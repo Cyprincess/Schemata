@@ -1,0 +1,9 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="GetModuleProjectName" Returns="@(ModuleProjectName)">
+    <ItemGroup>
+      <ModuleProjectName Include="$(AssemblyName)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

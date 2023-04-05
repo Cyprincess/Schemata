@@ -1,0 +1,33 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
+    <ProjectReference Include="..\..\generators\Schemata.DSL\Schemata.DSL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.props" Pack="true">
+      <PackagePath>build\$(AssemblyName).props</PackagePath>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.targets" Pack="true">
+      <PackagePath>build\$(AssemblyName).targets</PackagePath>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)Package.Build.props" Pack="true">
+      <PackagePath>build\Package.Build.props</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

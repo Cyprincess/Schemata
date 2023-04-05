@@ -1,0 +1,31 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata\Schemata.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
+    <ProjectReference Include="..\..\generators\Schemata.DSL\Schemata.DSL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseModularTargets)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Modular\Schemata.Modular.csproj" />
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Application.Modular.Targets.targets" Pack="true">
+      <PackagePath>build\$(AssemblyName).targets</PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup Condition=" '$(UseModularTargets)' == '' ">
+    <None Remove="Schemata.Application.Modular.Targets.targets" />
+  </ItemGroup>
+
+</Project>

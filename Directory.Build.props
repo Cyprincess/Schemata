@@ -1,0 +1,116 @@
+<Project>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+
+  <PropertyGroup>
+    <EnableSourceLink>false</EnableSourceLink>
+    <LangVersion>latest</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <NoWarn>$(NoWarn);CS1591;NU5118;NU5128</NoWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <ImplicitUsings>false</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <StrongNameKeyId>cyprin</StrongNameKeyId>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng\key.snk</AssemblyOriginatorKeyFile>
+    <DelaySign>false</DelaySign>
+    <PublicSign>false</PublicSign>
+    <PublicKey>
+      00240000048000009400000006020000002400005253413100040000010001005590ba6c1d0755ad2e1236b891d7281e3250322148c078e2de3e047e3e92a9f3d76e17849c24853d12af04b37ecff1ff892c98bf2879af294383b9158a3ce09edb75ce2e57f05db940fa3865b8e105355d9d8b3bf7b3ce4d82c7b18196d4149cac012847d43493424666cc3ca3c121972decae2fd577af739a5c8101fad68cc3
+    </PublicKey>
+    <PublicKeyToken>65af2e5d96893f11</PublicKeyToken>
+  </PropertyGroup>
+
+  <!--
+    These are set per-project so versioning is applied correctly, but are not set globally otherwise
+    the Arcade SDK will attempt to publish artifacts such as symbols to Microsoft's servers.
+  -->
+  <PropertyGroup
+      Condition=" '$(GITHUB_ACTIONS)' == 'true' AND '$(GITHUB_REF.StartsWith(`refs/pull/`))' == 'false' ">
+    <OfficialBuild>true</OfficialBuild>
+  </PropertyGroup>
+  <PropertyGroup
+      Condition=" '$(GITLAB_CI)' == 'true' AND '$(CI_PIPELINE_SOURCE.Contains(`_request_event`))' == 'false' ">
+    <OfficialBuild>true</OfficialBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(OfficialBuild)' == 'true' ">
+    <OfficialBuildId>$(_ComputedOfficialBuildId)</OfficialBuildId>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Maidy &amp; Cyprin Co., LTD.</Company>
+    <_ProjectCopyright>© Maidy &amp; Cyprin Co., LTD. All rights reserved.</_ProjectCopyright>
+
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)cyprin.png</PackageIconFullPath>
+    <PackageProjectUrl>https://github.com/Cypriness/Schemata</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>git://github.com/Cypriness/Schemata</RepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RepoRelativeProjectDir>$([MSBuild]::MakeRelative($(RepoRoot), $(MSBuildProjectDirectory)))</RepoRelativeProjectDir>
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+  </PropertyGroup>
+
+  <PropertyGroup
+      Condition=" $(RepoRelativeProjectDir.Contains('generators')) OR $(RepoRelativeProjectDir.Contains('targets')) ">
+    <IsPackable>true</IsPackable>
+    <IsShipping>true</IsShipping>
+    <SignAssembly>true</SignAssembly>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('src')) ">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSource>true</IncludeSource>
+    <IncludeSymbols>true</IncludeSymbols>
+    <IsPackable>true</IsPackable>
+    <IsShipping>true</IsShipping>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <SignAssembly>false</SignAssembly>
+  </PropertyGroup>
+  <ItemGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
+    <PackageReference Include="coverlet.msbuild">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <EnablePackageValidation>$(IsPackable)</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Include="DynamicDependentFile" />
+    <ProjectCapability Include="DynamicFileNesting" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(IsPackable)' == 'true' ">
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <SolutionReadmeFile>$(MSBuildThisFileDirectory)$(PackageReadmeFile)</SolutionReadmeFile>
+    <ProjectReadmeFile>$(MSBuildProjectDirectory)\$(PackageReadmeFile)</ProjectReadmeFile>
+    <ReadmeFile Condition=" Exists($(ProjectReadmeFile)) ">$(ProjectReadmeFile)</ReadmeFile>
+    <ReadmeFile Condition=" '$(ReadmeFile)' == '' ">$(SolutionReadmeFile)</ReadmeFile>
+  </PropertyGroup>
+  <ItemGroup Condition=" '$(IsPackable)' == 'true' ">
+    <None Remove="README.md" />
+    <None Include="$(ReadmeFile)" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Comprehensive Application Project Targets</Description>
+    <PackageTags>application;business;dsl;framework;generator;modular;tenancy</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UseModularTargets>true</UseModularTargets>
+    <UseDSLTargets>true</UseDSLTargets>
+  </PropertyGroup>
+
+</Project>

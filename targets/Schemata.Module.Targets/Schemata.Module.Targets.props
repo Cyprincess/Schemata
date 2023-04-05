@@ -1,0 +1,9 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)Package.Build.props" Pack="true">
+      <PackagePath>build\$(AssemblyName).props</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Modular Application Project Targets</Description>
+    <PackageTags>application;business;framework;modular</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UseModularTargets>true</UseModularTargets>
+  </PropertyGroup>
+
+</Project>

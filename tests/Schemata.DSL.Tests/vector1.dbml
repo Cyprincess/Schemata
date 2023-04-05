@@ -1,0 +1,146 @@
+
+; Mark = {Namespace | Enum | Entity | Trait}
+
+; Entity = "Entity" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Enum | Trait | Object | Index | Use | Field ] RC
+; Trait = "Trait" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Use | Field ] RC
+
+; Field = Type [ [WS] ? ] WS Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC {Note | Property} RC ]
+; Type = "String" | "Text" | "Integer" | "Int" | "Int32" | "Int4" | "Long" | "Int64" | "Int8" | "BigInteger" | "BigInt" | "Float" | "Double" | "Decimal" | "Boolean" | "DateTime" | "Timestamp" | "Guid" | Name
+; Option = "Required" | "Unique" | "PrimaryKey" | "Primary Key" | "AutoIncrement" | "Auto Increment" | "BTree" | "B Tree" | "Hash"
+; Property = ("Default" | "Length" | "Precision" | "Algorithm" | Key) WS Value
+; Value = String | QuotedString | Number | Boolean | MultilineString | Null
+
+; Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
+; EnumValue = Name [ [WS] = [WS] Value ] [ [WS] LC [Note] RC ]
+
+; Object = "Object" WS Name LC [ Note | ObjectField ] RC
+; ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note, ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function ) ]
+
+; Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
+
+; Note = "Note" WS Value
+
+; Use = "Use" WS Name { [WS] , [WS] Name }
+
+Namespace DSL.Tests.Vectors
+
+Trait Identifier {
+  Note 'Int64 Primary Key, it will generate an Interface.'
+  long id [primary key]
+}
+
+Trait Timestamp {
+  Note 'Entity Timestamp'
+
+  timestamp? creation_date {
+    Note 'All fields should named in snake_case,'
+    Note 'the generated property will use CamelCase.'
+  }
+  timestamp? modification_date
+}
+
+Trait Entity {
+  Use Identifier, Timestamp
+}
+
+Entity User {
+  Note 'This is a single-line comment, it goes to class summary XmlDoc'
+
+  Use Entity
+
+  string email_address [b tree]
+  string phone_number [b tree]
+  string password
+
+  string nickname
+
+  Object response {
+    id
+    nickname
+    email_address [omit] {
+      Note 'this field is omitted by default'
+    }
+    obfuscated_email_address [omit] {
+      Note '''a function call will generate a method in partial class,
+function call which has the first parameter named `self` will generate an instance method,
+without the specified parameter will generate a static method.'''
+    } = obfuscate(email_address)
+    phone_number [omit] {
+      Note '''all Object with omitted field will generate multi Record structs (isomers),
+for example, the User.Response Object will have 15 (1 + C[1,4] + C[2,4] + C[3,4]) isomers,
+they're all based on the one without any omitted field,
+isomers can be instantiated by calling static methods `User.Response.WithEmailAddress()`,
+`User.Response.WithPhoneNumber()`, ``User.Response.WithEmailAddressAndPhoneNumber()`, and etc.
+cuz Object(s) are Record(s), you can fill an isomer by using `with` keyword.'''
+    }
+    obfuscated_phone_number [omit] {
+      Note 'generate mapping methods can work well with service injection'
+    } = obfuscate(phone_number)
+  }
+}
+
+Entity Category {
+  Note '''This is a multi-line comment
+The comment goes to class summary XmlDoc'''
+
+  Use Entity
+
+  string Name [not null]
+
+  Object request {
+    name
+  }
+
+  Object response {
+    id
+    name
+    timestamp expiration_date {
+      Note 'unknown fields should have data type defined'
+    } = now()
+  }
+}
+
+Entity Post {
+; Entity Post : Entity {
+  Use Entity
+
+  Enum Status {
+    Draft {Note 'A draft is not public accessible'}
+    Published
+  }
+
+  long category_id
+  long user_id [
+    b tree
+  ]
+  Status status {default 'Published'}
+  string title {Note 'Title of the post'}
+  text body
+
+  Index category_id [b tree]
+
+  Object request {
+    Category.response category [omit all] {
+      Note '"omit all" will generate a new private Object isomer'
+      id
+    }
+    category_id [omit] = category.id
+    status
+    title
+    body
+  }
+
+  Object response {
+    Category.response category [omit all] {
+      id = category_id
+    }
+    User.response user [omit all] {
+      id {
+        Note 'Nested Object field xxx.yyy will be mapped to xxx_yyy automatically'
+      }
+    }
+    status
+    title
+    body
+  }
+}
