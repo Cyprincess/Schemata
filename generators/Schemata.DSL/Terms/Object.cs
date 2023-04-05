@@ -1,0 +1,53 @@
+using System.Collections.Generic;
+using Parlot;
+using static System.StringComparison;
+
+namespace Schemata.DSL.Terms;
+
+public class Object : TermBase
+{
+    public string Name { get; set; } = null!;
+
+    public Note? Note { get; set; }
+
+    public Dictionary<string, ObjectField>? Fields { get; set; }
+
+    // Object = "Object" WS Name LC [ Note | ObjectField ] RC
+    public static Object? Parse(Mark mark, Scanner scanner) {
+        if (!scanner.ReadText(nameof(Object), InvariantCultureIgnoreCase)) return null;
+
+        scanner.SkipWhiteSpace();
+
+        if (!scanner.ReadIdentifier(out var name)) {
+            throw new ParseException("Expected a name", scanner.Cursor.Position);
+        }
+
+        var @object = new Object { Name = name.GetText() };
+
+        SkipWhiteSpaceOrCommentOrNewLine(scanner);
+
+        if (scanner.ReadChar('{')) {
+            while (true) {
+                SkipWhiteSpaceOrCommentOrNewLine(scanner);
+                if (scanner.ReadChar('}')) break;
+
+                var note = Note.Parse(mark, scanner);
+                if (note != null) {
+                    @object.Note += note;
+                    continue;
+                }
+
+                var field = ObjectField.Parse(mark, scanner);
+                if (field != null) {
+                    @object.Fields ??= new Dictionary<string, ObjectField>();
+                    @object.Fields.Add(field.Name, field);
+                    continue;
+                }
+
+                throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
+            }
+        }
+
+        return @object;
+    }
+}

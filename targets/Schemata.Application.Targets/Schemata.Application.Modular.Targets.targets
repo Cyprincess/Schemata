@@ -1,0 +1,26 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="ResolveModuleProjectReferences" AfterTargets="AfterResolveReferences">
+    <MSBuild
+        Targets="GetModuleProjectName"
+        BuildInParallel="$(BuildInParallel)"
+        Projects="@(_MSBuildProjectReferenceExistent)"
+        Condition="'@(_MSBuildProjectReferenceExistent)' != ''"
+        SkipNonexistentTargets="true"
+        ContinueOnError="true">
+
+      <Output ItemName="ModuleProjectNames" TaskParameter="TargetOutputs" />
+    </MSBuild>
+
+    <ItemGroup>
+      <ModuleNames Include="@(ModulePackageNames);@(ModuleProjectNames)" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AssemblyAttribute Include="Schemata.Abstractions.Modular.ModuleAttribute" Condition="'@(ModuleNames)' != ''">
+        <_Parameter1>%(ModuleNames.Identity)</_Parameter1>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
+</Project>
