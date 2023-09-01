@@ -10,6 +10,7 @@ public interface ISimpleFeature : IFeature
 {
     public void ConfigureServices(
         IServiceCollection  services,
+        Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment);
 

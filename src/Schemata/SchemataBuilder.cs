@@ -2,7 +2,6 @@ using System;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Schemata;
 
@@ -12,16 +11,27 @@ public class SchemataBuilder
 
     public readonly IConfiguration      Configuration;
     public readonly IWebHostEnvironment Environment;
+    public readonly SchemataOptions     Options;
 
-    public SchemataBuilder(IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment) {
-        _services     = services;
+    public readonly Configurators Configurators;
+
+    public SchemataBuilder(
+        IServiceCollection  services,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment,
+        SchemataOptions     options) {
+        _services = services;
+
         Configuration = configuration;
         Environment   = environment;
+        Options       = options;
+
+        Configurators = new Configurators();
     }
 
     public SchemataBuilder Configure<TOptions>(Action<TOptions>? configure)
         where TOptions : class {
-        return Configure(Options.DefaultName, configure);
+        return Configure(Microsoft.Extensions.Options.Options.DefaultName, configure);
     }
 
     public SchemataBuilder Configure<TOptions>(string name, Action<TOptions>? configure)

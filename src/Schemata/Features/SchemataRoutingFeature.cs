@@ -9,11 +9,18 @@ public class SchemataRoutingFeature : FeatureBase
 {
     public override int Priority => 150_000_000;
 
-    public override void ConfigureServices(IServiceCollection services, IConfiguration conf, IWebHostEnvironment env) {
+    public override void ConfigureServices(
+        IServiceCollection  services,
+        Configurators       configurators,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         services.AddRouting();
     }
 
-    public override void Configure(IApplicationBuilder app, IConfiguration conf, IWebHostEnvironment env) {
+    public override void Configure(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         app.UseRouting();
     }
 }

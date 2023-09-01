@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Modular;
 
@@ -18,9 +21,16 @@ public class ModularStartup : IStartupFilter
     }
 
     public static ModularStartup Create(
-        IModulesRunner      runner,
+        SchemataOptions     options,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment,
+        IServiceProvider    provider) {
+        var providers = provider.GetRequiredService<IEnumerable<IModulesProvider>>();
+        var modules   = providers.SelectMany(p => p.GetModules()).ToList();
+        options.SetModules(modules);
+
+        var runner = provider.GetRequiredService<IModulesRunner>();
+
         return new ModularStartup(runner, configuration, environment);
     }
 

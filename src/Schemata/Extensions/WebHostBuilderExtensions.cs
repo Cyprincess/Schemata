@@ -17,15 +17,10 @@ public static class WebHostBuilderExtensions
     }
 
     public static IWebHostBuilder UseSchemata(
-        this IWebHostBuilder builder,
+        this IWebHostBuilder     builder,
         Action<SchemataBuilder>? schema,
         Action<SchemataOptions>? configure) {
         builder.ConfigureServices((context, services) => {
-            services.TryAddEnumerableSingleton<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create( // 
-                context.Configuration, // avoid using dependency injection
-                context.HostingEnvironment // to resolve IConfiguration and IWebHostEnvironment
-            ));
-
             services.AddSchemata(context.Configuration, context.HostingEnvironment, schema, configure);
         });
 

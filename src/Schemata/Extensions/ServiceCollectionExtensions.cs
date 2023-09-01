@@ -5,9 +5,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 using Schemata;
-using Schemata.Features;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -66,9 +64,16 @@ public static class ServiceCollectionExtensions
         IWebHostEnvironment      environment,
         Action<SchemataBuilder>? schema,
         Action<SchemataOptions>? configure) {
-        var builder = new SchemataBuilder(services, configuration, environment);
+        services.TryAddEnumerableSingleton<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(
+            configuration, //
+            environment    //
+        ));
 
-        builder.Configure(configure);
+        var options = new SchemataOptions();
+        configure?.Invoke(options);
+        services.AddSingleton(options);
+
+        var builder = new SchemataBuilder(services, configuration, environment, options);
 
         schema?.Invoke(builder);
 
@@ -79,19 +84,15 @@ public static class ServiceCollectionExtensions
 
     private static void AddFeatures(SchemataBuilder builder) {
         builder.ConfigureServices(services => {
-            using var sp = services.BuildServiceProvider();
-
-            var options = sp.GetRequiredService<IOptions<SchemataOptions>>().Value;
-
-            var modules = options.GetFeatures();
+            var modules = builder.Options.GetFeatures();
             if (modules is null) return;
 
-            var features = modules.Select(m => (ISimpleFeature)ActivatorUtilities.CreateInstance(sp, m)!).ToList();
+            var features = modules.ToList();
 
             features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
             foreach (var feature in features) {
-                feature.ConfigureServices(services, builder.Configuration, builder.Environment);
+                feature.ConfigureServices(services, builder.Configurators, builder.Configuration, builder.Environment);
             }
         });
     }

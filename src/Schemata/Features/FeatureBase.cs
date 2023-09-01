@@ -11,7 +11,14 @@ public abstract class FeatureBase : ISimpleFeature
 
     public virtual int Priority => int.MaxValue;
 
-    public virtual void ConfigureServices(IServiceCollection services, IConfiguration conf, IWebHostEnvironment env) { }
+    public virtual void ConfigureServices(
+        IServiceCollection  services,
+        Configurators       configurators,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) { }
 
-    public virtual void Configure(IApplicationBuilder app, IConfiguration conf, IWebHostEnvironment env) { }
+    public virtual void Configure(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) { }
 }

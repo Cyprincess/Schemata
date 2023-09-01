@@ -8,7 +8,10 @@ public class SchemataStaticFilesFeature : FeatureBase
 {
     public override int Priority => 130_000_000;
 
-    public override void Configure(IApplicationBuilder app, IConfiguration conf, IWebHostEnvironment env) {
+    public override void Configure(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         app.UseStaticFiles();
     }
 }
