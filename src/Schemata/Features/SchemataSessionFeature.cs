@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -10,17 +9,19 @@ public class SchemataSessionFeature : FeatureBase
 {
     public override int Priority => 180_000_000;
 
-    private readonly Action<SessionOptions> _configure;
-
-    public SchemataSessionFeature(Action<SessionOptions> configure) {
-        _configure = configure;
+    public override void ConfigureServices(
+        IServiceCollection  services,
+        Configurators       configurators,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
+        var configure = configurators.Get<SessionOptions>();
+        services.AddSession(configure);
     }
 
-    public override void ConfigureServices(IServiceCollection services, IConfiguration conf, IWebHostEnvironment env) {
-        services.AddSession(_configure);
-    }
-
-    public override void Configure(IApplicationBuilder app, IConfiguration conf, IWebHostEnvironment env) {
+    public override void Configure(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         app.UseSession();
     }
 }

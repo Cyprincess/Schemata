@@ -17,7 +17,7 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseDeveloperExceptionPage(this SchemataBuilder builder) {
         builder.Configure((SchemataOptions options) => {
-            options.AddFeature(typeof(SchemataDeveloperExceptionPageFeature));
+            options.AddFeature<SchemataDeveloperExceptionPageFeature>();
         });
 
         return builder;
@@ -28,7 +28,7 @@ public static class SchemataBuilderExtensions
     #region HTTPS Feature
 
     public static SchemataBuilder UseHttps(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataHttpsFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataHttpsFeature>(); });
 
         return builder;
     }
@@ -38,7 +38,7 @@ public static class SchemataBuilderExtensions
     #region Static Files Feature
 
     public static SchemataBuilder UseStaticFiles(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataStaticFilesFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataStaticFilesFeature>(); });
 
         return builder;
     }
@@ -50,12 +50,10 @@ public static class SchemataBuilderExtensions
     public static SchemataBuilder UseCookiePolicy(
         this SchemataBuilder         builder,
         Action<CookiePolicyOptions>? configure = null) {
-        builder.ConfigureServices(services => {
-            configure ??= _ => { };
-            services.TryAddSingleton(configure);
-        });
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataCookiePolicyFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataCookiePolicyFeature>(); });
 
         return builder;
     }
@@ -65,7 +63,7 @@ public static class SchemataBuilderExtensions
     #region Routing Feature
 
     public static SchemataBuilder UseRouting(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataRoutingFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataRoutingFeature>(); });
 
         return builder;
     }
@@ -75,12 +73,10 @@ public static class SchemataBuilderExtensions
     #region CORS Feature
 
     public static SchemataBuilder UseCors(this SchemataBuilder builder, Action<CorsOptions>? configure = null) {
-        builder.ConfigureServices(services => {
-            configure ??= _ => { };
-            services.TryAddSingleton(configure);
-        });
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataCorsFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataCorsFeature>(); });
 
         return builder;
     }
@@ -117,18 +113,16 @@ public static class SchemataBuilderExtensions
         Action<AuthenticationBuilder>? build,
         Action<AuthenticationOptions>? authenticate,
         Action<AuthorizationOptions>?  authorize) {
-        builder.ConfigureServices(services => {
-            build ??= _ => { };
-            services.TryAddSingleton(build);
+        build ??= _ => { };
+        builder.Configurators.TryAdd(build);
 
-            authenticate ??= _ => { };
-            services.TryAddSingleton(authenticate);
+        authenticate ??= _ => { };
+        builder.Configurators.TryAdd(authenticate);
 
-            authorize ??= _ => { };
-            services.TryAddSingleton(authorize);
-        });
+        authorize ??= _ => { };
+        builder.Configurators.TryAdd(authorize);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataAuthenticationFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataAuthenticationFeature>(); });
 
         return builder;
     }
@@ -143,14 +137,12 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseSession<T>(this SchemataBuilder builder, Action<SessionOptions>? configure = null)
         where T : class, ISessionStore {
-        builder.ConfigureServices(services => {
-            configure ??= _ => { };
-            services.TryAddSingleton(configure);
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
 
-            services.TryAddTransient<ISessionStore, T>();
-        });
+        builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature(typeof(SchemataSessionFeature)); });
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataSessionFeature>(); });
 
         return builder;
     }

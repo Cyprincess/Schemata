@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -10,9 +9,8 @@ public interface IModulesRunner
 {
     public void ConfigureServices(
         IServiceCollection  services,
-        IConfiguration      conf,
-        IWebHostEnvironment env,
-        IServiceProvider    provider);
+        IConfiguration      configuration,
+        IWebHostEnvironment environment);
 
     public void Configure(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 }

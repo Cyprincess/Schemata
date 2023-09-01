@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
@@ -11,17 +10,19 @@ public class SchemataCorsFeature : FeatureBase
 {
     public override int Priority => 160_000_000;
 
-    private readonly Action<CorsOptions> _configure;
-
-    public SchemataCorsFeature(Action<CorsOptions> configure) {
-        _configure = configure;
+    public override void ConfigureServices(
+        IServiceCollection  services,
+        Configurators       configurators,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
+        var configure = configurators.Get<CorsOptions>();
+        services.AddCors(configure);
     }
 
-    public override void ConfigureServices(IServiceCollection services, IConfiguration conf, IWebHostEnvironment env) {
-        services.AddCors(_configure);
-    }
-
-    public override void Configure(IApplicationBuilder app, IConfiguration conf, IWebHostEnvironment env) {
+    public override void Configure(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         app.UseCors();
     }
 }

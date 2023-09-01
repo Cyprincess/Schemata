@@ -1,13 +1,10 @@
 // ReSharper disable CheckNamespace
 
-using System;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata;
-using Schemata.Features;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -19,7 +16,7 @@ public static class ApplicationBuilderExtensions
         IWebHostEnvironment      environment) {
         var sp = app.ApplicationServices;
 
-        var options = sp.GetRequiredService<IOptions<SchemataOptions>>().Value;
+        var options = sp.GetRequiredService<SchemataOptions>();
 
         UseFeatures(app, configuration, environment, options);
 
@@ -36,7 +33,7 @@ public static class ApplicationBuilderExtensions
 
         var sp = app.ApplicationServices;
 
-        var features = modules.Select(m => (ISimpleFeature)ActivatorUtilities.CreateInstance(sp, m)!).ToList();
+        var features = modules.ToList();
 
         features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
