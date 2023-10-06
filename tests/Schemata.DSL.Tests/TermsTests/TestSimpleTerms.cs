@@ -3,7 +3,7 @@ using Parlot;
 using Schemata.DSL.Terms;
 using Xunit;
 
-namespace Schemata.DSL.Tests;
+namespace Schemata.DSL.Tests.TermsTests;
 
 public class TestSimpleTerms
 {
@@ -39,7 +39,7 @@ public class TestSimpleTerms
         var mark    = new Mark();
         var scanner = new Scanner(syntax);
         var term    = Value.Parse(mark, scanner);
-        Assert.Equal(expected, term.Body);
+        Assert.Equal(expected, term?.Body);
     }
 
     [Fact]
@@ -48,6 +48,33 @@ public class TestSimpleTerms
         var scanner = new Scanner("note \"Hello World\"");
         var term    = Note.Parse(mark, scanner);
         Assert.Equal("Hello World", term?.Comment);
+    }
+
+    [Theory]
+    [InlineData(Constants.Options.AutoIncrement, Constants.Options.AutoIncrement)]
+    [InlineData("auto_increment", Constants.Options.AutoIncrement)]
+    [InlineData("auto increment", Constants.Options.AutoIncrement)]
+    [InlineData(Constants.Options.PrimaryKey, Constants.Options.PrimaryKey)]
+    [InlineData("primary_key", Constants.Options.PrimaryKey)]
+    [InlineData("primary key", Constants.Options.PrimaryKey)]
+    [InlineData(Constants.Options.NotNull, Constants.Options.Required)]
+    [InlineData("not_null", Constants.Options.Required)]
+    [InlineData("not null", Constants.Options.Required)]
+    [InlineData(Constants.Options.Required, Constants.Options.Required)]
+    [InlineData(Constants.Options.Unique, Constants.Options.Unique)]
+    [InlineData(Constants.Options.BTree, Constants.Options.BTree)]
+    [InlineData("b_tree", Constants.Options.BTree)]
+    [InlineData("b tree", Constants.Options.BTree)]
+    [InlineData(Constants.Options.Hash, Constants.Options.Hash)]
+    [InlineData(Constants.Options.Omit, Constants.Options.Omit)]
+    [InlineData(Constants.Options.OmitAll, Constants.Options.OmitAll)]
+    [InlineData("omit_all", Constants.Options.OmitAll)]
+    [InlineData("omit all", Constants.Options.OmitAll)]
+    public void ShouldParseOption(string syntax, string expected) {
+        var mark    = new Mark();
+        var scanner = new Scanner(syntax);
+        var term    = Option.Parse(mark, scanner);
+        Assert.Equal(expected, term?.Name);
     }
 
     [Theory]

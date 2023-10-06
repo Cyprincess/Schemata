@@ -6,24 +6,32 @@ public class EnumValue : TermBase
 {
     public string Name { get; set; } = null!;
 
-    public string? Body { get; set; }
+    public string Body { get; set; } = null!;
 
     public Note? Note { get; set; }
 
-    // EnumValue = Name [ [WS] = [WS] Value ] [ [WS] LC [Note] RC ]
+    // EnumValue = Name [ [WS] EQ [WS] Value ] [ [WS] LC [Note] RC ]
     public static EnumValue? Parse(Mark mark, Scanner scanner) {
         if (!scanner.ReadIdentifier(out var name)) {
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }
 
-        var @enum = new EnumValue { Name = name.GetText() };
+        SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
-        scanner.SkipWhiteSpace();
+        var identifier = name.GetText();
 
+        string? body = null;
         if (scanner.ReadChar('=')) {
+            SkipWhiteSpaceOrCommentOrNewLine(scanner);
             var value = Value.Parse(mark, scanner);
-            @enum.Body = value.Body;
+            if (value == null) {
+                throw new ParseException("Expected a value", scanner.Cursor.Position);
+            }
+
+            body = value.Body;
         }
+
+        var @enum = new EnumValue { Name = identifier, Body = body ?? identifier };
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 

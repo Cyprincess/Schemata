@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Parlot;
 using static System.StringComparison;
@@ -45,95 +46,97 @@ public class Entity : TermBase
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
-        if (scanner.ReadChar('{')) {
-            while (true) {
-                SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+        if (!scanner.ReadChar('{')) {
+            throw new ParseException($"Expected {typeof(T).Name} definition", scanner.Cursor.Position);
+        }
 
-                var note = Note.Parse(mark, scanner);
-                if (note != null) {
-                    table.Note += note;
-                    continue;
-                }
+        while (true) {
+            SkipWhiteSpaceOrCommentOrNewLine(scanner);
+            if (scanner.ReadChar('}')) break;
 
-                if (table.ParseEnum(mark, scanner)) {
-                    continue;
-                }
-
-                if (table.ParseTrait(mark, scanner)) {
-                    continue;
-                }
-
-                if (table.ParseObject(mark, scanner)) {
-                    continue;
-                }
-
-                if (table.ParseIndex(mark, scanner)) {
-                    continue;
-                }
-
-                var uses = Use.Parse(mark, scanner);
-                if (uses != null) {
-                    table.Uses ??= new List<Use>();
-                    foreach (var use in uses) {
-                        table.Uses.Add(use);
-
-                        // TODO: move to Generator
-                        var entity = mark.Traits?[use.Name];
-                        if (entity == null) {
-                            throw new ParseException($"Unknown trait {use.Name}", scanner.Cursor.Position);
-                        }
-
-                        if (entity.Fields != null) {
-                            table.Fields ??= new Dictionary<string, Field>();
-                            foreach (var kv in entity.Fields) {
-                                if (table.Fields.ContainsKey(kv.Key)) {
-                                    throw new ParseException($"Duplicate field name {kv.Key}", scanner.Cursor.Position);
-                                }
-
-                                table.Fields.Add(kv.Key, kv.Value);
-                            }
-                        }
-
-                        if (entity.Indices != null) {
-                            table.Indices ??= new Dictionary<string, Index>();
-                            foreach (var kv in entity.Indices) {
-                                if (table.Indices.ContainsKey(kv.Key)) {
-                                    throw new ParseException($"Duplicate index name {kv.Key}", scanner.Cursor.Position);
-                                }
-
-                                table.Indices.Add(kv.Key, kv.Value);
-                            }
-                        }
-
-                        if (entity.Keys != null) {
-                            table.Keys ??= new Dictionary<string, Field>();
-                            foreach (var kv in entity.Keys) {
-                                if (table.Keys.ContainsKey(kv.Key)) {
-                                    throw new ParseException($"Duplicate key name {kv.Key}", scanner.Cursor.Position);
-                                }
-
-                                table.Keys.Add(kv.Key, kv.Value);
-                            }
-                        }
-                    }
-
-                    continue;
-                }
-
-                var field = Field.Parse(mark, table, scanner);
-                if (field != null) {
-                    table.Fields ??= new Dictionary<string, Field>();
-                    if (table.Fields.ContainsKey(field.Name)) {
-                        throw new ParseException($"Duplicate field name {field.Name}", scanner.Cursor.Position);
-                    }
-
-                    table.Fields.Add(field.Name, field);
-                    continue;
-                }
-
-                throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
+            var note = Note.Parse(mark, scanner);
+            if (note != null) {
+                table.Note += note;
+                continue;
             }
+
+            if (table.ParseEnum(mark, scanner)) {
+                continue;
+            }
+
+            if (table.ParseTrait(mark, scanner)) {
+                continue;
+            }
+
+            if (table.ParseObject(mark, scanner)) {
+                continue;
+            }
+
+            if (table.ParseIndex(mark, scanner)) {
+                continue;
+            }
+
+            var uses = Use.Parse(mark, scanner);
+            if (uses != null) {
+                table.Uses ??= new List<Use>();
+                foreach (var use in uses) {
+                    table.Uses.Add(use);
+
+                    // TODO: move to Generator
+                    var entity = mark.Traits?[use.Name];
+                    if (entity == null) {
+                        throw new ParseException($"Unknown trait {use.Name}", scanner.Cursor.Position);
+                    }
+
+                    if (entity.Fields != null) {
+                        table.Fields ??= new Dictionary<string, Field>();
+                        foreach (var kv in entity.Fields) {
+                            if (table.Fields.ContainsKey(kv.Key)) {
+                                throw new ParseException($"Duplicate field name {kv.Key}", scanner.Cursor.Position);
+                            }
+
+                            table.Fields.Add(kv.Key, kv.Value);
+                        }
+                    }
+
+                    if (entity.Indices != null) {
+                        table.Indices ??= new Dictionary<string, Index>();
+                        foreach (var kv in entity.Indices) {
+                            if (table.Indices.ContainsKey(kv.Key)) {
+                                throw new ParseException($"Duplicate index name {kv.Key}", scanner.Cursor.Position);
+                            }
+
+                            table.Indices.Add(kv.Key, kv.Value);
+                        }
+                    }
+
+                    if (entity.Keys != null) {
+                        table.Keys ??= new Dictionary<string, Field>();
+                        foreach (var kv in entity.Keys) {
+                            if (table.Keys.ContainsKey(kv.Key)) {
+                                throw new ParseException($"Duplicate key name {kv.Key}", scanner.Cursor.Position);
+                            }
+
+                            table.Keys.Add(kv.Key, kv.Value);
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            var field = Field.Parse(mark, table, scanner);
+            if (field != null) {
+                table.Fields ??= new Dictionary<string, Field>();
+                if (table.Fields.ContainsKey(field.Name)) {
+                    throw new ParseException($"Duplicate field name {field.Name}", scanner.Cursor.Position);
+                }
+
+                table.Fields.Add(field.Name, field);
+                continue;
+            }
+
+            throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
         }
 
         return table;
@@ -186,7 +189,7 @@ public class Entity : TermBase
         if (Indices.TryGetValue(index.Name, out var origin)) {
             try {
                 index = origin + index;
-            } catch (System.NotSupportedException) {
+            } catch (NotSupportedException) {
                 throw new ParseException($"Duplicate index name {index.Name}", scanner.Cursor.Position);
             }
         }

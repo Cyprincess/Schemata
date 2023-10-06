@@ -2,7 +2,7 @@ using System;
 
 namespace Schemata.Abstractions.Modular;
 
-[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
 public class ModuleAttribute : Attribute
 {
     public ModuleAttribute(string? name) {

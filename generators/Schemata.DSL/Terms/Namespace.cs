@@ -13,7 +13,7 @@ public class Namespace : TermBase
 
         scanner.SkipWhiteSpace();
 
-        if (!ReadIdentifier(scanner, out var name)) {
+        if (!ReadNamespacedIdentifier(scanner, out var name)) {
             throw new ParseException("Expected a full-qualified name", scanner.Cursor.Position);
         }
 

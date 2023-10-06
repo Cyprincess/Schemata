@@ -11,10 +11,10 @@
 ; Value = String | QuotedString | Number | Boolean | MultilineString | Null
 
 ; Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
-; EnumValue = Name [ [WS] = [WS] Value ] [ [WS] LC [Note] RC ]
+; EnumValue = Name [ [WS] EQ [WS] Value ] [ [WS] LC [Note] RC ]
 
 ; Object = "Object" WS Name LC [ Note | ObjectField ] RC
-; ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note, ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function ) ]
+; ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Function | Ref | Value ) ]
 
 ; Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
 

@@ -17,15 +17,7 @@ public class DefaultModulesRunner : IModulesRunner
         _options = options;
     }
 
-    public static DefaultModulesRunner Create(
-        SchemataOptions     options,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment,
-        IServiceCollection  services) {
-        var runner = new DefaultModulesRunner(options);
-        runner.ConfigureServices(services, configuration, environment);
-        return runner;
-    }
+    #region IModulesRunner Members
 
     public void ConfigureServices(
         IServiceCollection  services,
@@ -63,5 +55,17 @@ public class DefaultModulesRunner : IModulesRunner
         foreach (var startup in startups) {
             InvokerUtilities.CallMethod(sp, startup, nameof(Configure), app, configuration, environment);
         }
+    }
+
+    #endregion
+
+    public static DefaultModulesRunner Create(
+        SchemataOptions     options,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment,
+        IServiceCollection  services) {
+        var runner = new DefaultModulesRunner(options);
+        runner.ConfigureServices(services, configuration, environment);
+        return runner;
     }
 }

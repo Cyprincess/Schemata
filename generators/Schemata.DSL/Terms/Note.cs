@@ -14,8 +14,11 @@ public class Note : TermBase
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
         var value = Value.Parse(mark, scanner);
+        if (value == null) {
+            throw new ParseException("Expected a value", scanner.Cursor.Position);
+        }
 
-        EnsureLineEnd(scanner);
+        EnsureLineEnd(scanner, true);
 
         return new Note { Comment = value.Body };
     }

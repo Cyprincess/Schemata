@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Parlot;
@@ -63,10 +64,14 @@ public class Index : TermBase
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
                 if (scanner.ReadChar('}')) break;
 
-                var note = Note.Parse(mark, scanner);
-                if (note != null) {
-                    index.Note += note;
+                var property = Property.Parse(mark, scanner);
+                if (property?.Name == nameof(Note)) {
+                    index.Note += new Note { Comment = property.Body };
                     continue;
+                }
+
+                if (property != null) {
+                    throw new ParseException($"Invalid property {property.Name}", scanner.Cursor.Position);
                 }
 
                 throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
@@ -78,7 +83,7 @@ public class Index : TermBase
 
     public static Index operator +(Index a, Index b) {
         if (a.Name != b.Name || a.Table != b.Table || !a.Fields.SequenceEqual(b.Fields)) {
-            throw new System.NotSupportedException("Unexpected merge operation between two Index");
+            throw new NotSupportedException("Unexpected merge operation between two Index");
         }
 
         if (a.Options == null) return b;

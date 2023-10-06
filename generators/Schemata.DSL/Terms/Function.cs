@@ -5,7 +5,7 @@ namespace Schemata.DSL.Terms;
 
 public class Function : ValueTermBase
 {
-    public List<string>? Parameters { get; set; }
+    public List<ValueTermBase>? Parameters { get; set; }
 
     // Function = Name [WS] LP [ [WS] Name { [WS] , [WS] Name } ] RP
     public static Function? Parse(Mark mark, Scanner scanner) {
@@ -26,12 +26,18 @@ public class Function : ValueTermBase
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
             if (scanner.ReadChar(')')) break;
 
-            if (!scanner.ReadIdentifier(out var parameter)) {
-                throw new ParseException("Expected a parameter name", scanner.Cursor.Position);
+            function.Parameters ??= new List<ValueTermBase>();
+
+            var value = Value.Parse(mark, scanner);
+            if (value == null) {
+                throw new ParseException("Expected a parameter name or an expression", scanner.Cursor.Position);
             }
 
-            function.Parameters ??= new List<string>();
-            function.Parameters.Add(parameter.GetText());
+            if (value.Type == typeof(object)) {
+                function.Parameters.Add(new Ref { Body = value.Body });
+            } else {
+                function.Parameters.Add(value);
+            }
 
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
             scanner.ReadChar(',');

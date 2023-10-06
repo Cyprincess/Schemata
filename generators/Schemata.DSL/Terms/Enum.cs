@@ -25,14 +25,15 @@ public class Enum : TermBase
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
         if (!scanner.ReadChar('{')) {
-            throw new ParseException($"Expected start of square bracket, ‘{scanner.Cursor.Current}’ given",
-                scanner.Cursor.Position);
+            throw new ParseException("Expected Enum definition", scanner.Cursor.Position);
         }
 
         var @enum = new Enum { Name = name.GetText() };
 
         while (true) {
+            scanner.ReadChar(',');
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
+
             if (scanner.ReadChar('}')) break;
 
             var note = Note.Parse(mark, scanner);
@@ -42,20 +43,21 @@ public class Enum : TermBase
             }
 
             var value = EnumValue.Parse(mark, scanner);
-            if (value != null) {
-                @enum.Values ??= new Dictionary<string, EnumValue>();
-                if (@enum.Values.ContainsKey(value.Name)) {
-                    throw new ParseException($"Duplicate value {value.Name}", scanner.Cursor.Position);
-                }
-
-                @enum.Values.Add(value.Name, value);
-                continue;
+            if (value == null) {
+                throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
             }
 
-            throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
+            @enum.Values ??= new Dictionary<string, EnumValue>();
+            if (@enum.Values.ContainsKey(value.Name)) {
+                throw new ParseException($"Duplicate value {value.Name}", scanner.Cursor.Position);
+            }
+
+            @enum.Values.Add(value.Name, value);
+
+            SkipWhiteSpaceOrCommentOrNewLine(scanner);
         }
 
-        if (@enum.Values?.Count <= 0) {
+        if (@enum.Values is null or { Count: <= 0 }) {
             throw new ParseException("Expected at least one enum value", scanner.Cursor.Position);
         }
 
