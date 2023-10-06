@@ -22,7 +22,7 @@ public class Parser
 
         var text = await reader.ReadToEndAsync();
 
-        return new Parser(text);
+        return Read(text);
     }
 
     // Mark = {Namespace | Enum | Entity | Trait}

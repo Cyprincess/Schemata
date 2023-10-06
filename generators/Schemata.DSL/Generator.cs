@@ -6,6 +6,8 @@ namespace Schemata.DSL;
 [Generator]
 public class Generator : IIncrementalGenerator
 {
+    #region IIncrementalGenerator Members
+
     public void Initialize(IncrementalGeneratorInitializationContext context) {
         // define the execution pipeline here via a series of transformations:
 
@@ -31,4 +33,6 @@ public static partial class ConstStrings
 }}");
         });
     }
+
+    #endregion
 }

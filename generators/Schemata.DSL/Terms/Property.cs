@@ -4,7 +4,13 @@ namespace Schemata.DSL.Terms;
 
 public class Property : TermBase
 {
-    public string Name { get; set; } = null!;
+    private string _name = null!;
+
+    public string Name
+    {
+        get => _name;
+        set => _name = ToCamelCase(value);
+    }
 
     public string Body { get; set; } = null!;
 
@@ -15,6 +21,9 @@ public class Property : TermBase
         scanner.SkipWhiteSpace();
 
         var value = Value.Parse(mark, scanner);
+        if (value == null) {
+            throw new ParseException("Expected a value", scanner.Cursor.Position);
+        }
 
         EnsureLineEnd(scanner, true);
 

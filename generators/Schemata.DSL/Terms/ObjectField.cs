@@ -19,9 +19,9 @@ public class ObjectField : TermBase
 
     public Dictionary<string, ObjectField>? Fields { get; set; }
 
-    // ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note, ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function ) ]
+    // ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function | Ref ) ]
     public static ObjectField? Parse(Mark mark, Scanner scanner) {
-        if (!ReadIdentifier(scanner, out var type)) return null;
+        if (!ReadNamespacedIdentifier(scanner, out var type)) return null;
 
         scanner.SkipWhiteSpace();
 
@@ -86,10 +86,14 @@ public class ObjectField : TermBase
             var function = Function.Parse(mark, scanner);
             if (function != null) {
                 field.Map = function;
-            } else if (ReadIdentifier(scanner, out var token)) {
+            } else if (ReadNamespacedIdentifier(scanner, out var token)) {
                 field.Map = new Ref { Body = token.GetText() };
             } else {
                 field.Map = Value.Parse(mark, scanner);
+            }
+
+            if (field.Map == null) {
+                throw new ParseException("Expected an expression", scanner.Cursor.Position);
             }
         }
 

@@ -9,11 +9,11 @@ public class SchemataBuilder
 {
     private readonly IServiceCollection _services;
 
-    public readonly IConfiguration      Configuration;
+    public readonly IConfiguration Configuration;
+
+    public readonly Configurators       Configurators;
     public readonly IWebHostEnvironment Environment;
     public readonly SchemataOptions     Options;
-
-    public readonly Configurators Configurators;
 
     public SchemataBuilder(
         IServiceCollection  services,

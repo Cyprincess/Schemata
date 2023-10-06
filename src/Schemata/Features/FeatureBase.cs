@@ -7,6 +7,8 @@ namespace Schemata.Features;
 
 public abstract class FeatureBase : ISimpleFeature
 {
+    #region ISimpleFeature Members
+
     public virtual int Order => Priority;
 
     public virtual int Priority => int.MaxValue;
@@ -21,4 +23,6 @@ public abstract class FeatureBase : ISimpleFeature
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) { }
+
+    #endregion
 }

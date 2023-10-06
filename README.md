@@ -44,7 +44,7 @@ app.Run();
 
 ## Features
 
-- DSL
+- [DSL](generators/Schemata.DSL)
 - Audit
 - Datasource
 - Event

@@ -2,6 +2,8 @@ namespace Schemata.DSL;
 
 public static class Constants
 {
+    #region Nested type: Options
+
     public static class Options
     {
         public const string AutoIncrement = "AutoIncrement";
@@ -17,6 +19,22 @@ public static class Constants
         public const string Omit    = "Omit";
         public const string OmitAll = "OmitAll";
     }
+
+    #endregion
+
+    #region Nested type: Properties
+
+    public static class Properties
+    {
+        public const string Default   = "Default";
+        public const string Length    = "Length";
+        public const string Precision = "Precision";
+        public const string Algorithm = "Algorithm";
+    }
+
+    #endregion
+
+    #region Nested type: Types
 
     public static class Types
     {
@@ -40,11 +58,5 @@ public static class Constants
         public const string Guid       = "Guid";
     }
 
-    public static class Properties
-    {
-        public const string Default   = "Default";
-        public const string Length    = "Length";
-        public const string Precision = "Precision";
-        public const string Algorithm = "Algorithm";
-    }
+    #endregion
 }

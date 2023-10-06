@@ -8,7 +8,7 @@ public class TestParser
 {
     [Fact]
     public async Task ParseExample1() {
-        var file       = File.OpenRead("vector1.dbml");
+        var file       = File.OpenRead("vector1.skm");
         var parser     = await Parser.ReadAsync(file);
         var expression = parser.Parse();
     }

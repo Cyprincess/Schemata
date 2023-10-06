@@ -7,7 +7,7 @@ namespace Schemata.DSL.Terms;
 
 public abstract class TermBase
 {
-    protected static bool ReadIdentifier(Scanner scanner, out TokenResult result) {
+    protected static bool ReadNamespacedIdentifier(Scanner scanner, out TokenResult result) {
         return scanner.ReadFirstThenOthers(static x => Character.IsIdentifierStart(x),
             static x => x == '.' || Character.IsIdentifierPart(x), out result);
     }
@@ -39,6 +39,12 @@ public abstract class TermBase
         }
     }
 
+    protected static void SkipWhiteSpaceOrComment(Scanner scanner) {
+        do {
+            SkipComment(scanner);
+        } while (scanner.SkipWhiteSpace());
+    }
+
     protected static void SkipWhiteSpaceOrCommentOrNewLine(Scanner scanner) {
         do {
             SkipComment(scanner);
@@ -46,10 +52,10 @@ public abstract class TermBase
     }
 
     protected static void EnsureLineEnd(Scanner scanner, bool allowBracket = false) {
-        SkipComment(scanner);
+        SkipWhiteSpaceOrComment(scanner);
 
         var position = scanner.Cursor.Position;
-        if (!scanner.ReadNonWhiteSpaceOrNewLine(out var result)) return;
+        if (!scanner.ReadWhile(x => !Character.IsNewLine(x), out var result)) return;
 
         if (allowBracket && result.Span[0] == '}') {
             scanner.Cursor.ResetPosition(position);

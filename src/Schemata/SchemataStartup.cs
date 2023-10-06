@@ -15,9 +15,7 @@ public class SchemataStartup : IStartupFilter
         _environment   = environment;
     }
 
-    public static SchemataStartup Create(IConfiguration configuration, IWebHostEnvironment environment) {
-        return new SchemataStartup(configuration, environment);
-    }
+    #region IStartupFilter Members
 
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) {
         return app => {
@@ -25,5 +23,11 @@ public class SchemataStartup : IStartupFilter
 
             next(app);
         };
+    }
+
+    #endregion
+
+    public static SchemataStartup Create(IConfiguration configuration, IWebHostEnvironment environment) {
+        return new SchemataStartup(configuration, environment);
     }
 }

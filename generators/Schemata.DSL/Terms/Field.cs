@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Parlot;
 
@@ -34,7 +35,11 @@ public class Field : TermBase
 
         // TODO: check type
 
-        var field = new Field { Type = type.GetText(), Name = name.GetText(), Nullable = nullable };
+        var field = new Field {
+            Type     = type.GetText(),
+            Name     = name.GetText(),
+            Nullable = nullable,
+        };
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
@@ -63,12 +68,14 @@ public class Field : TermBase
                     {
                         table.Indices ??= new Dictionary<string, Index>();
                         var index = new Index {
-                            Table = table, Fields = { field.Name }, Options = new List<Option> { option },
+                            Table   = table,
+                            Fields  = { field.Name },
+                            Options = new List<Option> { option },
                         };
                         if (table.Indices.TryGetValue(index.Name, out var origin)) {
                             try {
                                 index = origin + index;
-                            } catch (System.NotSupportedException) {
+                            } catch (NotSupportedException) {
                                 throw new ParseException($"Duplicate index name {index.Name}", scanner.Cursor.Position);
                             }
                         }

@@ -30,7 +30,11 @@ public class DefaultModulesProvider : IModulesProvider
                              .ToList();
     }
 
+    #region IModulesProvider Members
+
     public IEnumerable<Type> GetModules() {
         return _modules;
     }
+
+    #endregion
 }
