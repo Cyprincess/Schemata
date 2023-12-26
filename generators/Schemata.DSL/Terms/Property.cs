@@ -16,7 +16,9 @@ public class Property : TermBase
 
     // Property = Name WS Value
     public static Property? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadIdentifier(out var name)) return null;
+        if (!scanner.ReadIdentifier(out var name)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 

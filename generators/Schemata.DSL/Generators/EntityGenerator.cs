@@ -61,7 +61,9 @@ public static class EntityGenerator
             var scope = @enum.Key;
             var name  = @enum.Value.Name;
             scope = scope.Remove(scope.Length - name.Length - 1, name.Length + 1);
-            if (string.IsNullOrWhiteSpace(scope)) continue;
+            if (string.IsNullOrWhiteSpace(scope)) {
+                continue;
+            }
 
             if (mark.Tables?.ContainsKey(scope) == true) {
                 @enum.Value.Generate(sb, null);
@@ -89,8 +91,8 @@ public static class EntityGenerator
             }
 
             if (field.Value.Nullable) {
-                type += "?";
-                value = "null";
+                type  += "?";
+                value =  "null";
             }
 
             name = Utilities.ToCamelCase(name);

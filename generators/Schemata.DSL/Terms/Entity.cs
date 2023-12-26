@@ -27,7 +27,9 @@ public class Entity : TermBase, INamedTerm
 
     // Entity = "Entity" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Enum | Trait | Dto | Index | Use | Field ] RC
     public static Entity? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Entity), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Entity), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -52,7 +54,9 @@ public class Entity : TermBase, INamedTerm
 
         while (true) {
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
-            if (scanner.ReadChar('}')) break;
+            if (scanner.ReadChar('}')) {
+                break;
+            }
 
             var note = Note.Parse(mark, scanner);
             if (note is not null) {
@@ -74,7 +78,7 @@ public class Entity : TermBase, INamedTerm
 
             var uses = Use.Parse(mark, scanner);
             if (uses is not null) {
-                table.Uses ??= new List<Use>();
+                table.Uses ??= [];
                 foreach (var use in uses) {
                     table.Uses.Add(use);
 
@@ -149,7 +153,9 @@ public class Entity : TermBase, INamedTerm
 
     protected virtual bool ParseEnum(Mark mark, Scanner scanner) {
         var @enum = Enum.Parse(mark, scanner);
-        if (@enum is null) return false;
+        if (@enum is null) {
+            return false;
+        }
 
         mark.Enums ??= new Dictionary<string, Enum>();
         mark.Enums.Add($"{Name}.{@enum.Name}", @enum);
@@ -159,7 +165,9 @@ public class Entity : TermBase, INamedTerm
 
     protected virtual bool ParseObject(Mark mark, Scanner scanner) {
         var @object = Object.Parse(mark, scanner);
-        if (@object is null) return false;
+        if (@object is null) {
+            return false;
+        }
 
         Objects ??= new Dictionary<string, Object>();
         Objects.Add(@object.Name, @object);
@@ -172,7 +180,9 @@ public class Entity : TermBase, INamedTerm
 
     protected virtual bool ParseIndex(Mark mark, Scanner scanner) {
         var index = Index.Parse(mark, this, scanner);
-        if (index is null) return false;
+        if (index is null) {
+            return false;
+        }
 
         Indices ??= new Dictionary<string, Index>();
         if (Indices.TryGetValue(index.Name, out var origin)) {

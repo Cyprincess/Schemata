@@ -23,7 +23,9 @@ public class Mark : TermBase
 
         while (true) {
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
-            if (scanner.Cursor.Eof) break;
+            if (scanner.Cursor.Eof) {
+                break;
+            }
 
             var @namespace = Namespace.Parse(mark, scanner);
             if (@namespace is not null) {
@@ -67,7 +69,9 @@ public class Mark : TermBase
             throw new ParseException($"unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
         }
 
-        if (mark.Length <= 0) return null;
+        if (mark.Length <= 0) {
+            return null;
+        }
 
         return mark;
     }

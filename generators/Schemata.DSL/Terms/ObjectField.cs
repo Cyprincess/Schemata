@@ -25,7 +25,9 @@ public class ObjectField : TermBase, INamedTerm
 
     // ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function | Ref ) ]
     public static ObjectField? Parse(Mark mark, Object? @object, Scanner scanner) {
-        if (!ReadNamespacedIdentifier(scanner, out var type)) return null;
+        if (!ReadNamespacedIdentifier(scanner, out var type)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -52,7 +54,7 @@ public class ObjectField : TermBase, INamedTerm
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);
             }
 
-            field.Options ??= new List<Option>();
+            field.Options ??= [];
             field.Options.Add(option);
         }
 
@@ -61,7 +63,9 @@ public class ObjectField : TermBase, INamedTerm
         if (scanner.ReadChar('{')) {
             while (true) {
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+                if (scanner.ReadChar('}')) {
+                    break;
+                }
 
                 var note = Note.Parse(mark, scanner);
                 if (note is not null) {

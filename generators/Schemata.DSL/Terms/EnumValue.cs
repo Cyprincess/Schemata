@@ -42,7 +42,9 @@ public class EnumValue : TermBase, INamedTerm
         if (scanner.ReadChar('{')) {
             while (true) {
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+                if (scanner.ReadChar('}')) {
+                    break;
+                }
 
                 var property = Property.Parse(mark, scanner);
                 if (property?.Name == nameof(Note)) {

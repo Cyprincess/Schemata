@@ -10,7 +10,7 @@ public class Index : TermBase, INamedTerm
 {
     public Entity Table { get; set; } = null!;
 
-    public List<string> Fields { get; set; } = new();
+    public List<string> Fields { get; set; } = [];
 
     public List<Option>? Options { get; set; }
 
@@ -25,7 +25,9 @@ public class Index : TermBase, INamedTerm
     // Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
     // Index.Option = "Unique" | "BTree" | "B Tree" | "Hash"
     public static Index? Parse(Mark mark, Entity table, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Index), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Index), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -57,7 +59,7 @@ public class Index : TermBase, INamedTerm
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);
             }
 
-            index.Options ??= new List<Option>();
+            index.Options ??= [];
             index.Options.Add(option);
         }
 
@@ -66,7 +68,9 @@ public class Index : TermBase, INamedTerm
         if (scanner.ReadChar('{')) {
             while (true) {
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+                if (scanner.ReadChar('}')) {
+                    break;
+                }
 
                 var property = Property.Parse(mark, scanner);
                 if (property?.Name == nameof(Note)) {
@@ -90,8 +94,13 @@ public class Index : TermBase, INamedTerm
             throw new NotSupportedException("Unexpected merge operation between two Index");
         }
 
-        if (a.Options is null) return b;
-        if (b.Options is null) return a;
+        if (a.Options is null) {
+            return b;
+        }
+
+        if (b.Options is null) {
+            return a;
+        }
 
         return new Index {
             Table   = a.Table,

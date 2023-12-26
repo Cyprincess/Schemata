@@ -26,7 +26,9 @@ public class Field : TermBase, INamedTerm
 
     // Field = Type [ [WS] ? ] WS Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC {Note | Property} RC ]
     public static Field? Parse(Mark mark, Entity? table, Scanner scanner) {
-        if (!scanner.ReadIdentifier(out var type)) return null;
+        if (!scanner.ReadIdentifier(out var type)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -90,7 +92,7 @@ public class Field : TermBase, INamedTerm
                 }
             }
 
-            field.Options ??= new List<Option>();
+            field.Options ??= [];
             field.Options.Add(option);
         }
 
@@ -99,7 +101,9 @@ public class Field : TermBase, INamedTerm
         if (scanner.ReadChar('{')) {
             while (true) {
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+                if (scanner.ReadChar('}')) {
+                    break;
+                }
 
                 var property = Property.Parse(mark, scanner);
 

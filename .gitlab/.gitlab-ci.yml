@@ -61,7 +61,7 @@ build:windows:
     CI_SYSTEM: windows
   image: ${CI_IMAGE_WINDOWS}
   script:
-    - .\eng\common\CIBuild.cmd -configuration Release -integrationTest
+    - .\eng\common\CIBuild.cmd -configuration Release -integrationTest /p:SuppressSymbolPackageFormatValidation=true
   artifacts:
     name: packages
     paths:
@@ -79,7 +79,7 @@ build:linux:
     CI_SYSTEM: linux
   image: ${CI_IMAGE_LINUX}
   script:
-    - ./eng/common/cibuild.sh -configuration Release -integrationTest
+    - ./eng/common/cibuild.sh -configuration Release -integrationTest /p:SuppressSymbolPackageFormatValidation=true
   tags:
     - ${CI_SYSTEM}
 

@@ -17,7 +17,9 @@ public class Function : TermBase, IValueTerm
     public static Function? Parse(Mark mark, Scanner scanner) {
         var position = scanner.Cursor.Position;
 
-        if (!scanner.ReadIdentifier(out var name)) return null;
+        if (!scanner.ReadIdentifier(out var name)) {
+            return null;
+        }
 
         var function = new Function { Body = name.GetText() };
 
@@ -30,9 +32,11 @@ public class Function : TermBase, IValueTerm
 
         while (true) {
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
-            if (scanner.ReadChar(')')) break;
+            if (scanner.ReadChar(')')) {
+                break;
+            }
 
-            function.Parameters ??= new List<IValueTerm>();
+            function.Parameters ??= [];
 
             var value = Value.Parse(mark, scanner);
             if (value is null) {

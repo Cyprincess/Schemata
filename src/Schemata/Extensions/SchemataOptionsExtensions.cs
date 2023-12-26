@@ -27,7 +27,7 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, ISimpleFeature value) {
-        var features = GetFeatures(options) ?? new HashSet<ISimpleFeature>();
+        var features = GetFeatures(options) ?? [];
         features.Add(value);
         options.SetFeatures(features);
     }

@@ -7,7 +7,9 @@ namespace Schemata.DSL.Terms;
 public abstract class TermBase
 {
     protected static string NormalizeType(Mark mark, INamedTerm? scope, string type) {
-        if (type.Contains('.')) return type;
+        if (type.Contains('.')) {
+            return type;
+        }
 
         if (Utilities.GetClrType(type) is not null) {
             return type;
@@ -42,7 +44,9 @@ public abstract class TermBase
 
         while (true) {
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
-            if (scanner.ReadChar(']')) break;
+            if (scanner.ReadChar(']')) {
+                break;
+            }
 
             var option = Option.Parse(mark, scanner);
             if (option is null) {
@@ -78,7 +82,9 @@ public abstract class TermBase
         SkipWhiteSpaceOrComment(scanner);
 
         var position = scanner.Cursor.Position;
-        if (!scanner.ReadWhile(x => !Character.IsNewLine(x), out var result)) return;
+        if (!scanner.ReadWhile(x => !Character.IsNewLine(x), out var result)) {
+            return;
+        }
 
         if (allowBracket && result.Span[0] == '}') {
             scanner.Cursor.ResetPosition(position);

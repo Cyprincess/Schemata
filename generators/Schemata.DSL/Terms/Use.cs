@@ -14,7 +14,9 @@ public class Use : TermBase, INamedTerm
 
     // Use = "Use" WS QualifiedName { [WS] , [WS] QualifiedName }
     public static IEnumerable<Use>? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Use), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Use), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         return Parse(scanner);
     }
@@ -31,7 +33,9 @@ public class Use : TermBase, INamedTerm
 
             scanner.SkipWhiteSpace();
 
-            if (!scanner.ReadChar(',')) break;
+            if (!scanner.ReadChar(',')) {
+                break;
+            }
         }
 
         EnsureLineEnd(scanner);

@@ -18,7 +18,9 @@ public class Object : TermBase, INamedTerm
 
     // Object = "Object" WS Name LC [ Note | ObjectField ] RC
     public static Object? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Object), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Object), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -33,7 +35,9 @@ public class Object : TermBase, INamedTerm
         if (scanner.ReadChar('{')) {
             while (true) {
                 SkipWhiteSpaceOrCommentOrNewLine(scanner);
-                if (scanner.ReadChar('}')) break;
+                if (scanner.ReadChar('}')) {
+                    break;
+                }
 
                 var note = Note.Parse(mark, scanner);
                 if (note is not null) {

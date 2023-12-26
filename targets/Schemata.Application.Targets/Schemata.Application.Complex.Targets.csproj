@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <UseModularTargets>true</UseModularTargets>
     <UseDSLTargets>true</UseDSLTargets>
+    <UseModularTargets>true</UseModularTargets>
   </PropertyGroup>
 
 </Project>
