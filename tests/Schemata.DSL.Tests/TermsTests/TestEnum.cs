@@ -55,7 +55,7 @@ public class TestEnum
         var scanner = new Scanner(syntax);
         var term    = Enum.Parse(mark, scanner);
         Assert.Equal(name, term?.Name);
-        Assert.Equal(values, term?.Values?.Select(v => v.Value.Body));
+        Assert.Equal(values, term?.Values?.Select(v => v.Value.Body) ?? []);
         Assert.Equal(note, term?.Note?.Comment);
     }
 }

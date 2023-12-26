@@ -85,7 +85,9 @@ public static class ServiceCollectionExtensions
     private static void AddFeatures(SchemataBuilder builder) {
         builder.ConfigureServices(services => {
             var modules = builder.Options.GetFeatures();
-            if (modules is null) return;
+            if (modules is null) {
+                return;
+            }
 
             var features = modules.ToList();
 

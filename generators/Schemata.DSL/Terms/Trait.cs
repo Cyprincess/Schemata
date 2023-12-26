@@ -7,7 +7,9 @@ public class Trait : Entity
 {
     // Trait = "Trait" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Use | Field ] RC
     public new static Trait? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Trait), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Trait), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 

@@ -26,7 +26,10 @@ public static class InvokerUtilities
         string            method,
         List<object?>?    parameters = null) {
         var mi = instance.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.Public);
-        if (mi is null) return;
+        if (mi is null) {
+            return;
+        }
+
         var pi        = mi.GetParameters();
         var arguments = new object?[pi.Length];
         for (var i = 0; i < pi.Length; i++) {

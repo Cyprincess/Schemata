@@ -22,8 +22,8 @@ public class TestIndex
         var scanner = new Scanner(syntax);
         var term    = Index.Parse(mark, entity, scanner);
         Assert.Equal(name, term?.Name);
-        Assert.Equal(fields, term?.Fields);
-        Assert.Equal(options, term?.Options?.Select(o => o.Name));
+        Assert.Equal(fields, term?.Fields ?? []);
+        Assert.Equal(options ?? [], term?.Options?.Select(o => o.Name) ?? []);
         Assert.Equal(note, term?.Note?.Comment);
     }
 }

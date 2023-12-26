@@ -8,7 +8,7 @@ namespace Schemata.Modular;
 
 public class DefaultModulesProvider : IModulesProvider
 {
-    private static List<Type> _modules = new();
+    private static List<Type> _modules = [];
 
     public DefaultModulesProvider() {
         if (_modules.Any()) {

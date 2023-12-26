@@ -27,7 +27,7 @@ public class TestSimpleTerms
         var mark    = new Mark();
         var scanner = new Scanner(syntax);
         var terms   = Use.Parse(mark, scanner);
-        Assert.Equal(expected, terms?.Select(t => t.Name));
+        Assert.Equal(expected, terms?.Select(t => t.Name) ?? []);
     }
 
     [Theory]

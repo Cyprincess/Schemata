@@ -17,6 +17,6 @@ public class TestFunction
         var scanner = new Scanner(syntax);
         var term    = Function.Parse(mark, scanner);
         Assert.Equal(name, term?.Body);
-        Assert.Equal(parameters, term?.Parameters?.Select(t => t.Body));
+        Assert.Equal(parameters ?? [], term?.Parameters?.Select(t => t.Body) ?? []);
     }
 }

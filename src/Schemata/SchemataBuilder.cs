@@ -5,49 +5,37 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata;
 
-public class SchemataBuilder
+public class SchemataBuilder(
+    IServiceCollection  services,
+    IConfiguration      configuration,
+    IWebHostEnvironment environment,
+    SchemataOptions     options)
 {
-    private readonly IServiceCollection _services;
+    public readonly IConfiguration Configuration = configuration;
 
-    public readonly IConfiguration Configuration;
+    public readonly Configurators       Configurators = new();
+    public readonly IWebHostEnvironment Environment   = environment;
+    public readonly SchemataOptions     Options       = options;
 
-    public readonly Configurators       Configurators;
-    public readonly IWebHostEnvironment Environment;
-    public readonly SchemataOptions     Options;
-
-    public SchemataBuilder(
-        IServiceCollection  services,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment,
-        SchemataOptions     options) {
-        _services = services;
-
-        Configuration = configuration;
-        Environment   = environment;
-        Options       = options;
-
-        Configurators = new Configurators();
-    }
-
-    public SchemataBuilder Configure<TOptions>(Action<TOptions>? configure)
+    public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {
         return Configure(Microsoft.Extensions.Options.Options.DefaultName, configure);
     }
 
-    public SchemataBuilder Configure<TOptions>(string name, Action<TOptions>? configure)
+    public SchemataBuilder Configure<TOptions>(string name, Action<TOptions> configure)
         where TOptions : class {
-        _services.Configure(name, configure);
+        services.Configure(name, configure);
 
         return this;
     }
 
-    public SchemataBuilder ConfigureServices(Action<IServiceCollection> services) {
-        services.Invoke(_services);
+    public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
+        action.Invoke(services);
 
         return this;
     }
 
     public IServiceCollection Build() {
-        return _services;
+        return services;
     }
 }

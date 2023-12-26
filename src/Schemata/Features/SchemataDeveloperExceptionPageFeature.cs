@@ -13,7 +13,9 @@ public class SchemataDeveloperExceptionPageFeature : FeatureBase
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        if (!environment.IsDevelopment()) return;
+        if (!environment.IsDevelopment()) {
+            return;
+        }
 
         app.UseDeveloperExceptionPage();
     }

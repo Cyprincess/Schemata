@@ -18,7 +18,9 @@ public class Enum : TermBase, INamedTerm
 
     // Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
     public static Enum? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Enum), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Enum), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 
@@ -38,7 +40,9 @@ public class Enum : TermBase, INamedTerm
             scanner.ReadChar(',');
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
-            if (scanner.ReadChar('}')) break;
+            if (scanner.ReadChar('}')) {
+                break;
+            }
 
             var note = Note.Parse(mark, scanner);
             if (note is not null) {

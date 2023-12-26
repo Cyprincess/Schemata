@@ -13,7 +13,9 @@ public class Namespace : TermBase, INamedTerm
 
     // Namespace = "Namespace" WS QualifiedName
     public static Namespace? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Namespace), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Namespace), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         scanner.SkipWhiteSpace();
 

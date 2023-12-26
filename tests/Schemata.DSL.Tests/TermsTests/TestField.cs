@@ -38,7 +38,7 @@ public class TestField
         Assert.Equal(name, term?.Name);
         Assert.Equal(nullable, term?.Nullable);
         Assert.Equal(note, term?.Note?.Comment);
-        Assert.Equal(options, term?.Options?.Select(o => o.Name));
-        Assert.Equal(properties, term?.Properties?.SelectMany(p => new[] { p.Key, p.Value.Body }));
+        Assert.Equal(options ?? [], term?.Options?.Select(o => o.Name) ?? []);
+        Assert.Equal(properties ?? [], term?.Properties?.SelectMany(p => new[] { p.Key, p.Value.Body }) ?? []);
     }
 }

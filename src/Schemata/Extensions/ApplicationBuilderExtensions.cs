@@ -29,7 +29,9 @@ public static class ApplicationBuilderExtensions
         IWebHostEnvironment environment,
         SchemataOptions     options) {
         var modules = options.GetFeatures();
-        if (modules is null) return;
+        if (modules is null) {
+            return;
+        }
 
         var sp = app.ApplicationServices;
 

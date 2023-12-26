@@ -13,7 +13,9 @@ public class SchemataHttpsFeature : FeatureBase
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        if (environment.IsDevelopment()) return;
+        if (environment.IsDevelopment()) {
+            return;
+        }
 
         app.UseHsts();
         app.UseHttpsRedirection();

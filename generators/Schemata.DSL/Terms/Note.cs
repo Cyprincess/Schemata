@@ -9,7 +9,9 @@ public class Note : TermBase
 
     // Note = "Note" WS Value
     public static Note? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Note), InvariantCultureIgnoreCase)) return null;
+        if (!scanner.ReadText(nameof(Note), InvariantCultureIgnoreCase)) {
+            return null;
+        }
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
@@ -24,8 +26,13 @@ public class Note : TermBase
     }
 
     public static Note? operator +(Note? a, Note? b) {
-        if (a is null) return b;
-        if (b is null) return a;
+        if (a is null) {
+            return b;
+        }
+
+        if (b is null) {
+            return a;
+        }
 
         return new Note { Comment = string.Equals(a.Comment, b.Comment) ? a.Comment : $"{a.Comment}\n{b.Comment}" };
     }
