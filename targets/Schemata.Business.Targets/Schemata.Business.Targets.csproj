@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Business Project Targets</Description>
+    <PackageTags>application;business;framework</PackageTags>
+  </PropertyGroup>
+
+</Project>

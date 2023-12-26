@@ -6,10 +6,8 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Index : TermBase
+public class Index : TermBase, INamedTerm
 {
-    public string Name => Fields.Aggregate($"IX_{Table.Name}", (s, f) => s + "_" + ToCamelCase(f));
-
     public Entity Table { get; set; } = null!;
 
     public List<string> Fields { get; set; } = new();
@@ -17,6 +15,12 @@ public class Index : TermBase
     public List<Option>? Options { get; set; }
 
     public Note? Note { get; set; }
+
+    #region INamedTerm Members
+
+    public string Name => Fields.Aggregate($"IX_{Table.Name}", (s, f) => s + "_" + Utilities.ToCamelCase(f));
+
+    #endregion
 
     // Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
     // Index.Option = "Unique" | "BTree" | "B Tree" | "Hash"
@@ -70,7 +74,7 @@ public class Index : TermBase
                     continue;
                 }
 
-                if (property != null) {
+                if (property is not null) {
                     throw new ParseException($"Invalid property {property.Name}", scanner.Cursor.Position);
                 }
 
@@ -86,8 +90,8 @@ public class Index : TermBase
             throw new NotSupportedException("Unexpected merge operation between two Index");
         }
 
-        if (a.Options == null) return b;
-        if (b.Options == null) return a;
+        if (a.Options is null) return b;
+        if (b.Options is null) return a;
 
         return new Index {
             Table   = a.Table,

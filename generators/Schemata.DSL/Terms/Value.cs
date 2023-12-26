@@ -4,9 +4,15 @@ using Parlot;
 
 namespace Schemata.DSL.Terms;
 
-public class Value : ValueTermBase
+public class Value : TermBase, IValueTerm
 {
     public Type Type { get; set; } = null!;
+
+    #region IValueTerm Members
+
+    public string Body { get; set; } = null!;
+
+    #endregion
 
     // Value = String | QuotedString | Number | Boolean | MultilineString | Null
     public static Value? Parse(Mark mark, Scanner scanner) {

@@ -4,11 +4,11 @@ using Parlot;
 
 namespace Schemata.DSL.Terms;
 
-public class Field : TermBase
+public class Field : TermBase, INamedTerm
 {
-    public string Type { get; set; } = null!;
+    public bool Inherited { get; set; }
 
-    public string Name { get; set; } = null!;
+    public string Type { get; set; } = null!;
 
     public bool Nullable { get; set; }
 
@@ -17,6 +17,12 @@ public class Field : TermBase
     public List<Option>? Options { get; set; }
 
     public Dictionary<string, Property>? Properties { get; set; }
+
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
 
     // Field = Type [ [WS] ? ] WS Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC {Note | Property} RC ]
     public static Field? Parse(Mark mark, Entity? table, Scanner scanner) {
@@ -33,10 +39,8 @@ public class Field : TermBase
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }
 
-        // TODO: check type
-
         var field = new Field {
-            Type     = type.GetText(),
+            Type     = NormalizeType(mark, table, type.GetText()),
             Name     = name.GetText(),
             Nullable = nullable,
         };
@@ -56,7 +60,7 @@ public class Field : TermBase
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);
             }
 
-            if (table != null) {
+            if (table is not null) {
                 switch (option.Name) {
                     case Constants.Options.PrimaryKey or Constants.Options.AutoIncrement:
                     {
@@ -104,7 +108,7 @@ public class Field : TermBase
                     continue;
                 }
 
-                if (property == null) {
+                if (property is null) {
                     throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
                 }
 

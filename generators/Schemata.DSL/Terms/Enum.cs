@@ -4,13 +4,17 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Enum : TermBase
+public class Enum : TermBase, INamedTerm
 {
-    public string Name { get; set; } = null!;
-
     public Note? Note { get; set; }
 
     public Dictionary<string, EnumValue>? Values { get; set; }
+
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
 
     // Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
     public static Enum? Parse(Mark mark, Scanner scanner) {
@@ -37,13 +41,13 @@ public class Enum : TermBase
             if (scanner.ReadChar('}')) break;
 
             var note = Note.Parse(mark, scanner);
-            if (note != null) {
+            if (note is not null) {
                 @enum.Note += note;
                 continue;
             }
 
             var value = EnumValue.Parse(mark, scanner);
-            if (value == null) {
+            if (value is null) {
                 throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
             }
 

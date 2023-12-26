@@ -18,10 +18,6 @@ public class Trait : Entity
         return false;
     }
 
-    protected override bool ParseTrait(Mark mark, Scanner scanner) {
-        return false;
-    }
-
     protected override bool ParseObject(Mark mark, Scanner scanner) {
         return false;
     }

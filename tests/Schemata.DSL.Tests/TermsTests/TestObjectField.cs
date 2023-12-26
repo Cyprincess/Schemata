@@ -34,7 +34,7 @@ public class TestObjectField
         string?   map      = null) {
         var mark    = new Mark();
         var scanner = new Scanner(syntax);
-        var term    = ObjectField.Parse(mark, scanner);
+        var term    = ObjectField.Parse(mark, null, scanner);
         Assert.Equal(type, term?.Type);
         Assert.Equal(name, term?.Name);
         Assert.Equal(nullable, term?.Nullable);

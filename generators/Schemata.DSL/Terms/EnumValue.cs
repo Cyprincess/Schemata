@@ -2,13 +2,17 @@ using Parlot;
 
 namespace Schemata.DSL.Terms;
 
-public class EnumValue : TermBase
+public class EnumValue : TermBase, INamedTerm
 {
-    public string Name { get; set; } = null!;
-
     public string Body { get; set; } = null!;
 
     public Note? Note { get; set; }
+
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
 
     // EnumValue = Name [ [WS] EQ [WS] Value ] [ [WS] LC [Note] RC ]
     public static EnumValue? Parse(Mark mark, Scanner scanner) {
@@ -24,7 +28,7 @@ public class EnumValue : TermBase
         if (scanner.ReadChar('=')) {
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
             var value = Value.Parse(mark, scanner);
-            if (value == null) {
+            if (value is null) {
                 throw new ParseException("Expected a value", scanner.Cursor.Position);
             }
 
@@ -46,7 +50,7 @@ public class EnumValue : TermBase
                     continue;
                 }
 
-                if (property != null) {
+                if (property is not null) {
                     throw new ParseException($"Invalid property {property.Name}", scanner.Cursor.Position);
                 }
 

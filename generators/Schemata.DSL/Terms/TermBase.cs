@@ -1,12 +1,35 @@
 using System.Collections.Generic;
 using System.Linq;
 using Parlot;
-using static System.StringSplitOptions;
 
 namespace Schemata.DSL.Terms;
 
 public abstract class TermBase
 {
+    protected static string NormalizeType(Mark mark, INamedTerm? scope, string type) {
+        if (type.Contains('.')) return type;
+
+        if (Utilities.GetClrType(type) is not null) {
+            return type;
+        }
+
+        if (scope is not null) {
+            var scoped = $"{scope.Name}.{type}";
+
+            type = scoped switch {
+                _ when mark.Enums?.ContainsKey(scoped) == true   => scoped,
+                _ when mark.Objects?.ContainsKey(scoped) == true => scoped,
+                _                                                => type,
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(mark.Namespace?.Name)) {
+            return type;
+        }
+
+        return $"{mark.Namespace?.Name}.{type}";
+    }
+
     protected static bool ReadNamespacedIdentifier(Scanner scanner, out TokenResult result) {
         return scanner.ReadFirstThenOthers(static x => Character.IsIdentifierStart(x),
             static x => x == '.' || Character.IsIdentifierPart(x), out result);
@@ -22,7 +45,7 @@ public abstract class TermBase
             if (scanner.ReadChar(']')) break;
 
             var option = Option.Parse(mark, scanner);
-            if (option == null) {
+            if (option is null) {
                 throw new ParseException("Expected at least one option", scanner.Cursor.Position);
             }
 
@@ -63,11 +86,5 @@ public abstract class TermBase
         }
 
         throw new ParseException($"Expected line break, ‘{result.GetText()}’ given", scanner.Cursor.Position);
-    }
-
-    protected static string ToCamelCase(string @string) {
-        return @string.Split(new[] { "_", " " }, RemoveEmptyEntries)
-                      .Select(s => char.ToUpperInvariant(s[0]) + s.Substring(1, s.Length - 1))
-                      .Aggregate(string.Empty, (s1, s2) => s1 + s2);
     }
 }

@@ -3,9 +3,13 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Namespace : TermBase
+public class Namespace : TermBase, INamedTerm
 {
+    #region INamedTerm Members
+
     public string Name { get; set; } = null!;
+
+    #endregion
 
     // Namespace = "Namespace" WS QualifiedName
     public static Namespace? Parse(Mark mark, Scanner scanner) {

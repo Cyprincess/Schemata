@@ -1,6 +1,7 @@
 
 ; Mark = {Namespace | Enum | Entity | Trait}
 
+; Namespace = "Namespace" WS QualifiedName
 ; Entity = "Entity" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Enum | Trait | Object | Index | Use | Field ] RC
 ; Trait = "Trait" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Use | Field ] RC
 
@@ -15,12 +16,14 @@
 
 ; Object = "Object" WS Name LC [ Note | ObjectField ] RC
 ; ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Function | Ref | Value ) ]
+; ObjectField.Option = "Omit" | "OmitAll" | "Omit All"
 
 ; Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
+; Index.Option = "Unique" | "BTree" | "B Tree" | "Hash"
 
 ; Note = "Note" WS Value
 
-; Use = "Use" WS Name { [WS] , [WS] Name }
+; Use = "Use" WS QualifiedName { [WS] , [WS] QualifiedName }
 
 Namespace DSL.Tests.Vectors
 
