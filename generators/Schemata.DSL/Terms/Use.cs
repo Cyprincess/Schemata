@@ -4,9 +4,13 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Use : TermBase
+public class Use : TermBase, INamedTerm
 {
+    #region INamedTerm Members
+
     public string Name { get; set; } = null!;
+
+    #endregion
 
     // Use = "Use" WS QualifiedName { [WS] , [WS] QualifiedName }
     public static IEnumerable<Use>? Parse(Mark mark, Scanner scanner) {

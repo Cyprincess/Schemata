@@ -9,7 +9,7 @@ public class Property : TermBase
     public string Name
     {
         get => _name;
-        set => _name = ToCamelCase(value);
+        set => _name = Utilities.ToCamelCase(value);
     }
 
     public string Body { get; set; } = null!;
@@ -21,7 +21,7 @@ public class Property : TermBase
         scanner.SkipWhiteSpace();
 
         var value = Value.Parse(mark, scanner);
-        if (value == null) {
+        if (value is null) {
             throw new ParseException("Expected a value", scanner.Cursor.Position);
         }
 

@@ -26,8 +26,8 @@ public class Mark : TermBase
             if (scanner.Cursor.Eof) break;
 
             var @namespace = Namespace.Parse(mark, scanner);
-            if (@namespace != null) {
-                if (mark.Namespace != null) {
+            if (@namespace is not null) {
+                if (mark.Namespace is not null) {
                     throw new ParseException("Namespace already defined", scanner.Cursor.Position);
                 }
 
@@ -41,7 +41,7 @@ public class Mark : TermBase
             }
 
             var @enum = Enum.Parse(mark, scanner);
-            if (@enum != null) {
+            if (@enum is not null) {
                 mark.Length++;
                 mark.Enums ??= new Dictionary<string, Enum>();
                 mark.Enums.Add(@enum.Name, @enum);
@@ -49,7 +49,7 @@ public class Mark : TermBase
             }
 
             var table = Entity.Parse(mark, scanner);
-            if (table != null) {
+            if (table is not null) {
                 mark.Length++;
                 mark.Tables ??= new Dictionary<string, Entity>();
                 mark.Tables?.Add(table.Name, table);
@@ -57,7 +57,7 @@ public class Mark : TermBase
             }
 
             var trait = Trait.Parse(mark, scanner);
-            if (trait != null) {
+            if (trait is not null) {
                 mark.Length++;
                 mark.Traits ??= new Dictionary<string, Trait>();
                 mark.Traits?.Add(trait.Name, trait);

@@ -246,13 +246,13 @@ namespace System.Runtime.CompilerServices
         ///     Slices the specified array using the specified range.
         /// </summary>
         public static T[] GetSubArray<T>(T[] array, Range range) {
-            if (array == null) {
+            if (array is null) {
                 throw new ArgumentNullException(nameof(array));
             }
 
             var (offset, length) = range.GetOffsetAndLength(array.Length);
 
-            if (default(T) != null || typeof(T[]) == array.GetType()) {
+            if (default(T) is not null || typeof(T[]) == array.GetType()) {
                 // We know the type of the array to be exactly T[].
 
                 if (length == 0) {

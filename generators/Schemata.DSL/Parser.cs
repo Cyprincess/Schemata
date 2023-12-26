@@ -35,7 +35,10 @@ public class Parser
     // Property = ("Default" | "Length" | "Precision" | "Algorithm" | Key) WS Value
     // Value = String | QuotedString | Number | Boolean | MultilineString | Null
     // Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
-    // EnumValue = Name [ [WS] = [WS] Value ] [ [WS] LC [Note] RC ]
+    // EnumValue = Name [ [WS] EQ [WS] Value ] [ [WS] LC [Note] RC ]
+    // Object = "Object" WS Name LC [ Note | ObjectField ] RC
+    // ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Function | Ref | Value ) ]
+    // ObjectField.Option = "Omit" | "OmitAll" | "Omit All"
     // Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
     // Index.Option = "Unique" | "BTree" | "B Tree" | "Hash"
     // Note = "Note" WS Value

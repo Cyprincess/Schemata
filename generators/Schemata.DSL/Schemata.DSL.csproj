@@ -13,13 +13,18 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
-    <PackageReference Include="Parlot" PrivateAssets="all" />
+    <PackageReference Include="Parlot" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true"
-          PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(PkgParlot)\lib\netstandard2.0\*.dll" CopyToOutputDirectory="PreserveNewest" />
+
+    <None Include="$(OutputPath)\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>

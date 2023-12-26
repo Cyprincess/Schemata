@@ -37,7 +37,7 @@ public static class InvokerUtilities
                 continue;
             }
 
-            if (provider == null) {
+            if (provider is null) {
                 throw new InvalidOperationException($"Cannot resolve parameter '{
                     parameter.Name
                 }' of method '{

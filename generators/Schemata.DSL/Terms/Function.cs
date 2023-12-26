@@ -3,9 +3,15 @@ using Parlot;
 
 namespace Schemata.DSL.Terms;
 
-public class Function : ValueTermBase
+public class Function : TermBase, IValueTerm
 {
-    public List<ValueTermBase>? Parameters { get; set; }
+    public List<IValueTerm>? Parameters { get; set; }
+
+    #region IValueTerm Members
+
+    public string Body { get; set; } = null!;
+
+    #endregion
 
     // Function = Name [WS] LP [ [WS] Name { [WS] , [WS] Name } ] RP
     public static Function? Parse(Mark mark, Scanner scanner) {
@@ -26,10 +32,10 @@ public class Function : ValueTermBase
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
             if (scanner.ReadChar(')')) break;
 
-            function.Parameters ??= new List<ValueTermBase>();
+            function.Parameters ??= new List<IValueTerm>();
 
             var value = Value.Parse(mark, scanner);
-            if (value == null) {
+            if (value is null) {
                 throw new ParseException("Expected a parameter name or an expression", scanner.Cursor.Position);
             }
 

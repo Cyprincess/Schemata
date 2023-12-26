@@ -44,7 +44,8 @@ app.Run();
 
 ## Features
 
-- [DSL](generators/Schemata.DSL)
+- [DSL](https://nuget.org/packages/Schemata.DSL)
+- [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets)
 - Audit
 - Datasource
 - Event

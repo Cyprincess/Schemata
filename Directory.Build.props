@@ -63,8 +63,7 @@
     <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
 
-  <PropertyGroup
-      Condition=" $(RepoRelativeProjectDir.Contains('generators')) OR $(RepoRelativeProjectDir.Contains('targets')) ">
+  <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('generators')) OR $(RepoRelativeProjectDir.Contains('targets')) ">
     <IsPackable>true</IsPackable>
     <IsShipping>true</IsShipping>
     <SignAssembly>true</SignAssembly>

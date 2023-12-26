@@ -3,24 +3,28 @@ using Parlot;
 
 namespace Schemata.DSL.Terms;
 
-public class ObjectField : TermBase
+public class ObjectField : TermBase, INamedTerm
 {
     public string? Type { get; set; }
-
-    public string Name { get; set; } = null!;
 
     public bool Nullable { get; set; }
 
     public Note? Note { get; set; }
 
-    public ValueTermBase? Map { get; set; }
+    public IValueTerm? Map { get; set; }
 
     public List<Option>? Options { get; set; }
 
     public Dictionary<string, ObjectField>? Fields { get; set; }
 
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
+
     // ObjectField = [Type WS] Name [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC [ Note | ObjectField ] RC ] [ [WS] EQ [WS] ( Value | Function | Ref ) ]
-    public static ObjectField? Parse(Mark mark, Scanner scanner) {
+    public static ObjectField? Parse(Mark mark, Object? @object, Scanner scanner) {
         if (!ReadNamespacedIdentifier(scanner, out var type)) return null;
 
         scanner.SkipWhiteSpace();
@@ -33,11 +37,9 @@ public class ObjectField : TermBase
         var field = new ObjectField { Name = type.GetText(), Nullable = nullable };
 
         if (scanner.ReadIdentifier(out var name)) {
-            field.Type = type.GetText();
+            field.Type = NormalizeType(mark, @object, type.GetText());
             field.Name = name.GetText();
         }
-
-        // TODO: check type
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
@@ -62,13 +64,14 @@ public class ObjectField : TermBase
                 if (scanner.ReadChar('}')) break;
 
                 var note = Note.Parse(mark, scanner);
-                if (note != null) {
+                if (note is not null) {
                     field.Note += note;
                     continue;
                 }
 
-                var f = Parse(mark, scanner);
-                if (f != null) {
+                var nested = field.Type is not null ? mark.Objects?[field.Type] : null;
+                var f      = Parse(mark, nested, scanner);
+                if (f is not null) {
                     field.Fields ??= new Dictionary<string, ObjectField>();
                     field.Fields.Add(f.Name, f);
                     continue;
@@ -84,7 +87,7 @@ public class ObjectField : TermBase
             SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
             var function = Function.Parse(mark, scanner);
-            if (function != null) {
+            if (function is not null) {
                 field.Map = function;
             } else if (ReadNamespacedIdentifier(scanner, out var token)) {
                 field.Map = new Ref { Body = token.GetText() };
@@ -92,7 +95,7 @@ public class ObjectField : TermBase
                 field.Map = Value.Parse(mark, scanner);
             }
 
-            if (field.Map == null) {
+            if (field.Map is null) {
                 throw new ParseException("Expected an expression", scanner.Cursor.Position);
             }
         }

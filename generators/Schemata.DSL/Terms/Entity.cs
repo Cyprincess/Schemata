@@ -5,15 +5,11 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Entity : TermBase
+public class Entity : TermBase, INamedTerm
 {
-    public string Name { get; set; } = null!;
-
     public Note? Note { get; set; }
 
     public List<Use>? Uses { get; set; }
-
-    public Dictionary<string, Enum>? Enums { get; set; }
 
     public Dictionary<string, Field>? Fields { get; set; }
 
@@ -23,7 +19,11 @@ public class Entity : TermBase
 
     public Dictionary<string, Object>? Objects { get; set; }
 
-    public Dictionary<string, Trait>? Traits { get; set; }
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
 
     // Entity = "Entity" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Enum | Trait | Dto | Index | Use | Field ] RC
     public static Entity? Parse(Mark mark, Scanner scanner) {
@@ -55,16 +55,12 @@ public class Entity : TermBase
             if (scanner.ReadChar('}')) break;
 
             var note = Note.Parse(mark, scanner);
-            if (note != null) {
+            if (note is not null) {
                 table.Note += note;
                 continue;
             }
 
             if (table.ParseEnum(mark, scanner)) {
-                continue;
-            }
-
-            if (table.ParseTrait(mark, scanner)) {
                 continue;
             }
 
@@ -77,29 +73,38 @@ public class Entity : TermBase
             }
 
             var uses = Use.Parse(mark, scanner);
-            if (uses != null) {
+            if (uses is not null) {
                 table.Uses ??= new List<Use>();
                 foreach (var use in uses) {
                     table.Uses.Add(use);
 
-                    // TODO: move to Generator
                     var entity = mark.Traits?[use.Name];
-                    if (entity == null) {
+                    if (entity is null) {
                         throw new ParseException($"Unknown trait {use.Name}", scanner.Cursor.Position);
                     }
 
-                    if (entity.Fields != null) {
+                    if (entity.Fields is not null) {
                         table.Fields ??= new Dictionary<string, Field>();
                         foreach (var kv in entity.Fields) {
                             if (table.Fields.ContainsKey(kv.Key)) {
                                 throw new ParseException($"Duplicate field name {kv.Key}", scanner.Cursor.Position);
                             }
 
-                            table.Fields.Add(kv.Key, kv.Value);
+                            var inherited = new Field {
+                                Inherited  = true,
+                                Type       = kv.Value.Type,
+                                Name       = kv.Value.Name,
+                                Nullable   = kv.Value.Nullable,
+                                Note       = kv.Value.Note,
+                                Options    = kv.Value.Options,
+                                Properties = kv.Value.Properties,
+                            };
+
+                            table.Fields.Add(kv.Key, inherited);
                         }
                     }
 
-                    if (entity.Indices != null) {
+                    if (entity.Indices is not null) {
                         table.Indices ??= new Dictionary<string, Index>();
                         foreach (var kv in entity.Indices) {
                             if (table.Indices.ContainsKey(kv.Key)) {
@@ -110,7 +115,7 @@ public class Entity : TermBase
                         }
                     }
 
-                    if (entity.Keys != null) {
+                    if (entity.Keys is not null) {
                         table.Keys ??= new Dictionary<string, Field>();
                         foreach (var kv in entity.Keys) {
                             if (table.Keys.ContainsKey(kv.Key)) {
@@ -126,7 +131,7 @@ public class Entity : TermBase
             }
 
             var field = Field.Parse(mark, table, scanner);
-            if (field != null) {
+            if (field is not null) {
                 table.Fields ??= new Dictionary<string, Field>();
                 if (table.Fields.ContainsKey(field.Name)) {
                     throw new ParseException($"Duplicate field name {field.Name}", scanner.Cursor.Position);
@@ -144,10 +149,7 @@ public class Entity : TermBase
 
     protected virtual bool ParseEnum(Mark mark, Scanner scanner) {
         var @enum = Enum.Parse(mark, scanner);
-        if (@enum == null) return false;
-
-        Enums ??= new Dictionary<string, Enum>();
-        Enums.Add(@enum.Name, @enum);
+        if (@enum is null) return false;
 
         mark.Enums ??= new Dictionary<string, Enum>();
         mark.Enums.Add($"{Name}.{@enum.Name}", @enum);
@@ -155,22 +157,9 @@ public class Entity : TermBase
         return true;
     }
 
-    protected virtual bool ParseTrait(Mark mark, Scanner scanner) {
-        var trait = Trait.Parse(mark, scanner);
-        if (trait == null) return false;
-
-        Traits ??= new Dictionary<string, Trait>();
-        Traits.Add(trait.Name, trait);
-
-        mark.Traits ??= new Dictionary<string, Trait>();
-        mark.Traits.Add($"{Name}.{trait.Name}", trait);
-
-        return true;
-    }
-
     protected virtual bool ParseObject(Mark mark, Scanner scanner) {
         var @object = Object.Parse(mark, scanner);
-        if (@object == null) return false;
+        if (@object is null) return false;
 
         Objects ??= new Dictionary<string, Object>();
         Objects.Add(@object.Name, @object);
@@ -183,7 +172,7 @@ public class Entity : TermBase
 
     protected virtual bool ParseIndex(Mark mark, Scanner scanner) {
         var index = Index.Parse(mark, this, scanner);
-        if (index == null) return false;
+        if (index is null) return false;
 
         Indices ??= new Dictionary<string, Index>();
         if (Indices.TryGetValue(index.Name, out var origin)) {

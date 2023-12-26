@@ -4,13 +4,17 @@ using static System.StringComparison;
 
 namespace Schemata.DSL.Terms;
 
-public class Object : TermBase
+public class Object : TermBase, INamedTerm
 {
-    public string Name { get; set; } = null!;
-
     public Note? Note { get; set; }
 
     public Dictionary<string, ObjectField>? Fields { get; set; }
+
+    #region INamedTerm Members
+
+    public string Name { get; set; } = null!;
+
+    #endregion
 
     // Object = "Object" WS Name LC [ Note | ObjectField ] RC
     public static Object? Parse(Mark mark, Scanner scanner) {
@@ -32,13 +36,13 @@ public class Object : TermBase
                 if (scanner.ReadChar('}')) break;
 
                 var note = Note.Parse(mark, scanner);
-                if (note != null) {
+                if (note is not null) {
                     @object.Note += note;
                     continue;
                 }
 
-                var field = ObjectField.Parse(mark, scanner);
-                if (field != null) {
+                var field = ObjectField.Parse(mark, @object, scanner);
+                if (field is not null) {
                     @object.Fields ??= new Dictionary<string, ObjectField>();
                     @object.Fields.Add(field.Name, field);
                     continue;
