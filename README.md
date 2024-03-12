@@ -47,6 +47,8 @@ var builder = WebApplication.CreateBuilder(args)
                                        .UseCodeFlow()
                                        .UseRefreshTokenFlow()
                                        .UseIntrospection();
+
+                                 schema.UseWorkflow();
                              });
 
 var app = builder.Build();
@@ -64,7 +66,7 @@ app.Run();
 - Task
 - Tenant
 - Validation
-- Workflow
+- [Workflow](https://nuget.org/packages/Schemata.Workflow)
 
 ## Features
 
@@ -106,3 +108,4 @@ An extension feature can be activated like a built-in feature.
 | Priority    | Package                           | Feature       | Description                       |
 |-------------|-----------------------------------|---------------|-----------------------------------|
 | 310_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
+| 320_000_000 | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |

@@ -39,4 +39,8 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Workflow.Automatonymous\Schemata.Workflow.Automatonymous.csproj" />
+  </ItemGroup>
+
 </Project>
