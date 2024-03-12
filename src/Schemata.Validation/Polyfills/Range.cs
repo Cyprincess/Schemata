@@ -3,6 +3,7 @@
 // https://github.com/dotnet/runtime/blob/257c3c1dfd004a7afebeecd5ca538e1ea831f50a/src/libraries/System.Private.CoreLib/src/System/Range.cs
 // https://github.com/dotnet/runtime/blob/16b28c704108c691c54a73ad845069aac2e3e282/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/RuntimeHelpers.cs
 
+#if NETSTANDARD2_0
 using System.Runtime.CompilerServices;
 
 // ReSharper disable once CheckNamespace
@@ -167,7 +168,7 @@ namespace System
         /// <param name="end">Represent the exclusive end index of the range.</param>
         public Range(Index start, Index end) {
             Start = start;
-            End   = end;
+            End = end;
         }
 
         /// <summary>Indicates whether the current Range object is equal to another object of the same type.</summary>
@@ -273,3 +274,4 @@ namespace System.Runtime.CompilerServices
         }
     }
 }
+#endif
