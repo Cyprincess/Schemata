@@ -83,9 +83,4 @@ public class SchemataAuthorizationFeature : FeatureBase
                      builder.UseAspNetCore();
                  });
     }
-
-    public override void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment) { }
 }

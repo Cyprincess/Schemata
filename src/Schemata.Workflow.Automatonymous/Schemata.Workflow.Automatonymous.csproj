@@ -6,12 +6,12 @@
 
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
-    <Description>Schemata Application Framework - Advices, Events, Hooks</Description>
-    <PackageTags>application;business;framework</PackageTags>
+    <Description>Schemata Application Framework - Workflow with Automatonymous</Description>
+    <PackageTags>application;business;framework;state;workflow</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Automatonymous" />
   </ItemGroup>
 
   <ItemGroup>

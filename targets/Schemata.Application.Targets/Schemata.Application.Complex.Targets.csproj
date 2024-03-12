@@ -11,6 +11,7 @@
     <UseModularTargets>true</UseModularTargets>
     <UseAuthorization>true</UseAuthorization>
     <UseRepository>true</UseRepository>
+    <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>
 
 </Project>
