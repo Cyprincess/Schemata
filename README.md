@@ -85,7 +85,7 @@ app.Run();
 - [Mapping](https://nuget.org/packages/Schemata.Mapping.Foundation)
 - Task
 - Tenant
-- Validation
+- [Validation](https://nuget.org/packages/Schemata.Validation)
 - [Workflow](https://nuget.org/packages/Schemata.Workflow.Foundation)
 
 ## Features
