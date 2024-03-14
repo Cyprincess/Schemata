@@ -21,18 +21,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)\..\Empty.props" Pack="true">
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.props" Pack="true">
       <PackagePath>build\$(AssemblyName).props</PackagePath>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\Empty.targets" Pack="true">
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.targets" Pack="true">
       <PackagePath>build\$(AssemblyName).targets</PackagePath>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.props" Pack="true" PackagePath="build" />
-    <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.targets" Pack="true" PackagePath="build" />
-    <None Include="$(MSBuildThisFileDirectory)Package.Build.props" Pack="true" PackagePath="build" />
+    <None Include="$(MSBuildThisFileDirectory)Package.Build.props" Pack="true">
+      <PackagePath>build\Package.Build.props</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
