@@ -20,18 +20,11 @@
     <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)\..\Empty.props" Pack="true">
-      <PackagePath>build\$(AssemblyName).props</PackagePath>
-    </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\Empty.targets" Pack="true">
-      <PackagePath>build\$(AssemblyName).targets</PackagePath>
-    </None>
-  </ItemGroup>
-
   <ItemGroup Condition=" '$(UseModularTargets)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Modular\Schemata.Modular.csproj" />
-    <None Include="$(MSBuildThisFileDirectory)Schemata.Application.Modular.Targets.targets" Pack="true" PackagePath="build" />
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Application.Modular.Targets.targets" Pack="true">
+      <PackagePath>build\$(AssemblyName).targets</PackagePath>
+    </None>
   </ItemGroup>
   <ItemGroup Condition=" '$(UseModularTargets)' == '' ">
     <None Remove="Schemata.Application.Modular.Targets.targets" />
