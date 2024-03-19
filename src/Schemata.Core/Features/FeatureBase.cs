@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata.Features;
+namespace Schemata.Core.Features;
 
 public abstract class FeatureBase : ISimpleFeature
 {

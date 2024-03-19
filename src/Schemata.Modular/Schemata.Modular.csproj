@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Schemata\Schemata.csproj" />
+    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Schemata\Schemata.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Core\Schemata.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">

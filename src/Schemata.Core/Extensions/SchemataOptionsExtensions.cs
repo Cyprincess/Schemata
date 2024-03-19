@@ -3,9 +3,9 @@
 using System;
 using System.Collections.Generic;
 using Schemata.Abstractions;
-using Schemata.Features;
+using Schemata.Core.Features;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public static class SchemataOptionsExtensions
 {

@@ -2,7 +2,7 @@
 
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata;
+using Schemata.Core;
 
 namespace Microsoft.AspNetCore.Builder;
 

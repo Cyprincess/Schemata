@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public class SchemataBuilder(
     IServiceCollection  services,

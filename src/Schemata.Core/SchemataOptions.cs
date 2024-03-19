@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public class SchemataOptions
 {

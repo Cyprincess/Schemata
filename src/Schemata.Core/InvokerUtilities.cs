@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public static class InvokerUtilities
 {
