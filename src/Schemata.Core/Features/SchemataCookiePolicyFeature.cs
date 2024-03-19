@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata.Features;
+namespace Schemata.Core.Features;
 
 public class SchemataCookiePolicyFeature : FeatureBase
 {

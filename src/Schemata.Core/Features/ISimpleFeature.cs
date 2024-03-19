@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 
-namespace Schemata.Features;
+namespace Schemata.Core.Features;
 
 public interface ISimpleFeature : IFeature
 {

@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using Schemata.Abstractions;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public static class ModularOptionsExtensions
 {

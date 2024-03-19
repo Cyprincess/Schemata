@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata;
+using Schemata.Core;
 using Schemata.Modular;
 
 namespace Microsoft.AspNetCore.Builder;

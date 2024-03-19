@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata;
-using Schemata.Features;
+using Schemata.Core;
+using Schemata.Core.Features;
 
 namespace Microsoft.AspNetCore.Builder;
 

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public class Configurators
 {

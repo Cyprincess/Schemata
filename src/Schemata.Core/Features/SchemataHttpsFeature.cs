@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
-namespace Schemata.Features;
+namespace Schemata.Core.Features;
 
 public class SchemataHttpsFeature : FeatureBase
 {

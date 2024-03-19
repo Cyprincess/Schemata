@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 
-namespace Schemata.Features;
+namespace Schemata.Core.Features;
 
 public class SchemataStaticFilesFeature : FeatureBase
 {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 
-namespace Schemata;
+namespace Schemata.Core;
 
 public class SchemataStartup : IStartupFilter
 {
