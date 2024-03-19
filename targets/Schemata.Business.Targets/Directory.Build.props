@@ -13,7 +13,8 @@
   <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
     <ProjectReference Include="..\..\generators\Schemata.DSL\Schemata.DSL.csproj" PrivateAssets="all" />
 
-    <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\Schemata.DSL.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>

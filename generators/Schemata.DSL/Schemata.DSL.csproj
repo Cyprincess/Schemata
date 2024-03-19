@@ -18,13 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="$(PkgParlot)\lib\netstandard2.0\*.dll" CopyToOutputDirectory="PreserveNewest" />
 
-    <None Include="$(OutputPath)\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>
