@@ -5,11 +5,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
+#if NET8_0_OR_GREATER
+using Microsoft.AspNetCore.RateLimiting;
+#endif
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -67,6 +69,22 @@ public static class SchemataBuilderExtensions
 
         return builder;
     }
+
+    #endregion
+
+    #region Routing Feature
+
+#if NET8_0_OR_GREATER
+    public static SchemataBuilder UseQuota(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
+
+        builder.Options.AddFeature<SchemataQuotaFeature>();
+
+        return builder;
+    }
+
+#endif
 
     #endregion
 
