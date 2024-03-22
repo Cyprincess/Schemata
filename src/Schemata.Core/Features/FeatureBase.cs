@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,10 +20,15 @@ public abstract class FeatureBase : ISimpleFeature
         IConfiguration      configuration,
         IWebHostEnvironment environment) { }
 
-    public virtual void Configure(
+    public virtual void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) { }
+
+    public virtual void ConfigureEndpoint(
+        IEndpointRouteBuilder endpoint,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment) { }
 
     #endregion
 }

@@ -9,7 +9,7 @@ public class SchemataDeveloperExceptionPageFeature : FeatureBase
 {
     public override int Priority => 110_000_000;
 
-    public override void Configure(
+    public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

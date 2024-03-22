@@ -22,6 +22,8 @@ public class SchemataStartup : IStartupFilter
             app.UseSchemata(_configuration, _environment);
 
             next(app);
+
+            app.UseEndpoints(endpoints => { endpoints.UseSchemata(app, _configuration, _environment); });
         };
     }
 

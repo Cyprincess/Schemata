@@ -17,7 +17,7 @@ public class SchemataRoutingFeature : FeatureBase
         services.AddRouting();
     }
 
-    public override void Configure(
+    public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

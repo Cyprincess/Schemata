@@ -4,6 +4,8 @@ using System;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
@@ -143,6 +145,32 @@ public static class SchemataBuilderExtensions
         builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
 
         builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataSessionFeature>(); });
+
+        return builder;
+    }
+
+    #endregion
+
+    #region Page Feature
+
+    public static SchemataBuilder UsePage(this SchemataBuilder builder, Action<RazorPagesOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
+
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataPageFeature>(); });
+
+        return builder;
+    }
+
+    #endregion
+
+    #region Controller Feature
+
+    public static SchemataBuilder UseController(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
+
+        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataControllerFeature>(); });
 
         return builder;
     }

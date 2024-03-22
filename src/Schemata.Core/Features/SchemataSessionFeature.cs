@@ -18,7 +18,7 @@ public class SchemataSessionFeature : FeatureBase
         services.AddSession(configure);
     }
 
-    public override void Configure(
+    public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

@@ -19,7 +19,7 @@ public class SchemataCorsFeature : FeatureBase
         services.AddCors(configure);
     }
 
-    public override void Configure(
+    public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

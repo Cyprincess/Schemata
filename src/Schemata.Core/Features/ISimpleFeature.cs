@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
@@ -14,5 +15,13 @@ public interface ISimpleFeature : IFeature
         IConfiguration      configuration,
         IWebHostEnvironment environment);
 
-    public void Configure(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
+    public void ConfigureApplication(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment);
+
+    public void ConfigureEndpoint(
+        IEndpointRouteBuilder endpoint,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment);
 }

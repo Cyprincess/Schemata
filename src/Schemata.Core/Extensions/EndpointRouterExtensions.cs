@@ -2,32 +2,34 @@
 
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 
 namespace Microsoft.AspNetCore.Builder;
 
-public static class ApplicationBuilderExtensions
+public static class EndpointRouterExtensions
 {
-    public static IApplicationBuilder UseSchemata(
-        this IApplicationBuilder app,
-        IConfiguration           configuration,
-        IWebHostEnvironment      environment) {
+    public static IEndpointRouteBuilder UseSchemata(
+        this IEndpointRouteBuilder endpoint,
+        IApplicationBuilder        app,
+        IConfiguration             configuration,
+        IWebHostEnvironment        environment) {
         var sp = app.ApplicationServices;
 
         var options = sp.GetRequiredService<SchemataOptions>();
 
-        UseFeatures(app, configuration, environment, options);
+        UseFeatures(endpoint, configuration, environment, options);
 
-        return app;
+        return endpoint;
     }
 
     private static void UseFeatures(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment,
-        SchemataOptions     options) {
+        IEndpointRouteBuilder endpoint,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment,
+        SchemataOptions       options) {
         var modules = options.GetFeatures();
         if (modules is null) {
             return;
@@ -38,7 +40,7 @@ public static class ApplicationBuilderExtensions
         features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var feature in features) {
-            feature.ConfigureApplication(app, configuration, environment);
+            feature.ConfigureEndpoint(endpoint, configuration, environment);
         }
     }
 }
