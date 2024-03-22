@@ -7,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
-public class SchemataControllerFeature : FeatureBase
+public class SchemataControllersFeature : FeatureBase
 {
-    public override int Priority => 220_000_000;
+    public override int Priority => 210_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
