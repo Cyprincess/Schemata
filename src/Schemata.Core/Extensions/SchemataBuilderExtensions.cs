@@ -18,9 +18,7 @@ public static class SchemataBuilderExtensions
     #region Developer Exception Page Feature
 
     public static SchemataBuilder UseDeveloperExceptionPage(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => {
-            options.AddFeature<SchemataDeveloperExceptionPageFeature>();
-        });
+        builder.Options.AddFeature<SchemataDeveloperExceptionPageFeature>();
 
         return builder;
     }
@@ -30,7 +28,7 @@ public static class SchemataBuilderExtensions
     #region HTTPS Feature
 
     public static SchemataBuilder UseHttps(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataHttpsFeature>(); });
+        builder.Options.AddFeature<SchemataHttpsFeature>();
 
         return builder;
     }
@@ -40,7 +38,7 @@ public static class SchemataBuilderExtensions
     #region Static Files Feature
 
     public static SchemataBuilder UseStaticFiles(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataStaticFilesFeature>(); });
+        builder.Options.AddFeature<SchemataStaticFilesFeature>();
 
         return builder;
     }
@@ -55,7 +53,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataCookiePolicyFeature>(); });
+        builder.Options.AddFeature<SchemataCookiePolicyFeature>();
 
         return builder;
     }
@@ -65,7 +63,7 @@ public static class SchemataBuilderExtensions
     #region Routing Feature
 
     public static SchemataBuilder UseRouting(this SchemataBuilder builder) {
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataRoutingFeature>(); });
+        builder.Options.AddFeature<SchemataRoutingFeature>();
 
         return builder;
     }
@@ -78,7 +76,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataCorsFeature>(); });
+        builder.Options.AddFeature<SchemataCorsFeature>();
 
         return builder;
     }
@@ -124,7 +122,7 @@ public static class SchemataBuilderExtensions
         authorize ??= _ => { };
         builder.Configurators.TryAdd(authorize);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataAuthenticationFeature>(); });
+        builder.Options.AddFeature<SchemataAuthenticationFeature>();
 
         return builder;
     }
@@ -142,9 +140,9 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
+        builder.Options.AddFeature<SchemataSessionFeature>();
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataSessionFeature>(); });
+        builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
 
         return builder;
     }
@@ -157,7 +155,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataPageFeature>(); });
+        builder.Options.AddFeature<SchemataPageFeature>();
 
         return builder;
     }
@@ -170,7 +168,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.Configure((SchemataOptions options) => { options.AddFeature<SchemataControllerFeature>(); });
+        builder.Options.AddFeature<SchemataControllerFeature>();
 
         return builder;
     }

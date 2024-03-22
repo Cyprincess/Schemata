@@ -8,7 +8,7 @@ public class Configurators
     private readonly Dictionary<Type, object> _configurators = new();
 
     public void TryAdd<T>(Action<T> action) {
-        if (!_configurators.ContainsKey(typeof(T))) {
+        if (_configurators.ContainsKey(typeof(T))) {
             return;
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Schemata.Core;
 
@@ -10,15 +11,16 @@ public class SchemataBuilder(
     IServiceCollection  services,
     IConfiguration      configuration,
     IWebHostEnvironment environment,
+    Configurators       configurators,
     SchemataOptions     options)
 {
-    public readonly IConfiguration Configuration = configuration;
-
-    public readonly Configurators       Configurators = new();
-    public readonly IWebHostEnvironment Environment   = environment;
-    public readonly SchemataOptions     Options       = options;
-
     private readonly List<Action<IServiceCollection>> _actions = [];
+
+    public readonly IConfiguration      Configuration = configuration;
+    public readonly IWebHostEnvironment Environment   = environment;
+
+    public readonly Configurators   Configurators = configurators;
+    public readonly SchemataOptions Options       = options;
 
     public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {
@@ -42,6 +44,9 @@ public class SchemataBuilder(
         foreach (var action in _actions) {
             action.Invoke(services);
         }
+
+        services.TryAddSingleton(Configurators);
+        services.TryAddSingleton(Options);
 
         return services;
     }
