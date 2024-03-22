@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,8 @@ public class SchemataBuilder(
     public readonly IWebHostEnvironment Environment   = environment;
     public readonly SchemataOptions     Options       = options;
 
+    private readonly List<Action<IServiceCollection>> _actions = [];
+
     public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {
         return Configure(Microsoft.Extensions.Options.Options.DefaultName, configure);
@@ -30,12 +33,16 @@ public class SchemataBuilder(
     }
 
     public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
-        action.Invoke(services);
+        _actions.Add(action);
 
         return this;
     }
 
     public IServiceCollection Build() {
+        foreach (var action in _actions) {
+            action.Invoke(services);
+        }
+
         return services;
     }
 }

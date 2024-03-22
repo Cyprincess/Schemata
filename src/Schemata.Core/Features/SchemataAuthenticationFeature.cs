@@ -26,7 +26,7 @@ public class SchemataAuthenticationFeature : FeatureBase
         services.AddAuthorization(authorize);
     }
 
-    public override void Configure(
+    public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

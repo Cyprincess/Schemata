@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,5 +13,14 @@ public interface IModulesRunner
         IConfiguration      configuration,
         IWebHostEnvironment environment);
 
-    public void Configure(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
+    public void ConfigureApplication(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment);
+
+    public void ConfigureEndpoints(
+        IEndpointRouteBuilder endpoint,
+        IApplicationBuilder   app,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment);
 }

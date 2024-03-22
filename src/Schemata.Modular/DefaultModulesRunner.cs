@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -34,14 +35,21 @@ public class DefaultModulesRunner : IModulesRunner
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
 
         foreach (var startup in startups) {
-            InvokerUtilities.CallMethod(startup, nameof(ConfigureServices), services, configuration, environment);
-
             services.TryAddSingleton(startup.GetType(), _ => startup);
             services.TryAddEnumerableSingleton(typeof(IModule), startup.GetType());
+
+            if (startup.GetType().GetMethod(nameof(ConfigureServices)) is null) {
+                continue;
+            }
+
+            InvokerUtilities.CallMethod(startup, nameof(ConfigureServices), services, configuration, environment);
         }
     }
 
-    public void Configure(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment) {
+    public void ConfigureApplication(
+        IApplicationBuilder app,
+        IConfiguration      configuration,
+        IWebHostEnvironment environment) {
         var modules = _options.GetModules();
         if (modules is not { Count: > 0 }) {
             return;
@@ -54,7 +62,36 @@ public class DefaultModulesRunner : IModulesRunner
         startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var startup in startups) {
-            InvokerUtilities.CallMethod(sp, startup, nameof(Configure), app, configuration, environment);
+            if (startup.GetType().GetMethod(nameof(ConfigureApplication)) is null) {
+                continue;
+            }
+
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication), app, configuration, environment);
+        }
+    }
+
+    public void ConfigureEndpoints(
+        IEndpointRouteBuilder endpoint,
+        IApplicationBuilder   app,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment) {
+        var modules = _options.GetModules();
+        if (modules is not { Count: > 0 }) {
+            return;
+        }
+
+        var sp = app.ApplicationServices;
+
+        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m)!).ToList();
+
+        startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
+
+        foreach (var startup in startups) {
+            if (startup.GetType().GetMethod(nameof(ConfigureEndpoints)) is null) {
+                continue;
+            }
+
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), app, configuration, environment);
         }
     }
 
