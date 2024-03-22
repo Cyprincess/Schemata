@@ -34,8 +34,7 @@ var builder = WebApplication.CreateBuilder(args)
                                  });
                                  schema.UseSession();
 
-                                 schema.UsePage();
-                                 schema.UseController();
+                                 schema.UseControllers();
 
                                  schema.UseModular();
                              });

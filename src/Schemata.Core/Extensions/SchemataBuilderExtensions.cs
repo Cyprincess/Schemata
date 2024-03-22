@@ -149,26 +149,13 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
-    #region Page Feature
-
-    public static SchemataBuilder UsePage(this SchemataBuilder builder, Action<RazorPagesOptions>? configure = null) {
-        configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
-
-        builder.Options.AddFeature<SchemataPageFeature>();
-
-        return builder;
-    }
-
-    #endregion
-
     #region Controller Feature
 
-    public static SchemataBuilder UseController(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
+    public static SchemataBuilder UseControllers(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
         configure ??= _ => { };
         builder.Configurators.TryAdd(configure);
 
-        builder.Options.AddFeature<SchemataControllerFeature>();
+        builder.Options.AddFeature<SchemataControllersFeature>();
 
         return builder;
     }

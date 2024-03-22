@@ -17,7 +17,8 @@ public static class SchemataOptionsExtensions
         options.Set(Constants.Options.Features, value);
     }
 
-    public static void AddFeature<T>(this SchemataOptions options) {
+    public static void AddFeature<T>(this SchemataOptions options)
+        where T : ISimpleFeature {
         AddFeature(options, typeof(T));
     }
 
@@ -26,9 +27,9 @@ public static class SchemataOptionsExtensions
         AddFeature(options, value);
     }
 
-    public static void AddFeature(this SchemataOptions options, ISimpleFeature value) {
+    public static void AddFeature(this SchemataOptions options, ISimpleFeature feature) {
         var features = GetFeatures(options) ?? [];
-        features.Add(value);
+        features.Add(feature);
         options.SetFeatures(features);
     }
 }
