@@ -35,7 +35,7 @@ public static class SchemataBuilderExtensions
                 services);
             services.TryAddSingleton<IModulesRunner>(_ => runner);
 
-            services.TryAddEnumerableSingleton<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
+            services.AddTransient<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
                 builder.Options,       // Avoid accessing the builder.Configure() method
                 builder.Configuration, // and builder.ConfigureServices() method
                 builder.Environment,   // after building the service provider.

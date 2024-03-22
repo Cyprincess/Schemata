@@ -64,16 +64,17 @@ public static class ServiceCollectionExtensions
         IWebHostEnvironment      environment,
         Action<SchemataBuilder>? schema,
         Action<SchemataOptions>? configure) {
-        services.TryAddEnumerableSingleton<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(
-            configuration, //
-            environment    //
+        services.AddTransient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create( //
+            configuration,                                                                  //
+            environment                                                                     //
         ));
+
+        var configurators = new Configurators();
 
         var options = new SchemataOptions();
         configure?.Invoke(options);
-        services.AddSingleton(options);
 
-        var builder = new SchemataBuilder(services, configuration, environment, options);
+        var builder = new SchemataBuilder(services, configuration, environment, configurators, options);
 
         schema?.Invoke(builder);
 
