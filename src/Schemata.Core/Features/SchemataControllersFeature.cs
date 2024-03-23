@@ -20,10 +20,10 @@ public class SchemataControllersFeature : FeatureBase
         services.AddControllers(configure);
     }
 
-    public override void ConfigureEndpoint(
-        IEndpointRouteBuilder endpoint,
+    public override void ConfigureEndpoints(
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {
-        endpoint.MapDefaultControllerRoute();
+        endpoints.MapDefaultControllerRoute();
     }
 }

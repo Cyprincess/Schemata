@@ -20,8 +20,8 @@ public interface ISimpleFeature : IFeature
         IConfiguration      configuration,
         IWebHostEnvironment environment);
 
-    public void ConfigureEndpoint(
-        IEndpointRouteBuilder endpoint,
+    public void ConfigureEndpoints(
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment);
 }

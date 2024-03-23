@@ -36,7 +36,7 @@ public class DefaultModulesRunner : IModulesRunner
 
         foreach (var startup in startups) {
             services.TryAddSingleton(startup.GetType(), _ => startup);
-            services.TryAddEnumerableSingleton(typeof(IModule), startup.GetType());
+            services.TryAddEnumerableSingleton<IModule>(_ => startup);
 
             if (startup.GetType().GetMethod(nameof(ConfigureServices)) is null) {
                 continue;
@@ -71,8 +71,8 @@ public class DefaultModulesRunner : IModulesRunner
     }
 
     public void ConfigureEndpoints(
-        IEndpointRouteBuilder endpoint,
         IApplicationBuilder   app,
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {
         var modules = _options.GetModules();
@@ -91,7 +91,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), app, configuration, environment);
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), app, endpoints, configuration, environment);
         }
     }
 

@@ -9,11 +9,11 @@ namespace Schemata.Core;
 
 public static class SchemataOptionsExtensions
 {
-    public static HashSet<ISimpleFeature>? GetFeatures(this SchemataOptions options) {
-        return options.Get<HashSet<ISimpleFeature>>(Constants.Options.Features);
+    public static Dictionary<Type, ISimpleFeature>? GetFeatures(this SchemataOptions options) {
+        return options.Get<Dictionary<Type, ISimpleFeature>>(Constants.Options.Features);
     }
 
-    public static void SetFeatures(this SchemataOptions options, HashSet<ISimpleFeature>? value) {
+    public static void SetFeatures(this SchemataOptions options, Dictionary<Type, ISimpleFeature>? value) {
         options.Set(Constants.Options.Features, value);
     }
 
@@ -23,13 +23,23 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, Type type) {
-        var value = (ISimpleFeature)Activator.CreateInstance(type)!;
-        AddFeature(options, value);
+        var feature = (ISimpleFeature)Activator.CreateInstance(type)!;
+        AddFeature(options, type, feature);
     }
 
-    public static void AddFeature(this SchemataOptions options, ISimpleFeature feature) {
+    public static void AddFeature(this SchemataOptions options, Type type, ISimpleFeature feature) {
         var features = GetFeatures(options) ?? [];
-        features.Add(feature);
+        features[type] = feature;
         options.SetFeatures(features);
+    }
+
+    public static bool HasFeature<T>(this SchemataOptions options)
+        where T : ISimpleFeature {
+        return HasFeature(options, typeof(T));
+    }
+
+    public static bool HasFeature(this SchemataOptions options, Type type) {
+        var features = GetFeatures(options);
+        return features?.ContainsKey(type) ?? false;
     }
 }

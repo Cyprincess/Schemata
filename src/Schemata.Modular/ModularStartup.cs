@@ -25,13 +25,13 @@ public class ModularStartup : IStartupFilter
 
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) {
         return app => {
+            app.UseModularControllers();
+
             next(app);
 
-            _runner.ConfigureApplication(app, _configuration, _environment);
+            app.UseModular(_runner, _configuration, _environment);
 
-            app.UseEndpoints(endpoints => {
-                _runner.ConfigureEndpoints(endpoints, app, _configuration, _environment);
-            });
+            app.UseEndpoints(endpoints => { endpoints.UseModular(app, _runner, _configuration, _environment); });
         };
     }
 

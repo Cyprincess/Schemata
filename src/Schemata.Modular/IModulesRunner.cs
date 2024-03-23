@@ -19,8 +19,8 @@ public interface IModulesRunner
         IWebHostEnvironment environment);
 
     public void ConfigureEndpoints(
-        IEndpointRouteBuilder endpoint,
         IApplicationBuilder   app,
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment);
 }
