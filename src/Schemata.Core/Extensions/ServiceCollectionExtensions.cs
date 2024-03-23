@@ -11,6 +11,14 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection TryAddEnumerableSingleton<T>(
+        this IServiceCollection   services,
+        Func<IServiceProvider, T> factory)
+        where T : class {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton(factory));
+        return services;
+    }
+
     public static IServiceCollection TryAddEnumerableSingleton<T, TI>(
         this IServiceCollection    services,
         Func<IServiceProvider, TI> factory)
@@ -90,7 +98,7 @@ public static class ServiceCollectionExtensions
                 return;
             }
 
-            var features = modules.ToList();
+            var features = modules.Values.ToList();
 
             features.Sort((a, b) => a.Order.CompareTo(b.Order));
 

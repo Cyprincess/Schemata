@@ -9,10 +9,10 @@ using Schemata.Core;
 
 namespace Microsoft.AspNetCore.Builder;
 
-public static class EndpointRouterExtensions
+public static class EndpointBuilderExtensions
 {
     public static IEndpointRouteBuilder UseSchemata(
-        this IEndpointRouteBuilder endpoint,
+        this IEndpointRouteBuilder endpoints,
         IApplicationBuilder        app,
         IConfiguration             configuration,
         IWebHostEnvironment        environment) {
@@ -20,13 +20,13 @@ public static class EndpointRouterExtensions
 
         var options = sp.GetRequiredService<SchemataOptions>();
 
-        UseFeatures(endpoint, configuration, environment, options);
+        UseFeatures(endpoints, configuration, environment, options);
 
-        return endpoint;
+        return endpoints;
     }
 
     private static void UseFeatures(
-        IEndpointRouteBuilder endpoint,
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment,
         SchemataOptions       options) {
@@ -35,12 +35,12 @@ public static class EndpointRouterExtensions
             return;
         }
 
-        var features = modules.ToList();
+        var features = modules.Values.ToList();
 
         features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var feature in features) {
-            feature.ConfigureEndpoint(endpoint, configuration, environment);
+            feature.ConfigureEndpoints(endpoints, configuration, environment);
         }
     }
 }

@@ -25,8 +25,8 @@ public abstract class FeatureBase : ISimpleFeature
         IConfiguration      configuration,
         IWebHostEnvironment environment) { }
 
-    public virtual void ConfigureEndpoint(
-        IEndpointRouteBuilder endpoint,
+    public virtual void ConfigureEndpoints(
+        IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) { }
 

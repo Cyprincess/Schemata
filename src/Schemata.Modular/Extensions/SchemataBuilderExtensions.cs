@@ -3,9 +3,11 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
+using Schemata.Core.Features;
 using Schemata.Modular;
 
 namespace Microsoft.AspNetCore.Builder;
@@ -25,6 +27,17 @@ public static class SchemataBuilderExtensions
         builder.ConfigureServices(services => {
             foreach (var provider in providers) {
                 services.TryAddEnumerableSingleton(typeof(IModulesProvider), provider);
+            }
+
+            if (builder.Options.HasFeature<SchemataControllersFeature>()) {
+                var part = new ModularApplicationPart();
+
+                services.AddSingleton(part);
+                services.AddSingleton<IActionDescriptorChangeProvider>(part);
+
+                services.AddMvcCore().ConfigureApplicationPartManager(manager => {
+                    manager.ApplicationParts.Add(part);
+                });
             }
 
             // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,

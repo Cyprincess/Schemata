@@ -33,7 +33,7 @@ public static class ApplicationBuilderExtensions
             return;
         }
 
-        var features = modules.ToList();
+        var features = modules.Values.ToList();
 
         features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 

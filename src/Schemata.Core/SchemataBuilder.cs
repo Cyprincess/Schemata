@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Schemata.Core;
 
@@ -45,8 +44,7 @@ public class SchemataBuilder(
             action.Invoke(services);
         }
 
-        services.TryAddSingleton(Configurators);
-        services.TryAddSingleton(Options);
+        services.AddSingleton(Options);
 
         return services;
     }
