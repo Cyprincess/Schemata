@@ -43,7 +43,7 @@ public static class InvokerUtilities
             arguments[i] = provider.GetRequiredService(parameter.ParameterType);
         }
 
-        return Activator.CreateInstance(type, parameters);
+        return Activator.CreateInstance(type, arguments);
     }
 
     public static void CallMethod(object instance, string method, params object?[] parameters) {
