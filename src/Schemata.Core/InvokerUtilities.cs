@@ -8,6 +8,44 @@ namespace Schemata.Core;
 
 public static class InvokerUtilities
 {
+    public static object? CreateInstance(Type type, params object?[] parameters) {
+        return CreateInstance(null, type, parameters.ToList());
+    }
+
+    public static object? CreateInstance(IServiceProvider provider, Type type, params object?[] parameters) {
+        return CreateInstance(provider, type, parameters.ToList());
+    }
+
+    public static object? CreateInstance(IServiceProvider? provider, Type type, List<object?>? parameters = null) {
+        var ci = type.GetConstructors().FirstOrDefault();
+        if (ci is null) {
+            return null;
+        }
+
+        var pi        = ci.GetParameters();
+        var arguments = new object?[pi.Length];
+        for (var i = 0; i < pi.Length; i++) {
+            var parameter = pi[i];
+
+            if (parameters?.FirstOrDefault(p => parameter.ParameterType.IsAssignableFrom(p?.GetType())) is not null) {
+                arguments[i] = parameters[i];
+                continue;
+            }
+
+            if (provider is null) {
+                throw new InvalidOperationException($"Cannot resolve parameter '{
+                    parameter.Name
+                }' of type '{
+                    type.FullName
+                }'.");
+            }
+
+            arguments[i] = provider.GetRequiredService(parameter.ParameterType);
+        }
+
+        return Activator.CreateInstance(type, parameters);
+    }
+
     public static void CallMethod(object instance, string method, params object?[] parameters) {
         CallMethod(null, instance, method, parameters.ToList());
     }
