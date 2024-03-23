@@ -11,38 +11,6 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection TryAddEnumerableSingleton<T>(
-        this IServiceCollection   services,
-        Func<IServiceProvider, T> factory)
-        where T : class {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton(factory));
-        return services;
-    }
-
-    public static IServiceCollection TryAddEnumerableSingleton<T, TI>(
-        this IServiceCollection    services,
-        Func<IServiceProvider, TI> factory)
-        where T : class
-        where TI : class, T {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<T, TI>(factory));
-        return services;
-    }
-
-    public static IServiceCollection TryAddEnumerableSingleton<T, TI>(this IServiceCollection services)
-        where T : class
-        where TI : class, T {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<T, TI>());
-        return services;
-    }
-
-    public static IServiceCollection TryAddEnumerableSingleton(
-        this IServiceCollection services,
-        Type                    service,
-        Type                    implementation) {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton(service, implementation));
-        return services;
-    }
-
     public static IServiceCollection AddSchemata(
         this IServiceCollection services,
         IConfiguration          configuration,

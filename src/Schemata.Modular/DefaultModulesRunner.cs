@@ -30,13 +30,13 @@ public class DefaultModulesRunner : IModulesRunner
             return;
         }
 
-        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m)!).ToList();
+        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m.EntryType)!).ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
 
         foreach (var startup in startups) {
             services.TryAddSingleton(startup.GetType(), _ => startup);
-            services.TryAddEnumerableSingleton<IModule>(_ => startup);
+            services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IModule), startup));
 
             if (startup.GetType().GetMethod(nameof(ConfigureServices)) is null) {
                 continue;
@@ -50,14 +50,9 @@ public class DefaultModulesRunner : IModulesRunner
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var modules = _options.GetModules();
-        if (modules is not { Count: > 0 }) {
-            return;
-        }
-
         var sp = app.ApplicationServices;
 
-        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m)!).ToList();
+        var startups = sp.GetServices<IModule>().ToList();
 
         startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
@@ -66,7 +61,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication));
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication), app);
         }
     }
 
@@ -75,14 +70,9 @@ public class DefaultModulesRunner : IModulesRunner
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {
-        var modules = _options.GetModules();
-        if (modules is not { Count: > 0 }) {
-            return;
-        }
-
         var sp = app.ApplicationServices;
 
-        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m)!).ToList();
+        var startups = sp.GetServices<IModule>().ToList();
 
         startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
@@ -91,7 +81,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints));
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), endpoints, app);
         }
     }
 
