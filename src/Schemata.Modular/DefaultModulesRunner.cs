@@ -66,7 +66,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication), app, configuration, environment);
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication));
         }
     }
 
@@ -91,7 +91,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), app, endpoints, configuration, environment);
+            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints));
         }
     }
 
