@@ -2,6 +2,7 @@
 
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Core;
 
 namespace Microsoft.AspNetCore.Hosting;
