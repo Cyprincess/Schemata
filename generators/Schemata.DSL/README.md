@@ -2,9 +2,9 @@
 
 Writing Schemata DSL for business entities, and generate database models, view models, mapping, validation, and so on.
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Cypriness/Schemata/build.yml)](https://github.com/Cypriness/Schemata/actions/workflows/build.yml)
-[![Codecov](https://img.shields.io/codecov/c/github/Cypriness/Schemata.svg)](https://codecov.io/gh/Cypriness/Schemata)
-[![license](https://img.shields.io/github/license/Cypriness/Schemata.svg)](https://github.com/Cypriness/Schemata/blob/master/LICENSE)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Cyprincess/Schemata/build.yml)](https://github.com/Cyprincess/Schemata/actions/workflows/build.yml)
+[![Codecov](https://img.shields.io/codecov/c/github/Cyprincess/Schemata.svg)](https://codecov.io/gh/Cyprincess/Schemata)
+[![license](https://img.shields.io/github/license/Cyprincess/Schemata.svg)](https://github.com/Cyprincess/Schemata/blob/master/LICENSE)
 
 ## Quick Start
 
