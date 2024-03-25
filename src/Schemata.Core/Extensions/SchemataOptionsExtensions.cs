@@ -23,7 +23,7 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, Type type) {
-        var feature = (ISimpleFeature)Utilities.CreateInstance(type, Utilities.CreateLogger(options.Logger, type))!;
+        var feature = Utilities.CreateInstance<ISimpleFeature>(type, Utilities.CreateLogger(options.Logger, type))!;
         AddFeature(options, type, feature);
     }
 
