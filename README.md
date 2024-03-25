@@ -19,6 +19,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args)
                             .UseSchemata(schema => {
+                                 schema.UseLogging();
+                                 schema.UseHttpLogging();
+                                 schema.UseW3CLogging();
+
                                  schema.UseDeveloperExceptionPage();
                                  schema.UseHttps();
                                  schema.UseStaticFiles();

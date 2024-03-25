@@ -4,9 +4,11 @@ using System;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
 #if NET8_0_OR_GREATER
@@ -17,6 +19,55 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class SchemataBuilderExtensions
 {
+    #region Logging Feature
+
+    public static SchemataBuilder UseLogging(this SchemataBuilder builder, Action<ILoggingBuilder>? configure = null) {
+        configure ??= logging => {
+            // Add console logger by default
+            logging.AddConsole();
+        };
+
+        builder.Configurators.TryAdd(configure);
+
+        builder.Options.Logger = LoggerFactory.Create(configure);
+
+        builder.Options.AddFeature<SchemataLoggingFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
+    #region HTTP Logging Feature
+
+    public static SchemataBuilder UseHttpLogging(
+        this SchemataBuilder        builder,
+        Action<HttpLoggingOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
+
+        builder.Options.AddFeature<SchemataHttpLoggingFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
+    #region W3C Logging Feature
+
+    public static SchemataBuilder UseW3CLogging(
+        this SchemataBuilder      builder,
+        Action<W3CLoggerOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configurators.TryAdd(configure);
+
+        builder.Options.AddFeature<SchemataW3CLoggingFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
     #region Developer Exception Page Feature
 
     public static SchemataBuilder UseDeveloperExceptionPage(this SchemataBuilder builder) {

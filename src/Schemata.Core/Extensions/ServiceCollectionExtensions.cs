@@ -4,7 +4,6 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
-using Schemata.Abstractions;
 using Schemata.Core;
 
 namespace Microsoft.Extensions.DependencyInjection;

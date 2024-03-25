@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -6,7 +5,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Modular;
 using Schemata.Core;
 
@@ -31,7 +29,10 @@ public class DefaultModulesRunner : IModulesRunner
             return;
         }
 
-        var startups = modules.Select(m => (IModule)Activator.CreateInstance(m.EntryType)!).ToList();
+        var startups = modules.Select(m =>
+                                   (IModule)Utilities.CreateInstance(m.EntryType,
+                                       Utilities.CreateLogger(_options.Logger, m.EntryType))!)
+                              .ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
 
@@ -43,7 +44,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(startup, nameof(ConfigureServices), services, configuration, environment);
+            Utilities.CallMethod(startup, nameof(ConfigureServices), services, configuration, environment);
         }
     }
 
@@ -62,7 +63,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureApplication), app);
+            Utilities.CallMethod(sp, startup, nameof(ConfigureApplication), app);
         }
     }
 
@@ -82,7 +83,7 @@ public class DefaultModulesRunner : IModulesRunner
                 continue;
             }
 
-            InvokerUtilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), endpoints, app);
+            Utilities.CallMethod(sp, startup, nameof(ConfigureEndpoints), endpoints, app);
         }
     }
 
