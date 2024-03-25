@@ -16,19 +16,25 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     public static SchemataBuilder UseModular(this SchemataBuilder builder) {
-        return UseModular(builder, new[] { typeof(DefaultModulesProvider) });
+        return UseModular<DefaultModulesRunner>(builder);
     }
 
-    public static SchemataBuilder UseModular<T>(this SchemataBuilder builder)
-        where T : class, IModulesProvider {
-        return UseModular(builder, new[] { typeof(T) });
+    public static SchemataBuilder UseModular<TRunner>(this SchemataBuilder builder)
+        where TRunner : class, IModulesRunner {
+        return UseModular(builder, typeof(TRunner), new[] { typeof(DefaultModulesProvider) });
     }
 
-    public static SchemataBuilder UseModular(this SchemataBuilder builder, IEnumerable<Type> providers) {
+    public static SchemataBuilder UseModular<TRunner>(this SchemataBuilder builder, IEnumerable<Type> providers)
+        where TRunner : class, IModulesRunner {
+        return UseModular(builder, typeof(TRunner), providers);
+    }
+
+    public static SchemataBuilder UseModular(this SchemataBuilder builder, Type runner, IEnumerable<Type> providers) {
         builder.ConfigureServices(services => {
             var modules = providers
-                         .Select(p => Utilities.CreateInstance(p, Utilities.CreateLogger(builder.Options.Logger, p),
-                              builder.Configuration, builder.Environment))
+                         .Select(p => Utilities.CreateInstance<IModulesProvider>(p,
+                              Utilities.CreateLogger(builder.Options.Logger, p), builder.Configuration,
+                              builder.Environment))
                          .OfType<IModulesProvider>()
                          .SelectMany(p => p.GetModules())
                          .ToList();
@@ -46,12 +52,10 @@ public static class SchemataBuilderExtensions
 
             // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,
             // we create a runner here instead of in the delegate.
-            var runner = DefaultModulesRunner.Create( //
-                builder.Options,                      // Avoid accessing the builder.Configure() method
-                builder.Configuration,                // and builder.ConfigureServices() method
-                builder.Environment,                  // after building the service provider.
-                services);
-            services.TryAddSingleton<IModulesRunner>(_ => runner);
+            var run = Utilities.CreateInstance<IModulesRunner>(runner,
+                Utilities.CreateLogger(builder.Options.Logger, runner), builder.Options)!;
+            run.ConfigureServices(services, builder.Configuration, builder.Environment);
+            services.TryAddSingleton<IModulesRunner>(_ => run);
 
             services.AddTransient<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
                 builder.Configuration, // and builder.ConfigureServices() method

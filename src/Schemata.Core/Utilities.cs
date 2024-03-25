@@ -16,18 +16,18 @@ public static class Utilities
         return Activator.CreateInstance(generic, factory);
     }
 
-    public static object? CreateInstance(Type type, params object?[] parameters) {
-        return CreateInstance(null, type, parameters.ToList());
+    public static T? CreateInstance<T>(Type type, params object?[] parameters) {
+        return CreateInstance<T>(null, type, parameters.ToList());
     }
 
-    public static object? CreateInstance(IServiceProvider provider, Type type, params object?[] parameters) {
-        return CreateInstance(provider, type, parameters.ToList());
+    public static T? CreateInstance<T>(IServiceProvider provider, Type type, params object?[] parameters) {
+        return CreateInstance<T>(provider, type, parameters.ToList());
     }
 
-    public static object? CreateInstance(IServiceProvider? provider, Type type, List<object?>? parameters = null) {
+    public static T? CreateInstance<T>(IServiceProvider? provider, Type type, List<object?>? parameters = null) {
         var ci = type.GetConstructors().FirstOrDefault();
         if (ci is null) {
-            return null;
+            return default;
         }
 
         var pi        = ci.GetParameters();
@@ -51,7 +51,7 @@ public static class Utilities
             arguments[i] = provider.GetRequiredService(parameter.ParameterType);
         }
 
-        return Activator.CreateInstance(type, arguments);
+        return (T?)Activator.CreateInstance(type, arguments);
     }
 
     public static void CallMethod(object instance, string method, params object?[] parameters) {

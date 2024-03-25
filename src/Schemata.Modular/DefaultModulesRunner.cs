@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Modular;
 using Schemata.Core;
 
@@ -12,10 +13,12 @@ namespace Schemata.Modular;
 
 public class DefaultModulesRunner : IModulesRunner
 {
-    private readonly SchemataOptions _options;
+    private readonly SchemataOptions               _options;
+    private readonly ILogger<DefaultModulesRunner> _logger;
 
-    private DefaultModulesRunner(SchemataOptions options) {
+    public DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModulesRunner> logger) {
         _options = options;
+        _logger  = logger;
     }
 
     #region IModulesRunner Members
@@ -30,7 +33,7 @@ public class DefaultModulesRunner : IModulesRunner
         }
 
         var startups = modules.Select(m =>
-                                   (IModule)Utilities.CreateInstance(m.EntryType,
+                                   Utilities.CreateInstance<IModule>(m.EntryType,
                                        Utilities.CreateLogger(_options.Logger, m.EntryType))!)
                               .ToList();
 
@@ -88,14 +91,4 @@ public class DefaultModulesRunner : IModulesRunner
     }
 
     #endregion
-
-    public static DefaultModulesRunner Create(
-        SchemataOptions     options,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment,
-        IServiceCollection  services) {
-        var runner = new DefaultModulesRunner(options);
-        runner.ConfigureServices(services, configuration, environment);
-        return runner;
-    }
 }
