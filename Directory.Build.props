@@ -51,11 +51,11 @@
     <_ProjectCopyright>© Maidy &amp; Cyprin Co., LTD. All rights reserved.</_ProjectCopyright>
 
     <PackageIconFullPath>$(MSBuildThisFileDirectory)cyprin.png</PackageIconFullPath>
-    <PackageProjectUrl>https://github.com/Cypriness/Schemata</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Cyprincess/Schemata</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>git://github.com/Cypriness/Schemata</RepositoryUrl>
+    <RepositoryUrl>git://github.com/Cyprincess/Schemata</RepositoryUrl>
   </PropertyGroup>
 
   <PropertyGroup>
