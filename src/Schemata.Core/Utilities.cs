@@ -35,8 +35,9 @@ public static class Utilities
         for (var i = 0; i < pi.Length; i++) {
             var parameter = pi[i];
 
-            if (parameters?.FirstOrDefault(p => parameter.ParameterType.IsAssignableFrom(p?.GetType())) is not null) {
-                arguments[i] = parameters[i];
+            var value = parameters?.FirstOrDefault(p => parameter.ParameterType.IsAssignableFrom(p?.GetType()));
+            if (value is not null) {
+                arguments[i] = value;
                 continue;
             }
 
@@ -81,8 +82,9 @@ public static class Utilities
         for (var i = 0; i < pi.Length; i++) {
             var parameter = pi[i];
 
-            if (parameters?.FirstOrDefault(p => parameter.ParameterType.IsAssignableFrom(p?.GetType())) is not null) {
-                arguments[i] = parameters[i];
+            var value = parameters?.FirstOrDefault(p => parameter.ParameterType.IsAssignableFrom(p?.GetType()));
+            if (value is not null) {
+                arguments[i] = value;
                 continue;
             }
 
