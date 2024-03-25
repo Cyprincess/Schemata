@@ -7,6 +7,7 @@ public class ModuleInfo(
     string   name,
     Assembly assembly,
     Type     entry,
+    Type     provider,
     string?  display     = null,
     string?  description = null,
     string?  company     = null,
@@ -28,4 +29,6 @@ public class ModuleInfo(
     public Assembly Assembly { get; private set; } = assembly;
 
     public Type EntryType { get; private set; } = entry;
+
+    public Type ProviderType { get; private set; } = provider;
 }

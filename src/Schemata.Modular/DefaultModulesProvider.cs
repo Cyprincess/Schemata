@@ -46,9 +46,7 @@ public class DefaultModulesProvider : IModulesProvider
 
             version = GetVersion(version);
 
-            logger.LogInformation("Found module {}, version {}", module.Name, version);
-
-            Modules.Add(new ModuleInfo(module.Name, assembly, type, display, description, company, copyright, version));
+            Modules.Add(new ModuleInfo(module.Name, assembly, type, typeof(DefaultModulesProvider), display, description, company, copyright, version));
         }
     }
 
