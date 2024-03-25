@@ -27,7 +27,8 @@ public static class SchemataBuilderExtensions
     public static SchemataBuilder UseModular(this SchemataBuilder builder, IEnumerable<Type> providers) {
         builder.ConfigureServices(services => {
             var modules = providers
-                         .Select(p => InvokerUtilities.CreateInstance(p, builder.Configuration, builder.Environment))
+                         .Select(p => Utilities.CreateInstance(p, Utilities.CreateLogger(builder.Options.Logger, p),
+                              builder.Configuration, builder.Environment))
                          .OfType<IModulesProvider>()
                          .SelectMany(p => p.GetModules())
                          .ToList();

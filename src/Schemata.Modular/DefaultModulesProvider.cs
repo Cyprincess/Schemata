@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
@@ -10,7 +11,7 @@ public class DefaultModulesProvider : IModulesProvider
 {
     private static readonly List<ModuleInfo> Modules = [];
 
-    public DefaultModulesProvider() {
+    public DefaultModulesProvider(ILogger<DefaultModulesProvider> logger) {
         if (Modules.Count != 0) {
             return;
         }
@@ -44,6 +45,8 @@ public class DefaultModulesProvider : IModulesProvider
             }
 
             version = GetVersion(version);
+
+            logger.LogInformation("Found module {}, version {}", module.Name, version);
 
             Modules.Add(new ModuleInfo(module.Name, assembly, type, display, description, company, copyright, version));
         }

@@ -1,10 +1,13 @@
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
-namespace Schemata.Abstractions;
+namespace Schemata.Core;
 
 public class SchemataOptions
 {
     private readonly Dictionary<string, object> _options = new();
+
+    public ILoggerFactory Logger { get; set; } = LoggerFactory.Create(_ => { });
 
     public TOptions? Get<TOptions>(string name)
         where TOptions : class {
