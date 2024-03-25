@@ -9,6 +9,8 @@ public class ModuleInfo(
     Type     entry,
     string?  display     = null,
     string?  description = null,
+    string?  company     = null,
+    string?  copyright   = null,
     string?  version     = null)
 {
     public string Name { get; private set; } = name;
@@ -16,6 +18,10 @@ public class ModuleInfo(
     public string DisplayName { get; private set; } = display ?? name;
 
     public string? Description { get; private set; } = description;
+
+    public string? Company { get; private set; } = company;
+
+    public string? Copyright { get; private set; } = copyright ?? $"\u00a9 {DateTime.Now.Year} {company}";
 
     public string? Version { get; private set; } = version;
 

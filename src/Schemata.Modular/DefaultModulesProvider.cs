@@ -33,17 +33,19 @@ public class DefaultModulesProvider : IModulesProvider
                 continue;
             }
 
-            var display     = assembly.GetCustomAttribute<AssemblyTitleAttribute>();
-            var description = assembly.GetCustomAttribute<AssemblyDescriptionAttribute>();
-            var version     = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            var display     = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product;
+            var description = assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
+            var company     = assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company;
+            var copyright   = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
 
-            Modules.Add(new ModuleInfo(       //
-                module.Name,                  //
-                assembly, type,               //
-                display?.Title,               //
-                description?.Description,     //
-                version?.InformationalVersion //
-            ));
+            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (string.IsNullOrWhiteSpace(version)) {
+                version = assembly.GetCustomAttribute<AssemblyVersionAttribute>()?.Version;
+            }
+
+            version = GetVersion(version);
+
+            Modules.Add(new ModuleInfo(module.Name, assembly, type, display, description, company, copyright, version));
         }
     }
 
@@ -54,4 +56,26 @@ public class DefaultModulesProvider : IModulesProvider
     }
 
     #endregion
+
+    private static string? GetVersion(string? version) {
+        if (string.IsNullOrWhiteSpace(version)) {
+            return null;
+        }
+
+        var index = version.IndexOf('+');
+        if (index == -1) {
+            return version;
+        }
+
+        var core  = version[..index];
+        var build = version[(index + 1)..];
+
+        build = build.Length switch {
+            40    => build[..8],
+            > 12  => build[..12],
+            var _ => build,
+        };
+
+        return $"{core}+{build}";
+    }
 }
