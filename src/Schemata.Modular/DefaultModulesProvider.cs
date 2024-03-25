@@ -33,8 +33,10 @@ public class DefaultModulesProvider : IModulesProvider
                 continue;
             }
 
-            var display     = assembly.GetCustomAttribute<AssemblyTitleAttribute>()?.Title;
+            var display     = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product;
             var description = assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
+            var company     = assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company;
+            var copyright   = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
 
             var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             if (string.IsNullOrWhiteSpace(version)) {
@@ -43,13 +45,7 @@ public class DefaultModulesProvider : IModulesProvider
 
             version = GetVersion(version);
 
-            Modules.Add(new ModuleInfo( //
-                module.Name,            //
-                assembly, type,         //
-                display,                //
-                description,            //
-                version                 //
-            ));
+            Modules.Add(new ModuleInfo(module.Name, assembly, type, display, description, company, copyright, version));
         }
     }
 
@@ -74,9 +70,11 @@ public class DefaultModulesProvider : IModulesProvider
         var core  = version[..index];
         var build = version[(index + 1)..];
 
-        if (build.Length > 12) {
-            build = build[..12];
-        }
+        build = build.Length switch {
+            40    => build[..8],
+            > 12  => build[..12],
+            var _ => build,
+        };
 
         return $"{core}+{build}";
     }
