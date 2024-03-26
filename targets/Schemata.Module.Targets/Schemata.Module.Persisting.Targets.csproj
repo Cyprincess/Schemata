@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Module Project Targets with Repository pattern</Description>
+    <PackageTags>application;business;database;datasource;framework;modular;repository</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UseRepository>true</UseRepository>
+  </PropertyGroup>
+
+</Project>

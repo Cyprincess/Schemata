@@ -7,7 +7,7 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - DSL Code Generator</Description>
-    <PackageTags>application;business;dsl;framework;generator;modular;tenancy</PackageTags>
+    <PackageTags>application;business;dsl;framework;generator</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
