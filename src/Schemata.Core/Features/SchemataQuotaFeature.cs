@@ -9,7 +9,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataQuotaFeature : FeatureBase
 {
-    public override int Priority => 151_100_000;
+    public override int Priority => 141_100_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

@@ -7,7 +7,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataRoutingFeature : FeatureBase
 {
-    public override int Priority => 150_000_000;
+    public override int Priority => 140_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

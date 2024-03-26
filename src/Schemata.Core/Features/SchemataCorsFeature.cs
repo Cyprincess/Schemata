@@ -8,7 +8,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataCorsFeature : FeatureBase
 {
-    public override int Priority => 160_000_000;
+    public override int Priority => 150_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

@@ -9,7 +9,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataAuthenticationFeature : FeatureBase
 {
-    public override int Priority => 170_000_000;
+    public override int Priority => 160_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
