@@ -48,7 +48,7 @@ var app = builder.Build();
 app.Run();
 ```
 
-## Features
+## Fields
 
 - [DSL](https://nuget.org/packages/Schemata.DSL)
 - [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets)
@@ -59,3 +59,30 @@ app.Run();
 - Tenant
 - Validation
 - Workflow
+
+## Features
+
+Features are pluginable components that can be added to the application startup.
+
+All features have an order and priority. The order is used to determine the order to `ConfigureServices` methods are
+called. The priority is used to determine the order to `Configure<Application|Endpoints>` methods are called.
+
+Order and Priority below 1_000_000_000 are reserved for built-in and Schemata extensions.
+
+### Built-in Features
+
+| Priority    | Feature                | Description                                        |
+|-------------|------------------------|----------------------------------------------------|
+| 100_110_000 | Logging                | Asp.Net Logging Middleware                         |
+| 100_120_000 | HttpLogging            | Asp.Net HTTP Logging Middleware                    |
+| 100_130_000 | W3CLogging             | Asp.Net W3C Logging Middleware                     |
+| 110_000_000 | DeveloperExceptionPage | Asp.Net Developer Exception Page Middleware        |
+| 120_000_000 | Https                  | Asp.Net HTTPS & HTTPS Redirection Middlewares      |
+| 130_000_000 | StaticFiles            | Asp.Net Static Files Middleware                    |
+| 140_000_000 | CookiePolicy           | Asp.Net Cookie Policy Middleware                   |
+| 150_000_000 | Routing                | Asp.Net Routing Middleware                         |
+| 151_100_000 | Quota                  | Asp.Net Rate Limiter Middleware                    |
+| 160_000_000 | Cors                   | Asp.Net CORS Middleware                            |
+| 170_000_000 | Authentication         | Asp.Net Authentication & Authorization Middlewares |
+| 180_000_000 | Session                | Asp.Net Session Middleware                         |
+| 210_000_000 | Controllers            | Asp.Net MVC Middlewares, without Views             |

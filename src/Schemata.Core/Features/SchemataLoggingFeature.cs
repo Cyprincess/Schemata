@@ -7,7 +7,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataLoggingFeature : FeatureBase
 {
-    public override int Priority => 100_100_000;
+    public override int Priority => 100_110_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
