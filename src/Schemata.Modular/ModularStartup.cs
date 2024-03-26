@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,13 +23,14 @@ public class ModularStartup : IStartupFilter
 
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) {
         return app => {
-            app.UseModularControllers();
-
             next(app);
 
             app.UseModular(_runner, _configuration, _environment);
+            app.UseModularControllers();
 
-            app.UseEndpoints(endpoints => { endpoints.UseModular(app, _runner, _configuration, _environment); });
+            if (app.ApplicationServices.GetService(typeof(EndpointDataSource)) is not null) {
+                app.UseEndpoints(endpoints => { endpoints.UseModular(app, _runner, _configuration, _environment); });
+            }
         };
     }
 

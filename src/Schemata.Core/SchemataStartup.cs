@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 
 namespace Schemata.Core;
@@ -21,9 +22,11 @@ public class SchemataStartup : IStartupFilter
         return app => {
             app.UseSchemata(_configuration, _environment);
 
-            next(app);
+            if (app.ApplicationServices.GetService(typeof(EndpointDataSource)) is not null) {
+                app.UseEndpoints(endpoints => { endpoints.UseSchemata(app, _configuration, _environment); });
+            }
 
-            app.UseEndpoints(endpoints => { endpoints.UseSchemata(app, _configuration, _environment); });
+            next(app);
         };
     }
 

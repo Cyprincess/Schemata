@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+[DependsOn<SchemataCookiePolicyFeature>]
 public class SchemataSessionFeature : FeatureBase
 {
     public override int Priority => 170_000_000;
