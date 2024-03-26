@@ -113,7 +113,7 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
-    #region Routing Feature
+    #region Quota Feature
 
 #if NET8_0_OR_GREATER
     public static SchemataBuilder UseQuota(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {
@@ -208,7 +208,7 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
-    #region Controller Feature
+    #region Controllers Feature
 
     public static SchemataBuilder UseControllers(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
         configure ??= _ => { };

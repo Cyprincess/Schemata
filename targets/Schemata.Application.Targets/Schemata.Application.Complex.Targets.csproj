@@ -9,6 +9,7 @@
   <PropertyGroup>
     <UseDSLTargets>true</UseDSLTargets>
     <UseModularTargets>true</UseModularTargets>
+    <UseRepository>true</UseRepository>
   </PropertyGroup>
 
 </Project>

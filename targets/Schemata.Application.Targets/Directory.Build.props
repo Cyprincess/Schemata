@@ -31,4 +31,8 @@
     <None Remove="Schemata.Application.Modular.Targets.targets" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
 </Project>

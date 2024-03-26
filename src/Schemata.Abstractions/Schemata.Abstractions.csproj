@@ -7,7 +7,7 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - Abstractions</Description>
-    <PackageTags>application;business;framework;modular;tenancy</PackageTags>
+    <PackageTags>application;business;framework</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

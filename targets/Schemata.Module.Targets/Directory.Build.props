@@ -21,6 +21,10 @@
     <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\Schemata.DSL.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)Schemata.Module.Targets.props" Pack="true">
       <PackagePath>build\$(AssemblyName).props</PackagePath>
