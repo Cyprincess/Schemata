@@ -15,7 +15,7 @@ public class SchemataCorsFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<CorsOptions>();
+        var configure = configurators.Pop<CorsOptions>();
         services.AddCors(configure);
     }
 

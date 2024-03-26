@@ -15,20 +15,16 @@ public class SchemataBuilder(
 {
     private readonly List<Action<IServiceCollection>> _actions = [];
 
+    internal readonly Configurators Configurators = configurators;
+
     public readonly IConfiguration      Configuration = configuration;
     public readonly IWebHostEnvironment Environment   = environment;
 
-    public readonly Configurators   Configurators = configurators;
-    public readonly SchemataOptions Options       = options;
+    public readonly SchemataOptions Options = options;
 
     public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {
-        return Configure(Microsoft.Extensions.Options.Options.DefaultName, configure);
-    }
-
-    public SchemataBuilder Configure<TOptions>(string name, Action<TOptions> configure)
-        where TOptions : class {
-        services.Configure(name, configure);
+        Configurators.Set(configure);
 
         return this;
     }
@@ -43,6 +39,8 @@ public class SchemataBuilder(
         foreach (var action in _actions) {
             action.Invoke(services);
         }
+
+        Configurators.Configure(services);
 
         services.AddSingleton(Options);
 
