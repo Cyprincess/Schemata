@@ -20,8 +20,6 @@ using Microsoft.Extensions.DependencyInjection;
 var builder = WebApplication.CreateBuilder(args)
                             .UseSchemata(schema => {
                                  schema.UseLogging();
-                                 schema.UseHttpLogging();
-                                 schema.UseW3CLogging();
 
                                  schema.UseDeveloperExceptionPage();
                                  schema.UseHttps();
@@ -61,14 +59,20 @@ app.Run();
 
 ## Features
 
-Features are pluginable components that can be added to the application startup.
+Features are components that can be added to the application startup.
 
-All features have an order and priority. The order is used to determine the order to `ConfigureServices` methods are
-called. The priority is used to determine the order to `Configure<Application|Endpoints>` methods are called.
+All features must implement the `ISimpleFeature` interface.
 
-Order and Priority below 1_000_000_000 are reserved for built-in and Schemata extensions.
+Features have `Order` and `Priority`, which are `Int32` values. The `Order` is used to determine the order
+to `ConfigureServices` methods are called. The `Priority` is used to determine the order
+to `Configure<Application|Endpoints>` methods are called.
+
+`Order` and `Priority` between `[0, 1_000_000_000)` are reserved for built-in and Schemata extensions.
 
 ### Built-in Features
+
+A built-in feature can be activated by calling the `Use` method on the `SchemataBuilder` instance, they may have
+additional configuration methods.
 
 | Priority    | Feature                | Description                                        |
 |-------------|------------------------|----------------------------------------------------|

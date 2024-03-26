@@ -3,19 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core;
 
 public static class Utilities
 {
-    public static object? CreateLogger(ILoggerFactory factory, Type type) {
-        var logger  = typeof(Logger<>);
-        var generic = logger.MakeGenericType(type);
-
-        return Activator.CreateInstance(generic, factory);
-    }
-
     public static T? CreateInstance<T>(Type type, params object?[] parameters) {
         return CreateInstance<T>(null, type, parameters.ToList());
     }

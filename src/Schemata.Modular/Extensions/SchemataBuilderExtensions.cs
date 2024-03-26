@@ -32,9 +32,8 @@ public static class SchemataBuilderExtensions
     public static SchemataBuilder UseModular(this SchemataBuilder builder, Type runner, IEnumerable<Type> providers) {
         builder.ConfigureServices(services => {
             var modules = providers
-                         .Select(p => Utilities.CreateInstance<IModulesProvider>(p,
-                              Utilities.CreateLogger(builder.Options.Logger, p), builder.Configuration,
-                              builder.Environment))
+                         .Select(p => Utilities.CreateInstance<IModulesProvider>(p, builder.Options.CreateLogger(p),
+                              builder.Configuration, builder.Environment))
                          .OfType<IModulesProvider>()
                          .SelectMany(p => p.GetModules())
                          .ToList();
@@ -54,8 +53,8 @@ public static class SchemataBuilderExtensions
                 // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,
                 // we create a runner here instead of in the delegate.
 
-                var run = Utilities.CreateInstance<IModulesRunner>(runner,
-                    Utilities.CreateLogger(builder.Options.Logger, runner), builder.Options)!;
+                var run = Utilities.CreateInstance<IModulesRunner>(runner, builder.Options.CreateLogger(runner),
+                    builder.Options)!;
                 run.ConfigureServices(services, builder.Configuration, builder.Environment);
                 services.TryAddSingleton<IModulesRunner>(_ => run);
             }

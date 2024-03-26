@@ -33,8 +33,7 @@ public class DefaultModulesRunner : IModulesRunner
         }
 
         var startups = modules.Select(m =>
-                                   Utilities.CreateInstance<IModule>(m.EntryType,
-                                       Utilities.CreateLogger(_options.Logger, m.EntryType))!)
+                                   Utilities.CreateInstance<IModule>(m.EntryType, _options.CreateLogger(m.EntryType))!)
                               .ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
