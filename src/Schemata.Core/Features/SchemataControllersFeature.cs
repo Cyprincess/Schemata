@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+[DependsOn<SchemataRoutingFeature>]
 public class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;

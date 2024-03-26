@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Schemata.Abstractions;
 using Schemata.Core.Features;
 
@@ -28,6 +29,21 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, Type type, ISimpleFeature feature) {
+        var attributes = type.GetCustomAttributes();
+        foreach (var attribute in attributes) {
+            var at = attribute.GetType();
+
+            if (at.Namespace != "Schemata.Core.Features") {
+                continue;
+            }
+
+            if (at.Name != "DependsOnAttribute`1") {
+                continue;
+            }
+
+            AddFeature(options, at.GenericTypeArguments[0]);
+        }
+
         var features = GetFeatures(options) ?? [];
         features[type] = feature;
         options.SetFeatures(features);
