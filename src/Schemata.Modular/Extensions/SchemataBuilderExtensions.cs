@@ -50,8 +50,7 @@ public static class SchemataBuilderExtensions
                         .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
             }
 
-            if (services.All(s => s.ServiceType != typeof(IModulesRunner)))
-            {
+            if (services.All(s => s.ServiceType != typeof(IModulesRunner))) {
                 // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,
                 // we create a runner here instead of in the delegate.
 

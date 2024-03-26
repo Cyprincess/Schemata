@@ -88,16 +88,6 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
-    #region Static Files Feature
-
-    public static SchemataBuilder UseStaticFiles(this SchemataBuilder builder) {
-        builder.Options.AddFeature<SchemataStaticFilesFeature>();
-
-        return builder;
-    }
-
-    #endregion
-
     #region Cookie Policy Feature
 
     public static SchemataBuilder UseCookiePolicy(

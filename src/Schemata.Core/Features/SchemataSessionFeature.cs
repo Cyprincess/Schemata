@@ -7,7 +7,7 @@ namespace Schemata.Core.Features;
 
 public class SchemataSessionFeature : FeatureBase
 {
-    public override int Priority => 180_000_000;
+    public override int Priority => 170_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

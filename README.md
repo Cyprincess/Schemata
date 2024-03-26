@@ -25,7 +25,6 @@ var builder = WebApplication.CreateBuilder(args)
 
                                  schema.UseDeveloperExceptionPage();
                                  schema.UseHttps();
-                                 schema.UseStaticFiles();
                                  schema.UseCookiePolicy();
                                  schema.UseRouting();
                                  schema.UseCors();
@@ -78,11 +77,10 @@ Order and Priority below 1_000_000_000 are reserved for built-in and Schemata ex
 | 100_130_000 | W3CLogging             | Asp.Net W3C Logging Middleware                     |
 | 110_000_000 | DeveloperExceptionPage | Asp.Net Developer Exception Page Middleware        |
 | 120_000_000 | Https                  | Asp.Net HTTPS & HTTPS Redirection Middlewares      |
-| 130_000_000 | StaticFiles            | Asp.Net Static Files Middleware                    |
-| 140_000_000 | CookiePolicy           | Asp.Net Cookie Policy Middleware                   |
-| 150_000_000 | Routing                | Asp.Net Routing Middleware                         |
-| 151_100_000 | Quota                  | Asp.Net Rate Limiter Middleware                    |
-| 160_000_000 | Cors                   | Asp.Net CORS Middleware                            |
-| 170_000_000 | Authentication         | Asp.Net Authentication & Authorization Middlewares |
-| 180_000_000 | Session                | Asp.Net Session Middleware                         |
+| 130_000_000 | CookiePolicy           | Asp.Net Cookie Policy Middleware                   |
+| 140_000_000 | Routing                | Asp.Net Routing Middleware                         |
+| 141_100_000 | Quota                  | Asp.Net Rate Limiter Middleware                    |
+| 150_000_000 | Cors                   | Asp.Net CORS Middleware                            |
+| 160_000_000 | Authentication         | Asp.Net Authentication & Authorization Middlewares |
+| 170_000_000 | Session                | Asp.Net Session Middleware                         |
 | 210_000_000 | Controllers            | Asp.Net MVC Middlewares, without Views             |
