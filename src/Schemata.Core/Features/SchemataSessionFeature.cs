@@ -14,7 +14,7 @@ public class SchemataSessionFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<SessionOptions>();
+        var configure = configurators.Pop<SessionOptions>();
         services.AddSession(configure);
     }
 

@@ -27,7 +27,7 @@ public static class SchemataBuilderExtensions
             logging.AddConsole();
         };
 
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.Logger = LoggerFactory.Create(configure);
 
@@ -44,7 +44,7 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder        builder,
         Action<HttpLoggingOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataHttpLoggingFeature>();
 
@@ -59,7 +59,7 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder      builder,
         Action<W3CLoggerOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataW3CLoggingFeature>();
 
@@ -104,7 +104,7 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder         builder,
         Action<CookiePolicyOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataCookiePolicyFeature>();
 
@@ -128,7 +128,7 @@ public static class SchemataBuilderExtensions
 #if NET8_0_OR_GREATER
     public static SchemataBuilder UseQuota(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataQuotaFeature>();
 
@@ -143,7 +143,7 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseCors(this SchemataBuilder builder, Action<CorsOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataCorsFeature>();
 
@@ -183,13 +183,13 @@ public static class SchemataBuilderExtensions
         Action<AuthenticationOptions>? authenticate,
         Action<AuthorizationOptions>?  authorize) {
         build ??= _ => { };
-        builder.Configurators.TryAdd(build);
+        builder.Configure(build);
 
         authenticate ??= _ => { };
-        builder.Configurators.TryAdd(authenticate);
+        builder.Configure(authenticate);
 
         authorize ??= _ => { };
-        builder.Configurators.TryAdd(authorize);
+        builder.Configure(authorize);
 
         builder.Options.AddFeature<SchemataAuthenticationFeature>();
 
@@ -207,7 +207,7 @@ public static class SchemataBuilderExtensions
     public static SchemataBuilder UseSession<T>(this SchemataBuilder builder, Action<SessionOptions>? configure = null)
         where T : class, ISessionStore {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataSessionFeature>();
 
@@ -222,7 +222,7 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseControllers(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
         configure ??= _ => { };
-        builder.Configurators.TryAdd(configure);
+        builder.Configure(configure);
 
         builder.Options.AddFeature<SchemataControllersFeature>();
 

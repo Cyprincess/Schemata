@@ -16,7 +16,7 @@ public class SchemataQuotaFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<RateLimiterOptions>();
+        var configure = configurators.Pop<RateLimiterOptions>();
         services.AddRateLimiter(configure);
     }
 

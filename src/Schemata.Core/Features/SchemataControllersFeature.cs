@@ -16,7 +16,7 @@ public class SchemataControllersFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<MvcOptions>();
+        var configure = configurators.Pop<MvcOptions>();
         services.AddControllers(configure);
     }
 

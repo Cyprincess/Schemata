@@ -15,7 +15,7 @@ public class SchemataW3CLoggingFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<W3CLoggerOptions>();
+        var configure = configurators.Pop<W3CLoggerOptions>();
         services.AddW3CLogging(configure);
     }
 

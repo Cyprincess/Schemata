@@ -13,8 +13,8 @@ namespace Schemata.Modular;
 
 public class DefaultModulesRunner : IModulesRunner
 {
-    private readonly SchemataOptions               _options;
     private readonly ILogger<DefaultModulesRunner> _logger;
+    private readonly SchemataOptions               _options;
 
     public DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModulesRunner> logger) {
         _options = options;

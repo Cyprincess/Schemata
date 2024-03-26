@@ -15,7 +15,7 @@ public class SchemataHttpLoggingFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Get<HttpLoggingOptions>();
+        var configure = configurators.Pop<HttpLoggingOptions>();
         services.AddHttpLogging(configure);
     }
 

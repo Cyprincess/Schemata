@@ -16,13 +16,13 @@ public class SchemataAuthenticationFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var authenticate = configurators.Get<AuthenticationOptions>();
+        var authenticate = configurators.Pop<AuthenticationOptions>();
         var builder      = services.AddAuthentication(authenticate);
 
-        var build = configurators.Get<AuthenticationBuilder>();
+        var build = configurators.Pop<AuthenticationBuilder>();
         build(builder);
 
-        var authorize = configurators.Get<AuthorizationOptions>();
+        var authorize = configurators.Pop<AuthorizationOptions>();
         services.AddAuthorization(authorize);
     }
 
