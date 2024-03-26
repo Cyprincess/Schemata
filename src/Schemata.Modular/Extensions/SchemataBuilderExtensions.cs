@@ -50,12 +50,16 @@ public static class SchemataBuilderExtensions
                         .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
             }
 
-            // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,
-            // we create a runner here instead of in the delegate.
-            var run = Utilities.CreateInstance<IModulesRunner>(runner,
-                Utilities.CreateLogger(builder.Options.Logger, runner), builder.Options)!;
-            run.ConfigureServices(services, builder.Configuration, builder.Environment);
-            services.TryAddSingleton<IModulesRunner>(_ => run);
+            if (services.All(s => s.ServiceType != typeof(IModulesRunner)))
+            {
+                // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,
+                // we create a runner here instead of in the delegate.
+
+                var run = Utilities.CreateInstance<IModulesRunner>(runner,
+                    Utilities.CreateLogger(builder.Options.Logger, runner), builder.Options)!;
+                run.ConfigureServices(services, builder.Configuration, builder.Environment);
+                services.TryAddSingleton<IModulesRunner>(_ => run);
+            }
 
             services.AddTransient<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
                 builder.Configuration, // and builder.ConfigureServices() method
