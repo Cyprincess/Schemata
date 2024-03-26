@@ -29,7 +29,7 @@ public static class SchemataBuilderExtensions
 
         builder.Configure(configure);
 
-        builder.Options.Logger = LoggerFactory.Create(configure);
+        builder.Options.Logging = LoggerFactory.Create(configure);
 
         builder.Options.AddFeature<SchemataLoggingFeature>();
 

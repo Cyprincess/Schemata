@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Core.Features;
 
@@ -24,7 +25,7 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, Type type) {
-        var feature = Utilities.CreateInstance<ISimpleFeature>(type, Utilities.CreateLogger(options.Logger, type))!;
+        var feature = Utilities.CreateInstance<ISimpleFeature>(type, options.CreateLogger(type))!;
         AddFeature(options, type, feature);
     }
 
@@ -37,11 +38,14 @@ public static class SchemataOptionsExtensions
                 continue;
             }
 
-            if (at.Name != "DependsOnAttribute`1") {
+            if (at.IsGenericType && at.GetGenericTypeDefinition() == typeof(DependsOnAttribute<>)) {
+                AddFeature(options, at.GenericTypeArguments[0]);
                 continue;
             }
 
-            AddFeature(options, at.GenericTypeArguments[0]);
+            if (attribute is InformationAttribute info && options.HasFeature<SchemataLoggingFeature>()) {
+                options.Logger.Log(info.Level, "{Message}", info.Message);
+            }
         }
 
         var features = GetFeatures(options) ?? [];

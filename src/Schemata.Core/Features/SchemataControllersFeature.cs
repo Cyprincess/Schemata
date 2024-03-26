@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataRoutingFeature>]
+[Information("Controllers depends on Routing middleware, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;

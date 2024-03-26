@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
+[Information("HTTP Logging can reduce the performance of an app", Level = LogLevel.Warning)]
+[Information("HTTP Logging can potentially log personally identifiable information (PII).", Level = LogLevel.Warning)]
 public class SchemataHttpLoggingFeature : FeatureBase
 {
     public override int Priority => 100_120_000;

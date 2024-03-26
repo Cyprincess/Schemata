@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 
@@ -7,7 +8,20 @@ public class SchemataOptions
 {
     private readonly Dictionary<string, object> _options = new();
 
-    public ILoggerFactory Logger { get; set; } = LoggerFactory.Create(_ => { });
+    public ILoggerFactory Logging { get; set; } = LoggerFactory.Create(_ => { });
+
+    public ILogger<SchemataBuilder> Logger => CreateLogger<SchemataBuilder>();
+
+    public ILogger<T> CreateLogger<T>() {
+        return Logging.CreateLogger<T>();
+    }
+
+    public object? CreateLogger(Type type) {
+        var logger  = typeof(Logger<>);
+        var generic = logger.MakeGenericType(type);
+
+        return Activator.CreateInstance(generic, Logging);
+    }
 
     public TOptions? Get<TOptions>(string name)
         where TOptions : class {

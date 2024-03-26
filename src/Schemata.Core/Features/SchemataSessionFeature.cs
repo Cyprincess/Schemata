@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataCookiePolicyFeature>]
+[Information("Session may requires Cookie Policy middleware, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataSessionFeature : FeatureBase
 {
     public override int Priority => 170_000_000;

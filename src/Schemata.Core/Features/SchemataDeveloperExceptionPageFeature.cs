@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
+[Information("Developer Exception Page will only be enabled in Development environment.", Level = LogLevel.Debug)]
 public class SchemataDeveloperExceptionPageFeature : FeatureBase
 {
     public override int Priority => 110_000_000;
