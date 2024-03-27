@@ -57,7 +57,7 @@ namespace System
                 throw new ArgumentOutOfRangeException(nameof(value), "value must be non-negative");
             }
 
-            return new Index(value);
+            return new(value);
         }
 
         /// <summary>Create an Index from the end at the position indicated by the value.</summary>
@@ -68,7 +68,7 @@ namespace System
                 throw new ArgumentOutOfRangeException(nameof(value), "value must be non-negative");
             }
 
-            return new Index(~value);
+            return new(~value);
         }
 
         /// <summary>Returns the index value.</summary>
@@ -192,12 +192,12 @@ namespace System
 
         /// <summary>Create a Range object starting from start index to the end of the collection.</summary>
         public static Range StartAt(Index start) {
-            return new Range(start, Index.End);
+            return new(start, Index.End);
         }
 
         /// <summary>Create a Range object starting from first element in the collection to the end Index.</summary>
         public static Range EndAt(Index end) {
-            return new Range(Index.Start, end);
+            return new(Index.Start, end);
         }
 
         /// <summary>Create a Range object starting from first element to the end.</summary>

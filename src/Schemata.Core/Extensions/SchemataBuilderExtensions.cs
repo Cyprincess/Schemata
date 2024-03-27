@@ -29,9 +29,9 @@ public static class SchemataBuilderExtensions
 
         builder.Configure(configure);
 
-        builder.Options.Logging = LoggerFactory.Create(configure);
+        builder.ReplaceLoggerFactory(LoggerFactory.Create(configure));
 
-        builder.Options.AddFeature<SchemataLoggingFeature>();
+        builder.AddFeature<SchemataLoggingFeature>();
 
         return builder;
     }
@@ -46,7 +46,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataHttpLoggingFeature>();
+        builder.AddFeature<SchemataHttpLoggingFeature>();
 
         return builder;
     }
@@ -61,7 +61,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataW3CLoggingFeature>();
+        builder.AddFeature<SchemataW3CLoggingFeature>();
 
         return builder;
     }
@@ -71,7 +71,7 @@ public static class SchemataBuilderExtensions
     #region Developer Exception Page Feature
 
     public static SchemataBuilder UseDeveloperExceptionPage(this SchemataBuilder builder) {
-        builder.Options.AddFeature<SchemataDeveloperExceptionPageFeature>();
+        builder.AddFeature<SchemataDeveloperExceptionPageFeature>();
 
         return builder;
     }
@@ -90,7 +90,7 @@ public static class SchemataBuilderExtensions
         };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataForwardedHeadersFeature>();
+        builder.AddFeature<SchemataForwardedHeadersFeature>();
 
         return builder;
     }
@@ -100,7 +100,7 @@ public static class SchemataBuilderExtensions
     #region HTTPS Feature
 
     public static SchemataBuilder UseHttps(this SchemataBuilder builder) {
-        builder.Options.AddFeature<SchemataHttpsFeature>();
+        builder.AddFeature<SchemataHttpsFeature>();
 
         return builder;
     }
@@ -115,7 +115,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataCookiePolicyFeature>();
+        builder.AddFeature<SchemataCookiePolicyFeature>();
 
         return builder;
     }
@@ -125,7 +125,7 @@ public static class SchemataBuilderExtensions
     #region Routing Feature
 
     public static SchemataBuilder UseRouting(this SchemataBuilder builder) {
-        builder.Options.AddFeature<SchemataRoutingFeature>();
+        builder.AddFeature<SchemataRoutingFeature>();
 
         return builder;
     }
@@ -139,7 +139,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataQuotaFeature>();
+        builder.AddFeature<SchemataQuotaFeature>();
 
         return builder;
     }
@@ -154,7 +154,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataCorsFeature>();
+        builder.AddFeature<SchemataCorsFeature>();
 
         return builder;
     }
@@ -200,7 +200,7 @@ public static class SchemataBuilderExtensions
         authorize ??= _ => { };
         builder.Configure(authorize);
 
-        builder.Options.AddFeature<SchemataAuthenticationFeature>();
+        builder.AddFeature<SchemataAuthenticationFeature>();
 
         return builder;
     }
@@ -218,7 +218,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataSessionFeature>();
+        builder.AddFeature<SchemataSessionFeature>();
 
         builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
 
@@ -233,7 +233,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.Options.AddFeature<SchemataControllersFeature>();
+        builder.AddFeature<SchemataControllersFeature>();
 
         return builder;
     }

@@ -47,7 +47,7 @@ public class Object : TermBase, INamedTerm
 
                 var field = ObjectField.Parse(mark, @object, scanner);
                 if (field is not null) {
-                    @object.Fields ??= new Dictionary<string, ObjectField>();
+                    @object.Fields ??= new();
                     @object.Fields.Add(field.Name, field);
                     continue;
                 }

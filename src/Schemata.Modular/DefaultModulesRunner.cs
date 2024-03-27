@@ -11,15 +11,9 @@ using Schemata.Core;
 
 namespace Schemata.Modular;
 
-public class DefaultModulesRunner : IModulesRunner
+public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModulesRunner> logger) : IModulesRunner
 {
-    private readonly ILogger<DefaultModulesRunner> _logger;
-    private readonly SchemataOptions               _options;
-
-    public DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModulesRunner> logger) {
-        _options = options;
-        _logger  = logger;
-    }
+    private readonly ILogger<DefaultModulesRunner> _logger = logger;
 
     #region IModulesRunner Members
 
@@ -27,14 +21,14 @@ public class DefaultModulesRunner : IModulesRunner
         IServiceCollection  services,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var modules = _options.GetModules();
+        var modules = options.GetModules();
         if (modules is not { Count: > 0 }) {
             return;
         }
 
-        var startups = modules.Select(m =>
-                                   Utilities.CreateInstance<IModule>(m.EntryType, _options.CreateLogger(m.EntryType))!)
-                              .ToList();
+        var startups = modules
+                      .Select(m => Utilities.CreateInstance<IModule>(m.EntryType, options.CreateLogger(m.EntryType))!)
+                      .ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
 

@@ -59,7 +59,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddFeatures(SchemataBuilder builder) {
         builder.ConfigureServices(services => {
-            var modules = builder.Options.GetFeatures();
+            var modules = builder.GetOptions().GetFeatures();
             if (modules is null) {
                 return;
             }
@@ -69,7 +69,7 @@ public static class ServiceCollectionExtensions
             features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
             foreach (var feature in features) {
-                feature.ConfigureServices(services, builder.Configurators, builder.Configuration, builder.Environment);
+                feature.ConfigureServices(services, builder.GetConfigurators(), builder.Configuration, builder.Environment);
             }
         });
     }

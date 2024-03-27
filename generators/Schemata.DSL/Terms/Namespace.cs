@@ -25,6 +25,6 @@ public class Namespace : TermBase, INamedTerm
 
         EnsureLineEnd(scanner);
 
-        return new Namespace { Name = name.GetText() };
+        return new() { Name = name.GetText() };
     }
 }

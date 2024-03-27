@@ -33,6 +33,6 @@ public class SchemataStartup : IStartupFilter
     #endregion
 
     public static SchemataStartup Create(IConfiguration configuration, IWebHostEnvironment environment) {
-        return new SchemataStartup(configuration, environment);
+        return new(configuration, environment);
     }
 }

@@ -46,8 +46,7 @@ public class DefaultModulesProvider : IModulesProvider
 
             version = GetVersion(version);
 
-            Modules.Add(new ModuleDescriptor(module.Name, assembly, type, typeof(DefaultModulesProvider), display,
-                description, company, copyright, version));
+            Modules.Add(new(module.Name, assembly, type, typeof(DefaultModulesProvider), display, description, company, copyright, version));
         }
     }
 

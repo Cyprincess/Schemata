@@ -10,21 +10,28 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
-public class EntityFrameworkCoreRepository<TContext, TEntity>(TContext context, IServiceProvider provider)
-    : RepositoryBase<TEntity>
+public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DbContext
     where TEntity : class
 {
-    protected TContext Context { get; } = context;
+    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) {
+        ServiceProvider = sp;
+        Context         = context;
+    }
 
-    protected IServiceProvider Provider { get; } = provider;
+    protected TContext Context { get; }
+
+    protected IServiceProvider ServiceProvider { get; }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
         var enumerable = BuildQuery(predicate).AsAsyncEnumerable().WithCancellation(ct);
 
-        await foreach (var entity in enumerable) yield return entity;
+        await foreach (var entity in enumerable) {
+            ct.ThrowIfCancellationRequested();
+            yield return entity;
+        }
     }
 
     public override async Task<TResult?> FirstOrDefaultAsync<TResult>(
@@ -60,20 +67,20 @@ public class EntityFrameworkCoreRepository<TContext, TEntity>(TContext context, 
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await Context.AddAsync(entity, ct);
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         Context.Entry(entity).State = EntityState.Detached;
         Context.Update(entity);
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         Context.Remove(entity);
     }

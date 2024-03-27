@@ -29,7 +29,7 @@ public class Use : TermBase, INamedTerm
                 throw new ParseException("Expected a full-qualified name", scanner.Cursor.Position);
             }
 
-            yield return new Use { Name = name.GetText() };
+            yield return new() { Name = name.GetText() };
 
             scanner.SkipWhiteSpace();
 

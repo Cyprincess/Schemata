@@ -45,7 +45,7 @@ public class Mark : TermBase
             var @enum = Enum.Parse(mark, scanner);
             if (@enum is not null) {
                 mark.Length++;
-                mark.Enums ??= new Dictionary<string, Enum>();
+                mark.Enums ??= new();
                 mark.Enums.Add(@enum.Name, @enum);
                 continue;
             }
@@ -53,7 +53,7 @@ public class Mark : TermBase
             var table = Entity.Parse(mark, scanner);
             if (table is not null) {
                 mark.Length++;
-                mark.Tables ??= new Dictionary<string, Entity>();
+                mark.Tables ??= new();
                 mark.Tables?.Add(table.Name, table);
                 continue;
             }
@@ -61,7 +61,7 @@ public class Mark : TermBase
             var trait = Trait.Parse(mark, scanner);
             if (trait is not null) {
                 mark.Length++;
-                mark.Traits ??= new Dictionary<string, Trait>();
+                mark.Traits ??= new();
                 mark.Traits?.Add(trait.Name, trait);
                 continue;
             }

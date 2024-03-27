@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,26 +15,37 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProvider provider) : RepositoryBase<TEntity>
+public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    protected TContext Context { get; } = context;
+    public LinQ2DbRepository(IServiceProvider sp, TContext context) {
+        ServiceProvider = sp;
+        Context         = context;
 
-    protected IServiceProvider Provider { get; } = provider;
+        var entity = typeof(TEntity);
+        TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
+    }
+
+    protected TContext Context { get; }
+
+    protected IServiceProvider ServiceProvider { get; }
 
     protected DataConnectionTransaction? Transaction { get; set; }
 
     protected int RowsAffected { get; set; }
 
-    public string TableName { get; } = typeof(TEntity).Name.Pluralize();
+    public string TableName { get; }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
         var enumerable = BuildQuery(predicate).AsAsyncEnumerable().WithCancellation(ct);
 
-        await foreach (var entity in enumerable) yield return entity;
+        await foreach (var entity in enumerable) {
+            ct.ThrowIfCancellationRequested();
+            yield return entity;
+        }
     }
 
     public override async Task<TResult?> FirstOrDefaultAsync<TResult>(
@@ -68,7 +81,7 @@ public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProv
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 
@@ -76,7 +89,7 @@ public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProv
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 
@@ -84,7 +97,7 @@ public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProv
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 

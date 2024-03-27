@@ -1,6 +1,5 @@
-using System.Threading;
 using Schemata.Abstractions;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public interface IRepositoryUpdateAsyncAdvice<in TEntity> : IAdvice<TEntity, CancellationToken>;
+public interface IRepositoryUpdateAsyncAdvice<in TEntity> : IAdvice<TEntity>;

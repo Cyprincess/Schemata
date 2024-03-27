@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataRoutingFeature>]
-[Information("Controllers depends on Routing middleware, it will be added automatically.", Level = LogLevel.Debug)]
+[Information("Controllers depends on Routing feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;

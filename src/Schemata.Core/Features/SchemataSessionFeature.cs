@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataCookiePolicyFeature>]
-[Information("Session may requires Cookie Policy middleware, it will be added automatically.", Level = LogLevel.Debug)]
+[Information("Session may requires Cookie Policy feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataSessionFeature : FeatureBase
 {
     public override int Priority => 170_000_000;

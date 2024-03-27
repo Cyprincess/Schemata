@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Schemata.Core.Features;
 
 namespace Schemata.Core;
 
@@ -15,12 +17,45 @@ public class SchemataBuilder(
 {
     private readonly List<Action<IServiceCollection>> _actions = [];
 
-    internal readonly Configurators Configurators = configurators;
+    private Configurators   Configurators => configurators;
+    private SchemataOptions Options       => options;
 
-    public readonly IConfiguration      Configuration = configuration;
-    public readonly IWebHostEnvironment Environment   = environment;
+    public IConfiguration      Configuration => configuration;
+    public IWebHostEnvironment Environment   => environment;
 
-    public readonly SchemataOptions Options = options;
+    public SchemataBuilder AddFeature<T>()
+        where T : ISimpleFeature {
+        Options.AddFeature<T>();
+
+        return this;
+    }
+
+    public bool HasFeature<T>()
+        where T : ISimpleFeature {
+        return Options.HasFeature<T>();
+    }
+
+    public SchemataBuilder ReplaceLoggerFactory(ILoggerFactory factory) {
+        Options.ReplaceLoggerFactory(factory);
+
+        return this;
+    }
+
+    public ILogger<T> CreateLogger<T>() {
+        return Options.CreateLogger<T>();
+    }
+
+    public object? CreateLogger(Type type) {
+        return Options.CreateLogger(type);
+    }
+
+    public Configurators GetConfigurators() {
+        return Configurators;
+    }
+
+    public SchemataOptions GetOptions() {
+        return Options;
+    }
 
     public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {

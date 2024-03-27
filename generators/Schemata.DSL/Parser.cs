@@ -10,11 +10,11 @@ public class Parser
     private readonly Scanner _scanner;
 
     private Parser(string text) {
-        _scanner = new Scanner(text);
+        _scanner = new(text);
     }
 
     public static Parser Read(string text) {
-        return new Parser(text);
+        return new(text);
     }
 
     public static async Task<Parser> ReadAsync(Stream stream) {

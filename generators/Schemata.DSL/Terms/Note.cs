@@ -22,7 +22,7 @@ public class Note : TermBase
 
         EnsureLineEnd(scanner, true);
 
-        return new Note { Comment = value.Body };
+        return new() { Comment = value.Body };
     }
 
     public static Note? operator +(Note? a, Note? b) {
@@ -34,6 +34,6 @@ public class Note : TermBase
             return a;
         }
 
-        return new Note { Comment = string.Equals(a.Comment, b.Comment) ? a.Comment : $"{a.Comment}\n{b.Comment}" };
+        return new() { Comment = string.Equals(a.Comment, b.Comment) ? a.Comment : $"{a.Comment}\n{b.Comment}" };
     }
 }
