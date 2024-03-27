@@ -1,11 +1,18 @@
 <Project>
 
+  <PropertyGroup>
+    <OpenIddictVersion>5.3.0</OpenIddictVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageVersion Include="coverlet.msbuild" Version="6.0.2" />
     <PackageVersion Include="Humanizer.Core" Version="2.14.1" />
     <PackageVersion Include="linq2db" Version="5.4.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
+    <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="$(OpenIddictVersion)" />
+    <PackageVersion Include="OpenIddict.Validation.AspNetCore" Version="$(OpenIddictVersion)" />
+    <PackageVersion Include="OpenIddict.Validation.ServerIntegration" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="Parlot" Version="0.0.24" />
   </ItemGroup>
 

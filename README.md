@@ -38,6 +38,8 @@ var builder = WebApplication.CreateBuilder(args)
                                  schema.UseControllers();
 
                                  schema.UseModular();
+
+                                 schema.UseAuthorization();
                              });
 
 var app = builder.Build();
@@ -88,3 +90,11 @@ additional configuration methods.
 | 160_000_000 | Authentication         | Asp.Net Authentication & Authorization Middlewares |
 | 170_000_000 | Session                | Asp.Net Session Middleware                         |
 | 210_000_000 | Controllers            | Asp.Net MVC Middlewares, without Views             |
+
+### Extension Features
+
+An extension feature can be activated like a built-in feature.
+
+| Priority    | Package                           | Feature       | Description                       |
+|-------------|-----------------------------------|---------------|-----------------------------------|
+| 310_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
