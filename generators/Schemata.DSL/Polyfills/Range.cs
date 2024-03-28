@@ -1,10 +1,9 @@
-// ReSharper disable CheckNamespace
-
 // https://github.com/dotnet/runtime/blob/419e949d258ecee4c40a460fb09c66d974229623/src/libraries/System.Private.CoreLib/src/System/Index.cs
 // https://github.com/dotnet/runtime/blob/419e949d258ecee4c40a460fb09c66d974229623/src/libraries/System.Private.CoreLib/src/System/Range.cs
 
 using System.Runtime.CompilerServices;
 
+// ReSharper disable once CheckNamespace
 namespace System
 {
     /// <summary>Represent a type can be used to index a collection either from the start or the end.</summary>
@@ -238,6 +237,7 @@ namespace System
     }
 }
 
+// ReSharper disable once CheckNamespace
 namespace System.Runtime.CompilerServices
 {
     internal static class RuntimeHelpers
@@ -264,7 +264,7 @@ namespace System.Runtime.CompilerServices
                 return dest;
             } else {
                 // The array is actually a U[] where U:T.
-                var dest = (T[])Array.CreateInstance(array.GetType().GetElementType(), length);
+                var dest = (T[])Array.CreateInstance(array.GetType().GetElementType()!, length);
                 Array.Copy(array, offset, dest, 0, length);
                 return dest;
             }

@@ -1,4 +1,3 @@
 namespace Schemata.Abstractions.Modular;
 
-public interface IModule : IFeature
-{ }
+public interface IModule : IFeature;

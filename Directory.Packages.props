@@ -1,11 +1,13 @@
 <Project>
 
   <PropertyGroup>
-    <OpenIddictVersion>5.3.0</OpenIddictVersion>
+    <OpenIddictVersion>5.4.0</OpenIddictVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageVersion Include="ConfigureAwait.Fody" Version="3.3.2" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.2" />
+    <PackageVersion Include="Fody" Version="6.8.0" />
     <PackageVersion Include="Humanizer.Core" Version="2.14.1" />
     <PackageVersion Include="linq2db" Version="5.4.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
@@ -13,7 +15,7 @@
     <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="OpenIddict.Validation.AspNetCore" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="OpenIddict.Validation.ServerIntegration" Version="$(OpenIddictVersion)" />
-    <PackageVersion Include="Parlot" Version="0.0.24" />
+    <PackageVersion Include="Parlot" Version="0.0.25" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '8.0')) ">
@@ -26,8 +28,14 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' ">
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="2.1.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.1.1" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.1')) ">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
   </ItemGroup>
 
 </Project>

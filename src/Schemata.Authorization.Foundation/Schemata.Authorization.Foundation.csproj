@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Pipeline\Schemata.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

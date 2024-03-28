@@ -1,9 +1,8 @@
-// ReSharper disable CheckNamespace
-
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 
+// ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Hosting;
 
 public static class WebHostBuilderExtensions

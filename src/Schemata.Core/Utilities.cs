@@ -93,6 +93,6 @@ public static class Utilities
             arguments[i] = provider.GetRequiredService(parameter.ParameterType);
         }
 
-        mi.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments?.ToArray(), null);
+        mi.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments.ToArray(), null);
     }
 }

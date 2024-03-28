@@ -10,6 +10,7 @@ using Humanizer;
 using LinqToDB;
 using LinqToDB.Data;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.LinqToDB;
 
@@ -17,11 +18,14 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    public LinQ2DbRepository(TContext context) {
-        Context = context;
+    public LinQ2DbRepository(TContext context, IServiceProvider provider) {
+        Context  = context;
+        Provider = provider;
     }
 
-    protected TContext                   Context      { get; }
+    protected TContext         Context  { get; }
+    protected IServiceProvider Provider { get; }
+
     protected DataConnectionTransaction? Transaction  { get; set; }
     protected int                        RowsAffected { get; set; }
 
@@ -66,18 +70,24 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+
         await BeginTransactionAsync(ct);
 
         RowsAffected += await Context.InsertAsync(entity, TableName, token: ct);
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+
         await BeginTransactionAsync(ct);
 
         RowsAffected += await Context.UpdateAsync(entity, TableName, token: ct);
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+
         await BeginTransactionAsync(ct);
 
         RowsAffected += await Context.DeleteAsync(entity, TableName, token: ct);

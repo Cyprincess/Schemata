@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
@@ -14,11 +15,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     where TContext : DbContext
     where TEntity : class
 {
-    public EntityFrameworkCoreRepository(TContext context) {
-        Context = context;
+    public EntityFrameworkCoreRepository(TContext context, IServiceProvider provider) {
+        Context  = context;
+        Provider = provider;
     }
 
-    protected TContext Context { get; }
+    protected TContext         Context  { get; }
+    protected IServiceProvider Provider { get; }
 
     public override async IAsyncEnumerable<TEntity> ListAsync(
         Expression<Func<TEntity, bool>>?           predicate,
@@ -59,20 +62,22 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+
         await Context.AddAsync(entity, ct);
     }
 
-    public override Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+    public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+
         Context.Entry(entity).State = EntityState.Detached;
         Context.Update(entity);
-
-        return Task.CompletedTask;
     }
 
-    public override Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        Context.Remove(entity);
+    public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
 
-        return Task.CompletedTask;
+        Context.Remove(entity);
     }
 
     public override async Task<int> CommitAsync(CancellationToken ct = default) {

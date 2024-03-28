@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace Schemata.Abstractions.Modular;
 
-public class ModuleInfo(
+public class ModuleDescriptor(
     string   name,
     Assembly assembly,
     Type     entry,
