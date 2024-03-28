@@ -78,6 +78,10 @@
     <IsShipping>true</IsShipping>
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
+  <ItemGroup Condition=" $(RepoRelativeProjectDir.Contains('src')) ">
+    <PackageReference Include="ConfigureAwait.Fody" PrivateAssets="all" />
+    <PackageReference Include="Fody" PrivateAssets="all" />
+  </ItemGroup>
 
   <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
     <IsPackable>false</IsPackable>
@@ -85,10 +89,7 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
-    <PackageReference Include="coverlet.msbuild">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>

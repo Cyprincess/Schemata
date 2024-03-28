@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.1;net6.0;net8.0</TargetFrameworks>
@@ -12,6 +12,11 @@
 
   <ItemGroup>
     <PackageReference Include="Humanizer.Core" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

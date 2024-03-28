@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Schemata.DSL.Terms;
 
 // ReSharper disable once CheckNamespace

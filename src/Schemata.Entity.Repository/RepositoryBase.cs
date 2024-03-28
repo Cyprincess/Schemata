@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,28 +11,29 @@ public abstract class RepositoryBase<TEntity> : IRepository<TEntity>
 {
     #region IRepository<TEntity> Members
 
-    public virtual Expression<Func<TEntity, bool>>? Query(Expression<Func<TEntity, bool>>? predicate = null) {
-        return predicate;
-    }
+    public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
-    public abstract IAsyncEnumerable<TEntity> ListAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default);
+    public abstract Task<TResult?> FirstOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
-    public abstract Task<TEntity?> FirstOrDefaultAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default);
+    public abstract Task<TResult?> SingleOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
-    public abstract Task<TEntity?> SingleOrDefaultAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default);
+    public abstract Task<bool> AnyAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
-    public abstract Task<bool> AnyAsync(Expression<Func<TEntity, bool>>?   predicate, CancellationToken ct = default);
-    public abstract Task<int>  CountAsync(Expression<Func<TEntity, bool>>? predicate, CancellationToken ct = default);
+    public abstract Task<int> CountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
-    public abstract Task<long> LongCountAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default);
+    public abstract Task<long> LongCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
 
     public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
 
@@ -56,4 +56,18 @@ public abstract class RepositoryBase<TEntity> : IRepository<TEntity>
     public abstract Task<int> CommitAsync(CancellationToken ct = default);
 
     #endregion
+
+    protected IQueryable<TResult> BuildQuery<TResult>(
+        IQueryable<TEntity>                             table,
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
+        if (predicate != null) {
+            return predicate(table);
+        }
+
+        if (typeof(TResult) == typeof(TEntity)) {
+            return (IQueryable<TResult>)table;
+        }
+
+        return table.Select(e => (TResult)(object)e);
+    }
 }

@@ -1,5 +1,3 @@
-// ReSharper disable CheckNamespace
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +9,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Modular;
 
+// ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
 public static class SchemataBuilderExtensions

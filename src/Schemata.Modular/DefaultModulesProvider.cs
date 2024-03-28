@@ -9,7 +9,7 @@ namespace Schemata.Modular;
 
 public class DefaultModulesProvider : IModulesProvider
 {
-    private static readonly List<ModuleInfo> Modules = [];
+    private static readonly List<ModuleDescriptor> Modules = [];
 
     public DefaultModulesProvider(ILogger<DefaultModulesProvider> logger) {
         if (Modules.Count != 0) {
@@ -46,13 +46,14 @@ public class DefaultModulesProvider : IModulesProvider
 
             version = GetVersion(version);
 
-            Modules.Add(new ModuleInfo(module.Name, assembly, type, typeof(DefaultModulesProvider), display, description, company, copyright, version));
+            Modules.Add(new ModuleDescriptor(module.Name, assembly, type, typeof(DefaultModulesProvider), display,
+                description, company, copyright, version));
         }
     }
 
     #region IModulesProvider Members
 
-    public IEnumerable<ModuleInfo> GetModules() {
+    public IEnumerable<ModuleDescriptor> GetModules() {
         return Modules;
     }
 

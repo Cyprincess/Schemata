@@ -1,4 +1,4 @@
-﻿namespace Schemata.DSL.Terms;
+namespace Schemata.DSL.Terms;
 
 public interface INamedTerm
 {

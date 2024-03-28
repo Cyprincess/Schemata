@@ -1,5 +1,3 @@
-// ReSharper disable CheckNamespace
-
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -7,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Core.Features;
 
+// ReSharper disable once CheckNamespace
 namespace Schemata.Core;
 
 public static class SchemataOptionsExtensions
@@ -38,7 +37,7 @@ public static class SchemataOptionsExtensions
                 continue;
             }
 
-            if (at.IsGenericType && at.GetGenericTypeDefinition() == typeof(DependsOnAttribute<>)) {
+            if (at.Name == typeof(DependsOnAttribute<>).Name) {
                 AddFeature(options, at.GenericTypeArguments[0]);
                 continue;
             }
