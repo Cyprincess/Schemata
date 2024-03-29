@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -72,6 +73,25 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseDeveloperExceptionPage(this SchemataBuilder builder) {
         builder.Options.AddFeature<SchemataDeveloperExceptionPageFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
+    #region Forwarded Headers Feature
+
+    public static SchemataBuilder UseForwardedHeaders(
+        this SchemataBuilder             builder,
+        Action<ForwardedHeadersOptions>? configure = null) {
+        configure ??= options => {
+            options.ForwardedHeaders = ForwardedHeaders.All;
+            options.KnownNetworks.Clear();
+            options.KnownProxies.Clear();
+        };
+        builder.Configure(configure);
+
+        builder.Options.AddFeature<SchemataForwardedHeadersFeature>();
 
         return builder;
     }

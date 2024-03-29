@@ -22,6 +22,7 @@ var builder = WebApplication.CreateBuilder(args)
                                  schema.UseLogging();
 
                                  schema.UseDeveloperExceptionPage();
+                                 schema.UseForwardedHeaders();
                                  schema.UseHttps();
                                  schema.UseCookiePolicy();
                                  schema.UseRouting();
@@ -80,6 +81,7 @@ additional configuration methods.
 | 100_120_000 | HttpLogging            | Asp.Net HTTP Logging Middleware                    |
 | 100_130_000 | W3CLogging             | Asp.Net W3C Logging Middleware                     |
 | 110_000_000 | DeveloperExceptionPage | Asp.Net Developer Exception Page Middleware        |
+| 110_100_000 | ForwardedHeaders       | Asp.Net Forwarded Headers Middleware               |
 | 120_000_000 | Https                  | Asp.Net HTTPS & HTTPS Redirection Middlewares      |
 | 130_000_000 | CookiePolicy           | Asp.Net Cookie Policy Middleware                   |
 | 140_000_000 | Routing                | Asp.Net Routing Middleware                         |
