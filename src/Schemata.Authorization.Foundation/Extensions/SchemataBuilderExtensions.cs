@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Core;
 
@@ -8,14 +9,18 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class SchemataBuilderExtensions
 {
-    public static SchemataBuilder UseAuthorization(
-        this SchemataBuilder             builder,
-        Action<OpenIddictServerBuilder>? configure = null) {
-        configure ??= _ => { };
-        builder.Configure(configure);
+    public static SchemataAuthorizationBuilder UseAuthorization(
+        this SchemataBuilder                       builder,
+        Action<OpenIddictServerBuilder>?           serve     = null,
+        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null) {
+        serve ??= _ => { };
+        builder.Configure(serve);
 
-        builder.Options.AddFeature<SchemataAuthorizationFeature>();
+        integrate ??= _ => { };
+        builder.Configure(integrate);
 
-        return builder;
+        builder.AddFeature<SchemataAuthorizationFeature>();
+
+        return new SchemataAuthorizationBuilder(builder);
     }
 }

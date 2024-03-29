@@ -7,10 +7,11 @@ namespace Schemata.Core;
 public class SchemataOptions
 {
     private readonly Dictionary<string, object> _options = new();
+    private          ILogger<SchemataBuilder>?  _logger;
 
-    public ILoggerFactory Logging { get; set; } = LoggerFactory.Create(_ => { });
+    public ILoggerFactory Logging { get; private set; } = LoggerFactory.Create(_ => { });
 
-    public ILogger<SchemataBuilder> Logger => CreateLogger<SchemataBuilder>();
+    public ILogger<SchemataBuilder> Logger => _logger ??= CreateLogger<SchemataBuilder>();
 
     public ILogger<T> CreateLogger<T>() {
         return Logging.CreateLogger<T>();
@@ -21,6 +22,10 @@ public class SchemataOptions
         var generic = logger.MakeGenericType(type);
 
         return Activator.CreateInstance(generic, Logging);
+    }
+
+    public void ReplaceLoggerFactory(ILoggerFactory factory) {
+        Logging = factory;
     }
 
     public TOptions? Get<TOptions>(string name)

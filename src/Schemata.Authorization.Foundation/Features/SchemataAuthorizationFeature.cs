@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -17,15 +18,29 @@ public class SchemataAuthorizationFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Pop<OpenIddictServerBuilder>();
+        var serve     = configurators.Pop<OpenIddictServerBuilder>();
+        var integrate = configurators.Pop<OpenIddictServerAspNetCoreBuilder>();
+
+        var features = new List<IAuthorizationFeature>();
+        var build    = configurators.Pop<IList<IAuthorizationFeature>>();
+        build(features);
+        features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
         services.AddOpenIddict()
                 .AddServer(options => {
-                     configure(options);
+                     serve(options);
 
                      options.EnableDegradedMode();
 
-                     options.UseAspNetCore();
+                     var core = options.UseAspNetCore()
+                                       .EnableStatusCodePagesIntegration();
+
+                     integrate(core);
+
+                     foreach (var feature in features) {
+                         feature.ConfigureServer(services, options);
+                         feature.ConfigureServerAspNetCore(services, core);
+                     }
                  })
                 .AddValidation(options => {
                      options.UseLocalServer();

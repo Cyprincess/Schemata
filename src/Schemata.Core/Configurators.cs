@@ -13,9 +13,14 @@ public class Configurators
         _configurators[typeof(T)] = action;
     }
 
+    public Action<T>? TryGet<T>() {
+        return _configurators.TryGetValue(typeof(T), out var action) ? (Action<T>)action : null;
+    }
+
     public Action<T> Get<T>() {
-        if (_configurators.TryGetValue(typeof(T), out var action)) {
-            return (Action<T>)action;
+        var action = TryGet<T>();
+        if (action is not null) {
+            return action;
         }
 
         throw new KeyNotFoundException($"No configurator for {typeof(T)}");
