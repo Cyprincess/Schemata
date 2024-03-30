@@ -5,7 +5,8 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Authorization.Foundation.Entities;
 
 [Table("Tokens")]
-public class SchemataToken : IIdentifier, IConcurrency, ITimestamp
+[CanonicalName("tokens/{token}")]
+public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     public virtual long? ApplicationId { get; set; }
 
@@ -26,6 +27,14 @@ public class SchemataToken : IIdentifier, IConcurrency, ITimestamp
     public virtual DateTime? ExpirationDate { get; set; }
 
     public virtual DateTime? RedemptionDate { get; set; }
+
+    #region ICanonicalName Members
+
+    public virtual string? Name { get; set; }
+
+    public virtual string? CanonicalName { get; set; }
+
+    #endregion
 
     #region IConcurrency Members
 

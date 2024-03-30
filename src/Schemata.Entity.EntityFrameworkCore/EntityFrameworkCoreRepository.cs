@@ -26,7 +26,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
-        var enumerable = BuildQuery(predicate).AsAsyncEnumerable().WithCancellation(ct);
+        var query      = await BuildQueryAsync(predicate, ct);
+        var enumerable = query.AsAsyncEnumerable().WithCancellation(ct);
 
         await foreach (var entity in enumerable) {
             ct.ThrowIfCancellationRequested();
@@ -38,49 +39,57 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
         where TResult : default {
-        return await BuildQuery(predicate).FirstOrDefaultAsync(ct);
+        var query = await BuildQueryAsync(predicate, ct);
+        return await query.FirstOrDefaultAsync(ct);
     }
 
     public override async Task<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
         where TResult : default {
-        return await BuildQuery(predicate).SingleOrDefaultAsync(ct);
+        var query = await BuildQueryAsync(predicate, ct);
+        return await query.SingleOrDefaultAsync(ct);
     }
 
     public override async Task<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
-        return await BuildQuery(predicate).AnyAsync(ct);
+        var query = await BuildQueryAsync(predicate, ct);
+        return await query.AnyAsync(ct);
     }
 
     public override async Task<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
-        return await BuildQuery(predicate).CountAsync(ct);
+        var query = await BuildQueryAsync(predicate, ct);
+        return await query.CountAsync(ct);
     }
 
     public override async Task<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
-        return await BuildQuery(predicate).LongCountAsync(ct);
+        var query = await BuildQueryAsync(predicate, ct);
+        return await query.LongCountAsync(ct);
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        if (!next) return;
 
         await Context.AddAsync(entity, ct);
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        if (!next) return;
 
         Context.Entry(entity).State = EntityState.Detached;
         Context.Update(entity);
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        if (!next) return;
 
         Context.Remove(entity);
     }
@@ -89,8 +98,15 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return await Context.SaveChangesAsync(ct);
     }
 
-    private IQueryable<TResult> BuildQuery<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
+    private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct) {
         var table = Context.Set<TEntity>().AsQueryable();
-        return BuildQuery(table, predicate);
+
+        var query = new QueryContainer<TEntity>(table);
+
+        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, query, ct);
+
+        return BuildQuery(query.Query, predicate);
     }
 }

@@ -5,10 +5,9 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Authorization.Foundation.Entities;
 
 [Table("Scopes")]
-public class SchemataScope : IIdentifier, IConcurrency, ITimestamp
+[CanonicalName("scopes/{scope}")]
+public class SchemataScope : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    public virtual string? Name { get; set; }
-
     public virtual string? DisplayName { get; set; }
 
     public virtual string? DisplayNames { get; set; }
@@ -20,6 +19,14 @@ public class SchemataScope : IIdentifier, IConcurrency, ITimestamp
     public virtual string? Properties { get; set; }
 
     public virtual string? Resources { get; set; }
+
+    #region ICanonicalName Members
+
+    public virtual string? Name { get; set; }
+
+    public virtual string? CanonicalName { get; set; }
+
+    #endregion
 
     #region IConcurrency Members
 
