@@ -152,8 +152,6 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             yield break;
         }
 
-        var list = scopes.ToList();
-
         var authorizations = _authorizations.ListAsync(Query, ct);
         await foreach (var authorization in authorizations) {
             ct.ThrowIfCancellationRequested();
@@ -163,12 +161,19 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         yield break;
 
         IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
-            return q.Where(a
-                => a.ApplicationId == application.Id &&
-                   a.Subject == subject &&
-                   a.Status == status &&
-                   a.Type == type &&
-                   a.Scopes == list);
+            var query = q.Where(a => a.ApplicationId == application.Id //
+                                  && a.Subject == subject              //
+                                  && a.Status == status                //
+                                  && a.Type == type);
+
+            var predicate = Predicate.False<TAuthorization>();
+
+            foreach (var scope in scopes) {
+                var wrapped = $"\"{scope}\"";
+                predicate = predicate.Or(a => a.Scopes!.Contains(wrapped));
+            }
+
+            return query.Where(predicate);
         }
     }
 
@@ -213,16 +218,17 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         TAuthorization    authorization,
         CancellationToken ct) {
         if (string.IsNullOrEmpty(authorization.Properties)) {
-            return new(ImmutableDictionary.Create<string, JsonElement>());
+            return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", authorization.Properties);
         var properties = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties);
 
-            return result ?? ImmutableDictionary.Create<string, JsonElement>();
+            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
         })!;
 
         return new(properties);
@@ -231,7 +237,21 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual ValueTask<ImmutableArray<string>> GetScopesAsync(
         TAuthorization    authorization,
         CancellationToken ct) {
-        return new(authorization.Scopes?.ToImmutableArray() ?? ImmutableArray<string>.Empty);
+        if (string.IsNullOrEmpty(authorization.Scopes)) {
+            return new(ImmutableArray<string>.Empty);
+        }
+
+        var key = string.Concat(Constants.Schemata, "\x1e", authorization.Scopes);
+        var uris = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(authorization.Scopes);
+
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
+
+        return new(uris);
     }
 
     public virtual ValueTask<string?> GetStatusAsync(TAuthorization authorization, CancellationToken ct) {
@@ -310,12 +330,12 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         TAuthorization         authorization,
         ImmutableArray<string> scopes,
         CancellationToken      ct) {
-        if (scopes is not { Length: > 0 }) {
+        if (scopes.IsDefaultOrEmpty) {
             authorization.Scopes = null;
             return default;
         }
 
-        authorization.Scopes = scopes.ToList();
+        authorization.Scopes = JsonSerializer.Serialize(scopes);
         return default;
     }
 

@@ -142,7 +142,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
 
         var key = string.Concat(Constants.Schemata, "\x1e", token.Properties);
         var properties = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(token.Properties);
 

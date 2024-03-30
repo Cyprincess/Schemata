@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -18,7 +17,7 @@ public class SchemataAuthorization : IIdentifier, IConcurrency, ITimestamp
 
     public virtual string? Properties { get; set; }
 
-    public virtual List<string>? Scopes { get; set; }
+    public virtual string? Scopes { get; set; }
 
     #region IConcurrency Members
 

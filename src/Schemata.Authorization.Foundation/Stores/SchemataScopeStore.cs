@@ -62,7 +62,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     }
 
     public virtual IAsyncEnumerable<TScope> FindByResourceAsync(string resource, CancellationToken ct) {
-        return _scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(resource)), ct);
+        var wrapped = $"\"{resource}\"";
+        return _scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(wrapped)), ct);
     }
 
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
@@ -79,24 +80,30 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDescriptionsAsync(
         TScope            scope,
         CancellationToken ct) {
-        if (scope.Descriptions is not { Count: > 0 }) {
-            return new(ImmutableDictionary.Create<CultureInfo, string>());
+        if (string.IsNullOrWhiteSpace(scope.Descriptions)) {
+            return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.Descriptions);
-        var names = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var descriptions = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+
+            var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions);
+            if (descriptions is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var (culture, name) in scope.Descriptions) {
-                builder[CultureInfo.GetCultureInfo(culture)] = name;
+            foreach (var (culture, description) in descriptions) {
+                builder[CultureInfo.GetCultureInfo(culture)] = description;
             }
 
             return builder.ToImmutable();
         })!;
 
-        return new(names);
+        return new(descriptions);
     }
 
     public virtual ValueTask<string?> GetDisplayNameAsync(TScope scope, CancellationToken ct) {
@@ -106,17 +113,23 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
         TScope            scope,
         CancellationToken ct) {
-        if (scope.DisplayNames is not { Count: > 0 }) {
-            return new(ImmutableDictionary.Create<CultureInfo, string>());
+        if (string.IsNullOrWhiteSpace(scope.DisplayNames)) {
+            return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.DisplayNames);
         var names = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames);
+            if (names is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var (culture, name) in scope.DisplayNames) {
+            foreach (var (culture, name) in names) {
                 builder[CultureInfo.GetCultureInfo(culture)] = name;
             }
 
@@ -138,23 +151,38 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         TScope            scope,
         CancellationToken ct) {
         if (string.IsNullOrEmpty(scope.Properties)) {
-            return new(ImmutableDictionary.Create<string, JsonElement>());
+            return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.Properties);
         var properties = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties);
 
-            return result ?? ImmutableDictionary.Create<string, JsonElement>();
+            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
         })!;
 
         return new(properties);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetResourcesAsync(TScope scope, CancellationToken ct) {
-        return new(scope.Resources?.ToImmutableArray() ?? ImmutableArray<string>.Empty);
+        if (string.IsNullOrEmpty(scope.Resources)) {
+            return new(ImmutableArray<string>.Empty);
+        }
+
+        var key = string.Concat(Constants.Schemata, "\x1e", scope.Resources);
+        var resources = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High)
+                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources);
+
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
+
+        return new(resources);
     }
 
     public virtual ValueTask<TScope> InstantiateAsync(CancellationToken ct) {
@@ -186,7 +214,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return default;
         }
 
-        scope.Descriptions = descriptions.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
+        var dictionary = descriptions.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
+        scope.Descriptions = JsonSerializer.Serialize(dictionary);
         return default;
     }
 
@@ -204,7 +233,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return default;
         }
 
-        scope.DisplayNames = names.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
+        var dictionary = names.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
+        scope.DisplayNames = JsonSerializer.Serialize(dictionary);
         return default;
     }
 
@@ -228,12 +258,12 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     }
 
     public virtual ValueTask SetResourcesAsync(TScope scope, ImmutableArray<string> resources, CancellationToken ct) {
-        if (resources is not { Length: > 0 }) {
+        if (resources.IsDefaultOrEmpty) {
             scope.Resources = null;
             return default;
         }
 
-        scope.Resources = resources.ToList();
+        scope.Resources = JsonSerializer.Serialize(resources);
         return default;
     }
 

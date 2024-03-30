@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -20,21 +19,21 @@ public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
 
     public virtual string? DisplayName { get; set; }
 
-    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+    public virtual string? DisplayNames { get; set; }
 
     public virtual string? Properties { get; set; }
 
     public virtual string? JsonWebKeySet { get; set; }
 
-    public virtual List<string>? PostLogoutRedirectUris { get; set; }
+    public virtual string? PostLogoutRedirectUris { get; set; }
 
-    public virtual List<string>? RedirectUris { get; set; }
+    public virtual string? RedirectUris { get; set; }
 
-    public virtual List<string>? Permissions { get; set; }
+    public virtual string? Permissions { get; set; }
 
-    public virtual List<string>? Requirements { get; set; }
+    public virtual string? Requirements { get; set; }
 
-    public virtual Dictionary<string, string>? Settings { get; set; }
+    public virtual string? Settings { get; set; }
 
     #region IConcurrency Members
 
