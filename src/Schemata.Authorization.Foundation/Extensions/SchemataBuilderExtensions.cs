@@ -12,9 +12,9 @@ public static class SchemataBuilderExtensions
 {
     public static SchemataAuthorizationBuilder UseAuthorization(
         this SchemataBuilder                       builder,
-        Action<OpenIddictCoreBuilder>?             store     = null,
         Action<OpenIddictServerBuilder>?           serve     = null,
-        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null) {
+        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
+        Action<OpenIddictCoreBuilder>?             store     = null) {
         store ??= _ => { };
         builder.Configure(store);
 

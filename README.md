@@ -40,7 +40,13 @@ var builder = WebApplication.CreateBuilder(args)
 
                                  schema.UseModular();
 
-                                 schema.UseAuthorization();
+                                 schema.UseAuthorization(options => {
+                                            options.AddEphemeralEncryptionKey()
+                                                   .AddEphemeralSigningKey();
+                                        })
+                                       .UseCodeFlow()
+                                       .UseRefreshTokenFlow()
+                                       .UseIntrospection();
                              });
 
 var app = builder.Build();

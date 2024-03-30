@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Schemata.Authorization.Foundation.Entities;
 using Schemata.Authorization.Foundation.Resolver;
 using Schemata.Authorization.Foundation.Stores;
@@ -14,6 +16,8 @@ using Schemata.Core.Features;
 namespace Schemata.Authorization.Foundation.Features;
 
 [DependsOn<SchemataAuthenticationFeature>]
+[DependsOn<SchemataControllersFeature>]
+[Information("Authorization depends on Authentication and Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataAuthorizationFeature : FeatureBase
 {
     public override int Priority => 310_000_000;
@@ -31,6 +35,10 @@ public class SchemataAuthorizationFeature : FeatureBase
         var build    = configurators.Pop<IList<IAuthorizationFeature>>();
         build(features);
         features.Sort((a, b) => a.Order.CompareTo(b.Order));
+
+        var part = new AssemblyPart(typeof(SchemataAuthorizationFeature).Assembly);
+        services.AddMvcCore()
+                .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
 
         services.AddOpenIddict()
                 .AddCore(builder => {
