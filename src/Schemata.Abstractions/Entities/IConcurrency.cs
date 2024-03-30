@@ -1,6 +1,6 @@
 using System;
 
-namespace Schemata.Abstractions.Entity;
+namespace Schemata.Abstractions.Entities;
 
 public interface IConcurrency
 {

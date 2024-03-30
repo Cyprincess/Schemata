@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Entity;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 

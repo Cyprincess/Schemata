@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,58 +13,57 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
+public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProvider provider) : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    public LinQ2DbRepository(TContext context, IServiceProvider provider) {
-        Context  = context;
-        Provider = provider;
-    }
+    protected TContext Context { get; } = context;
 
-    protected TContext         Context  { get; }
-    protected IServiceProvider Provider { get; }
+    protected IServiceProvider Provider { get; } = provider;
 
-    protected DataConnectionTransaction? Transaction  { get; set; }
-    protected int                        RowsAffected { get; set; }
+    protected DataConnectionTransaction? Transaction { get; set; }
+
+    protected int RowsAffected { get; set; }
 
     public string TableName { get; } = typeof(TEntity).Name.Pluralize();
 
-    public override async IAsyncEnumerable<TEntity> ListAsync(
-        Expression<Func<TEntity, bool>>?           predicate,
-        [EnumeratorCancellation] CancellationToken ct = default) {
+    public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        [EnumeratorCancellation] CancellationToken      ct = default) {
         var enumerable = BuildQuery(predicate).AsAsyncEnumerable().WithCancellation(ct);
 
         await foreach (var entity in enumerable) yield return entity;
     }
 
-    public override async Task<TEntity?> FirstOrDefaultAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default) {
+    public override async Task<TResult?> FirstOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default)
+        where TResult : default {
         return await BuildQuery(predicate).FirstOrDefaultAsync(ct);
     }
 
-    public override async Task<TEntity?> SingleOrDefaultAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default) {
+    public override async Task<TResult?> SingleOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default)
+        where TResult : default {
         return await BuildQuery(predicate).SingleOrDefaultAsync(ct);
     }
 
-    public override async Task<bool> AnyAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default) {
+    public override async Task<bool> AnyAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default) {
         return await BuildQuery(predicate).AnyAsync(ct);
     }
 
-    public override async Task<int> CountAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default) {
+    public override async Task<int> CountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default) {
         return await BuildQuery(predicate).CountAsync(ct);
     }
 
-    public override async Task<long> LongCountAsync(
-        Expression<Func<TEntity, bool>>? predicate,
-        CancellationToken                ct = default) {
+    public override async Task<long> LongCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default) {
         return await BuildQuery(predicate).LongCountAsync(ct);
     }
 
@@ -112,10 +110,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return rows;
     }
 
-    private IQueryable<TEntity> BuildQuery(Expression<Func<TEntity, bool>>? predicate) {
-        var table = Context.GetTable<TEntity>().TableName(TableName);
-
-        return predicate != null ? table.Where(predicate) : table;
+    private IQueryable<TResult> BuildQuery<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
+        var table = Context.GetTable<TEntity>().TableName(TableName).AsQueryable();
+        return BuildQuery(table, predicate);
     }
 
     private async Task BeginTransactionAsync(CancellationToken ct) {
