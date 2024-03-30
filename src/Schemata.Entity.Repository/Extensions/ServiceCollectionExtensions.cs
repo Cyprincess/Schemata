@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTimestamp<>));
         services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddConcurrency<>));
         services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTrash<>));
+        services.AddTransient(typeof(IRepositoryQueryAsyncAdvice<>), typeof(AdviceQueryTrash<>));
         services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTimestamp<>));
         services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveConcurrency<>));
         services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTrash<>));
