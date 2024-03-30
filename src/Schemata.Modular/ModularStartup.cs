@@ -39,8 +39,8 @@ public class ModularStartup : IStartupFilter
     public static ModularStartup Create(
         IConfiguration      configuration,
         IWebHostEnvironment environment,
-        IServiceProvider    provider) {
-        var runner = provider.GetRequiredService<IModulesRunner>();
+        IServiceProvider    sp) {
+        var runner = sp.GetRequiredService<IModulesRunner>();
 
         return new(runner, configuration, environment);
     }

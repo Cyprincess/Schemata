@@ -19,9 +19,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    public LinQ2DbRepository(IServiceProvider provider, TContext context) {
-        Provider = provider;
-        Context  = context;
+    public LinQ2DbRepository(IServiceProvider sp, TContext context) {
+        ServiceProvider = sp;
+        Context         = context;
 
         var entity = typeof(TEntity);
         TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
@@ -29,7 +29,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     protected TContext Context { get; }
 
-    protected IServiceProvider Provider { get; }
+    protected IServiceProvider ServiceProvider { get; }
 
     protected DataConnectionTransaction? Transaction { get; set; }
 
@@ -81,7 +81,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 
@@ -89,7 +89,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 
@@ -97,7 +97,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await BeginTransactionAsync(ct);
 

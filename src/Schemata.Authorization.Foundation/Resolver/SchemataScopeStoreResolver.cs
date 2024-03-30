@@ -7,13 +7,13 @@ using Schemata.Authorization.Foundation.Stores;
 
 namespace Schemata.Authorization.Foundation.Resolver;
 
-public class SchemataScopeStoreResolver(IMemoryCache cache, IServiceProvider provider) : IOpenIddictScopeStoreResolver
+public class SchemataScopeStoreResolver(IMemoryCache cache, IServiceProvider sp) : IOpenIddictScopeStoreResolver
 {
     #region IOpenIddictScopeStoreResolver Members
 
     public IOpenIddictScopeStore<TScope> Get<TScope>()
         where TScope : class {
-        var store = provider.GetService<IOpenIddictScopeStore<TScope>>();
+        var store = sp.GetService<IOpenIddictScopeStore<TScope>>();
         if (store is not null) {
             return store;
         }
@@ -26,7 +26,7 @@ public class SchemataScopeStoreResolver(IMemoryCache cache, IServiceProvider pro
             return typeof(SchemataScopeStore<>).MakeGenericType(entity);
         })!;
 
-        return (IOpenIddictScopeStore<TScope>)provider.GetRequiredService(type);
+        return (IOpenIddictScopeStore<TScope>)sp.GetRequiredService(type);
     }
 
     #endregion

@@ -12,11 +12,11 @@ public static class Utilities
         return CreateInstance<T>(null, type, parameters.ToList());
     }
 
-    public static T? CreateInstance<T>(IServiceProvider provider, Type type, params object?[] parameters) {
-        return CreateInstance<T>(provider, type, parameters.ToList());
+    public static T? CreateInstance<T>(IServiceProvider sp, Type type, params object?[] parameters) {
+        return CreateInstance<T>(sp, type, parameters.ToList());
     }
 
-    public static T? CreateInstance<T>(IServiceProvider? provider, Type type, List<object?>? parameters = null) {
+    public static T? CreateInstance<T>(IServiceProvider? sp, Type type, List<object?>? parameters = null) {
         var ci = type.GetConstructors().FirstOrDefault();
         if (ci is null) {
             return default;
@@ -33,7 +33,7 @@ public static class Utilities
                 continue;
             }
 
-            if (provider is null) {
+            if (sp is null) {
                 throw new InvalidOperationException($"Cannot resolve parameter '{
                     parameter.Name
                 }' of type '{
@@ -41,7 +41,7 @@ public static class Utilities
                 }'.");
             }
 
-            arguments[i] = provider.GetRequiredService(parameter.ParameterType);
+            arguments[i] = sp.GetRequiredService(parameter.ParameterType);
         }
 
         return (T?)Activator.CreateInstance(type, arguments);
@@ -52,15 +52,15 @@ public static class Utilities
     }
 
     public static void CallMethod(
-        IServiceProvider provider,
+        IServiceProvider sp,
         object           instance,
         string           method,
         params object?[] parameters) {
-        CallMethod(provider, instance, method, parameters.ToList());
+        CallMethod(sp, instance, method, parameters.ToList());
     }
 
     public static void CallMethod(
-        IServiceProvider? provider,
+        IServiceProvider? sp,
         object            instance,
         string            method,
         List<object?>?    parameters = null) {
@@ -80,7 +80,7 @@ public static class Utilities
                 continue;
             }
 
-            if (provider is null) {
+            if (sp is null) {
                 throw new InvalidOperationException($"Cannot resolve parameter '{
                     parameter.Name
                 }' of method '{
@@ -90,7 +90,7 @@ public static class Utilities
                 }'.");
             }
 
-            arguments[i] = provider.GetRequiredService(parameter.ParameterType);
+            arguments[i] = sp.GetRequiredService(parameter.ParameterType);
         }
 
         mi.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments.ToArray(), null);

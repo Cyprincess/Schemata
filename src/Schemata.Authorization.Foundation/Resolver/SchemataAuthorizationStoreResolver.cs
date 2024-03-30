@@ -10,7 +10,7 @@ using Schemata.Authorization.Foundation.Stores;
 namespace Schemata.Authorization.Foundation.Resolver;
 
 public class SchemataAuthorizationStoreResolver(
-    IServiceProvider                       provider,
+    IServiceProvider                       sp,
     IMemoryCache                           cache,
     IOptionsMonitor<OpenIddictCoreOptions> options) : IOpenIddictAuthorizationStoreResolver
 {
@@ -18,7 +18,7 @@ public class SchemataAuthorizationStoreResolver(
 
     public IOpenIddictAuthorizationStore<TAuthorization> Get<TAuthorization>()
         where TAuthorization : class {
-        var store = provider.GetService<IOpenIddictAuthorizationStore<TAuthorization>>();
+        var store = sp.GetService<IOpenIddictAuthorizationStore<TAuthorization>>();
         if (store is not null) {
             return store;
         }
@@ -34,7 +34,7 @@ public class SchemataAuthorizationStoreResolver(
             return typeof(SchemataAuthorizationStore<,,>).MakeGenericType(entity, application, token);
         })!;
 
-        return (IOpenIddictAuthorizationStore<TAuthorization>)provider.GetRequiredService(type);
+        return (IOpenIddictAuthorizationStore<TAuthorization>)sp.GetRequiredService(type);
     }
 
     #endregion

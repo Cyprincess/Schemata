@@ -14,14 +14,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     where TContext : DbContext
     where TEntity : class
 {
-    public EntityFrameworkCoreRepository(TContext context, IServiceProvider provider) {
-        Context  = context;
-        Provider = provider;
+    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) {
+        ServiceProvider = sp;
+        Context         = context;
     }
 
     protected TContext Context { get; }
 
-    protected IServiceProvider Provider { get; }
+    protected IServiceProvider ServiceProvider { get; }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -67,20 +67,20 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         await Context.AddAsync(entity, ct);
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         Context.Entry(entity).State = EntityState.Detached;
         Context.Update(entity);
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(Provider, entity, ct);
+        await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
 
         Context.Remove(entity);
     }

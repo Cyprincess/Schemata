@@ -7,13 +7,13 @@ using Schemata.Authorization.Foundation.Stores;
 
 namespace Schemata.Authorization.Foundation.Resolver;
 
-public class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider provider) : IOpenIddictTokenStoreResolver
+public class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider sp) : IOpenIddictTokenStoreResolver
 {
     #region IOpenIddictTokenStoreResolver Members
 
     public IOpenIddictTokenStore<TToken> Get<TToken>()
         where TToken : class {
-        var store = provider.GetService<IOpenIddictTokenStore<TToken>>();
+        var store = sp.GetService<IOpenIddictTokenStore<TToken>>();
         if (store is not null) {
             return store;
         }
@@ -26,7 +26,7 @@ public class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider pro
             return typeof(SchemataTokenStore<>).MakeGenericType(entity);
         })!;
 
-        return (IOpenIddictTokenStore<TToken>)provider.GetRequiredService(type);
+        return (IOpenIddictTokenStore<TToken>)sp.GetRequiredService(type);
     }
 
     #endregion
