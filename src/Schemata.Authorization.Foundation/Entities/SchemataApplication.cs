@@ -5,7 +5,8 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Authorization.Foundation.Entities;
 
 [Table("Applications")]
-public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
+[CanonicalName("applications/{application}")]
+public class SchemataApplication : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     public virtual string? ApplicationType { get; set; }
 
@@ -34,6 +35,18 @@ public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
     public virtual string? Requirements { get; set; }
 
     public virtual string? Settings { get; set; }
+
+    #region ICanonicalName Members
+
+    public virtual string? Name
+    {
+        get => ClientId;
+        set => ClientId = value;
+    }
+
+    public virtual string? CanonicalName { get; set; }
+
+    #endregion
 
     #region IConcurrency Members
 
