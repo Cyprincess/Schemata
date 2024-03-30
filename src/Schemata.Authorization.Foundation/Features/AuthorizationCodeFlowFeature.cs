@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Authorization.Foundation.Handlers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -13,8 +12,6 @@ public class AuthorizationCodeFlowFeature : IAuthorizationFeature
 
     public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) {
         builder.AllowAuthorizationCodeFlow()
-               .AddEventHandler(SchemataAuthorizationHandler.Descriptor)
-               .AddEventHandler(SchemataExchangeHandler.Descriptor)
                .RequireProofKeyForCodeExchange()
                .SetAuthorizationEndpointUris("/Connect/Authorize")
                .SetTokenEndpointUris("/Connect/Token");

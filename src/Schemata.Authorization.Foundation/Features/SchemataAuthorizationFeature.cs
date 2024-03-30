@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Entities;
+using Schemata.Authorization.Foundation.Resolver;
+using Schemata.Authorization.Foundation.Stores;
 using Schemata.Core;
 using Schemata.Core.Features;
 
@@ -18,6 +22,7 @@ public class SchemataAuthorizationFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
+        var store     = configurators.Pop<OpenIddictCoreBuilder>();
         var serve     = configurators.Pop<OpenIddictServerBuilder>();
         var integrate = configurators.Pop<OpenIddictServerAspNetCoreBuilder>();
 
@@ -27,24 +32,42 @@ public class SchemataAuthorizationFeature : FeatureBase
         features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
         services.AddOpenIddict()
-                .AddServer(options => {
-                     serve(options);
+                .AddCore(builder => {
+                     builder.DisableAdditionalFiltering();
 
-                     options.EnableDegradedMode();
+                     builder.SetDefaultApplicationEntity<SchemataApplication>()
+                            .SetDefaultAuthorizationEntity<SchemataAuthorization>()
+                            .SetDefaultScopeEntity<SchemataScope>()
+                            .SetDefaultTokenEntity<SchemataToken>();
 
-                     var core = options.UseAspNetCore()
+                     store(builder);
+
+                     builder.ReplaceApplicationStoreResolver<SchemataApplicationStoreResolver>()
+                            .ReplaceAuthorizationStoreResolver<SchemataAuthorizationStoreResolver>()
+                            .ReplaceScopeStoreResolver<SchemataScopeStoreResolver>()
+                            .ReplaceTokenStoreResolver<SchemataTokenStoreResolver>();
+
+                     builder.Services.TryAddScoped(typeof(SchemataApplicationStore<>));
+                     builder.Services.TryAddScoped(typeof(SchemataAuthorizationStore<>));
+                     builder.Services.TryAddScoped(typeof(SchemataScopeStore<>));
+                     builder.Services.TryAddScoped(typeof(SchemataTokenStore<>));
+                 })
+                .AddServer(builder => {
+                     serve(builder);
+
+                     var core = builder.UseAspNetCore()
                                        .EnableStatusCodePagesIntegration();
 
                      integrate(core);
 
                      foreach (var feature in features) {
-                         feature.ConfigureServer(services, options);
+                         feature.ConfigureServer(services, builder);
                          feature.ConfigureServerAspNetCore(services, core);
                      }
                  })
-                .AddValidation(options => {
-                     options.UseLocalServer();
-                     options.UseAspNetCore();
+                .AddValidation(builder => {
+                     builder.UseLocalServer();
+                     builder.UseAspNetCore();
                  });
     }
 

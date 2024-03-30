@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Authorization.Foundation.Handlers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -12,8 +11,7 @@ public class AuthorizationIntrospectionFeature : IAuthorizationFeature
     public int Priority => Order;
 
     public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) {
-        builder.AddEventHandler(SchemataIntrospectionHandler.Descriptor)
-               .SetIntrospectionEndpointUris("/Connect/Introspect");
+        builder.SetIntrospectionEndpointUris("/Connect/Introspect");
     }
 
     public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) { }

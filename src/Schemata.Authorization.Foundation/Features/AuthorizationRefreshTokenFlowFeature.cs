@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Authorization.Foundation.Handlers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -13,7 +12,6 @@ public class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
 
     public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) {
         builder.AllowRefreshTokenFlow()
-               .AddEventHandler(SchemataExchangeHandler.Descriptor)
                .SetTokenEndpointUris("/Connect/Token");
     }
 

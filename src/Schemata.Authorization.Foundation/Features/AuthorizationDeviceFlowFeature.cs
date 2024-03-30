@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Authorization.Foundation.Handlers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -13,8 +12,6 @@ public class AuthorizationDeviceFlowFeature : IAuthorizationFeature
 
     public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) {
         builder.AllowDeviceCodeFlow()
-               .AddEventHandler(SchemataDeviceHandler.Descriptor)
-               .AddEventHandler(SchemataExchangeHandler.Descriptor)
                .SetDeviceEndpointUris("/Connect/Device")
                .SetVerificationEndpointUris("/Connect/Verify")
                .SetTokenEndpointUris("/Connect/Token");
