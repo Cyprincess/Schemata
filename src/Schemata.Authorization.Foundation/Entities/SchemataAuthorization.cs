@@ -6,13 +6,11 @@ namespace Schemata.Authorization.Foundation.Entities;
 
 public class SchemataAuthorization : IIdentifier, IConcurrency, ITimestamp
 {
-    public virtual long? ApplicationId { get; set; }
-
     public virtual string? Subject { get; set; }
 
-    public virtual string? ClientId { get; set; }
-
     public virtual string? Type { get; set; }
+
+    public virtual long? ApplicationId { get; set; }
 
     public virtual string? Status { get; set; }
 

@@ -1,14 +1,18 @@
 using System;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
+using OpenIddict.Core;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Stores;
 
 namespace Schemata.Authorization.Foundation.Resolver;
 
-public class SchemataApplicationStoreResolver(IMemoryCache cache, IServiceProvider provider)
-    : IOpenIddictApplicationStoreResolver
+public class SchemataApplicationStoreResolver(
+    IServiceProvider                       provider,
+    IMemoryCache                           cache,
+    IOptionsMonitor<OpenIddictCoreOptions> options) : IOpenIddictApplicationStoreResolver
 {
     #region IOpenIddictApplicationStoreResolver Members
 
@@ -24,7 +28,10 @@ public class SchemataApplicationStoreResolver(IMemoryCache cache, IServiceProvid
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 
-            return typeof(SchemataApplicationStore<>).MakeGenericType(entity);
+            var authorization = options.CurrentValue.DefaultAuthorizationType!;
+            var token         = options.CurrentValue.DefaultTokenType!;
+
+            return typeof(SchemataApplicationStore<,,>).MakeGenericType(entity, authorization, token);
         })!;
 
         return (IOpenIddictApplicationStore<TApplication>)provider.GetRequiredService(type);

@@ -32,7 +32,10 @@ public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProv
         [EnumeratorCancellation] CancellationToken      ct = default) {
         var enumerable = BuildQuery(predicate).AsAsyncEnumerable().WithCancellation(ct);
 
-        await foreach (var entity in enumerable) yield return entity;
+        await foreach (var entity in enumerable) {
+            ct.ThrowIfCancellationRequested();
+            yield return entity;
+        }
     }
 
     public override async Task<TResult?> FirstOrDefaultAsync<TResult>(

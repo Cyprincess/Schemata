@@ -11,8 +11,6 @@ public class SchemataToken : IIdentifier, IConcurrency, ITimestamp
 
     public virtual string? Subject { get; set; }
 
-    public virtual string? ClientId { get; set; }
-
     public virtual string? Type { get; set; }
 
     public virtual string? ReferenceId { get; set; }

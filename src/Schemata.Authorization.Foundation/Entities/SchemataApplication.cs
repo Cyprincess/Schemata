@@ -6,7 +6,7 @@ namespace Schemata.Authorization.Foundation.Entities;
 
 public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
 {
-    public string? ApplicationType { get; set; }
+    public virtual string? ApplicationType { get; set; }
 
     public virtual string? ClientId { get; set; }
 
@@ -17,6 +17,8 @@ public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
     public virtual string? ConsentType { get; set; }
 
     public virtual string? DisplayName { get; set; }
+
+    public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
     public virtual string? Properties { get; set; }
 
@@ -29,8 +31,6 @@ public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
     public virtual List<string>? Permissions { get; set; }
 
     public virtual List<string>? Requirements { get; set; }
-
-    public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
     public virtual Dictionary<string, string>? Settings { get; set; }
 
@@ -48,8 +48,8 @@ public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
 
     #region ITimestamp Members
 
-    public DateTime? CreationDate     { get; set; }
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? CreationDate     { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,85 +14,176 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Foundation.Stores;
 
-public class SchemataAuthorizationStore<TAuthorization>(IRepository<TAuthorization> repository, IMemoryCache cache)
-    : IOpenIddictAuthorizationStore<TAuthorization>
+// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
+public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : IOpenIddictAuthorizationStore<TAuthorization>
     where TAuthorization : SchemataAuthorization
+    where TApplication : SchemataApplication
+    where TToken : SchemataToken
 {
+    private readonly IRepository<TApplication>   _applications;
+    private readonly IRepository<TAuthorization> _authorizations;
+    private readonly IRepository<TToken>         _tokens;
+    private readonly IMemoryCache                _cache;
+
+    public SchemataAuthorizationStore(
+        IRepository<TApplication>   applications,
+        IRepository<TAuthorization> authorizations,
+        IRepository<TToken>         tokens,
+        IMemoryCache                cache) {
+        _applications   = applications;
+        _authorizations = authorizations;
+        _tokens         = tokens;
+        _cache          = cache;
+    }
+
     #region IOpenIddictAuthorizationStore<TAuthorization> Members
 
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
-        return await repository.LongCountAsync<TAuthorization>(null, ct);
+        return await _authorizations.LongCountAsync<TAuthorization>(null, ct);
     }
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TAuthorization>, IQueryable<TResult>> query,
         CancellationToken                                     ct) {
-        return await repository.LongCountAsync(query, ct);
+        return await _authorizations.LongCountAsync(query, ct);
     }
 
     public virtual async ValueTask CreateAsync(TAuthorization authorization, CancellationToken ct) {
-        await repository.AddAsync(authorization, ct);
-        await repository.CommitAsync(ct);
+        await _authorizations.AddAsync(authorization, ct);
+        await _authorizations.CommitAsync(ct);
     }
 
     public virtual async ValueTask DeleteAsync(TAuthorization authorization, CancellationToken ct) {
-        await repository.RemoveAsync(authorization, ct);
-        await repository.CommitAsync(ct);
+        var tokens = _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == authorization.Id), ct);
+        await foreach (var token in tokens) {
+            ct.ThrowIfCancellationRequested();
+            await _tokens.RemoveAsync(token, ct);
+        }
+
+        await _tokens.CommitAsync(ct);
+
+        await _authorizations.RemoveAsync(authorization, ct);
+        await _authorizations.CommitAsync(ct);
     }
 
-    public virtual IAsyncEnumerable<TAuthorization> FindAsync(string subject, string client, CancellationToken ct) {
-        return repository.ListAsync(q => q.Where(a => a.Subject == subject && a.ClientId == client), ct);
+    public virtual async IAsyncEnumerable<TAuthorization> FindAsync(
+        string                                     subject,
+        string                                     client,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var id          = long.Parse(client);
+        var application = await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        if (application is null) {
+            yield break;
+        }
+
+        var authorizations = _authorizations.ListAsync(Query, ct);
+        await foreach (var authorization in authorizations) {
+            ct.ThrowIfCancellationRequested();
+            yield return authorization;
+        }
+
+        yield break;
+
+        IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
+            return q.Where(a => a.ApplicationId == application.Id && a.Subject == subject);
+        }
     }
 
-    public virtual IAsyncEnumerable<TAuthorization> FindAsync(
-        string            subject,
-        string            client,
-        string            status,
-        CancellationToken ct) {
-        return repository.ListAsync(
-            q => q.Where(a => a.Subject == subject && a.ClientId == client && a.Status == status), ct);
+    public virtual async IAsyncEnumerable<TAuthorization> FindAsync(
+        string                                     subject,
+        string                                     client,
+        string                                     status,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var id          = long.Parse(client);
+        var application = await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        if (application is null) {
+            yield break;
+        }
+
+        var authorizations = _authorizations.ListAsync(Query, ct);
+        await foreach (var authorization in authorizations) {
+            ct.ThrowIfCancellationRequested();
+            yield return authorization;
+        }
+
+        yield break;
+
+        IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
+            return q.Where(a => a.ApplicationId == application.Id && a.Subject == subject && a.Status == status);
+        }
     }
 
-    public virtual IAsyncEnumerable<TAuthorization> FindAsync(
-        string            subject,
-        string            client,
-        string            status,
-        string            type,
-        CancellationToken ct) {
-        return repository.ListAsync(
-            q => q.Where(a => a.Subject == subject && a.ClientId == client && a.Status == status && a.Type == type),
-            ct);
+    public virtual async IAsyncEnumerable<TAuthorization> FindAsync(
+        string                                     subject,
+        string                                     client,
+        string                                     status,
+        string                                     type,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var id          = long.Parse(client);
+        var application = await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        if (application is null) {
+            yield break;
+        }
+
+        var authorizations = _authorizations.ListAsync(Query, ct);
+        await foreach (var authorization in authorizations) {
+            ct.ThrowIfCancellationRequested();
+            yield return authorization;
+        }
+
+        yield break;
+
+        IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
+            return q.Where(a
+                => a.ApplicationId == application.Id && a.Subject == subject && a.Status == status && a.Type == type);
+        }
     }
 
-    public virtual IAsyncEnumerable<TAuthorization> FindAsync(
-        string                 subject,
-        string                 client,
-        string                 status,
-        string                 type,
-        ImmutableArray<string> scopes,
-        CancellationToken      ct) {
+    public virtual async IAsyncEnumerable<TAuthorization> FindAsync(
+        string                                     subject,
+        string                                     client,
+        string                                     status,
+        string                                     type,
+        ImmutableArray<string>                     scopes,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var id          = long.Parse(client);
+        var application = await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        if (application is null) {
+            yield break;
+        }
+
         var list = scopes.ToList();
-        return repository.ListAsync(
-            q => q.Where(a
-                => a.Subject == subject &&
-                   a.ClientId == client &&
+
+        var authorizations = _authorizations.ListAsync(Query, ct);
+        await foreach (var authorization in authorizations) {
+            ct.ThrowIfCancellationRequested();
+            yield return authorization;
+        }
+
+        yield break;
+
+        IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
+            return q.Where(a
+                => a.ApplicationId == application.Id &&
+                   a.Subject == subject &&
                    a.Status == status &&
                    a.Type == type &&
-                   a.Scopes == list), ct);
+                   a.Scopes == list);
+        }
     }
 
     public virtual IAsyncEnumerable<TAuthorization> FindByApplicationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return repository.ListAsync(q => q.Where(a => a.ApplicationId == id), ct);
+        return FindByApplicationIdAsync(id, ct);
     }
 
-    public virtual async ValueTask<TAuthorization?> FindByIdAsync(string identifier, CancellationToken ct) {
+    public virtual ValueTask<TAuthorization?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return await repository.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        return FindByIdAsync(id, ct);
     }
 
     public virtual IAsyncEnumerable<TAuthorization> FindBySubjectAsync(string subject, CancellationToken ct) {
-        return repository.ListAsync(q => q.Where(a => a.Subject == subject), ct);
+        return _authorizations.ListAsync(q => q.Where(a => a.Subject == subject), ct);
     }
 
     public virtual ValueTask<string?> GetApplicationIdAsync(TAuthorization authorization, CancellationToken ct) {
@@ -102,7 +194,7 @@ public class SchemataAuthorizationStore<TAuthorization>(IRepository<TAuthorizati
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
         CancellationToken                                             ct) {
-        return await repository.SingleOrDefaultAsync(q => query(q, state), ct);
+        return await _authorizations.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask<DateTimeOffset?> GetCreationDateAsync(TAuthorization authorization, CancellationToken ct) {
@@ -125,9 +217,8 @@ public class SchemataAuthorizationStore<TAuthorization>(IRepository<TAuthorizati
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", authorization.Properties);
-        var properties = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties);
 
@@ -160,26 +251,27 @@ public class SchemataAuthorizationStore<TAuthorization>(IRepository<TAuthorizati
     }
 
     public virtual IAsyncEnumerable<TAuthorization> ListAsync(int? count, int? offset, CancellationToken ct) {
-        return repository.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
+        return _authorizations.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
         CancellationToken                                             ct) {
-        return repository.ListAsync(q => query(q, state), ct);
+        return _authorizations.ListAsync(q => query(q, state), ct);
     }
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
-        var authorizations = repository.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime), ct);
+        var authorizations = _authorizations.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime), ct);
         var count          = 0L;
 
         await foreach (var authorization in authorizations) {
-            await repository.RemoveAsync(authorization, ct);
+            ct.ThrowIfCancellationRequested();
+            await _authorizations.RemoveAsync(authorization, ct);
             count++;
         }
 
-        await repository.CommitAsync(ct);
+        await _authorizations.CommitAsync(ct);
 
         return count;
     }
@@ -243,9 +335,17 @@ public class SchemataAuthorizationStore<TAuthorization>(IRepository<TAuthorizati
     }
 
     public virtual async ValueTask UpdateAsync(TAuthorization authorization, CancellationToken ct) {
-        await repository.UpdateAsync(authorization, ct);
-        await repository.CommitAsync(ct);
+        await _authorizations.UpdateAsync(authorization, ct);
+        await _authorizations.CommitAsync(ct);
     }
 
     #endregion
+
+    public virtual IAsyncEnumerable<TAuthorization> FindByApplicationIdAsync(long id, CancellationToken ct) {
+        return _authorizations.ListAsync(q => q.Where(a => a.ApplicationId == id), ct);
+    }
+
+    public virtual async ValueTask<TAuthorization?> FindByIdAsync(long id, CancellationToken ct) {
+        return await _authorizations.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+    }
 }

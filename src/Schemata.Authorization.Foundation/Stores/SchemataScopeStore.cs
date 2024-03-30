@@ -14,54 +14,62 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Foundation.Stores;
 
-public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryCache cache)
-    : IOpenIddictScopeStore<TScope>
+// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
+public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     where TScope : SchemataScope
 {
+    private readonly IRepository<TScope> _scopes;
+    private readonly IMemoryCache        _cache;
+
+    public SchemataScopeStore(IRepository<TScope> scopes, IMemoryCache cache) {
+        _scopes = scopes;
+        _cache  = cache;
+    }
+
     #region IOpenIddictScopeStore<TScope> Members
 
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
-        return await repository.LongCountAsync<TScope>(null, ct);
+        return await _scopes.LongCountAsync<TScope>(null, ct);
     }
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TScope>, IQueryable<TResult>> query,
         CancellationToken                             ct) {
-        return await repository.LongCountAsync(query, ct);
+        return await _scopes.LongCountAsync(query, ct);
     }
 
     public virtual async ValueTask CreateAsync(TScope scope, CancellationToken ct) {
-        await repository.AddAsync(scope, ct);
-        await repository.CommitAsync(ct);
+        await _scopes.AddAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
     public virtual async ValueTask DeleteAsync(TScope scope, CancellationToken ct) {
-        await repository.RemoveAsync(scope, ct);
-        await repository.CommitAsync(ct);
+        await _scopes.RemoveAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
-    public virtual async ValueTask<TScope?> FindByIdAsync(string identifier, CancellationToken ct) {
+    public virtual ValueTask<TScope?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return await repository.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
+        return FindByIdAsync(id, ct);
     }
 
     public virtual async ValueTask<TScope?> FindByNameAsync(string name, CancellationToken ct) {
-        return await repository.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
+        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
     }
 
     public virtual IAsyncEnumerable<TScope> FindByNamesAsync(ImmutableArray<string> names, CancellationToken ct) {
-        return repository.ListAsync(q => q.Where(s => names.Contains(s.Name!)), ct);
+        return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name!)), ct);
     }
 
     public virtual IAsyncEnumerable<TScope> FindByResourceAsync(string resource, CancellationToken ct) {
-        throw new NotImplementedException();
+        return _scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(resource)), ct);
     }
 
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
         CancellationToken                                     ct) {
-        return await repository.SingleOrDefaultAsync(q => query(q, state), ct);
+        return await _scopes.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask<string?> GetDescriptionAsync(TScope scope, CancellationToken ct) {
@@ -76,9 +84,8 @@ public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryC
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.Descriptions);
-        var names = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
@@ -104,9 +111,8 @@ public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryC
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.DisplayNames);
-        var names = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
@@ -136,9 +142,8 @@ public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryC
         }
 
         var key = string.Concat(Constants.Schemata, "\x1e", scope.Properties);
-        var properties = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
             var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties);
 
@@ -157,14 +162,14 @@ public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryC
     }
 
     public virtual IAsyncEnumerable<TScope> ListAsync(int? count, int? offset, CancellationToken ct) {
-        return repository.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
+        return _scopes.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
         CancellationToken                                     ct) {
-        return repository.ListAsync(q => query(q, state), ct);
+        return _scopes.ListAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask SetDescriptionAsync(TScope scope, string? description, CancellationToken ct) {
@@ -233,9 +238,13 @@ public class SchemataScopeStore<TScope>(IRepository<TScope> repository, IMemoryC
     }
 
     public virtual async ValueTask UpdateAsync(TScope scope, CancellationToken ct) {
-        await repository.UpdateAsync(scope, ct);
-        await repository.CommitAsync(ct);
+        await _scopes.UpdateAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
     #endregion
+
+    public virtual async ValueTask<TScope?> FindByIdAsync(long id, CancellationToken ct) {
+        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
+    }
 }

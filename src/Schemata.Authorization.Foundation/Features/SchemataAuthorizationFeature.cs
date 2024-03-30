@@ -47,8 +47,8 @@ public class SchemataAuthorizationFeature : FeatureBase
                             .ReplaceScopeStoreResolver<SchemataScopeStoreResolver>()
                             .ReplaceTokenStoreResolver<SchemataTokenStoreResolver>();
 
-                     builder.Services.TryAddScoped(typeof(SchemataApplicationStore<>));
-                     builder.Services.TryAddScoped(typeof(SchemataAuthorizationStore<>));
+                     builder.Services.TryAddScoped(typeof(SchemataApplicationStore<,,>));
+                     builder.Services.TryAddScoped(typeof(SchemataAuthorizationStore<,,>));
                      builder.Services.TryAddScoped(typeof(SchemataScopeStore<>));
                      builder.Services.TryAddScoped(typeof(SchemataTokenStore<>));
                  })
