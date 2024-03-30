@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Core.Features;
@@ -29,7 +28,7 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions options, Type type, ISimpleFeature feature) {
-        var attributes = type.GetCustomAttributes();
+        var attributes = type.GetCustomAttributes(true);
         foreach (var attribute in attributes) {
             var at = attribute.GetType();
 

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Foundation.Entities;
 
+[Table("Applications")]
 public class SchemataApplication : IIdentifier, IConcurrency, ITimestamp
 {
     public virtual string? ApplicationType { get; set; }

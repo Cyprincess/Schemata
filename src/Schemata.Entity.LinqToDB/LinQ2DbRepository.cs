@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,19 +15,27 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class LinQ2DbRepository<TContext, TEntity>(TContext context, IServiceProvider provider) : RepositoryBase<TEntity>
+public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    protected TContext Context { get; } = context;
+    public LinQ2DbRepository(IServiceProvider provider, TContext context) {
+        Provider = provider;
+        Context  = context;
 
-    protected IServiceProvider Provider { get; } = provider;
+        var entity = typeof(TEntity);
+        TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
+    }
+
+    protected TContext Context { get; }
+
+    protected IServiceProvider Provider { get; }
 
     protected DataConnectionTransaction? Transaction { get; set; }
 
     protected int RowsAffected { get; set; }
 
-    public string TableName { get; } = typeof(TEntity).Name.Pluralize();
+    public string TableName { get; }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
