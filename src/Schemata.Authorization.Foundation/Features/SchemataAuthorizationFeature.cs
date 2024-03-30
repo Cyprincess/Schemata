@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Schemata.Authorization.Foundation.Entities;
 using Schemata.Authorization.Foundation.Resolver;
 using Schemata.Authorization.Foundation.Stores;
@@ -57,6 +58,10 @@ public class SchemataAuthorizationFeature : FeatureBase
 
                      var core = builder.UseAspNetCore()
                                        .EnableStatusCodePagesIntegration();
+
+                     if (environment.IsDevelopment()) {
+                         core.DisableTransportSecurityRequirement();
+                     }
 
                      integrate(core);
 

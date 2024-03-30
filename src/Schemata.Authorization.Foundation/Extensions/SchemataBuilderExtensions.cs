@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Core;
+using Schemata.Core.Features;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -22,6 +23,14 @@ public static class SchemataBuilderExtensions
 
         integrate ??= _ => { };
         builder.Configure(integrate);
+
+        if (!builder.HasFeature<SchemataHttpsFeature>()) {
+            builder.Configure<OpenIddictServerAspNetCoreBuilder>(options => {
+                integrate(options);
+
+                options.DisableTransportSecurityRequirement();
+            });
+        }
 
         builder.AddFeature<SchemataAuthorizationFeature>();
 
