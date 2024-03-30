@@ -4,13 +4,9 @@ using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation;
 
-public class SchemataAuthorizationBuilder
+public class SchemataAuthorizationBuilder(SchemataBuilder builder)
 {
-    public SchemataAuthorizationBuilder(SchemataBuilder builder) {
-        Builder = builder;
-    }
-
-    public SchemataBuilder Builder { get; }
+    public SchemataBuilder Builder { get; } = builder;
 
     public SchemataAuthorizationBuilder UseCodeFlow() {
         AddFeature<AuthorizationCodeFlowFeature>();

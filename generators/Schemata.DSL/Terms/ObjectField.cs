@@ -76,7 +76,7 @@ public class ObjectField : TermBase, INamedTerm
                 var nested = field.Type is not null ? mark.Objects?[field.Type] : null;
                 var f      = Parse(mark, nested, scanner);
                 if (f is not null) {
-                    field.Fields ??= new Dictionary<string, ObjectField>();
+                    field.Fields ??= new();
                     field.Fields.Add(f.Name, f);
                     continue;
                 }

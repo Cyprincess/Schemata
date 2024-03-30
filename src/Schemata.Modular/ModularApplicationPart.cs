@@ -44,7 +44,7 @@ public class ModularApplicationPart : ApplicationPart, IApplicationPartTypeProvi
 
     public ModularApplicationPart Commit() {
         var old = _cts;
-        _cts = new CancellationTokenSource();
+        _cts = new();
         old.Cancel();
 
         return this;

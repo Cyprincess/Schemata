@@ -102,7 +102,7 @@ public class Index : TermBase, INamedTerm
             return a;
         }
 
-        return new Index {
+        return new() {
             Table   = a.Table,
             Fields  = a.Fields,
             Options = a.Options.Union(b.Options).ToList(),

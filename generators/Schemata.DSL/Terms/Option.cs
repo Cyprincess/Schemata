@@ -25,6 +25,6 @@ public class Option : TermBase
             throw new ParseException("Expected an option", scanner.Cursor.Position);
         }
 
-        return new Option { Name = name.GetText() };
+        return new() { Name = name.GetText() };
     }
 }

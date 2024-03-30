@@ -6,215 +6,210 @@ public interface IAdvice : IFeature;
 
 public interface IAdvice<in T1> : IAdvice
 {
-    Task<bool> AdviseAsync(T1 arg1);
+    Task<bool> AdviseAsync(T1 a1);
 }
 
 public interface IAdvice<in T1, in T2> : IAdvice
 {
-    Task<bool> AdviseAsync(T1 arg1, T2 arg2);
+    Task<bool> AdviseAsync(T1 a1, T2 a2);
 }
 
 public interface IAdvice<in T1, in T2, in T3> : IAdvice
 {
-    Task<bool> AdviseAsync(T1 arg1, T2 arg2, T3 arg3);
+    Task<bool> AdviseAsync(T1 a1, T2 a2, T3 a3);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6,
-        T7 arg7);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6,
-        T7 arg7,
-        T8 arg8);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6,
-        T7 arg7,
-        T8 arg8,
-        T9 arg9);
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8,
+        T9 a9);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10);
 }
 
 public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11);
 }
 
-public interface
-    IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11,
-        T12 arg12);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11,
+        T12 a12);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12,
-                         in T13> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11,
-        T12 arg12,
-        T13 arg13);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11,
+        T12 a12,
+        T13 a13);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11,
-        T12 arg12,
-        T13 arg13,
-        T14 arg14);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11,
+        T12 a12,
+        T13 a13,
+        T14 a14);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14, in T15> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14, in T15> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11,
-        T12 arg12,
-        T13 arg13,
-        T14 arg14,
-        T15 arg15);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11,
+        T12 a12,
+        T13 a13,
+        T14 a14,
+        T15 a15);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14, in T15, in T16> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14, in T15, in T16> : IAdvice
 {
     Task<bool> AdviseAsync(
-        T1  arg1,
-        T2  arg2,
-        T3  arg3,
-        T4  arg4,
-        T5  arg5,
-        T6  arg6,
-        T7  arg7,
-        T8  arg8,
-        T9  arg9,
-        T10 arg10,
-        T11 arg11,
-        T12 arg12,
-        T13 arg13,
-        T14 arg14,
-        T15 arg15,
-        T16 arg16);
+        T1  a1,
+        T2  a2,
+        T3  a3,
+        T4  a4,
+        T5  a5,
+        T6  a6,
+        T7  a7,
+        T8  a8,
+        T9  a9,
+        T10 a10,
+        T11 a11,
+        T12 a12,
+        T13 a13,
+        T14 a14,
+        T15 a15,
+        T16 a16);
 }

@@ -21,6 +21,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataAuthorizationFeature>();
 
-        return new SchemataAuthorizationBuilder(builder);
+        return new(builder);
     }
 }

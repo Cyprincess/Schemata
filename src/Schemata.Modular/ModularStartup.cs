@@ -42,6 +42,6 @@ public class ModularStartup : IStartupFilter
         IServiceProvider    provider) {
         var runner = provider.GetRequiredService<IModulesRunner>();
 
-        return new ModularStartup(runner, configuration, environment);
+        return new(runner, configuration, environment);
     }
 }

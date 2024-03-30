@@ -34,7 +34,7 @@ public class SchemataOptions
             return null;
         }
 
-        return value is TOptions options ? options : null;
+        return value as TOptions;
     }
 
     public void Set<TOptions>(string name, TOptions? options)

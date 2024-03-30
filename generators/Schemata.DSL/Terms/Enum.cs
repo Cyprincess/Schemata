@@ -55,7 +55,7 @@ public class Enum : TermBase, INamedTerm
                 throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
             }
 
-            @enum.Values ??= new Dictionary<string, EnumValue>();
+            @enum.Values ??= new();
             if (@enum.Values.ContainsKey(value.Name)) {
                 throw new ParseException($"Duplicate value {value.Name}", scanner.Cursor.Position);
             }

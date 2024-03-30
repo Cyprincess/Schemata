@@ -66,17 +66,17 @@ public class Field : TermBase, INamedTerm
                 switch (option.Name) {
                     case Constants.Options.PrimaryKey or Constants.Options.AutoIncrement:
                     {
-                        table.Keys ??= new Dictionary<string, Field>();
+                        table.Keys ??= new();
                         table.Keys.Add(field.Name, field);
                         continue;
                     }
                     case Constants.Options.Unique or Constants.Options.BTree or Constants.Options.Hash:
                     {
-                        table.Indices ??= new Dictionary<string, Index>();
+                        table.Indices ??= new();
                         var index = new Index {
                             Table   = table,
                             Fields  = { field.Name },
-                            Options = new List<Option> { option },
+                            Options = new() { option },
                         };
                         if (table.Indices.TryGetValue(index.Name, out var origin)) {
                             try {
@@ -116,7 +116,7 @@ public class Field : TermBase, INamedTerm
                     throw new ParseException($"Unexpected char {scanner.Cursor.Current}", scanner.Cursor.Position);
                 }
 
-                field.Properties ??= new Dictionary<string, Property>();
+                field.Properties ??= new();
                 field.Properties.Add(property.Name, property);
             }
         }

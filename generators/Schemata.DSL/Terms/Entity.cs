@@ -88,7 +88,7 @@ public class Entity : TermBase, INamedTerm
                     }
 
                     if (entity.Fields is not null) {
-                        table.Fields ??= new Dictionary<string, Field>();
+                        table.Fields ??= new();
                         foreach (var kv in entity.Fields) {
                             if (table.Fields.ContainsKey(kv.Key)) {
                                 throw new ParseException($"Duplicate field name {kv.Key}", scanner.Cursor.Position);
@@ -109,7 +109,7 @@ public class Entity : TermBase, INamedTerm
                     }
 
                     if (entity.Indices is not null) {
-                        table.Indices ??= new Dictionary<string, Index>();
+                        table.Indices ??= new();
                         foreach (var kv in entity.Indices) {
                             if (table.Indices.ContainsKey(kv.Key)) {
                                 throw new ParseException($"Duplicate index name {kv.Key}", scanner.Cursor.Position);
@@ -120,7 +120,7 @@ public class Entity : TermBase, INamedTerm
                     }
 
                     if (entity.Keys is not null) {
-                        table.Keys ??= new Dictionary<string, Field>();
+                        table.Keys ??= new();
                         foreach (var kv in entity.Keys) {
                             if (table.Keys.ContainsKey(kv.Key)) {
                                 throw new ParseException($"Duplicate key name {kv.Key}", scanner.Cursor.Position);
@@ -136,7 +136,7 @@ public class Entity : TermBase, INamedTerm
 
             var field = Field.Parse(mark, table, scanner);
             if (field is not null) {
-                table.Fields ??= new Dictionary<string, Field>();
+                table.Fields ??= new();
                 if (table.Fields.ContainsKey(field.Name)) {
                     throw new ParseException($"Duplicate field name {field.Name}", scanner.Cursor.Position);
                 }
@@ -157,7 +157,7 @@ public class Entity : TermBase, INamedTerm
             return false;
         }
 
-        mark.Enums ??= new Dictionary<string, Enum>();
+        mark.Enums ??= new();
         mark.Enums.Add($"{Name}.{@enum.Name}", @enum);
 
         return true;
@@ -169,10 +169,10 @@ public class Entity : TermBase, INamedTerm
             return false;
         }
 
-        Objects ??= new Dictionary<string, Object>();
+        Objects ??= new();
         Objects.Add(@object.Name, @object);
 
-        mark.Objects ??= new Dictionary<string, Object>();
+        mark.Objects ??= new();
         mark.Objects.Add($"{Name}.{@object.Name}", @object);
 
         return true;
@@ -184,7 +184,7 @@ public class Entity : TermBase, INamedTerm
             return false;
         }
 
-        Indices ??= new Dictionary<string, Index>();
+        Indices ??= new();
         if (Indices.TryGetValue(index.Name, out var origin)) {
             try {
                 index = origin + index;
