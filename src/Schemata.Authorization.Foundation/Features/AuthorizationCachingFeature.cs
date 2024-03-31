@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -10,21 +12,23 @@ public class AuthorizationCachingFeature : IAuthorizationFeature
 
     public int Priority => Order;
 
-    public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) { }
+    public void ConfigureServer(
+        IReadOnlyList<IAuthorizationFeature> features,
+        IServiceCollection                   services,
+        OpenIddictServerBuilder              builder) { }
 
     public void ConfigureServerAspNetCore(
-        IServiceCollection                services,
-        OpenIddictServerBuilder           builder,
-        OpenIddictServerAspNetCoreBuilder integration) {
-        builder.Configure(options => {
-            if (options.AuthorizationEndpointUris is { Count: > 0 }) {
-                integration.EnableAuthorizationRequestCaching();
-            }
+        IReadOnlyList<IAuthorizationFeature> features,
+        IServiceCollection                   services,
+        OpenIddictServerBuilder              builder,
+        OpenIddictServerAspNetCoreBuilder    integration) {
+        if (features.OfType<AuthorizationCodeFlowFeature>().Any()) {
+            integration.EnableAuthorizationRequestCaching();
+        }
 
-            if (options.LogoutEndpointUris is { Count: > 0 }) {
-                integration.EnableLogoutRequestCaching();
-            }
-        });
+        if (features.OfType<AuthorizationLogoutFeature>().Any()) {
+            integration.EnableLogoutRequestCaching();
+        }
     }
 
     #endregion

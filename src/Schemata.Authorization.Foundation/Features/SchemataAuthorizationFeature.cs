@@ -73,8 +73,8 @@ public class SchemataAuthorizationFeature : FeatureBase
                      integrate(integration);
 
                      foreach (var feature in features) {
-                         feature.ConfigureServer(services, builder);
-                         feature.ConfigureServerAspNetCore(services, builder, integration);
+                         feature.ConfigureServer(features, services, builder);
+                         feature.ConfigureServerAspNetCore(features, services, builder, integration);
                      }
                  })
                 .AddValidation(builder => {

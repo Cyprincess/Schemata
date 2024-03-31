@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -10,7 +11,10 @@ public class AuthorizationCodeFlowFeature : IAuthorizationFeature
 
     public int Priority => Order;
 
-    public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder) {
+    public void ConfigureServer(
+        IReadOnlyList<IAuthorizationFeature> features,
+        IServiceCollection                   services,
+        OpenIddictServerBuilder              builder) {
         builder.AllowAuthorizationCodeFlow()
                .RequireProofKeyForCodeExchange()
                .SetAuthorizationEndpointUris("/Connect/Authorize")
@@ -18,9 +22,10 @@ public class AuthorizationCodeFlowFeature : IAuthorizationFeature
     }
 
     public void ConfigureServerAspNetCore(
-        IServiceCollection                services,
-        OpenIddictServerBuilder           builder,
-        OpenIddictServerAspNetCoreBuilder integration) {
+        IReadOnlyList<IAuthorizationFeature> features,
+        IServiceCollection                   services,
+        OpenIddictServerBuilder              builder,
+        OpenIddictServerAspNetCoreBuilder    integration) {
         integration.EnableAuthorizationEndpointPassthrough()
                    .EnableTokenEndpointPassthrough();
     }
