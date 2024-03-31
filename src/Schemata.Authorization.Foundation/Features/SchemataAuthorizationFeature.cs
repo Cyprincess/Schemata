@@ -6,9 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Schemata.Authorization.Foundation.Entities;
-using Schemata.Authorization.Foundation.Resolver;
-using Schemata.Authorization.Foundation.Stores;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Resolver;
+using Schemata.Authorization.Skeleton.Stores;
 using Schemata.Core;
 using Schemata.Core.Features;
 

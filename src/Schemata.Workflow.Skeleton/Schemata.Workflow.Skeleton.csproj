@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
-    <Description>Schemata Application Framework - Workflow with Automatonymous</Description>
+    <Description>Schemata Application Framework - Workflow Skeleton</Description>
     <PackageTags>application;business;framework;state;workflow</PackageTags>
   </PropertyGroup>
 

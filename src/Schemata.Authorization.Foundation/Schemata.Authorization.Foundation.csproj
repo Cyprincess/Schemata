@@ -15,17 +15,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenIddict.Core" />
     <PackageReference Include="OpenIddict.Server.AspNetCore" />
     <PackageReference Include="OpenIddict.Validation.AspNetCore" />
     <PackageReference Include="OpenIddict.Validation.ServerIntegration" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
-    <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
-    <ProjectReference Include="..\Schemata.Pipeline\Schemata.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

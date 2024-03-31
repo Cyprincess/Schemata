@@ -6,18 +6,17 @@
 
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
-    <Description>Schemata Application Framework - Entity Repository for Entity Framework Core</Description>
-    <PackageTags>application;business;database;datasource;ef;efcore;entity-framework-core;Entity;framework;repository</PackageTags>
+    <Description>Schemata Application Framework - Authorization Skeleton</Description>
+    <PackageTags>application;authentication;authorization;business;framework;security</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="OpenIddict.Core" />
     <PackageReference Include="System.Memory" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
-    <ProjectReference Include="..\Schemata.Pipeline\Schemata.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

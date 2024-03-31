@@ -10,10 +10,10 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using Schemata.Abstractions;
-using Schemata.Authorization.Foundation.Entities;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 
-namespace Schemata.Authorization.Foundation.Stores;
+namespace Schemata.Authorization.Skeleton.Stores;
 
 // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
 public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IOpenIddictApplicationStore<TApplication>
@@ -144,8 +144,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var (culture, name) in names) {
-                builder[CultureInfo.GetCultureInfo(culture)] = name;
+            foreach (var kv in names) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
             }
 
             return builder.ToImmutable();

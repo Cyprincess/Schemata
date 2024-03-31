@@ -17,8 +17,16 @@
     <None Include="$(SolutionDir)artifacts\bin\Schemata.DSL\$(Configuration)\netstandard2.0\Schemata.DSL.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseAuthorization)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Automatonymous\Schemata.Workflow.Automatonymous.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

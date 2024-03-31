@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
-namespace Schemata.Authorization.Foundation.Entities;
+namespace Schemata.Authorization.Skeleton.Entities;
 
 [Table("Applications")]
 [CanonicalName("applications/{application}")]

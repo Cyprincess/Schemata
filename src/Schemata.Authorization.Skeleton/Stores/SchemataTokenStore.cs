@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using OpenIddict.Abstractions;
 using Schemata.Abstractions;
-using Schemata.Authorization.Foundation.Entities;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 
-namespace Schemata.Authorization.Foundation.Stores;
+namespace Schemata.Authorization.Skeleton.Stores;
 
 // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
 public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>

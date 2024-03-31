@@ -3,9 +3,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Abstractions;
 using Schemata.Abstractions;
-using Schemata.Authorization.Foundation.Stores;
+using Schemata.Authorization.Skeleton.Stores;
 
-namespace Schemata.Authorization.Foundation.Resolver;
+namespace Schemata.Authorization.Skeleton.Resolver;
 
 public class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider sp) : IOpenIddictTokenStoreResolver
 {

@@ -40,7 +40,7 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Automatonymous\Schemata.Workflow.Automatonymous.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Workflow.Foundation\Schemata.Workflow.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

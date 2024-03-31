@@ -9,10 +9,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using OpenIddict.Abstractions;
 using Schemata.Abstractions;
-using Schemata.Authorization.Foundation.Entities;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 
-namespace Schemata.Authorization.Foundation.Stores;
+namespace Schemata.Authorization.Skeleton.Stores;
 
 // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
 public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
@@ -96,8 +96,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var (culture, description) in descriptions) {
-                builder[CultureInfo.GetCultureInfo(culture)] = description;
+            foreach (var kv in descriptions) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
             }
 
             return builder.ToImmutable();
@@ -129,8 +129,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
 
             var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var (culture, name) in names) {
-                builder[CultureInfo.GetCultureInfo(culture)] = name;
+            foreach (var kv in names) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
             }
 
             return builder.ToImmutable();
