@@ -37,12 +37,14 @@
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="1.1.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.1')) ">
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />
   </ItemGroup>
 
