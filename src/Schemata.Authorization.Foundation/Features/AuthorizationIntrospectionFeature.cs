@@ -14,7 +14,10 @@ public class AuthorizationIntrospectionFeature : IAuthorizationFeature
         builder.SetIntrospectionEndpointUris("/Connect/Introspect");
     }
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) { }
+    public void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration) { }
 
     #endregion
 }

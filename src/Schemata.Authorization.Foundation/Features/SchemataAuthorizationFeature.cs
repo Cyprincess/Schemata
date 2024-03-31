@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
@@ -64,18 +63,18 @@ public class SchemataAuthorizationFeature : FeatureBase
                 .AddServer(builder => {
                      serve(builder);
 
-                     var core = builder.UseAspNetCore()
-                                       .EnableStatusCodePagesIntegration();
+                     var integration = builder.UseAspNetCore()
+                                              .EnableStatusCodePagesIntegration();
 
                      if (environment.IsDevelopment()) {
-                         core.DisableTransportSecurityRequirement();
+                         integration.DisableTransportSecurityRequirement();
                      }
 
-                     integrate(core);
+                     integrate(integration);
 
                      foreach (var feature in features) {
                          feature.ConfigureServer(services, builder);
-                         feature.ConfigureServerAspNetCore(services, core);
+                         feature.ConfigureServerAspNetCore(services, builder, integration);
                      }
                  })
                 .AddValidation(builder => {

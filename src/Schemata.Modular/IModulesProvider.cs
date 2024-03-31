@@ -5,5 +5,5 @@ namespace Schemata.Modular;
 
 public interface IModulesProvider
 {
-    public IEnumerable<ModuleDescriptor> GetModules();
+    IEnumerable<ModuleDescriptor> GetModules();
 }

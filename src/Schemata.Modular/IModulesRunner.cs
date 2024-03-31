@@ -8,17 +8,11 @@ namespace Schemata.Modular;
 
 public interface IModulesRunner
 {
-    public void ConfigureServices(
-        IServiceCollection  services,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment);
+    void ConfigureServices(IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment);
 
-    public void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment);
+    void ConfigureApplication(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 
-    public void ConfigureEndpoints(
+    void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,

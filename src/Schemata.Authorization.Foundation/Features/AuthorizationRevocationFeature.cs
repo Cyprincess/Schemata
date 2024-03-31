@@ -14,7 +14,10 @@ public class AuthorizationRevocationFeature : IAuthorizationFeature
         builder.SetRevocationEndpointUris("/Connect/Revocation");
     }
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) { }
+    public void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration) { }
 
     #endregion
 }

@@ -43,6 +43,11 @@ public class SchemataAuthorizationBuilder(SchemataBuilder builder)
         return this;
     }
 
+    public SchemataAuthorizationBuilder UseCaching() {
+        AddFeature<AuthorizationCachingFeature>();
+        return this;
+    }
+
     public SchemataAuthorizationBuilder AddFeature<T>()
         where T : IAuthorizationFeature, new() {
         var build = Builder.GetConfigurators().TryGet<IList<IAuthorizationFeature>>();

@@ -17,9 +17,12 @@ public class AuthorizationDeviceFlowFeature : IAuthorizationFeature
                .SetTokenEndpointUris("/Connect/Token");
     }
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) {
-        builder.EnableTokenEndpointPassthrough()
-               .EnableVerificationEndpointPassthrough();
+    public void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration) {
+        integration.EnableTokenEndpointPassthrough()
+                   .EnableVerificationEndpointPassthrough();
     }
 
     #endregion

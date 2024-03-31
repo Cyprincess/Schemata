@@ -9,18 +9,15 @@ namespace Schemata.Core.Features;
 
 public interface ISimpleFeature : IFeature
 {
-    public void ConfigureServices(
+    void ConfigureServices(
         IServiceCollection  services,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment);
 
-    public void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment);
+    void ConfigureApplication(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 
-    public void ConfigureEndpoints(
+    void ConfigureEndpoints(
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment);

@@ -14,9 +14,12 @@ public class AuthorizationLogoutFeature : IAuthorizationFeature
         builder.SetLogoutEndpointUris("/Connect/Logout");
     }
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) {
-        builder.EnableLogoutEndpointPassthrough();
-    }
-
     #endregion
+
+    public void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration) {
+        integration.EnableLogoutEndpointPassthrough();
+    }
 }

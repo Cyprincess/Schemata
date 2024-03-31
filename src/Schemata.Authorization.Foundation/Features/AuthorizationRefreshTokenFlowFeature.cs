@@ -15,8 +15,11 @@ public class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
                .SetTokenEndpointUris("/Connect/Token");
     }
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder) {
-        builder.EnableTokenEndpointPassthrough();
+    public void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration) {
+        integration.EnableTokenEndpointPassthrough();
     }
 
     #endregion

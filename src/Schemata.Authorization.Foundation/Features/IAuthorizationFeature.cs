@@ -5,7 +5,10 @@ namespace Schemata.Authorization.Foundation.Features;
 
 public interface IAuthorizationFeature : IFeature
 {
-    public void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder);
+    void ConfigureServer(IServiceCollection services, OpenIddictServerBuilder builder);
 
-    public void ConfigureServerAspNetCore(IServiceCollection services, OpenIddictServerAspNetCoreBuilder builder);
+    void ConfigureServerAspNetCore(
+        IServiceCollection                services,
+        OpenIddictServerBuilder           builder,
+        OpenIddictServerAspNetCoreBuilder integration);
 }
