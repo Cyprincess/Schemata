@@ -14,7 +14,7 @@ public class SchemataCookiePolicyFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Pop<CookiePolicyOptions>();
+        var configure = configurators.PopOrDefault<CookiePolicyOptions>();
         services.AddCookiePolicy(configure);
     }
 

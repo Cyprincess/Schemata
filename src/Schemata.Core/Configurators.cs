@@ -32,6 +32,14 @@ public class Configurators
         return action;
     }
 
+    public Action<T> PopOrDefault<T>() {
+        try {
+            return Pop<T>();
+        } catch (KeyNotFoundException) {
+            return _ => { };
+        }
+    }
+
     public IServiceCollection Configure(IServiceCollection services) {
         services.AddOptions();
 

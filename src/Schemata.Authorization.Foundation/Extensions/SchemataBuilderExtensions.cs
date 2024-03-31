@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
 
@@ -15,6 +16,18 @@ public static class SchemataBuilderExtensions
         Action<OpenIddictServerBuilder>?           serve     = null,
         Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
         Action<OpenIddictCoreBuilder>?             store     = null) {
+        return UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(builder, serve, integrate, store);
+    }
+
+    public static SchemataAuthorizationBuilder UseAuthorization<TApplication, TAuthorization, TScope, TToken>(
+        this SchemataBuilder                       builder,
+        Action<OpenIddictServerBuilder>?           serve     = null,
+        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
+        Action<OpenIddictCoreBuilder>?             store     = null)
+        where TApplication : SchemataApplication
+        where TAuthorization : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken {
         store ??= _ => { };
         builder.Configure(store);
 
@@ -32,7 +45,7 @@ public static class SchemataBuilderExtensions
             });
         }
 
-        builder.AddFeature<SchemataAuthorizationFeature>();
+        builder.AddFeature<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
 
         return new(builder);
     }

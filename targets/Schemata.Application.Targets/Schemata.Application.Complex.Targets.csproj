@@ -3,13 +3,14 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - Comprehensive Application Project Targets</Description>
-    <PackageTags>application;business;dsl;framework;generator;modular;tenancy</PackageTags>
+    <PackageTags>application;business;dsl;database;datasource;framework;generator;modular;repository;tenancy</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
     <UseDSLTargets>true</UseDSLTargets>
     <UseModularTargets>true</UseModularTargets>
     <UseAuthorization>true</UseAuthorization>
+    <UseIdentity>true</UseIdentity>
     <UseRepository>true</UseRepository>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>

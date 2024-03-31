@@ -26,7 +26,6 @@ public class ModularStartup : IStartupFilter
             next(app);
 
             app.UseModular(_runner, _configuration, _environment);
-            app.UseModularControllers();
 
             if (app.ApplicationServices.GetService(typeof(EndpointDataSource)) is not null) {
                 app.UseEndpoints(endpoints => { endpoints.UseModular(app, _runner, _configuration, _environment); });

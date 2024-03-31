@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
-using Schemata.Core.Features;
 using Schemata.Modular;
 
 // ReSharper disable once CheckNamespace
@@ -37,16 +35,6 @@ public static class SchemataBuilderExtensions
                          .SelectMany(p => p.GetModules())
                          .ToList();
             builder.GetOptions().SetModules(modules);
-
-            if (builder.HasFeature<SchemataControllersFeature>()) {
-                var part = new ModularApplicationPart();
-
-                services.AddSingleton(part);
-                services.AddSingleton<IActionDescriptorChangeProvider>(part);
-
-                services.AddMvcCore()
-                        .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
-            }
 
             if (services.All(s => s.ServiceType != typeof(IModulesRunner))) {
                 // To avoid accessing the builder.Configure() method and builder.ConfigureServices() method after building the service provider,

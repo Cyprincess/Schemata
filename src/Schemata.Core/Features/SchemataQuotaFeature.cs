@@ -27,5 +27,4 @@ public class SchemataQuotaFeature : FeatureBase
         app.UseRateLimiter();
     }
 }
-
 #endif

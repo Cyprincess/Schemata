@@ -35,12 +35,16 @@
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseIdentity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Automatonymous\Schemata.Workflow.Automatonymous.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Workflow.Foundation\Schemata.Workflow.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

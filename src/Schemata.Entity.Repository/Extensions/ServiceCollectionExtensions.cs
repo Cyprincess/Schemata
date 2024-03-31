@@ -7,7 +7,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddRepository(this IServiceCollection services, Type implementationType) {
+    public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type implementationType) {
         var serviceType = typeof(IRepository<>);
 
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
@@ -29,6 +29,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateTimestamp<>));
         services.AddTransient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateConcurrency<>));
 
-        return services;
+        return new(services);
     }
 }

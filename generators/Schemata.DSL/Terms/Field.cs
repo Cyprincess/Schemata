@@ -76,7 +76,7 @@ public class Field : TermBase, INamedTerm
                         var index = new Index {
                             Table   = table,
                             Fields  = { field.Name },
-                            Options = new() { option },
+                            Options = [option],
                         };
                         if (table.Indices.TryGetValue(index.Name, out var origin)) {
                             try {
