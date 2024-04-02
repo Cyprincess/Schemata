@@ -6,6 +6,7 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Entity.Repository.Advices;
 
 public class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
+    where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 
@@ -13,7 +14,7 @@ public class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(TEntity entity, CancellationToken ct) {
+    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
         if (entity is not ITimestamp timestamp) return Task.FromResult(true);
 
         timestamp.CreationDate     = DateTime.UtcNow;

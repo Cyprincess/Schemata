@@ -19,6 +19,7 @@ public class AdviceAddCanonicalName
 }
 
 public class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IRepositoryAddAsyncAdvice<TEntity>
+    where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 
@@ -26,7 +27,7 @@ public class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IReposito
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(TEntity entity, CancellationToken ct) {
+    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
         if (entity is not ICanonicalName named) return Task.FromResult(true);
 
         var type = entity.GetType();
