@@ -6,6 +6,7 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Entity.Repository.Advices;
 
 public class AdviceRemoveConcurrency<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity>
+    where TEntity : class
 {
     #region IRepositoryRemoveAsyncAdvice<TEntity> Members
 
@@ -13,7 +14,7 @@ public class AdviceRemoveConcurrency<TEntity> : IRepositoryRemoveAsyncAdvice<TEn
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(TEntity entity, CancellationToken ct) {
+    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
         if (entity is not ITrash) return Task.FromResult(true);
         if (entity is not IConcurrency concurrency) return Task.FromResult(true);
 

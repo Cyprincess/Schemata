@@ -6,6 +6,7 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Entity.Repository.Advices;
 
 public class AdviceQueryTrash<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
+    where TEntity : class
 {
     #region IRepositoryQueryAsyncAdvice<TEntity> Members
 
@@ -13,7 +14,10 @@ public class AdviceQueryTrash<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(QueryContainer<TEntity> query, CancellationToken ct = default) {
+    public Task<bool> AdviseAsync(
+        IRepository<TEntity>    repository,
+        QueryContainer<TEntity> query,
+        CancellationToken       ct = default) {
         if (!typeof(ITrash).IsAssignableFrom(typeof(TEntity))) return Task.FromResult(true);
 
         query.ApplyModification(q => {

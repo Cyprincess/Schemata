@@ -9,27 +9,35 @@ namespace Schemata.Entity.Repository;
 public interface IRepository<TEntity>
     where TEntity : class
 {
+    IAsyncEnumerable<TEntity> AsAsyncEnumerable();
+
+    IQueryable<TEntity> AsQueryable();
+
     IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
-    Task<TResult?> FirstOrDefaultAsync<TResult>(
+    ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
+
+    ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
+
+    ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
-    Task<TResult?> SingleOrDefaultAsync<TResult>(
+    ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
-    Task<bool> AnyAsync<TResult>(
+    ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
-    Task<int> CountAsync<TResult>(
+    ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
-    Task<long> LongCountAsync<TResult>(
+    ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
@@ -41,5 +49,5 @@ public interface IRepository<TEntity>
     Task RemoveAsync(TEntity                   entity,   CancellationToken ct = default);
     Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 
-    Task<int> CommitAsync(CancellationToken ct = default);
+    ValueTask<int> CommitAsync(CancellationToken ct = default);
 }

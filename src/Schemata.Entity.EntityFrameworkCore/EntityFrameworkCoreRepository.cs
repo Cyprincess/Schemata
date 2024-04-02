@@ -17,11 +17,22 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) {
         ServiceProvider = sp;
         Context         = context;
+        DbSet           = context.Set<TEntity>();
     }
 
     protected TContext Context { get; }
 
+    protected DbSet<TEntity> DbSet { get; }
+
     protected IServiceProvider ServiceProvider { get; }
+
+    public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
+        return DbSet.AsAsyncEnumerable();
+    }
+
+    public override IQueryable<TEntity> AsQueryable() {
+        return DbSet.AsQueryable();
+    }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -35,7 +46,11 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         }
     }
 
-    public override async Task<TResult?> FirstOrDefaultAsync<TResult>(
+    public override async ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
+        return await DbSet.FindAsync(keys, ct);
+    }
+
+    public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
         where TResult : default {
@@ -43,7 +58,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return await query.FirstOrDefaultAsync(ct);
     }
 
-    public override async Task<TResult?> SingleOrDefaultAsync<TResult>(
+    public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
         where TResult : default {
@@ -51,21 +66,21 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return await query.SingleOrDefaultAsync(ct);
     }
 
-    public override async Task<bool> AnyAsync<TResult>(
+    public override async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
         return await query.AnyAsync(ct);
     }
 
-    public override async Task<int> CountAsync<TResult>(
+    public override async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
         return await query.CountAsync(ct);
     }
 
-    public override async Task<long> LongCountAsync<TResult>(
+    public override async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
@@ -73,14 +88,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
         await Context.AddAsync(entity, ct);
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
         Context.Entry(entity).State = EntityState.Detached;
@@ -88,24 +103,24 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, ct);
+        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
         Context.Remove(entity);
     }
 
-    public override async Task<int> CommitAsync(CancellationToken ct = default) {
+    public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         return await Context.SaveChangesAsync(ct);
     }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct) {
-        var table = Context.Set<TEntity>().AsQueryable();
+        var table = AsQueryable();
 
         var query = new QueryContainer<TEntity>(table);
 
-        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, query, ct);
+        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, query, ct);
 
         return BuildQuery(query.Query, predicate);
     }
