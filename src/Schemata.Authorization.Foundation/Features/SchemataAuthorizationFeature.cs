@@ -14,9 +14,8 @@ using Schemata.Core.Features;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-[DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
-[Information("Authorization depends on Authentication and Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
+[Information("Authorization depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataAuthorizationFeature : FeatureBase
 {
     public override int Priority => 320_000_000;

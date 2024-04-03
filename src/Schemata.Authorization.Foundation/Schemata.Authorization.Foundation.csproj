@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>
