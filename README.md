@@ -107,5 +107,6 @@ An extension feature can be activated like a built-in feature.
 
 | Priority    | Package                           | Feature       | Description                       |
 |-------------|-----------------------------------|---------------|-----------------------------------|
-| 310_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
-| 320_000_000 | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |
+| 310_000_000 | Schemata.Identity.Foundation      | Identity      | Schemata Identity Foundation      |
+| 320_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
+| 330_000_000 | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |

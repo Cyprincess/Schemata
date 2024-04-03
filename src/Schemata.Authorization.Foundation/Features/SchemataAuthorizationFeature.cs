@@ -19,7 +19,7 @@ namespace Schemata.Authorization.Foundation.Features;
 [Information("Authorization depends on Authentication and Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataAuthorizationFeature : FeatureBase
 {
-    public override int Priority => 310_000_000;
+    public override int Priority => 320_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Session;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -218,9 +217,7 @@ public static class SchemataBuilderExtensions
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.AddFeature<SchemataSessionFeature>();
-
-        builder.ConfigureServices(services => { services.TryAddTransient<ISessionStore, T>(); });
+        builder.AddFeature<SchemataSessionFeature<T>>();
 
         return builder;
     }

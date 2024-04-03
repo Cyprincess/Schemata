@@ -11,7 +11,7 @@ namespace Schemata.Workflow.Foundation.Features;
 [Information("Workflow depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
 public class SchemataWorkflowFeature : FeatureBase
 {
-    public override int Priority => 320_000_000;
+    public override int Priority => 330_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
