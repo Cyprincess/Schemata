@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Session;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -226,11 +227,27 @@ public static class SchemataBuilderExtensions
 
     #region Controllers Feature
 
-    public static SchemataBuilder UseControllers(this SchemataBuilder builder, Action<MvcOptions>? configure = null) {
+    public static SchemataBuilder UseControllers(
+        this SchemataBuilder builder,
+        Action<MvcOptions>?  configure = null,
+        Action<IMvcBuilder>? build     = null) {
         configure ??= _ => { };
         builder.Configure(configure);
 
+        build ??= _ => { };
+        builder.Configure(build);
+
         builder.AddFeature<SchemataControllersFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
+    #region Json Serializer Feature
+
+    public static SchemataBuilder UseJsonSerializer(this SchemataBuilder builder) {
+        builder.AddFeature<SchemataJsonSerializerFeature>();
 
         return builder;
     }

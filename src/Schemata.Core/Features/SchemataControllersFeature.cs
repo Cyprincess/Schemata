@@ -20,7 +20,11 @@ public class SchemataControllersFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
         var configure = configurators.Pop<MvcOptions>();
-        services.AddControllers(configure);
+        var build     = configurators.Pop<IMvcBuilder>();
+
+        var builder = services.AddControllers(configure);
+
+        build(builder);
     }
 
     public override void ConfigureEndpoints(

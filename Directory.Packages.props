@@ -17,6 +17,7 @@
     <PackageVersion Include="OpenIddict.Validation.ServerIntegration" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="Parlot" Version="0.0.25" />
     <PackageVersion Include="System.Memory" Version="4.5.5" />
+    <PackageVersion Include="System.Text.Json" Version="8.0.3" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.2" />
     <PackageVersion Include="linq2db" Version="5.4.0" />
   </ItemGroup>
