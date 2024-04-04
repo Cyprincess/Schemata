@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Schemata.Core;
 using Schemata.Identity.Foundation.Features;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Stores;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -22,7 +23,7 @@ public static class SchemataBuilderExtensions
         Action<IdentityBuilder>? build     = null)
         where TUser : SchemataUser
         where TRole : SchemataRole {
-        return UseIdentity<TUser, TRole, IUserStore<TUser>, IRoleStore<TRole>>(builder, configure, build);
+        return UseIdentity<TUser, TRole, SchemataUserStore<TUser>, SchemataRoleStore<TRole>>(builder, configure, build);
     }
 
     public static SchemataBuilder UseIdentity<TUser, TRole, TUserStore, TRoleStore>(

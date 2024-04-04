@@ -23,7 +23,7 @@ public class SchemataUserStore : SchemataUserStore<IdentityUser<long>>
 }
 
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, IdentityRole<long>>
-    where TUser : IdentityUser<long>, new()
+    where TUser : IdentityUser<long>
 {
     public SchemataUserStore(
         IRepository<TUser> users,
