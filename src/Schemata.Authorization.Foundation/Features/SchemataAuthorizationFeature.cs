@@ -16,7 +16,11 @@ namespace Schemata.Authorization.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
 [Information("Authorization depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataAuthorizationFeature : FeatureBase
+public class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
+    where TApplication : SchemataApplication
+    where TAuthorization : SchemataAuthorization
+    where TScope: SchemataScope
+    where TToken : SchemataToken
 {
     public override int Priority => 320_000_000;
 
@@ -34,7 +38,7 @@ public class SchemataAuthorizationFeature : FeatureBase
         build(features);
         features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
-        var part = new AssemblyPart(typeof(SchemataAuthorizationFeature).Assembly);
+        var part = new AssemblyPart(typeof(SchemataAuthorizationFeature<,,,>).Assembly);
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
 
@@ -42,10 +46,10 @@ public class SchemataAuthorizationFeature : FeatureBase
                 .AddCore(builder => {
                      builder.DisableAdditionalFiltering();
 
-                     builder.SetDefaultApplicationEntity<SchemataApplication>()
-                            .SetDefaultAuthorizationEntity<SchemataAuthorization>()
-                            .SetDefaultScopeEntity<SchemataScope>()
-                            .SetDefaultTokenEntity<SchemataToken>();
+                     builder.SetDefaultApplicationEntity<TApplication>()
+                            .SetDefaultAuthorizationEntity<TAuthorization>()
+                            .SetDefaultScopeEntity<TScope>()
+                            .SetDefaultTokenEntity<TToken>();
 
                      store(builder);
 
