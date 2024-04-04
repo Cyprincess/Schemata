@@ -10,6 +10,7 @@
     <UseDSLTargets>true</UseDSLTargets>
     <UseModularTargets>true</UseModularTargets>
     <UseAuthorization>true</UseAuthorization>
+    <UseIdentity>true</UseIdentity>
     <UseRepository>true</UseRepository>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>

@@ -9,6 +9,7 @@
   <PropertyGroup>
     <UseDSLTargets>true</UseDSLTargets>
     <UseAuthorization>true</UseAuthorization>
+    <UseIdentity>true</UseIdentity>
     <UseRepository>true</UseRepository>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>
