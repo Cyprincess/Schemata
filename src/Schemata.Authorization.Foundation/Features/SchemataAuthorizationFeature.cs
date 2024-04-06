@@ -19,7 +19,7 @@ namespace Schemata.Authorization.Foundation.Features;
 public class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization
-    where TScope: SchemataScope
+    where TScope : SchemataScope
     where TToken : SchemataToken
 {
     public override int Priority => 320_000_000;

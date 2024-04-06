@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,14 +28,18 @@ public class SchemataJsonSerializerFeature : FeatureBase
                 : JsonTypeInfoResolver.Combine();
         });
 
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
+            options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            options.SerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+        });
+
         if (services.All(s => s.ServiceType != typeof(IActionDescriptorChangeProvider))) {
             return;
         }
 
-        services.Configure<JsonOptions>(options => {
-            var serializer = options.JsonSerializerOptions;
-            serializer.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            serializer.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
+            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
         });
     }
 }

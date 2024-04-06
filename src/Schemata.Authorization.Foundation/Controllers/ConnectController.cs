@@ -8,6 +8,7 @@ using Schemata.Identity.Skeleton.Entities;
 namespace Schemata.Authorization.Foundation.Controllers;
 
 [Route("~/[controller]")]
+[Produces("application/json")]
 public partial class ConnectController : ControllerBase
 {
     private readonly IOpenIddictApplicationManager   _applications;

@@ -18,7 +18,7 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public partial class ConnectController : ControllerBase
 {
-    [HttpGet("Authorize")]
+    [HttpGet(nameof(Authorize))]
     public async Task<IActionResult> Authorize() {
         var request = HttpContext.GetOpenIddictServerRequest()
                    ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
@@ -200,7 +200,7 @@ public partial class ConnectController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("Authorize")]
+    [HttpPost(nameof(Authorize))]
     public async Task<IActionResult> Accept() {
         var request = HttpContext.GetOpenIddictServerRequest()
                    ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");

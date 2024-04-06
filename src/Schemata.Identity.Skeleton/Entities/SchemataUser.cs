@@ -1,6 +1,28 @@
+using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-public class SchemataUser : IdentityUser<long>
-{ }
+[Table("Users")]
+[CanonicalName("users/{user}")]
+public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+{
+    public virtual string Name { get; set; }
+
+    public virtual string CanonicalName { get; set; }
+
+    [NotMapped]
+    public override string ConcurrencyStamp
+    {
+        get => Timestamp?.ToString();
+        set => Timestamp = Guid.Parse(value);
+    }
+
+    public virtual Guid? Timestamp { get; set; }
+
+    public virtual DateTime? CreationDate { get; set; }
+
+    public virtual DateTime? ModificationDate { get; set; }
+}

@@ -6,48 +6,49 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Entity.Repository;
+using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataUserStore : SchemataUserStore<IdentityUser<long>>
+public class SchemataUserStore : SchemataUserStore<SchemataUser>
 {
     public SchemataUserStore(
-        IRepository<IdentityUser<long>> users,
-        IRepository<IdentityRole<long>> roles,
-        IRepository<IdentityUserClaim<long>> userClaims,
-        IRepository<IdentityUserRole<long>> userRoles,
-        IRepository<IdentityUserLogin<long>> userLogins,
-        IRepository<IdentityUserToken<long>> userTokens,
+        IRepository<SchemataUser> users,
+        IRepository<SchemataRole> roles,
+        IRepository<SchemataUserClaim> userClaims,
+        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserLogin> userLogins,
+        IRepository<SchemataUserToken> userTokens,
         IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
 
-public class SchemataUserStore<TUser> : SchemataUserStore<TUser, IdentityRole<long>>
-    where TUser : IdentityUser<long>
+public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
+    where TUser : SchemataUser
 {
     public SchemataUserStore(
         IRepository<TUser> users,
-        IRepository<IdentityRole<long>> roles,
-        IRepository<IdentityUserClaim<long>> userClaims,
-        IRepository<IdentityUserRole<long>> userRoles,
-        IRepository<IdentityUserLogin<long>> userLogins,
-        IRepository<IdentityUserToken<long>> userTokens,
+        IRepository<SchemataRole> roles,
+        IRepository<SchemataUserClaim> userClaims,
+        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserLogin> userLogins,
+        IRepository<SchemataUserToken> userTokens,
         IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
 
-public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, IdentityUserClaim<long>,
-    IdentityUserRole<long>, IdentityUserLogin<long>, IdentityUserToken<long>, IdentityRoleClaim<long>>
-    where TUser : IdentityUser<long>
-    where TRole : IdentityRole<long>
+public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim,
+    SchemataUserRole, SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
+    where TUser : SchemataUser
+    where TRole : SchemataRole
 {
     public SchemataUserStore(
         IRepository<TUser> users,
         IRepository<TRole> roles,
-        IRepository<IdentityUserClaim<long>> userClaims,
-        IRepository<IdentityUserRole<long>> userRoles,
-        IRepository<IdentityUserLogin<long>> userLogins,
-        IRepository<IdentityUserToken<long>> userTokens,
+        IRepository<SchemataUserClaim> userClaims,
+        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserLogin> userLogins,
+        IRepository<SchemataUserToken> userTokens,
         IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
@@ -55,13 +56,13 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, I
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
     IProtectedUserStore<TUser>
-    where TUser : IdentityUser<long>
-    where TRole : IdentityRole<long>
-    where TUserClaim : IdentityUserClaim<long>, new()
-    where TUserRole : IdentityUserRole<long>, new()
-    where TUserLogin : IdentityUserLogin<long>, new()
-    where TUserToken : IdentityUserToken<long>, new()
-    where TRoleClaim : IdentityRoleClaim<long>, new()
+    where TUser : SchemataUser
+    where TRole : SchemataRole
+    where TUserClaim : SchemataUserClaim, new()
+    where TUserRole : SchemataUserRole, new()
+    where TUserLogin : SchemataUserLogin, new()
+    where TUserToken : SchemataUserToken, new()
+    where TRoleClaim : SchemataRoleClaim, new()
 {
     protected readonly IRepository<TRole>      RolesRepository;
     protected readonly IRepository<TUserClaim> UserClaimsRepository;

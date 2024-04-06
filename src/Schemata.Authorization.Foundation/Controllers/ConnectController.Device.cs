@@ -16,7 +16,7 @@ namespace Schemata.Authorization.Foundation.Controllers;
 public partial class ConnectController : ControllerBase
 {
     [Authorize]
-    [HttpGet("Verify")]
+    [HttpGet(nameof(Verify))]
     public async Task<IActionResult> Verify() {
         // Retrieve the claims principal associated with the user code.
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -61,7 +61,7 @@ public partial class ConnectController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("Verify")]
+    [HttpPost(nameof(Verify))]
     public async Task<IActionResult> VerifyAccept() {
         // Retrieve the profile of the logged in user.
         var user = await _users.GetUserAsync(User)

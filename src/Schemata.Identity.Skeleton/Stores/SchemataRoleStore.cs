@@ -6,24 +6,25 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Entity.Repository;
+using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, IdentityUserRole<long>, IdentityRoleClaim<long>>
-    where TRole : IdentityRole<long>
+public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataUserRole, SchemataRoleClaim>
+    where TRole : SchemataRole
 {
     public SchemataRoleStore(
         IRepository<TRole> rolesRepository,
-        IRepository<IdentityUserRole<long>> userRolesRepository,
-        IRepository<IdentityRoleClaim<long>> roleClaimsRepository,
+        IRepository<SchemataUserRole> userRolesRepository,
+        IRepository<SchemataRoleClaim> roleClaimsRepository,
         IdentityErrorDescriber describer = null) : base(rolesRepository, userRolesRepository, roleClaimsRepository,
         describer) { }
 }
 
 public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
-    where TRole : IdentityRole<long>
-    where TUserRole : IdentityUserRole<long>, new()
-    where TRoleClaim : IdentityRoleClaim<long>, new()
+    where TRole : SchemataRole
+    where TUserRole : SchemataUserRole, new()
+    where TRoleClaim : SchemataRoleClaim, new()
 {
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
     protected readonly IRepository<TRole>      RolesRepository;

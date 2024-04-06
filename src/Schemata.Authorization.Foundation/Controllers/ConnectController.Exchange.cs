@@ -14,8 +14,8 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public partial class ConnectController : ControllerBase
 {
-    [HttpPost("Token")]
-    public async Task<IActionResult> Exchange() {
+    [HttpPost(nameof(Token))]
+    public async Task<IActionResult> Token() {
         var request = HttpContext.GetOpenIddictServerRequest()
                    ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 

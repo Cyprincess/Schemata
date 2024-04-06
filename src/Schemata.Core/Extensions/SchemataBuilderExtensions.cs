@@ -143,7 +143,6 @@ public static class SchemataBuilderExtensions
 
         return builder;
     }
-
 #endif
 
     #endregion

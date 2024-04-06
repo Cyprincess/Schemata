@@ -6,7 +6,7 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public partial class ConnectController : ControllerBase
 {
-    [HttpPost("Logout")]
+    [HttpPost(nameof(Logout))]
     public async Task<IActionResult> Logout() {
         // Ask ASP.NET Core Identity to delete the local and external cookies created
         // when the user agent is redirected from the external identity provider
