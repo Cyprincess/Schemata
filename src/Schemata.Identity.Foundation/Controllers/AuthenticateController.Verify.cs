@@ -21,7 +21,7 @@ public partial class AuthenticateController : ControllerBase
 
         var user = await GetUserAsync(email, phone);
         if (user is null) {
-            return Unauthorized();
+            return BadRequest();
         }
 
         var result = code switch {
@@ -31,7 +31,7 @@ public partial class AuthenticateController : ControllerBase
         };
 
         if (result is not { Succeeded: true }) {
-            return Unauthorized();
+            return BadRequest();
         }
 
         return NoContent();

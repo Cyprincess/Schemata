@@ -37,22 +37,23 @@ public partial class AuthenticateController : ControllerBase
     public async Task<IActionResult> Reset([FromBody] ResetRequest request) {
         var user = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (user is null) {
-            return BadRequest(UserManager.ErrorDescriber.InvalidToken());
+            return BadRequest();
         }
 
         var confirmed = request switch {
-            var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) =>
-                await UserManager.IsEmailConfirmedAsync(user),
-            var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber) =>
-                await UserManager.IsPhoneNumberConfirmedAsync(user),
+            var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) => await UserManager.IsEmailConfirmedAsync(user),
+            var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber) => await UserManager.IsPhoneNumberConfirmedAsync(user),
             var _ => false,
         };
 
         if (!confirmed) {
-            return BadRequest(UserManager.ErrorDescriber.InvalidToken());
+            return BadRequest();
         }
 
-        await UserManager.ResetPasswordAsync(user, request.Code, request.Password);
+        var result = await UserManager.ResetPasswordAsync(user, request.Code, request.Password);
+        if (!result.Succeeded) {
+            return BadRequest(result.Errors);
+        }
 
         return NoContent();
     }
