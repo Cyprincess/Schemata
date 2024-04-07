@@ -145,7 +145,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(token.Properties);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(token.Properties!);
 
             return result ?? ImmutableDictionary.Create<string, JsonElement>();
         })!;

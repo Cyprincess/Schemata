@@ -68,12 +68,12 @@ internal sealed class BearerTokenHandler(
     protected override async Task HandleSignInAsync(ClaimsPrincipal user, AuthenticationProperties? properties) {
         var utcNow = Clock.UtcNow;
 
-        properties            ??= new();
-        properties.ExpiresUtc =   utcNow + Options.BearerTokenExpiration;
+        properties ??= new();
+        properties.ExpiresUtc = utcNow + Options.BearerTokenExpiration;
 
         var response = new AccessTokenResponse {
-            AccessToken  = Options.BearerTokenProtector.Protect(CreateBearerTicket(user, properties)),
-            ExpiresIn    = (long)Options.BearerTokenExpiration.TotalSeconds,
+            AccessToken = Options.BearerTokenProtector.Protect(CreateBearerTicket(user, properties)),
+            ExpiresIn = (long)Options.BearerTokenExpiration.TotalSeconds,
             RefreshToken = Options.RefreshTokenProtector.Protect(CreateRefreshTicket(user, utcNow)),
         };
 

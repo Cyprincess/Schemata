@@ -12,11 +12,11 @@ namespace Schemata.Authorization.Foundation.Controllers;
 [Produces("application/json")]
 public partial class ConnectController : ControllerBase
 {
-    private readonly IOpenIddictApplicationManager   _applications;
-    private readonly IOpenIddictAuthorizationManager _authorizations;
-    private readonly IOpenIddictScopeManager         _scopes;
-    private readonly SignInManager<SchemataUser>     _sign;
-    private readonly SchemataUserManager<SchemataUser>       _users;
+    private readonly IOpenIddictApplicationManager     _applications;
+    private readonly IOpenIddictAuthorizationManager   _authorizations;
+    private readonly IOpenIddictScopeManager           _scopes;
+    private readonly SignInManager<SchemataUser>       _sign;
+    private readonly SchemataUserManager<SchemataUser> _users;
 
     public ConnectController(
         IOpenIddictApplicationManager     applications,

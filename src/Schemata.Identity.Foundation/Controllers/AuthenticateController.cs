@@ -3,26 +3,34 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
+using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
 [Route("~/[controller]")]
 [Produces("application/json")]
-public partial class AuthenticateController(
-    SignInManager<SchemataUser>         signInManager,
-    SchemataUserManager<SchemataUser>   userManager,
-    IMailSender<SchemataUser>           mailSender,
-    IMessageSender<SchemataUser>        messageSender,
-    IOptionsMonitor<BearerTokenOptions> options) : ControllerBase
+public partial class AuthenticateController : ControllerBase
 {
-    protected readonly SignInManager<SchemataUser>         SignInManager = signInManager;
-    protected readonly SchemataUserManager<SchemataUser>   UserManager   = userManager;
-    protected readonly IMailSender<SchemataUser>           MailSender    = mailSender;
-    protected readonly IMessageSender<SchemataUser>        MessageSender = messageSender;
-    protected readonly IOptionsMonitor<BearerTokenOptions> Options       = options;
+    protected readonly IMailSender<SchemataUser>           MailSender;
+    protected readonly IMessageSender<SchemataUser>        MessageSender;
+    protected readonly IOptionsMonitor<BearerTokenOptions> Options;
+    protected readonly SignInManager<SchemataUser>         SignInManager;
+    protected readonly SchemataUserManager<SchemataUser>   UserManager;
+
+    public AuthenticateController(
+        SignInManager<SchemataUser>         signInManager,
+        SchemataUserManager<SchemataUser>   userManager,
+        IMailSender<SchemataUser>           mailSender,
+        IMessageSender<SchemataUser>        messageSender,
+        IOptionsMonitor<BearerTokenOptions> options) {
+        SignInManager = signInManager;
+        UserManager   = userManager;
+        MailSender    = mailSender;
+        MessageSender = messageSender;
+        Options       = options;
+    }
 
     protected virtual async Task<SchemataUser?> GetUserAsync(string? email, string? phone) {
         return true switch {

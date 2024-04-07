@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -8,8 +9,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
+using Schemata.Identity.Skeleton.Services;
 #if NET6_0
 using Microsoft.AspNetCore.Authentication.BearerToken;
 #endif
@@ -36,8 +39,23 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
 
         var build = configurators.Pop<IdentityBuilder>();
 
+        services.Configure<JsonSerializerOptions>(options => {
+            options.Converters.Add(new ClaimStoreJsonConverter());
+        });
+
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
+            options.SerializerOptions.Converters.Add(new ClaimStoreJsonConverter());
+        });
+
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
+            options.JsonSerializerOptions.Converters.Add(new ClaimStoreJsonConverter());
+        });
+
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
                 .AddBearerToken(IdentityConstants.ApplicationScheme);
+
+        services.TryAddTransient(typeof(IMailSender<>), typeof(NoOpMailSender<>));
+        services.TryAddTransient(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
 
         services.TryAddScoped<IUserStore<TUser>, TUserStore>();
         services.TryAddScoped<IRoleStore<TRole>, TRoleStore>();

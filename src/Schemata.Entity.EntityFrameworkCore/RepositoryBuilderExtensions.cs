@@ -13,7 +13,6 @@ public static class RepositoryBuilderExtensions
         ServiceLifetime                                    contextLifetime = ServiceLifetime.Transient,
         ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped)
         where TContext : DbContext {
-
         builder.Services.AddDbContext<TContext, TContext>(configure, contextLifetime, optionsLifetime);
 
         return builder;
@@ -25,7 +24,6 @@ public static class RepositoryBuilderExtensions
         ServiceLifetime                                    contextLifetime = ServiceLifetime.Transient,
         ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped)
         where TContextImplementation : DbContext, TContextService {
-
         builder.Services.AddDbContext<TContextService, TContextImplementation>(configure, contextLifetime, optionsLifetime);
 
         return builder;

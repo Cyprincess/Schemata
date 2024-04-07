@@ -226,7 +226,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties!);
 
             return result ?? ImmutableDictionary<string, JsonElement>.Empty;
         })!;
@@ -246,7 +246,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(authorization.Scopes);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(authorization.Scopes!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;

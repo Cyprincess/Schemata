@@ -32,67 +32,69 @@ namespace Schemata.Entity.LinqToDB;
 
 public class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
-        public MappingAttribute[] GetAttributes(Type type)
-        {
-            var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
+    #region IMetadataReader Members
 
-            if (t == null) {
-                return Array.Empty<MappingAttribute>();
-            }
+    public MappingAttribute[] GetAttributes(Type type) {
+        var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
 
-            var attr = new TableAttribute {
-                IsColumnAttributeRequired = false,
-            };
-
-            var name = t.Name;
-
-            if (string.IsNullOrWhiteSpace(name)) {
-                return [attr];
-            }
-
-            var names = name.Replace("[", "").Replace("]", "").Split('.');
-
-            switch (names.Length)
-            {
-                case 0: break;
-                case 1: attr.Name = names[0]; break;
-                case 2:
-                    attr.Name   = names[0];
-                    attr.Schema = names[1];
-                    break;
-                default:
-                    throw new MetadataException($"Invalid table name '{name}' of type '{type.FullName}'");
-            }
-
-            return [attr];
-
-        }
-
-        public MappingAttribute[] GetAttributes(Type type, MemberInfo member)
-        {
-            var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
-            if (c != null)
-            {
-                var attr = new ColumnAttribute {
-                    Name   = c.Name,
-                    DbType = c.TypeName,
-                };
-
-                return [attr];
-            }
-
-            if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>())
-            {
-                var attr = new NotColumnAttribute();
-
-                return [attr];
-            }
-
+        if (t == null) {
             return Array.Empty<MappingAttribute>();
         }
 
-        /// <inheritdoc cref="IMetadataReader.GetDynamicColumns"/>
-        public MemberInfo[] GetDynamicColumns(Type type) => Array.Empty<MemberInfo>();
+        var attr = new TableAttribute { IsColumnAttributeRequired = false };
 
-        public string GetObjectID() => $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}.";
+        var name = t.Name;
+
+        if (string.IsNullOrWhiteSpace(name)) {
+            return [attr];
+        }
+
+        var names = name.Replace("[", "").Replace("]", "").Split('.');
+
+        switch (names.Length) {
+            case 0: break;
+            case 1:
+                attr.Name = names[0];
+                break;
+            case 2:
+                attr.Name   = names[0];
+                attr.Schema = names[1];
+                break;
+            default:
+                throw new MetadataException($"Invalid table name '{name}' of type '{type.FullName}'");
+        }
+
+        return [attr];
+    }
+
+    public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
+        var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
+        if (c != null) {
+            var attr = new ColumnAttribute {
+                Name = c.Name,
+                DbType = c.TypeName,
+            };
+
+            return [attr];
+        }
+
+        if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
+            var attr = new NotColumnAttribute();
+
+            return [attr];
+        }
+
+        return Array.Empty<MappingAttribute>();
+    }
+
+    /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />
+    public MemberInfo[] GetDynamicColumns(Type type) {
+        return Array.Empty<MemberInfo>();
+    }
+
+    public string GetObjectID() {
+        return $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}.";
+    }
+
+    #endregion
 }

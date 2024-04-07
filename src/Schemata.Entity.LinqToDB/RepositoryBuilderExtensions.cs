@@ -58,7 +58,6 @@ public static class RepositoryBuilderExtensions
         ServiceLifetime                                  lifetime = ServiceLifetime.Transient)
         where TContextImplementation : TContext
         where TContext : DataConnection {
-
         // Register default metadata reader for System.ComponentModel.DataAnnotations.Schema attributes
         // This is required for LINQ to DB to work with entities that have TableAttribute, ColumnAttribute, etc.
         MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
@@ -82,11 +81,6 @@ public static class RepositoryBuilderExtensions
         return builder;
     }
 
-    private enum OptionsParameterType
-    {
-        DataOptionsTImpl, DataOptionsTContext, DataOptions,
-    }
-
     private static OptionsParameterType HasTypedContextConstructor<TContextImplementation, TContext>()
         where TContextImplementation : IDataContext
         where TContext : IDataContext {
@@ -106,4 +100,13 @@ public static class RepositoryBuilderExtensions
 
         throw new ArgumentException($"Missing constructor accepting '{nameof(DataOptions)}' on type {typeof(TContextImplementation).Name}.");
     }
+
+    #region Nested type: OptionsParameterType
+
+    private enum OptionsParameterType
+    {
+        DataOptionsTImpl, DataOptionsTContext, DataOptions,
+    }
+
+    #endregion
 }

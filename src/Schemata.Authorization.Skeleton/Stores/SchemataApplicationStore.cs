@@ -137,7 +137,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames);
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames!);
             if (names is null) {
                 return ImmutableDictionary<CultureInfo, string>.Empty;
             }
@@ -186,7 +186,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;
@@ -206,7 +206,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;
@@ -226,7 +226,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(application.Properties);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(application.Properties!);
 
             return result ?? ImmutableDictionary<string, JsonElement>.Empty;
         })!;
@@ -246,7 +246,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;
@@ -266,7 +266,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;
@@ -286,7 +286,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(application.Settings);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(application.Settings!);
 
             return result ?? ImmutableDictionary<string, string>.Empty;
         })!;

@@ -9,8 +9,6 @@ namespace Schemata.Identity.Skeleton.Entities;
 [CanonicalName("roles/{role}")]
 public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    public string CanonicalName { get; set; }
-
     [NotMapped]
     public override string ConcurrencyStamp
     {
@@ -18,9 +16,23 @@ public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, ICo
         set => Timestamp = Guid.Parse(value);
     }
 
+    #region ICanonicalName Members
+
+    public string CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
     public virtual Guid? Timestamp { get; set; }
+
+    #endregion
+
+    #region ITimestamp Members
 
     public DateTime? CreationDate { get; set; }
 
     public DateTime? ModificationDate { get; set; }
+
+    #endregion
 }

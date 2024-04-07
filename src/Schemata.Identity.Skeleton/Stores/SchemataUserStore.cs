@@ -37,8 +37,8 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
         describer) { }
 }
 
-public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim,
-    SchemataUserRole, SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
+public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
+    SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
     where TUser : SchemataUser
     where TRole : SchemataRole
 {
@@ -56,6 +56,7 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
     IUserPhoneStore<TUser>,
+    IUserPrincipalNameStore<TUser>,
     IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
@@ -93,7 +94,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     /// <inheritdoc />
     public override IQueryable<TUser> Users => UsersRepository.AsQueryable();
 
-    #region IProtectedUserStore<TUser> Members
+    #region IUserPhoneStore<TUser> Members
 
     /// <inheritdoc />
     public override async Task<IdentityResult> CreateAsync(TUser user, CancellationToken ct = default) {
@@ -158,6 +159,21 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ThrowIfDisposed();
 
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
+    }
+
+    public virtual async Task<TUser> FindByPhoneAsync(string phone, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
+    }
+
+    #endregion
+
+    #region IUserPrincipalNameStore<TUser> Members
+
+    public virtual Task<string> GetUserPrincipalNameAsync(TUser user, CancellationToken ct) {
+        return GetNormalizedUserNameAsync(user, ct);
     }
 
     #endregion
@@ -518,12 +534,5 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     protected override async Task RemoveUserTokenAsync(TUserToken token) {
         await UserTokensRepository.RemoveAsync(token);
         await UserTokensRepository.CommitAsync();
-    }
-
-    public async Task<TUser> FindByPhoneAsync(string phone, CancellationToken ct) {
-        ct.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
-
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
     }
 }

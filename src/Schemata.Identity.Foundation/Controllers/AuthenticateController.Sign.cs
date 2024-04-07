@@ -36,20 +36,15 @@ public partial class AuthenticateController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request) {
         var result = await SignInManager.PasswordSignInAsync(request.Username, request.Password, false, true);
 
-        if (result.RequiresTwoFactor)
-        {
-            if (!string.IsNullOrEmpty(request.TwoFactorCode))
-            {
+        if (result.RequiresTwoFactor) {
+            if (!string.IsNullOrEmpty(request.TwoFactorCode)) {
                 result = await SignInManager.TwoFactorAuthenticatorSignInAsync(request.TwoFactorCode, false, false);
-            }
-            else if (!string.IsNullOrEmpty(request.TwoFactorRecoveryCode))
-            {
+            } else if (!string.IsNullOrEmpty(request.TwoFactorRecoveryCode)) {
                 result = await SignInManager.TwoFactorRecoveryCodeSignInAsync(request.TwoFactorRecoveryCode);
             }
         }
 
-        if (!result.Succeeded)
-        {
+        if (!result.Succeeded) {
             return BadRequest(result.ToString());
         }
 
@@ -59,12 +54,11 @@ public partial class AuthenticateController : ControllerBase
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
         var protector = Options.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
-        var ticket         = protector.Unprotect(request.RefreshToken);
+        var ticket    = protector.Unprotect(request.RefreshToken);
 
-        if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc ||
-            DateTimeOffset.UtcNow >= expiresUtc ||
-            await SignInManager.ValidateSecurityStampAsync(ticket.Principal) is not { } user)
-        {
+        if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc
+         || DateTimeOffset.UtcNow >= expiresUtc
+         || await SignInManager.ValidateSecurityStampAsync(ticket.Principal) is not { } user) {
             return Challenge();
         }
 

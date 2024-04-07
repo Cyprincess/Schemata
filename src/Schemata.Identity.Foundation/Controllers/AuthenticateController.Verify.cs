@@ -7,20 +7,20 @@ namespace Schemata.Identity.Foundation.Controllers;
 public partial class AuthenticateController : ControllerBase
 {
     [HttpGet(nameof(Confirm))]
-    public async Task<IActionResult> Confirm([FromQuery] string? email, [FromQuery] string? phone, [FromQuery] string? code) {
-        if (string.IsNullOrWhiteSpace(code))
-        {
+    public async Task<IActionResult> Confirm(
+        [FromQuery] string? email,
+        [FromQuery] string? phone,
+        [FromQuery] string? code) {
+        if (string.IsNullOrWhiteSpace(code)) {
             return BadRequest();
         }
 
-        if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone))
-        {
+        if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone)) {
             return BadRequest();
         }
 
         var user = await GetUserAsync(email, phone);
-        if (user is null)
-        {
+        if (user is null) {
             return Unauthorized();
         }
 
@@ -30,8 +30,7 @@ public partial class AuthenticateController : ControllerBase
             var _                                        => null,
         };
 
-        if (result is not { Succeeded: true })
-        {
+        if (result is not { Succeeded: true }) {
             return Unauthorized();
         }
 
@@ -41,8 +40,7 @@ public partial class AuthenticateController : ControllerBase
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request) {
         var user = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
-        if (user is null)
-        {
+        if (user is null) {
             return Accepted();
         }
 

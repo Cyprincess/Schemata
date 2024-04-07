@@ -89,7 +89,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions);
+            var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions!);
             if (descriptions is null) {
                 return ImmutableDictionary<CultureInfo, string>.Empty;
             }
@@ -122,7 +122,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames);
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames!);
             if (names is null) {
                 return ImmutableDictionary<CultureInfo, string>.Empty;
             }
@@ -159,7 +159,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties!);
 
             return result ?? ImmutableDictionary<string, JsonElement>.Empty;
         })!;
@@ -177,7 +177,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources!);
 
             return result ?? ImmutableArray<string>.Empty;
         })!;

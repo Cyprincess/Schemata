@@ -9,10 +9,6 @@ namespace Schemata.Identity.Skeleton.Entities;
 [CanonicalName("users/{user}")]
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    public virtual string Name { get; set; }
-
-    public virtual string CanonicalName { get; set; }
-
     [NotMapped]
     public override string ConcurrencyStamp
     {
@@ -20,9 +16,25 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, ICo
         set => Timestamp = Guid.Parse(value);
     }
 
+    #region ICanonicalName Members
+
+    public virtual string Name { get; set; }
+
+    public virtual string CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
     public virtual Guid? Timestamp { get; set; }
+
+    #endregion
+
+    #region ITimestamp Members
 
     public virtual DateTime? CreationDate { get; set; }
 
     public virtual DateTime? ModificationDate { get; set; }
+
+    #endregion
 }

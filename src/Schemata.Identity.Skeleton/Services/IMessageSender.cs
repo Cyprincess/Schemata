@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Schemata.Identity.Skeleton.Entities;
 
-namespace Schemata.Identity.Skeleton;
+namespace Schemata.Identity.Skeleton.Services;
 
 public interface IMessageSender<in TUser>
     where TUser : SchemataUser
