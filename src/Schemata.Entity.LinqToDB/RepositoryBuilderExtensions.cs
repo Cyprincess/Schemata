@@ -1,4 +1,4 @@
-﻿// Some code is borrowed from linq2db's ServiceConfigurationExtensions.cs
+// Some code is borrowed from linq2db's ServiceConfigurationExtensions.cs
 // https://github.com/linq2db/linq2db/blob/33b9d1369f34395b2c922f57ae41ac0b7b6324fa/Source/LinqToDB.AspNet/ServiceConfigurationExtensions.cs
 // The borrowed code is licensed under the MIT License:
 //

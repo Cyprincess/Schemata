@@ -1,4 +1,4 @@
-﻿namespace Schemata.Identity.Foundation.Models;
+namespace Schemata.Identity.Foundation.Models;
 
 public class AuthenticatorResponse
 {

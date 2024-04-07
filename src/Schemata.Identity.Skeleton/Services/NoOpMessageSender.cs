@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;

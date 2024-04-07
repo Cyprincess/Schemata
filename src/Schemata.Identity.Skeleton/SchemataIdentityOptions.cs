@@ -1,4 +1,4 @@
-﻿namespace Schemata.Identity.Skeleton;
+namespace Schemata.Identity.Skeleton;
 
 public class SchemataIdentityOptions
 {
