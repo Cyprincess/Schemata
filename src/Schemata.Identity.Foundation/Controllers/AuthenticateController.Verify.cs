@@ -11,6 +11,10 @@ public partial class AuthenticateController : ControllerBase
         [FromQuery] string? email,
         [FromQuery] string? phone,
         [FromQuery] string? code) {
+        if (!Options.CurrentValue.AllowAccountConfirmation) {
+            return NotFound();
+        }
+
         if (string.IsNullOrWhiteSpace(code)) {
             return BadRequest();
         }
@@ -39,6 +43,10 @@ public partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request) {
+        if (!Options.CurrentValue.AllowAccountConfirmation) {
+            return NotFound();
+        }
+
         var user = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (user is null) {
             return Accepted();

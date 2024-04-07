@@ -24,6 +24,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Email")]
     public async Task<IActionResult> Email([FromBody] ProfileRequest request) {
+        if (!Options.CurrentValue.AllowEmailChange) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
@@ -44,6 +48,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Phone")]
     public async Task<IActionResult> Phone([FromBody] ProfileRequest request) {
+        if (!Options.CurrentValue.AllowPhoneNumberChange) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
@@ -64,6 +72,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Password")]
     public async Task<IActionResult> Password([FromBody] ProfileRequest request) {
+        if (!Options.CurrentValue.AllowPasswordChange) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
@@ -84,6 +96,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpGet(nameof(Authenticator))]
     public async Task<IActionResult> Authenticator() {
+        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
@@ -114,6 +130,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPost(nameof(Authenticator))]
     public async Task<IActionResult> Enroll([FromBody] AuthenticatorRequest request) {
+        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
@@ -135,6 +155,10 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPatch(nameof(Authenticator))]
     public async Task<IActionResult> Downgrade([FromBody] AuthenticatorRequest request) {
+        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+            return NotFound();
+        }
+
         if (await UserManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }

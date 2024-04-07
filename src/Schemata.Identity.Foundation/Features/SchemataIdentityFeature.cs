@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
@@ -36,8 +37,10 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
         var configure = configurators.Pop<IdentityOptions>();
+        var build     = configurators.Pop<IdentityBuilder>();
 
-        var build = configurators.Pop<IdentityBuilder>();
+        var identify = configurators.Pop<SchemataIdentityOptions>();
+        services.Configure(identify);
 
         services.Configure<JsonSerializerOptions>(options => {
             options.Converters.Add(new ClaimStoreJsonConverter());

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
@@ -13,22 +14,25 @@ namespace Schemata.Identity.Foundation.Controllers;
 [Produces("application/json")]
 public partial class AuthenticateController : ControllerBase
 {
-    protected readonly IMailSender<SchemataUser>           MailSender;
-    protected readonly IMessageSender<SchemataUser>        MessageSender;
-    protected readonly IOptionsMonitor<BearerTokenOptions> Options;
-    protected readonly SignInManager<SchemataUser>         SignInManager;
-    protected readonly SchemataUserManager<SchemataUser>   UserManager;
+    protected readonly IOptionsMonitor<BearerTokenOptions>      BearerToken;
+    protected readonly IMailSender<SchemataUser>                MailSender;
+    protected readonly IMessageSender<SchemataUser>             MessageSender;
+    protected readonly IOptionsMonitor<SchemataIdentityOptions> Options;
+    protected readonly SignInManager<SchemataUser>              SignInManager;
+    protected readonly SchemataUserManager<SchemataUser>        UserManager;
 
     public AuthenticateController(
-        SignInManager<SchemataUser>         signInManager,
-        SchemataUserManager<SchemataUser>   userManager,
-        IMailSender<SchemataUser>           mailSender,
-        IMessageSender<SchemataUser>        messageSender,
-        IOptionsMonitor<BearerTokenOptions> options) {
+        SignInManager<SchemataUser>              signInManager,
+        SchemataUserManager<SchemataUser>        userManager,
+        IMailSender<SchemataUser>                mailSender,
+        IMessageSender<SchemataUser>             messageSender,
+        IOptionsMonitor<BearerTokenOptions>      bearerToken,
+        IOptionsMonitor<SchemataIdentityOptions> options) {
         SignInManager = signInManager;
         UserManager   = userManager;
         MailSender    = mailSender;
         MessageSender = messageSender;
+        BearerToken   = bearerToken;
         Options       = options;
     }
 
@@ -41,6 +45,10 @@ public partial class AuthenticateController : ControllerBase
     }
 
     protected virtual async Task SendConfirmationCodeAsync(SchemataUser user, string? email, string? phone) {
+        if (!Options.CurrentValue.AllowAccountConfirmation) {
+            return;
+        }
+
         switch (user) {
             case var _ when !string.IsNullOrWhiteSpace(email):
             {

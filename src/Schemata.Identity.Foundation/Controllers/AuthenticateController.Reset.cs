@@ -8,6 +8,10 @@ public partial class AuthenticateController : ControllerBase
 {
     [HttpPost(nameof(Forgot))]
     public async Task<IActionResult> Forgot([FromBody] ForgetRequest request) {
+        if (!Options.CurrentValue.AllowPasswordReset) {
+            return NotFound();
+        }
+
         var user = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (user is null) {
             return Accepted();
@@ -35,6 +39,10 @@ public partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Reset))]
     public async Task<IActionResult> Reset([FromBody] ResetRequest request) {
+        if (!Options.CurrentValue.AllowPasswordReset) {
+            return NotFound();
+        }
+
         var user = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (user is null) {
             return BadRequest();

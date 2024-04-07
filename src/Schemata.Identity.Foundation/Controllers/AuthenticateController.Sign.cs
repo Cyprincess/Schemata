@@ -11,6 +11,10 @@ public partial class AuthenticateController : ControllerBase
 {
     [HttpPost(nameof(Register))]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request) {
+        if (!Options.CurrentValue.AllowRegistration) {
+            return NotFound();
+        }
+
         var username = request.EmailAddress ?? request.PhoneNumber;
 
         var user = new SchemataUser {
@@ -53,7 +57,7 @@ public partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
-        var protector = Options.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
+        var protector = BearerToken.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
         var ticket    = protector.Unprotect(request.RefreshToken);
 
         if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc
