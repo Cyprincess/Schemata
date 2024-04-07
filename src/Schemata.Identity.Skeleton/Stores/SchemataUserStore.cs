@@ -55,6 +55,7 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
 
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
+    IUserPhoneStore<TUser>,
     IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
@@ -156,8 +157,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName),
-            ct);
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
 
     #endregion
@@ -170,8 +170,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     /// <inheritdoc />
     protected override async Task<TRole> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName),
-            ct);
+        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
     }
 
     /// <inheritdoc />
@@ -519,5 +518,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     protected override async Task RemoveUserTokenAsync(TUserToken token) {
         await UserTokensRepository.RemoveAsync(token);
         await UserTokensRepository.CommitAsync();
+    }
+
+    public async Task<TUser> FindByPhoneAsync(string phone, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
     }
 }

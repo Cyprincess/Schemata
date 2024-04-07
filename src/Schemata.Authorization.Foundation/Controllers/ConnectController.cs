@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Managers;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
@@ -15,14 +16,14 @@ public partial class ConnectController : ControllerBase
     private readonly IOpenIddictAuthorizationManager _authorizations;
     private readonly IOpenIddictScopeManager         _scopes;
     private readonly SignInManager<SchemataUser>     _sign;
-    private readonly UserManager<SchemataUser>       _users;
+    private readonly SchemataUserManager<SchemataUser>       _users;
 
     public ConnectController(
-        IOpenIddictApplicationManager   applications,
-        IOpenIddictAuthorizationManager authorizations,
-        IOpenIddictScopeManager         scopes,
-        SignInManager<SchemataUser>     sign,
-        UserManager<SchemataUser>       users) {
+        IOpenIddictApplicationManager     applications,
+        IOpenIddictAuthorizationManager   authorizations,
+        IOpenIddictScopeManager           scopes,
+        SignInManager<SchemataUser>       sign,
+        SchemataUserManager<SchemataUser> users) {
         _applications   = applications;
         _authorizations = authorizations;
         _scopes         = scopes;

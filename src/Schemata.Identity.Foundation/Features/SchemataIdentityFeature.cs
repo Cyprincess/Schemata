@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Managers;
 #if NET6_0
 using Microsoft.AspNetCore.Authentication.BearerToken;
 #endif
@@ -43,6 +44,7 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
 
         var builder = services.AddIdentityCore<TUser>(configure)
                               .AddRoles<TRole>()
+                              .AddUserManager<SchemataUserManager<TUser>>()
                               .AddSignInManager()
                               .AddDefaultTokenProviders();
 
