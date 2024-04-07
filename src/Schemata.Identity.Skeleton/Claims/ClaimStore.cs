@@ -9,8 +9,12 @@ public class ClaimStore : IList<string>
 
     #region IList<string> Members
 
-    public void Add(string value) {
-        _values.Add(value);
+    public void Add(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return;
+        }
+
+        _values.Add(value!);
     }
 
     public void Clear() {

@@ -7,5 +7,5 @@ namespace Schemata.Identity.Skeleton.Stores;
 public interface IUserPhoneStore<TUser> : IUserPhoneNumberStore<TUser>
     where TUser : class
 {
-    Task<TUser> FindByPhoneAsync(string phone, CancellationToken cancellationToken);
+    Task<TUser?> FindByPhoneAsync(string phone, CancellationToken cancellationToken);
 }

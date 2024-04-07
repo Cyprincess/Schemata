@@ -6,5 +6,5 @@ namespace Schemata.Identity.Skeleton.Stores;
 public interface IUserPrincipalNameStore<TUser>
     where TUser : class
 {
-    Task<string> GetUserPrincipalNameAsync(TUser user, CancellationToken cancellationToken);
+    Task<string?> GetUserPrincipalNameAsync(TUser user, CancellationToken cancellationToken);
 }

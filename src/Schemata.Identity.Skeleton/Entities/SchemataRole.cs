@@ -10,15 +10,15 @@ namespace Schemata.Identity.Skeleton.Entities;
 public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     [NotMapped]
-    public override string ConcurrencyStamp
+    public override string? ConcurrencyStamp
     {
         get => Timestamp?.ToString();
-        set => Timestamp = Guid.Parse(value);
+        set => Timestamp = string.IsNullOrWhiteSpace(value) ? Guid.NewGuid() : Guid.Parse(value);
     }
 
     #region ICanonicalName Members
 
-    public string CanonicalName { get; set; }
+    public string? CanonicalName { get; set; }
 
     #endregion
 

@@ -19,7 +19,7 @@ public class SchemataUserStore : SchemataUserStore<SchemataUser>
         IRepository<SchemataUserRole> userRoles,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
 
@@ -33,7 +33,7 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
         IRepository<SchemataUserRole> userRoles,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
 
@@ -49,7 +49,7 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
         IRepository<SchemataUserRole> userRoles,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
         describer) { }
 }
 
@@ -80,7 +80,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         IRepository<TUserRole>  userRoles,
         IRepository<TUserLogin> userLogins,
         IRepository<TUserToken> userTokens,
-        IdentityErrorDescriber  describer = null) : base(describer ?? new IdentityErrorDescriber()) {
+        IdentityErrorDescriber? describer = null) : base(describer ?? new IdentityErrorDescriber()) {
         UsersRepository      = users;
         RolesRepository      = roles;
         UserClaimsRepository = userClaims;
@@ -145,6 +145,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return IdentityResult.Success;
     }
 
+#nullable disable
     /// <inheritdoc />
     public override async Task<TUser> FindByIdAsync(string userId, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
@@ -160,8 +161,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
+#nullable restore
 
-    public virtual async Task<TUser> FindByPhoneAsync(string phone, CancellationToken ct) {
+    public virtual async Task<TUser?> FindByPhoneAsync(string phone, CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
@@ -172,7 +174,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserPrincipalNameStore<TUser> Members
 
-    public virtual Task<string> GetUserPrincipalNameAsync(TUser user, CancellationToken ct) {
+    public virtual Task<string?> GetUserPrincipalNameAsync(TUser user, CancellationToken ct) {
         return GetNormalizedUserNameAsync(user, ct);
     }
 
@@ -184,6 +186,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
     }
 
+#nullable disable
     /// <inheritdoc />
     protected override async Task<TRole> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
@@ -219,6 +222,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UserLoginsRepository.SingleOrDefaultAsync(
             q => q.Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey), ct);
     }
+#nullable restore
 
     /// <inheritdoc />
     public override async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken ct = default) {
@@ -452,6 +456,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                          .ToListAsync(ct);
     }
 
+#nullable disable
     /// <inheritdoc />
     public override async Task<TUser> FindByLoginAsync(
         string            loginProvider,
@@ -474,6 +479,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedEmail == normalizedEmail), ct);
     }
+#nullable restore
 
     /// <inheritdoc />
     public override async Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default) {
@@ -515,6 +521,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Id)), ct).ToListAsync(ct);
     }
 
+#nullable disable
     /// <inheritdoc />
     protected override Task<TUserToken> FindTokenAsync(
         TUser             user,
@@ -523,6 +530,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         CancellationToken ct) {
         return UserTokensRepository.FindAsync([user.Id, loginProvider, name], ct).AsTask();
     }
+#nullable restore
 
     /// <inheritdoc />
     protected override async Task AddUserTokenAsync(TUserToken token) {

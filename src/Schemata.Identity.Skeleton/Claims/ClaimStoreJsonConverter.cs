@@ -6,7 +6,7 @@ namespace Schemata.Identity.Skeleton.Claims;
 
 public class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
 {
-    public override ClaimStore Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
+    public override ClaimStore? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         if (reader.TokenType == JsonTokenType.Null) {
             return null;
         }

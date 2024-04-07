@@ -10,17 +10,17 @@ namespace Schemata.Identity.Skeleton.Entities;
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     [NotMapped]
-    public override string ConcurrencyStamp
+    public override string? ConcurrencyStamp
     {
         get => Timestamp?.ToString();
-        set => Timestamp = Guid.Parse(value);
+        set => Timestamp = string.IsNullOrWhiteSpace(value) ? Guid.NewGuid() : Guid.Parse(value);
     }
 
     #region ICanonicalName Members
 
-    public virtual string Name { get; set; }
+    public virtual string? Name { get; set; }
 
-    public virtual string CanonicalName { get; set; }
+    public virtual string? CanonicalName { get; set; }
 
     #endregion
 

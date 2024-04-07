@@ -26,7 +26,7 @@ public class SchemataUserManager<TUser>(
 {
     private readonly IServiceProvider _services = services;
 
-    public virtual async Task<string> GetUserPrincipalNameAsync(TUser user) {
+    public virtual async Task<string?> GetUserPrincipalNameAsync(TUser user) {
         ThrowIfDisposed();
         var store = GetPrincipalNameStore();
 
@@ -53,7 +53,7 @@ public class SchemataUserManager<TUser>(
         return claims;
     }
 
-    public virtual async Task<TUser> FindByPhoneAsync(string phone) {
+    public virtual async Task<TUser?> FindByPhoneAsync(string phone) {
         ThrowIfDisposed();
         var store = GetPhoneNumberStore();
 

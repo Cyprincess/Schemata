@@ -17,7 +17,7 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataUserRol
         IRepository<TRole> rolesRepository,
         IRepository<SchemataUserRole> userRolesRepository,
         IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IdentityErrorDescriber describer = null) : base(rolesRepository, userRolesRepository, roleClaimsRepository,
+        IdentityErrorDescriber? describer = null) : base(rolesRepository, userRolesRepository, roleClaimsRepository,
         describer) { }
 }
 
@@ -35,7 +35,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
         IRepository<TRole>      rolesRepository,
         IRepository<TUserRole>  userRolesRepository,
         IRepository<TRoleClaim> roleClaimsRepository,
-        IdentityErrorDescriber  describer = null) {
+        IdentityErrorDescriber? describer = null) {
         RolesRepository      = rolesRepository;
         RoleClaimsRepository = roleClaimsRepository;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
@@ -106,18 +106,18 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
     }
 
     /// <inheritdoc />
-    public virtual Task<string> GetRoleNameAsync(TRole role, CancellationToken ct = default) {
+    public virtual Task<string?> GetRoleNameAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         if (role == null) {
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult(role.Name);
+        return Task.FromResult<string?>(role.Name);
     }
 
     /// <inheritdoc />
-    public virtual Task SetRoleNameAsync(TRole role, string roleName, CancellationToken ct = default) {
+    public virtual Task SetRoleNameAsync(TRole role, string? roleName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         if (role == null) {
@@ -128,6 +128,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
         return Task.CompletedTask;
     }
 
+#nullable disable
     /// <inheritdoc />
     public virtual async Task<TRole> FindByIdAsync(string id, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
@@ -135,6 +136,8 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
         var roleId = long.Parse(id);
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == roleId), ct);
     }
+
+    #endregion
 
     /// <inheritdoc />
     public virtual async Task<TRole> FindByNameAsync(string normalizedName, CancellationToken ct = default) {
