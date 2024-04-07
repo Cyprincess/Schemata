@@ -153,7 +153,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         var id = ConvertIdFromString(userId);
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == id), ct);
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     public override async Task<TUser> FindByNameAsync(string normalizedUserName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
@@ -191,17 +193,23 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     protected override async Task<TRole> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     protected override async Task<TUserRole> FindUserRoleAsync(long userId, long roleId, CancellationToken ct) {
         return await UserRolesRepository.FindAsync([userId, roleId], ct).AsTask();
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     protected override async Task<TUser> FindUserAsync(long userId, CancellationToken ct) {
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == userId), ct);
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     protected override async Task<TUserLogin> FindUserLoginAsync(
         long              userId,
@@ -213,7 +221,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                            && l.LoginProvider == loginProvider
                            && l.ProviderKey == providerKey), ct);
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     protected override async Task<TUserLogin> FindUserLoginAsync(
         string            loginProvider,
@@ -471,7 +481,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         return null;
     }
+#nullable restore
 
+#nullable disable
     /// <inheritdoc />
     public override async Task<TUser> FindByEmailAsync(string normalizedEmail, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();

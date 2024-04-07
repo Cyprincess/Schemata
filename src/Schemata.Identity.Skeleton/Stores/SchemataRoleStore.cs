@@ -136,29 +136,30 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
         var roleId = long.Parse(id);
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == roleId), ct);
     }
+#nullable restore
 
-    #endregion
-
+#nullable disable
     /// <inheritdoc />
     public virtual async Task<TRole> FindByNameAsync(string normalizedName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedName == normalizedName), ct);
     }
+#nullable restore
 
     /// <inheritdoc />
-    public virtual Task<string> GetNormalizedRoleNameAsync(TRole role, CancellationToken ct = default) {
+    public virtual Task<string?> GetNormalizedRoleNameAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         if (role == null) {
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult(role.NormalizedName);
+        return Task.FromResult<string?>(role.NormalizedName);
     }
 
     /// <inheritdoc />
-    public virtual Task SetNormalizedRoleNameAsync(TRole role, string normalizedName, CancellationToken ct = default) {
+    public virtual Task SetNormalizedRoleNameAsync(TRole role, string? normalizedName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         if (role == null) {
@@ -223,7 +224,9 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(claim));
         }
 
-        var claims = RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Id) && rc.ClaimValue == claim.Value && rc.ClaimType == claim.Type), ct);
+        var claims = RoleClaimsRepository.ListAsync(
+            q => q.Where(rc => rc.RoleId.Equals(role.Id) && rc.ClaimValue == claim.Value && rc.ClaimType == claim.Type),
+            ct);
         await foreach (var c in claims) {
             await RoleClaimsRepository.RemoveAsync(c, ct);
         }
