@@ -151,8 +151,7 @@ public interface
         CancellationToken ct = default);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12,
-                         in T13> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13> : IAdvice
 {
     Task<bool> AdviseAsync(
         T1                a1,
@@ -171,8 +170,7 @@ public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8,
         CancellationToken ct = default);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14> : IAdvice
 {
     Task<bool> AdviseAsync(
         T1                a1,
@@ -192,8 +190,7 @@ public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8,
         CancellationToken ct = default);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14, in T15> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14, in T15> : IAdvice
 {
     Task<bool> AdviseAsync(
         T1                a1,
@@ -214,8 +211,7 @@ public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8,
         CancellationToken ct = default);
 }
 
-public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13,
-                         in T14, in T15, in T16> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12, in T13, in T14, in T15, in T16> : IAdvice
 {
     Task<bool> AdviseAsync(
         T1                a1,

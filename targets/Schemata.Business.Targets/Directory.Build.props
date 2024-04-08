@@ -25,6 +25,10 @@
     <ProjectReference Include="..\..\src\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseMapping)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>

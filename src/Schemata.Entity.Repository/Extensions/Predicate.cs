@@ -13,25 +13,45 @@ public static class Predicate
         return q => false;
     }
 
+    public static Expression<Func<TResult, bool>>? Cast<T, TResult>(Expression<Func<T, bool>>? predicate) {
+        if (predicate == null) {
+            return null;
+        }
+
+        var parameter = Expression.Parameter(typeof(T));
+
+        var body = Replacer.Replace(predicate, parameter);
+
+        return Expression.Lambda<Func<TResult, bool>>(body!, parameter);
+    }
+
     public static Expression<Func<TEntity, bool>> And<TEntity>(
         this Expression<Func<TEntity, bool>>? left,
         Expression<Func<TEntity, bool>>?      right) {
-        return CombinePredicates(left, right, ExpressionType.AndAlso);
+        return Combine(left, right, ExpressionType.AndAlso);
     }
 
     public static Expression<Func<TEntity, bool>> Or<TEntity>(
         this Expression<Func<TEntity, bool>>? left,
         Expression<Func<TEntity, bool>>?      right) {
-        return CombinePredicates(left, right, ExpressionType.OrElse);
+        return Combine(left, right, ExpressionType.OrElse);
     }
 
-    private static Expression<Func<T, bool>> CombinePredicates<T>(
+    private static Expression<Func<T, bool>> Combine<T>(
         this Expression<Func<T, bool>>? left,
         Expression<Func<T, bool>>?      right,
         ExpressionType                  type) {
-        if (left is null && right is null) return False<T>();
-        if (left is null) return right!;
-        if (right is null) return left!;
+        if (left is null && right is null) {
+            return False<T>();
+        }
+
+        if (left is null) {
+            return right!;
+        }
+
+        if (right is null) {
+            return left!;
+        }
 
         var parameter = Expression.Parameter(typeof(T));
 

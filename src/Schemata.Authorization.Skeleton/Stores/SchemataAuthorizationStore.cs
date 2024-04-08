@@ -20,20 +20,20 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     where TApplication : SchemataApplication
     where TToken : SchemataToken
 {
+    private readonly IMemoryCache                _cache;
     private readonly IRepository<TApplication>   _applications;
     private readonly IRepository<TAuthorization> _authorizations;
     private readonly IRepository<TToken>         _tokens;
-    private readonly IMemoryCache                _cache;
 
     public SchemataAuthorizationStore(
+        IMemoryCache                cache,
         IRepository<TApplication>   applications,
         IRepository<TAuthorization> authorizations,
-        IRepository<TToken>         tokens,
-        IMemoryCache                cache) {
+        IRepository<TToken>         tokens) {
+        _cache          = cache;
         _applications   = applications;
         _authorizations = authorizations;
         _tokens         = tokens;
-        _cache          = cache;
     }
 
     #region IOpenIddictAuthorizationStore<TAuthorization> Members

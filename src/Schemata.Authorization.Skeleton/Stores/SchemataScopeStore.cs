@@ -18,12 +18,12 @@ namespace Schemata.Authorization.Skeleton.Stores;
 public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     where TScope : SchemataScope
 {
-    private readonly IRepository<TScope> _scopes;
     private readonly IMemoryCache        _cache;
+    private readonly IRepository<TScope> _scopes;
 
-    public SchemataScopeStore(IRepository<TScope> scopes, IMemoryCache cache) {
-        _scopes = scopes;
+    public SchemataScopeStore(IMemoryCache cache, IRepository<TScope> scopes) {
         _cache  = cache;
+        _scopes = scopes;
     }
 
     #region IOpenIddictScopeStore<TScope> Members

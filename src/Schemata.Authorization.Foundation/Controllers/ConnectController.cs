@@ -1,3 +1,7 @@
+// Some code is borrowed from OpenIddict
+// https://github.com/openiddict/openiddict-core/blob/b32eb8c0a29c9e1cccb15e5d2ac2f6d4f8b7243b/sandbox/OpenIddict.Sandbox.AspNetCore.Server/Controllers/AuthorizationController.cs
+// The borrowed code is licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
 using System.Collections.Generic;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
@@ -8,8 +12,8 @@ using Schemata.Identity.Skeleton.Managers;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+[ApiController]
 [Route("~/[controller]")]
-[Produces("application/json")]
 public partial class ConnectController : ControllerBase
 {
     private readonly IOpenIddictApplicationManager     _applications;

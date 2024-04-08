@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
@@ -36,7 +37,8 @@ public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModule
             services.TryAddSingleton(startup.GetType(), _ => startup);
             services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IModule), startup));
 
-            if (startup.GetType().GetMethod(nameof(ConfigureServices)) is null) {
+            if (startup.GetType()
+                       .GetMethod(nameof(ConfigureServices), BindingFlags.Instance | BindingFlags.Public) is null) {
                 continue;
             }
 
@@ -55,7 +57,8 @@ public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModule
         startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var startup in startups) {
-            if (startup.GetType().GetMethod(nameof(ConfigureApplication)) is null) {
+            if (startup.GetType()
+                       .GetMethod(nameof(ConfigureApplication), BindingFlags.Instance | BindingFlags.Public) is null) {
                 continue;
             }
 
@@ -75,7 +78,8 @@ public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModule
         startups.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var startup in startups) {
-            if (startup.GetType().GetMethod(nameof(ConfigureEndpoints)) is null) {
+            if (startup.GetType()
+                       .GetMethod(nameof(ConfigureEndpoints), BindingFlags.Instance | BindingFlags.Public) is null) {
                 continue;
             }
 

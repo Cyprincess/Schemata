@@ -63,6 +63,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         var type = typeof(TEntity);
 
         var properties = KeyPropertiesCache(type);
@@ -157,6 +159,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         if (Transaction == null) return 0;
 
         try {
@@ -178,6 +182,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct) {
+        ct.ThrowIfCancellationRequested();
+
         var table = AsQueryable();
 
         var query = new QueryContainer<TEntity>(table);
@@ -188,6 +194,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     }
 
     private async Task BeginTransactionAsync(CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+
         if (Transaction != null) return;
 
         Transaction = await Context.BeginTransactionAsync(ct);

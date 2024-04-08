@@ -23,7 +23,9 @@ public class SchemataStartup : IStartupFilter
             app.UseSchemata(_configuration, _environment);
 
             if (app.ApplicationServices.GetService(typeof(EndpointDataSource)) is not null) {
-                app.UseEndpoints(endpoints => { endpoints.UseSchemata(app, _configuration, _environment); });
+                app.UseEndpoints(endpoints => {
+                    endpoints.UseSchemata(app, _configuration, _environment);
+                });
             }
 
             next(app);

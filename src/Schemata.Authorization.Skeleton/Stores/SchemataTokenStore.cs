@@ -17,12 +17,12 @@ namespace Schemata.Authorization.Skeleton.Stores;
 public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     where TToken : SchemataToken
 {
-    private readonly IRepository<TToken> _tokens;
     private readonly IMemoryCache        _cache;
+    private readonly IRepository<TToken> _tokens;
 
-    public SchemataTokenStore(IRepository<TToken> tokens, IMemoryCache cache) {
-        _tokens = tokens;
+    public SchemataTokenStore(IMemoryCache cache, IRepository<TToken> tokens) {
         _cache  = cache;
+        _tokens = tokens;
     }
 
     #region IOpenIddictTokenStore<TToken> Members

@@ -10,8 +10,8 @@ using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
+[ApiController]
 [Route("~/[controller]")]
-[Produces("application/json")]
 public partial class AuthenticateController : ControllerBase
 {
     protected readonly IOptionsMonitor<BearerTokenOptions>      BearerToken;

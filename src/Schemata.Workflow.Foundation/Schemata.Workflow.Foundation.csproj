@@ -15,8 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Mapping.Foundation\Schemata.Mapping.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Pipeline\Schemata.Pipeline.csproj" />
     <ProjectReference Include="..\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" />
   </ItemGroup>

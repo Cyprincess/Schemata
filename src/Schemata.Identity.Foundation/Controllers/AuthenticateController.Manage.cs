@@ -142,8 +142,7 @@ public partial class AuthenticateController : ControllerBase
             return BadRequest();
         }
 
-        if (!await UserManager.VerifyTwoFactorTokenAsync(user, UserManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode))
-        {
+        if (!await UserManager.VerifyTwoFactorTokenAsync(user, UserManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode)) {
             return BadRequest();
         }
 
@@ -163,7 +162,8 @@ public partial class AuthenticateController : ControllerBase
             return NotFound();
         }
 
-        if (string.IsNullOrWhiteSpace(request.TwoFactorCode) || string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
+        if (string.IsNullOrWhiteSpace(request.TwoFactorCode)
+         || string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
             return BadRequest();
         }
 

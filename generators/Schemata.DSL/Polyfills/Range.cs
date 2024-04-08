@@ -1,6 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
-// https://github.com/dotnet/runtime/blob/419e949d258ecee4c40a460fb09c66d974229623/src/libraries/System.Private.CoreLib/src/System/Index.cs
-// https://github.com/dotnet/runtime/blob/419e949d258ecee4c40a460fb09c66d974229623/src/libraries/System.Private.CoreLib/src/System/Range.cs
+// https://github.com/dotnet/runtime/blob/257c3c1dfd004a7afebeecd5ca538e1ea831f50a/src/libraries/System.Private.CoreLib/src/System/Index.cs
+// https://github.com/dotnet/runtime/blob/257c3c1dfd004a7afebeecd5ca538e1ea831f50a/src/libraries/System.Private.CoreLib/src/System/Range.cs
 
 using System.Runtime.CompilerServices;
 

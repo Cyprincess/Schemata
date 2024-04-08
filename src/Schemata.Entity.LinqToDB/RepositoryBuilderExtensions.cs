@@ -1,5 +1,5 @@
-// Some code is borrowed from linq2db's ServiceConfigurationExtensions.cs
-// https://github.com/linq2db/linq2db/blob/33b9d1369f34395b2c922f57ae41ac0b7b6324fa/Source/LinqToDB.AspNet/ServiceConfigurationExtensions.cs
+// Some code is borrowed from linq2db
+// https://github.com/linq2db/linq2db/blob/4120b637104810a1b0c4d338794257579fa1604d/Source/LinqToDB.AspNet/ServiceConfigurationExtensions.cs
 // The borrowed code is licensed under the MIT License:
 //
 // Copyright (c) 2024 Igor Tkachev, Ilya Chudin, Svyatoslav Danyliv, Dmitry Lukashenko
