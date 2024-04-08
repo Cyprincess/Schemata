@@ -1,6 +1,8 @@
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,16 @@ public class SchemataControllersFeature : FeatureBase
         var build     = configurators.PopOrDefault<IMvcBuilder>();
 
         var builder = services.AddControllers(configure);
+
+        builder.ConfigureApplicationPartManager(manager => {
+            var parts = manager.ApplicationParts.OfType<AssemblyPart>()
+                               .Where(p => p.Name.StartsWith("Schemata."))
+                               .ToArray();
+
+            foreach (var part in parts) {
+                manager.ApplicationParts.Remove(part);
+            }
+        });
 
         build(builder);
     }

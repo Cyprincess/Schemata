@@ -54,6 +54,10 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
             options.JsonSerializerOptions.Converters.Add(new ClaimStoreJsonConverter());
         });
 
+        var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
+        services.AddMvcCore()
+                .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
+
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
                 .AddBearerToken(IdentityConstants.ApplicationScheme);
 

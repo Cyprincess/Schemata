@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -38,7 +37,7 @@ public class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, 
         build(features);
         features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
-        var part = new AssemblyPart(typeof(SchemataAuthorizationFeature<,,,>).Assembly);
+        var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
 
