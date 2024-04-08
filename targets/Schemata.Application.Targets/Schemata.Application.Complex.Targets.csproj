@@ -11,6 +11,7 @@
     <UseModularTargets>true</UseModularTargets>
     <UseAuthorization>true</UseAuthorization>
     <UseIdentity>true</UseIdentity>
+    <UseMapster>true</UseMapster>
     <UseRepository>true</UseRepository>
     <UseValidation>true</UseValidation>
     <UseWorkflow>true</UseWorkflow>

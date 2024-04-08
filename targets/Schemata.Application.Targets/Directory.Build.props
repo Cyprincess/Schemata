@@ -35,6 +35,10 @@
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseMapster)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseIdentity)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
   </ItemGroup>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Mapping.AutoMapper\Schemata.Mapping.AutoMapper.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

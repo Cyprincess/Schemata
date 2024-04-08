@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Mapper Foundation</Description>
+    <PackageTags>application;business;framework;mapper</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>
