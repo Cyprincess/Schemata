@@ -28,34 +28,38 @@ using System.Reflection;
 using LinqToDB;
 using LinqToDB.Data;
 using LinqToDB.Mapping;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
 
 // ReSharper disable once CheckNamespace
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Microsoft.AspNetCore.Builder;
 
-public static class RepositoryBuilderExtensions
+public static class SchemataRepositoryBuilderExtensions
 {
     public static SchemataRepositoryBuilder UseLinqToDb(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  lifetime = ServiceLifetime.Transient) {
-        return UseLinqToDb<DataConnection, DataConnection>(builder, configure, lifetime);
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped) {
+        return UseLinqToDb<DataConnection, DataConnection>(builder, configure, contextLifetime, optionsLifetime);
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  lifetime = ServiceLifetime.Transient)
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
         where TContext : DataConnection {
-        return UseLinqToDb<TContext, TContext>(builder, configure, lifetime);
+        return UseLinqToDb<TContext, TContext>(builder, configure, contextLifetime, optionsLifetime);
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  lifetime = ServiceLifetime.Transient)
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
         where TContextImplementation : TContext
         where TContext : DataConnection {
         // Register default metadata reader for System.ComponentModel.DataAnnotations.Schema attributes
@@ -64,17 +68,17 @@ public static class RepositoryBuilderExtensions
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
-        builder.Services.TryAdd(new ServiceDescriptor(typeof(TContext), typeof(TContextImplementation), lifetime));
+        builder.Services.TryAdd(new ServiceDescriptor(typeof(TContext), typeof(TContextImplementation), contextLifetime));
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())), lifetime));
+                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())), optionsLifetime));
                 break;
             case OptionsParameterType.DataOptionsTContext:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())), lifetime));
+                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())), optionsLifetime));
                 break;
             case OptionsParameterType.DataOptions:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions), sp => configure(sp, new()), lifetime));
+                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions), sp => configure(sp, new()), optionsLifetime));
                 break;
         }
 

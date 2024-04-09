@@ -1,11 +1,12 @@
 using System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.Repository;
 
 // ReSharper disable once CheckNamespace
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Microsoft.AspNetCore.Builder;
 
-public static class RepositoryBuilderExtensions
+public static class SchemataRepositoryBuilderExtensions
 {
     public static SchemataRepositoryBuilder UseEntityFrameworkCore<TContext>(
         this SchemataRepositoryBuilder                     builder,

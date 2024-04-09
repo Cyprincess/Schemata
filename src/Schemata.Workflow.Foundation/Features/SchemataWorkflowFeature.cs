@@ -36,9 +36,9 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
 
         services.TryAddSingleton<ITypeResolver, TypeResolver>();
 
-        services.TryAddTransient<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>();
-        services.TryAddTransient<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
-        services.TryAddTransient<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
+        services.TryAddScoped<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>();
+        services.TryAddScoped<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
+        services.TryAddScoped<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
 
         services.Map(map);
     }

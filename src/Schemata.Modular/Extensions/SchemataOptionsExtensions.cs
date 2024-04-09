@@ -5,7 +5,7 @@ using Schemata.Abstractions.Modular;
 // ReSharper disable once CheckNamespace
 namespace Schemata.Core;
 
-public static class ModularOptionsExtensions
+public static class SchemataOptionsExtensions
 {
     public static List<ModuleDescriptor>? GetModules(this SchemataOptions schemata) {
         return schemata.Get<List<ModuleDescriptor>>(Constants.Options.ModularModules);

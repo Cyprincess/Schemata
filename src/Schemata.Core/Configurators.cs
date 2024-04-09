@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Schemata.Core;
@@ -71,7 +70,7 @@ public class Configurators
             var tcg = tc.MakeGenericType(type);
 
             var instance = Activator.CreateInstance(tcg, Options.DefaultName, configure)!;
-            services.TryAddSingleton(icg, _ => instance);
+            services.AddSingleton(icg, _ => instance);
         }
 
         _configurators.Clear();
