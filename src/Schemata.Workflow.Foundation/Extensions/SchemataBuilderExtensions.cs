@@ -1,6 +1,7 @@
 using System;
 using Schemata.Core;
 using Schemata.Mapping.Skeleton.Configurations;
+using Schemata.Workflow.Foundation;
 using Schemata.Workflow.Foundation.Features;
 using Schemata.Workflow.Skeleton;
 using Schemata.Workflow.Skeleton.Entities;
@@ -11,14 +12,14 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class SchemataBuilderExtensions
 {
-    public static SchemataBuilder UseWorkflow(
+    public static SchemataWorkflowBuilder UseWorkflow(
         this SchemataBuilder                                                                  builder,
         Action<SchemataWorkflowOptions>?                                                      configure = null,
         Action<Map<WorkflowDetails<SchemataWorkflow, SchemataTransition>, WorkflowResponse>>? mapping   = null) {
         return UseWorkflow<SchemataWorkflow, SchemataTransition>(builder, configure, mapping);
     }
 
-    public static SchemataBuilder UseWorkflow<TWorkflow, TTransition>(
+    public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition>(
         this SchemataBuilder                                                    builder,
         Action<SchemataWorkflowOptions>?                                        configure = null,
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, WorkflowResponse>>? mapping   = null)
@@ -27,7 +28,7 @@ public static class SchemataBuilderExtensions
         return UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(builder, configure, mapping);
     }
 
-    public static SchemataBuilder UseWorkflow<TWorkflow, TTransition, TResponse>(
+    public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition, TResponse>(
         this SchemataBuilder                                             builder,
         Action<SchemataWorkflowOptions>?                                 configure = null,
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>? mapping   = null)
@@ -56,6 +57,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
 
-        return builder;
+        return new(builder);
     }
 }

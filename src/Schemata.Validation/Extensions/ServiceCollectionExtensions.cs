@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddValidator<TValidator>(
         this IServiceCollection services,
-        ServiceLifetime         lifetime = ServiceLifetime.Transient)
+        ServiceLifetime         lifetime = ServiceLifetime.Scoped)
         where TValidator : class, IValidator {
         var implementationType = typeof(TValidator);
         var validatorType = implementationType.GetInterfaces()
@@ -31,7 +31,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddValidator<T, TValidator>(
         this IServiceCollection services,
-        ServiceLifetime         lifetime = ServiceLifetime.Transient)
+        ServiceLifetime         lifetime = ServiceLifetime.Scoped)
         where TValidator : class, IValidator<T> {
         return AddValidator(services, typeof(IValidator<T>), typeof(TValidator), lifetime);
     }
@@ -40,10 +40,10 @@ public static class ServiceCollectionExtensions
         IServiceCollection services,
         Type               service,
         Type               implementation,
-        ServiceLifetime    lifetime) {
+        ServiceLifetime    lifetime = ServiceLifetime.Scoped) {
         services.TryAdd(new ServiceDescriptor(service, implementation, lifetime));
 
-        services.TryAddTransient(typeof(IValidationAsyncAdvice<>), typeof(AdviceValidation<>));
+        services.TryAddScoped(typeof(IValidationAsyncAdvice<>), typeof(AdviceValidation<>));
 
         return services;
     }
