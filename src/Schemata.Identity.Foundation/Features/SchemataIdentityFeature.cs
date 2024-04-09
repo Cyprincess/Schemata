@@ -14,9 +14,6 @@ using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
-#if NET6_0
-using Microsoft.AspNetCore.Authentication.BearerToken;
-#endif
 
 namespace Schemata.Identity.Foundation.Features;
 
@@ -42,16 +39,18 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
         var identify = configurators.Pop<SchemataIdentityOptions>();
         services.Configure(identify);
 
+        var converter = new ClaimStoreJsonConverter();
+
         services.Configure<JsonSerializerOptions>(options => {
-            options.Converters.Add(new ClaimStoreJsonConverter());
+            options.Converters.Add(converter);
         });
 
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
-            options.SerializerOptions.Converters.Add(new ClaimStoreJsonConverter());
+            options.SerializerOptions.Converters.Add(converter);
         });
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
-            options.JsonSerializerOptions.Converters.Add(new ClaimStoreJsonConverter());
+            options.JsonSerializerOptions.Converters.Add(converter);
         });
 
         var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
