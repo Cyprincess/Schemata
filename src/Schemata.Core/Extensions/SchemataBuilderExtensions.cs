@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -245,7 +246,12 @@ public static class SchemataBuilderExtensions
 
     #region Json Serializer Feature
 
-    public static SchemataBuilder UseJsonSerializer(this SchemataBuilder builder) {
+    public static SchemataBuilder UseJsonSerializer(
+        this SchemataBuilder           builder,
+        Action<JsonSerializerOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configure(configure);
+
         builder.AddFeature<SchemataJsonSerializerFeature>();
 
         return builder;

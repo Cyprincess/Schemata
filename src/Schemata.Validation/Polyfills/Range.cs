@@ -168,7 +168,7 @@ namespace System
         /// <param name="end">Represent the exclusive end index of the range.</param>
         public Range(Index start, Index end) {
             Start = start;
-            End = end;
+            End   = end;
         }
 
         /// <summary>Indicates whether the current Range object is equal to another object of the same type.</summary>

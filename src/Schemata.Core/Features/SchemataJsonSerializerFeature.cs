@@ -18,25 +18,22 @@ public class SchemataJsonSerializerFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
+        var configure = configurators.Pop<JsonSerializerOptions>();
+
         var @enum = new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
 
         services.Configure<JsonSerializerOptions>(options => {
-            options.MaxDepth             = 32;
-            options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
-
-            options.Converters.Add(@enum);
+            options.MaxDepth = 32;
 
             options.TypeInfoResolver = JsonSerializer.IsReflectionEnabledByDefault
                 ? new DefaultJsonTypeInfoResolver()
                 : JsonTypeInfoResolver.Combine();
+
+            Configure(options);
         });
 
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
-            options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            options.SerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
-
-            options.SerializerOptions.Converters.Add(@enum);
+            Configure(options.SerializerOptions);
         });
 
         if (services.All(s => s.ServiceType != typeof(IActionDescriptorChangeProvider))) {
@@ -44,10 +41,18 @@ public class SchemataJsonSerializerFeature : FeatureBase
         }
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
-            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
-
-            options.JsonSerializerOptions.Converters.Add(@enum);
+            Configure(options.JsonSerializerOptions);
         });
+
+        return;
+
+        void Configure(JsonSerializerOptions options) {
+            options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+
+            options.Converters.Add(@enum);
+
+            configure(options);
+        }
     }
 }
