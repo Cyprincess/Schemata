@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,16 +10,13 @@ using Schemata.Core.Features;
 namespace Schemata.Core;
 
 public class SchemataBuilder(
-    IServiceCollection  services,
     IConfiguration      configuration,
-    IWebHostEnvironment environment,
-    Configurators       configurators,
-    SchemataOptions     options)
+    IWebHostEnvironment environment)
 {
-    private readonly List<Action<IServiceCollection>> _actions = [];
+    internal readonly List<Action<IServiceCollection>> Actions = [];
 
-    private Configurators   Configurators => configurators;
-    private SchemataOptions Options       => options;
+    internal readonly Configurators   Configurators = new();
+    internal readonly SchemataOptions Options = new();
 
     public IConfiguration      Configuration => configuration;
     public IWebHostEnvironment Environment   => environment;
@@ -49,10 +47,6 @@ public class SchemataBuilder(
         return Options.CreateLogger(type);
     }
 
-    public Configurators GetConfigurators() {
-        return Configurators;
-    }
-
     public SchemataOptions GetOptions() {
         return Options;
     }
@@ -65,20 +59,31 @@ public class SchemataBuilder(
     }
 
     public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
-        _actions.Add(action);
+        Actions.Add(action);
 
         return this;
     }
 
-    public IServiceCollection Build() {
-        foreach (var action in _actions) {
+    public SchemataBuilder Invoke(IServiceCollection services) {
+        foreach (var action in Actions) {
             action.Invoke(services);
         }
 
-        Configurators.Configure(services);
+        var modules = GetOptions().GetFeatures();
+        if (modules is null) {
+            return this;
+        }
 
-        services.AddSingleton(Options);
+        var features = modules.Values.ToList();
 
-        return services;
+        features.Sort((a, b) => a.Order.CompareTo(b.Order));
+
+        foreach (var feature in features) {
+            feature.ConfigureServices(services, Configurators, Configuration, Environment);
+        }
+
+        Configurators.Invoke(services);
+
+        return this;
     }
 }

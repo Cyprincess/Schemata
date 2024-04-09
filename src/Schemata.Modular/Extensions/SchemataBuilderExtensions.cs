@@ -46,11 +46,11 @@ public static class SchemataBuilderExtensions
                 services.TryAddSingleton<IModulesRunner>(_ => run);
             }
 
-            services.AddTransient<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
-                builder.Configuration, // and builder.ConfigureServices() method
-                builder.Environment,   // after building the service provider.
-                sp                     //
-            ));
+            services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, ModularStartup>(sp => ModularStartup.Create(
+                builder.Configuration,
+                builder.Environment,
+                sp
+            )));
         });
 
         return builder;

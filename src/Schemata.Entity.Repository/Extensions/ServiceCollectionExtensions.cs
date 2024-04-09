@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advices;
 
@@ -16,18 +17,18 @@ public static class ServiceCollectionExtensions
                 nameof(implementationType));
         }
 
-        services.AddScoped(serviceType, implementationType);
+        services.TryAddScoped(serviceType, implementationType);
 
-        services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTimestamp<>));
-        services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddConcurrency<>));
-        services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddCanonicalName<>));
-        services.AddTransient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTrash<>));
-        services.AddTransient(typeof(IRepositoryQueryAsyncAdvice<>), typeof(AdviceQueryTrash<>));
-        services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTimestamp<>));
-        services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveConcurrency<>));
-        services.AddTransient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTrash<>));
-        services.AddTransient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateTimestamp<>));
-        services.AddTransient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateConcurrency<>));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTimestamp<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddConcurrency<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddCanonicalName<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTrash<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryQueryAsyncAdvice<>), typeof(AdviceQueryTrash<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTimestamp<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveConcurrency<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTrash<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateTimestamp<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateConcurrency<>)));
 
         return new(services);
     }

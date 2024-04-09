@@ -114,8 +114,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return;
         }
 
-        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.RaiseEventAsync),
-            BindingFlags.Static);
+        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.RaiseEventAsync), BindingFlags.Static);
         var invoke = method!.MakeGenericMethod(type, typeof(TEvent));
 
         await (Task)invoke.Invoke(null, [machine, instance, @event, ct])!;
@@ -138,8 +137,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return null;
         }
 
-        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync),
-            BindingFlags.Static);
+        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync), BindingFlags.Static);
         var invoke = method!.MakeGenericMethod(type);
 
         var events = await (Task<IEnumerable<string>>)invoke.Invoke(null, [machine, instance, ct])!;
