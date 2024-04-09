@@ -28,6 +28,8 @@ public class SchemataStartup : IStartupFilter
                 });
             }
 
+            app.CleanSchemata();
+
             next(app);
         };
     }

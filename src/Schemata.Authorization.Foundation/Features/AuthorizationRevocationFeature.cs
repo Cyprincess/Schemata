@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-public class AuthorizationRevocationFeature : IAuthorizationFeature
+public sealed class AuthorizationRevocationFeature : IAuthorizationFeature
 {
     #region IAuthorizationFeature Members
 

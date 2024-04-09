@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Core;
+using Schemata.Core.Features;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -15,21 +19,11 @@ public static class ApplicationBuilderExtensions
         IWebHostEnvironment      environment) {
         var sp = app.ApplicationServices;
 
-        var options = sp.GetRequiredService<SchemataOptions>();
+        var schemata = sp.GetRequiredService<SchemataOptions>();
 
-        UseFeatures(app, configuration, environment, options);
-
-        return app;
-    }
-
-    private static void UseFeatures(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment,
-        SchemataOptions     options) {
-        var modules = options.GetFeatures();
+        var modules = schemata.GetFeatures();
         if (modules is null) {
-            return;
+            return app;
         }
 
         var features = modules.Values.ToList();
@@ -39,5 +33,17 @@ public static class ApplicationBuilderExtensions
         foreach (var feature in features) {
             feature.ConfigureApplication(app, configuration, environment);
         }
+
+        return app;
+    }
+
+    public static IApplicationBuilder CleanSchemata(this IApplicationBuilder app) {
+        var sp = app.ApplicationServices;
+
+        var schemata = sp.GetRequiredService<SchemataOptions>();
+
+        schemata.Pop<Dictionary<Type, ISimpleFeature>>(Constants.Options.Features);
+
+        return app;
     }
 }

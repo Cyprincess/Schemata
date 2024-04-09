@@ -12,7 +12,7 @@ using Schemata.Core;
 
 namespace Schemata.Modular;
 
-public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModulesRunner> logger) : IModulesRunner
+public class DefaultModulesRunner(SchemataOptions schemata, ILogger<DefaultModulesRunner> logger) : IModulesRunner
 {
     private readonly ILogger<DefaultModulesRunner> _logger = logger;
 
@@ -22,13 +22,13 @@ public class DefaultModulesRunner(SchemataOptions options, ILogger<DefaultModule
         IServiceCollection  services,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var modules = options.GetModules();
+        var modules = schemata.GetModules();
         if (modules is not { Count: > 0 }) {
             return;
         }
 
         var startups = modules
-                      .Select(m => Utilities.CreateInstance<IModule>(m.EntryType, options.CreateLogger(m.EntryType))!)
+                      .Select(m => Utilities.CreateInstance<IModule>(m.EntryType, schemata.CreateLogger(m.EntryType))!)
                       .ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));

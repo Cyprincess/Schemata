@@ -6,17 +6,19 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Mapping.Skeleton;
 
-namespace Schemata.Mapping.AutoMapper;
+namespace Schemata.Mapping.Foundation.Features;
 
-public class SchemataMappingFeature : FeatureBase
+public sealed class SchemataMappingFeature<T> : FeatureBase
+    where T : class, ISimpleMapper
 {
     public override int Priority => 330_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        services.TryAddSingleton<ISimpleMapper, SimpleMapper>();
+        services.TryAddSingleton<ISimpleMapper, T>();
     }
 }

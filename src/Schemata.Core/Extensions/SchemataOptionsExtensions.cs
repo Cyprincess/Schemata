@@ -9,25 +9,25 @@ namespace Schemata.Core;
 
 public static class SchemataOptionsExtensions
 {
-    public static Dictionary<Type, ISimpleFeature>? GetFeatures(this SchemataOptions options) {
-        return options.Get<Dictionary<Type, ISimpleFeature>>(Constants.Options.Features);
+    public static Dictionary<Type, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
+        return schemata.Get<Dictionary<Type, ISimpleFeature>>(Constants.Options.Features);
     }
 
-    public static void SetFeatures(this SchemataOptions options, Dictionary<Type, ISimpleFeature>? value) {
-        options.Set(Constants.Options.Features, value);
+    public static void SetFeatures(this SchemataOptions schemata, Dictionary<Type, ISimpleFeature>? value) {
+        schemata.Set(Constants.Options.Features, value);
     }
 
-    public static void AddFeature<T>(this SchemataOptions options)
+    public static void AddFeature<T>(this SchemataOptions schemata)
         where T : ISimpleFeature {
-        AddFeature(options, typeof(T));
+        AddFeature(schemata, typeof(T));
     }
 
-    public static void AddFeature(this SchemataOptions options, Type type) {
-        var feature = Utilities.CreateInstance<ISimpleFeature>(type, options.CreateLogger(type))!;
-        AddFeature(options, type, feature);
+    public static void AddFeature(this SchemataOptions schemata, Type type) {
+        var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))!;
+        AddFeature(schemata, type, feature);
     }
 
-    public static void AddFeature(this SchemataOptions options, Type type, ISimpleFeature feature) {
+    public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
         var attributes = type.GetCustomAttributes(true);
         foreach (var attribute in attributes) {
             var at = attribute.GetType();
@@ -37,27 +37,27 @@ public static class SchemataOptionsExtensions
             }
 
             if (at.Name == typeof(DependsOnAttribute<>).Name) {
-                AddFeature(options, at.GenericTypeArguments[0]);
+                AddFeature(schemata, at.GenericTypeArguments[0]);
                 continue;
             }
 
-            if (attribute is InformationAttribute info && options.HasFeature<SchemataLoggingFeature>()) {
-                options.Logger.Log(info.Level, "{Message}", info.Message);
+            if (attribute is InformationAttribute info && schemata.HasFeature<SchemataLoggingFeature>()) {
+                schemata.Logger.Log(info.Level, "{Message}", info.Message);
             }
         }
 
-        var features = GetFeatures(options) ?? [];
+        var features = GetFeatures(schemata) ?? [];
         features[type] = feature;
-        options.SetFeatures(features);
+        schemata.SetFeatures(features);
     }
 
-    public static bool HasFeature<T>(this SchemataOptions options)
+    public static bool HasFeature<T>(this SchemataOptions schemata)
         where T : ISimpleFeature {
-        return HasFeature(options, typeof(T));
+        return HasFeature(schemata, typeof(T));
     }
 
-    public static bool HasFeature(this SchemataOptions options, Type type) {
-        var features = GetFeatures(options);
+    public static bool HasFeature(this SchemataOptions schemata, Type type) {
+        var features = GetFeatures(schemata);
         return features?.ContainsKey(type) ?? false;
     }
 }

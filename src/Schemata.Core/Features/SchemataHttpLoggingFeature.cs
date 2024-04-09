@@ -9,12 +9,13 @@ namespace Schemata.Core.Features;
 
 [Information("HTTP Logging can reduce the performance of an app", Level = LogLevel.Warning)]
 [Information("HTTP Logging can potentially log personally identifiable information (PII).", Level = LogLevel.Warning)]
-public class SchemataHttpLoggingFeature : FeatureBase
+public sealed class SchemataHttpLoggingFeature : FeatureBase
 {
     public override int Priority => 100_120_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

@@ -28,6 +28,15 @@ public class SchemataOptions
         Logging = factory;
     }
 
+    public TOptions? Pop<TOptions>(string name)
+        where TOptions : class {
+        if (!_options.Remove(name, out var value)) {
+            return null;
+        }
+
+        return value as TOptions;
+    }
+
     public TOptions? Get<TOptions>(string name)
         where TOptions : class {
         if (!_options.TryGetValue(name, out var value)) {

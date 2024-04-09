@@ -6,12 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
-public class SchemataCorsFeature : FeatureBase
+public sealed class SchemataCorsFeature : FeatureBase
 {
     public override int Priority => 150_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

@@ -20,7 +20,7 @@ namespace Schemata.Identity.Foundation.Features;
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
 [Information("Identity depends on Authentication and Controllers features, these features will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
+public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserStore : class, IUserStore<TUser>
@@ -30,6 +30,7 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
@@ -76,6 +77,7 @@ public class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : Fea
     }
 
     public override void ConfigureEndpoints(
+        IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {

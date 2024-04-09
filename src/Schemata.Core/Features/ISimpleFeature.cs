@@ -11,6 +11,7 @@ public interface ISimpleFeature : IFeature
 {
     void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment);
@@ -18,6 +19,7 @@ public interface ISimpleFeature : IFeature
     void ConfigureApplication(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 
     void ConfigureEndpoints(
+        IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment);

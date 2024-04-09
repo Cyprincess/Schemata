@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Schemata.Core.Features;
 
-public class SchemataForwardedHeadersFeature : FeatureBase
+public sealed class SchemataForwardedHeadersFeature : FeatureBase
 {
     public override int Priority => 110_100_000;
 
