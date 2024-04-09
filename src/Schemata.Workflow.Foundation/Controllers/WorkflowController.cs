@@ -42,6 +42,9 @@ public class WorkflowController : ControllerBase
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        if (response == null) {
+            return NotFound();
+        }
 
         return Ok(response);
     }
@@ -69,6 +72,9 @@ public class WorkflowController : ControllerBase
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        if (response == null) {
+            return NotFound();
+        }
 
         return Ok(response);
     }

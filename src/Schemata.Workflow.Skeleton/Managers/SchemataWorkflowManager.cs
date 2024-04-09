@@ -89,6 +89,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return null;
         }
 
+        if (!typeof(IStatefulEntity).IsAssignableFrom(type)) {
+            return null;
+        }
+
         var instance = await repository.SingleOrDefaultAsync<IStatefulEntity>(e => e.Id == workflow.InstanceId, ct);
 
         return (IStatefulEntity?)instance;
