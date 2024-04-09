@@ -7,12 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
-public class SchemataQuotaFeature : FeatureBase
+public sealed class SchemataQuotaFeature : FeatureBase
 {
     public override int Priority => 141_100_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

@@ -98,7 +98,8 @@ Features are characterized by `Order` and `Priority`, both of which are `Int32` 
 sequence in which the `ConfigureServices` methods are invoked. The `Priority` establishes the sequence for invoking
 the `Configure<Application|Endpoints>` methods.
 
-The range `[0, 1_000_000_000)` for `Order` and `Priority` is reserved for built-in features and Schemata extensions.
+The range `[0, 1_000_000_000)` and `[2_147_000_000, Int32.MaxValue]` for `Order` and `Priority` is reserved for built-in
+features and Schemata extensions.
 
 ### Built-in Features
 
@@ -126,12 +127,13 @@ also have additional configuration methods.
 
 An extension feature can be activated in the same way as a built-in feature.
 
-| Priority    | Package                           | Feature       | Description                       |
-|-------------|-----------------------------------|---------------|-----------------------------------|
-| 310_000_000 | Schemata.Identity.Foundation      | Identity      | Schemata Identity Foundation      |
-| 320_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
-| 330_000_000 | Schemata.Mapping.Foundation       | Mapping       | Schemata Mapper Foundation        |
-| 340_000_000 | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |
+| Priority      | Package                           | Feature       | Description                       |
+|---------------|-----------------------------------|---------------|-----------------------------------|
+| 310_000_000   | Schemata.Identity.Foundation      | Identity      | Schemata Identity Foundation      |
+| 320_000_000   | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
+| 330_000_000   | Schemata.Mapping.Foundation       | Mapping       | Schemata Mapper Foundation        |
+| 340_000_000   | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |
+| 2_147_400_000 | Schemata.Modular                  | Modular       | Modularization                    |
 
 ## Compliance
 

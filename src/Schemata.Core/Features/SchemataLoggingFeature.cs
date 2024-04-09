@@ -5,12 +5,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
-public class SchemataLoggingFeature : FeatureBase
+public sealed class SchemataLoggingFeature : FeatureBase
 {
     public override int Priority => 100_110_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

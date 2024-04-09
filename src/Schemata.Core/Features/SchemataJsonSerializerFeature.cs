@@ -1,20 +1,19 @@
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
-public class SchemataJsonSerializerFeature : FeatureBase
+public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
     public override int Priority => 210_100_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
@@ -36,7 +35,7 @@ public class SchemataJsonSerializerFeature : FeatureBase
             Configure(options.SerializerOptions);
         });
 
-        if (services.All(s => s.ServiceType != typeof(IActionDescriptorChangeProvider))) {
+        if (!schemata.HasFeature<SchemataControllersFeature>()) {
             return;
         }
 

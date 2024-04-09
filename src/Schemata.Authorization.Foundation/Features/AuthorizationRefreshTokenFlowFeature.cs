@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-public class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
+public sealed class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
 {
     #region IAuthorizationFeature Members
 

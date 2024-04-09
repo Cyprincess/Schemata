@@ -17,21 +17,11 @@ public static class EndpointBuilderExtensions
         IWebHostEnvironment        environment) {
         var sp = app.ApplicationServices;
 
-        var options = sp.GetRequiredService<SchemataOptions>();
+        var schemata = sp.GetRequiredService<SchemataOptions>();
 
-        UseFeatures(endpoints, configuration, environment, options);
-
-        return endpoints;
-    }
-
-    private static void UseFeatures(
-        IEndpointRouteBuilder endpoints,
-        IConfiguration        configuration,
-        IWebHostEnvironment   environment,
-        SchemataOptions       options) {
-        var modules = options.GetFeatures();
+        var modules = schemata.GetFeatures();
         if (modules is null) {
-            return;
+            return endpoints;
         }
 
         var features = modules.Values.ToList();
@@ -39,7 +29,9 @@ public static class EndpointBuilderExtensions
         features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
         foreach (var feature in features) {
-            feature.ConfigureEndpoints(endpoints, configuration, environment);
+            feature.ConfigureEndpoints(app, endpoints, configuration, environment);
         }
+
+        return endpoints;
     }
 }

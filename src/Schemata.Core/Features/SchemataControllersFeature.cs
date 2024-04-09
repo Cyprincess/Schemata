@@ -12,12 +12,13 @@ namespace Schemata.Core.Features;
 
 [DependsOn<SchemataRoutingFeature>]
 [Information("Controllers depends on Routing feature, it will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataControllersFeature : FeatureBase
+public sealed class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
@@ -40,6 +41,7 @@ public class SchemataControllersFeature : FeatureBase
     }
 
     public override void ConfigureEndpoints(
+        IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {

@@ -15,7 +15,7 @@ namespace Schemata.Workflow.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
 [Information("Workflow depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : FeatureBase
+public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : FeatureBase
     where TTransition : SchemataTransition
     where TWorkflow : SchemataWorkflow
     where TResponse : WorkflowResponse
@@ -24,6 +24,7 @@ public class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : Featur
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {

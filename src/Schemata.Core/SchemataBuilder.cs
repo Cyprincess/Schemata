@@ -9,14 +9,12 @@ using Schemata.Core.Features;
 
 namespace Schemata.Core;
 
-public class SchemataBuilder(
-    IConfiguration      configuration,
-    IWebHostEnvironment environment)
+public class SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment)
 {
     internal readonly List<Action<IServiceCollection>> Actions = [];
 
     internal readonly Configurators   Configurators = new();
-    internal readonly SchemataOptions Options = new();
+    internal readonly SchemataOptions Options       = new();
 
     public IConfiguration      Configuration => configuration;
     public IWebHostEnvironment Environment   => environment;
@@ -79,7 +77,7 @@ public class SchemataBuilder(
         features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
         foreach (var feature in features) {
-            feature.ConfigureServices(services, Configurators, Configuration, Environment);
+            feature.ConfigureServices(services, Options, Configurators, Configuration, Environment);
         }
 
         Configurators.Invoke(services);

@@ -16,6 +16,7 @@ public abstract class FeatureBase : ISimpleFeature
 
     public virtual void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) { }
@@ -26,6 +27,7 @@ public abstract class FeatureBase : ISimpleFeature
         IWebHostEnvironment environment) { }
 
     public virtual void ConfigureEndpoints(
+        IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment) { }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-public class AuthorizationCachingFeature : IAuthorizationFeature
+public sealed class AuthorizationCachingFeature : IAuthorizationFeature
 {
     #region IAuthorizationFeature Members
 

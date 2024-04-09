@@ -15,7 +15,7 @@ namespace Schemata.Authorization.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
 [Information("Authorization depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
+public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization
     where TScope : SchemataScope
@@ -25,6 +25,7 @@ public class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, 
 
     public override void ConfigureServices(
         IServiceCollection  services,
+        SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
