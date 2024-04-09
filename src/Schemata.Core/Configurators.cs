@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Schemata.Core;
@@ -10,16 +12,35 @@ public class Configurators
     private readonly Dictionary<Type, object> _configurators = new();
 
     public void Set<T>(Action<T> action) {
-        _configurators[typeof(T)] = action;
+        var key = typeof(T);
+
+        if (!TryGet<T>(out var configure)) {
+            _configurators[typeof(T)] = action;
+            return;
+        }
+
+        _configurators[key] = (T options) => {
+            configure(options);
+            action(options);
+        };
     }
 
-    public Action<T>? TryGet<T>() {
-        return _configurators.TryGetValue(typeof(T), out var action) ? (Action<T>)action : null;
+    public bool TryGet<T>([MaybeNullWhen(false)] out Action<T> action) {
+        action = null;
+        if (!_configurators.TryGetValue(typeof(T), out var @object)) {
+            return false;
+        }
+
+        if (@object is not Action<T> configure) {
+            return false;
+        }
+
+        action = configure;
+        return true;
     }
 
     public Action<T> Get<T>() {
-        var action = TryGet<T>();
-        if (action is not null) {
+        if (TryGet<T>(out var action)) {
             return action;
         }
 
@@ -40,7 +61,7 @@ public class Configurators
         }
     }
 
-    public IServiceCollection Configure(IServiceCollection services) {
+    public IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);
@@ -50,8 +71,10 @@ public class Configurators
             var tcg = tc.MakeGenericType(type);
 
             var instance = Activator.CreateInstance(tcg, Options.DefaultName, configure)!;
-            services.AddSingleton(icg, _ => instance);
+            services.TryAddSingleton(icg, _ => instance);
         }
+
+        _configurators.Clear();
 
         return services;
     }

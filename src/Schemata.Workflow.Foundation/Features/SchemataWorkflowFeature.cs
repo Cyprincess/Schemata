@@ -35,7 +35,7 @@ public class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : Featur
 
         services.TryAddSingleton<ITypeResolver, TypeResolver>();
 
-        services.AddTransient<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>();
+        services.TryAddTransient<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>();
         services.TryAddTransient<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
         services.TryAddTransient<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
 

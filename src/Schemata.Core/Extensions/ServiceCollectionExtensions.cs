@@ -1,7 +1,7 @@
 using System;
-using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 
 // ReSharper disable once CheckNamespace
@@ -38,39 +38,20 @@ public static class ServiceCollectionExtensions
         IWebHostEnvironment      environment,
         Action<SchemataBuilder>? schema,
         Action<SchemataOptions>? configure) {
-        services.AddTransient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create( //
-            configuration,                                                                  //
-            environment                                                                     //
-        ));
+        var builder = new SchemataBuilder(configuration, environment);
 
-        var configurators = new Configurators();
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(
+            configuration,
+            environment
+        )));
 
-        var options = new SchemataOptions();
-        configure?.Invoke(options);
-
-        var builder = new SchemataBuilder(services, configuration, environment, configurators, options);
+        services.TryAddSingleton(builder.Options);
 
         schema?.Invoke(builder);
+        configure?.Invoke(builder.Options);
 
-        AddFeatures(builder);
+        builder.Invoke(services);
 
-        return builder.Build();
-    }
-
-    private static void AddFeatures(SchemataBuilder builder) {
-        builder.ConfigureServices(services => {
-            var modules = builder.GetOptions().GetFeatures();
-            if (modules is null) {
-                return;
-            }
-
-            var features = modules.Values.ToList();
-
-            features.Sort((a, b) => a.Order.CompareTo(b.Order));
-
-            foreach (var feature in features) {
-                feature.ConfigureServices(services, builder.GetConfigurators(), builder.Configuration, builder.Environment);
-            }
-        });
+        return services;
     }
 }
