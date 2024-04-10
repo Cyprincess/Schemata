@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
@@ -40,8 +41,26 @@ public static class SchemataResourceBuilderExtensions
             resource.Endpoints.AddRange(endpoints);
         }
 
+        var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
+        if (authorize is not null) {
+            var policy = new ResourcePolicyAttribute {
+                Methods = string.Join(',', [
+                    nameof(resource.Browse), nameof(resource.Read), nameof(resource.Edit),
+                    nameof(resource.Add), nameof(resource.Delete),
+                ]),
+                Policy                = authorize.Policy,
+                Roles                 = authorize.Roles,
+                AuthenticationSchemes = authorize.AuthenticationSchemes,
+            };
+            resource.Browse = policy;
+            resource.Read   = policy;
+            resource.Edit   = policy;
+            resource.Add    = policy;
+            resource.Delete = policy;
+        }
+
         builder.Builder.Configure<SchemataResourceOptions>(options => {
-            options.Resources[resource.EntityType] = resource;
+            options.Resources[resource.Entity] = resource;
         });
 
         return builder;

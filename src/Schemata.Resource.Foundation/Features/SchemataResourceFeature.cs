@@ -22,7 +22,12 @@ public class SchemataResourceFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceAddAdvice<,>), typeof(AdviceAddValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceBrowseAdvice<>), typeof(AdviceBrowseAuthorize<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceReadAdvice<>), typeof(AdviceReadAuthorize<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditAdvice<,>), typeof(AdviceEditAuthorize<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditAdvice<,>), typeof(AdviceEditValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceAddAdvice<,>), typeof(AdviceAddAuthorize<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceAddAdvice<,>), typeof(AdviceAddValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvice<>), typeof(AdviceDeleteAuthorize<>)));
     }
 }

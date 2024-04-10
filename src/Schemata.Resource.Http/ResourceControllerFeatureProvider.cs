@@ -40,7 +40,7 @@ public class ResourceControllerFeatureProvider : IApplicationFeatureProvider<Con
             }
 
             var controller = typeof(ResourceController<,,,>)
-                            .MakeGenericType(entity, resource.RequestType!, resource.DetailType!, resource.SummaryType!)
+                            .MakeGenericType(entity, resource.Request!, resource.Detail!, resource.Summary!)
                             .GetTypeInfo();
 
             feature.Controllers.Add(controller);

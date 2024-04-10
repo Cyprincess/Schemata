@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
@@ -43,7 +44,25 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
 
                 services.Configure<SchemataResourceOptions>(options => {
                     foreach (var resource in resources) {
-                        options.Resources[resource.EntityType] = resource;
+                        var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
+                        if (authorize is not null) {
+                            var policy = new ResourcePolicyAttribute {
+                                Methods = string.Join(',', [
+                                    nameof(resource.Browse), nameof(resource.Read), nameof(resource.Edit),
+                                    nameof(resource.Add), nameof(resource.Delete),
+                                ]),
+                                Policy                = authorize.Policy,
+                                Roles                 = authorize.Roles,
+                                AuthenticationSchemes = authorize.AuthenticationSchemes,
+                            };
+                            resource.Browse = policy;
+                            resource.Read   = policy;
+                            resource.Edit   = policy;
+                            resource.Add    = policy;
+                            resource.Delete = policy;
+                        }
+
+                        options.Resources[resource.Entity] = resource;
                     }
                 });
             }

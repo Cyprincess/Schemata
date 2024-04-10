@@ -11,10 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Humanizer.Core" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
   </ItemGroup>
 
