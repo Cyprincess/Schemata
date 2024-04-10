@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace Schemata.Workflow.Skeleton;
 
-public class TypeResolver : ITypeResolver
+public sealed class TypeResolver : ITypeResolver
 {
     private readonly ConcurrentDictionary<string, Type> _types = [];
 

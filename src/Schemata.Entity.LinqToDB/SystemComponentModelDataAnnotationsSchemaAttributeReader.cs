@@ -30,7 +30,7 @@ using LinqToDB.Metadata;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
+public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
     #region IMetadataReader Members
 

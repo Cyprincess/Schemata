@@ -12,7 +12,7 @@ using Schemata.Core;
 
 namespace Schemata.Modular;
 
-public class DefaultModulesRunner(SchemataOptions schemata, ILogger<DefaultModulesRunner> logger) : IModulesRunner
+public sealed class DefaultModulesRunner(SchemataOptions schemata, ILogger<DefaultModulesRunner> logger) : IModulesRunner
 {
     private readonly ILogger<DefaultModulesRunner> _logger = logger;
 

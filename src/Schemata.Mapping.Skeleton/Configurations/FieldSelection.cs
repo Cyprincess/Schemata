@@ -4,7 +4,7 @@ using System.Linq.Expressions;
 
 namespace Schemata.Mapping.Skeleton.Configurations;
 
-public class FieldSelection<TSource, TDestination>
+public sealed class FieldSelection<TSource, TDestination>
 {
     private readonly Mapping<TSource, TDestination> _mapping;
 

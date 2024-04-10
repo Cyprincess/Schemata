@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Schemata.Identity.Skeleton.Claims;
 
-public class ClaimsStore : Dictionary<string, ClaimStore>
+public sealed class ClaimsStore : Dictionary<string, ClaimStore>
 {
     public void AddClaim(string? type, string? value) {
         if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(value)) {

@@ -7,7 +7,7 @@ using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
 
-public class DefaultModulesProvider : IModulesProvider
+public sealed class DefaultModulesProvider : IModulesProvider
 {
     private static readonly List<ModuleDescriptor> Modules = [];
 

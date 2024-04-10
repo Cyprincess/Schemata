@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Schemata.Core;
 
-public class Configurators
+public sealed class Configurators
 {
     private readonly Dictionary<Type, object> _configurators = new();
 

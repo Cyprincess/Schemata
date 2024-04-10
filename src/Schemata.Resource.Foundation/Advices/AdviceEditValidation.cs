@@ -9,7 +9,7 @@ using Schemata.Validation.FluentValidation.Advices;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
+public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {

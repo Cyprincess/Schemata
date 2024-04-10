@@ -6,12 +6,8 @@ namespace Schemata.Authorization.Skeleton.Entities;
 
 [Table("Scopes")]
 [CanonicalName("scopes/{scope}")]
-public class SchemataScope : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {
-    public virtual string? DisplayName { get; set; }
-
-    public virtual string? DisplayNames { get; set; }
-
     public virtual string? Description { get; set; }
 
     public virtual string? Descriptions { get; set; }
@@ -30,20 +26,28 @@ public class SchemataScope : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region IConcurrency Members
 
-    public Guid? Timestamp { get; set; }
+    public virtual Guid? Timestamp { get; set; }
+
+    #endregion
+
+    #region IDisplayName Members
+
+    public virtual string? DisplayName { get; set; }
+
+    public virtual string? DisplayNames { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    public virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    public DateTime? CreationDate     { get; set; }
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? CreationDate     { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

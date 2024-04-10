@@ -15,7 +15,7 @@ namespace Schemata.Resource.Http.Features;
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataResourceFeature>]
 [Information("Resource Service depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-public class SchemataHttpResourceFeature : FeatureBase
+public sealed class SchemataHttpResourceFeature : FeatureBase
 {
     public override int Priority => 360_100_000;
 

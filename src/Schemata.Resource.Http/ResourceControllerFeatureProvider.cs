@@ -12,8 +12,8 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Http;
 
-public class ResourceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>,
-                                                 IActionDescriptorChangeProvider
+public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>,
+                                                        IActionDescriptorChangeProvider
 {
     private CancellationTokenSource             _cts = new();
     public  Dictionary<Type, ResourceAttribute> Resources { get; set; } = [];

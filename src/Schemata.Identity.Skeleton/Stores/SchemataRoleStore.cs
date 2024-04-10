@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
+using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
 
@@ -14,28 +19,33 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataUserRol
     where TRole : SchemataRole
 {
     public SchemataRoleStore(
-        IRepository<TRole> rolesRepository,
-        IRepository<SchemataUserRole> userRolesRepository,
+        IMemoryCache                   cache,
+        IRepository<TRole>             rolesRepository,
+        IRepository<SchemataUserRole>  userRolesRepository,
         IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IdentityErrorDescriber? describer = null) : base(rolesRepository, userRolesRepository, roleClaimsRepository,
-        describer) { }
+        IdentityErrorDescriber?        describer = null) : base(cache, rolesRepository, userRolesRepository,
+        roleClaimsRepository, describer) { }
 }
 
-public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
+public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>,
+                                                               IRoleDisplayNameStore<TRole>
     where TRole : SchemataRole
     where TUserRole : SchemataUserRole, new()
     where TRoleClaim : SchemataRoleClaim, new()
 {
+    protected readonly IMemoryCache            Cache;
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
     protected readonly IRepository<TRole>      RolesRepository;
 
     private bool _disposed;
 
     public SchemataRoleStore(
+        IMemoryCache            cache,
         IRepository<TRole>      rolesRepository,
         IRepository<TUserRole>  userRolesRepository,
         IRepository<TRoleClaim> roleClaimsRepository,
         IdentityErrorDescriber? describer = null) {
+        Cache                = cache;
         RolesRepository      = rolesRepository;
         RoleClaimsRepository = roleClaimsRepository;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
@@ -171,7 +181,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
     }
 
     /// <inheritdoc />
-    public void Dispose() {
+    public virtual void Dispose() {
         _disposed = true;
     }
 
@@ -234,9 +244,43 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
 
     #endregion
 
-    protected void ThrowIfDisposed() {
-        if (_disposed) {
-            throw new ObjectDisposedException(GetType().Name);
+    #region IRoleDisplayNameStore<TRole> Members
+
+    public virtual Task<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
+        TRole             role,
+        CancellationToken ct = default) {
+        if (string.IsNullOrWhiteSpace(role.DisplayNames)) {
+            return Task.FromResult(ImmutableDictionary<CultureInfo, string>.Empty);
         }
+
+        var key = string.Concat(Constants.Schemata, "\x1e", role.DisplayNames);
+        var names = Cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(role.DisplayNames!);
+            if (names is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
+
+            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+
+            foreach (var kv in names) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+            }
+
+            return builder.ToImmutable();
+        })!;
+
+        return Task.FromResult(names);
+    }
+
+    #endregion
+
+    protected virtual void ThrowIfDisposed() {
+        if (!_disposed) {
+            return;
+        }
+
+        throw new ObjectDisposedException(GetType().Name);
     }
 }

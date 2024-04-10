@@ -58,6 +58,8 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
 
+        services.AddMemoryCache();
+
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
                 .AddBearerToken(IdentityConstants.ApplicationScheme);
 

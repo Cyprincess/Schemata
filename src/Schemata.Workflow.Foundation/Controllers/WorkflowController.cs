@@ -14,7 +14,7 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Authorize]
 [ApiController]
 [Route("~/[controller]")]
-public class WorkflowController : ControllerBase
+public sealed class WorkflowController : ControllerBase
 {
     private readonly ILogger<WorkflowController>              _logger;
     private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;

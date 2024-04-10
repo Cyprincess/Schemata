@@ -223,7 +223,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     #endregion
 
-    protected IQueryable<TResult> BuildQuery<TResult>(
+    protected virtual IQueryable<TResult> BuildQuery<TResult>(
         IQueryable<TEntity>                             table,
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
         if (predicate != null) {

@@ -10,15 +10,15 @@ public class SchemataUserClaim : IdentityUserClaim<long>, IIdentifier, ITimestam
 {
     #region IIdentifier Members
 
-    public new long Id { get; set; }
+    public new virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    public DateTime? CreationDate { get; set; }
+    public virtual DateTime? CreationDate { get; set; }
 
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

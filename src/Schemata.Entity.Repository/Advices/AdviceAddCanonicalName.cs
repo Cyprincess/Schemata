@@ -18,7 +18,7 @@ public class AdviceAddCanonicalName
     protected static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> PropertiesCache = new();
 }
 
-public class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IRepositoryAddAsyncAdvice<TEntity>
+public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IRepositoryAddAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members

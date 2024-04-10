@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Schemata.Entity.Repository;
 
-public class QueryContainer<TEntity>
+public sealed class QueryContainer<TEntity>
 {
     public QueryContainer(IQueryable<TEntity> query) {
         Query = query;

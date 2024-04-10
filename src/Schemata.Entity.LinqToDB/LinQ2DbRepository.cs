@@ -30,17 +30,17 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Table = context.GetTable<TEntity>().TableName(TableName);
     }
 
-    protected TContext Context { get; }
+    protected virtual TContext Context { get; }
 
-    protected ITable<TEntity> Table { get; }
+    protected virtual ITable<TEntity> Table { get; }
 
-    protected IServiceProvider ServiceProvider { get; }
+    protected virtual IServiceProvider ServiceProvider { get; }
 
-    protected DataConnectionTransaction? Transaction { get; set; }
+    protected virtual DataConnectionTransaction? Transaction { get; set; }
 
-    protected int RowsAffected { get; set; }
+    protected virtual int RowsAffected { get; set; }
 
-    public string TableName { get; }
+    public virtual string TableName { get; }
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return Table.AsAsyncEnumerable();

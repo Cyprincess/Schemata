@@ -1,17 +1,17 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Schemata.Identity.Foundation.Models;
+using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
-public partial class AuthenticateController : ControllerBase
+public sealed partial class AuthenticateController : ControllerBase
 {
     [HttpGet(nameof(Confirm))]
     public async Task<IActionResult> Confirm(
         [FromQuery] string? email,
         [FromQuery] string? phone,
         [FromQuery] string? code) {
-        if (!Options.CurrentValue.AllowAccountConfirmation) {
+        if (!_options.CurrentValue.AllowAccountConfirmation) {
             return NotFound();
         }
 
@@ -29,8 +29,8 @@ public partial class AuthenticateController : ControllerBase
         }
 
         var result = code switch {
-            var _ when !string.IsNullOrWhiteSpace(email) => await UserManager.ChangeEmailAsync(user, email, code),
-            var _ when !string.IsNullOrWhiteSpace(phone) => await UserManager.ChangePhoneNumberAsync(user, phone, code),
+            var _ when !string.IsNullOrWhiteSpace(email) => await _userManager.ChangeEmailAsync(user, email, code),
+            var _ when !string.IsNullOrWhiteSpace(phone) => await _userManager.ChangePhoneNumberAsync(user, phone, code),
             var _                                        => null,
         };
 
@@ -43,7 +43,7 @@ public partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request) {
-        if (!Options.CurrentValue.AllowAccountConfirmation) {
+        if (!_options.CurrentValue.AllowAccountConfirmation) {
             return NotFound();
         }
 

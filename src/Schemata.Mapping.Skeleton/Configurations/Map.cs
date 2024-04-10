@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace Schemata.Mapping.Skeleton.Configurations;
 
-public class Map<TSource, TDestination>
+public sealed class Map<TSource, TDestination>
 {
     private readonly List<IMapping> _mappings = [];
 

@@ -3,7 +3,7 @@ using System.Linq.Expressions;
 
 namespace Schemata.Mapping.Skeleton.Configurations;
 
-public class Mapping<TSource, TDestination> : IMapping
+public sealed class Mapping<TSource, TDestination> : IMapping
 {
     internal Mapping(Map<TSource, TDestination> map, Expression<Func<TDestination, object?>> destinationField) {
         Map              = map;

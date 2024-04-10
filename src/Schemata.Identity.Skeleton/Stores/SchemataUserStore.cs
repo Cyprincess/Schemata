@@ -89,7 +89,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         UserTokensRepository = userTokens;
     }
 
-    public bool AutoSaveChanges { get; set; } = true;
+    public virtual bool AutoSaveChanges { get; set; } = true;
 
     /// <inheritdoc />
     public override IQueryable<TUser> Users => UsersRepository.AsQueryable();
@@ -182,10 +182,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #endregion
 
-    protected async Task SaveChanges(CancellationToken ct) {
-        if (AutoSaveChanges) {
-            await UsersRepository.CommitAsync(ct);
+    protected virtual async Task SaveChanges(CancellationToken ct) {
+        if (!AutoSaveChanges) {
+            return;
         }
+
+        await UsersRepository.CommitAsync(ct);
     }
 
 #nullable disable

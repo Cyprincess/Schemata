@@ -6,7 +6,7 @@ using Humanizer;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
-public class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest>
+public sealed class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest>
 {
     #region IValidationAsyncAdvice<TRequest> Members
 

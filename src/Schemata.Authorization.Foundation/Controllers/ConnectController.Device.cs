@@ -13,11 +13,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using Schemata.Authorization.Foundation.Models;
+using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
-public partial class ConnectController : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
     [Authorize]
     [HttpGet(nameof(Verify))]

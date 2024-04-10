@@ -5,7 +5,7 @@ using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.AutoMapper;
 
-public class SimpleMapper : ISimpleMapper
+public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly IMapper _mapper;
 

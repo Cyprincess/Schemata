@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public class AdviceAddConcurrency<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
+public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members

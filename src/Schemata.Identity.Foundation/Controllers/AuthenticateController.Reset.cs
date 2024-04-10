@@ -1,14 +1,14 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Schemata.Identity.Foundation.Models;
+using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
-public partial class AuthenticateController : ControllerBase
+public sealed partial class AuthenticateController : ControllerBase
 {
     [HttpPost(nameof(Forgot))]
     public async Task<IActionResult> Forgot([FromBody] ForgetRequest request) {
-        if (!Options.CurrentValue.AllowPasswordReset) {
+        if (!_options.CurrentValue.AllowPasswordReset) {
             return NotFound();
         }
 
@@ -19,17 +19,17 @@ public partial class AuthenticateController : ControllerBase
 
         switch (request) {
             case var _ when !string.IsNullOrWhiteSpace(request.EmailAddress)
-                         && await UserManager.IsEmailConfirmedAsync(user):
+                         && await _userManager.IsEmailConfirmedAsync(user):
             {
-                var code = await UserManager.GeneratePasswordResetTokenAsync(user);
-                await MailSender.SendPasswordResetCodeAsync(user, request.EmailAddress, code);
+                var code = await _userManager.GeneratePasswordResetTokenAsync(user);
+                await _mailSender.SendPasswordResetCodeAsync(user, request.EmailAddress, code);
                 break;
             }
             case var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber)
-                         && await UserManager.IsPhoneNumberConfirmedAsync(user):
+                         && await _userManager.IsPhoneNumberConfirmedAsync(user):
             {
-                var code = await UserManager.GeneratePasswordResetTokenAsync(user);
-                await MessageSender.SendPasswordResetCodeAsync(user, request.PhoneNumber, code);
+                var code = await _userManager.GeneratePasswordResetTokenAsync(user);
+                await _messageSender.SendPasswordResetCodeAsync(user, request.PhoneNumber, code);
                 break;
             }
         }
@@ -39,7 +39,7 @@ public partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Reset))]
     public async Task<IActionResult> Reset([FromBody] ResetRequest request) {
-        if (!Options.CurrentValue.AllowPasswordReset) {
+        if (!_options.CurrentValue.AllowPasswordReset) {
             return NotFound();
         }
 
@@ -49,8 +49,8 @@ public partial class AuthenticateController : ControllerBase
         }
 
         var confirmed = request switch {
-            var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) => await UserManager.IsEmailConfirmedAsync(user),
-            var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber) => await UserManager.IsPhoneNumberConfirmedAsync(user),
+            var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) => await _userManager.IsEmailConfirmedAsync(user),
+            var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber) => await _userManager.IsPhoneNumberConfirmedAsync(user),
             var _ => false,
         };
 
@@ -58,7 +58,7 @@ public partial class AuthenticateController : ControllerBase
             return BadRequest();
         }
 
-        var result = await UserManager.ResetPasswordAsync(user, request.Code, request.Password);
+        var result = await _userManager.ResetPasswordAsync(user, request.Code, request.Password);
         if (!result.Succeeded) {
             return BadRequest(result.Errors);
         }

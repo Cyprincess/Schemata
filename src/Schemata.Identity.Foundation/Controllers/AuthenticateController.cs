@@ -12,14 +12,14 @@ namespace Schemata.Identity.Foundation.Controllers;
 
 [ApiController]
 [Route("~/[controller]")]
-public partial class AuthenticateController : ControllerBase
+public sealed partial class AuthenticateController : ControllerBase
 {
-    protected readonly IOptionsMonitor<BearerTokenOptions>      BearerToken;
-    protected readonly IMailSender<SchemataUser>                MailSender;
-    protected readonly IMessageSender<SchemataUser>             MessageSender;
-    protected readonly IOptionsMonitor<SchemataIdentityOptions> Options;
-    protected readonly SignInManager<SchemataUser>              SignInManager;
-    protected readonly SchemataUserManager<SchemataUser>        UserManager;
+    private readonly IOptionsMonitor<BearerTokenOptions>      _bearerToken;
+    private readonly IMailSender<SchemataUser>                _mailSender;
+    private readonly IMessageSender<SchemataUser>             _messageSender;
+    private readonly IOptionsMonitor<SchemataIdentityOptions> _options;
+    private readonly SignInManager<SchemataUser>              _signInManager;
+    private readonly SchemataUserManager<SchemataUser>        _userManager;
 
     public AuthenticateController(
         SignInManager<SchemataUser>              signInManager,
@@ -28,40 +28,40 @@ public partial class AuthenticateController : ControllerBase
         IMessageSender<SchemataUser>             messageSender,
         IOptionsMonitor<BearerTokenOptions>      bearerToken,
         IOptionsMonitor<SchemataIdentityOptions> options) {
-        SignInManager = signInManager;
-        UserManager   = userManager;
-        MailSender    = mailSender;
-        MessageSender = messageSender;
-        BearerToken   = bearerToken;
-        Options       = options;
+        _signInManager = signInManager;
+        _userManager   = userManager;
+        _mailSender    = mailSender;
+        _messageSender = messageSender;
+        _bearerToken   = bearerToken;
+        _options       = options;
     }
 
-    protected EmptyResult EmptyResult { get; } = new();
+    private EmptyResult EmptyResult { get; } = new();
 
-    protected virtual async Task<SchemataUser?> GetUserAsync(string? email, string? phone) {
+    private async Task<SchemataUser?> GetUserAsync(string? email, string? phone) {
         return true switch {
-            var _ when !string.IsNullOrWhiteSpace(email) => await UserManager.FindByEmailAsync(email),
-            var _ when !string.IsNullOrWhiteSpace(phone) => await UserManager.FindByPhoneAsync(phone),
+            var _ when !string.IsNullOrWhiteSpace(email) => await _userManager.FindByEmailAsync(email),
+            var _ when !string.IsNullOrWhiteSpace(phone) => await _userManager.FindByPhoneAsync(phone),
             var _                                        => null,
         };
     }
 
-    protected virtual async Task SendConfirmationCodeAsync(SchemataUser user, string? email, string? phone) {
-        if (!Options.CurrentValue.AllowAccountConfirmation) {
+    private async Task SendConfirmationCodeAsync(SchemataUser user, string? email, string? phone) {
+        if (!_options.CurrentValue.AllowAccountConfirmation) {
             return;
         }
 
         switch (user) {
             case var _ when !string.IsNullOrWhiteSpace(email):
             {
-                var code = await UserManager.GenerateChangeEmailTokenAsync(user, email);
-                await MailSender.SendConfirmationCodeAsync(user, email, code);
+                var code = await _userManager.GenerateChangeEmailTokenAsync(user, email);
+                await _mailSender.SendConfirmationCodeAsync(user, email, code);
                 break;
             }
             case var _ when !string.IsNullOrWhiteSpace(phone):
             {
-                var code = await UserManager.GenerateChangePhoneNumberTokenAsync(user, phone);
-                await MessageSender.SendConfirmationCodeAsync(user, phone, code);
+                var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, phone);
+                await _messageSender.SendConfirmationCodeAsync(user, phone, code);
                 break;
             }
         }
