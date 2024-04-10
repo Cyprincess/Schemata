@@ -55,11 +55,11 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
                                 Roles                 = authorize.Roles,
                                 AuthenticationSchemes = authorize.AuthenticationSchemes,
                             };
-                            resource.Browse = policy;
-                            resource.Read   = policy;
-                            resource.Edit   = policy;
-                            resource.Add    = policy;
-                            resource.Delete = policy;
+                            resource.Browse ??= policy;
+                            resource.Read   ??= policy;
+                            resource.Edit   ??= policy;
+                            resource.Add    ??= policy;
+                            resource.Delete ??= policy;
                         }
 
                         options.Resources[resource.Entity] = resource;
