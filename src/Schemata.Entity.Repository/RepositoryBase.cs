@@ -18,7 +18,9 @@ public abstract class RepositoryBase
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> TypeProperties = new();
 
     protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
-        if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) return pi;
+        if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
+            return pi;
+        }
 
         var allProperties = TypePropertiesCache(type);
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
@@ -35,7 +37,9 @@ public abstract class RepositoryBase
     }
 
     protected static IList<PropertyInfo> TypePropertiesCache(Type type) {
-        if (TypeProperties.TryGetValue(type.TypeHandle, out var pis)) return pis;
+        if (TypeProperties.TryGetValue(type.TypeHandle, out var pis)) {
+            return pis;
+        }
 
         var properties = type.GetProperties().Where(IsNotVirtual).ToList();
         TypeProperties[type.TypeHandle] = properties;
@@ -43,10 +47,14 @@ public abstract class RepositoryBase
     }
 
     private static bool IsNotVirtual(PropertyInfo property) {
-        if (!property.CanRead) return false;
+        if (!property.CanRead) {
+            return false;
+        }
 
         var getter = property.GetGetMethod();
-        if (getter == null) return false;
+        if (getter == null) {
+            return false;
+        }
 
         return !property.HasCustomAttribute<NotMappedAttribute>(false);
     }

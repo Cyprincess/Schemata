@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
-using Schemata.Workflow.Skeleton;
+using Schemata.Abstractions.Options;
 using Schemata.Workflow.Skeleton.Managers;
 
 namespace Schemata.Workflow.Foundation.Controllers;

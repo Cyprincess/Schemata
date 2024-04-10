@@ -15,7 +15,9 @@ public class AdviceAddConcurrency<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not IConcurrency concurrency) return Task.FromResult(true);
+        if (entity is not IConcurrency concurrency) {
+            return Task.FromResult(true);
+        }
 
         concurrency.Timestamp = Guid.NewGuid();
 

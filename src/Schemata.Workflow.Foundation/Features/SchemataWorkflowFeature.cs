@@ -20,7 +20,7 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
     where TWorkflow : SchemataWorkflow
     where TResponse : WorkflowResponse
 {
-    public override int Priority => 340_000_000;
+    public override int Priority => 350_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

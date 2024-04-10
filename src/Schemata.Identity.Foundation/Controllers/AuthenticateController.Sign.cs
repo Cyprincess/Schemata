@@ -52,7 +52,7 @@ public partial class AuthenticateController : ControllerBase
             return BadRequest(result.ToString());
         }
 
-        return new EmptyResult();
+        return EmptyResult;
     }
 
     [HttpPost(nameof(Refresh))]

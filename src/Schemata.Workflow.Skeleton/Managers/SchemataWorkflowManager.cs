@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Automatonymous;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Options;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Workflow.Skeleton.Entities;

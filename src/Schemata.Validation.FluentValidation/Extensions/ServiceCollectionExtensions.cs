@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Validation.Advices;
+using Schemata.Validation.FluentValidation.Advices;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -43,7 +43,8 @@ public static class ServiceCollectionExtensions
         ServiceLifetime    lifetime = ServiceLifetime.Scoped) {
         services.TryAdd(new ServiceDescriptor(service, implementation, lifetime));
 
-        services.TryAddScoped(typeof(IValidationAsyncAdvice<>), typeof(AdviceValidation<>));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAsyncAdvice<>), typeof(AdviceValidation<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAsyncAdvice<>), typeof(AdviceValidationErrors<>)));
 
         return services;
     }

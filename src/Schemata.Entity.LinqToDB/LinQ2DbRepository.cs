@@ -135,7 +135,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         await BeginTransactionAsync(ct);
 
         var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         RowsAffected += await Context.InsertAsync(entity, TableName, token: ct);
     }
@@ -144,7 +146,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         await BeginTransactionAsync(ct);
 
         var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         RowsAffected += await Context.UpdateAsync(entity, TableName, token: ct);
     }
@@ -153,7 +157,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         await BeginTransactionAsync(ct);
 
         var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         RowsAffected += await Context.DeleteAsync(entity, TableName, token: ct);
     }
@@ -161,7 +167,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        if (Transaction == null) return 0;
+        if (Transaction == null) {
+            return 0;
+        }
 
         try {
             await Transaction.CommitAsync(ct);
@@ -196,7 +204,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     private async Task BeginTransactionAsync(CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
 
-        if (Transaction != null) return;
+        if (Transaction != null) {
+            return;
+        }
 
         Transaction = await Context.BeginTransactionAsync(ct);
     }

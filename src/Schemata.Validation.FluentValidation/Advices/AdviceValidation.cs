@@ -4,13 +4,13 @@ using System.Threading.Tasks;
 using FluentValidation;
 using Humanizer;
 
-namespace Schemata.Validation.Advices;
+namespace Schemata.Validation.FluentValidation.Advices;
 
 public class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest>
 {
     #region IValidationAsyncAdvice<TRequest> Members
 
-    public int Order => 1_000;
+    public int Order => 1_000_000_000;
 
     public int Priority => Order;
 
@@ -44,10 +44,10 @@ public class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest>
                 }
             }
 
-            errors.Add(new("error", $"{field}={code}"));
+            errors.Add(new(field, code));
         }
 
-        return false;
+        return true;
     }
 
     #endregion

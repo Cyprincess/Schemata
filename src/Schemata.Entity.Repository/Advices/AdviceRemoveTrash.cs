@@ -15,7 +15,9 @@ public class AdviceRemoveTrash<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity>
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not ITrash trash) return Task.FromResult(true);
+        if (entity is not ITrash trash) {
+            return Task.FromResult(true);
+        }
 
         trash.DeletionDate = DateTime.UtcNow;
 

@@ -1,9 +1,9 @@
 using System;
+using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Mapping.Skeleton.Configurations;
 using Schemata.Workflow.Foundation;
 using Schemata.Workflow.Foundation.Features;
-using Schemata.Workflow.Skeleton;
 using Schemata.Workflow.Skeleton.Entities;
 using Schemata.Workflow.Skeleton.Models;
 

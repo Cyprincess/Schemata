@@ -132,8 +132,7 @@ public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8,
         CancellationToken ct = default);
 }
 
-public interface
-    IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12> : IAdvice
+public interface IAdvice<in T1, in T2, in T3, in T4, in T5, in T6, in T7, in T8, in T9, in T10, in T11, in T12> : IAdvice
 {
     Task<bool> AdviseAsync(
         T1                a1,

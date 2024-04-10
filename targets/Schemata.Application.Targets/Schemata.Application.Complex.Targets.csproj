@@ -13,6 +13,7 @@
     <UseIdentity>true</UseIdentity>
     <UseMapster>true</UseMapster>
     <UseRepository>true</UseRepository>
+    <UseResource>true</UseResource>
     <UseValidation>true</UseValidation>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>

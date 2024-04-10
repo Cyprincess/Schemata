@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Schemata.Identity.Skeleton;
+using Schemata.Abstractions.Options;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
@@ -35,6 +35,8 @@ public partial class AuthenticateController : ControllerBase
         BearerToken   = bearerToken;
         Options       = options;
     }
+
+    protected EmptyResult EmptyResult { get; } = new();
 
     protected virtual async Task<SchemataUser?> GetUserAsync(string? email, string? phone) {
         return true switch {

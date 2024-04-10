@@ -15,7 +15,9 @@ public class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAsyncAdvice<TEn
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not IConcurrency concurrency) return true;
+        if (entity is not IConcurrency concurrency) {
+            return true;
+        }
 
         var stored = await repository.GetAsync(entity, ct);
 

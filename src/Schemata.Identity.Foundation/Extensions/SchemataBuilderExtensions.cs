@@ -1,8 +1,8 @@
 using System;
 using Microsoft.AspNetCore.Identity;
+using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Identity.Foundation.Features;
-using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Stores;
 

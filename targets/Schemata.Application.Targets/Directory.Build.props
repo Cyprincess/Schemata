@@ -35,16 +35,25 @@
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(UseMapster)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
-  </ItemGroup>
-
   <ItemGroup Condition=" '$(UseIdentity)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseMapster)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseResource)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">

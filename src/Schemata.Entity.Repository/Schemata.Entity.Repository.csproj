@@ -14,6 +14,7 @@
     <PackageReference Include="Humanizer.Core" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
+
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
     <PackageReference Include="System.ComponentModel.Annotations" />

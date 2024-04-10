@@ -91,7 +91,9 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         ct.ThrowIfCancellationRequested();
 
         var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         await Context.AddAsync(entity, ct);
     }
@@ -100,7 +102,9 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         ct.ThrowIfCancellationRequested();
 
         var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         Context.Entry(entity).State = EntityState.Detached;
         Context.Update(entity);
@@ -110,7 +114,9 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         ct.ThrowIfCancellationRequested();
 
         var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
-        if (!next) return;
+        if (!next) {
+            return;
+        }
 
         Context.Remove(entity);
     }
