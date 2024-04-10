@@ -5,9 +5,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("Roles")]
+[Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
-public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {
     [NotMapped]
     public override string? ConcurrencyStamp
@@ -18,7 +18,7 @@ public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, ICo
 
     #region ICanonicalName Members
 
-    public string? CanonicalName { get; set; }
+    public virtual string? CanonicalName { get; set; }
 
     #endregion
 
@@ -28,11 +28,19 @@ public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, ICo
 
     #endregion
 
+    #region IDisplayName Members
+
+    public virtual string? DisplayName { get; set; }
+
+    public virtual string? DisplayNames { get; set; }
+
+    #endregion
+
     #region ITimestamp Members
 
-    public DateTime? CreationDate { get; set; }
+    public virtual DateTime? CreationDate { get; set; }
 
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

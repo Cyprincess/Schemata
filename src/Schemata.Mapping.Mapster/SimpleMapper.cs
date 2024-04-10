@@ -6,7 +6,7 @@ using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.Mapster;
 
-public class SimpleMapper : ISimpleMapper
+public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly Mapper _mapper;
 

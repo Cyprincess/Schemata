@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 namespace Schemata.Resource.Http;
 
 [AttributeUsage(AttributeTargets.Class)]
-public class ResourceControllerConventionAttribute : Attribute, IControllerModelConvention
+public sealed class ResourceControllerConventionAttribute : Attribute, IControllerModelConvention
 {
     #region IControllerModelConvention Members
 

@@ -5,7 +5,7 @@ using FluentValidation;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
-public class AdviceValidationErrors<TRequest> : IValidationAsyncAdvice<TRequest>
+public sealed class AdviceValidationErrors<TRequest> : IValidationAsyncAdvice<TRequest>
 {
     #region IValidationAsyncAdvice<TRequest> Members
 

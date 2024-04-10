@@ -1,6 +1,6 @@
 namespace Schemata.Abstractions.Options;
 
-public class SchemataIdentityOptions
+public sealed class SchemataIdentityOptions
 {
     public bool AllowRegistration { get; set; } = true;
 

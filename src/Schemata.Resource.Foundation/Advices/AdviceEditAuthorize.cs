@@ -7,7 +7,7 @@ using Schemata.Abstractions.Options;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public class AdviceEditAuthorize<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
+public sealed class AdviceEditAuthorize<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {

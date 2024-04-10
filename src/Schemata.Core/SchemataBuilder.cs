@@ -9,7 +9,7 @@ using Schemata.Core.Features;
 
 namespace Schemata.Core;
 
-public class SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment)
+public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment)
 {
     internal readonly List<Action<IServiceCollection>> Actions = [];
 

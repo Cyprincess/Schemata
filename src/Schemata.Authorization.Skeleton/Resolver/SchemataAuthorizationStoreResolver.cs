@@ -9,7 +9,7 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
-public class SchemataAuthorizationStoreResolver(
+public sealed class SchemataAuthorizationStoreResolver(
     IServiceProvider                       sp,
     IMemoryCache                           cache,
     IOptionsMonitor<OpenIddictCoreOptions> options) : IOpenIddictAuthorizationStoreResolver

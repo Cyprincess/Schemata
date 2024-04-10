@@ -3,7 +3,7 @@ using Schemata.Workflow.Skeleton.Entities;
 
 namespace Schemata.Workflow.Skeleton.Models;
 
-public class WorkflowDetails<TWorkflow, TTransition>
+public sealed class WorkflowDetails<TWorkflow, TTransition>
     where TTransition : SchemataTransition
     where TWorkflow : SchemataWorkflow
 {

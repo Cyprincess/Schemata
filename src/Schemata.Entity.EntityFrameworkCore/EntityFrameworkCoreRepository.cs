@@ -20,11 +20,11 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         DbSet           = context.Set<TEntity>();
     }
 
-    protected TContext Context { get; }
+    protected virtual TContext Context { get; }
 
-    protected DbSet<TEntity> DbSet { get; }
+    protected virtual DbSet<TEntity> DbSet { get; }
 
-    protected IServiceProvider ServiceProvider { get; }
+    protected virtual IServiceProvider ServiceProvider { get; }
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return DbSet.AsAsyncEnumerable();

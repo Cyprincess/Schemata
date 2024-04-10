@@ -13,7 +13,7 @@ namespace Schemata.Resource.Http;
 [ApiController]
 [ResourceControllerConvention]
 [Route("~/Resources/[controller]")]
-public class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
+public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
     where TDetail : class, IIdentifier
@@ -29,7 +29,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         _mapper     = mapper;
     }
 
-    protected EmptyResult EmptyResult { get; } = new();
+    private EmptyResult EmptyResult { get; } = new();
 
     [HttpGet]
     public async Task<IActionResult> Browse(

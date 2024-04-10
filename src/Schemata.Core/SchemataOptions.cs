@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core;
 
-public class SchemataOptions
+public sealed class SchemataOptions
 {
     private readonly Dictionary<string, object> _options = new();
     private          ILogger<SchemataBuilder>?  _logger;

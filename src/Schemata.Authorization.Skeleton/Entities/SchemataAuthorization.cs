@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Authorizations")]
+[Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
 public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
@@ -30,20 +30,20 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
 
     #region IConcurrency Members
 
-    public Guid? Timestamp { get; set; }
+    public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    public virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    public DateTime? CreationDate     { get; set; }
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? CreationDate     { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public class AdviceAddTrash<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
+public sealed class AdviceAddTrash<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members

@@ -17,7 +17,7 @@ using OpenIddict.Server.AspNetCore;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
-public partial class ConnectController : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
     [HttpPost(nameof(Token))]
     public async Task<IActionResult> Token() {
@@ -54,15 +54,16 @@ public partial class ConnectController : ControllerBase
             }
 
             var identity = new ClaimsIdentity(result.Principal?.Claims,
-                TokenValidationParameters.DefaultAuthenticationType, OpenIddictConstants.Claims.Name,
+                TokenValidationParameters.DefaultAuthenticationType, OpenIddictConstants.Claims.Subject,
                 OpenIddictConstants.Claims.Role);
 
             // Override the user claims present in the principal in case they
             // changed since the authorization code/refresh token was issued.
             identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))
                     .SetClaim(OpenIddictConstants.Claims.Email, await _users.GetEmailAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.Name, await _users.GetUserNameAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _users.GetPhoneNumberAsync(user))
                     .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _users.GetUserNameAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.Nickname, await _users.GetDisplayNameAsync(user))
                     .SetClaims(OpenIddictConstants.Claims.Role, (await _users.GetRolesAsync(user)).ToImmutableArray());
 
             identity.SetDestinations(GetDestinations);
@@ -82,7 +83,7 @@ public partial class ConnectController : ControllerBase
 
             // Create the claims-based identity that will be used by OpenIddict to generate tokens.
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-                OpenIddictConstants.Claims.Name, OpenIddictConstants.Claims.Role);
+                OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens (use the client_id as the subject identifier).
             identity.SetClaim(OpenIddictConstants.Claims.Subject, await _applications.GetClientIdAsync(application));

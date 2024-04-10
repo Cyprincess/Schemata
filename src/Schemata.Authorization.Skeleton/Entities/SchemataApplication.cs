@@ -4,9 +4,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Applications")]
+[Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
-public class SchemataApplication : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataApplication : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {
     public virtual string? ApplicationType { get; set; }
 
@@ -17,10 +17,6 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IConcurrency, IT
     public virtual string? ClientType { get; set; }
 
     public virtual string? ConsentType { get; set; }
-
-    public virtual string? DisplayName { get; set; }
-
-    public virtual string? DisplayNames { get; set; }
 
     public virtual string? Properties { get; set; }
 
@@ -50,13 +46,21 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IConcurrency, IT
 
     #region IConcurrency Members
 
-    public Guid? Timestamp { get; set; }
+    public virtual Guid? Timestamp { get; set; }
+
+    #endregion
+
+    #region IDisplayName Members
+
+    public virtual string? DisplayName { get; set; }
+
+    public virtual string? DisplayNames { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    public virtual long Id { get; set; }
 
     #endregion
 

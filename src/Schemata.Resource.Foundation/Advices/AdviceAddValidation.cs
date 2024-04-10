@@ -10,7 +10,7 @@ using Schemata.Validation.FluentValidation.Advices;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public class AdviceAddValidation<TEntity, TRequest> : IResourceAddAdvice<TEntity, TRequest>
+public sealed class AdviceAddValidation<TEntity, TRequest> : IResourceAddAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {

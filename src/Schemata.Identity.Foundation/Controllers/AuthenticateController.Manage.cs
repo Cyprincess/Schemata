@@ -3,20 +3,20 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Schemata.Identity.Foundation.Models;
+using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
-public partial class AuthenticateController : ControllerBase
+public sealed partial class AuthenticateController : ControllerBase
 {
     [Authorize]
     [HttpGet("~/Account/Profile")]
     public async Task<IActionResult> Profile() {
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
-        var store = await UserManager.ToClaimsAsync(user);
+        var store = await _userManager.ToClaimsAsync(user);
 
         return Ok(store);
     }
@@ -24,11 +24,11 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Email")]
     public async Task<IActionResult> Email([FromBody] ProfileRequest request) {
-        if (!Options.CurrentValue.AllowEmailChange) {
+        if (!_options.CurrentValue.AllowEmailChange) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
@@ -48,11 +48,11 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Phone")]
     public async Task<IActionResult> Phone([FromBody] ProfileRequest request) {
-        if (!Options.CurrentValue.AllowPhoneNumberChange) {
+        if (!_options.CurrentValue.AllowPhoneNumberChange) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
@@ -72,11 +72,11 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPut("~/Account/Profile/Password")]
     public async Task<IActionResult> Password([FromBody] ProfileRequest request) {
-        if (!Options.CurrentValue.AllowPasswordChange) {
+        if (!_options.CurrentValue.AllowPasswordChange) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
@@ -88,7 +88,7 @@ public partial class AuthenticateController : ControllerBase
             return NoContent();
         }
 
-        await UserManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
+        await _userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
 
         return NoContent();
     }
@@ -96,32 +96,32 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpGet(nameof(Authenticator))]
     public async Task<IActionResult> Authenticator() {
-        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+        if (!_options.CurrentValue.AllowTwoFactorAuthentication) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
         var result = new AuthenticatorResponse {
-            IsTwoFactorEnabled = await UserManager.GetTwoFactorEnabledAsync(user),
+            IsTwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
         };
 
         if (!result.IsTwoFactorEnabled) {
-            await UserManager.ResetAuthenticatorKeyAsync(user);
-            var key = await UserManager.GetAuthenticatorKeyAsync(user);
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            var key = await _userManager.GetAuthenticatorKeyAsync(user);
             if (string.IsNullOrEmpty(key)) {
                 throw new NotSupportedException("The user manager must produce an authenticator key after reset.");
             }
 
-            var codes = await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+            var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
 
             result.SharedKey     = key;
             result.RecoveryCodes = codes?.ToArray();
         } else {
-            result.IsMachineRemembered = await SignInManager.IsTwoFactorClientRememberedAsync(user);
-            result.RecoveryCodesLeft   = await UserManager.CountRecoveryCodesAsync(user);
+            result.IsMachineRemembered = await _signInManager.IsTwoFactorClientRememberedAsync(user);
+            result.RecoveryCodesLeft   = await _userManager.CountRecoveryCodesAsync(user);
         }
 
         return Ok(result);
@@ -130,11 +130,11 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPost(nameof(Authenticator))]
     public async Task<IActionResult> Enroll([FromBody] AuthenticatorRequest request) {
-        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+        if (!_options.CurrentValue.AllowTwoFactorAuthentication) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
@@ -142,11 +142,11 @@ public partial class AuthenticateController : ControllerBase
             return BadRequest();
         }
 
-        if (!await UserManager.VerifyTwoFactorTokenAsync(user, UserManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode)) {
+        if (!await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode)) {
             return BadRequest();
         }
 
-        await UserManager.SetTwoFactorEnabledAsync(user, true);
+        await _userManager.SetTwoFactorEnabledAsync(user, true);
 
         return NoContent();
     }
@@ -154,11 +154,11 @@ public partial class AuthenticateController : ControllerBase
     [Authorize]
     [HttpPatch(nameof(Authenticator))]
     public async Task<IActionResult> Downgrade([FromBody] AuthenticatorRequest request) {
-        if (!Options.CurrentValue.AllowTwoFactorAuthentication) {
+        if (!_options.CurrentValue.AllowTwoFactorAuthentication) {
             return NotFound();
         }
 
-        if (await UserManager.GetUserAsync(User) is not { } user) {
+        if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
 
@@ -168,8 +168,8 @@ public partial class AuthenticateController : ControllerBase
         }
 
         var passed = request switch {
-            var _ when !string.IsNullOrWhiteSpace(request.TwoFactorCode) => await UserManager.VerifyTwoFactorTokenAsync(user, UserManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode),
-            var _ when !string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode) => (await UserManager.RedeemTwoFactorRecoveryCodeAsync(user, request.TwoFactorRecoveryCode)).Succeeded,
+            var _ when !string.IsNullOrWhiteSpace(request.TwoFactorCode) => await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode),
+            var _ when !string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode) => (await _userManager.RedeemTwoFactorRecoveryCodeAsync(user, request.TwoFactorRecoveryCode)).Succeeded,
             var _ => false,
         };
 
@@ -177,8 +177,8 @@ public partial class AuthenticateController : ControllerBase
             return BadRequest();
         }
 
-        await UserManager.SetTwoFactorEnabledAsync(user, false);
-        await UserManager.ResetAuthenticatorKeyAsync(user);
+        await _userManager.SetTwoFactorEnabledAsync(user, false);
+        await _userManager.ResetAuthenticatorKeyAsync(user);
 
         return NoContent();
     }

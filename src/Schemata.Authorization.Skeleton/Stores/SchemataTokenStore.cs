@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,7 @@ using OpenIddict.Abstractions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
@@ -193,7 +195,9 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     }
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
-        var tokens = _tokens.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime), ct);
+        Expression<Func<TToken, bool>> query = t => (t.Status != Statuses.Inactive && t.Status != Statuses.Valid)
+                                                  || t.ExpirationDate < DateTime.UtcNow;
+        var tokens = _tokens.ListAsync(q => q.Where(t => t.CreationDate < threshold.UtcDateTime).Where(query), ct);
         var count  = 0L;
 
         await foreach (var token in tokens) {

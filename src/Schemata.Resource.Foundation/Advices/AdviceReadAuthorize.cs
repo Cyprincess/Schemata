@@ -7,7 +7,7 @@ using Schemata.Abstractions.Options;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public class AdviceReadAuthorize<TEntity> : IResourceReadAdvice<TEntity>
+public sealed class AdviceReadAuthorize<TEntity> : IResourceReadAdvice<TEntity>
     where TEntity : class, IIdentifier
 {
     private readonly SchemataResourceOptions _options;

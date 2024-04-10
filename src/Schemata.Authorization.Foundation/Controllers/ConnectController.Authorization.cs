@@ -16,11 +16,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using Schemata.Authorization.Foundation.Models;
+using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
-public partial class ConnectController : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
     [HttpGet(nameof(Authorize))]
     public async Task<IActionResult> Authorize() {
@@ -143,13 +143,14 @@ public partial class ConnectController : ControllerBase
                                                              && !request.HasPrompt(OpenIddictConstants.Prompts.Consent):
                 // Create the claims-based identity that will be used by OpenIddict to generate tokens.
                 var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-                    OpenIddictConstants.Claims.Name, OpenIddictConstants.Claims.Role);
+                    OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
 
                 // Add the claims that will be persisted in the tokens.
                 identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))
                         .SetClaim(OpenIddictConstants.Claims.Email, await _users.GetEmailAsync(user))
-                        .SetClaim(OpenIddictConstants.Claims.Name, await _users.GetUserNameAsync(user))
+                        .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _users.GetPhoneNumberAsync(user))
                         .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _users.GetUserNameAsync(user))
+                        .SetClaim(OpenIddictConstants.Claims.Nickname, await _users.GetDisplayNameAsync(user))
                         .SetClaims(OpenIddictConstants.Claims.Role, (await _users.GetRolesAsync(user)).ToImmutableArray());
 
                 // Note: in this sample, the granted scopes match the requested scope
@@ -241,13 +242,14 @@ public partial class ConnectController : ControllerBase
 
         // Create the claims-based identity that will be used by OpenIddict to generate tokens.
         var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-            OpenIddictConstants.Claims.Name, OpenIddictConstants.Claims.Role);
+            OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
 
         // Add the claims that will be persisted in the tokens.
         identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))
                 .SetClaim(OpenIddictConstants.Claims.Email, await _users.GetEmailAsync(user))
-                .SetClaim(OpenIddictConstants.Claims.Name, await _users.GetUserNameAsync(user))
+                .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _users.GetPhoneNumberAsync(user))
                 .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _users.GetUserNameAsync(user))
+                .SetClaim(OpenIddictConstants.Claims.Nickname, await _users.GetDisplayNameAsync(user))
                 .SetClaims(OpenIddictConstants.Claims.Role, (await _users.GetRolesAsync(user)).ToImmutableArray());
 
         // Note: in this sample, the granted scopes match the requested scope

@@ -4,7 +4,7 @@ using Schemata.Mapping.Skeleton.Configurations;
 
 namespace Schemata.Mapping.Skeleton;
 
-public class SchemataMappingOptions
+public sealed class SchemataMappingOptions
 {
     public List<IMapping> Mappings { get; } = [];
 

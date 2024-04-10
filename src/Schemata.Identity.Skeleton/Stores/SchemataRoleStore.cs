@@ -10,34 +10,35 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataUserRole, SchemataRoleClaim>
+public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>
     where TRole : SchemataRole
 {
     public SchemataRoleStore(
         IRepository<TRole> rolesRepository,
-        IRepository<SchemataUserRole> userRolesRepository,
         IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IdentityErrorDescriber? describer = null) : base(rolesRepository, userRolesRepository, roleClaimsRepository,
-        describer) { }
+        IRepository<SchemataUserRole> userRoleRepository,
+        IdentityErrorDescriber? describer = null) : base(rolesRepository, roleClaimsRepository, userRoleRepository, describer) { }
 }
 
-public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
+public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
     where TRole : SchemataRole
-    where TUserRole : SchemataUserRole, new()
     where TRoleClaim : SchemataRoleClaim, new()
+    where TUserRole : SchemataUserRole, new()
 {
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
     protected readonly IRepository<TRole>      RolesRepository;
+    protected readonly IRepository<TUserRole>  UserRoleRepository;
 
     private bool _disposed;
 
     public SchemataRoleStore(
         IRepository<TRole>      rolesRepository,
-        IRepository<TUserRole>  userRolesRepository,
         IRepository<TRoleClaim> roleClaimsRepository,
+        IRepository<TUserRole>  userRoleRepository,
         IdentityErrorDescriber? describer = null) {
         RolesRepository      = rolesRepository;
         RoleClaimsRepository = roleClaimsRepository;
+        UserRoleRepository   = userRoleRepository;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
     }
 
@@ -84,6 +85,13 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
+        var users = UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Id)), ct);
+        await foreach (var user in users) {
+            await UserRoleRepository.RemoveAsync(user, ct);
+        }
+
+        await UserRoleRepository.CommitAsync(ct);
+
         await RolesRepository.RemoveAsync(role, ct);
         try {
             await RolesRepository.CommitAsync(ct);
@@ -113,7 +121,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult<string?>(role.Name);
+        return Task.FromResult<string?>(role.DisplayName);
     }
 
     /// <inheritdoc />
@@ -124,7 +132,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        role.Name = roleName;
+        role.DisplayName = roleName;
         return Task.CompletedTask;
     }
 
@@ -171,7 +179,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
     }
 
     /// <inheritdoc />
-    public void Dispose() {
+    public virtual void Dispose() {
         _disposed = true;
     }
 
@@ -234,9 +242,11 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
 
     #endregion
 
-    protected void ThrowIfDisposed() {
-        if (_disposed) {
-            throw new ObjectDisposedException(GetType().Name);
+    protected virtual void ThrowIfDisposed() {
+        if (!_disposed) {
+            return;
         }
+
+        throw new ObjectDisposedException(GetType().Name);
     }
 }

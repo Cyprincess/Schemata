@@ -12,7 +12,7 @@ namespace Schemata.Resource.Foundation.Features;
 [DependsOn<SchemataRoutingFeature>]
 [Information("Resource Service depends on Routing feature, it will be added automatically.", Level = LogLevel.Debug)]
 [Information("Resource Service depends on Mapping feature, you should add it manually.", Level = LogLevel.Information)]
-public class SchemataResourceFeature : FeatureBase
+public sealed class SchemataResourceFeature : FeatureBase
 {
     public override int Priority => 360_000_000;
 

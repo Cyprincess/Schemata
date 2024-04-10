@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public class AdviceRemoveTimestamp<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity>
+public sealed class AdviceRemoveTimestamp<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryRemoveAsyncAdvice<TEntity> Members

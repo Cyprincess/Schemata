@@ -7,7 +7,7 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
-public class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider sp) : IOpenIddictTokenStoreResolver
+public sealed class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvider sp) : IOpenIddictTokenStoreResolver
 {
     #region IOpenIddictTokenStoreResolver Members
 

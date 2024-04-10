@@ -3,7 +3,7 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;
 
-public class NoOpMailSender<TUser> : IMailSender<TUser>
+public sealed class NoOpMailSender<TUser> : IMailSender<TUser>
     where TUser : SchemataUser
 {
     #region IMailSender<TUser> Members

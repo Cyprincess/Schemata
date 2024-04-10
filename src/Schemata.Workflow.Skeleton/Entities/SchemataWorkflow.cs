@@ -4,35 +4,35 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
-[Table("Workflows")]
+[Table("SchemataWorkflows")]
 [CanonicalName("workflows/{workflow}")]
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 {
-    public string Type { get; set; } = null!;
+    public virtual string Type { get; set; } = null!;
 
-    public long InstanceId { get; set; }
+    public virtual long InstanceId { get; set; }
 
-    public string InstanceType { get; set; } = null!;
+    public virtual string InstanceType { get; set; } = null!;
 
     #region ICanonicalName Members
 
-    public string? Name { get; set; }
+    public virtual string? Name { get; set; }
 
-    public string? CanonicalName { get; set; }
+    public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    public virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    public DateTime? CreationDate { get; set; }
+    public virtual DateTime? CreationDate { get; set; }
 
-    public DateTime? ModificationDate { get; set; }
+    public virtual DateTime? ModificationDate { get; set; }
 
     #endregion
 }

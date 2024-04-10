@@ -11,6 +11,7 @@ using OpenIddict.Abstractions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
@@ -282,7 +283,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     }
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
-        var authorizations = _authorizations.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime), ct);
+        var authorizations = _authorizations.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime).Where(a => a.Status != Statuses.Valid), ct);
         var count          = 0L;
 
         await foreach (var authorization in authorizations) {

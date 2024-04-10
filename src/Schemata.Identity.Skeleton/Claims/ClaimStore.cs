@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Schemata.Identity.Skeleton.Claims;
 
-public class ClaimStore : IList<string>
+public sealed class ClaimStore : IList<string>
 {
     private readonly List<string> _values = [];
 

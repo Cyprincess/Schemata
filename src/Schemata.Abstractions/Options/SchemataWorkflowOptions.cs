@@ -2,7 +2,7 @@ using System;
 
 namespace Schemata.Abstractions.Options;
 
-public class SchemataWorkflowOptions
+public sealed class SchemataWorkflowOptions
 {
     public Type WorkflowType { get; set; } = null!;
 

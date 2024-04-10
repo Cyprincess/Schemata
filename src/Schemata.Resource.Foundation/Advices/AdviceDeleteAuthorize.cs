@@ -7,7 +7,7 @@ using Schemata.Abstractions.Options;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public class AdviceDeleteAuthorize<TEntity> : IResourceDeleteAdvice<TEntity>
+public sealed class AdviceDeleteAuthorize<TEntity> : IResourceDeleteAdvice<TEntity>
     where TEntity : class, IIdentifier
 {
     private readonly SchemataResourceOptions _options;

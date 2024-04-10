@@ -5,9 +5,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("Users")]
+[Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
-public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {
     [NotMapped]
     public override string? ConcurrencyStamp
@@ -27,6 +27,14 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, ICo
     #region IConcurrency Members
 
     public virtual Guid? Timestamp { get; set; }
+
+    #endregion
+
+    #region IDisplayName Members
+
+    public virtual string? DisplayName { get; set; }
+
+    public virtual string? DisplayNames { get; set; }
 
     #endregion
 

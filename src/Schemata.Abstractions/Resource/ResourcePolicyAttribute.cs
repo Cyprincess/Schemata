@@ -3,7 +3,7 @@ using System;
 namespace Schemata.Abstractions.Resource;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
-public class ResourcePolicyAttribute : Attribute
+public sealed class ResourcePolicyAttribute : Attribute
 {
     public ResourcePolicyAttribute() { }
 

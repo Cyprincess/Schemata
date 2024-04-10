@@ -8,7 +8,7 @@ using OpenIddict.Server.AspNetCore;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
-public partial class ConnectController : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
     [HttpPost(nameof(Logout))]
     public async Task<IActionResult> Logout() {

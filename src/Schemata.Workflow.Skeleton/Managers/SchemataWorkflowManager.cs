@@ -47,6 +47,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return await FindAsync(id, ct);
     }
 
+    Task<IStatefulEntity?> IWorkflowManager.FindInstanceAsync(long id, CancellationToken ct) {
+        return FindInstanceAsync(id, ct);
+    }
+
     Task<IStatefulEntity?> IWorkflowManager.GetInstanceAsync(SchemataWorkflow workflow, CancellationToken ct) {
         return GetInstanceAsync((TWorkflow)workflow, ct);
     }

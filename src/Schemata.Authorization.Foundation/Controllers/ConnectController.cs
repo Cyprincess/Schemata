@@ -14,7 +14,7 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 [ApiController]
 [Route("~/[controller]")]
-public partial class ConnectController : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
     private readonly IOpenIddictApplicationManager     _applications;
     private readonly IOpenIddictAuthorizationManager   _authorizations;

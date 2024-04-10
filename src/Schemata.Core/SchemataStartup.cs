@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Schemata.Core;
 
-public class SchemataStartup : IStartupFilter
+public sealed class SchemataStartup : IStartupFilter
 {
     private readonly IConfiguration      _configuration;
     private readonly IWebHostEnvironment _environment;

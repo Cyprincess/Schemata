@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 
 namespace Schemata.Core;
 
-public class SchemataExtensionPart<T> : ApplicationPart, IApplicationPartTypeProvider
+public sealed class SchemataExtensionPart<T> : ApplicationPart, IApplicationPartTypeProvider
 {
     public SchemataExtensionPart() {
         Assembly = typeof(T).Assembly;
