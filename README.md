@@ -66,6 +66,9 @@ var builder = WebApplication.CreateBuilder(args)
                                             map.For(d => d.Grade).Ignore()
                                                .For(d => d.Sex).From(s => s.Sex.ToString());
                                         });
+
+                                 schema.UseResource()
+                                       .MapHttp()
                              });
 
 var app = builder.Build();
@@ -127,13 +130,15 @@ also have additional configuration methods.
 
 An extension feature can be activated in the same way as a built-in feature.
 
-| Priority      | Package                           | Feature       | Description                       |
-|---------------|-----------------------------------|---------------|-----------------------------------|
-| 310_000_000   | Schemata.Identity.Foundation      | Identity      | Schemata Identity Foundation      |
-| 320_000_000   | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
-| 330_000_000   | Schemata.Mapping.Foundation       | Mapping       | Schemata Mapper Foundation        |
-| 340_000_000   | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |
-| 2_147_400_000 | Schemata.Modular                  | Modular       | Modularization                    |
+| Priority      | Package                           | Feature              | Description                        |
+|---------------|-----------------------------------|----------------------|------------------------------------|
+| 310_000_000   | Schemata.Identity.Foundation      | Identity             | Schemata Identity Foundation       |
+| 320_000_000   | Schemata.Authorization.Foundation | Authorization        | Schemata Authorization Foundation  |
+| 340_000_000   | Schemata.Mapping.Foundation       | Mapping              | Schemata Mapper Foundation         |
+| 350_000_000   | Schemata.Workflow.Foundation      | Workflow             | Schemata Workflow Foundation       |
+| 360_000_000   | Schemata.Resource.Foundation      | Resource             | Schemata Resource Service          |
+| 360_100_000   | Schemata.Resource.Http            | Resource (`MapHttp`) | Schemata Resource Service for HTTP |
+| 2_147_400_000 | Schemata.Modular                  | Modular              | Modularization                     |
 
 ## Compliance
 
@@ -150,6 +155,7 @@ Some packages may have additional compliance requirements, which are documented 
 | Schemata.Authorization.Foundation | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Identity.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Mapping.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
+| Schemata.Resource.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Workflow.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation

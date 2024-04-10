@@ -15,8 +15,13 @@ public class AdviceRemoveTimestamp<TEntity> : IRepositoryRemoveAsyncAdvice<TEnti
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not ITrash) return Task.FromResult(true);
-        if (entity is not ITimestamp time) return Task.FromResult(true);
+        if (entity is not ITrash) {
+            return Task.FromResult(true);
+        }
+
+        if (entity is not ITimestamp time) {
+            return Task.FromResult(true);
+        }
 
         time.ModificationDate = DateTime.UtcNow;
 

@@ -34,7 +34,7 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Validation\Schemata.Validation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">

@@ -76,7 +76,9 @@ public static class Predicate
         }
 
         public static Expression? Replace(LambdaExpression? expression, ParameterExpression parameter) {
-            if (expression == null) return null;
+            if (expression == null) {
+                return null;
+            }
 
             var visitor = new Replacer(expression.Parameters[0], parameter);
             return visitor.Visit(expression.Body);

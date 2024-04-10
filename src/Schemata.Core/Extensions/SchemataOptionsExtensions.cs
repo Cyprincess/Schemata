@@ -28,6 +28,11 @@ public static class SchemataOptionsExtensions
     }
 
     public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
+        var features = GetFeatures(schemata) ?? [];
+        if (features.ContainsKey(type)) {
+            return;
+        }
+
         var attributes = type.GetCustomAttributes(true);
         foreach (var attribute in attributes) {
             var at = attribute.GetType();
@@ -46,7 +51,6 @@ public static class SchemataOptionsExtensions
             }
         }
 
-        var features = GetFeatures(schemata) ?? [];
         features[type] = feature;
         schemata.SetFeatures(features);
     }

@@ -15,7 +15,9 @@ public class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not ITimestamp timestamp) return Task.FromResult(true);
+        if (entity is not ITimestamp timestamp) {
+            return Task.FromResult(true);
+        }
 
         timestamp.CreationDate     = DateTime.UtcNow;
         timestamp.ModificationDate = DateTime.UtcNow;

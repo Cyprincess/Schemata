@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Options;
 using Schemata.Workflow.Skeleton.Entities;
 
 namespace Schemata.Workflow.Skeleton.Managers;

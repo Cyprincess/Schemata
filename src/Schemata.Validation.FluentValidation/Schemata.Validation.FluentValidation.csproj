@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
-    <Description>Schemata Application Framework - Validation Skeleton</Description>
+    <Description>Schemata Application Framework - Validation (using FluentValidation)</Description>
     <PackageTags>application;business;framework;validation</PackageTags>
   </PropertyGroup>
 

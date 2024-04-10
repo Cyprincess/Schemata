@@ -18,7 +18,9 @@ public class AdviceQueryTrash<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
         IRepository<TEntity>    repository,
         QueryContainer<TEntity> query,
         CancellationToken       ct = default) {
-        if (!typeof(ITrash).IsAssignableFrom(typeof(TEntity))) return Task.FromResult(true);
+        if (!typeof(ITrash).IsAssignableFrom(typeof(TEntity))) {
+            return Task.FromResult(true);
+        }
 
         query.ApplyModification(q => {
             return q.OfType<ITrash>().Where(e => e.DeletionDate == null).OfType<TEntity>();

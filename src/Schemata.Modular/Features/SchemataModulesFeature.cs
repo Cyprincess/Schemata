@@ -1,10 +1,13 @@
 using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Options;
+using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
 
@@ -27,6 +30,24 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
                                .GetModules()
                                .ToList();
         schemata.SetModules(modules);
+
+        if (schemata.GetFeatures()?.Any(f => f.Key.Name == "SchemataResourceFeature") == true) {
+            foreach (var module in modules) {
+                var resources = module.Assembly.DefinedTypes
+                                      .SelectMany(t => t.GetCustomAttributes<ResourceAttribute>())
+                                      .ToList();
+
+                if (resources.Count == 0) {
+                    continue;
+                }
+
+                services.Configure<SchemataResourceOptions>(options => {
+                    foreach (var resource in resources) {
+                        options.Resources[resource.EntityType] = resource;
+                    }
+                });
+            }
+        }
 
         if (services.Any(s => s.ServiceType == typeof(IModulesRunner))) {
             return;

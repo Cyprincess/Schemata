@@ -11,7 +11,7 @@ namespace Schemata.Mapping.Foundation.Features;
 public sealed class SchemataMappingFeature<T> : FeatureBase
     where T : class, ISimpleMapper
 {
-    public override int Priority => 330_000_000;
+    public override int Priority => 340_000_000;
 
     public override void ConfigureServices(
         IServiceCollection  services,

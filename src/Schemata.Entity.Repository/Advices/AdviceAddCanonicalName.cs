@@ -28,12 +28,16 @@ public class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IReposito
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not ICanonicalName named) return Task.FromResult(true);
+        if (entity is not ICanonicalName named) {
+            return Task.FromResult(true);
+        }
 
         var type = entity.GetType();
 
         var attribute = type.GetCustomAttribute<CanonicalNameAttribute>(false);
-        if (attribute == null) return Task.FromResult(true);
+        if (attribute == null) {
+            return Task.FromResult(true);
+        }
 
         var current = type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize() ?? type.Name;
 
