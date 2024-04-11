@@ -101,7 +101,7 @@ Features are characterized by `Order` and `Priority`, both of which are `Int32` 
 sequence in which the `ConfigureServices` methods are invoked. The `Priority` establishes the sequence for invoking
 the `Configure<Application|Endpoints>` methods.
 
-The range `[0, 1_000_000_000)` and `[2_147_000_000, Int32.MaxValue]` for `Order` and `Priority` is reserved for built-in
+The range `[0, 1_000_000_000)` and `(2_147_000_000, 2_147_400_000]` for `Order` and `Priority` is reserved for built-in
 features and Schemata extensions.
 
 ### Built-in Features

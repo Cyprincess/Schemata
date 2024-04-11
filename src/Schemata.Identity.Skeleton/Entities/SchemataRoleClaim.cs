@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
@@ -10,6 +11,7 @@ public class SchemataRoleClaim : IdentityRoleClaim<long>, IIdentifier, ITimestam
 {
     #region IIdentifier Members
 
+    [Key]
     public new virtual long Id { get; set; }
 
     #endregion

@@ -1,9 +1,12 @@
 using System;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
+[DisplayName("Workflow")]
 [Table("SchemataWorkflows")]
 [CanonicalName("workflows/{workflow}")]
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
@@ -24,6 +27,7 @@ public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion

@@ -1,9 +1,12 @@
 using System;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+[DisplayName("Token")]
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
@@ -44,6 +47,7 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion

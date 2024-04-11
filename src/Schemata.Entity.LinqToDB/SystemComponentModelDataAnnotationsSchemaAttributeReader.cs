@@ -23,6 +23,7 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
@@ -37,7 +38,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     public MappingAttribute[] GetAttributes(Type type) {
         var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
 
-        if (t == null) {
+        if (t is null) {
             return Array.Empty<MappingAttribute>();
         }
 
@@ -68,23 +69,32 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     }
 
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
-        var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
-        if (c != null) {
-            var attr = new ColumnAttribute {
-                Name = c.Name,
-                DbType = c.TypeName,
-            };
-
-            return [attr];
-        }
-
         if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
-            var attr = new NotColumnAttribute();
-
-            return [attr];
+            return [new NotColumnAttribute()];
         }
 
-        return Array.Empty<MappingAttribute>();
+        var attributes = new List<MappingAttribute>();
+
+        if (member.HasAttribute<System.ComponentModel.DataAnnotations.KeyAttribute>()) {
+            attributes.Add(new PrimaryKeyAttribute());
+        }
+
+        var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();
+        if (g is {
+            DatabaseGeneratedOption: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity
+        }) {
+            attributes.Add(new IdentityAttribute());
+        }
+
+        var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
+        if (c is not null) {
+            attributes.Add(new ColumnAttribute {
+                Name   = c.Name,
+                DbType = c.TypeName,
+            });
+        }
+
+        return attributes.ToArray();
     }
 
     /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />

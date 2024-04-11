@@ -1,10 +1,13 @@
 using System;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+[DisplayName("User")]
 [Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
@@ -35,6 +38,13 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDi
     public virtual string? DisplayName { get; set; }
 
     public virtual string? DisplayNames { get; set; }
+
+    #endregion
+
+    #region IIdentifier Members
+
+    [Key]
+    public override long Id { get; set; }
 
     #endregion
 
