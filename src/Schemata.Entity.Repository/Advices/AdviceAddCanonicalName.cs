@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
@@ -39,7 +40,8 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
             return Task.FromResult(true);
         }
 
-        var current = type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize() ?? type.Name;
+        var current = type.GetCustomAttribute<DisplayNameAttribute>(false)?.DisplayName.Singularize()
+                   ?? type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize() ?? type.Name;
 
         if (!PropertiesCache.TryGetValue(type, out var properties)) {
             properties = type

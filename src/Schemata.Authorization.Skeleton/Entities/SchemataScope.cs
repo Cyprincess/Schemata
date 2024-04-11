@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+[DisplayName("Scope")]
 [Table("SchemataScopes")]
 [CanonicalName("scopes/{scope}")]
 public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp

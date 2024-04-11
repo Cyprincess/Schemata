@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+[DisplayName("Application")]
 [Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
 public class SchemataApplication : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp

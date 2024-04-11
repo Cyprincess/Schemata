@@ -1,10 +1,12 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+[DisplayName("User")]
 [Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp

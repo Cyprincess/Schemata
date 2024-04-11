@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
+[DisplayName("Transition")]
 [Table("SchemataTransitions")]
 [CanonicalName("workflows/{workflow}/transitions/{transition}")]
 public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestamp

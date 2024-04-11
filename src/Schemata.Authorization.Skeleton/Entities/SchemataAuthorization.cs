@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+[DisplayName("Authorization")]
 [Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
 public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, ITimestamp

@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
+[DisplayName("Workflow")]
 [Table("SchemataWorkflows")]
 [CanonicalName("workflows/{workflow}")]
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
