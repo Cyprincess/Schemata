@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Authorizations")]
+[Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
 public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {

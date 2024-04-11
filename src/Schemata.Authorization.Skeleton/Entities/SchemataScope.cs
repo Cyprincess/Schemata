@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Scopes")]
+[Table("SchemataScopes")]
 [CanonicalName("scopes/{scope}")]
 public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {

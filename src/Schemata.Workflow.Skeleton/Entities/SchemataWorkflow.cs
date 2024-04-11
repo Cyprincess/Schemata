@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
-[Table("Workflows")]
+[Table("SchemataWorkflows")]
 [CanonicalName("workflows/{workflow}")]
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 {

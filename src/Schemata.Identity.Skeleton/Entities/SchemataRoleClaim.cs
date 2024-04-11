@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("RoleClaims")]
+[Table("SchemataRoleClaims")]
 public class SchemataRoleClaim : IdentityRoleClaim<long>, IIdentifier, ITimestamp
 {
     #region IIdentifier Members

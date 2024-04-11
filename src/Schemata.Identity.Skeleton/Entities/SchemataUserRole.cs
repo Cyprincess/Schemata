@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("UserRole")]
+[Table("SchemataUserRole")]
 public class SchemataUserRole : IdentityUserRole<long>, ITimestamp
 {
     #region ITimestamp Members

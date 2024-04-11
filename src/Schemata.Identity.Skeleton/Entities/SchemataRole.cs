@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("Roles")]
+[Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
 public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {

@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("UserTokens")]
+[Table("SchemataUserTokens")]
 public class SchemataUserToken : IdentityUserToken<long>, ITimestamp
 {
     #region ITimestamp Members

@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Applications")]
+[Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
 public class SchemataApplication : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {

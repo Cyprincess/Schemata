@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
-[Table("Transitions")]
+[Table("SchemataTransitions")]
 [CanonicalName("workflows/{workflow}/transitions/{transition}")]
 public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestamp
 {

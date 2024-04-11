@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-[Table("Users")]
+[Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {

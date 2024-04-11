@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-[Table("Tokens")]
+[Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
