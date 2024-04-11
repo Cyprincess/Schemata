@@ -29,7 +29,7 @@ public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvic
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(
-        long?             id,
+        long              id,
         TRequest          request,
         HttpContext       context,
         CancellationToken ct = default) {

@@ -23,8 +23,8 @@ public sealed class AdviceBrowseAuthorize<TEntity> : IResourceBrowseAdvice<TEnti
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(
-        string?           query,
-        long?             cursor,
+        string            query,
+        long              cursor,
         int               size,
         HttpContext       context,
         CancellationToken ct = default) {

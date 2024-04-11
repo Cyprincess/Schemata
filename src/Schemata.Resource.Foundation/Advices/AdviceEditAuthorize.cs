@@ -24,7 +24,7 @@ public sealed class AdviceEditAuthorize<TEntity, TRequest> : IResourceEditAdvice
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(
-        long?             id,
+        long              id,
         TRequest          request,
         HttpContext       context,
         CancellationToken ct = default) {

@@ -22,7 +22,7 @@ public sealed class AdviceReadAuthorize<TEntity> : IResourceReadAdvice<TEntity>
 
     public int Priority => Order;
 
-    public async Task<bool> AdviseAsync(long? id, HttpContext context, CancellationToken ct = default) {
+    public async Task<bool> AdviseAsync(long id, HttpContext context, CancellationToken ct = default) {
         var resource = _options.Resources[typeof(TEntity)];
 
         if (resource.Read is null) {
