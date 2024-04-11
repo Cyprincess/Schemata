@@ -10,7 +10,11 @@ public interface ISimpleMapper
 
     TDestination? Map<TSource, TDestination>(TSource source);
 
+    void Map<TSource, TDestination>(TSource source, TDestination destination);
+
     object? Map(object source, Type destinationType);
 
     object? Map(object source, Type sourceType, Type destinationType);
+
+    void Map(object source, object destination, Type sourceType, Type destinationType);
 }

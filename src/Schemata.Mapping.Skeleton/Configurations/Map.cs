@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq.Expressions;
 
 namespace Schemata.Mapping.Skeleton.Configurations;
@@ -23,7 +22,7 @@ public sealed class Map<TSource, TDestination>
         return new(mapping);
     }
 
-    internal ImmutableArray<IMapping> Compile() {
+    internal IEnumerable<IMapping> Compile() {
         foreach (var mapping in _mappings) {
             if (mapping.IsIgnored) {
                 continue;
@@ -36,6 +35,6 @@ public sealed class Map<TSource, TDestination>
             }
         }
 
-        return _mappings.ToImmutableArray();
+        return _mappings;
     }
 }

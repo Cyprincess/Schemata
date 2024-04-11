@@ -10,11 +10,4 @@
     <PackageTags>application;business;framework;mapper</PackageTags>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
-    <PackageReference Include="System.Collections.Immutable" />
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.1')) ">
-    <PackageReference Include="System.Collections.Immutable" />
-  </ItemGroup>
-
 </Project>

@@ -32,12 +32,24 @@ public sealed class SimpleMapper : ISimpleMapper
         return _mapper.Map<TSource, TDestination>(source);
     }
 
+    public void Map<TSource, TDestination>(TSource source, TDestination destination) {
+        _mapper.Map(source, destination);
+    }
+
     public object? Map(object source, Type destinationType) {
         return _mapper.Map(source, source.GetType(), destinationType);
     }
 
     public object? Map(object source, Type sourceType, Type destinationType) {
         return _mapper.Map(source, sourceType, destinationType);
+    }
+
+    public void Map(
+        object source,
+        object destination,
+        Type   sourceType,
+        Type   destinationType) {
+        _mapper.Map(source, destination, sourceType, destinationType);
     }
 
     #endregion

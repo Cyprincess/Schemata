@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace Schemata.Mapping.Skeleton.Configurations;
@@ -33,7 +33,7 @@ public sealed class FieldSelection<TSource, TDestination>
         return new(mapping);
     }
 
-    internal ImmutableArray<IMapping> Compile() {
+    internal IEnumerable<IMapping> Compile() {
         return _mapping.Map.Compile();
     }
 }
