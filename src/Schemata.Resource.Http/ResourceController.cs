@@ -118,7 +118,9 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
         await _repository.AddAsync(entity, HttpContext.RequestAborted);
         await _repository.CommitAsync(HttpContext.RequestAborted);
 
-        return CreatedAtAction(nameof(Read), new { id = entity.Id }, entity);
+        var detail = _mapper.Map<TEntity, TDetail>(entity);
+
+        return CreatedAtAction(nameof(Read), new { id = entity.Id }, detail);
     }
 
     [HttpDelete("{id}")]
