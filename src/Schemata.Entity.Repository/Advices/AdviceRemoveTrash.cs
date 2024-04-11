@@ -14,14 +14,16 @@ public sealed class AdviceRemoveTrash<TEntity> : IRepositoryRemoveAsyncAdvice<TE
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
+    public async Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
         if (entity is not ITrash trash) {
-            return Task.FromResult(true);
+            return true;
         }
 
         trash.DeletionDate = DateTime.UtcNow;
 
-        return Task.FromResult(false);
+        await repository.UpdateAsync(entity, ct);
+
+        return false;
     }
 
     #endregion
