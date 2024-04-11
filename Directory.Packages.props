@@ -42,7 +42,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
-    <PackageVersion Include="System.Collections.Immutable" Version="1.7.1" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />
   </ItemGroup>
 
@@ -50,7 +49,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
-    <PackageVersion Include="System.Collections.Immutable" Version="1.7.1" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />
   </ItemGroup>
 

@@ -89,7 +89,13 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
             return NotFound();
         }
 
-        throw new NotImplementedException();
+        _mapper.Map(request, entity);
+
+        await _repository.UpdateAsync(entity, HttpContext.RequestAborted);
+        await _repository.CommitAsync(HttpContext.RequestAborted);
+
+        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        return Ok(detail);
     }
 
     [HttpPost]
@@ -104,7 +110,15 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
             return EmptyResult;
         }
 
-        throw new NotImplementedException();
+        var entity = _mapper.Map<TRequest, TEntity>(request);
+        if (entity is null) {
+            return BadRequest();
+        }
+
+        await _repository.AddAsync(entity, HttpContext.RequestAborted);
+        await _repository.CommitAsync(HttpContext.RequestAborted);
+
+        return CreatedAtAction(nameof(Read), new { id = entity.Id }, entity);
     }
 
     [HttpDelete("{id}")]
