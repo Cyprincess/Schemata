@@ -1,53 +1,44 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Caching.Memory;
-using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataUserRole, SchemataRoleClaim>
+public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>
     where TRole : SchemataRole
 {
     public SchemataRoleStore(
-        IMemoryCache                   cache,
-        IRepository<TRole>             rolesRepository,
-        IRepository<SchemataUserRole>  userRolesRepository,
+        IRepository<TRole> rolesRepository,
         IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IdentityErrorDescriber?        describer = null) : base(cache, rolesRepository, userRolesRepository,
-        roleClaimsRepository, describer) { }
+        IRepository<SchemataUserRole> userRoleRepository,
+        IdentityErrorDescriber? describer = null) : base(rolesRepository, roleClaimsRepository, userRoleRepository, describer) { }
 }
 
-public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>,
-                                                               IRoleDisplayNameStore<TRole>
+public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
     where TRole : SchemataRole
-    where TUserRole : SchemataUserRole, new()
     where TRoleClaim : SchemataRoleClaim, new()
+    where TUserRole : SchemataUserRole, new()
 {
-    protected readonly IMemoryCache            Cache;
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
     protected readonly IRepository<TRole>      RolesRepository;
+    protected readonly IRepository<TUserRole>  UserRoleRepository;
 
     private bool _disposed;
 
     public SchemataRoleStore(
-        IMemoryCache            cache,
         IRepository<TRole>      rolesRepository,
-        IRepository<TUserRole>  userRolesRepository,
         IRepository<TRoleClaim> roleClaimsRepository,
+        IRepository<TUserRole>  userRoleRepository,
         IdentityErrorDescriber? describer = null) {
-        Cache                = cache;
         RolesRepository      = rolesRepository;
         RoleClaimsRepository = roleClaimsRepository;
+        UserRoleRepository   = userRoleRepository;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
     }
 
@@ -94,6 +85,13 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
+        var users = UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Id)), ct);
+        await foreach (var user in users) {
+            await UserRoleRepository.RemoveAsync(user, ct);
+        }
+
+        await UserRoleRepository.CommitAsync(ct);
+
         await RolesRepository.RemoveAsync(role, ct);
         try {
             await RolesRepository.CommitAsync(ct);
@@ -123,7 +121,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult<string?>(role.Name);
+        return Task.FromResult<string?>(role.DisplayName);
     }
 
     /// <inheritdoc />
@@ -134,7 +132,7 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        role.Name = roleName;
+        role.DisplayName = roleName;
         return Task.CompletedTask;
     }
 
@@ -240,38 +238,6 @@ public class SchemataRoleStore<TRole, TUserRole, TRoleClaim> : IQueryableRoleSto
         }
 
         await RoleClaimsRepository.CommitAsync(ct);
-    }
-
-    #endregion
-
-    #region IRoleDisplayNameStore<TRole> Members
-
-    public virtual Task<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
-        TRole             role,
-        CancellationToken ct = default) {
-        if (string.IsNullOrWhiteSpace(role.DisplayNames)) {
-            return Task.FromResult(ImmutableDictionary<CultureInfo, string>.Empty);
-        }
-
-        var key = string.Concat(Constants.Schemata, "\x1e", role.DisplayNames);
-        var names = Cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
-
-            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(role.DisplayNames!);
-            if (names is null) {
-                return ImmutableDictionary<CultureInfo, string>.Empty;
-            }
-
-            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
-
-            foreach (var kv in names) {
-                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-            }
-
-            return builder.ToImmutable();
-        })!;
-
-        return Task.FromResult(names);
     }
 
     #endregion

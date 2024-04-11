@@ -16,11 +16,10 @@ public class SchemataUserStore : SchemataUserStore<SchemataUser>
         IRepository<SchemataUser> users,
         IRepository<SchemataRole> roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserRole> userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
-        describer) { }
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
@@ -30,11 +29,10 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
         IRepository<TUser> users,
         IRepository<SchemataRole> roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserRole> userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
-        describer) { }
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
 public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
@@ -46,18 +44,15 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
         IRepository<TUser> users,
         IRepository<TRole> roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRoles,
+        IRepository<SchemataUserRole> userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRoles, userLogins, userTokens,
-        describer) { }
+        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
-    IUserPhoneStore<TUser>,
-    IUserPrincipalNameStore<TUser>,
-    IProtectedUserStore<TUser>
+    IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserClaim : SchemataUserClaim, new()
@@ -69,7 +64,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     protected readonly IRepository<TRole>      RolesRepository;
     protected readonly IRepository<TUserClaim> UserClaimsRepository;
     protected readonly IRepository<TUserLogin> UserLoginsRepository;
-    protected readonly IRepository<TUserRole>  UserRolesRepository;
+    protected readonly IRepository<TUserRole>  UserRoleRepository;
     protected readonly IRepository<TUser>      UsersRepository;
     protected readonly IRepository<TUserToken> UserTokensRepository;
 
@@ -77,14 +72,14 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         IRepository<TUser>      users,
         IRepository<TRole>      roles,
         IRepository<TUserClaim> userClaims,
-        IRepository<TUserRole>  userRoles,
+        IRepository<TUserRole>  userRole,
         IRepository<TUserLogin> userLogins,
         IRepository<TUserToken> userTokens,
         IdentityErrorDescriber? describer = null) : base(describer ?? new IdentityErrorDescriber()) {
         UsersRepository      = users;
         RolesRepository      = roles;
         UserClaimsRepository = userClaims;
-        UserRolesRepository  = userRoles;
+        UserRoleRepository   = userRole;
         UserLoginsRepository = userLogins;
         UserTokensRepository = userTokens;
     }
@@ -134,6 +129,13 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         if (user == null) {
             throw new ArgumentNullException(nameof(user));
         }
+
+        var roles = UserRoleRepository.ListAsync(q => q.Where(ur => ur.UserId.Equals(user.Id)), ct);
+        await foreach (var role in roles) {
+            await UserRoleRepository.RemoveAsync(role, ct);
+        }
+
+        await UserRoleRepository.CommitAsync(ct);
 
         await UsersRepository.RemoveAsync(user, ct);
         try {
@@ -200,7 +202,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 #nullable disable
     /// <inheritdoc />
     protected override async Task<TUserRole> FindUserRoleAsync(long userId, long roleId, CancellationToken ct) {
-        return await UserRolesRepository.FindAsync([userId, roleId], ct).AsTask();
+        return await UserRoleRepository.FindAsync([userId, roleId], ct).AsTask();
     }
 #nullable restore
 
@@ -253,8 +255,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new InvalidOperationException($"Role {normalizedRoleName} does not exist.");
         }
 
-        await UserRolesRepository.AddAsync(CreateUserRole(user, roleEntity), ct);
-        await UserRolesRepository.CommitAsync(ct);
+        await UserRoleRepository.AddAsync(CreateUserRole(user, roleEntity), ct);
+        await UserRoleRepository.CommitAsync(ct);
     }
 
     /// <inheritdoc />
@@ -282,8 +284,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return;
         }
 
-        await UserRolesRepository.RemoveAsync(userRole, ct);
-        await UserRolesRepository.CommitAsync(ct);
+        await UserRoleRepository.RemoveAsync(userRole, ct);
+        await UserRoleRepository.CommitAsync(ct);
     }
 
     /// <inheritdoc />
@@ -296,8 +298,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         var userId = user.Id;
 
-        var roles = await UserRolesRepository.ListAsync(q => q.Where(r => r.UserId == userId).Select(r => r.RoleId), ct)
-                                             .ToListAsync(ct);
+        var roles = await UserRoleRepository.ListAsync(q => q.Where(r => r.UserId == userId).Select(r => r.RoleId), ct)
+                                            .ToListAsync(ct);
 
         return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Id)).Select(r => r.Name!), ct)
                                     .ToListAsync(ct);
@@ -528,7 +530,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return [];
         }
 
-        var users = await UserRolesRepository
+        var users = await UserRoleRepository
                          .ListAsync(q => q.Where(ur => ur.RoleId == role.Id).Select(ur => ur.UserId), ct)
                          .ToListAsync(ct);
 
