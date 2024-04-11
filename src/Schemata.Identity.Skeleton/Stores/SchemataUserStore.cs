@@ -309,7 +309,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         var roles = await UserRoleRepository.ListAsync(q => q.Where(r => r.UserId == userId).Select(r => r.RoleId), ct)
                                             .ToListAsync(ct);
 
-        return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Id)).Select(r => r.Name!), ct)
+        return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Id)).Select(r => r.DisplayName!), ct)
                                     .ToListAsync(ct);
     }
 
