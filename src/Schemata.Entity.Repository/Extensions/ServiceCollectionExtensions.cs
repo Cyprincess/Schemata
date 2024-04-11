@@ -24,8 +24,6 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddCanonicalName<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTrash<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAsyncAdvice<>), typeof(AdviceQueryTrash<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTimestamp<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveConcurrency<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveTrash<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateTimestamp<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateConcurrency<>)));
