@@ -78,10 +78,12 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             return [attr];
         }
 
-        if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
-            var attr = new NotColumnAttribute();
+        if (member.HasAttribute<System.ComponentModel.DataAnnotations.KeyAttribute>()) {
+            return [new PrimaryKeyAttribute()];
+        }
 
-            return [attr];
+        if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
+            return [new NotColumnAttribute()];
         }
 
         return Array.Empty<MappingAttribute>();
