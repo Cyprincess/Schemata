@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation;
@@ -38,9 +39,9 @@ public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvic
             return true;
         }
 
-        context.Response.StatusCode          = StatusCodes.Status422UnprocessableEntity;
-        context.Response.Headers.ContentType = new("application/json");
-        await context.Response.WriteAsJsonAsync(new { errors }, ct);
+        context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+        context.Response.Headers.Append("Error", errors.Select(kv => $"{kv.Key}={kv.Value}").ToArray());
+
         return false;
     }
 

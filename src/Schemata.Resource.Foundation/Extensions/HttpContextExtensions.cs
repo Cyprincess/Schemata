@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
@@ -36,7 +37,8 @@ public static class HttpContextExtensions
             return AuthorizationResult.Success();
         }
 
-        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        context.Response.StatusCode              = StatusCodes.Status404NotFound;
+        context.Response.Headers.WWWAuthenticate = endpoint.AuthenticationSchemes.ToArray();
 
         return AuthorizationResult.Failed();
     }

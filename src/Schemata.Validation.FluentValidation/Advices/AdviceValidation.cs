@@ -44,7 +44,7 @@ public sealed class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest
                 }
             }
 
-            errors.Add(new("error", $"{field}={code}"));
+            errors.Add(new(field, code));
         }
 
         return true;
