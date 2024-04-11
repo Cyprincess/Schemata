@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -42,6 +43,7 @@ public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurr
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion

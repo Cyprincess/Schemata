@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -46,6 +47,7 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion

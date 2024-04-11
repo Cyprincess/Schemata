@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -38,6 +39,7 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion

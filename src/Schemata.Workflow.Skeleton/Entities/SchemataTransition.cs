@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -40,6 +41,7 @@ public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestam
 
     #region IIdentifier Members
 
+    [Key]
     public virtual long Id { get; set; }
 
     #endregion
