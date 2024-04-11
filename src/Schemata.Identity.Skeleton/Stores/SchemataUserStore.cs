@@ -52,7 +52,7 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
 
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
-    IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
+    IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserClaim : SchemataUserClaim, new()
@@ -88,6 +88,14 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     /// <inheritdoc />
     public override IQueryable<TUser> Users => UsersRepository.AsQueryable();
+
+    #region IUserDisplayNameStore<TUser> Members
+
+    public virtual Task<string?> GetDisplayNameAsync(TUser user, CancellationToken ct) {
+        return Task.FromResult(user.DisplayName);
+    }
+
+    #endregion
 
     #region IUserPhoneStore<TUser> Members
 

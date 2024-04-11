@@ -26,15 +26,26 @@ public class SchemataUserManager<TUser>(
 {
     private readonly IServiceProvider _services = services;
 
-    public virtual async Task<string?> GetUserPrincipalNameAsync(TUser user) {
+    public virtual Task<string?> GetDisplayNameAsync(TUser user) {
         ThrowIfDisposed();
-        var store = GetPrincipalNameStore();
+        var store = GetDisplayNameStore();
 
         if (user == null) {
             throw new ArgumentNullException(nameof(user));
         }
 
-        return await store.GetUserPrincipalNameAsync(user, CancellationToken);
+        return store.GetDisplayNameAsync(user, CancellationToken);
+    }
+
+    public virtual Task<string?> GetUserPrincipalNameAsync(TUser user) {
+        ThrowIfDisposed();
+        var store = GetUserPrincipalNameStore();
+
+        if (user == null) {
+            throw new ArgumentNullException(nameof(user));
+        }
+
+        return store.GetUserPrincipalNameAsync(user, CancellationToken);
     }
 
     public virtual async Task<ClaimsStore> ToClaimsAsync(TUser user) {
@@ -42,9 +53,9 @@ public class SchemataUserManager<TUser>(
 
         claims.AddClaim(ClaimTypes.NameIdentifier, await GetUserIdAsync(user));
         claims.AddClaim(ClaimTypes.Upn, await GetUserPrincipalNameAsync(user));
-        claims.AddClaim(ClaimTypes.Name, await GetUserNameAsync(user));
         claims.AddClaim(ClaimTypes.Email, await GetEmailAsync(user));
         claims.AddClaim(ClaimTypes.MobilePhone, await GetPhoneNumberAsync(user));
+        claims.AddClaim(ClaimTypes.Name, await GetDisplayNameAsync(user));
 
         foreach (var role in await GetRolesAsync(user)) {
             claims.AddClaim(ClaimTypes.Role, role);
@@ -89,8 +100,8 @@ public class SchemataUserManager<TUser>(
         return user;
     }
 
-    private IUserPrincipalNameStore<TUser> GetPrincipalNameStore() {
-        if (Store is not IUserPrincipalNameStore<TUser> cast) {
+    private IUserDisplayNameStore<TUser> GetDisplayNameStore() {
+        if (Store is not IUserDisplayNameStore<TUser> cast) {
             throw new NotSupportedException();
         }
 
@@ -99,6 +110,14 @@ public class SchemataUserManager<TUser>(
 
     private IUserPhoneStore<TUser> GetPhoneNumberStore() {
         if (Store is not IUserPhoneStore<TUser> cast) {
+            throw new NotSupportedException();
+        }
+
+        return cast;
+    }
+
+    private IUserPrincipalNameStore<TUser> GetUserPrincipalNameStore() {
+        if (Store is not IUserPrincipalNameStore<TUser> cast) {
             throw new NotSupportedException();
         }
 
