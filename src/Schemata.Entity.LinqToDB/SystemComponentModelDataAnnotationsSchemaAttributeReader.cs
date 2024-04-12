@@ -82,6 +82,11 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             return [new PrimaryKeyAttribute()];
         }
 
+        var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();
+        if (g is { DatabaseGeneratedOption: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity }) {
+            return [new IdentityAttribute()];
+        }
+
         if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
             return [new NotColumnAttribute()];
         }
