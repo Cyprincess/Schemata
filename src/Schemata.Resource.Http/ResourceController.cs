@@ -47,6 +47,10 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
         var entities = await _repository.ListAsync(q => q.Select(e => e), HttpContext.RequestAborted)
                                         .ToListAsync(HttpContext.RequestAborted);
 
+        if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(_services, entities, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
         var summaries = _mapper.Map<IEnumerable<TEntity>, IEnumerable<TSummary>>(entities);
         return Ok(summaries);
     }
@@ -66,7 +70,12 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
             return NotFound();
         }
 
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(_services, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
         var detail = _mapper.Map<TEntity, TDetail>(entity);
+
         return Ok(detail);
     }
 
@@ -94,7 +103,12 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
         await _repository.UpdateAsync(entity, HttpContext.RequestAborted);
         await _repository.CommitAsync(HttpContext.RequestAborted);
 
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(_services, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
         var detail = _mapper.Map<TEntity, TDetail>(entity);
+
         return Ok(detail);
     }
 
@@ -117,6 +131,10 @@ public sealed class ResourceController<TEntity, TRequest, TDetail, TSummary> : C
 
         await _repository.AddAsync(entity, HttpContext.RequestAborted);
         await _repository.CommitAsync(HttpContext.RequestAborted);
+
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(_services, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
 
         var detail = _mapper.Map<TEntity, TDetail>(entity);
 
