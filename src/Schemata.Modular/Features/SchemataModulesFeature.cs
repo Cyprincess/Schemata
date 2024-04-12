@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
@@ -18,7 +19,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
 {
-    public override int Priority => 2_147_400_000;
+    public override int Priority => Constants.Orders.Max;
 
     public override void ConfigureServices(
         IServiceCollection  services,
@@ -47,7 +48,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
                         var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
                         if (authorize is not null) {
                             var policy = new ResourcePolicyAttribute {
-                                Methods = string.Join(',', [
+                                Methods = string.Join(",", [
                                     nameof(resource.Browse), nameof(resource.Read), nameof(resource.Edit),
                                     nameof(resource.Add), nameof(resource.Delete),
                                 ]),

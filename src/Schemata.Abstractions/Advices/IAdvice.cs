@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Schemata.Abstractions;
+namespace Schemata.Abstractions.Advices;
 
 public interface IAdvice : IFeature;
 

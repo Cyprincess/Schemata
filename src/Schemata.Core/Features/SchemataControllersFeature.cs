@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Schemata.Core.Middlewares;
 
 namespace Schemata.Core.Features;
 
@@ -25,7 +26,11 @@ public sealed class SchemataControllersFeature : FeatureBase
         var configure = configurators.PopOrDefault<MvcOptions>();
         var build     = configurators.PopOrDefault<IMvcBuilder>();
 
-        var builder = services.AddControllers(configure);
+        var builder = services.AddControllers(options => {
+            options.Filters.Add<HttpExceptionFilter>();
+
+            configure(options);
+        });
 
         builder.ConfigureApplicationPartManager(manager => {
             var parts = manager.ApplicationParts.OfType<AssemblyPart>()

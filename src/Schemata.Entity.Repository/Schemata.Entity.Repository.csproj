@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+    <ProjectReference Include="..\Schemata.Pipeline\Schemata.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

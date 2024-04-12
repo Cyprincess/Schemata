@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
-using Schemata.Validation.FluentValidation.Advices;
+using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
@@ -14,12 +14,10 @@ public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvic
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
-    private readonly IServiceProvider     _services;
-    private readonly IValidator<TRequest> _validator;
+    private readonly IServiceProvider _services;
 
-    public AdviceEditValidation(IServiceProvider services, IValidator<TRequest> validator) {
-        _services  = services;
-        _validator = validator;
+    public AdviceEditValidation(IServiceProvider services) {
+        _services = services;
     }
 
     #region IResourceEditAdvice<TEntity,TRequest> Members
@@ -34,15 +32,12 @@ public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvic
         HttpContext       context,
         CancellationToken ct = default) {
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_services, _validator, request, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_services, Operations.Edit, request, errors, ct);
         if (pass) {
             return true;
         }
 
-        context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
-        context.Response.Headers.Append("Error", errors.Select(kv => $"{kv.Key}={kv.Value}").ToArray());
-
-        return false;
+        throw new ValidationException(errors);
     }
 
     #endregion

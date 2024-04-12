@@ -1,4 +1,4 @@
-using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Entity.Repository.Advices;
 

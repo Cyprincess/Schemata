@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata;

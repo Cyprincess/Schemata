@@ -1,8 +1,8 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 
 // ReSharper disable once CheckNamespace
@@ -37,9 +37,6 @@ public static class HttpContextExtensions
             return AuthorizationResult.Success();
         }
 
-        context.Response.StatusCode              = StatusCodes.Status404NotFound;
-        context.Response.Headers.WWWAuthenticate = endpoint.AuthenticationSchemes.ToArray();
-
-        return AuthorizationResult.Failed();
+        throw new AuthorizationException();
     }
 }

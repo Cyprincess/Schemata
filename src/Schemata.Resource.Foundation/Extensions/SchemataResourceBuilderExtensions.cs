@@ -44,7 +44,7 @@ public static class SchemataResourceBuilderExtensions
         var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
         if (authorize is not null) {
             var policy = new ResourcePolicyAttribute {
-                Methods = string.Join(',', [
+                Methods = string.Join(",", [
                     nameof(resource.Browse), nameof(resource.Read), nameof(resource.Edit),
                     nameof(resource.Add), nameof(resource.Delete),
                 ]),
