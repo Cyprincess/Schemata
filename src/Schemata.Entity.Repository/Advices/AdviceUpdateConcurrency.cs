@@ -19,9 +19,9 @@ public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAsyncAdv
             return true;
         }
 
-        var stored = await repository.GetAsync(entity, ct);
+        var stored = await repository.GetAsync<IConcurrency>(entity, ct);
 
-        if (OfType<IConcurrency>(stored)?.Timestamp != concurrency.Timestamp) {
+        if (stored?.Timestamp != concurrency.Timestamp) {
             throw new ConcurrencyException();
         }
 
@@ -31,9 +31,4 @@ public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAsyncAdv
     }
 
     #endregion
-
-    public TResult? OfType<TResult>(object? entity)
-        where TResult : class {
-        return entity as TResult;
-    }
 }

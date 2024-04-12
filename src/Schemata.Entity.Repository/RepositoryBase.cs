@@ -159,7 +159,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         CancellationToken                               ct = default);
 
     public virtual ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default) {
-        var type = typeof(TEntity);
+        return GetAsync<TEntity>(entity, ct);
+    }
+
+    public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default) {
+        var type = entity.GetType();
 
         var properties = KeyPropertiesCache(type);
         if (properties.Count == 0) {
@@ -176,10 +180,44 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             keys.Add(value);
         }
 
-        return FindAsync(keys.ToArray(), ct);
+        return FindAsync<TResult>(keys.ToArray(), ct);
     }
 
-    public abstract ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
+    public virtual ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
+        return FindAsync<TEntity>(keys, ct);
+    }
+
+    public virtual async ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        var type = typeof(TEntity);
+
+        var properties = KeyPropertiesCache(type);
+        if (properties.Count == 0) {
+            throw new ArgumentException("Entity must have at least one [Key]");
+        }
+
+        if (properties.Count != keys.Length) {
+            throw new ArgumentException("Entity key count mismatch");
+        }
+
+        var predicate = Predicate.True<TEntity>();
+
+        var instance = Expression.Parameter(type, "e");
+
+        for (var i = 0; i < properties.Count; i++) {
+            var info     = properties[i];
+            var property = Expression.Property(instance, info);
+            var value    = Expression.Constant(keys[i]);
+            var equality = Expression.Equal(property, value);
+
+            var lambda = Expression.Lambda<Func<TEntity, bool>>(equality, instance);
+
+            predicate = predicate.And(lambda);
+        }
+
+        return await SingleOrDefaultAsync<TResult>(q => q.Where(predicate).OfType<TResult>(), ct);
+    }
 
     public abstract ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -230,10 +268,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             return predicate(table);
         }
 
-        if (typeof(TResult) == typeof(TEntity)) {
-            return (IQueryable<TResult>)table;
-        }
-
-        return table.Select(e => (TResult)(object)e);
+        return table.OfType<TResult>();
     }
 }
