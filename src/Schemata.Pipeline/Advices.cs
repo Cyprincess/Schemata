@@ -12,7 +12,7 @@ public static class Advices<TAdvice>
     where TAdvice : IAdvice
 {
     public static async Task<bool> AdviseAsync<T1>(IServiceProvider sp, T1 a1, CancellationToken ct = default) {
-        var advices = sp.GetServices<TAdvice>().OfType<IAdvice<T1>>().OrderBy(a => a.Order).ToList();
+        var advices = sp.GetServices<TAdvice>().Cast<IAdvice<T1>>().OrderBy(a => a.Order).ToList();
         foreach (var advice in advices) {
             ct.ThrowIfCancellationRequested();
             var next = await advice.AdviseAsync(a1, ct);
@@ -29,7 +29,7 @@ public static class Advices<TAdvice>
         T1                a1,
         T2                a2,
         CancellationToken ct = default) {
-        var advices = sp.GetServices<TAdvice>().OfType<IAdvice<T1, T2>>().OrderBy(a => a.Order).ToList();
+        var advices = sp.GetServices<TAdvice>().Cast<IAdvice<T1, T2>>().OrderBy(a => a.Order).ToList();
         foreach (var advice in advices) {
             ct.ThrowIfCancellationRequested();
             var next = await advice.AdviseAsync(a1, a2, ct);
@@ -47,7 +47,7 @@ public static class Advices<TAdvice>
         T2                a2,
         T3                a3,
         CancellationToken ct = default) {
-        var advices = sp.GetServices<TAdvice>().OfType<IAdvice<T1, T2, T3>>().OrderBy(a => a.Order).ToList();
+        var advices = sp.GetServices<TAdvice>().Cast<IAdvice<T1, T2, T3>>().OrderBy(a => a.Order).ToList();
         foreach (var advice in advices) {
             ct.ThrowIfCancellationRequested();
             var next = await advice.AdviseAsync(a1, a2, a3, ct);
@@ -66,7 +66,7 @@ public static class Advices<TAdvice>
         T3                a3,
         T4                a4,
         CancellationToken ct = default) {
-        var advices = sp.GetServices<TAdvice>().OfType<IAdvice<T1, T2, T3, T4>>().OrderBy(a => a.Order).ToList();
+        var advices = sp.GetServices<TAdvice>().Cast<IAdvice<T1, T2, T3, T4>>().OrderBy(a => a.Order).ToList();
         foreach (var advice in advices) {
             ct.ThrowIfCancellationRequested();
             var next = await advice.AdviseAsync(a1, a2, a3, a4, ct);
@@ -86,7 +86,7 @@ public static class Advices<TAdvice>
         T4                a4,
         T5                a5,
         CancellationToken ct = default) {
-        var advices = sp.GetServices<TAdvice>().OfType<IAdvice<T1, T2, T3, T4, T5>>().OrderBy(a => a.Order).ToList();
+        var advices = sp.GetServices<TAdvice>().Cast<IAdvice<T1, T2, T3, T4, T5>>().OrderBy(a => a.Order).ToList();
         foreach (var advice in advices) {
             ct.ThrowIfCancellationRequested();
             var next = await advice.AdviseAsync(a1, a2, a3, a4, a5, ct);
@@ -108,7 +108,7 @@ public static class Advices<TAdvice>
         T6                a6,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -133,7 +133,7 @@ public static class Advices<TAdvice>
         T7                a7,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -159,7 +159,7 @@ public static class Advices<TAdvice>
         T8                a8,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -186,7 +186,7 @@ public static class Advices<TAdvice>
         T9                a9,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -214,7 +214,7 @@ public static class Advices<TAdvice>
         T10               a10,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -243,7 +243,7 @@ public static class Advices<TAdvice>
         T11               a11,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -273,7 +273,7 @@ public static class Advices<TAdvice>
         T12               a12,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -304,7 +304,7 @@ public static class Advices<TAdvice>
         T13               a13,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -336,7 +336,7 @@ public static class Advices<TAdvice>
         T14               a14,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -369,7 +369,7 @@ public static class Advices<TAdvice>
         T15               a15,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
@@ -403,7 +403,7 @@ public static class Advices<TAdvice>
         T16               a16,
         CancellationToken ct = default) {
         var advices = sp.GetServices<TAdvice>()
-                        .OfType<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>>()
+                        .Cast<IAdvice<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>>()
                         .OrderBy(a => a.Order)
                         .ToList();
         foreach (var advice in advices) {
