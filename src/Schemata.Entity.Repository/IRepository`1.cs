@@ -19,7 +19,11 @@ public interface IRepository<TEntity>
 
     ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
 
+    ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default);
+
     ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
+
+    ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default);
 
     ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,

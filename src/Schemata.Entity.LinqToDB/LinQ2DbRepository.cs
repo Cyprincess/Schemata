@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -60,38 +59,6 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             ct.ThrowIfCancellationRequested();
             yield return entity;
         }
-    }
-
-    public override async ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
-
-        var type = typeof(TEntity);
-
-        var properties = KeyPropertiesCache(type);
-        if (properties.Count == 0) {
-            throw new ArgumentException("Entity must have at least one [Key]");
-        }
-
-        if (properties.Count != keys.Length) {
-            throw new ArgumentException("Entity key count mismatch");
-        }
-
-        var query = Predicate.True<TEntity>();
-
-        var instance = Expression.Parameter(type, "e");
-
-        for (var i = 0; i < properties.Count; i++) {
-            var info     = properties[i];
-            var property = Expression.Property(instance, info);
-            var value    = Expression.Constant(keys[i]);
-            var equality = Expression.Equal(property, value);
-
-            var lambda = Expression.Lambda<Func<TEntity, bool>>(equality, instance);
-
-            query = query.And(lambda);
-        }
-
-        return await Table.FirstOrDefaultAsync(query, ct);
     }
 
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(

@@ -46,10 +46,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         }
     }
 
-    public override async ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
-        return await DbSet.FindAsync(keys, ct);
-    }
-
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
