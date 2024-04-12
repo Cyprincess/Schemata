@@ -11,8 +11,6 @@ namespace Schemata.Workflow.Skeleton.Entities;
 [CanonicalName("workflows/{workflow}")]
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 {
-    public virtual string Type { get; set; } = null!;
-
     public virtual long InstanceId { get; set; }
 
     public virtual string InstanceType { get; set; } = null!;

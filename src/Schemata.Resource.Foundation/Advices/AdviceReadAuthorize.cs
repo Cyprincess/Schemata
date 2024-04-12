@@ -12,8 +12,8 @@ public sealed class AdviceReadAuthorize<TEntity> : IResourceReadAdvice<TEntity>
 {
     private readonly SchemataResourceOptions _options;
 
-    public AdviceReadAuthorize(IOptionsMonitor<SchemataResourceOptions> options) {
-        _options = options.CurrentValue;
+    public AdviceReadAuthorize(IOptions<SchemataResourceOptions> options) {
+        _options = options.Value;
     }
 
     #region IResourceReadAdvice<TEntity> Members

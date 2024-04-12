@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -16,7 +17,7 @@ public class AdviceAddCanonicalName
 {
     protected static readonly Regex ResourceNameRegex = new(@"\{(?<name>\w+)\}");
 
-    protected static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> PropertiesCache = new();
+    protected static readonly ConcurrentDictionary<Type, Dictionary<string, PropertyInfo>> PropertiesCache = new();
 }
 
 public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IRepositoryAddAsyncAdvice<TEntity>
@@ -51,7 +52,7 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
                                      | BindingFlags.Instance)
                         .ToDictionary(p => p.Name, p => p);
 
-            PropertiesCache.Add(type, properties);
+            PropertiesCache[type] = properties;
         }
 
         var name = ResourceNameRegex.Replace(attribute.ResourceName, m => {

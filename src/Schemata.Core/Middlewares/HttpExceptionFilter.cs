@@ -7,7 +7,7 @@ namespace Schemata.Core.Middlewares;
 
 public class HttpExceptionFilter : IActionFilter, IOrderedFilter
 {
-    public int Order => Constants.Orders.Max;
+    #region IActionFilter Members
 
     public void OnActionExecuting(ActionExecutingContext context) { }
 
@@ -32,4 +32,12 @@ public class HttpExceptionFilter : IActionFilter, IOrderedFilter
 
         context.ExceptionHandled = true;
     }
+
+    #endregion
+
+    #region IOrderedFilter Members
+
+    public int Order => Constants.Orders.Max;
+
+    #endregion
 }
