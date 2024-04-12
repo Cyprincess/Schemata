@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
@@ -33,10 +34,7 @@ public sealed class AdviceAddValidation<TEntity, TRequest> : IResourceAddAdvice<
             return true;
         }
 
-        context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
-        context.Response.Headers.Append("Error", errors.Select(kv => $"{kv.Key}={kv.Value}").ToArray());
-
-        return false;
+        throw new ValidationException(errors);
     }
 
     #endregion

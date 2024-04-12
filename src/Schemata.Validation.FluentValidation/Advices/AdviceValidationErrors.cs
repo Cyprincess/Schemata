@@ -10,7 +10,7 @@ public sealed class AdviceValidationErrors<T> : IValidationAsyncAdvice<T>
 {
     #region IValidationAsyncAdvice<T> Members
 
-    public int Order => 2_147_400_000;
+    public int Order => Constants.Orders.Max;
 
     public int Priority => Order;
 

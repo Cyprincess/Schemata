@@ -13,4 +13,9 @@ public static class Constants
     }
 
     #endregion
+
+    public static class Orders
+    {
+        public const int Max = 2_147_400_000;
+    }
 }

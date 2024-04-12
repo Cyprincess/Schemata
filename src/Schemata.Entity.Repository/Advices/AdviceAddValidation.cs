@@ -19,7 +19,7 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAsyncAdvice<TEn
 
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 
-    public int Order => 2_147_400_000;
+    public int Order => Constants.Orders.Max;
 
     public int Priority => Order;
 
