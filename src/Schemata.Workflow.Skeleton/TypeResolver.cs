@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using Schemata.Abstractions;
 
 namespace Schemata.Workflow.Skeleton;
 
@@ -32,18 +33,7 @@ public sealed class TypeResolver : ITypeResolver
             return true;
         }
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        foreach (var assembly in assemblies) {
-            type = assembly.GetType(name, false);
-            if (type == null) {
-                continue;
-            }
-
-            _types.TryAdd(name!, type);
-            return true;
-        }
-
-        return false;
+        return AppDomainTypeCache.Types.TryGetValue(name!, out type);
     }
 
     #endregion

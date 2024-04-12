@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Core.Json;
 
 namespace Schemata.Core.Features;
 
@@ -17,21 +17,21 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var configure = configurators.Pop<JsonSerializerOptions>();
+        var configure = configurators.PopOrDefault<JsonSerializerOptions>();
 
         var @enum = new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
 
         services.Configure<JsonSerializerOptions>(options => {
             options.MaxDepth = 32;
 
-            options.TypeInfoResolver = JsonSerializer.IsReflectionEnabledByDefault
-                ? new DefaultJsonTypeInfoResolver()
-                : JsonTypeInfoResolver.Combine();
+            options.TypeInfoResolver = new PolymorphicTypeResolver();
 
             Configure(options);
         });
 
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
+            options.SerializerOptions.TypeInfoResolver = new PolymorphicTypeResolver();
+
             Configure(options.SerializerOptions);
         });
 
@@ -40,6 +40,8 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         }
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
+            options.JsonSerializerOptions.TypeInfoResolver = new PolymorphicTypeResolver();
+
             Configure(options.JsonSerializerOptions);
         });
 

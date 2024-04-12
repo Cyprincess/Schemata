@@ -14,7 +14,7 @@ public static class AutoMapperConfigurator
     public static IMapperConfigurationExpression Configure(
         IMapperConfigurationExpression config,
         SchemataMappingOptions         options) {
-        var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map), BindingFlags.NonPublic | BindingFlags.Static);
+        var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map), BindingFlags.Static | BindingFlags.NonPublic);
         foreach (var group in options.Mappings.GroupBy(m => (m.SourceType, m.DestinationType))) {
             var invoke = method!.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
             invoke.Invoke(null, [config, group]);

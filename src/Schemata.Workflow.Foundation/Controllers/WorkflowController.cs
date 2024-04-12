@@ -1,13 +1,23 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
+using GreenPipes.Internals.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
+using Schemata.Abstractions.Resource;
+using Schemata.Mapping.Skeleton;
+using Schemata.Workflow.Foundation.Advices;
+using Schemata.Workflow.Skeleton.Entities;
 using Schemata.Workflow.Skeleton.Managers;
+using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Foundation.Controllers;
 
@@ -16,17 +26,63 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Route("~/[controller]")]
 public sealed class WorkflowController : ControllerBase
 {
+    private static readonly Dictionary<Type, Type> Types = [];
+
     private readonly ILogger<WorkflowController>              _logger;
+    private readonly ISimpleMapper                            _mapper;
     private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;
     private readonly IServiceProvider                         _services;
 
     public WorkflowController(
         ILogger<WorkflowController>              logger,
+        ISimpleMapper                            mapper,
         IOptionsMonitor<SchemataWorkflowOptions> options,
         IServiceProvider                         services) {
         _logger   = logger;
+        _mapper   = mapper;
         _options  = options;
         _services = services;
+    }
+
+    private EmptyResult EmptyResult { get; } = new();
+
+    [HttpPost]
+    public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
+        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, request, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
+        if (request.Instance is null) {
+            return BadRequest();
+        }
+
+        var rt = request.Instance.GetType();
+        if (!Types.TryGetValue(rt, out var it)) {
+            it = AppDomainTypeCache.Types.Values.Where(t => t.HasAttribute<ResourceAttribute>())
+                                   .Select(t => new { Type = t, Attribute = t.GetCustomAttribute<ResourceAttribute>() })
+                                   .Where(t => t.Attribute!.Request == rt)
+                                   .Select(t => t.Type)
+                                   .FirstOrDefault();
+            if (it is null) {
+                return BadRequest();
+            }
+
+            Types[rt] = it;
+        }
+
+        var instance = _mapper.Map<IStatefulEntity>(request.Instance, rt, it);
+        if (instance is null) {
+            return BadRequest();
+        }
+
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
+            _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
+
+        var manager = (IWorkflowManager)_services.GetRequiredService(type);
+
+        var workflow = await manager.CreateAsync(instance);
+
+        return Ok(workflow);
     }
 
     [HttpGet("{id:long}")]

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -14,6 +15,8 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     where TWorkflow : SchemataWorkflow
     where TResponse : WorkflowResponse
 {
+    Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default);
+
     Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default);
 
     Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default);
@@ -21,6 +24,10 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     Task<IStatefulEntity?> GetInstanceAsync(TWorkflow workflow, CancellationToken ct = default);
 
     IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default);
+
+    Task<TWorkflow?> CreateAsync(IStatefulEntity instance, CancellationToken ct = default);
+
+    Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default);
 
     Task RaiseAsync<TEvent>(TWorkflow workflow, TEvent @event, CancellationToken ct = default)
         where TEvent : class, IEvent;

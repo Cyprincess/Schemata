@@ -23,8 +23,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder                                                    builder,
         Action<SchemataWorkflowOptions>?                                        configure = null,
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, WorkflowResponse>>? mapping   = null)
-        where TTransition : SchemataTransition
-        where TWorkflow : SchemataWorkflow {
+        where TTransition : SchemataTransition, new()
+        where TWorkflow : SchemataWorkflow, new() {
         return UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(builder, configure, mapping);
     }
 
@@ -32,8 +32,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder                                             builder,
         Action<SchemataWorkflowOptions>?                                 configure = null,
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>? mapping   = null)
-        where TTransition : SchemataTransition
-        where TWorkflow : SchemataWorkflow
+        where TTransition : SchemataTransition, new()
+        where TWorkflow : SchemataWorkflow, new()
         where TResponse : WorkflowResponse {
         builder.Configure<SchemataWorkflowOptions>(options => {
             configure?.Invoke(options);
