@@ -1,21 +1,22 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using FluentValidation;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
-public sealed class AdviceValidationErrors<TRequest> : IValidationAsyncAdvice<TRequest>
+public sealed class AdviceValidationErrors<T> : IValidationAsyncAdvice<T>
 {
-    #region IValidationAsyncAdvice<TRequest> Members
+    #region IValidationAsyncAdvice<T> Members
 
     public int Order => 2_147_400_000;
 
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(
-        IValidator<TRequest>                validator,
-        TRequest                            request,
+        Operations                          operation,
+        T                                   request,
         IList<KeyValuePair<string, string>> errors,
         CancellationToken                   ct = default) {
         return Task.FromResult(errors.Count == 0);

@@ -196,7 +196,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         Expression<Func<TToken, bool>> query = t => (t.Status != Statuses.Inactive && t.Status != Statuses.Valid)
-                                                  || t.ExpirationDate < DateTime.UtcNow;
+                                                 || t.ExpirationDate < DateTime.UtcNow;
         var tokens = _tokens.ListAsync(q => q.Where(t => t.CreationDate < threshold.UtcDateTime).Where(query), ct);
         var count  = 0L;
 

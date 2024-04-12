@@ -1,5 +1,5 @@
 using System;
 
-namespace Schemata.Entity.Repository;
+namespace Schemata.Abstractions.Exceptions;
 
 public sealed class ConcurrencyException : Exception;

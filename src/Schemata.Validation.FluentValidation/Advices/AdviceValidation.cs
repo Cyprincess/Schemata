@@ -3,23 +3,34 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation;
 using Humanizer;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
-public sealed class AdviceValidation<TRequest> : IValidationAsyncAdvice<TRequest>
+public sealed class AdviceValidation<T> : IValidationAsyncAdvice<T>
 {
-    #region IValidationAsyncAdvice<TRequest> Members
+    private readonly IValidator<T> _validator;
+
+    public AdviceValidation(IValidator<T> validator) {
+        _validator = validator;
+    }
+
+    #region IValidationAsyncAdvice<T> Members
 
     public int Order => 1_000_000_000;
 
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(
-        IValidator<TRequest>                validator,
-        TRequest                            request,
+        Operations                          operation,
+        T                                   request,
         IList<KeyValuePair<string, string>> errors,
         CancellationToken                   ct = default) {
-        var results = await validator.ValidateAsync(request, ct);
+        var context = new ValidationContext<T>(request, null, ValidatorOptions.Global.ValidatorSelectors.DefaultValidatorSelectorFactory());
+        context.RootContextData[nameof(Operations)] = operation;
+
+        var results = await _validator.ValidateAsync(context, ct);
         if (results.IsValid || results.Errors.Count == 0) {
             return true;
         }

@@ -1,4 +1,4 @@
-namespace Schemata.Authorization.Skeleton.Models;
+namespace Schemata.Abstractions;
 
 public class ErrorResponse
 {
