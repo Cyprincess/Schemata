@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Automatonymous;
+using Automatonymous.Graphing;
 using Schemata.Abstractions.Entities;
 using Schemata.Workflow.Skeleton.Entities;
 
@@ -30,5 +31,12 @@ public static class StateMachineBaseExtensions
         ct.ThrowIfCancellationRequested();
         var events = await machine.NextEvents(instance);
         return events.Select(e => e.Name);
+    }
+
+    public static Task<StateMachineGraph> GetGraphAsync<TI>(this StateMachineBase<TI> machine, CancellationToken ct)
+        where TI : class, IStatefulEntity {
+        ct.ThrowIfCancellationRequested();
+        var graph = machine.GetGraph();
+        return Task.FromResult(graph);
     }
 }

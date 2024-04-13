@@ -70,14 +70,21 @@ public sealed class WorkflowController : ControllerBase
             return BadRequest();
         }
 
-        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
-            _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType, _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
 
         var manager = (IWorkflowManager)_services.GetRequiredService(type);
 
         var workflow = await manager.CreateAsync(instance);
+        if (workflow == null) {
+            return BadRequest();
+        }
 
-        return Ok(workflow);
+        var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        if (response == null) {
+            return NotFound();
+        }
+
+        return Ok(response);
     }
 
     [HttpGet("{id:long}")]
