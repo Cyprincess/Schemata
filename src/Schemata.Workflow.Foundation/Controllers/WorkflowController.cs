@@ -1,18 +1,14 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
-using GreenPipes.Internals.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
-using Schemata.Abstractions.Resource;
 using Schemata.Mapping.Skeleton;
 using Schemata.Workflow.Foundation.Advices;
 using Schemata.Workflow.Skeleton.Entities;
@@ -26,25 +22,25 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Route("~/[controller]")]
 public sealed class WorkflowController : ControllerBase
 {
-    private static readonly Dictionary<Type, Type> Types = [];
+    private static readonly ConcurrentDictionary<Type, Type> Types = [];
 
     private readonly ILogger<WorkflowController>              _logger;
     private readonly ISimpleMapper                            _mapper;
     private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;
-    private readonly SchemataResourceOptions        _resources;
+    private readonly SchemataResourceOptions                  _resources;
     private readonly IServiceProvider                         _services;
 
     public WorkflowController(
         ILogger<WorkflowController>              logger,
         ISimpleMapper                            mapper,
         IOptionsMonitor<SchemataWorkflowOptions> options,
-        IOptions<SchemataResourceOptions>       resources,
+        IOptions<SchemataResourceOptions>        resources,
         IServiceProvider                         services) {
-        _logger   = logger;
-        _mapper   = mapper;
-        _options  = options;
+        _logger    = logger;
+        _mapper    = mapper;
+        _options   = options;
         _resources = resources.Value;
-        _services = services;
+        _services  = services;
     }
 
     private EmptyResult EmptyResult { get; } = new();

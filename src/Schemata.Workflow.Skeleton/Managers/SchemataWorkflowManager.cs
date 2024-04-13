@@ -47,14 +47,6 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return GetInstanceTypeAsync(type, ct);
     }
 
-    public Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default) {
-        if (!_resolver.TryResolveType(type, out var it)) {
-            return Task.FromResult<Type?>(null);
-        }
-
-        return Task.FromResult(it);
-    }
-
     async Task<SchemataWorkflow?> IWorkflowManager.FindAsync(long id, CancellationToken ct) {
         return await FindAsync(id, ct);
     }
@@ -94,6 +86,14 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     #endregion
 
     #region IWorkflowManager<TWorkflow,TTransition,TResponse> Members
+
+    public Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default) {
+        if (!_resolver.TryResolveType(type, out var it)) {
+            return Task.FromResult<Type?>(null);
+        }
+
+        return Task.FromResult(it);
+    }
 
     public virtual async Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default) {
         return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);

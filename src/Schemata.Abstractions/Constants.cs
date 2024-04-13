@@ -14,8 +14,12 @@ public static class Constants
 
     #endregion
 
+    #region Nested type: Orders
+
     public static class Orders
     {
         public const int Max = 2_147_400_000;
     }
+
+    #endregion
 }

@@ -45,7 +45,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         }
 
         var entities = await Repository.ListAsync(q => q.Select(e => e), HttpContext.RequestAborted)
-                                        .ToListAsync(HttpContext.RequestAborted);
+                                       .ToListAsync(HttpContext.RequestAborted);
 
         if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(ServiceProvider, entities, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
