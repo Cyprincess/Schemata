@@ -26,10 +26,16 @@ public static class MapsterConfigurator
 
         foreach (var mapping in mappings) {
             mapping.Invoke((
+                with,
                 destination,
                 source,
                 condition,
                 ignored) => {
+                if (with is Expression<Func<TSource, TDestination>> converter) {
+                    setter.MapWith(converter);
+                    return;
+                }
+
                 if (destination is not Expression<Func<TDestination, object>> member) {
                     return;
                 }

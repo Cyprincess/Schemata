@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-using Automatonymous.Graphing;
 using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Mapping.Skeleton.Configurations;
@@ -44,14 +42,6 @@ public static class SchemataBuilderExtensions
             options.WorkflowResponseType   = typeof(TResponse);
             options.TransitionType         = typeof(TTransition);
             options.TransitionResponseType = typeof(TransitionResponse);
-        });
-
-        builder.Configure<Map<StateMachineGraph, WorkflowGraphResponse>>(map => {
-            map.For(d => d.Vertices).From(s => s.Vertices.Select(v => v.Title));
-            map.For(d => d.Edges)
-           .From(s => s.Edges.Select(e => new {
-                From = e.From.Title, To = e.To.Title,
-            }));
         });
 
         builder.Configure<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>(map => {

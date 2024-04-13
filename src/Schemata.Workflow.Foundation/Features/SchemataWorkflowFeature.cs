@@ -1,3 +1,4 @@
+using Automatonymous.Graphing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +31,7 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        var map = configurators.Pop<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>();
+        var mapping = configurators.Pop<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>();
 
         var part = new SchemataExtensionPart<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
         services.AddMvcCore()
@@ -42,6 +43,10 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
         services.TryAddScoped<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
         services.TryAddScoped<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
 
-        services.Map(map);
+        services.Map<Vertex, string>(map => {
+            map.With(s => s.Title);
+        });
+
+        services.Map(mapping);
     }
 }
