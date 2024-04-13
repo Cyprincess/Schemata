@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Automatonymous;
+using Automatonymous.Graphing;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
@@ -188,14 +189,16 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return null;
         }
 
-        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync), BindingFlags.Static | BindingFlags.Public);
-        var invoke = method!.MakeGenericMethod(type);
+        var visit = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetGraphAsync), BindingFlags.Static | BindingFlags.Public);
+        var graph = await (Task<StateMachineGraph>)visit!.MakeGenericMethod(type).Invoke(null, [machine, ct])!;
 
-        var events = await (Task<IEnumerable<string>>)invoke.Invoke(null, [machine, instance, ct])!;
+        var next = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync), BindingFlags.Static | BindingFlags.Public);
+        var events = await (Task<IEnumerable<string>>)next!.MakeGenericMethod(type).Invoke(null, [machine, instance, ct])!;
 
         var details = new WorkflowDetails<TWorkflow, TTransition> {
             Workflow    = workflow,
             Instance    = instance,
+            Graph       = graph,
             Events      = events.ToList(),
             Transitions = transitions,
         };
