@@ -6,7 +6,7 @@ namespace Schemata.Workflow.Skeleton.Models;
 
 public class WorkflowResponse : IIdentifier, IStateful, ITimestamp
 {
-    public virtual WorkflowGraphResponse? Graph { get; set; }
+    public virtual GraphResponse? Graph { get; set; }
 
     public virtual List<string>? Events { get; set; }
 

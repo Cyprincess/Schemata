@@ -22,8 +22,18 @@ public sealed class Map<TSource, TDestination>
         return new(mapping);
     }
 
+    public Map<TSource, TDestination> With(Expression<Func<TSource, TDestination>> with) {
+        var mapping = Add(new(this));
+        mapping.SetWithExpression(with);
+        return this;
+    }
+
     internal IEnumerable<IMapping> Compile() {
         foreach (var mapping in _mappings) {
+            if (mapping.IsConverter) {
+                continue;
+            }
+
             if (mapping.IsIgnored) {
                 continue;
             }

@@ -1,6 +1,6 @@
 namespace Schemata.Workflow.Skeleton.Models;
 
-public class WorkflowEdgeResponse
+public class EdgeResponse
 {
     public virtual string? To { get; set; }
 
