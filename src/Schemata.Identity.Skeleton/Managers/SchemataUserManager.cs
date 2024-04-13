@@ -13,14 +13,14 @@ namespace Schemata.Identity.Skeleton.Managers;
 
 public class SchemataUserManager<TUser>(
     IUserStore<TUser>                      store,
-    IOptions<IdentityOptions>              optionsAccessor,
+    IOptions<IdentityOptions>              options,
     IPasswordHasher<TUser>                 passwordHasher,
     IEnumerable<IUserValidator<TUser>>     userValidators,
     IEnumerable<IPasswordValidator<TUser>> passwordValidators,
     ILookupNormalizer                      keyNormalizer,
     IdentityErrorDescriber                 errors,
     IServiceProvider                       services,
-    ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store, optionsAccessor, passwordHasher,
+    ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store, options, passwordHasher,
     userValidators, passwordValidators, keyNormalizer, errors, services, logger)
     where TUser : class
 {

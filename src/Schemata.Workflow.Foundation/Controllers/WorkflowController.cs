@@ -31,16 +31,19 @@ public sealed class WorkflowController : ControllerBase
     private readonly ILogger<WorkflowController>              _logger;
     private readonly ISimpleMapper                            _mapper;
     private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;
+    private readonly SchemataResourceOptions        _resources;
     private readonly IServiceProvider                         _services;
 
     public WorkflowController(
         ILogger<WorkflowController>              logger,
         ISimpleMapper                            mapper,
         IOptionsMonitor<SchemataWorkflowOptions> options,
+        IOptions<SchemataResourceOptions>       resources,
         IServiceProvider                         services) {
         _logger   = logger;
         _mapper   = mapper;
         _options  = options;
+        _resources = resources.Value;
         _services = services;
     }
 
@@ -58,11 +61,7 @@ public sealed class WorkflowController : ControllerBase
 
         var rt = request.Instance.GetType();
         if (!Types.TryGetValue(rt, out var it)) {
-            it = AppDomainTypeCache.Types.Values.Where(t => t.HasAttribute<ResourceAttribute>())
-                                   .Select(t => new { Type = t, Attribute = t.GetCustomAttribute<ResourceAttribute>() })
-                                   .Where(t => t.Attribute!.Request == rt)
-                                   .Select(t => t.Type)
-                                   .FirstOrDefault();
+            it = _resources.Resources.Where(r => r.Value.Request == rt).Select(r => r.Key).FirstOrDefault();
             if (it is null) {
                 return BadRequest();
             }
