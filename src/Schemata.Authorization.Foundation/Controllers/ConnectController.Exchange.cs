@@ -35,10 +35,8 @@ public sealed partial class ConnectController : ControllerBase
             if (user is null) {
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new(new Dictionary<string, string?> {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error]
-                            = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription]
-                            = "The token is no longer valid.",
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error]            = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The token is no longer valid.",
                     }));
             }
 
@@ -46,15 +44,14 @@ public sealed partial class ConnectController : ControllerBase
             if (!await _sign.CanSignInAsync(user)) {
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new(new Dictionary<string, string?> {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error]
-                            = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription]
-                            = "The user is no longer allowed to sign in.",
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error]            = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user is no longer allowed to sign in.",
                     }));
             }
 
             var identity = new ClaimsIdentity(result.Principal?.Claims,
-                TokenValidationParameters.DefaultAuthenticationType, OpenIddictConstants.Claims.Subject,
+                TokenValidationParameters.DefaultAuthenticationType,
+                OpenIddictConstants.Claims.Subject,
                 OpenIddictConstants.Claims.Role);
 
             // Override the user claims present in the principal in case they
@@ -83,7 +80,8 @@ public sealed partial class ConnectController : ControllerBase
 
             // Create the claims-based identity that will be used by OpenIddict to generate tokens.
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-                OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
+                OpenIddictConstants.Claims.Subject,
+                OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens (use the client_id as the subject identifier).
             identity.SetClaim(OpenIddictConstants.Claims.Subject, await _applications.GetClientIdAsync(application));

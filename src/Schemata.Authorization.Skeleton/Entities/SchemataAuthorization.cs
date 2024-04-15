@@ -46,7 +46,7 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
 
     #region ITimestamp Members
 
-    public virtual DateTime? CreateTime     { get; set; }
+    public virtual DateTime? CreateTime { get; set; }
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

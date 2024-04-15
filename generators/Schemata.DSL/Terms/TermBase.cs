@@ -34,7 +34,8 @@ public abstract class TermBase
 
     protected static bool ReadNamespacedIdentifier(Scanner scanner, out TokenResult result) {
         return scanner.ReadFirstThenOthers(static x => Character.IsIdentifierStart(x),
-            static x => x == '.' || Character.IsIdentifierPart(x), out result);
+            static x => x == '.' || Character.IsIdentifierPart(x),
+            out result);
     }
 
     protected static IEnumerable<Option> ParseOptions(Mark mark, Scanner scanner) {

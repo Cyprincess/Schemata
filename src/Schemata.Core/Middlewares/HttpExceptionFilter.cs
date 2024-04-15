@@ -27,8 +27,8 @@ public class HttpExceptionFilter : IActionFilter, IOrderedFilter
         }
 
         context.Result = response.Error is not null || response.Errors is not null || response.ErrorDescription is not null
-                ? new ObjectResult(response) { StatusCode = http.StatusCode }
-                : new StatusCodeResult(http.StatusCode);
+            ? new ObjectResult(response) { StatusCode = http.StatusCode }
+            : new StatusCodeResult(http.StatusCode);
 
         context.ExceptionHandled = true;
     }

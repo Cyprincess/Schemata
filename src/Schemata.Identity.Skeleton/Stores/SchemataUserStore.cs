@@ -14,26 +14,38 @@ namespace Schemata.Identity.Skeleton.Stores;
 public class SchemataUserStore : SchemataUserStore<SchemataUser>
 {
     public SchemataUserStore(
-        IRepository<SchemataUser> users,
-        IRepository<SchemataRole> roles,
+        IRepository<SchemataUser>      users,
+        IRepository<SchemataRole>      roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRole,
+        IRepository<SchemataUserRole>  userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
+        IdentityErrorDescriber?        describer = null) : base(users,
+        roles,
+        userClaims,
+        userRole,
+        userLogins,
+        userTokens,
+        describer) { }
 }
 
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     where TUser : SchemataUser
 {
     public SchemataUserStore(
-        IRepository<TUser> users,
-        IRepository<SchemataRole> roles,
+        IRepository<TUser>             users,
+        IRepository<SchemataRole>      roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRole,
+        IRepository<SchemataUserRole>  userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
+        IdentityErrorDescriber?        describer = null) : base(users,
+        roles,
+        userClaims,
+        userRole,
+        userLogins,
+        userTokens,
+        describer) { }
 }
 
 public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
@@ -42,13 +54,19 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
     where TRole : SchemataRole
 {
     public SchemataUserStore(
-        IRepository<TUser> users,
-        IRepository<TRole> roles,
+        IRepository<TUser>             users,
+        IRepository<TRole>             roles,
         IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole> userRole,
+        IRepository<SchemataUserRole>  userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
+        IdentityErrorDescriber?        describer = null) : base(users,
+        roles,
+        userClaims,
+        userRole,
+        userLogins,
+        userTokens,
+        describer) { }
 }
 
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :

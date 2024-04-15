@@ -36,7 +36,10 @@ public class ObjectField : TermBase, INamedTerm
             scanner.SkipWhiteSpace();
         }
 
-        var field = new ObjectField { Name = type.GetText(), Nullable = nullable };
+        var field = new ObjectField {
+            Name     = type.GetText(),
+            Nullable = nullable,
+        };
 
         if (scanner.ReadIdentifier(out var name)) {
             field.Type = NormalizeType(mark, @object, type.GetText());

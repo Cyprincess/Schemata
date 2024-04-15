@@ -25,8 +25,7 @@ internal sealed class BearerTokenHandler(
     ISystemClock                        clock)
     : SignInAuthenticationHandler<BearerTokenOptions>(optionsMonitor, loggerFactory, urlEncoder, clock)
 {
-    private static readonly AuthenticateResult FailedUnprotectingToken
-        = AuthenticateResult.Fail("Unprotected token failed");
+    private static readonly AuthenticateResult FailedUnprotectingToken = AuthenticateResult.Fail("Unprotected token failed");
 
     private static readonly AuthenticateResult TokenExpired = AuthenticateResult.Fail("Token expired");
 

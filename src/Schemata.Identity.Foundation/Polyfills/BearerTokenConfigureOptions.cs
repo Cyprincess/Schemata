@@ -21,10 +21,8 @@ internal sealed class BearerTokenConfigureOptions(IDataProtectionProvider dp)
             return;
         }
 
-        options.BearerTokenProtector
-            = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "BearerToken"));
-        options.RefreshTokenProtector
-            = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "RefreshToken"));
+        options.BearerTokenProtector = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "BearerToken"));
+        options.RefreshTokenProtector = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "RefreshToken"));
     }
 
     public void Configure(BearerTokenOptions options) {

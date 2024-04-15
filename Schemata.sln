@@ -72,6 +72,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schemata.DSL.Tests", "tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schemata.Mapping.Tests", "tests\Schemata.Mapping.Tests\Schemata.Mapping.Tests.csproj", "{497D40F7-A20D-4A24-B8DA-E98E35C9376C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schemata.Resource.Tests", "tests\Schemata.Resource.Tests\Schemata.Resource.Tests.csproj", "{FE25C525-776A-4517-9C51-1F9968B9633E}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0388B432-22EC-4D94-B484-6C2AF10E1723}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.props = Directory.Build.props
@@ -220,6 +222,10 @@ Global
 		{497D40F7-A20D-4A24-B8DA-E98E35C9376C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{497D40F7-A20D-4A24-B8DA-E98E35C9376C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{497D40F7-A20D-4A24-B8DA-E98E35C9376C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE25C525-776A-4517-9C51-1F9968B9633E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE25C525-776A-4517-9C51-1F9968B9633E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE25C525-776A-4517-9C51-1F9968B9633E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE25C525-776A-4517-9C51-1F9968B9633E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{684A7E67-14A2-405B-9166-AF80E87170E6} = {4843B4F7-FC22-49D1-BFE9-F9D1BE560B45}
@@ -255,5 +261,6 @@ Global
 		{7B4F3007-9910-491A-AC67-41BEE7A26A4B} = {28ED7FC7-3078-43BE-9CA5-BB12B9CD7A92}
 		{D982A6E1-77BE-445C-836B-7353FBB8E4E5} = {CBCC79D2-0708-4D1B-807B-2BEC52FE45F8}
 		{497D40F7-A20D-4A24-B8DA-E98E35C9376C} = {CBCC79D2-0708-4D1B-807B-2BEC52FE45F8}
+		{FE25C525-776A-4517-9C51-1F9968B9633E} = {CBCC79D2-0708-4D1B-807B-2BEC52FE45F8}
 	EndGlobalSection
 EndGlobal

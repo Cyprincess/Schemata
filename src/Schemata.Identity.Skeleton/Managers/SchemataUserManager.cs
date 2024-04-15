@@ -20,8 +20,15 @@ public class SchemataUserManager<TUser>(
     ILookupNormalizer                      keyNormalizer,
     IdentityErrorDescriber                 errors,
     IServiceProvider                       services,
-    ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store, options, passwordHasher, userValidators,
-    passwordValidators, keyNormalizer, errors, services, logger)
+    ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store,
+    options,
+    passwordHasher,
+    userValidators,
+    passwordValidators,
+    keyNormalizer,
+    errors,
+    services,
+    logger)
     where TUser : class
 {
     private readonly IServiceProvider _services = services;
