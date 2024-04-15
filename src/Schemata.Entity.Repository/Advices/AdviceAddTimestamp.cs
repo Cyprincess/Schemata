@@ -19,8 +19,8 @@ public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEnt
             return Task.FromResult(true);
         }
 
-        timestamp.CreationDate     = DateTime.UtcNow;
-        timestamp.ModificationDate = DateTime.UtcNow;
+        timestamp.CreateTime     = DateTime.UtcNow;
+        timestamp.UpdateTime = DateTime.UtcNow;
 
         return Task.FromResult(true);
     }

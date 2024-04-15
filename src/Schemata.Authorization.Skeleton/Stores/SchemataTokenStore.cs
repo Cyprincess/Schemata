@@ -112,19 +112,19 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     }
 
     public virtual ValueTask<DateTimeOffset?> GetCreationDateAsync(TToken token, CancellationToken ct) {
-        if (token.CreationDate == null) {
+        if (token.CreateTime is null) {
             return new(result: null);
         }
 
-        return new(DateTime.SpecifyKind(token.CreationDate.Value, DateTimeKind.Utc));
+        return new(DateTime.SpecifyKind(token.CreateTime.Value, DateTimeKind.Utc));
     }
 
     public virtual ValueTask<DateTimeOffset?> GetExpirationDateAsync(TToken token, CancellationToken ct) {
-        if (token.ExpirationDate == null) {
+        if (token.ExpireTime is null) {
             return new(result: null);
         }
 
-        return new(DateTime.SpecifyKind(token.ExpirationDate.Value, DateTimeKind.Utc));
+        return new(DateTime.SpecifyKind(token.ExpireTime.Value, DateTimeKind.Utc));
     }
 
     public virtual ValueTask<string?> GetIdAsync(TToken token, CancellationToken ct) {
@@ -156,11 +156,11 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     }
 
     public virtual ValueTask<DateTimeOffset?> GetRedemptionDateAsync(TToken token, CancellationToken ct) {
-        if (token.RedemptionDate == null) {
+        if (token.RedeemTime is null) {
             return new(result: null);
         }
 
-        return new(DateTime.SpecifyKind(token.RedemptionDate.Value, DateTimeKind.Utc));
+        return new(DateTime.SpecifyKind(token.RedeemTime.Value, DateTimeKind.Utc));
     }
 
     public virtual ValueTask<string?> GetReferenceIdAsync(TToken token, CancellationToken ct) {
@@ -196,8 +196,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         Expression<Func<TToken, bool>> query = t => (t.Status != Statuses.Inactive && t.Status != Statuses.Valid)
-                                                 || t.ExpirationDate < DateTime.UtcNow;
-        var tokens = _tokens.ListAsync(q => q.Where(t => t.CreationDate < threshold.UtcDateTime).Where(query), ct);
+                                                 || t.ExpireTime < DateTime.UtcNow;
+        var tokens = _tokens.ListAsync(q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query), ct);
         var count  = 0L;
 
         await foreach (var token in tokens) {
@@ -237,12 +237,12 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     }
 
     public virtual ValueTask SetCreationDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
-        token.CreationDate = date?.UtcDateTime;
+        token.CreateTime = date?.UtcDateTime;
         return default;
     }
 
     public virtual ValueTask SetExpirationDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
-        token.ExpirationDate = date?.UtcDateTime;
+        token.ExpireTime = date?.UtcDateTime;
         return default;
     }
 
@@ -266,7 +266,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     }
 
     public virtual ValueTask SetRedemptionDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
-        token.RedemptionDate = date?.UtcDateTime;
+        token.RedeemTime = date?.UtcDateTime;
         return default;
     }
 

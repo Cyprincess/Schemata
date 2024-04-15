@@ -20,7 +20,7 @@ public static class ServiceCollectionExtensions
                                                    => t.IsGenericType
                                                    && t.GetGenericTypeDefinition() == typeof(IValidator<>));
 
-        if (validatorType == null) {
+        if (validatorType is null) {
             throw new AggregateException(implementationType.Name + "is not implement with IValidator<>.");
         }
 

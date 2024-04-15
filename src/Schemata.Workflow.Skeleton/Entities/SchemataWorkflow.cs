@@ -32,9 +32,9 @@ public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 
     #region ITimestamp Members
 
-    public virtual DateTime? CreationDate { get; set; }
+    public virtual DateTime? CreateTime { get; set; }
 
-    public virtual DateTime? ModificationDate { get; set; }
+    public virtual DateTime? UpdateTime { get; set; }
 
     #endregion
 }

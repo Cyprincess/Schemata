@@ -14,7 +14,7 @@ public static class Predicate
     }
 
     public static Expression<Func<TResult, bool>>? Cast<T, TResult>(Expression<Func<T, bool>>? predicate) {
-        if (predicate == null) {
+        if (predicate is null) {
             return null;
         }
 
@@ -76,7 +76,7 @@ public static class Predicate
         }
 
         public static Expression? Replace(LambdaExpression? expression, ParameterExpression parameter) {
-            if (expression == null) {
+            if (expression is null) {
                 return null;
             }
 

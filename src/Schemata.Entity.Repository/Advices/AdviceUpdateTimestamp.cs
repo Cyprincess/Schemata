@@ -19,7 +19,7 @@ public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAsyncAdvic
             return Task.FromResult(true);
         }
 
-        time.ModificationDate = DateTime.UtcNow;
+        time.UpdateTime = DateTime.UtcNow;
 
         return Task.FromResult(true);
     }

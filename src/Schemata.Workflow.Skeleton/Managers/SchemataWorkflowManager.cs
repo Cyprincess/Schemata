@@ -102,7 +102,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     public virtual async Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default) {
         var workflow = await FindAsync(id, ct);
-        if (workflow == null) {
+        if (workflow is null) {
             return null;
         }
 
@@ -111,7 +111,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     public virtual async Task<IStatefulEntity?> GetInstanceAsync(TWorkflow workflow, CancellationToken ct = default) {
         var (type, repository) = await ResolveRepositoryAsync(workflow);
-        if (type == null || repository == null) {
+        if (type is null || repository is null) {
             return null;
         }
 
@@ -132,7 +132,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         var type = instance.GetType();
 
         var repository = ResolveRepository(type);
-        if (repository == null) {
+        if (repository is null) {
             return null;
         }
 
@@ -157,12 +157,12 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     public virtual async Task RaiseAsync<TEvent>(TWorkflow workflow, TEvent @event, CancellationToken ct = default)
         where TEvent : class, IEvent {
         var instance = await GetInstanceAsync(workflow, ct);
-        if (instance == null) {
+        if (instance is null) {
             return;
         }
 
         var (type, machine) = await ResolveStateMachineAsync(workflow);
-        if (type == null || machine == null) {
+        if (type is null || machine is null) {
             return;
         }
 
@@ -180,12 +180,12 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         var transitions = await ListTransitionsAsync(workflow.Id, ct).ToListAsync(ct);
 
         var instance = await GetInstanceAsync(workflow, ct);
-        if (instance == null) {
+        if (instance is null) {
             return null;
         }
 
         var (type, machine) = await ResolveStateMachineAsync(workflow);
-        if (type == null || machine == null) {
+        if (type is null || machine is null) {
             return null;
         }
 
@@ -212,7 +212,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     protected virtual async Task<(Type?, IRepository?)> ResolveRepositoryAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
-        if (it == null) {
+        if (it is null) {
             return (null, null);
         }
 
@@ -228,7 +228,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     protected virtual async Task<(Type?, StateMachine?)> ResolveStateMachineAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
-        if (it == null) {
+        if (it is null) {
             return (null, null);
         }
 

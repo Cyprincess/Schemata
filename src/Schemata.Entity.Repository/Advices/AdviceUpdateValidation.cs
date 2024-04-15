@@ -25,7 +25,7 @@ public sealed class AdviceUpdateValidation<TEntity> : IRepositoryUpdateAsyncAdvi
 
     public async Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(_services, Operations.Edit, entity, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(_services, Operations.Update, entity, errors, ct);
         if (pass) {
             return true;
         }

@@ -27,7 +27,7 @@ public abstract class RepositoryBase
 
         if (keyProperties.Count == 0) {
             var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
-            if (id != null) {
+            if (id is not null) {
                 keyProperties.Add(id);
             }
         }
@@ -52,7 +52,7 @@ public abstract class RepositoryBase
         }
 
         var getter = property.GetGetMethod();
-        if (getter == null) {
+        if (getter is null) {
             return false;
         }
 
@@ -66,6 +66,19 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     #region IRepository Members
 
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
+        Expression<Func<T, bool>>?                 predicate,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        await foreach (var item in ListAsync(expression, ct)) {
+            ct.ThrowIfCancellationRequested();
+            yield return item;
+        }
+    }
+
+    async IAsyncEnumerable<object> IRepository.SearchAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
         [EnumeratorCancellation] CancellationToken ct) {
         var query = Predicate.Cast<T, TEntity>(predicate);
@@ -158,6 +171,10 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
+    public abstract IAsyncEnumerable<TResult> SearchAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
+
     public virtual ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default) {
         return GetAsync<TEntity>(entity, ct);
     }
@@ -173,7 +190,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         var keys = new List<object>();
         foreach (var property in properties) {
             var value = property.GetValue(entity);
-            if (value == null) {
+            if (value is null) {
                 throw new ArgumentException("Entity key cannot be null");
             }
 
@@ -264,7 +281,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     protected virtual IQueryable<TResult> BuildQuery<TResult>(
         IQueryable<TEntity>                             table,
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
-        if (predicate != null) {
+        if (predicate is not null) {
             return predicate(table);
         }
 

@@ -4,7 +4,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceAddTrash<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
+public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members
@@ -14,11 +14,11 @@ public sealed class AdviceAddTrash<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
-        if (entity is not ITrash trash) {
+        if (entity is not ISoftDelete trash) {
             return Task.FromResult(true);
         }
 
-        trash.DeletionDate = null;
+        trash.DeleteTime = null;
 
         return Task.FromResult(true);
     }

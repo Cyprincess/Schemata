@@ -17,6 +17,10 @@ public interface IRepository<TEntity>
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
 
+    IAsyncEnumerable<TResult> SearchAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default);
+
     ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
 
     ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default);

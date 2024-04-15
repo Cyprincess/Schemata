@@ -51,7 +51,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual async Task<IdentityResult> CreateAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -64,7 +64,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual async Task<IdentityResult> UpdateAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -82,7 +82,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual async Task<IdentityResult> DeleteAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -107,7 +107,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual Task<string> GetRoleIdAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -118,7 +118,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual Task<string?> GetRoleNameAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -129,7 +129,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual Task SetRoleNameAsync(TRole role, string? roleName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -160,7 +160,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual Task<string?> GetNormalizedRoleNameAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -171,7 +171,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual Task SetNormalizedRoleNameAsync(TRole role, string? normalizedName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -194,7 +194,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     /// <inheritdoc />
     public virtual async Task<IList<Claim>> GetClaimsAsync(TRole role, CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
@@ -206,11 +206,11 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     /// <inheritdoc />
     public virtual async Task AddClaimAsync(TRole role, Claim claim, CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
-        if (claim == null) {
+        if (claim is null) {
             throw new ArgumentNullException(nameof(claim));
         }
 
@@ -225,11 +225,11 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     /// <inheritdoc />
     public virtual async Task RemoveClaimAsync(TRole role, Claim claim, CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (role == null) {
+        if (role is null) {
             throw new ArgumentNullException(nameof(role));
         }
 
-        if (claim == null) {
+        if (claim is null) {
             throw new ArgumentNullException(nameof(claim));
         }
 

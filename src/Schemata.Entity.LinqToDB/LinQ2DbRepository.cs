@@ -61,6 +61,12 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         }
     }
 
+    public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default) {
+        throw new NotImplementedException();
+    }
+
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default)
@@ -134,7 +140,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        if (Transaction == null) {
+        if (Transaction is null) {
             return 0;
         }
 
@@ -171,7 +177,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     private async Task BeginTransactionAsync(CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
 
-        if (Transaction != null) {
+        if (Transaction is not null) {
             return;
         }
 

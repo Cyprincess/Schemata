@@ -4,7 +4,7 @@ namespace Schemata.Abstractions.Entities;
 
 public interface ITimestamp
 {
-    DateTime? CreationDate { get; set; }
+    DateTime? CreateTime { get; set; }
 
-    DateTime? ModificationDate { get; set; }
+    DateTime? UpdateTime { get; set; }
 }

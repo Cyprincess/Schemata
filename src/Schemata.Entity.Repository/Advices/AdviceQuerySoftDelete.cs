@@ -5,7 +5,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceQueryTrash<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
+public sealed class AdviceQuerySoftDelete<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryQueryAsyncAdvice<TEntity> Members
@@ -18,12 +18,12 @@ public sealed class AdviceQueryTrash<TEntity> : IRepositoryQueryAsyncAdvice<TEnt
         IRepository<TEntity>    repository,
         QueryContainer<TEntity> query,
         CancellationToken       ct = default) {
-        if (!typeof(ITrash).IsAssignableFrom(typeof(TEntity))) {
+        if (!typeof(ISoftDelete).IsAssignableFrom(typeof(TEntity))) {
             return Task.FromResult(true);
         }
 
         query.ApplyModification(q => {
-            return q.OfType<ITrash>().Where(e => e.DeletionDate == null).OfType<TEntity>();
+            return q.OfType<ISoftDelete>().Where(e => e.DeleteTime == null).OfType<TEntity>();
         });
 
         return Task.FromResult(true);

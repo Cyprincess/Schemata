@@ -21,7 +21,7 @@ public sealed class TypeResolver : ITypeResolver
         }
 
         type = AppDomainTypeCache.GetType(name!);
-        return type != null;
+        return type is not null;
     }
 
     #endregion

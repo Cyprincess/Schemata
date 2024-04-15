@@ -49,17 +49,17 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
                         if (authorize is not null) {
                             var policy = new ResourcePolicyAttribute {
                                 Methods = string.Join(",", [
-                                    nameof(resource.Browse), nameof(resource.Read), nameof(resource.Edit),
-                                    nameof(resource.Add), nameof(resource.Delete),
+                                    nameof(resource.List), nameof(resource.Get), nameof(resource.Create),
+                                    nameof(resource.Update), nameof(resource.Delete),
                                 ]),
                                 Policy                = authorize.Policy,
                                 Roles                 = authorize.Roles,
                                 AuthenticationSchemes = authorize.AuthenticationSchemes,
                             };
-                            resource.Browse ??= policy;
-                            resource.Read   ??= policy;
-                            resource.Edit   ??= policy;
-                            resource.Add    ??= policy;
+                            resource.List   ??= policy;
+                            resource.Get    ??= policy;
+                            resource.Create ??= policy;
+                            resource.Update ??= policy;
                             resource.Delete ??= policy;
                         }
 

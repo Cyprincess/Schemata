@@ -2,9 +2,9 @@ namespace Schemata.Abstractions;
 
 public enum Operations
 {
-    Browse,
-    Read,
-    Edit,
-    Add,
+    List,
+    Get,
+    Create,
+    Update,
     Delete,
 }

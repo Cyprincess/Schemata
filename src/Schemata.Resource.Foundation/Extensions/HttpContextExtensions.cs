@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 
@@ -14,7 +15,7 @@ public static class HttpContextExtensions
         this HttpContext        context,
         ResourcePolicyAttribute policy,
         ResourceAttribute       resource,
-        string?                 operation) {
+        Operations?             operation) {
         var authorization = context.RequestServices.GetRequiredService<IAuthorizationService>();
         var provider      = context.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>();
 
@@ -23,7 +24,7 @@ public static class HttpContextExtensions
                 Policy                = policy.Policy,
                 AuthenticationSchemes = policy.AuthenticationSchemes,
                 Roles = policy.Roles?.Replace("{entity}", resource.Entity.Name.Kebaberize())
-                              .Replace("{operation}", operation.Kebaberize()),
+                              .Replace("{operation}", operation.Humanize().Kebaberize()),
             },
         ]);
 
