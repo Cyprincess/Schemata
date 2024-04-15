@@ -1,4 +1,4 @@
-using Schemata.Resource.Foundation.Filter;
+using Schemata.Resource.Foundation.Filters;
 using Xunit;
 
 namespace Schemata.Resource.Tests;
@@ -7,7 +7,7 @@ public class TestFilterParser
 {
     [Fact]
     public void ParseExample1() {
-        var expression = Parser.Expression.Parse("a b AND c AND d");
+        var expression = Parser.Filter.Parse("a b AND c AND d");
 
         Assert.Equal("[AND {\"a\" \"b\"} \"c\" \"d\"]", expression.ToString());
         Assert.True(expression.IsConstant);
@@ -15,7 +15,7 @@ public class TestFilterParser
 
     [Fact]
     public void ParseExample2() {
-        var expression = Parser.Expression.Parse("New York Giants OR Yankees");
+        var expression = Parser.Filter.Parse("New York Giants OR Yankees");
 
         Assert.Equal("{\"New\" \"York\" [OR \"Giants\" \"Yankees\"]}", expression.ToString());
         Assert.True(expression.IsConstant);
@@ -23,7 +23,7 @@ public class TestFilterParser
 
     [Fact]
     public void ParseExample3() {
-        var expression = Parser.Expression.Parse("a < 10 OR a >= 100");
+        var expression = Parser.Filter.Parse("a < 10 OR a >= 100");
 
         Assert.Equal("[OR [< \"a\" 10] [>= \"a\" 100]]", expression.ToString());
         Assert.False(expression.IsConstant);
@@ -31,7 +31,7 @@ public class TestFilterParser
 
     [Fact]
     public void ParseExample4() {
-        var expression = Parser.Expression.Parse("expr.type_map.1.type");
+        var expression = Parser.Filter.Parse("expr.type_map.1.type");
 
         Assert.Equal("\"expr\".\"type_map\".1.\"type\"", expression.ToString());
         Assert.False(expression.IsConstant);
@@ -39,7 +39,7 @@ public class TestFilterParser
 
     [Fact]
     public void ParseExample5() {
-        var expression = Parser.Expression.Parse("(msg.endsWith('world') AND retries < 10)");
+        var expression = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
 
         Assert.Equal("[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]", expression.ToString());
         Assert.False(expression.IsConstant);
@@ -75,7 +75,7 @@ public class TestFilterParser
     [InlineData("annotations:schedule", "[: \"annotations\" \"schedule\"]", false)]
     [InlineData("annotations.schedule = \"test\"", "[= \"annotations\".\"schedule\" \"test\"]", false)]
     public void ParseMoreVectors(string input, string expected, bool constant) {
-        var expression = Parser.Expression.Parse(input);
+        var expression = Parser.Filter.Parse(input);
 
         Assert.Equal(expected, expression?.ToString());
         Assert.Equal(constant, expression?.IsConstant);

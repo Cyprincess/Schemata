@@ -14,7 +14,7 @@ public class Option : TermBase
             value = Utilities.ToCamelCase(value);
             _name = value switch {
                 Constants.Options.NotNull => Constants.Options.Required,
-                _                         => value,
+                var _                     => value,
             };
         }
     }

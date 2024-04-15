@@ -19,9 +19,9 @@ public abstract class TermBase
             var scoped = $"{scope.Name}.{type}";
 
             type = scoped switch {
-                _ when mark.Enums?.ContainsKey(scoped) == true   => scoped,
-                _ when mark.Objects?.ContainsKey(scoped) == true => scoped,
-                _                                                => type,
+                var _ when mark.Enums?.ContainsKey(scoped) == true   => scoped,
+                var _ when mark.Objects?.ContainsKey(scoped) == true => scoped,
+                var _                                                => type,
             };
         }
 
