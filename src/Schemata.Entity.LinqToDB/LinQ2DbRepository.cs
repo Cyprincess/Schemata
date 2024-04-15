@@ -19,21 +19,19 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    public LinQ2DbRepository(IServiceProvider sp, TContext context) {
-        ServiceProvider = sp;
-        Context         = context;
+    private ITable<TEntity>? _table;
+
+    public LinQ2DbRepository(IServiceProvider sp, TContext context) : base(sp) {
+        Context = context;
 
         var entity = typeof(TEntity);
-        TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
 
-        Table = context.GetTable<TEntity>().TableName(TableName);
+        TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
     }
 
     protected virtual TContext Context { get; }
 
-    protected virtual ITable<TEntity> Table { get; }
-
-    protected virtual IServiceProvider ServiceProvider { get; }
+    protected virtual ITable<TEntity> Table => _table ??= Context.GetTable<TEntity>().TableName(TableName);
 
     protected virtual DataConnectionTransaction? Transaction { get; set; }
 
@@ -52,7 +50,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
-        var query      = await BuildQueryAsync(predicate, ct);
+        var query = await BuildQueryAsync(predicate, ct);
+
         var enumerable = query.AsAsyncEnumerable().WithCancellation(ct);
 
         await foreach (var entity in enumerable) {
@@ -72,6 +71,13 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         CancellationToken                               ct = default)
         where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.FirstOrDefaultAsync(ct);
     }
 
@@ -80,6 +86,13 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         CancellationToken                               ct = default)
         where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.SingleOrDefaultAsync(ct);
     }
 
@@ -87,6 +100,13 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, bool>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.AnyAsync(ct);
     }
 
@@ -94,6 +114,13 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, int>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.CountAsync(ct);
     }
 
@@ -101,13 +128,20 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, long>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.LongCountAsync(ct);
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -118,7 +152,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -129,7 +163,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -167,9 +201,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
         var table = AsQueryable();
 
-        var query = new QueryContainer<TEntity>(table);
+        var query = new QueryContainer<TEntity>(this, table);
 
-        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, query, ct);
+        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, query, ct);
 
         return BuildQuery(query.Query, predicate);
     }

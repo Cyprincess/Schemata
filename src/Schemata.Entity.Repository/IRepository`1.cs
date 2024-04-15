@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Entity.Repository;
 
 public interface IRepository<TEntity>
     where TEntity : class
 {
+    AdviceContext AdviceContext { get; }
+
     IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
     IQueryable<TEntity> AsQueryable();
@@ -58,4 +61,11 @@ public interface IRepository<TEntity>
     Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 
     ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    IRepository<TEntity> Once();
+    IRepository<TEntity> SuppressAddValidation();
+    IRepository<TEntity> SuppressUpdateValidation();
+    IRepository<TEntity> SuppressUpdateConcurrency();
+    IRepository<TEntity> SuppressQuerySoftDelete();
+    IRepository<TEntity> SuppressRemoveSoftDelete();
 }

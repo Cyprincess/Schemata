@@ -1,4 +1,4 @@
-namespace Schemata.Abstractions;
+namespace Schemata.Abstractions.Entities;
 
 public enum Operations
 {

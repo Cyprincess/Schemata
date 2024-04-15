@@ -9,11 +9,13 @@ namespace Schemata.Core;
 
 public static class SchemataOptionsExtensions
 {
-    public static Dictionary<Type, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
-        return schemata.Get<Dictionary<Type, ISimpleFeature>>(Constants.Options.Features);
+    public static Dictionary<RuntimeTypeHandle, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
+        return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Constants.Options.Features);
     }
 
-    public static void SetFeatures(this SchemataOptions schemata, Dictionary<Type, ISimpleFeature>? value) {
+    public static void SetFeatures(
+        this SchemataOptions                           schemata,
+        Dictionary<RuntimeTypeHandle, ISimpleFeature>? value) {
         schemata.Set(Constants.Options.Features, value);
     }
 
@@ -29,7 +31,7 @@ public static class SchemataOptionsExtensions
 
     public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
         var features = GetFeatures(schemata) ?? [];
-        if (features.ContainsKey(type)) {
+        if (features.ContainsKey(type.TypeHandle)) {
             return;
         }
 
@@ -51,7 +53,7 @@ public static class SchemataOptionsExtensions
             }
         }
 
-        features[type] = feature;
+        features[type.TypeHandle] = feature;
         schemata.SetFeatures(features);
     }
 
@@ -62,6 +64,6 @@ public static class SchemataOptionsExtensions
 
     public static bool HasFeature(this SchemataOptions schemata, Type type) {
         var features = GetFeatures(schemata);
-        return features?.ContainsKey(type) ?? false;
+        return features?.ContainsKey(type.TypeHandle) ?? false;
     }
 }

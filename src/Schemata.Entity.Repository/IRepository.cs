@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Entity.Repository;
 
 public interface IRepository
 {
+    AdviceContext AdviceContext { get; }
+
     IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>?   predicate, CancellationToken ct = default);
     IAsyncEnumerable<object> SearchAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
@@ -22,4 +25,11 @@ public interface IRepository
     Task RemoveAsync(object entity, CancellationToken ct = default);
 
     ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    IRepository Once();
+    IRepository SuppressAddValidation();
+    IRepository SuppressUpdateValidation();
+    IRepository SuppressUpdateConcurrency();
+    IRepository SuppressQuerySoftDelete();
+    IRepository SuppressRemoveSoftDelete();
 }

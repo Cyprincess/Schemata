@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 
@@ -15,7 +16,15 @@ public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAsyncAdv
 
     public int Priority => Order;
 
-    public async Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
+    public async Task<bool> AdviseAsync(
+        AdviceContext        ctx,
+        IRepository<TEntity> repository,
+        TEntity              entity,
+        CancellationToken    ct) {
+        if (ctx.Has<SuppressUpdateConcurrency>()) {
+            return true;
+        }
+
         if (entity is not IConcurrency concurrency) {
             return true;
         }

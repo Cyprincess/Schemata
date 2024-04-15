@@ -44,7 +44,7 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
             options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
 
-            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
 
             options.TypeInfoResolver = new PolymorphicTypeResolver();
 

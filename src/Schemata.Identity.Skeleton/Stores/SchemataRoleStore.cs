@@ -15,10 +15,13 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
     where TRole : SchemataRole
 {
     public SchemataRoleStore(
-        IRepository<TRole> rolesRepository,
+        IRepository<TRole>             rolesRepository,
         IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IRepository<SchemataUserRole> userRoleRepository,
-        IdentityErrorDescriber? describer = null) : base(rolesRepository, roleClaimsRepository, userRoleRepository, describer) { }
+        IRepository<SchemataUserRole>  userRoleRepository,
+        IdentityErrorDescriber?        describer = null) : base(rolesRepository,
+        roleClaimsRepository,
+        userRoleRepository,
+        describer) { }
 }
 
 public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>

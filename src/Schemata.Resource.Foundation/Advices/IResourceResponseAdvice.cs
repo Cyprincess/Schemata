@@ -4,5 +4,5 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public interface IResourceResponseAdvice<TEntity> : IAdvice<TEntity, HttpContext>
-    where TEntity : class, IIdentifier;
+public interface IResourceResponseAdvice<TDetail> : IAdvice<TDetail?, HttpContext>
+    where TDetail : class, IIdentifier;

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 

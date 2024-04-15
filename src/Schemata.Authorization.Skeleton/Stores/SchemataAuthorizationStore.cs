@@ -135,8 +135,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         yield break;
 
         IQueryable<TAuthorization> Query(IQueryable<TAuthorization> q) {
-            return q.Where(a
-                => a.ApplicationId == application.Id && a.Subject == subject && a.Status == status && a.Type == type);
+            return q.Where(a => a.ApplicationId == application.Id && a.Subject == subject && a.Status == status && a.Type == type);
         }
     }
 

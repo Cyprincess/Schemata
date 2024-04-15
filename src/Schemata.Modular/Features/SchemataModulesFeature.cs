@@ -33,40 +33,38 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
                                .ToList();
         schemata.SetModules(modules);
 
-        if (schemata.GetFeatures()?.Any(f => f.Key.Name == "SchemataResourceFeature") == true) {
-            foreach (var module in modules) {
-                var resources = module.Assembly.DefinedTypes
-                                      .SelectMany(t => t.GetCustomAttributes<ResourceAttribute>())
-                                      .ToList();
+        foreach (var module in modules) {
+            var resources = module.Assembly.DefinedTypes
+                                  .SelectMany(t => t.GetCustomAttributes<ResourceAttribute>())
+                                  .ToList();
 
-                if (resources.Count == 0) {
-                    continue;
-                }
-
-                services.Configure<SchemataResourceOptions>(options => {
-                    foreach (var resource in resources) {
-                        var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
-                        if (authorize is not null) {
-                            var policy = new ResourcePolicyAttribute {
-                                Methods = string.Join(",", [
-                                    nameof(resource.List), nameof(resource.Get), nameof(resource.Create),
-                                    nameof(resource.Update), nameof(resource.Delete),
-                                ]),
-                                Policy                = authorize.Policy,
-                                Roles                 = authorize.Roles,
-                                AuthenticationSchemes = authorize.AuthenticationSchemes,
-                            };
-                            resource.List   ??= policy;
-                            resource.Get    ??= policy;
-                            resource.Create ??= policy;
-                            resource.Update ??= policy;
-                            resource.Delete ??= policy;
-                        }
-
-                        options.Resources[resource.Entity] = resource;
-                    }
-                });
+            if (resources.Count == 0) {
+                continue;
             }
+
+            services.Configure<SchemataResourceOptions>(options => {
+                foreach (var resource in resources) {
+                    var authorize = resource.Entity.GetCustomAttribute<AuthorizeAttribute>();
+                    if (authorize is not null) {
+                        var policy = new ResourcePolicyAttribute {
+                            Methods = string.Join(",", [
+                                nameof(resource.List), nameof(resource.Get), nameof(resource.Create),
+                                nameof(resource.Update), nameof(resource.Delete),
+                            ]),
+                            Policy                = authorize.Policy,
+                            Roles                 = authorize.Roles,
+                            AuthenticationSchemes = authorize.AuthenticationSchemes,
+                        };
+                        resource.List   ??= policy;
+                        resource.Get    ??= policy;
+                        resource.Create ??= policy;
+                        resource.Update ??= policy;
+                        resource.Delete ??= policy;
+                    }
+
+                    options.Resources[resource.Entity] = resource;
+                }
+            });
         }
 
         if (services.Any(s => s.ServiceType == typeof(IModulesRunner))) {

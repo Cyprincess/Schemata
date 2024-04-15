@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Entity.Repository.Advices;
@@ -23,9 +24,17 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAsyncAdvice<TEn
 
     public int Priority => Order;
 
-    public async Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
+    public async Task<bool> AdviseAsync(
+        AdviceContext        ctx,
+        IRepository<TEntity> repository,
+        TEntity              entity,
+        CancellationToken    ct) {
+        if (ctx.Has<SuppressAddValidation>()) {
+            return true;
+        }
+
         var errors = new List<KeyValuePair<string, string>>();
-        var pass   = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(_services, Operations.Create, entity, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(_services, ctx, Operations.Create, entity, errors, ct);
         if (pass) {
             return true;
         }

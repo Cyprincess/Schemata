@@ -9,13 +9,16 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
+using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.Repository;
 
 public abstract class RepositoryBase
 {
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties  = new();
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> TypeProperties = new();
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties = [];
 
     protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
         if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
@@ -37,12 +40,7 @@ public abstract class RepositoryBase
     }
 
     protected static IList<PropertyInfo> TypePropertiesCache(Type type) {
-        if (TypeProperties.TryGetValue(type.TypeHandle, out var pis)) {
-            return pis;
-        }
-
-        var properties = type.GetProperties().Where(IsNotVirtual).ToList();
-        TypeProperties[type.TypeHandle] = properties;
+        var properties = AppDomainTypeCache.GetProperties(type).Values.Where(IsNotVirtual).ToList();
         return properties;
     }
 
@@ -63,7 +61,15 @@ public abstract class RepositoryBase
 public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
+    public RepositoryBase(IServiceProvider sp) {
+        ServiceProvider = sp;
+    }
+
+    protected virtual IServiceProvider ServiceProvider { get; }
+
     #region IRepository Members
+
+    AdviceContext IRepository.AdviceContext => AdviceContext;
 
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
@@ -159,9 +165,35 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return RemoveAsync(e, ct);
     }
 
+    IRepository IRepository.Once() {
+        return (IRepository)Once();
+    }
+
+    IRepository IRepository.SuppressAddValidation() {
+        return (IRepository)SuppressAddValidation();
+    }
+
+    IRepository IRepository.SuppressUpdateValidation() {
+        return (IRepository)SuppressUpdateValidation();
+    }
+
+    IRepository IRepository.SuppressUpdateConcurrency() {
+        return (IRepository)SuppressUpdateConcurrency();
+    }
+
+    IRepository IRepository.SuppressQuerySoftDelete() {
+        return (IRepository)SuppressQuerySoftDelete();
+    }
+
+    IRepository IRepository.SuppressRemoveSoftDelete() {
+        return (IRepository)SuppressRemoveSoftDelete();
+    }
+
     #endregion
 
     #region IRepository<TEntity> Members
+
+    public virtual AdviceContext AdviceContext { get; } = new();
 
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
@@ -275,6 +307,36 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     }
 
     public abstract ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    public virtual IRepository<TEntity> Once() {
+        var type = GetType();
+        return (IRepository<TEntity>)ActivatorUtilities.CreateInstance(ServiceProvider, type);
+    }
+
+    public virtual IRepository<TEntity> SuppressAddValidation() {
+        AdviceContext.Set<SuppressAddValidation>(default);
+        return this;
+    }
+
+    public virtual IRepository<TEntity> SuppressUpdateValidation() {
+        AdviceContext.Set<SuppressUpdateValidation>(default);
+        return this;
+    }
+
+    public virtual IRepository<TEntity> SuppressUpdateConcurrency() {
+        AdviceContext.Set<SuppressUpdateConcurrency>(default);
+        return this;
+    }
+
+    public virtual IRepository<TEntity> SuppressQuerySoftDelete() {
+        AdviceContext.Set<SuppressQuerySoftDelete>(default);
+        return this;
+    }
+
+    public virtual IRepository<TEntity> SuppressRemoveSoftDelete() {
+        AdviceContext.Set<SuppressRemoveSoftDelete>(default);
+        return this;
+    }
 
     #endregion
 

@@ -6,7 +6,7 @@ namespace Schemata.Core;
 
 public sealed class SchemataOptions
 {
-    private readonly Dictionary<string, object> _options = new();
+    private readonly Dictionary<string, object> _options = [];
     private          ILogger<SchemataBuilder>?  _logger;
 
     public ILoggerFactory Logging { get; private set; } = LoggerFactory.Create(_ => { });

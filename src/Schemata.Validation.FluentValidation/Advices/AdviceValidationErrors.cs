@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
@@ -15,6 +16,7 @@ public sealed class AdviceValidationErrors<T> : IValidationAsyncAdvice<T>
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(
+        AdviceContext                       ctx,
         Operations                          operation,
         T                                   request,
         IList<KeyValuePair<string, string>> errors,

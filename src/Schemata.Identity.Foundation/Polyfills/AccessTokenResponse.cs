@@ -19,7 +19,7 @@ public sealed class AccessTokenResponse
     /// <remarks>
     ///     This is serialized as "tokenType": "Bearer" using <see cref="JsonSerializerDefaults.Web" />.
     /// </remarks>
-    public string TokenType { get; } = "Bearer";
+    public string TokenType => "Bearer";
 
     /// <summary>
     ///     The opaque bearer token to send as part of the Authorization request header.

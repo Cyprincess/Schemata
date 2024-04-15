@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
 using Schemata.Mapping.Skeleton;
@@ -22,7 +23,7 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Route("~/[controller]")]
 public sealed class WorkflowController : ControllerBase
 {
-    private static readonly ConcurrentDictionary<Type, Type> Types = [];
+    private static readonly ConcurrentDictionary<Type, Type> RequestToInstance = [];
 
     private readonly ILogger<WorkflowController>              _logger;
     private readonly ISimpleMapper                            _mapper;
@@ -47,7 +48,9 @@ public sealed class WorkflowController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
-        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, request, HttpContext, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -56,13 +59,13 @@ public sealed class WorkflowController : ControllerBase
         }
 
         var rt = request.Instance.GetType();
-        if (!Types.TryGetValue(rt, out var it)) {
+        if (!RequestToInstance.TryGetValue(rt, out var it)) {
             it = _resources.Resources.Where(r => r.Value.Request == rt).Select(r => r.Key).FirstOrDefault();
             if (it is null) {
                 return BadRequest();
             }
 
-            Types[rt] = it;
+            RequestToInstance[rt] = it;
         }
 
         var instance = _mapper.Map<IStatefulEntity>(request.Instance, rt, it);

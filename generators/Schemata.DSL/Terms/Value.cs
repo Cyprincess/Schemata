@@ -17,23 +17,23 @@ public class Value : TermBase, IValueTerm
     // Value = String | QuotedString | Number | Boolean | MultilineString | Null
     public static Value? Parse(Mark mark, Scanner scanner) {
         return true switch {
-            _ when ReadMultilineString(scanner, out var multi) => new() {
+            var _ when ReadMultilineString(scanner, out var multi) => new() {
                 Body = multi, //
                 Type = typeof(string),
             },
-            _ when scanner.ReadQuotedString(out var quoted) => new() {
+            var _ when scanner.ReadQuotedString(out var quoted) => new() {
                 Body = quoted.Span[1..^1].ToString(), //
                 Type = typeof(string),
             },
-            _ when scanner.ReadDecimal(out var number) => new() {
+            var _ when scanner.ReadDecimal(out var number) => new() {
                 Body = number.GetText(), //
                 Type = number.GetText().IndexOf('.') >= 0 ? typeof(decimal) : typeof(long),
             },
-            _ when ReadSingleLineString(scanner, out var simple) => new() {
+            var _ when ReadSingleLineString(scanner, out var simple) => new() {
                 Body = simple, //
                 Type = typeof(object),
             },
-            _ => null,
+            var _ => null,
         };
     }
 

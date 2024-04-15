@@ -144,7 +144,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     public virtual async Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default) {
         var workflow = new TWorkflow {
-            InstanceId  = id,
+            InstanceId   = id,
             InstanceType = instance.FullName!,
         };
 

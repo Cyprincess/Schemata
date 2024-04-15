@@ -27,11 +27,8 @@ public sealed partial class ConnectController : ControllerBase
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         if (result.Succeeded && !string.IsNullOrEmpty(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Retrieve the application details from the database using the client_id stored in the principal.
-            var application
-                = await _applications.FindByClientIdAsync(
-                      result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId)!)
-               ?? throw new InvalidOperationException(
-                      "Details concerning the calling client application cannot be found.");
+            var application = await _applications.FindByClientIdAsync(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId)!)
+                           ?? throw new InvalidOperationException("Details concerning the calling client application cannot be found.");
 
             // Render a form asking the user to confirm the authorization demand.
             var response = new VerifyResponse {
@@ -77,7 +74,8 @@ public sealed partial class ConnectController : ControllerBase
         if (result.Succeeded && !string.IsNullOrEmpty(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Create the claims-based identity that will be used by OpenIddict to generate tokens.
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-                OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
+                OpenIddictConstants.Claims.Subject,
+                OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens.
             identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))

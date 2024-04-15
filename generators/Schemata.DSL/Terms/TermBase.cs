@@ -19,9 +19,9 @@ public abstract class TermBase
             var scoped = $"{scope.Name}.{type}";
 
             type = scoped switch {
-                _ when mark.Enums?.ContainsKey(scoped) == true   => scoped,
-                _ when mark.Objects?.ContainsKey(scoped) == true => scoped,
-                _                                                => type,
+                var _ when mark.Enums?.ContainsKey(scoped) == true   => scoped,
+                var _ when mark.Objects?.ContainsKey(scoped) == true => scoped,
+                var _                                                => type,
             };
         }
 
@@ -34,7 +34,8 @@ public abstract class TermBase
 
     protected static bool ReadNamespacedIdentifier(Scanner scanner, out TokenResult result) {
         return scanner.ReadFirstThenOthers(static x => Character.IsIdentifierStart(x),
-            static x => x == '.' || Character.IsIdentifierPart(x), out result);
+            static x => x == '.' || Character.IsIdentifierPart(x),
+            out result);
     }
 
     protected static IEnumerable<Option> ParseOptions(Mark mark, Scanner scanner) {

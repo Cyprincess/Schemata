@@ -1,4 +1,4 @@
-namespace Schemata.Resource.Foundation.Models;
+namespace Schemata.Abstractions.Resource;
 
 public class ListRequest
 {

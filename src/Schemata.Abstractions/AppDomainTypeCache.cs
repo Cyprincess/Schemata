@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -11,9 +12,12 @@ public static class AppDomainTypeCache
 
     public static readonly ConcurrentDictionary<string, Type> Types;
 
+    public static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> Properties;
+
     static AppDomainTypeCache() {
         Assemblies = [];
         Types      = [];
+        Properties = [];
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
             var name = assembly.GetName().Name;
@@ -72,5 +76,20 @@ public static class AppDomainTypeCache
         }
 
         return null;
+    }
+
+    public static Dictionary<string, PropertyInfo> GetProperties(Type type) {
+        if (Properties.TryGetValue(type.TypeHandle, out var properties)) {
+            return properties;
+        }
+
+        properties = type.GetProperties(BindingFlags.GetProperty
+                                      | BindingFlags.IgnoreCase
+                                      | BindingFlags.Public
+                                      | BindingFlags.Instance)
+                         .ToDictionary(m => m.Name, m => m);
+        Properties[type.TypeHandle] = properties;
+
+        return properties;
     }
 }

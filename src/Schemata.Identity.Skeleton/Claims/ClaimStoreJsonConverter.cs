@@ -36,7 +36,7 @@ public sealed class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
         return store;
     }
 
-    public override void Write(Utf8JsonWriter writer, ClaimStore value, JsonSerializerOptions options) {
+    public override void Write(Utf8JsonWriter writer, ClaimStore? value, JsonSerializerOptions options) {
         if (value is null) {
             writer.WriteNullValue();
             return;

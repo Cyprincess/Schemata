@@ -6,20 +6,22 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Json;
 
 namespace Schemata.Core.Json;
 
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
-    private readonly Dictionary<Type, List<JsonDerivedType>?> _types = [];
+    private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>?> _types = [];
 
     public PolymorphicTypeResolver() {
         var types = AppDomainTypeCache.Types.Values.Where(t => t.HasCustomAttribute<PolymorphicAttribute>(false));
         foreach (var type in types) {
             var attribute = type.GetCustomAttribute<PolymorphicAttribute>();
-            if (!_types.TryGetValue(attribute!.BaseType, out var value)) {
-                value                      = [];
-                _types[attribute.BaseType] = value;
+            var handle    = attribute!.BaseType.TypeHandle;
+            if (!_types.TryGetValue(handle, out var value)) {
+                value          = [];
+                _types[handle] = value;
             }
 
             value!.Add(new(type, attribute.Name ?? type.FullName ?? type.Name));
@@ -29,7 +31,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
     public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options) {
         var info = base.GetTypeInfo(type, options);
 
-        if (!_types.TryGetValue(info.Type, out var children)) {
+        if (!_types.TryGetValue(info.Type.TypeHandle, out var children)) {
             return info;
         }
 

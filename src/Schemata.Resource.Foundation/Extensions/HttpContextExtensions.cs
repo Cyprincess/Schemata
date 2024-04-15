@@ -1,8 +1,9 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 
@@ -38,6 +39,6 @@ public static class HttpContextExtensions
             return AuthorizationResult.Success();
         }
 
-        throw new AuthorizationException();
+        throw new AuthorizationException(401, result.Failure?.FailureReasons.FirstOrDefault()?.Message ?? "");
     }
 }

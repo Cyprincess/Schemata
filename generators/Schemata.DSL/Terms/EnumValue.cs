@@ -35,7 +35,10 @@ public class EnumValue : TermBase, INamedTerm
             body = value.Body;
         }
 
-        var @enum = new EnumValue { Name = identifier, Body = body ?? identifier };
+        var @enum = new EnumValue {
+            Name = identifier,
+            Body = body ?? identifier,
+        };
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 

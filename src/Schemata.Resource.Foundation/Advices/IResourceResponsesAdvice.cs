@@ -5,5 +5,5 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public interface IResourceResponsesAdvice<TEntity> : IAdvice<IList<TEntity>, HttpContext>
-    where TEntity : class, IIdentifier;
+public interface IResourceResponsesAdvice<TSummary> : IAdvice<IEnumerable<TSummary>?, HttpContext>
+    where TSummary : class, IIdentifier;

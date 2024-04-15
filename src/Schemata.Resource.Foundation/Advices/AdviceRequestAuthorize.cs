@@ -2,7 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
 
@@ -23,7 +23,11 @@ public sealed class AdviceRequestAuthorize<TEntity> : IResourceRequestAdvice<TEn
 
     public int Priority => Order;
 
-    public async Task<bool> AdviseAsync(HttpContext context, Operations operation, CancellationToken ct = default) {
+    public async Task<bool> AdviseAsync(
+        AdviceContext     ctx,
+        HttpContext       context,
+        Operations        operation,
+        CancellationToken ct = default) {
         var resource = _options.Resources[typeof(TEntity)];
 
         var policy = operation switch {

@@ -29,6 +29,9 @@ public class Property : TermBase
 
         EnsureLineEnd(scanner, true);
 
-        return new() { Name = name.GetText(), Body = value.Body };
+        return new() {
+            Name = name.GetText(),
+            Body = value.Body,
+        };
     }
 }

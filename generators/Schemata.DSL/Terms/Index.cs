@@ -35,7 +35,10 @@ public class Index : TermBase, INamedTerm
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }
 
-        var index = new Index { Table = table, Fields = { field.GetText() } };
+        var index = new Index {
+            Table  = table,
+            Fields = { field.GetText() },
+        };
 
         while (true) {
             scanner.SkipWhiteSpace();
