@@ -19,8 +19,6 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         IWebHostEnvironment environment) {
         var configure = configurators.PopOrDefault<JsonSerializerOptions>();
 
-        var @enum = new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
-
         services.Configure<JsonSerializerOptions>(options => {
             options.MaxDepth = 32;
 
@@ -42,10 +40,11 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         return;
 
         void Configure(JsonSerializerOptions options) {
+            options.DictionaryKeyPolicy  = JsonNamingPolicy.SnakeCaseLower;
             options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
 
-            options.Converters.Add(@enum);
+            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
 
             options.TypeInfoResolver = new PolymorphicTypeResolver();
 

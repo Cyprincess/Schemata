@@ -104,7 +104,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IdentityResult> CreateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -117,7 +117,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IdentityResult> UpdateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -135,7 +135,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IdentityResult> DeleteAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -251,7 +251,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -260,7 +260,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
-        if (roleEntity == null) {
+        if (roleEntity is null) {
             throw new InvalidOperationException($"Role {normalizedRoleName} does not exist.");
         }
 
@@ -275,7 +275,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -284,12 +284,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
-        if (roleEntity == null) {
+        if (roleEntity is null) {
             return;
         }
 
         var userRole = await FindUserRoleAsync(user.Id, roleEntity.Id, ct);
-        if (userRole == null) {
+        if (userRole is null) {
             return;
         }
 
@@ -301,7 +301,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IList<string>> GetRolesAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -321,7 +321,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -330,18 +330,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var role = await FindRoleAsync(normalizedRoleName, ct);
-        if (role == null) {
+        if (role is null) {
             return false;
         }
 
         var userRole = await FindUserRoleAsync(user.Id, role.Id, ct);
-        return userRole != null;
+        return userRole is not null;
     }
 
     /// <inheritdoc />
     public override async Task<IList<Claim>> GetClaimsAsync(TUser user, CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -353,11 +353,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     /// <inheritdoc />
     public override async Task AddClaimsAsync(TUser user, IEnumerable<Claim> claims, CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
-        if (claims == null) {
+        if (claims is null) {
             throw new ArgumentNullException(nameof(claims));
         }
 
@@ -375,15 +375,15 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         Claim             newClaim,
         CancellationToken ct = default) {
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
-        if (claim == null) {
+        if (claim is null) {
             throw new ArgumentNullException(nameof(claim));
         }
 
-        if (newClaim == null) {
+        if (newClaim is null) {
             throw new ArgumentNullException(nameof(newClaim));
         }
 
@@ -406,11 +406,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         IEnumerable<Claim> claims,
         CancellationToken  ct = default) {
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
-        if (claims == null) {
+        if (claims is null) {
             throw new ArgumentNullException(nameof(claims));
         }
 
@@ -430,11 +430,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task AddLoginAsync(TUser user, UserLoginInfo login, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
-        if (login == null) {
+        if (login is null) {
             throw new ArgumentNullException(nameof(login));
         }
 
@@ -450,12 +450,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
         var entry = await FindUserLoginAsync(user.Id, loginProvider, providerKey, ct);
-        if (entry == null) {
+        if (entry is null) {
             return;
         }
 
@@ -467,7 +467,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IList<UserLoginInfo>> GetLoginsAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -488,7 +488,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         var userLogin = await FindUserLoginAsync(loginProvider, providerKey, ct);
-        if (userLogin != null) {
+        if (userLogin is not null) {
             return await FindUserAsync(userLogin.UserId, ct);
         }
 
@@ -510,7 +510,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public override async Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (claim == null) {
+        if (claim is null) {
             throw new ArgumentNullException(nameof(claim));
         }
 
@@ -535,7 +535,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         var role = await FindRoleAsync(normalizedRoleName, ct);
 
-        if (role == null) {
+        if (role is null) {
             return [];
         }
 

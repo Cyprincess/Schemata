@@ -10,29 +10,25 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
+public sealed class AdviceCreateValidation<TEntity, TRequest> : IResourceCreateAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
     private readonly IServiceProvider _services;
 
-    public AdviceEditValidation(IServiceProvider services) {
+    public AdviceCreateValidation(IServiceProvider services) {
         _services = services;
     }
 
-    #region IResourceEditAdvice<TEntity,TRequest> Members
+    #region IResourceCreateAdvice<TEntity,TRequest> Members
 
     public int Order => 200_000_000;
 
     public int Priority => Order;
 
-    public async Task<bool> AdviseAsync(
-        long              id,
-        TRequest          request,
-        HttpContext       context,
-        CancellationToken ct = default) {
+    public async Task<bool> AdviseAsync(TRequest request, HttpContext context, CancellationToken ct = default) {
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_services, Operations.Edit, request, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_services, Operations.Create, request, errors, ct);
         if (pass) {
             return true;
         }

@@ -30,7 +30,7 @@ public class SchemataUserManager<TUser>(
         ThrowIfDisposed();
         var store = GetDisplayNameStore();
 
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -41,7 +41,7 @@ public class SchemataUserManager<TUser>(
         ThrowIfDisposed();
         var store = GetUserPrincipalNameStore();
 
-        if (user == null) {
+        if (user is null) {
             throw new ArgumentNullException(nameof(user));
         }
 
@@ -74,7 +74,7 @@ public class SchemataUserManager<TUser>(
 
         var user = await store.FindByPhoneAsync(phone, CancellationToken);
 
-        if (user != null || !Options.Stores.ProtectPersonalData) {
+        if (user is not null || !Options.Stores.ProtectPersonalData) {
             return user;
         }
 
@@ -83,14 +83,14 @@ public class SchemataUserManager<TUser>(
         var keyring   = _services.GetService<ILookupProtectorKeyRing>();
         var protector = _services.GetService<ILookupProtector>();
 
-        if (keyring == null || protector == null) {
+        if (keyring is null || protector is null) {
             return user;
         }
 
         foreach (var key in keyring.GetAllKeyIds()) {
             var old = protector.Protect(key, phone);
             user = await store.FindByPhoneAsync(old, CancellationToken);
-            if (user == null) {
+            if (user is null) {
                 continue;
             }
 

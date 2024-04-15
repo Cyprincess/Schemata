@@ -8,7 +8,8 @@ namespace Schemata.Entity.Repository;
 
 public interface IRepository
 {
-    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>?   predicate, CancellationToken ct = default);
+    IAsyncEnumerable<object> SearchAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>?  predicate, CancellationToken ct = default);
     ValueTask<object?> SingleOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);

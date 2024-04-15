@@ -22,20 +22,20 @@ public class ResourceAttribute : Attribute
         foreach (var policy in policies) {
             var methods = policy.Methods?.Split(',').ToList();
 
-            if (methods?.Contains(nameof(Browse)) == true) {
-                Browse ??= policy;
+            if (methods?.Contains(nameof(List)) == true) {
+                List ??= policy;
             }
 
-            if (methods?.Contains(nameof(Read)) == true) {
-                Read ??= policy;
+            if (methods?.Contains(nameof(Get)) == true) {
+                Get ??= policy;
             }
 
-            if (methods?.Contains(nameof(Edit)) == true) {
-                Edit ??= policy;
+            if (methods?.Contains(nameof(Create)) == true) {
+                Create ??= policy;
             }
 
-            if (methods?.Contains(nameof(Add)) == true) {
-                Add ??= policy;
+            if (methods?.Contains(nameof(Update)) == true) {
+                Update ??= policy;
             }
 
             if (methods?.Contains(nameof(Delete)) == true) {
@@ -54,13 +54,13 @@ public class ResourceAttribute : Attribute
 
     public Type? Summary { get; }
 
-    public ResourcePolicyAttribute? Browse { get; set; }
+    public ResourcePolicyAttribute? List { get; set; }
 
-    public ResourcePolicyAttribute? Read { get; set; }
+    public ResourcePolicyAttribute? Get { get; set; }
 
-    public ResourcePolicyAttribute? Edit { get; set; }
+    public ResourcePolicyAttribute? Create { get; set; }
 
-    public ResourcePolicyAttribute? Add { get; set; }
+    public ResourcePolicyAttribute? Update { get; set; }
 
     public ResourcePolicyAttribute? Delete { get; set; }
 

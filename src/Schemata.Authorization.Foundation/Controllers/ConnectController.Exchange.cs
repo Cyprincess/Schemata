@@ -77,7 +77,7 @@ public sealed partial class ConnectController : ControllerBase
             // if client_id or client_secret are invalid, this action won't be invoked.
 
             var application = await _applications.FindByClientIdAsync(request.ClientId!);
-            if (application == null) {
+            if (application is null) {
                 throw new InvalidOperationException("The application details cannot be found in the database.");
             }
 

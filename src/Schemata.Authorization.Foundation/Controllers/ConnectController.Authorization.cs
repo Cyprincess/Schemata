@@ -39,8 +39,8 @@ public sealed partial class ConnectController : ControllerBase
         var result = await HttpContext.AuthenticateAsync();
         if (result is not { Succeeded: true }
          || request.HasPrompt(OpenIddictConstants.Prompts.Login)
-         || (request.MaxAge != null
-          && result.Properties?.IssuedUtc != null
+         || (request.MaxAge is not null
+          && result.Properties?.IssuedUtc is not null
           && DateTimeOffset.UtcNow - result.Properties.IssuedUtc > TimeSpan.FromSeconds(request.MaxAge.Value))) {
             // If the client application requested promptless authentication,
             // return an error indicating that the user is not logged in.

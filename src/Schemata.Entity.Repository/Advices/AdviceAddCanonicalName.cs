@@ -37,7 +37,7 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
         var type = entity.GetType();
 
         var attribute = type.GetCustomAttribute<CanonicalNameAttribute>(false);
-        if (attribute == null) {
+        if (attribute is null) {
             return Task.FromResult(true);
         }
 

@@ -75,12 +75,12 @@ public sealed class WorkflowController : ControllerBase
         var manager = (IWorkflowManager)_services.GetRequiredService(type);
 
         var workflow = await manager.CreateAsync(instance);
-        if (workflow == null) {
+        if (workflow is null) {
             return BadRequest();
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
-        if (response == null) {
+        if (response is null) {
             return NotFound();
         }
 
@@ -88,19 +88,19 @@ public sealed class WorkflowController : ControllerBase
     }
 
     [HttpGet("{id:long}")]
-    public async Task<IActionResult> Read(long id) {
+    public async Task<IActionResult> Get(long id) {
         var type = typeof(IWorkflowManager<,,>)
            .MakeGenericType(_options.CurrentValue.WorkflowType, _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
 
         var manager = (IWorkflowManager)_services.GetRequiredService(type);
 
         var workflow = await manager.FindAsync(id);
-        if (workflow == null) {
+        if (workflow is null) {
             return NotFound();
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
-        if (response == null) {
+        if (response is null) {
             return NotFound();
         }
 
@@ -115,7 +115,7 @@ public sealed class WorkflowController : ControllerBase
         var manager = (IWorkflowManager)_services.GetRequiredService(type);
 
         var workflow = await manager.FindAsync(id);
-        if (workflow == null) {
+        if (workflow is null) {
             return NotFound();
         }
 
@@ -130,7 +130,7 @@ public sealed class WorkflowController : ControllerBase
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
-        if (response == null) {
+        if (response is null) {
             return NotFound();
         }
 

@@ -37,7 +37,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     public MappingAttribute[] GetAttributes(Type type) {
         var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
 
-        if (t == null) {
+        if (t is null) {
             return Array.Empty<MappingAttribute>();
         }
 
@@ -69,7 +69,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
         var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
-        if (c != null) {
+        if (c is not null) {
             var attr = new ColumnAttribute {
                 Name = c.Name,
                 DbType = c.TypeName,

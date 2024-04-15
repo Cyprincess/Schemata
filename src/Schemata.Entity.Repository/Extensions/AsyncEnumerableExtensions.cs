@@ -12,7 +12,7 @@ public static class AsyncEnumerableExtensions
         this IAsyncEnumerable<T>?                  source,
         Expression<Func<T, TResult>>               mapper,
         [EnumeratorCancellation] CancellationToken ct = default) {
-        if (source == null) {
+        if (source is null) {
             yield break;
         }
 

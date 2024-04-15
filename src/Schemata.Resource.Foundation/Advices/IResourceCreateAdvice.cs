@@ -4,6 +4,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public interface IResourceEditAdvice<TEntity, TRequest> : IAdvice<long, TRequest, HttpContext>
+public interface IResourceCreateAdvice<TEntity, TRequest> : IAdvice<TRequest, HttpContext>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier;

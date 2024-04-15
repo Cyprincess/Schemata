@@ -204,11 +204,11 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     }
 
     public virtual ValueTask<DateTimeOffset?> GetCreationDateAsync(TAuthorization authorization, CancellationToken ct) {
-        if (authorization.CreationDate == null) {
+        if (authorization.CreateTime is null) {
             return new(result: null);
         }
 
-        return new(DateTime.SpecifyKind(authorization.CreationDate.Value, DateTimeKind.Utc));
+        return new(DateTime.SpecifyKind(authorization.CreateTime.Value, DateTimeKind.Utc));
     }
 
     public virtual ValueTask<string?> GetIdAsync(TAuthorization authorization, CancellationToken ct) {
@@ -283,7 +283,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     }
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
-        var authorizations = _authorizations.ListAsync(q => q.Where(a => a.CreationDate < threshold.UtcDateTime).Where(a => a.Status != Statuses.Valid), ct);
+        var authorizations = _authorizations.ListAsync(q => q.Where(a => a.CreateTime < threshold.UtcDateTime).Where(a => a.Status != Statuses.Valid), ct);
         var count          = 0L;
 
         await foreach (var authorization in authorizations) {
@@ -309,7 +309,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         TAuthorization    authorization,
         DateTimeOffset?   date,
         CancellationToken ct) {
-        authorization.CreationDate = date?.UtcDateTime;
+        authorization.CreateTime = date?.UtcDateTime;
         return default;
     }
 

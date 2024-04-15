@@ -27,9 +27,9 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     public virtual string? Properties { get; set; }
 
-    public virtual DateTime? ExpirationDate { get; set; }
+    public virtual DateTime? ExpireTime { get; set; }
 
-    public virtual DateTime? RedemptionDate { get; set; }
+    public virtual DateTime? RedeemTime { get; set; }
 
     #region ICanonicalName Members
 
@@ -54,8 +54,8 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region ITimestamp Members
 
-    public virtual DateTime? CreationDate     { get; set; }
-    public virtual DateTime? ModificationDate { get; set; }
+    public virtual DateTime? CreateTime     { get; set; }
+    public virtual DateTime? UpdateTime { get; set; }
 
     #endregion
 }
