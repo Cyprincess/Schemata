@@ -60,19 +60,24 @@ public abstract class Logical : IToken
     protected virtual Expression? ToRestrictionExpression(IToken token, Container ctx) {
         var member = new Member(token.Position, new Text(token.Position, "q"), null);
 
-        var restriction = new Restriction(token.Position, member, (new ExactMatch(token.Position), ToArg(token)));
+        var arg = ToArg(token);
+        if (arg is null) {
+            throw new ParseException("Expect arg", token.Position);
+        }
+
+        var restriction = new Restriction(token.Position, member, (new ExactMatch(token.Position), arg));
 
         return restriction.ToExpression(ctx);
     }
 
-    protected virtual IArg ToArg(IToken token) {
+    protected virtual IArg? ToArg(IToken token) {
         return token switch {
             Filter f                           => f,
             Function f                         => f,
             Member m                           => m,
             Term { Modifier         : null } t => ToArg(t.Simple),
             Restriction { Comparator: null } r => ToArg(r.Comparable),
-            var _                              => throw new ParseException("Expect arg", token.Position),
+            var _                              => null,
         };
     }
 }

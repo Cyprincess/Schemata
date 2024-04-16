@@ -22,7 +22,7 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Route("~/[controller]")]
 public sealed class WorkflowController : ControllerBase
 {
-    private static readonly ConcurrentDictionary<Type, Type> Types = [];
+    private static readonly ConcurrentDictionary<Type, Type> RequestToInstance = [];
 
     private readonly ILogger<WorkflowController>              _logger;
     private readonly ISimpleMapper                            _mapper;
@@ -56,13 +56,13 @@ public sealed class WorkflowController : ControllerBase
         }
 
         var rt = request.Instance.GetType();
-        if (!Types.TryGetValue(rt, out var it)) {
+        if (!RequestToInstance.TryGetValue(rt, out var it)) {
             it = _resources.Resources.Where(r => r.Value.Request == rt).Select(r => r.Key).FirstOrDefault();
             if (it is null) {
                 return BadRequest();
             }
 
-            Types[rt] = it;
+            RequestToInstance[rt] = it;
         }
 
         var instance = _mapper.Map<IStatefulEntity>(request.Instance, rt, it);

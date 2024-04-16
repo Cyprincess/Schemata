@@ -26,6 +26,10 @@ public class Text : IValue
             return value;
         }
 
+        if (ctx.TryGetExpression(Value, out var expression)) {
+            return expression;
+        }
+
         return Expression.Constant(Value);
     }
 

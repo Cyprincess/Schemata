@@ -180,9 +180,11 @@ public class Parser
         // : { member [ASC | DESC] }
         // ;
 
-        var asc   = Parsers.Terms.Text("ASC").Then(_ => Ordering.Ascending);
-        var desc  = Parsers.Terms.Text("DESC").Then(_ => Ordering.Descending);
+        var asc  = Parsers.Terms.Text("ASC").Then(_ => Ordering.Ascending);
+        var desc = Parsers.Terms.Text("DESC").Then(_ => Ordering.Descending);
 
-        Order = Parsers.Separated(comma, member.And(Parsers.ZeroOrOne(asc.Or(desc)))).Then(o => o.ToDictionary(kv => kv.Item1, kv => kv.Item2)).Compile();
+        Order = Parsers.Separated(comma, member.And(Parsers.ZeroOrOne(asc.Or(desc))))
+                       .Then(o => o.ToDictionary(kv => kv.Item1, kv => kv.Item2))
+                       .Compile();
     }
 }

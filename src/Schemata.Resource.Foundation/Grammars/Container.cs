@@ -81,7 +81,7 @@ public class Container
         string             name,
         IEnumerable<Type>? types,
         Func<MethodInfo?>  getter) {
-        var typ       = types?.Aggregate("", (s, i) => s = $"{s}{i.Name},");
+        var typ       = types?.Aggregate("", (s, i) => $"{s}{i.Name},");
         var qualified = $"{type.FullName}.{name}({typ})";
 
         if (MethodCache.TryGetValue(qualified, out var method)) {

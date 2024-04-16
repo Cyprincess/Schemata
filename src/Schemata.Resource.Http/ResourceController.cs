@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Humanizer;
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advices;
+using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Models;
 
 namespace Schemata.Resource.Http;
@@ -43,7 +46,14 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        var entities = await Repository.ListAsync(q => q.Select(e => e), HttpContext.RequestAborted)
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
+
+        if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
+            var order = Parser.Order.Parse(request.OrderBy);
+            query = query.ApplyOrdering(order);
+        }
+
+        var entities = await Repository.ListAsync(q => query(q), HttpContext.RequestAborted)
                                        .ToListAsync(HttpContext.RequestAborted);
 
         if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(ServiceProvider, entities, HttpContext, HttpContext.RequestAborted)) {

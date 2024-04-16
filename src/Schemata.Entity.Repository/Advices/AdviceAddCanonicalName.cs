@@ -1,14 +1,12 @@
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
@@ -16,8 +14,6 @@ namespace Schemata.Entity.Repository.Advices;
 public class AdviceAddCanonicalName
 {
     protected static readonly Regex ResourceNameRegex = new(@"\{(?<name>\w+)\}");
-
-    protected static readonly ConcurrentDictionary<Type, Dictionary<string, PropertyInfo>> PropertiesCache = new();
 }
 
 public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IRepositoryAddAsyncAdvice<TEntity>
@@ -44,16 +40,7 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
         var current = type.GetCustomAttribute<DisplayNameAttribute>(false)?.DisplayName.Singularize()
                    ?? type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize() ?? type.Name;
 
-        if (!PropertiesCache.TryGetValue(type, out var properties)) {
-            properties = type
-                        .GetProperties(BindingFlags.GetProperty
-                                     | BindingFlags.IgnoreCase
-                                     | BindingFlags.Public
-                                     | BindingFlags.Instance)
-                        .ToDictionary(p => p.Name, p => p);
-
-            PropertiesCache[type] = properties;
-        }
+        var properties = AppDomainTypeCache.GetProperties(type);
 
         var name = ResourceNameRegex.Replace(attribute.ResourceName, m => {
             var matched = m.Groups["name"].Value.Pascalize();

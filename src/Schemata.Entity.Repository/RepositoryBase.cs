@@ -9,13 +9,13 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 
 namespace Schemata.Entity.Repository;
 
 public abstract class RepositoryBase
 {
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties  = new();
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> TypeProperties = new();
 
     protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
         if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
@@ -37,12 +37,7 @@ public abstract class RepositoryBase
     }
 
     protected static IList<PropertyInfo> TypePropertiesCache(Type type) {
-        if (TypeProperties.TryGetValue(type.TypeHandle, out var pis)) {
-            return pis;
-        }
-
-        var properties = type.GetProperties().Where(IsNotVirtual).ToList();
-        TypeProperties[type.TypeHandle] = properties;
+        var properties = AppDomainTypeCache.GetProperties(type).Values.Where(IsNotVirtual).ToList();
         return properties;
     }
 

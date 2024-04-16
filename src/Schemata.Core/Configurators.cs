@@ -14,7 +14,7 @@ public sealed class Configurators
         var key = typeof(T);
 
         if (!TryGet<T>(out var configure)) {
-            _configurators[typeof(T)] = action;
+            _configurators[key] = action;
             return;
         }
 
