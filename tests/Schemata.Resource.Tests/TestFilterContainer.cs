@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Parlot;
-using Schemata.Resource.Foundation.Filters;
-using Schemata.Resource.Foundation.Filters.Terms;
+using Schemata.Resource.Foundation.Grammars;
 using Xunit;
 
 namespace Schemata.Resource.Tests;

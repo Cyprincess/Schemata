@@ -19,19 +19,19 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
+    private ITable<TEntity>? _table;
+
     public LinQ2DbRepository(IServiceProvider sp, TContext context) {
         ServiceProvider = sp;
         Context         = context;
 
         var entity = typeof(TEntity);
         TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
-
-        Table = context.GetTable<TEntity>().TableName(TableName);
     }
 
     protected virtual TContext Context { get; }
 
-    protected virtual ITable<TEntity> Table { get; }
+    protected virtual ITable<TEntity> Table => _table ??= Context.GetTable<TEntity>().TableName(TableName);
 
     protected virtual IServiceProvider ServiceProvider { get; }
 
