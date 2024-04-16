@@ -28,6 +28,10 @@ public class Function : IComparable
     public bool IsConstant => false;
 
     public Expression? ToExpression(Container ctx) {
+        if (!ctx.AllowFunctions) {
+            return null;
+        }
+
         var instance = Member.ToMemberExpression(ctx);
 
         if (instance is null) {
@@ -56,7 +60,19 @@ public class Function : IComparable
             default: return null;
         }
 
-        return Expression.Call(instance!, method, null, Args.Select(p => p.ToExpression(ctx)!).ToArray());
+        if (!ctx.Functions.TryGetValue(instance.Type, out var methods)) {
+            return null;
+        }
+
+        if (!methods.TryGetValue(method, out var allowed)) {
+            return null;
+        }
+
+        if (!allowed) {
+            return null;
+        }
+
+        return Expression.Call(instance, method, null, Args.Select(p => p.ToExpression(ctx)!).ToArray());
     }
 
     #endregion

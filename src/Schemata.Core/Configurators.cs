@@ -8,7 +8,7 @@ namespace Schemata.Core;
 
 public sealed class Configurators
 {
-    private readonly Dictionary<Type, object> _configurators = new();
+    private readonly Dictionary<Type, object> _configurators = [];
 
     public void Set<T>(Action<T> action) {
         var key = typeof(T);

@@ -48,6 +48,11 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
 
+        if (!string.IsNullOrWhiteSpace(request.Filter)) {
+            var filter = Parser.Filter.Parse(request.Filter);
+            query = query.ApplyFiltering(filter);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
             var order = Parser.Order.Parse(request.OrderBy);
             query = query.ApplyOrdering(order);

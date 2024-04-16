@@ -15,7 +15,7 @@ namespace Schemata.Entity.Repository;
 
 public abstract class RepositoryBase
 {
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties  = new();
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties  = [];
 
     protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
         if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {

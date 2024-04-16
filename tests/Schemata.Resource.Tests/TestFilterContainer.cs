@@ -49,10 +49,10 @@ public class TestFilterContainer
         var func       = (Func<MyVector4, bool>)expression!.Compile();
 
         var vector = new MyVector4 {
-            type_map = {
-                new MyVector4.MyType { type = "foo" },
-                new MyVector4.MyType { type = "bar" },
-            },
+            type_map = [
+                new() { type = "foo" },
+                new() { type = "bar" },
+            ],
         };
         Assert.True(func(vector));
     }
@@ -61,7 +61,11 @@ public class TestFilterContainer
     public void TranslateExample5() {
         var filter = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
 
-        var expression = Container.Build(filter).Bind("msg", typeof(string)).Bind("retries", typeof(int)).Build();
+        var expression = Container.Build(filter)
+                                  .AllowFunction<string>("endsWith")
+                                  .Bind("msg", typeof(string))
+                                  .Bind("retries", typeof(int))
+                                  .Build();
         var func       = (Func<string, int, bool>)expression!.Compile();
 
         Assert.True(func("hello world", 9));
@@ -75,6 +79,6 @@ public class TestFilterContainer
             public string type { get; set; } = string.Empty;
         }
 
-        public List<MyType> type_map { get; } = new();
+        public IEnumerable<MyType> type_map { get; set; } = [];
     }
 }

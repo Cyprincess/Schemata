@@ -11,7 +11,11 @@ namespace Schemata.Resource.Foundation.Grammars;
 
 public class Container
 {
-    private static readonly Dictionary<string, MethodInfo> MethodCache = new();
+    private static readonly Dictionary<string, MethodInfo> MethodCache = [];
+
+    public bool AllowFunctions { get; private set; }
+
+    public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
 
     public Container(IToken token) {
         Token = token;
@@ -19,12 +23,30 @@ public class Container
 
     private IToken Token { get; }
 
-    private Dictionary<string, Expression> Expressions { get; } = new();
+    private Dictionary<string, Expression> Expressions { get; } = [];
 
-    private Dictionary<string, ParameterExpression> Parameters { get; } = new();
+    private Dictionary<string, ParameterExpression> Parameters { get; } = [];
 
     public static Container Build(IToken token) {
         return new(token);
+    }
+
+    public Container AllowFunction<T>(string method) {
+        return AllowFunction(typeof(T), method);
+    }
+
+    public Container AllowFunction(Type type, string method) {
+        AllowFunctions = true;
+
+        if (!Functions.TryGetValue(type, out var methods)) {
+            methods = new();
+
+            Functions[type] = methods;
+        }
+
+        methods[method] = true;
+
+        return this;
     }
 
     public Container Bind(string name, Type type) {
