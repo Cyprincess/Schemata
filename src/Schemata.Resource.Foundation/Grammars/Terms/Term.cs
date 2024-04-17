@@ -31,7 +31,7 @@ public class Term : IToken
         }
 
         if (expression is null) {
-            return null;
+            throw new ParseException("Except simple", Simple.Position);
         }
 
         if (Simple.IsConstant && expression is ConstantExpression constant) {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Mvc;
+using Parlot;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -86,13 +87,29 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
 
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
-            var filter = Parser.Filter.Parse(request.Filter);
-            query = query.ApplyFiltering(filter);
+            try {
+                var filter = Parser.Filter.Parse(request.Filter);
+                query = query.ApplyFiltering(filter);
+            } catch (ParseException) {
+                throw new InvalidArgumentException {
+                    Errors = new() {
+                        [nameof(request.Filter).Underscore()] = "invalid",
+                    },
+                };
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
-            var order = Parser.Order.Parse(request.OrderBy);
-            query = query.ApplyOrdering(order);
+            try {
+                var order = Parser.Order.Parse(request.OrderBy);
+                query = query.ApplyOrdering(order);
+            } catch (ParseException) {
+                throw new InvalidArgumentException {
+                    Errors = new() {
+                        [nameof(request.OrderBy).Underscore()] = "invalid",
+                    },
+                };
+            }
         }
 
         if (request.ShowDeleted is true) {

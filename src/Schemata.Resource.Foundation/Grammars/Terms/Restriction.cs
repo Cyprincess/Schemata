@@ -30,13 +30,17 @@ public class Restriction : ISimple
 
     public Expression? ToExpression(Container ctx) {
         var left = Comparable.ToExpression(ctx);
+        if (left is null) {
+            throw new ParseException("Except comparable", Comparable.Position);
+        }
+
         if (Comparator is null || Arg is null) {
             return left;
         }
 
         var right = Arg.ToExpression(ctx);
-        if (left is null || right is null) {
-            return null;
+        if (right is null) {
+            throw new ParseException("Except arg", Arg.Position);
         }
 
         if (Comparator.Type is null) {

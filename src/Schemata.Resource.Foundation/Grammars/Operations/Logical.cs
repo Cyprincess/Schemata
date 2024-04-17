@@ -19,12 +19,12 @@ public abstract class Logical : IToken
 
     public abstract bool IsConstant { get; }
 
-    public virtual Expression? ToExpression(Container ctx) {
+    public virtual Expression ToExpression(Container ctx) {
         var first = Tokens.FirstOrDefault();
 
         var expression = first?.ToExpression(ctx);
         if (expression is null) {
-            return null;
+            throw new ParseException("Except terms", Position);
         }
 
         if (expression.Type != typeof(bool)) {
@@ -32,7 +32,7 @@ public abstract class Logical : IToken
         }
 
         if (expression is null) {
-            return null;
+            throw new ParseException("Except restriction", first!.Position);
         }
 
         foreach (var token in Tokens.Skip(1)) {

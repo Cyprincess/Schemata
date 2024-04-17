@@ -27,15 +27,15 @@ public class Function : IComparable
 
     public bool IsConstant => false;
 
-    public Expression? ToExpression(Container ctx) {
+    public Expression ToExpression(Container ctx) {
         if (!ctx.AllowFunctions) {
-            return null;
+            throw new ParseException("Function not allowed", Position);
         }
 
         var instance = Member.ToMemberExpression(ctx);
 
         if (instance is null) {
-            return null;
+            throw new ParseException("Except name or instance", Member.Position);
         }
 
         string? method;
@@ -48,28 +48,31 @@ public class Function : IComparable
             }
             case ParameterExpression parameter:
             {
-                var last = Member.Fields.LastOrDefault()?.ToExpression(ctx);
-                if (last is not ConstantExpression { Value: string @string }) {
-                    return null;
+                var last = Member.Fields.LastOrDefault();
+                if (last?.ToExpression(ctx) is not ConstantExpression { Value: string @string }) {
+                    throw new ParseException("Except name", last?.Position ?? Position);
                 }
 
                 instance = parameter;
                 method   = @string;
                 break;
             }
-            default: return null;
+            default:
+            {
+                throw new ParseException("Except name or instance", Member.Position);
+            }
         }
 
         if (!ctx.Functions.TryGetValue(instance.Type, out var methods)) {
-            return null;
+            throw new ParseException($"Function {instance.Type.Name}.{method} not allowed", Position);
         }
 
         if (!methods.TryGetValue(method, out var allowed)) {
-            return null;
+            throw new ParseException($"Function {instance.Type.Name}.{method} not allowed", Position);
         }
 
         if (!allowed) {
-            return null;
+            throw new ParseException($"Function {instance.Type.Name}.{method} not allowed", Position);
         }
 
         return Expression.Call(instance, method, null, Args.Select(p => p.ToExpression(ctx)!).ToArray());

@@ -111,7 +111,9 @@ public class Container
 
         method = getter();
 
-        if (method == null) return null;
+        if (method == null) {
+            return null;
+        }
 
         MethodCache.Add(qualified, method);
 

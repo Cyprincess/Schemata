@@ -18,7 +18,7 @@ public class Null : IValue
 
     public bool IsConstant => true;
 
-    public Expression? ToExpression(Container ctx) {
+    public Expression ToExpression(Container ctx) {
         return Expression.Constant(null);
     }
 

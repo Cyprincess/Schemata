@@ -31,7 +31,7 @@ public class Member : IComparable
 
     public bool IsConstant => Value.IsConstant && Fields.Count == 0;
 
-    public Expression? ToExpression(Container ctx) {
+    public Expression ToExpression(Container ctx) {
         var expression = ToMemberExpression(ctx);
 
         if (Fields.Count <= 0) {
@@ -43,15 +43,15 @@ public class Member : IComparable
 
     #endregion
 
-    public Expression? ToMemberExpression(Container ctx) {
+    public Expression ToMemberExpression(Container ctx) {
         var expression = Value.ToExpression(ctx);
+
+        if (expression is null) {
+            throw new ParseException("Expect value", Value.Position);
+        }
 
         if (Fields.Count <= 0) {
             return expression;
-        }
-
-        if (expression is null) {
-            return null;
         }
 
         foreach (var field in Fields.Take(Fields.Count - 1)) {
@@ -65,11 +65,7 @@ public class Member : IComparable
         return Fields.Count > 0 ? $"{Value}.{string.Join('.', Fields)}" : Value.ToString();
     }
 
-    internal static Expression? BuildAccess(Expression? expression, IField? field, Container ctx) {
-        if (expression is null) {
-            return null;
-        }
-
+    internal Expression BuildAccess(Expression expression, IField? field, Container ctx) {
         if (field is null) {
             return expression;
         }

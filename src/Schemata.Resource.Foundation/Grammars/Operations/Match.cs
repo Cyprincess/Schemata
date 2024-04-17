@@ -1,3 +1,4 @@
+using System;
 using System.Linq.Expressions;
 using Parlot;
 using Schemata.Resource.Foundation.Grammars.Terms;
@@ -16,11 +17,11 @@ public abstract class Match : IBinary
         return null;
     }
 
-    public Expression? ToExpression(Expression left, Expression right, Container ctx) {
+    public Expression ToExpression(Expression left, Expression right, Container ctx) {
         var normalize = ctx.GetMethod(typeof(string), nameof(string.ToUpper), []);
 
         if (normalize is null) {
-            return null;
+            throw new NotSupportedException("No string normalization method found");
         }
 
         var method = this switch {
@@ -32,7 +33,7 @@ public abstract class Match : IBinary
         };
 
         if (method is null) {
-            return null;
+            throw new ParseException("No match method found", Position);
         }
 
         if (right.Type != typeof(string)) {

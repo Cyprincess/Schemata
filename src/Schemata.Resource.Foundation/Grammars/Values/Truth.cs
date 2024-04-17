@@ -21,7 +21,7 @@ public class Truth : IValue
 
     public bool IsConstant => true;
 
-    public Expression? ToExpression(Container ctx) {
+    public Expression ToExpression(Container ctx) {
         return Expression.Constant(Value);
     }
 
