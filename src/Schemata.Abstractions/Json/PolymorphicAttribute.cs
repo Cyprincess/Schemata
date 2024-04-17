@@ -1,6 +1,6 @@
 using System;
 
-namespace Schemata.Abstractions;
+namespace Schemata.Abstractions.Json;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class PolymorphicAttribute : Attribute

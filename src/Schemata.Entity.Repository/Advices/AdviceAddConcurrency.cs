@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
@@ -14,7 +15,11 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAsyncAdvice<TE
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
+    public Task<bool> AdviseAsync(
+        AdviceContext        ctx,
+        IRepository<TEntity> repository,
+        TEntity              entity,
+        CancellationToken    ct) {
         if (entity is not IConcurrency concurrency) {
             return Task.FromResult(true);
         }

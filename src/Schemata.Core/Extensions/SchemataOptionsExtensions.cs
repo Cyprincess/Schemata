@@ -13,7 +13,9 @@ public static class SchemataOptionsExtensions
         return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Constants.Options.Features);
     }
 
-    public static void SetFeatures(this SchemataOptions schemata, Dictionary<RuntimeTypeHandle, ISimpleFeature>? value) {
+    public static void SetFeatures(
+        this SchemataOptions                           schemata,
+        Dictionary<RuntimeTypeHandle, ISimpleFeature>? value) {
         schemata.Set(Constants.Options.Features, value);
     }
 

@@ -14,17 +14,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     where TContext : DbContext
     where TEntity : class
 {
-    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) {
-        ServiceProvider = sp;
-        Context         = context;
-        DbSet           = context.Set<TEntity>();
+    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) : base(sp) {
+        Context = context;
+        DbSet   = context.Set<TEntity>();
     }
 
     protected virtual TContext Context { get; }
 
     protected virtual DbSet<TEntity> DbSet { get; }
-
-    protected virtual IServiceProvider ServiceProvider { get; }
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return DbSet.AsAsyncEnumerable();
@@ -92,7 +89,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -103,7 +100,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -115,7 +112,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
+        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
         if (!next) {
             return;
         }
@@ -136,7 +133,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
 
         var query = new QueryContainer<TEntity>(table);
 
-        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, query, ct);
+        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, query, ct);
 
         return BuildQuery(query.Query, predicate);
     }

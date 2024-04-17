@@ -66,19 +66,27 @@ public class TestFilterContainer
                                   .Bind("msg", typeof(string))
                                   .Bind("retries", typeof(int))
                                   .Build();
-        var func       = (Func<string, int, bool>)expression!.Compile();
+        var func = (Func<string, int, bool>)expression!.Compile();
 
         Assert.True(func("hello world", 9));
         Assert.False(func("hello world", 10));
     }
 
+    #region Nested type: MyVector4
+
     public class MyVector4
     {
+        public IEnumerable<MyType> type_map { get; set; } = [];
+
+        #region Nested type: MyType
+
         public class MyType
         {
             public string type { get; set; } = string.Empty;
         }
 
-        public IEnumerable<MyType> type_map { get; set; } = [];
+        #endregion
     }
+
+    #endregion
 }

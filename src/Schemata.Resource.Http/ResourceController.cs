@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Humanizer;
 using Microsoft.AspNetCore.Mvc;
-using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
@@ -38,11 +36,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpGet]
     public virtual async Task<IActionResult> List([FromQuery] ListRequest request) {
-        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, HttpContext, Operations.List, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, HttpContext, Operations.List, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceListAdvice<TEntity>>.AdviseAsync(ServiceProvider, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceListAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -61,7 +61,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         var entities = await Repository.ListAsync(q => query(q), HttpContext.RequestAborted)
                                        .ToListAsync(HttpContext.RequestAborted);
 
-        if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(ServiceProvider, entities, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, entities, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -71,11 +71,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpGet("{id}")]
     public virtual async Task<IActionResult> Get(long id) {
-        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, HttpContext, Operations.Get, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, HttpContext, Operations.Get, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceGetAdvice<TEntity>>.AdviseAsync(ServiceProvider, id, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceGetAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -84,7 +86,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return NotFound();
         }
 
-        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, entity, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -95,13 +97,15 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpPost]
     public virtual async Task<IActionResult> Create([FromBody] TRequest request) {
-        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, HttpContext, Operations.Create, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, HttpContext, Operations.Create, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
         request.Id = default;
 
-        if (!await Advices<IResourceCreateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceCreateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -113,7 +117,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         await Repository.AddAsync(entity, HttpContext.RequestAborted);
         await Repository.CommitAsync(HttpContext.RequestAborted);
 
-        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, entity, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -124,7 +128,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpPut("{id}")]
     public virtual async Task<IActionResult> Update(long id, [FromBody] TRequest request) {
-        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, HttpContext, Operations.Update, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, HttpContext, Operations.Update, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -132,7 +138,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return BadRequest();
         }
 
-        if (!await Advices<IResourceUpdateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, id, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceUpdateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -146,7 +152,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         await Repository.UpdateAsync(entity, HttpContext.RequestAborted);
         await Repository.CommitAsync(HttpContext.RequestAborted);
 
-        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, entity, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, entity, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -157,11 +163,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpDelete("{id}")]
     public virtual async Task<IActionResult> Delete(long id) {
-        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, HttpContext, Operations.Delete, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IResourceRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, HttpContext, Operations.Delete, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceDeleteAdvice<TEntity>>.AdviseAsync(ServiceProvider, id, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceDeleteAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 

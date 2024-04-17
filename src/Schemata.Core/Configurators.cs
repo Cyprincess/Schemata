@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -19,12 +18,12 @@ public sealed class Configurators
         }
 
         _configurators[key] = (T options) => {
-            configure(options);
+            configure!.Invoke(options);
             action(options);
         };
     }
 
-    public bool TryGet<T>([MaybeNullWhen(false)] out Action<T> action) {
+    public bool TryGet<T>(out Action<T>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof(T), out var @object)) {
             return false;
@@ -40,7 +39,7 @@ public sealed class Configurators
 
     public Action<T> Get<T>() {
         if (TryGet<T>(out var action)) {
-            return action;
+            return action!;
         }
 
         throw new KeyNotFoundException($"No configurator for {typeof(T)}");

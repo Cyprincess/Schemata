@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using FluentValidation;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
@@ -25,6 +25,7 @@ public sealed class AdviceValidation<T> : IValidationAsyncAdvice<T>
     public int Priority => Order;
 
     public async Task<bool> AdviseAsync(
+        AdviceContext                       ctx,
         Operations                          operation,
         T                                   request,
         IList<KeyValuePair<string, string>> errors,

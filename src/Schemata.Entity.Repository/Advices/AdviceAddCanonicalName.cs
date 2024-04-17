@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
@@ -25,7 +26,11 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
 
     public int Priority => Order;
 
-    public Task<bool> AdviseAsync(IRepository<TEntity> repository, TEntity entity, CancellationToken ct) {
+    public Task<bool> AdviseAsync(
+        AdviceContext        ctx,
+        IRepository<TEntity> repository,
+        TEntity              entity,
+        CancellationToken    ct) {
         if (entity is not ICanonicalName named) {
             return Task.FromResult(true);
         }

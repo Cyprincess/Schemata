@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Abstractions.Advices;
 

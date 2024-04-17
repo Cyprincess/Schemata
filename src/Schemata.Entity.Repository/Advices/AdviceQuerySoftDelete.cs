@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
@@ -15,9 +16,14 @@ public sealed class AdviceQuerySoftDelete<TEntity> : IRepositoryQueryAsyncAdvice
     public int Priority => Order;
 
     public Task<bool> AdviseAsync(
+        AdviceContext           ctx,
         IRepository<TEntity>    repository,
         QueryContainer<TEntity> query,
         CancellationToken       ct = default) {
+        if (ctx.Has<SuppressQuerySoftDelete>()) {
+            return Task.FromResult(true);
+        }
+
         if (!typeof(ISoftDelete).IsAssignableFrom(typeof(TEntity))) {
             return Task.FromResult(true);
         }

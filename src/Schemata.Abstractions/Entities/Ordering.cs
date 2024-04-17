@@ -1,3 +1,3 @@
 namespace Schemata.Abstractions.Entities;
 
-public enum Ordering { Ascending, Descending, }
+public enum Ordering { Ascending, Descending }

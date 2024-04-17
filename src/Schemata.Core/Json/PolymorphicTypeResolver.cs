@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Json;
 
 namespace Schemata.Core.Json;
 
@@ -19,7 +20,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
             var attribute = type.GetCustomAttribute<PolymorphicAttribute>();
             var handle    = attribute!.BaseType.TypeHandle;
             if (!_types.TryGetValue(handle, out var value)) {
-                value                      = [];
+                value          = [];
                 _types[handle] = value;
             }
 

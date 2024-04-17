@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
 using Schemata.Mapping.Skeleton;
@@ -47,7 +48,9 @@ public sealed class WorkflowController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
-        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, request, HttpContext, HttpContext.RequestAborted)) {
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 

@@ -11,8 +11,9 @@ public static class ServiceCollectionExtensions
     public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type implementationType) {
         var serviceType = typeof(IRepository<>);
 
+        var nonGenericInterface     = implementationType.GetInterface(nameof(IRepository));
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
-        if (implementationInterface?.GetGenericTypeDefinition() != serviceType) {
+        if (nonGenericInterface == null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
             throw new ArgumentException($"The type {implementationType} does not implement {serviceType}.",
                 nameof(implementationType));
         }

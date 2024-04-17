@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -13,13 +12,13 @@ public class Container
 {
     private static readonly Dictionary<string, MethodInfo> MethodCache = [];
 
-    public bool AllowFunctions { get; private set; }
-
-    public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
-
     public Container(IToken token) {
         Token = token;
     }
+
+    public bool AllowFunctions { get; private set; }
+
+    public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
 
     private IToken Token { get; }
 
@@ -63,16 +62,16 @@ public class Container
         return this;
     }
 
-    public bool TryGetExpression(string? name, [MaybeNullWhen(false)] out Expression expression) {
+    public bool TryGetExpression(string? name, out Expression? expression) {
         if (!string.IsNullOrWhiteSpace(name)) {
             return Expressions.TryGetValue(name, out expression);
         }
 
-        expression = null;
+        expression = default;
         return false;
     }
 
-    public bool TryGetParameter(string? name, [MaybeNullWhen(false)] out ParameterExpression parameter) {
+    public bool TryGetParameter(string? name, out ParameterExpression? parameter) {
         if (!string.IsNullOrWhiteSpace(name)) {
             return Parameters.TryGetValue(name, out parameter);
         }
