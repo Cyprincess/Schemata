@@ -46,6 +46,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
+        var repository = Repository.Once();
+
         Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
 
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
@@ -58,7 +60,11 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             query = query.ApplyOrdering(order);
         }
 
-        var entities = await Repository.ListAsync(q => query(q), HttpContext.RequestAborted)
+        if (request.ShowDeleted is true) {
+            repository = repository.SuppressQuerySoftDelete();
+        }
+
+        var entities = await repository.ListAsync(q => query(q), HttpContext.RequestAborted)
                                        .ToListAsync(HttpContext.RequestAborted);
 
         if (!await Advices<IResourceResponsesAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, entities, HttpContext, HttpContext.RequestAborted)) {
@@ -81,7 +87,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        var entity = await Repository.SingleOrDefaultAsync(q => q.Where(e => e.Id == id), HttpContext.RequestAborted);
+        var repository = Repository.Once().SuppressQuerySoftDelete();
+
+        var entity = await repository.SingleOrDefaultAsync(q => q.Where(e => e.Id == id), HttpContext.RequestAborted);
         if (entity is null) {
             return NotFound();
         }
