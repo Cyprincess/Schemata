@@ -17,11 +17,17 @@ public abstract class Match : IBinary
     }
 
     public Expression? ToExpression(Expression left, Expression right, Container ctx) {
+        var normalize = ctx.GetMethod(typeof(string), nameof(string.ToUpper), []);
+
+        if (normalize is null) {
+            return null;
+        }
+
         var method = this switch {
-            ExactMatch  => ctx.GetMethod(typeof(string), "Contains", [typeof(string)]),
-            FuzzyMatch  => ctx.GetMethod(typeof(string), "Contains", [typeof(string)]),
-            PrefixMatch => ctx.GetMethod(typeof(string), "StartsWith", [typeof(string)]),
-            SuffixMatch => ctx.GetMethod(typeof(string), "EndsWith", [typeof(string)]),
+            ExactMatch  => ctx.GetMethod(typeof(string), nameof(string.Contains), [typeof(string)]),
+            FuzzyMatch  => ctx.GetMethod(typeof(string), nameof(string.Contains), [typeof(string)]),
+            PrefixMatch => ctx.GetMethod(typeof(string), nameof(string.StartsWith), [typeof(string)]),
+            SuffixMatch => ctx.GetMethod(typeof(string), nameof(string.EndsWith), [typeof(string)]),
             var _       => null,
         };
 
@@ -33,7 +39,7 @@ public abstract class Match : IBinary
             right = Expression.Call(right, "ToString", null);
         }
 
-        return Expression.Call(left, method, right);
+        return Expression.Call(Expression.Call(left, normalize, null), method, Expression.Call(right, normalize, null));
     }
 
     public virtual ExpressionType? Type => null;
