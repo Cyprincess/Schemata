@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Humanizer;
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advices;
@@ -46,6 +48,39 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
+        var token = await PageToken.FromStringAsync(request.PageToken) ?? new PageToken {
+            Filter      = request.Filter,
+            OrderBy     = request.OrderBy,
+            ShowDeleted = request.ShowDeleted,
+        };
+        if (token.Filter != request.Filter
+         || token.OrderBy != request.OrderBy
+         || token.ShowDeleted != request.ShowDeleted) {
+            throw new InvalidArgumentException {
+                Errors = new() {
+                    [nameof(request.PageToken).Underscore()] = "mismatch",
+                },
+            };
+        }
+
+        if (request.PageSize.HasValue) {
+            token.PageSize = request.PageSize.Value;
+        }
+
+        token.PageSize = token.PageSize switch {
+            <= 0  => 25,
+            > 100 => 100,
+            var _ => token.PageSize,
+        };
+
+        if (request.Skip.HasValue) {
+            token.Skip += request.Skip.Value;
+        }
+
+        if (token.Skip < 0) {
+            token.Skip = 0;
+        }
+
         var repository = Repository.Once();
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
@@ -64,6 +99,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             repository = repository.SuppressQuerySoftDelete();
         }
 
+        var response = new ListResponse<TSummary> {
+            TotalSize = await repository.LongCountAsync(q => query(q), HttpContext.RequestAborted),
+        };
+
+        query = query.ApplyPaginating(token);
+
         var entities = await repository.ListAsync(q => query(q), HttpContext.RequestAborted)
                                        .ToListAsync(HttpContext.RequestAborted);
 
@@ -71,8 +112,15 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        var summaries = Mapper.Map<IEnumerable<TEntity>, IEnumerable<TSummary>>(entities);
-        return Ok(summaries);
+        token.Skip += token.PageSize;
+
+        if (entities.Count >= token.PageSize) {
+            response.NextPageToken = await token.ToStringAsync();
+        }
+
+        response.Entities = Mapper.Map<IEnumerable<TEntity>, IEnumerable<TSummary>>(entities);
+
+        return Ok(response);
     }
 
     [HttpGet("{id}")]

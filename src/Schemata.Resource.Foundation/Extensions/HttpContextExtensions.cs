@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
@@ -38,6 +39,6 @@ public static class HttpContextExtensions
             return AuthorizationResult.Success();
         }
 
-        throw new AuthorizationException();
+        throw new AuthorizationException(401, result.Failure?.FailureReasons.FirstOrDefault()?.Message ?? "");
     }
 }

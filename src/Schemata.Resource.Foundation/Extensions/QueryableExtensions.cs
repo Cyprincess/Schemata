@@ -5,6 +5,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Models;
 
 // ReSharper disable once CheckNamespace
 namespace System.Linq;
@@ -53,6 +54,16 @@ public static class QueryableExtensions
 
             query = q => build(q).ApplyOrdering(select, ordering);
         }
+
+        return query;
+    }
+
+    public static Func<IQueryable<T>, IQueryable<T>> ApplyPaginating<T>(
+        this Func<IQueryable<T>, IQueryable<T>> query,
+        PageToken                               token) {
+        var build = query;
+
+        query = q => build(q).Skip(token.Skip).Take(token.PageSize);
 
         return query;
     }
