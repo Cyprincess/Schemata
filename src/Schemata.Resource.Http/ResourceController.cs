@@ -8,6 +8,7 @@ using Parlot;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advices;

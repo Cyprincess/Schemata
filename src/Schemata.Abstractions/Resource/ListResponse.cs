@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Schemata.Resource.Foundation.Models;
+namespace Schemata.Abstractions.Resource;
 
 public class ListResponse<TSummary>
 {
