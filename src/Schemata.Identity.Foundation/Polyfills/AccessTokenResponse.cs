@@ -3,7 +3,7 @@
 
 #if NET6_0
 using System.Text.Json;
-using Schemata.Identity.Foundation;
+using Schemata.Identity.Skeleton;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;

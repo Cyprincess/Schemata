@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
-using Schemata.Identity.Foundation;
+using Schemata.Identity.Skeleton;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;

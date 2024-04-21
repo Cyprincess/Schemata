@@ -1,4 +1,4 @@
-namespace Schemata.Identity.Foundation;
+namespace Schemata.Identity.Skeleton;
 
 public static class SchemataIdentityConstants
 {
