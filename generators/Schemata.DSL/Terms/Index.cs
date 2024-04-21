@@ -54,9 +54,9 @@ public class Index : TermBase, INamedTerm
 
         foreach (var option in ParseOptions(mark, scanner)) {
             switch (option.Name) {
-                case Constants.Options.Unique:
-                case Constants.Options.BTree:
-                case Constants.Options.Hash:
+                case SkmConstants.Options.Unique:
+                case SkmConstants.Options.BTree:
+                case SkmConstants.Options.Hash:
                     break;
                 default:
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);

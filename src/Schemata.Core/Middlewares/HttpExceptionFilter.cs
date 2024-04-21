@@ -37,7 +37,7 @@ public class HttpExceptionFilter : IActionFilter, IOrderedFilter
 
     #region IOrderedFilter Members
 
-    public int Order => Constants.Orders.Max;
+    public int Order => SchemataConstants.Orders.Max;
 
     #endregion
 }

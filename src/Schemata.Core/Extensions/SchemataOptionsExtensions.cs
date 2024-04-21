@@ -10,13 +10,13 @@ namespace Schemata.Core;
 public static class SchemataOptionsExtensions
 {
     public static Dictionary<RuntimeTypeHandle, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
-        return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Constants.Options.Features);
+        return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(SchemataConstants.Options.Features);
     }
 
     public static void SetFeatures(
         this SchemataOptions                           schemata,
         Dictionary<RuntimeTypeHandle, ISimpleFeature>? value) {
-        schemata.Set(Constants.Options.Features, value);
+        schemata.Set(SchemataConstants.Options.Features, value);
     }
 
     public static void AddFeature<T>(this SchemataOptions schemata)

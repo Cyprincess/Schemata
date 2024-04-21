@@ -1,6 +1,6 @@
 namespace Schemata.DSL;
 
-public static class Constants
+public static class SkmConstants
 {
     #region Nested type: Options
 

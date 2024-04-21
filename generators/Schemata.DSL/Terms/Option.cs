@@ -13,7 +13,7 @@ public class Option : TermBase
         {
             value = Utilities.ToCamelCase(value);
             _name = value switch {
-                Constants.Options.NotNull => Constants.Options.Required,
+                SkmConstants.Options.NotNull => SkmConstants.Options.Required,
                 var _                     => value,
             };
         }

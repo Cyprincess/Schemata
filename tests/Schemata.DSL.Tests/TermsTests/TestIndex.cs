@@ -9,8 +9,8 @@ public class TestIndex
 {
     [Theory]
     [InlineData("Index category_id", "IX_Post_CategoryId", new[] { "category_id" })]
-    [InlineData("Index category_id[b tree]", "IX_Post_CategoryId", new[] { "category_id" }, new[] { Constants.Options.BTree })]
-    [InlineData("Index user_id creation_date [hash] {Note FOOBAR}", "IX_Post_UserId_CreationDate", new[] { "user_id", "creation_date" }, new[] { Constants.Options.Hash }, "FOOBAR")]
+    [InlineData("Index category_id[b tree]", "IX_Post_CategoryId", new[] { "category_id" }, new[] { SkmConstants.Options.BTree })]
+    [InlineData("Index user_id creation_date [hash] {Note FOOBAR}", "IX_Post_UserId_CreationDate", new[] { "user_id", "creation_date" }, new[] { SkmConstants.Options.Hash }, "FOOBAR")]
     public void ShouldParseIndex(
         string    syntax,
         string    name,

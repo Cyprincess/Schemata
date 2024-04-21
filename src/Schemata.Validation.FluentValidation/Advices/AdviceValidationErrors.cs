@@ -11,7 +11,7 @@ public sealed class AdviceValidationErrors<T> : IValidationAsyncAdvice<T>
 {
     #region IValidationAsyncAdvice<T> Members
 
-    public int Order => Constants.Orders.Max;
+    public int Order => SchemataConstants.Orders.Max;
 
     public int Priority => Order;
 

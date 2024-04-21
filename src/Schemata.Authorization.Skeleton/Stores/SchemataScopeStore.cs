@@ -84,7 +84,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(Constants.Schemata, "\x1e", scope.Descriptions);
+        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Descriptions);
         var descriptions = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -117,7 +117,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(Constants.Schemata, "\x1e", scope.DisplayNames);
+        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.DisplayNames);
         var names = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -154,7 +154,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(Constants.Schemata, "\x1e", scope.Properties);
+        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Properties);
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -172,7 +172,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(Constants.Schemata, "\x1e", scope.Resources);
+        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Resources);
         var resources = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
