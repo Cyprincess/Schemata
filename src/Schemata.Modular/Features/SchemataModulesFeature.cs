@@ -19,7 +19,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
 {
-    public override int Priority => Constants.Orders.Max;
+    public override int Priority => SchemataConstants.Orders.Max;
 
     public override void ConfigureServices(
         IServiceCollection  services,

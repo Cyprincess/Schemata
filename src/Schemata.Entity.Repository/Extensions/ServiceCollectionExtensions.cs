@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
 
         var nonGenericInterface     = implementationType.GetInterface(nameof(IRepository));
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
-        if (nonGenericInterface == null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
+        if (nonGenericInterface is null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
             throw new ArgumentException($"The type {implementationType} does not implement {serviceType}.",
                 nameof(implementationType));
         }

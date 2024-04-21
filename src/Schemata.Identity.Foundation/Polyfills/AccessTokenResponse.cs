@@ -3,6 +3,7 @@
 
 #if NET6_0
 using System.Text.Json;
+using Schemata.Identity.Foundation;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;
@@ -19,7 +20,7 @@ public sealed class AccessTokenResponse
     /// <remarks>
     ///     This is serialized as "tokenType": "Bearer" using <see cref="JsonSerializerDefaults.Web" />.
     /// </remarks>
-    public string TokenType => "Bearer";
+    public string TokenType => SchemataIdentityConstants.Scheme;
 
     /// <summary>
     ///     The opaque bearer token to send as part of the Authorization request header.

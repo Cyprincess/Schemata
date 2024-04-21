@@ -20,7 +20,7 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAsyncAdvice<TEn
 
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 
-    public int Order => Constants.Orders.Max;
+    public int Order => SchemataConstants.Orders.Max;
 
     public int Priority => Order;
 

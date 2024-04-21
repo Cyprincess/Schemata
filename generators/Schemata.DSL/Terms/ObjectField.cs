@@ -50,8 +50,8 @@ public class ObjectField : TermBase, INamedTerm
 
         foreach (var option in ParseOptions(mark, scanner)) {
             switch (option.Name) {
-                case Constants.Options.Omit:
-                case Constants.Options.OmitAll:
+                case SkmConstants.Options.Omit:
+                case SkmConstants.Options.OmitAll:
                     break;
                 default:
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);

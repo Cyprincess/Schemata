@@ -19,7 +19,7 @@ public sealed class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvi
         }
 
         var entity = typeof(TToken);
-        var key    = string.Concat(Constants.Schemata, "\x1e", entity.Name);
+        var key    = string.Concat(SchemataConstants.Schemata, "\x1e", entity.Name);
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 

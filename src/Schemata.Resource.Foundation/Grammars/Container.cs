@@ -91,7 +91,7 @@ public class Container
             () => {
                 flag ??= BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
 
-                return types == null
+                return types is null
                     ? type.GetMethod(name, flag.Value)
                     : type.GetMethod(name, flag.Value, null, types, null);
             });
@@ -111,7 +111,7 @@ public class Container
 
         method = getter();
 
-        if (method == null) {
+        if (method is null) {
             return null;
         }
 

@@ -42,7 +42,7 @@ public static class ApplicationBuilderExtensions
 
         var schemata = sp.GetRequiredService<SchemataOptions>();
 
-        schemata.Pop<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Constants.Options.Features);
+        schemata.Pop<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(SchemataConstants.Options.Features);
 
         return app;
     }

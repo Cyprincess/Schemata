@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
+using Schemata.Identity.Foundation;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;
@@ -61,7 +62,7 @@ internal sealed class BearerTokenHandler(
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties) {
-        Response.Headers.Append(HeaderNames.WWWAuthenticate, "Bearer");
+        Response.Headers.Append(HeaderNames.WWWAuthenticate, SchemataIdentityConstants.Scheme);
         return base.HandleChallengeAsync(properties);
     }
 

@@ -51,12 +51,12 @@ public class Field : TermBase, INamedTerm
 
         foreach (var option in ParseOptions(mark, scanner)) {
             switch (option.Name) {
-                case Constants.Options.AutoIncrement:
-                case Constants.Options.PrimaryKey:
-                case Constants.Options.Required:
-                case Constants.Options.Unique:
-                case Constants.Options.BTree:
-                case Constants.Options.Hash:
+                case SkmConstants.Options.AutoIncrement:
+                case SkmConstants.Options.PrimaryKey:
+                case SkmConstants.Options.Required:
+                case SkmConstants.Options.Unique:
+                case SkmConstants.Options.BTree:
+                case SkmConstants.Options.Hash:
                     break;
                 default:
                     throw new ParseException($"Unexpected option {option.Name}", scanner.Cursor.Position);
@@ -64,13 +64,13 @@ public class Field : TermBase, INamedTerm
 
             if (table is not null) {
                 switch (option.Name) {
-                    case Constants.Options.PrimaryKey or Constants.Options.AutoIncrement:
+                    case SkmConstants.Options.PrimaryKey or SkmConstants.Options.AutoIncrement:
                     {
                         table.Keys ??= new();
                         table.Keys.Add(field.Name, field);
                         continue;
                     }
-                    case Constants.Options.Unique or Constants.Options.BTree or Constants.Options.Hash:
+                    case SkmConstants.Options.Unique or SkmConstants.Options.BTree or SkmConstants.Options.Hash:
                     {
                         table.Indices ??= new();
                         var index = new Index {
