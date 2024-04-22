@@ -124,16 +124,17 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
         query = query.ApplyPaginating(token);
 
-        var entities = await repository.ListAsync(q => query(q), HttpContext.RequestAborted)
-                                       .ToListAsync(HttpContext.RequestAborted);
+        var entities = repository.ListAsync(q => query(q), HttpContext.RequestAborted);
+
+        var summaries = await Mapper.EachAsync<TEntity, TSummary>(entities).ToListAsync();
 
         token.Skip += token.PageSize;
 
-        if (entities.Count >= token.PageSize) {
+        if (summaries.Count >= token.PageSize) {
             response.NextPageToken = await token.ToStringAsync();
         }
 
-        response.Entities = Mapper.Map<IEnumerable<TEntity>, IEnumerable<TSummary>>(entities)?.ToImmutableArray();
+        response.Entities = summaries.ToImmutableList();
 
         if (!await Advices<IResourceResponsesAdvice<TSummary>>.AdviseAsync(ServiceProvider, ctx, response.Entities, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
