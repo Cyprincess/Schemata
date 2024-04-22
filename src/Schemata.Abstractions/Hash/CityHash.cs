@@ -495,7 +495,7 @@ public class CityHash
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong HashLen16(ulong u, ulong v) {
-        return Hash128To64(new Uint128(u, v));
+        return Hash128To64(new(u, v));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -640,7 +640,7 @@ public class CityHash
 
         b += Rotate(a, 44);
 
-        return new Uint128(a + z, b + c);
+        return new(a + z, b + c);
     }
 
     [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]

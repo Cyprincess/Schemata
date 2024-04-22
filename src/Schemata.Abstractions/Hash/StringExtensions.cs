@@ -1,4 +1,3 @@
-using Schemata.Abstractions;
 using Schemata.Abstractions.Hash;
 
 // ReSharper disable once CheckNamespace
