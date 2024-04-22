@@ -1,4 +1,3 @@
-using System;
 using System.Linq.Expressions;
 using Parlot;
 using Schemata.Resource.Foundation.Grammars.Terms;
@@ -18,12 +17,6 @@ public abstract class Match : IBinary
     }
 
     public Expression ToExpression(Expression left, Expression right, Container ctx) {
-        var normalize = ctx.GetMethod(typeof(string), nameof(string.ToUpper), []);
-
-        if (normalize is null) {
-            throw new NotSupportedException("No string normalization method found");
-        }
-
         var method = this switch {
             ExactMatch  => ctx.GetMethod(typeof(string), nameof(string.Contains), [typeof(string)]),
             FuzzyMatch  => ctx.GetMethod(typeof(string), nameof(string.Contains), [typeof(string)]),
@@ -40,7 +33,20 @@ public abstract class Match : IBinary
             right = Expression.Call(right, "ToString", null);
         }
 
-        return Expression.Call(Expression.Call(left, normalize, null), method, Expression.Call(right, normalize, null));
+        if (this is not FuzzyMatch) {
+            return Expression.Call(left, method, right);
+        }
+
+        var normalize = ctx.GetMethod(typeof(string), nameof(string.ToUpper), []);
+
+        if (normalize is null) {
+            return Expression.Call(left, method, right);
+        }
+
+        left  = Expression.Call(left, normalize, null);
+        right = Expression.Call(right, normalize, null);
+
+        return Expression.Call(left, method, right);
     }
 
     public virtual ExpressionType? Type => null;
