@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 
@@ -132,7 +131,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.DisplayNames);
+        var key = application.DisplayNames!.ToCacheKey();
         var names = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -163,7 +162,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(result: null);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.JsonWebKeySet);
+        var key = application.JsonWebKeySet!.ToCacheKey();
         var set = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -181,7 +180,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Permissions);
+        var key = application.Permissions!.ToCacheKey();
         var permissions = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -201,7 +200,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.PostLogoutRedirectUris);
+        var key = application.PostLogoutRedirectUris!.ToCacheKey();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -221,7 +220,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Properties);
+        var key = application.Properties!.ToCacheKey();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -241,7 +240,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.RedirectUris);
+        var key = application.RedirectUris!.ToCacheKey();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -261,7 +260,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Requirements);
+        var key = application.Requirements!.ToCacheKey();
         var requirements = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -281,7 +280,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<string, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Settings);
+        var key = application.Settings!.ToCacheKey();
         var settings = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

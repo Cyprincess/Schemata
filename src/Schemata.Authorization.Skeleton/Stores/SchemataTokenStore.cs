@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using OpenIddict.Abstractions;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -142,7 +141,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
             return new(ImmutableDictionary.Create<string, JsonElement>());
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", token.Properties);
+        var key = token.Properties!.ToCacheKey();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

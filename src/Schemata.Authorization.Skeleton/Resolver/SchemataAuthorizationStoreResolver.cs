@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using OpenIddict.Core;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
@@ -24,7 +23,7 @@ public sealed class SchemataAuthorizationStoreResolver(
         }
 
         var entity = options.CurrentValue.DefaultAuthorizationType!;
-        var key    = string.Concat(SchemataConstants.Schemata, "\x1e", entity.Name);
+        var key    = (entity.FullName ?? entity.Name).ToCacheKey();
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 

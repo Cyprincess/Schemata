@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Abstractions;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
@@ -19,7 +18,7 @@ public sealed class SchemataScopeStoreResolver(IMemoryCache cache, IServiceProvi
         }
 
         var entity = typeof(TScope);
-        var key    = string.Concat(SchemataConstants.Schemata, "\x1e", entity.Name);
+        var key    = (entity.FullName ?? entity.Name).ToCacheKey();
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 

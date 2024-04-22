@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using OpenIddict.Abstractions;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -221,7 +220,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", authorization.Properties);
+        var key = authorization.Properties!.ToCacheKey();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -241,7 +240,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", authorization.Scopes);
+        var key = authorization.Scopes!.ToCacheKey();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

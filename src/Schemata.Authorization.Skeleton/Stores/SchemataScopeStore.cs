@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using OpenIddict.Abstractions;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 
@@ -84,7 +83,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Descriptions);
+        var key = scope.Descriptions!.ToCacheKey();
         var descriptions = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -117,7 +116,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.DisplayNames);
+        var key = scope.DisplayNames!.ToCacheKey();
         var names = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -154,7 +153,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Properties);
+        var key = scope.Properties!.ToCacheKey();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -172,7 +171,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Resources);
+        var key = scope.Resources!.ToCacheKey();
         var resources = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
