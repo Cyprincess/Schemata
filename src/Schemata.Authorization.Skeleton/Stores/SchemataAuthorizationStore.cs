@@ -221,7 +221,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", authorization.Properties);
+        var key = authorization.Properties!.CityHash64();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -241,7 +241,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", authorization.Scopes);
+        var key = authorization.Scopes!.CityHash64();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

@@ -84,7 +84,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Descriptions);
+        var key = scope.Descriptions!.CityHash64();
         var descriptions = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -117,7 +117,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.DisplayNames);
+        var key = scope.DisplayNames!.CityHash64();
         var names = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -154,7 +154,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Properties);
+        var key = scope.Properties!.CityHash64();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -172,7 +172,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", scope.Resources);
+        var key = scope.Resources!.CityHash64();
         var resources = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

@@ -132,7 +132,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.DisplayNames);
+        var key = application.DisplayNames!.CityHash64();
         var names = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -163,7 +163,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(result: null);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.JsonWebKeySet);
+        var key = application.JsonWebKeySet!.CityHash64();
         var set = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -181,7 +181,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Permissions);
+        var key = application.Permissions!.CityHash64();
         var permissions = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -201,7 +201,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.PostLogoutRedirectUris);
+        var key = application.PostLogoutRedirectUris!.CityHash64();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -221,7 +221,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Properties);
+        var key = application.Properties!.CityHash64();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -241,7 +241,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.RedirectUris);
+        var key = application.RedirectUris!.CityHash64();
         var uris = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -261,7 +261,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableArray<string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Requirements);
+        var key = application.Requirements!.CityHash64();
         var requirements = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
@@ -281,7 +281,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
             return new(ImmutableDictionary<string, string>.Empty);
         }
 
-        var key = string.Concat(SchemataConstants.Schemata, "\x1e", application.Settings);
+        var key = application.Settings!.CityHash64();
         var settings = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));
