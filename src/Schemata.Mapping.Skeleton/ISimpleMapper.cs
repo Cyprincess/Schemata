@@ -1,15 +1,9 @@
 using System;
-using System.Collections.Generic;
-using System.Threading;
 
 namespace Schemata.Mapping.Skeleton;
 
 public interface ISimpleMapper
 {
-    IEnumerable<T?> Map<T>(IEnumerable<object> source);
-
-    IAsyncEnumerable<T?> MapAsync<T>(IAsyncEnumerable<object> source, CancellationToken ct = default);
-
     T? Map<T>(object source);
 
     T? Map<T>(object source, Type sourceType, Type destinationType);
