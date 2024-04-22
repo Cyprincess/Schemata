@@ -10,4 +10,8 @@
     <PackageTags>application;business;framework;mapper</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.Extensions.Options;
 using Schemata.Mapping.Skeleton;
@@ -10,14 +14,25 @@ public sealed class SimpleMapper : ISimpleMapper
     private readonly IMapper _mapper;
 
     public SimpleMapper(IOptions<SchemataMappingOptions> options) {
-        var config = new MapperConfiguration(mapper => {
-            AutoMapperConfigurator.Configure(mapper, options.Value);
-        });
+        var config = new MapperConfiguration(mapper => { AutoMapperConfigurator.Configure(mapper, options.Value); });
 
         _mapper = new Mapper(config);
     }
 
     #region ISimpleMapper Members
+
+    public IEnumerable<T?> Map<T>(IEnumerable<object> source) {
+        return _mapper.Map<IEnumerable<T>>(source);
+    }
+
+    public async IAsyncEnumerable<T?> MapAsync<T>(
+        IAsyncEnumerable<object>                   source,
+        [EnumeratorCancellation] CancellationToken ct = default) {
+        await foreach (var item in source.WithCancellation(ct)) {
+            ct.ThrowIfCancellationRequested();
+            yield return _mapper.Map<T>(item);
+        }
+    }
 
     public T? Map<T>(object source) {
         return _mapper.Map<T>(source);
