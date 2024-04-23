@@ -6,7 +6,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceQuerySoftDelete<TEntity> : IRepositoryQueryAsyncAdvice<TEntity>
+public sealed class AdviceBuildBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryQueryAsyncAdvice<TEntity> Members
@@ -17,7 +17,6 @@ public sealed class AdviceQuerySoftDelete<TEntity> : IRepositoryQueryAsyncAdvice
 
     public Task<bool> AdviseAsync(
         AdviceContext           ctx,
-        IRepository<TEntity>    repository,
         QueryContainer<TEntity> query,
         CancellationToken       ct = default) {
         if (ctx.Has<SuppressQuerySoftDelete>()) {

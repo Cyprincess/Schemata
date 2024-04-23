@@ -20,12 +20,12 @@ public static class ServiceCollectionExtensions
 
         services.TryAddScoped(serviceType, implementationType);
 
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvice<>), typeof(AdviceBuildBuildQuerySoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddCanonicalName<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddConcurrency<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddSoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddTimestamp<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAsyncAdvice<>), typeof(AdviceAddValidation<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAsyncAdvice<>), typeof(AdviceQuerySoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveSoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateConcurrency<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceUpdateTimestamp<>)));

@@ -25,6 +25,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Context = context;
 
         var entity = typeof(TEntity);
+
         TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
     }
 
@@ -49,7 +50,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
-        var query      = await BuildQueryAsync(predicate, ct);
+        var query = await BuildQueryAsync(predicate, ct);
+
         var enumerable = query.AsAsyncEnumerable().WithCancellation(ct);
 
         await foreach (var entity in enumerable) {
@@ -164,9 +166,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
         var table = AsQueryable();
 
-        var query = new QueryContainer<TEntity>(table);
+        var query = new QueryContainer<TEntity>(this, table);
 
-        await Advices<IRepositoryQueryAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, query, ct);
+        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, query, ct);
 
         return BuildQuery(query.Query, predicate);
     }
