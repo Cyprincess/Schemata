@@ -9,13 +9,13 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceUpdateValidation<TEntity, TRequest> : IResourceUpdateAdvice<TEntity, TRequest>
+public sealed class AdviceEditValidation<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
     private readonly IServiceProvider _services;
 
-    public AdviceUpdateValidation(IServiceProvider services) {
+    public AdviceEditValidation(IServiceProvider services) {
         _services = services;
     }
 

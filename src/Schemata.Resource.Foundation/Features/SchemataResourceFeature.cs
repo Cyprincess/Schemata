@@ -24,6 +24,6 @@ public sealed class SchemataResourceFeature : FeatureBase
         IWebHostEnvironment environment) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceRequestAdvice<>), typeof(AdviceRequestAuthorize<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateAdvice<,>), typeof(AdviceCreateValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvice<,>), typeof(AdviceUpdateValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditAdvice<,>), typeof(AdviceEditValidation<,>)));
     }
 }

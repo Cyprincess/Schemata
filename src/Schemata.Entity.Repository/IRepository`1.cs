@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advices;
 
 namespace Schemata.Entity.Repository;
 
 public interface IRepository<TEntity>
     where TEntity : class
 {
+    AdviceContext AdviceContext { get; }
+
     IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
     IQueryable<TEntity> AsQueryable();

@@ -214,7 +214,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return BadRequest();
         }
 
-        if (!await Advices<IResourceUpdateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceEditAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 

@@ -65,11 +65,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         ServiceProvider = sp;
     }
 
-    protected virtual AdviceContext AdviceContext { get; } = new();
-
     protected virtual IServiceProvider ServiceProvider { get; }
 
     #region IRepository Members
+
+    AdviceContext IRepository.AdviceContext => AdviceContext;
 
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
@@ -192,6 +192,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     #endregion
 
     #region IRepository<TEntity> Members
+
+    public virtual AdviceContext AdviceContext { get; } = new();
 
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 

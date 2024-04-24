@@ -55,6 +55,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         CancellationToken                               ct = default)
         where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.FirstOrDefaultAsync(ct);
     }
 
@@ -63,6 +70,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         CancellationToken                               ct = default)
         where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.SingleOrDefaultAsync(ct);
     }
 
@@ -70,6 +84,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, bool>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.AnyAsync(ct);
     }
 
@@ -77,6 +98,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, int>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.CountAsync(ct);
     }
 
@@ -84,6 +112,13 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default) {
         var query = await BuildQueryAsync(predicate, ct);
+
+        var context = new QueryContext<TEntity, TResult, long>(this, query);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        if (!next) {
+            return context.Result;
+        }
+
         return await query.LongCountAsync(ct);
     }
 
