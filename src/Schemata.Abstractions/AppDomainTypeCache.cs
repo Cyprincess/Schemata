@@ -20,6 +20,10 @@ public static class AppDomainTypeCache
         Properties = [];
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+            if (assembly.IsDynamic) {
+                continue;
+            }
+
             var name = assembly.GetName().Name;
             if (string.IsNullOrWhiteSpace(name)) {
                 continue;
@@ -91,5 +95,11 @@ public static class AppDomainTypeCache
         Properties[type.TypeHandle] = properties;
 
         return properties;
+    }
+
+    public static PropertyInfo? GetProperty(Type type, string name) {
+        var properties = GetProperties(type);
+
+        return properties.TryGetValue(name, out var property) ? property : null;
     }
 }

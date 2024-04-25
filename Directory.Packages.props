@@ -26,13 +26,17 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '8.0')) ">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="8.0.4" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '6.0')) ">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="6.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="6.0.29" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="6.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="6.0.29" />
   </ItemGroup>
@@ -40,6 +44,7 @@
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="1.1.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="2.1.23" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />
@@ -47,6 +52,7 @@
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.1')) ">
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.32" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.32" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="3.1.32" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="4.7.0" />

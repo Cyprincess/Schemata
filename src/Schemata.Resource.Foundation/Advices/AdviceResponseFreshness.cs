@@ -18,7 +18,7 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvice
 
     public Task<bool> AdviseAsync(
         AdviceContext     ctx,
-        TEntity           entity,
+        TEntity?          entity,
         TDetail?          detail,
         HttpContext       context,
         CancellationToken ct = default) {

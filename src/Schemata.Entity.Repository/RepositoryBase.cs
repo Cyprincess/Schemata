@@ -29,7 +29,8 @@ public abstract class RepositoryBase
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
 
         if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
+            var id = allProperties.FirstOrDefault(p
+                => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
             if (id is not null) {
                 keyProperties.Add(id);
             }
@@ -198,6 +199,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
     public abstract IQueryable<TEntity> AsQueryable();
+
+    public abstract string? GetQueryString<T>(IQueryable<T> query);
 
     public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,

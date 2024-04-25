@@ -16,6 +16,8 @@ public interface IRepository<TEntity>
 
     IQueryable<TEntity> AsQueryable();
 
+    string? GetQueryString<T>(IQueryable<T> query);
+
     IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
