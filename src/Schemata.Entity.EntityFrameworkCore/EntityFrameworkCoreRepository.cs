@@ -57,7 +57,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
         if (!next) {
             return context.Result;
         }
@@ -72,7 +72,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
         if (!next) {
             return context.Result;
         }
@@ -86,7 +86,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, bool>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, bool>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
         if (!next) {
             return context.Result;
         }
@@ -100,7 +100,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, int>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, int>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
         if (!next) {
             return context.Result;
         }
@@ -114,7 +114,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, long>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, IAsyncEnumerable<TResult>>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, long>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
         if (!next) {
             return context.Result;
         }
