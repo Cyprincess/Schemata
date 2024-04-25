@@ -1,3 +1,3 @@
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class SuppressUpdateValidation;
+public sealed class SuppressEditFreshness;
