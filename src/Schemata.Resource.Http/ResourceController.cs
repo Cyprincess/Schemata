@@ -47,7 +47,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceListAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceListRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -151,7 +151,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceGetAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceGetRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -164,7 +164,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
         var detail = Mapper.Map<TEntity, TDetail>(entity);
 
-        if (!await Advices<IResourceResponseAdvice<TDetail>>.AdviseAsync(ServiceProvider, ctx, detail, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity, TDetail>>.AdviseAsync(ServiceProvider, ctx, entity, detail, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -181,7 +181,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
         request.Id = default;
 
-        if (!await Advices<IResourceCreateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceCreateRequestAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -190,12 +190,16 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return BadRequest();
         }
 
+        if (!await Advices<IResourceCreateAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, request, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
         await Repository.AddAsync(entity, HttpContext.RequestAborted);
         await Repository.CommitAsync(HttpContext.RequestAborted);
 
         var detail = Mapper.Map<TEntity, TDetail>(entity);
 
-        if (!await Advices<IResourceResponseAdvice<TDetail>>.AdviseAsync(ServiceProvider, ctx, detail, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity, TDetail>>.AdviseAsync(ServiceProvider, ctx, entity, detail, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -214,13 +218,17 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return BadRequest();
         }
 
-        if (!await Advices<IResourceEditAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceEditRequestAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
         var entity = await Repository.SingleOrDefaultAsync(q => q.Where(e => e.Id == id), HttpContext.RequestAborted);
         if (entity is null) {
             return NotFound();
+        }
+
+        if (!await Advices<IResourceEditAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, id, request, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
         }
 
         Mapper.Map(request, entity);
@@ -230,7 +238,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
         var detail = Mapper.Map<TEntity, TDetail>(entity);
 
-        if (!await Advices<IResourceResponseAdvice<TDetail>>.AdviseAsync(ServiceProvider, ctx, detail, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceResponseAdvice<TEntity, TDetail>>.AdviseAsync(ServiceProvider, ctx, entity, detail, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -245,13 +253,17 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceDeleteAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IResourceDeleteRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
         var entity = await Repository.SingleOrDefaultAsync(q => q.Where(e => e.Id == id), HttpContext.RequestAborted);
         if (entity is null) {
             return NotFound();
+        }
+
+        if (!await Advices<IResourceDeleteAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, id, entity, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
         }
 
         await Repository.RemoveAsync(entity, HttpContext.RequestAborted);

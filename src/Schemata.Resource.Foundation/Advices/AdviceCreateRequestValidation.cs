@@ -9,13 +9,13 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceCreateValidation<TEntity, TRequest> : IResourceCreateAdvice<TEntity, TRequest>
+public sealed class AdviceCreateRequestValidation<TEntity, TRequest> : IResourceCreateRequestAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
     private readonly IServiceProvider _services;
 
-    public AdviceCreateValidation(IServiceProvider services) {
+    public AdviceCreateRequestValidation(IServiceProvider services) {
         _services = services;
     }
 
@@ -30,7 +30,7 @@ public sealed class AdviceCreateValidation<TEntity, TRequest> : IResourceCreateA
         TRequest          request,
         HttpContext       context,
         CancellationToken ct = default) {
-        if (ctx.Has<SuppressCreateValidation>()) {
+        if (ctx.Has<SuppressCreateRequestValidation>()) {
             return true;
         }
 
