@@ -48,7 +48,10 @@ public sealed class AdviceValidation<T> : IValidationAsyncAdvice<T>
 
         foreach (var error in results.Errors) {
             var field  = error.PropertyName.Underscore();
-            var code   = error.ErrorCode[..^9].Underscore();
+
+            var code = error.ErrorCode.EndsWith("Validator")
+                ? error.ErrorCode.Substring(0, error.ErrorCode.Length - 9).Underscore()
+                : error.ErrorCode.Underscore();
             var values = error.FormattedMessagePlaceholderValues;
             if (values.TryGetValue("ComparisonValue", out var c)) {
                 code += $",{c}";

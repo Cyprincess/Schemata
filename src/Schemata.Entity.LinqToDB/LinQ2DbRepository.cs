@@ -78,7 +78,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             return context.Result;
         }
 
-        return await query.FirstOrDefaultAsync(ct);
+        context.Result = await query.FirstOrDefaultAsync(ct);
+        await Advices<IRepositoryResultAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        return context.Result;
     }
 
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
@@ -93,7 +95,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             return context.Result;
         }
 
-        return await query.SingleOrDefaultAsync(ct);
+        context.Result = await query.SingleOrDefaultAsync(ct);
+        await Advices<IRepositoryResultAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        return context.Result;
     }
 
     public override async ValueTask<bool> AnyAsync<TResult>(
@@ -107,7 +111,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             return context.Result;
         }
 
-        return await query.AnyAsync(ct);
+        context.Result = await query.AnyAsync(ct);
+        await Advices<IRepositoryResultAdvice<TEntity, TResult, bool>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        return context.Result;
     }
 
     public override async ValueTask<int> CountAsync<TResult>(
@@ -121,7 +127,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             return context.Result;
         }
 
-        return await query.CountAsync(ct);
+        context.Result = await query.CountAsync(ct);
+        await Advices<IRepositoryResultAdvice<TEntity, TResult, int>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        return context.Result;
     }
 
     public override async ValueTask<long> LongCountAsync<TResult>(
@@ -135,7 +143,9 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             return context.Result;
         }
 
-        return await query.LongCountAsync(ct);
+        context.Result = await query.LongCountAsync(ct);
+        await Advices<IRepositoryResultAdvice<TEntity, TResult, long>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+        return context.Result;
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {

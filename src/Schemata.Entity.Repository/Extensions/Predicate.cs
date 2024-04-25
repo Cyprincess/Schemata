@@ -20,7 +20,7 @@ public static class Predicate
 
         var parameter = Expression.Parameter(typeof(T));
 
-        var body = Replacer.Replace(predicate, parameter);
+        var body = ExpressionReplacer.Replace(predicate, parameter);
 
         return Expression.Lambda<Func<TResult, bool>>(body!, parameter);
     }
@@ -55,22 +55,22 @@ public static class Predicate
 
         var parameter = Expression.Parameter(typeof(T));
 
-        var l = Replacer.Replace(left, parameter);
-        var r = Replacer.Replace(right, parameter);
+        var l = ExpressionReplacer.Replace(left, parameter);
+        var r = ExpressionReplacer.Replace(right, parameter);
 
         var body = Expression.MakeBinary(type, l!, r!);
 
         return Expression.Lambda<Func<T, bool>>(body, parameter);
     }
 
-    #region Nested type: Replacer
+    #region Nested type: ExpressionReplacer
 
-    private class Replacer : ExpressionVisitor
+    private class ExpressionReplacer : ExpressionVisitor
     {
-        private readonly Expression _newValue;
         private readonly Expression _oldValue;
+        private readonly Expression _newValue;
 
-        private Replacer(Expression oldValue, Expression newValue) {
+        private ExpressionReplacer(Expression oldValue, Expression newValue) {
             _oldValue = oldValue;
             _newValue = newValue;
         }
@@ -80,7 +80,7 @@ public static class Predicate
                 return null;
             }
 
-            var visitor = new Replacer(expression.Parameters[0], parameter);
+            var visitor = new ExpressionReplacer(expression.Parameters[0], parameter);
             return visitor.Visit(expression.Body);
         }
 
