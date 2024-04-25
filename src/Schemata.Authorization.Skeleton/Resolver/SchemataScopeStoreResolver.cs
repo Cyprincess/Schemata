@@ -18,7 +18,7 @@ public sealed class SchemataScopeStoreResolver(IMemoryCache cache, IServiceProvi
         }
 
         var entity = typeof(TScope);
-        var key    = (entity.FullName ?? entity.Name).CityHash64();
+        var key    = (entity.FullName ?? entity.Name).ToCacheKey();
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 

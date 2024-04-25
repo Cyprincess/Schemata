@@ -18,7 +18,7 @@ public sealed class SchemataTokenStoreResolver(IMemoryCache cache, IServiceProvi
         }
 
         var entity = typeof(TToken);
-        var key    = (entity.FullName ?? entity.Name).CityHash64();
+        var key    = (entity.FullName ?? entity.Name).ToCacheKey();
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 

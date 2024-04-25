@@ -141,7 +141,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
             return new(ImmutableDictionary.Create<string, JsonElement>());
         }
 
-        var key = token.Properties!.CityHash64();
+        var key = token.Properties!.ToCacheKey();
         var properties = _cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High)
                  .SetSlidingExpiration(TimeSpan.FromMinutes(1));

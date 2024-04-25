@@ -23,7 +23,7 @@ public sealed class SchemataApplicationStoreResolver(
         }
 
         var entity = typeof(TApplication);
-        var key    = (entity.FullName ?? entity.Name).CityHash64();
+        var key    = (entity.FullName ?? entity.Name).ToCacheKey();
         var type = cache.GetOrCreate(key, entry => {
             entry.SetPriority(CacheItemPriority.High);
 
