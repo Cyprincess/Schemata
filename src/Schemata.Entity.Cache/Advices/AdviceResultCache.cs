@@ -60,6 +60,13 @@ public class AdviceResultCache<TEntity, TResult, T> : AdviceResultCache, IReposi
         var type = typeof(TEntity);
         var name = type.FullName ?? type.Name;
 
+        var result = typeof(T);
+        if (result is { IsValueType: true, IsPrimitive: true }) {
+            AffectedKeys[$"{name}.\x1e{result.Name}"] = key!;
+
+            return Task.FromResult(true);
+        }
+
         var visitor = new PropertyVisitor(type);
         visitor.Visit(expression);
 

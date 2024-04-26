@@ -39,14 +39,19 @@ public sealed class AdviceRemoveCache<TEntity> : IRepositoryUpdateAsyncAdvice<TE
 
         foreach (var g in AdviceResultCache.AffectedKeys.Keys.Where(k => k.StartsWith(name))
                                            .GroupBy(k => k.Split('=').First())) {
+            var kv       = "";
             var property = g.Key.Substring(name.Length);
-            var info     = AppDomainTypeCache.GetProperty(type, property);
-            if (info is null) {
-                continue;
-            }
+            if (property.StartsWith("\x1e")) {
+                kv = g.Key;
+            } else {
+                var info = AppDomainTypeCache.GetProperty(type, property);
+                if (info is null) {
+                    continue;
+                }
 
-            var value = info.GetValue(entity);
-            var kv    = $"{name}{property}={value}";
+                var value = info.GetValue(entity);
+                kv = $"{name}{property}={value}";
+            }
 
             if (!AdviceResultCache.AffectedKeys.TryGetValue(kv, out var key)) {
                 continue;
