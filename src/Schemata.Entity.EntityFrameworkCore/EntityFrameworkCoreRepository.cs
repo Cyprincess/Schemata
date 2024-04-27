@@ -31,6 +31,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return DbSet.AsQueryable();
     }
 
+    public override string? GetQueryString<T>(IQueryable<T> query) {
+#if NET6_0_OR_GREATER
+        return query.ToQueryString();
+#else
+        return query.ToSql();
+#endif
+    }
+
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {

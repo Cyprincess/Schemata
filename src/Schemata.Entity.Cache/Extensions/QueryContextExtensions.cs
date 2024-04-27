@@ -7,7 +7,7 @@ public static class QueryContextExtensions
 {
     public static string? ToCacheKey<TEntity, TResult, T>(this QueryContext<TEntity, TResult, T> context)
         where TEntity : class {
-        var query = context.Query.Expression.ToString();
+        var query = context.Repository.GetQueryString(context.Query);
         return !string.IsNullOrWhiteSpace(query)
             ? string.Concat(query, "\x1e", typeof(T).Name).ToCacheKey()
             : null;
