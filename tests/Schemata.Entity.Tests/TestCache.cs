@@ -36,8 +36,8 @@ public class TestCache
 
         var repository = new EntityFrameworkCoreRepository<TestingContext, Student>(scope.ServiceProvider, context);
 
-        var alice = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Alice")));
-        var bob = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
+        var alice = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Alice")).OrderByDescending(u => u.Name));
+        var bob   = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
 
         await repository.UpdateAsync(bob!);
     }

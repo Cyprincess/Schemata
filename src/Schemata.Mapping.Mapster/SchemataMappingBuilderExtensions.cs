@@ -1,4 +1,5 @@
 using Mapster;
+using Schemata.Core;
 using Schemata.Mapping.Foundation;
 using Schemata.Mapping.Foundation.Features;
 using Schemata.Mapping.Mapster;
@@ -13,7 +14,7 @@ public static class SchemataMappingBuilderExtensions
                          .IgnoreNullValues(true)
                          .PreserveReference(true);
 
-        builder.Builder.AddFeature<SchemataMappingFeature<SimpleMapper>>();
+        builder.Schemata.AddFeature<SchemataMappingFeature<SimpleMapper>>();
 
         return builder;
     }

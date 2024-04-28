@@ -62,7 +62,7 @@ public abstract class RepositoryBase
 public abstract class RepositoryBase<TEntity>(IServiceProvider sp) : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
-    protected virtual IServiceProvider ServiceProvider { get; } = sp;
+    protected virtual IServiceProvider ServiceProvider => sp;
 
     #region IRepository Members
 
@@ -340,12 +340,12 @@ public abstract class RepositoryBase<TEntity>(IServiceProvider sp) : RepositoryB
     #endregion
 
     protected virtual IQueryable<TResult> BuildQuery<TResult>(
-        IQueryable<TEntity>                             table,
+        IQueryable<TEntity>                             query,
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
         if (predicate is not null) {
-            return predicate(table);
+            return predicate(query);
         }
 
-        return table.OfType<TResult>();
+        return query.OfType<TResult>();
     }
 }

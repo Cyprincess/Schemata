@@ -14,7 +14,7 @@ public class Option : TermBase
             value = Utilities.ToCamelCase(value);
             _name = value switch {
                 SkmConstants.Options.NotNull => SkmConstants.Options.Required,
-                var _                     => value,
+                var _                        => value,
             };
         }
     }
