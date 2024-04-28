@@ -11,7 +11,7 @@ public static class SchemataMappingBuilderExtensions
     public static SchemataMappingBuilder Map<TSource, TDestination>(
         this SchemataMappingBuilder         builder,
         Action<Map<TSource, TDestination>>? configure = null) {
-        builder.Builder.Configure<SchemataMappingOptions>(options => {
+        builder.Configurators.Set<SchemataMappingOptions>(options => {
             options.AddMapping(configure);
         });
 

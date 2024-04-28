@@ -8,7 +8,7 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataResourceBuilderExtensions
 {
     public static SchemataHttpResourceBuilder MapHttp(this SchemataResourceBuilder builder) {
-        builder.Builder.AddFeature<SchemataHttpResourceFeature>();
+        builder.AddFeature<SchemataHttpResourceFeature>();
 
         return new(builder);
     }

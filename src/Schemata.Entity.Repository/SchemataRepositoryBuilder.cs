@@ -4,5 +4,5 @@ namespace Schemata.Entity.Repository;
 
 public sealed class SchemataRepositoryBuilder(IServiceCollection services)
 {
-    public IServiceCollection Services { get; } = services;
+    public IServiceCollection Services => services;
 }

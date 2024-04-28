@@ -47,6 +47,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
 
-        return new(builder);
+        return new(builder.Options, builder.Configurators);
     }
 }

@@ -49,7 +49,7 @@ public static class SchemataAuthorizationBuilderExtensions
 
     public static SchemataAuthorizationBuilder AddFeature<T>(this SchemataAuthorizationBuilder builder)
         where T : IAuthorizationFeature, new() {
-        builder.Builder.Configure<IList<IAuthorizationFeature>>(configure => {
+        builder.Configurators.Set<IList<IAuthorizationFeature>>(configure => {
             configure.Add(new T());
         });
 

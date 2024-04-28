@@ -9,7 +9,7 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceAddValidation<TEntity>(IServiceProvider services) : IRepositoryAddAsyncAdvice<TEntity>
+public sealed class AdviceAddValidation<TEntity>(IServiceProvider sp) : IRepositoryAddAsyncAdvice<TEntity>
     where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members
@@ -28,7 +28,7 @@ public sealed class AdviceAddValidation<TEntity>(IServiceProvider services) : IR
         }
 
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(services, ctx, Operations.Create, entity, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(sp, ctx, Operations.Create, entity, errors, ct);
         if (pass) {
             return true;
         }

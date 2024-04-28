@@ -188,7 +188,7 @@ public class SchemataTokenStore<TToken>(IMemoryCache cache, IRepository<TToken> 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         Expression<Func<TToken, bool>> query = t => (t.Status != Statuses.Inactive && t.Status != Statuses.Valid)
                                                  || t.ExpireTime < DateTime.UtcNow;
-        var count  = 0L;
+        var count = 0L;
 
         await foreach (var token in tokens.ListAsync(q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query), ct)) {
             ct.ThrowIfCancellationRequested();

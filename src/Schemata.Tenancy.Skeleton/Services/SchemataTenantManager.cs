@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Entity.Repository;
 using Microsoft.Extensions.Caching.Memory;
+using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton.Services;

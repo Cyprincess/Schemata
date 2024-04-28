@@ -19,7 +19,7 @@ public class SchemataUserManager<TUser>(
     IEnumerable<IPasswordValidator<TUser>> passwordValidators,
     ILookupNormalizer                      keyNormalizer,
     IdentityErrorDescriber                 errors,
-    IServiceProvider                       services,
+    IServiceProvider                       sp,
     ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store,
     options,
     passwordHasher,
@@ -27,11 +27,11 @@ public class SchemataUserManager<TUser>(
     passwordValidators,
     keyNormalizer,
     errors,
-    services,
+    sp,
     logger)
     where TUser : class
 {
-    private readonly IServiceProvider _services = services;
+    private readonly IServiceProvider _sp = sp;
 
     public virtual Task<string?> GetDisplayNameAsync(TUser user) {
         ThrowIfDisposed();
@@ -87,8 +87,8 @@ public class SchemataUserManager<TUser>(
 
         // Need to potentially check all keys
 
-        var keyring   = _services.GetService<ILookupProtectorKeyRing>();
-        var protector = _services.GetService<ILookupProtector>();
+        var keyring   = _sp.GetService<ILookupProtectorKeyRing>();
+        var protector = _sp.GetService<ILookupProtector>();
 
         if (keyring is null || protector is null) {
             return user;

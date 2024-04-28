@@ -2,7 +2,7 @@ using Schemata.Core;
 
 namespace Schemata.Workflow.Foundation;
 
-public sealed class SchemataWorkflowBuilder(SchemataBuilder builder)
+public sealed class SchemataWorkflowBuilder(Services services)
 {
-    public SchemataBuilder Builder { get; } = builder;
+    public Services Services => services;
 }

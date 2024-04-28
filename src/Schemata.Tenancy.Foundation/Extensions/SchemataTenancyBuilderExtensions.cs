@@ -21,7 +21,7 @@ public static class SchemataTenancyBuilderExtensions
 #pragma warning restore CA2252
 #endif
     {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<ITenantResolver<TKey>, RequestHeaderResolver<TKey>>();
         });
 
@@ -32,7 +32,7 @@ public static class SchemataTenancyBuilderExtensions
         this SchemataTenancyBuilder<TTenant, TKey> builder)
         where TTenant : SchemataTenant<TKey>
         where TKey : struct, IEquatable<TKey> {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<ITenantResolver<TKey>, RequestHostResolver<TTenant, TKey>>();
         });
 
@@ -50,7 +50,7 @@ public static class SchemataTenancyBuilderExtensions
 #pragma warning restore CA2252
 #endif
     {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<ITenantResolver<TKey>, RequestPathResolver<TKey>>();
         });
 
@@ -68,7 +68,7 @@ public static class SchemataTenancyBuilderExtensions
 #pragma warning restore CA2252
 #endif
     {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<ITenantResolver<TKey>, RequestPrincipalResolver<TKey>>();
         });
 
@@ -86,7 +86,7 @@ public static class SchemataTenancyBuilderExtensions
 #pragma warning restore CA2252
 #endif
     {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<ITenantResolver<TKey>, RequestQueryResolver<TKey>>();
         });
 

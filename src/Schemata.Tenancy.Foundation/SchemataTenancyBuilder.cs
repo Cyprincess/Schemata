@@ -4,9 +4,9 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation;
 
-public sealed class SchemataTenancyBuilder<TTenant, TKey>(SchemataBuilder builder)
+public sealed class SchemataTenancyBuilder<TTenant, TKey>(Services services)
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    public SchemataBuilder Builder { get; } = builder;
+    public Services Services => services;
 }

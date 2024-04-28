@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -11,10 +10,9 @@ namespace Schemata.Core;
 
 public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment)
 {
-    internal readonly List<Action<IServiceCollection>> Actions = [];
-
-    internal readonly Configurators   Configurators = new();
-    internal readonly SchemataOptions Options       = new();
+    public readonly Services        Services      = new();
+    public readonly Configurators   Configurators = new();
+    public readonly SchemataOptions Options       = new();
 
     public IConfiguration      Configuration => configuration;
     public IWebHostEnvironment Environment   => environment;
@@ -45,10 +43,6 @@ public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnviro
         return Options.CreateLogger(type);
     }
 
-    public SchemataOptions GetOptions() {
-        return Options;
-    }
-
     public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
         where TOptions : class {
         Configurators.Set(configure);
@@ -63,17 +57,15 @@ public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnviro
     }
 
     public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
-        Actions.Add(action);
+        Services.Add(action);
 
         return this;
     }
 
     public SchemataBuilder Invoke(IServiceCollection services) {
-        foreach (var action in Actions) {
-            action.Invoke(services);
-        }
+        Services.Invoke(services);
 
-        var modules = GetOptions().GetFeatures();
+        var modules = Options.GetFeatures();
         if (modules is null) {
             return this;
         }

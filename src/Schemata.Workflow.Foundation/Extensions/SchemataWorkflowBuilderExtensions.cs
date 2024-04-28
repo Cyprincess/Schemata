@@ -11,7 +11,7 @@ public static class SchemataWorkflowBuilderExtensions
     public static SchemataWorkflowBuilder Use<TStateMachine, TI>(this SchemataWorkflowBuilder builder)
         where TStateMachine : StateMachineBase<TI>
         where TI : class, IStatefulEntity {
-        builder.Builder.ConfigureServices(services => {
+        builder.Services.Add(services => {
             services.TryAddScoped<StateMachineBase<TI>, TStateMachine>();
         });
 

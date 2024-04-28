@@ -58,6 +58,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
 
-        return new(builder);
+        return new(builder.Services);
     }
 }

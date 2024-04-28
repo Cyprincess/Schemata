@@ -37,6 +37,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataTenancyFeature<TManager, TTenant, TKey>>();
 
-        return new(builder);
+        return new(builder.Services);
     }
 }
