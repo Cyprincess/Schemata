@@ -9,7 +9,7 @@ namespace Schemata.Entity.Repository.Advices;
 public sealed class AdviceBuildBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryAdvice<TEntity>
     where TEntity : class
 {
-    #region IRepositoryQueryAsyncAdvice<TEntity> Members
+    #region IRepositoryBuildQueryAdvice<TEntity> Members
 
     public int Order => 100_000_000;
 
@@ -17,7 +17,7 @@ public sealed class AdviceBuildBuildQuerySoftDelete<TEntity> : IRepositoryBuildQ
 
     public Task<bool> AdviseAsync(
         AdviceContext           ctx,
-        QueryContainer<TEntity> query,
+        QueryContainer<TEntity> container,
         CancellationToken       ct = default) {
         if (ctx.Has<SuppressQuerySoftDelete>()) {
             return Task.FromResult(true);
@@ -27,7 +27,7 @@ public sealed class AdviceBuildBuildQuerySoftDelete<TEntity> : IRepositoryBuildQ
             return Task.FromResult(true);
         }
 
-        query.ApplyModification(q => {
+        container.ApplyModification(q => {
             return q.OfType<ISoftDelete>().Where(e => e.DeleteTime == null).OfType<TEntity>();
         });
 

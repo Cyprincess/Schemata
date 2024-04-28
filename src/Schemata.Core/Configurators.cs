@@ -103,7 +103,6 @@ public sealed class Configurators
         return action!;
     }
 
-
     public Action<T1, T2> PopOrDefault<T1, T2>() {
         if (!TryGet<T1, T2>(out var action)) {
             return (_, _) => { };
@@ -114,7 +113,7 @@ public sealed class Configurators
         return action!;
     }
 
-    public IServiceCollection Invoke(IServiceCollection services) {
+    internal IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);

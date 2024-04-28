@@ -2,7 +2,9 @@ using Schemata.Core;
 
 namespace Schemata.Mapping.Foundation;
 
-public sealed class SchemataMappingBuilder(SchemataBuilder builder)
+public sealed class SchemataMappingBuilder(SchemataOptions schemata, Configurators configurators)
 {
-    public SchemataBuilder Builder { get; } = builder;
+    public SchemataOptions Schemata => schemata;
+
+    public Configurators Configurators => configurators;
 }

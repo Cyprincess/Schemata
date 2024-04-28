@@ -14,9 +14,9 @@ public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider s
     where TContext : DbContext
     where TEntity : class
 {
-    protected virtual TContext Context { get; } = context;
+    protected virtual TContext Context => context;
 
-    protected virtual DbSet<TEntity> DbSet { get; } = context.Set<TEntity>();
+    protected virtual DbSet<TEntity> DbSet => context.Set<TEntity>();
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return DbSet.AsAsyncEnumerable();

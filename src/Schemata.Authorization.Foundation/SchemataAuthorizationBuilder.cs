@@ -2,7 +2,9 @@ using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation;
 
-public class SchemataAuthorizationBuilder(SchemataBuilder builder)
+public sealed class SchemataAuthorizationBuilder(SchemataOptions schemata, Configurators configurators)
 {
-    public SchemataBuilder Builder { get; } = builder;
+    public SchemataOptions Schemata => schemata;
+
+    public Configurators Configurators => configurators;
 }

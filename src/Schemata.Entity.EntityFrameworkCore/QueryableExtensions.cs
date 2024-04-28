@@ -9,8 +9,7 @@ namespace Schemata.Entity.EntityFrameworkCore;
 public static class QueryableExtensions
 {
 #if NETSTANDARD2_0 || NETSTANDARD2_1
-    public static string? ToSql<TEntity>(this IQueryable<TEntity> query)
-    {
+    public static string? ToSql<TEntity>(this IQueryable<TEntity> query) {
         using var enumerator = query.Provider.Execute<IEnumerable<TEntity>>(query.Expression).GetEnumerator();
         var       relationalCommandCache = enumerator.Private("_relationalCommandCache");
         var       selectExpression = relationalCommandCache?.Private<SelectExpression>("_selectExpression");
