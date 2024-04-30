@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
@@ -9,6 +10,7 @@ using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Entity.Repository.Advices;
 
@@ -57,7 +59,14 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
                 throw new MissingFieldException(type.Name, $"{matched}Name");
             }
 
-            return property.GetValue(entity)?.ToString() ?? string.Empty;
+            var value = property.GetValue(entity)?.ToString();
+            if (string.IsNullOrWhiteSpace(value)) {
+                throw new ValidationException(new [] {
+                    new KeyValuePair<string, string>($"{matched}Name", "not_empty"),
+                });
+            }
+
+            return value;
         });
 
         named.CanonicalName = name;
