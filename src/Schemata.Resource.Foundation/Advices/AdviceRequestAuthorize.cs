@@ -8,14 +8,10 @@ using Schemata.Abstractions.Options;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceRequestAuthorize<TEntity> : IResourceRequestAdvice<TEntity>
+public sealed class AdviceRequestAuthorize<TEntity>(IOptions<SchemataResourceOptions> options) : IResourceRequestAdvice<TEntity>
     where TEntity : class, IIdentifier
 {
-    private readonly SchemataResourceOptions _options;
-
-    public AdviceRequestAuthorize(IOptions<SchemataResourceOptions> options) {
-        _options = options.Value;
-    }
+    private readonly SchemataResourceOptions _options = options.Value;
 
     #region IResourceRequestAdvice<TEntity> Members
 

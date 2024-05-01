@@ -4,17 +4,13 @@ using Schemata.Resource.Foundation.Grammars.Terms;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
-public class Has : IBinary
+public class Has(TextPosition position) : IBinary
 {
     public const char Char = ':';
 
-    public Has(TextPosition position) {
-        Position = position;
-    }
-
     #region IBinary Members
 
-    public TextPosition Position { get; }
+    public TextPosition Position { get; } = position;
 
     public bool IsConstant => false;
 

@@ -19,7 +19,8 @@ namespace Schemata.Identity.Foundation.Features;
 
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
-[Information("Identity depends on Authentication and Controllers features, these features will be added automatically.", Level = LogLevel.Debug)]
+[Information("Identity depends on Authentication feature, these features will be added automatically.", Level = LogLevel.Debug)]
+[Information("Identity depends on Controllers feature, these features will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
     where TUser : SchemataUser
     where TRole : SchemataRole

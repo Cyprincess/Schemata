@@ -56,6 +56,12 @@ public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnviro
         return this;
     }
 
+    public SchemataBuilder Configure<T1, T2>(Action<T1, T2> configure) {
+        Configurators.Set(configure);
+
+        return this;
+    }
+
     public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
         Actions.Add(action);
 

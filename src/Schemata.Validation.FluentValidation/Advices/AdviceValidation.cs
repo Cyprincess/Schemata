@@ -10,14 +10,8 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Validation.FluentValidation.Advices;
 
-public sealed class AdviceValidation<T> : IValidationAsyncAdvice<T>
+public sealed class AdviceValidation<T>(IServiceProvider services) : IValidationAsyncAdvice<T>
 {
-    private readonly IServiceProvider _services;
-
-    public AdviceValidation(IServiceProvider services) {
-        _services = services;
-    }
-
     #region IValidationAsyncAdvice<T> Members
 
     public int Order => 100_000_000;
@@ -30,7 +24,7 @@ public sealed class AdviceValidation<T> : IValidationAsyncAdvice<T>
         T                                   request,
         IList<KeyValuePair<string, string>> errors,
         CancellationToken                   ct = default) {
-        var validator = _services.GetService<IValidator<T>>();
+        var validator = services.GetService<IValidator<T>>();
         if (validator is null) {
             return true;
         }

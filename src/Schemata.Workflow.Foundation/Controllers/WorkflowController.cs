@@ -21,28 +21,16 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Authorize]
 [ApiController]
 [Route("~/[controller]")]
-public sealed class WorkflowController : ControllerBase
+public sealed class WorkflowController(
+    ILogger<WorkflowController>              logger,
+    ISimpleMapper                            mapper,
+    IOptionsMonitor<SchemataWorkflowOptions> options,
+    IOptions<SchemataResourceOptions>        resources,
+    IServiceProvider                         services) : ControllerBase
 {
     private static readonly ConcurrentDictionary<Type, Type> RequestToInstance = [];
 
-    private readonly ILogger<WorkflowController>              _logger;
-    private readonly ISimpleMapper                            _mapper;
-    private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;
-    private readonly SchemataResourceOptions                  _resources;
-    private readonly IServiceProvider                         _services;
-
-    public WorkflowController(
-        ILogger<WorkflowController>              logger,
-        ISimpleMapper                            mapper,
-        IOptionsMonitor<SchemataWorkflowOptions> options,
-        IOptions<SchemataResourceOptions>        resources,
-        IServiceProvider                         services) {
-        _logger    = logger;
-        _mapper    = mapper;
-        _options   = options;
-        _resources = resources.Value;
-        _services  = services;
-    }
+    private readonly SchemataResourceOptions                  _resources = resources.Value;
 
     private EmptyResult EmptyResult { get; } = new();
 
@@ -50,7 +38,7 @@ public sealed class WorkflowController : ControllerBase
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
         var ctx = new AdviceContext();
 
-        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_services, ctx, request, HttpContext, HttpContext.RequestAborted)) {
+        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(services, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
@@ -68,21 +56,21 @@ public sealed class WorkflowController : ControllerBase
             RequestToInstance[rt] = it;
         }
 
-        var instance = _mapper.Map<IStatefulEntity>(request.Instance, rt, it);
+        var instance = mapper.Map<IStatefulEntity>(request.Instance, rt, it);
         if (instance is null) {
             return BadRequest();
         }
 
-        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType, _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(options.CurrentValue.WorkflowType, options.CurrentValue.TransitionType, options.CurrentValue.WorkflowResponseType);
 
-        var manager = (IWorkflowManager)_services.GetRequiredService(type);
+        var manager = (IWorkflowManager)services.GetRequiredService(type);
 
         var workflow = await manager.CreateAsync(instance);
         if (workflow is null) {
             return BadRequest();
         }
 
-        var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        var response = await manager.MapAsync(workflow, options.CurrentValue, User);
         if (response is null) {
             return NotFound();
         }
@@ -93,16 +81,16 @@ public sealed class WorkflowController : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Get(long id) {
         var type = typeof(IWorkflowManager<,,>)
-           .MakeGenericType(_options.CurrentValue.WorkflowType, _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
+           .MakeGenericType(options.CurrentValue.WorkflowType, options.CurrentValue.TransitionType, options.CurrentValue.WorkflowResponseType);
 
-        var manager = (IWorkflowManager)_services.GetRequiredService(type);
+        var manager = (IWorkflowManager)services.GetRequiredService(type);
 
         var workflow = await manager.FindAsync(id);
         if (workflow is null) {
             return NotFound();
         }
 
-        var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        var response = await manager.MapAsync(workflow, options.CurrentValue, User);
         if (response is null) {
             return NotFound();
         }
@@ -113,9 +101,9 @@ public sealed class WorkflowController : ControllerBase
     [HttpPost("{id:long}")]
     public async Task<IActionResult> Raise(long id, IEvent request) {
         var type = typeof(IWorkflowManager<,,>)
-           .MakeGenericType(_options.CurrentValue.WorkflowType, _options.CurrentValue.TransitionType, _options.CurrentValue.WorkflowResponseType);
+           .MakeGenericType(options.CurrentValue.WorkflowType, options.CurrentValue.TransitionType, options.CurrentValue.WorkflowResponseType);
 
-        var manager = (IWorkflowManager)_services.GetRequiredService(type);
+        var manager = (IWorkflowManager)services.GetRequiredService(type);
 
         var workflow = await manager.FindAsync(id);
         if (workflow is null) {
@@ -128,11 +116,11 @@ public sealed class WorkflowController : ControllerBase
         try {
             await manager.RaiseAsync(workflow, request);
         } catch (Exception e) {
-            _logger.LogError("Unable to update state: {Message}", e.Message);
+            logger.LogError("Unable to update state: {Message}", e.Message);
             return BadRequest();
         }
 
-        var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
+        var response = await manager.MapAsync(workflow, options.CurrentValue, User);
         if (response is null) {
             return NotFound();
         }

@@ -11,42 +11,29 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>
-    where TRole : SchemataRole
-{
-    public SchemataRoleStore(
-        IRepository<TRole>             rolesRepository,
-        IRepository<SchemataRoleClaim> roleClaimsRepository,
-        IRepository<SchemataUserRole>  userRoleRepository,
-        IdentityErrorDescriber?        describer = null) : base(rolesRepository,
-        roleClaimsRepository,
-        userRoleRepository,
-        describer) { }
-}
+public class SchemataRoleStore<TRole>(
+    IRepository<TRole>             roles,
+    IRepository<SchemataRoleClaim> roleClaims,
+    IRepository<SchemataUserRole>  userRole,
+    IdentityErrorDescriber?        describer = null) : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>(roles, roleClaims, userRole, describer)
+    where TRole : SchemataRole;
 
-public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
+public class SchemataRoleStore<TRole, TRoleClaim, TUserRole>(
+    IRepository<TRole>      roles,
+    IRepository<TRoleClaim> roleClaims,
+    IRepository<TUserRole>  userRole,
+    IdentityErrorDescriber? describer = null) : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
     where TRole : SchemataRole
     where TRoleClaim : SchemataRoleClaim, new()
     where TUserRole : SchemataUserRole, new()
 {
-    protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
-    protected readonly IRepository<TRole>      RolesRepository;
-    protected readonly IRepository<TUserRole>  UserRoleRepository;
+    protected readonly IRepository<TRoleClaim> RoleClaimsRepository = roleClaims;
+    protected readonly IRepository<TRole>      RolesRepository      = roles;
+    protected readonly IRepository<TUserRole>  UserRoleRepository   = userRole;
 
     private bool _disposed;
 
-    public SchemataRoleStore(
-        IRepository<TRole>      rolesRepository,
-        IRepository<TRoleClaim> roleClaimsRepository,
-        IRepository<TUserRole>  userRoleRepository,
-        IdentityErrorDescriber? describer = null) {
-        RolesRepository      = rolesRepository;
-        RoleClaimsRepository = roleClaimsRepository;
-        UserRoleRepository   = userRoleRepository;
-        ErrorDescriber       = describer ?? new IdentityErrorDescriber();
-    }
-
-    public IdentityErrorDescriber ErrorDescriber { get; set; }
+    public IdentityErrorDescriber ErrorDescriber { get; set; } = describer ?? new IdentityErrorDescriber();
 
     #region IQueryableRoleStore<TRole> Members
 

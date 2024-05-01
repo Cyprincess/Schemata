@@ -5,14 +5,9 @@ using System.Reflection;
 
 namespace Schemata.Entity.Cache;
 
-class PropertyVisitor : ExpressionVisitor
+class PropertyVisitor(Type type) : ExpressionVisitor
 {
-    private readonly Type               _type;
     private readonly List<PropertyInfo> _properties = [];
-
-    public PropertyVisitor(Type type) {
-        _type = type;
-    }
 
     public IReadOnlyList<PropertyInfo> Properties => _properties;
 
@@ -24,7 +19,7 @@ class PropertyVisitor : ExpressionVisitor
 
     protected override Expression VisitMember(MemberExpression node) {
         var property = node.Member as PropertyInfo;
-        if (property != null && _type.IsAssignableFrom(property.DeclaringType)) {
+        if (property != null && type.IsAssignableFrom(property.DeclaringType)) {
             _properties.Add(property);
         }
 

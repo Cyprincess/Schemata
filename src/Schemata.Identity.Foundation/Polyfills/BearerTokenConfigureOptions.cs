@@ -9,8 +9,7 @@ using Microsoft.Extensions.Options;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;
 
-internal sealed class BearerTokenConfigureOptions(IDataProtectionProvider dp)
-    : IConfigureNamedOptions<BearerTokenOptions>
+internal sealed class BearerTokenConfigureOptions(IDataProtectionProvider dp) : IConfigureNamedOptions<BearerTokenOptions>
 {
     private const string PrimaryPurpose = "Microsoft.AspNetCore.Authentication.BearerToken";
 

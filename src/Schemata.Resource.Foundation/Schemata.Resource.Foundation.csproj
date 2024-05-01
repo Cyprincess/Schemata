@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="Humanizer.Core" />
     <PackageReference Include="Parlot" />
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>

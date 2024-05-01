@@ -44,6 +44,8 @@ var builder = WebApplication.CreateBuilder(args)
                                  schema.UseControllers();
                                  schema.UseJsonSerializer();
 
+                                 schema.UseTenancy()
+                                       .UseHostResolver();
                                  schema.UseModular();
 
                                  schema.UseIdentity();
@@ -101,8 +103,8 @@ Features are characterized by `Order` and `Priority`, both of which are `Int32` 
 sequence in which the `ConfigureServices` methods are invoked. The `Priority` establishes the sequence for invoking
 the `Configure<Application|Endpoints>` methods.
 
-The range `[100_000_000, 1_000_000_000)` and `(2_147_000_000, 2_147_400_000]` for `Order` and `Priority` is reserved for built-in
-features and Schemata extensions.
+The range `[100_000_000, 1_000_000_000)` and `(2_147_000_000, 2_147_400_000]` for `Order` and `Priority` is reserved for
+built-in features and Schemata extensions.
 
 ### Built-in Features
 
@@ -111,11 +113,12 @@ also have additional configuration methods.
 
 | Priority    | Feature                | Description                                                                           |
 |-------------|------------------------|---------------------------------------------------------------------------------------|
+| 100_010_000 | ExceptionHandler       | Asp.Net Exception Handler Middleware                                                  |
 | 100_110_000 | Logging                | Asp.Net Logging Middleware                                                            |
 | 100_120_000 | HttpLogging            | Asp.Net HTTP Logging Middleware                                                       |
 | 100_130_000 | W3CLogging             | Asp.Net W3C Logging Middleware                                                        |
 | 110_000_000 | DeveloperExceptionPage | Asp.Net Developer Exception Page Middleware                                           |
-| 110_100_000 | ForwardedHeaders       | Asp.Net Forwarded Headers Middleware                                                  |
+| 111_000_000 | ForwardedHeaders       | Asp.Net Forwarded Headers Middleware                                                  |
 | 120_000_000 | Https                  | Asp.Net HTTPS & HTTPS Redirection Middlewares                                         |
 | 130_000_000 | CookiePolicy           | Asp.Net Cookie Policy Middleware                                                      |
 | 140_000_000 | Routing                | Asp.Net Routing Middleware                                                            |
@@ -138,6 +141,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 350_000_000   | Schemata.Workflow.Foundation      | Workflow             | Schemata Workflow Foundation       |
 | 360_000_000   | Schemata.Resource.Foundation      | Resource             | Schemata Resource Service          |
 | 360_100_000   | Schemata.Resource.Http            | Resource (`MapHttp`) | Schemata Resource Service for HTTP |
+| 2_147_100_000 | Schemata.Tenancy.Foundation       | Tenancy              | Schemata Tenancy Foundation        |
 | 2_147_400_000 | Schemata.Modular                  | Modular              | Modularization                     |
 
 ## Compliance
@@ -156,6 +160,7 @@ Some packages may have additional compliance requirements, which are documented 
 | Schemata.Identity.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Mapping.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Resource.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
+| Schemata.Tenancy.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Workflow.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
@@ -180,6 +185,11 @@ and [Mapster](https://www.nuget.org/packages/Mapster/), among others.
 
 It provides a unified interface for these libraries, enabling developers to switch between them without modifying their
 code.
+
+### Schemata.Resource.Foundation
+
+The Schemata Resource Foundation is designed to comply with
+the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals.
 
 ### Schemata.Workflow.Foundation
 

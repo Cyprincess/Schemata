@@ -59,14 +59,10 @@ public abstract class RepositoryBase
     }
 }
 
-public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
+public abstract class RepositoryBase<TEntity>(IServiceProvider sp) : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
-    public RepositoryBase(IServiceProvider sp) {
-        ServiceProvider = sp;
-    }
-
-    protected virtual IServiceProvider ServiceProvider { get; }
+    protected virtual IServiceProvider ServiceProvider { get; } = sp;
 
     #region IRepository Members
 

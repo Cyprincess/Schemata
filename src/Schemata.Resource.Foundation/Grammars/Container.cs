@@ -8,19 +8,15 @@ using Expression = System.Linq.Expressions.Expression;
 
 namespace Schemata.Resource.Foundation.Grammars;
 
-public class Container
+public class Container(IToken token)
 {
     private static readonly Dictionary<string, MethodInfo> MethodCache = [];
-
-    public Container(IToken token) {
-        Token = token;
-    }
 
     public bool AllowFunctions { get; private set; }
 
     public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
 
-    private IToken Token { get; }
+    private IToken Token { get; } = token;
 
     private Dictionary<string, Expression> Expressions { get; } = [];
 

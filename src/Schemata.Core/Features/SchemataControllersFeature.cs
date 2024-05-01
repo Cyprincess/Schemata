@@ -7,12 +7,13 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Schemata.Core.Middlewares;
 
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataRoutingFeature>]
+[DependsOn<SchemataExceptionHandlerFeature>]
 [Information("Controllers depends on Routing feature, it will be added automatically.", Level = LogLevel.Debug)]
+[Information("Controllers depends on Exception Handler feature, it will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;
@@ -26,11 +27,7 @@ public sealed class SchemataControllersFeature : FeatureBase
         var configure = configurators.PopOrDefault<MvcOptions>();
         var build     = configurators.PopOrDefault<IMvcBuilder>();
 
-        var builder = services.AddControllers(options => {
-            options.Filters.Add<HttpExceptionFilter>();
-
-            configure(options);
-        });
+        var builder = services.AddControllers(configure);
 
         builder.ConfigureApplicationPartManager(manager => {
             var parts = manager.ApplicationParts.OfType<AssemblyPart>()

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Tenancy Foundation</Description>
+    <PackageTags>application;business;framework;tenant;tenancy</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '6.0')) ">
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '6.0')) ">
+    <PackageReference Include="System.Runtime.Experimental" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Tenancy.Skeleton\Schemata.Tenancy.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

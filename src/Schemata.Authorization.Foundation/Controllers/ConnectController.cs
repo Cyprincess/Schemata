@@ -14,27 +14,13 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 [ApiController]
 [Route("~/[controller]")]
-public sealed partial class ConnectController : ControllerBase
+public sealed partial class ConnectController(
+    IOpenIddictApplicationManager     applicationManager,
+    IOpenIddictAuthorizationManager   authorizationManager,
+    IOpenIddictScopeManager           scopeManager,
+    SignInManager<SchemataUser>       signInManager,
+    SchemataUserManager<SchemataUser> userManager) : ControllerBase
 {
-    private readonly IOpenIddictApplicationManager     _applications;
-    private readonly IOpenIddictAuthorizationManager   _authorizations;
-    private readonly IOpenIddictScopeManager           _scopes;
-    private readonly SignInManager<SchemataUser>       _sign;
-    private readonly SchemataUserManager<SchemataUser> _users;
-
-    public ConnectController(
-        IOpenIddictApplicationManager     applications,
-        IOpenIddictAuthorizationManager   authorizations,
-        IOpenIddictScopeManager           scopes,
-        SignInManager<SchemataUser>       sign,
-        SchemataUserManager<SchemataUser> users) {
-        _applications   = applications;
-        _authorizations = authorizations;
-        _scopes         = scopes;
-        _sign           = sign;
-        _users          = users;
-    }
-
     private IEnumerable<string> GetDestinations(Claim claim) {
         // Note: by default, claims are NOT automatically included in the access and identity tokens.
         // To allow OpenIddict to serialize them, you must attach them a destination, that specifies

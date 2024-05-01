@@ -3,13 +3,9 @@ using System;
 namespace Schemata.Abstractions.Json;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public class PolymorphicAttribute : Attribute
+public class PolymorphicAttribute(Type type) : Attribute
 {
-    public PolymorphicAttribute(Type baseType) {
-        BaseType = baseType;
-    }
-
-    public Type BaseType { get; }
+    public Type BaseType { get; } = type;
 
     public string? Name { get; set; }
 }
