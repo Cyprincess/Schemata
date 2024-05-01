@@ -9,16 +9,10 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.Cache.Advices;
 
-public sealed class AdviceRemoveCache<TEntity> : IRepositoryUpdateAsyncAdvice<TEntity>,
-                                                 IRepositoryRemoveAsyncAdvice<TEntity>
+public sealed class AdviceRemoveCache<TEntity>(IMemoryCache cache) : IRepositoryUpdateAsyncAdvice<TEntity>,
+                                                                     IRepositoryRemoveAsyncAdvice<TEntity>
     where TEntity : class
 {
-    private readonly IMemoryCache _cache;
-
-    public AdviceRemoveCache(IMemoryCache cache) {
-        _cache = cache;
-    }
-
     #region IRepositoryUpdateAsyncAdvice<TEntity> Members
 
     public int Order => 1_000;
@@ -58,7 +52,7 @@ public sealed class AdviceRemoveCache<TEntity> : IRepositoryUpdateAsyncAdvice<TE
             }
 
             AdviceResultCache.AffectedKeys.TryRemove(kv, out var _);
-            _cache.Remove(key);
+            cache.Remove(key);
         }
 
         return Task.FromResult(true);

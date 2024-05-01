@@ -23,8 +23,7 @@ internal sealed class BearerTokenHandler(
     IOptionsMonitor<BearerTokenOptions> optionsMonitor,
     ILoggerFactory                      loggerFactory,
     UrlEncoder                          urlEncoder,
-    ISystemClock                        clock)
-    : SignInAuthenticationHandler<BearerTokenOptions>(optionsMonitor, loggerFactory, urlEncoder, clock)
+    ISystemClock                        clock) : SignInAuthenticationHandler<BearerTokenOptions>(optionsMonitor, loggerFactory, urlEncoder, clock)
 {
     private static readonly AuthenticateResult FailedUnprotectingToken = AuthenticateResult.Fail("Unprotected token failed");
 

@@ -10,18 +10,13 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
-public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
+public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider sp, TContext context) : RepositoryBase<TEntity>(sp)
     where TContext : DbContext
     where TEntity : class
 {
-    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) : base(sp) {
-        Context = context;
-        DbSet   = context.Set<TEntity>();
-    }
+    protected virtual TContext Context { get; } = context;
 
-    protected virtual TContext Context { get; }
-
-    protected virtual DbSet<TEntity> DbSet { get; }
+    protected virtual DbSet<TEntity> DbSet { get; } = context.Set<TEntity>();
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return DbSet.AsAsyncEnumerable();

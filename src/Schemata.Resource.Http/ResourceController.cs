@@ -21,21 +21,18 @@ namespace Schemata.Resource.Http;
 [ApiController]
 [ResourceControllerConvention]
 [Route("~/Resources/[controller]")]
-public class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
+public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
+    IServiceProvider     services,
+    IRepository<TEntity> repository,
+    ISimpleMapper        mapper) : ControllerBase
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
     where TDetail : class, IIdentifier
     where TSummary : class, IIdentifier
 {
-    protected readonly ISimpleMapper        Mapper;
-    protected readonly IRepository<TEntity> Repository;
-    protected readonly IServiceProvider     ServiceProvider;
-
-    public ResourceController(IServiceProvider services, IRepository<TEntity> repository, ISimpleMapper mapper) {
-        ServiceProvider = services;
-        Repository      = repository;
-        Mapper          = mapper;
-    }
+    protected readonly ISimpleMapper        Mapper          = mapper;
+    protected readonly IRepository<TEntity> Repository      = repository;
+    protected readonly IServiceProvider     ServiceProvider = services;
 
     protected virtual EmptyResult EmptyResult { get; } = new();
 

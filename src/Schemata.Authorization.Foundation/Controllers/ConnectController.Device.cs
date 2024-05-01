@@ -27,22 +27,22 @@ public sealed partial class ConnectController : ControllerBase
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         if (result.Succeeded && !string.IsNullOrEmpty(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Retrieve the application details from the database using the client_id stored in the principal.
-            var application = await _applications.FindByClientIdAsync(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId)!)
+            var application = await applicationManager.FindByClientIdAsync(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId)!)
                            ?? throw new InvalidOperationException("Details concerning the calling client application cannot be found.");
 
             // Render a form asking the user to confirm the authorization demand.
             var response = new VerifyResponse {
-                ApplicationName = await _applications.GetLocalizedDisplayNameAsync(application),
+                ApplicationName = await applicationManager.GetLocalizedDisplayNameAsync(application),
                 UserCode        = result.Properties.GetTokenValue(OpenIddictServerAspNetCoreConstants.Tokens.UserCode),
                 Scopes          = [],
             };
 
-            var scopes = _scopes.FindByNamesAsync(result.Principal.GetScopes());
+            var scopes = scopeManager.FindByNamesAsync(result.Principal.GetScopes());
             await foreach (var scope in scopes) {
                 response.Scopes.Add(new() {
-                    Name        = await _scopes.GetNameAsync(scope),
-                    DisplayName = await _scopes.GetLocalizedDisplayNameAsync(scope),
-                    Description = await _scopes.GetLocalizedDescriptionAsync(scope),
+                    Name        = await scopeManager.GetNameAsync(scope),
+                    DisplayName = await scopeManager.GetLocalizedDisplayNameAsync(scope),
+                    Description = await scopeManager.GetLocalizedDescriptionAsync(scope),
                 });
             }
 
@@ -66,7 +66,7 @@ public sealed partial class ConnectController : ControllerBase
     [HttpPost(nameof(Verify))]
     public async Task<IActionResult> VerifyAccept() {
         // Retrieve the profile of the logged in user.
-        var user = await _users.GetUserAsync(User)
+        var user = await userManager.GetUserAsync(User)
                 ?? throw new InvalidOperationException("The user details cannot be retrieved.");
 
         // Retrieve the claims principal associated with the user code.
@@ -78,18 +78,18 @@ public sealed partial class ConnectController : ControllerBase
                 OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens.
-            identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.Email, await _users.GetEmailAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _users.GetPhoneNumberAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _users.GetUserNameAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.Nickname, await _users.GetDisplayNameAsync(user))
-                    .SetClaims(OpenIddictConstants.Claims.Role, (await _users.GetRolesAsync(user)).ToImmutableArray());
+            identity.SetClaim(OpenIddictConstants.Claims.Subject, await userManager.GetUserIdAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.Email, await userManager.GetEmailAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await userManager.GetPhoneNumberAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await userManager.GetUserNameAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.Nickname, await userManager.GetDisplayNameAsync(user))
+                    .SetClaims(OpenIddictConstants.Claims.Role, (await userManager.GetRolesAsync(user)).ToImmutableArray());
 
             // Note: in this sample, the granted scopes match the requested scope
             // but you may want to allow the user to uncheck specific scopes.
             // For that, simply restrict the list of scopes before calling SetScopes.
             identity.SetScopes(result.Principal.GetScopes());
-            identity.SetResources(await _scopes.ListResourcesAsync(identity.GetScopes()).ToListAsync());
+            identity.SetResources(await scopeManager.ListResourcesAsync(identity.GetScopes()).ToListAsync());
             identity.SetDestinations(GetDestinations);
 
             var properties = new AuthenticationProperties {

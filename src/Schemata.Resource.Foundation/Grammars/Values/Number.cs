@@ -4,20 +4,15 @@ using Schemata.Resource.Foundation.Grammars.Terms;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
-public class Number : IValue
+public class Number(TextPosition position, decimal value) : IValue
 {
-    public Number(TextPosition position, decimal value) {
-        Position = position;
-        Value    = value;
-    }
-
-    public decimal Value { get; }
+    public decimal Value { get; } = value;
 
     #region IValue Members
 
     object IValue.Value => Value;
 
-    public TextPosition Position { get; }
+    public TextPosition Position { get; } = position;
 
     public bool IsConstant => true;
 

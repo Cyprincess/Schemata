@@ -4,17 +4,13 @@ using Schemata.Resource.Foundation.Grammars.Terms;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
-public class GreaterThan : IBinary
+public class GreaterThan(TextPosition position) : IBinary
 {
     public const char Char = '>';
 
-    public GreaterThan(TextPosition position) {
-        Position = position;
-    }
-
     #region IBinary Members
 
-    public TextPosition Position { get; }
+    public TextPosition Position { get; } = position;
 
     public bool IsConstant => false;
 

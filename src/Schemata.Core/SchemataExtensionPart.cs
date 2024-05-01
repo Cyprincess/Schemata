@@ -6,11 +6,7 @@ namespace Schemata.Core;
 
 public sealed class SchemataExtensionPart<T> : ApplicationPart, IApplicationPartTypeProvider
 {
-    public SchemataExtensionPart() {
-        Assembly = typeof(T).Assembly;
-    }
-
-    public Assembly Assembly { get; }
+    public Assembly Assembly { get; } = typeof(T).Assembly;
 
     public override string Name => Assembly.GetName().Name!;
 

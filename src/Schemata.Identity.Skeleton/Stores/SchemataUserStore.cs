@@ -11,67 +11,45 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-public class SchemataUserStore : SchemataUserStore<SchemataUser>
-{
-    public SchemataUserStore(
-        IRepository<SchemataUser>      users,
-        IRepository<SchemataRole>      roles,
-        IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole>  userRole,
-        IRepository<SchemataUserLogin> userLogins,
-        IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber?        describer = null) : base(users,
-        roles,
-        userClaims,
-        userRole,
-        userLogins,
-        userTokens,
-        describer) { }
-}
+public class SchemataUserStore(
+    IRepository<SchemataUser>      users,
+    IRepository<SchemataRole>      roles,
+    IRepository<SchemataUserClaim> userClaims,
+    IRepository<SchemataUserRole>  userRole,
+    IRepository<SchemataUserLogin> userLogins,
+    IRepository<SchemataUserToken> userTokens,
+    IdentityErrorDescriber?        describer = null) : SchemataUserStore<SchemataUser>(users, roles, userClaims, userRole, userLogins, userTokens, describer);
 
-public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
+public class SchemataUserStore<TUser>(
+    IRepository<TUser>             users,
+    IRepository<SchemataRole>      roles,
+    IRepository<SchemataUserClaim> userClaims,
+    IRepository<SchemataUserRole>  userRole,
+    IRepository<SchemataUserLogin> userLogins,
+    IRepository<SchemataUserToken> userTokens,
+    IdentityErrorDescriber?        describer = null) : SchemataUserStore<TUser, SchemataRole>(users, roles, userClaims, userRole, userLogins, userTokens, describer)
+    where TUser : SchemataUser;
+
+public class SchemataUserStore<TUser, TRole>(
+    IRepository<TUser>             users,
+    IRepository<TRole>             roles,
+    IRepository<SchemataUserClaim> userClaims,
+    IRepository<SchemataUserRole>  userRole,
+    IRepository<SchemataUserLogin> userLogins,
+    IRepository<SchemataUserToken> userTokens,
+    IdentityErrorDescriber?        describer = null) : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole, SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>(users, roles, userClaims, userRole, userLogins, userTokens, describer)
     where TUser : SchemataUser
-{
-    public SchemataUserStore(
-        IRepository<TUser>             users,
-        IRepository<SchemataRole>      roles,
-        IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole>  userRole,
-        IRepository<SchemataUserLogin> userLogins,
-        IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber?        describer = null) : base(users,
-        roles,
-        userClaims,
-        userRole,
-        userLogins,
-        userTokens,
-        describer) { }
-}
+    where TRole : SchemataRole;
 
-public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
-    SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
-    where TUser : SchemataUser
-    where TRole : SchemataRole
-{
-    public SchemataUserStore(
-        IRepository<TUser>             users,
-        IRepository<TRole>             roles,
-        IRepository<SchemataUserClaim> userClaims,
-        IRepository<SchemataUserRole>  userRole,
-        IRepository<SchemataUserLogin> userLogins,
-        IRepository<SchemataUserToken> userTokens,
-        IdentityErrorDescriber?        describer = null) : base(users,
-        roles,
-        userClaims,
-        userRole,
-        userLogins,
-        userTokens,
-        describer) { }
-}
-
-public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
-    UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
-    IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
+public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>(
+    IRepository<TUser>      users,
+    IRepository<TRole>      roles,
+    IRepository<TUserClaim> userClaims,
+    IRepository<TUserRole>  userRole,
+    IRepository<TUserLogin> userLogins,
+    IRepository<TUserToken> userTokens,
+    IdentityErrorDescriber? describer = null) : UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>(describer ?? new IdentityErrorDescriber()),
+                                                IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserClaim : SchemataUserClaim, new()
@@ -80,28 +58,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     where TUserToken : SchemataUserToken, new()
     where TRoleClaim : SchemataRoleClaim, new()
 {
-    protected readonly IRepository<TRole>      RolesRepository;
-    protected readonly IRepository<TUserClaim> UserClaimsRepository;
-    protected readonly IRepository<TUserLogin> UserLoginsRepository;
-    protected readonly IRepository<TUserRole>  UserRoleRepository;
-    protected readonly IRepository<TUser>      UsersRepository;
-    protected readonly IRepository<TUserToken> UserTokensRepository;
-
-    public SchemataUserStore(
-        IRepository<TUser>      users,
-        IRepository<TRole>      roles,
-        IRepository<TUserClaim> userClaims,
-        IRepository<TUserRole>  userRole,
-        IRepository<TUserLogin> userLogins,
-        IRepository<TUserToken> userTokens,
-        IdentityErrorDescriber? describer = null) : base(describer ?? new IdentityErrorDescriber()) {
-        UsersRepository      = users;
-        RolesRepository      = roles;
-        UserClaimsRepository = userClaims;
-        UserRoleRepository   = userRole;
-        UserLoginsRepository = userLogins;
-        UserTokensRepository = userTokens;
-    }
+    protected readonly IRepository<TRole>      RolesRepository      = roles;
+    protected readonly IRepository<TUserClaim> UserClaimsRepository = userClaims;
+    protected readonly IRepository<TUserLogin> UserLoginsRepository = userLogins;
+    protected readonly IRepository<TUserRole>  UserRoleRepository   = userRole;
+    protected readonly IRepository<TUser>      UsersRepository      = users;
+    protected readonly IRepository<TUserToken> UserTokensRepository = userTokens;
 
     public virtual bool AutoSaveChanges { get; set; } = true;
 

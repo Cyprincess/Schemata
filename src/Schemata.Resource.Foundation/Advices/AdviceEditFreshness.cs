@@ -8,15 +8,11 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceEditFreshness<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
+public sealed class AdviceEditFreshness<TEntity, TRequest>(IServiceProvider services) : IResourceEditAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
-    private readonly IServiceProvider _services;
-
-    public AdviceEditFreshness(IServiceProvider services) {
-        _services = services;
-    }
+    private readonly IServiceProvider _services = services;
 
     #region IResourceUpdateAdvice<TEntity,TRequest> Members
 

@@ -6,7 +6,7 @@ namespace Schemata.Core.Features;
 
 public sealed class SchemataForwardedHeadersFeature : FeatureBase
 {
-    public override int Priority => 110_100_000;
+    public override int Priority => 111_000_000;
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

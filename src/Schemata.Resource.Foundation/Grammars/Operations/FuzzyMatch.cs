@@ -2,15 +2,11 @@ using Parlot;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
-public class FuzzyMatch : Match
+public class FuzzyMatch(TextPosition position) : Match
 {
     public const string Name = "=~";
 
-    public FuzzyMatch(TextPosition position) {
-        Position = position;
-    }
-
-    public override TextPosition Position { get; }
+    public override TextPosition Position { get; } = position;
 
     public override string ToString() {
         return $"{Name}";

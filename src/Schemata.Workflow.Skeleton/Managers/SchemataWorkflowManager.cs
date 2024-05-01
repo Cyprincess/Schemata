@@ -17,31 +17,16 @@ using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Skeleton.Managers;
 
-public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkflowManager<TWorkflow, TTransition, TResponse>,
-                                                                          IWorkflowManager
+public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
+    ISimpleMapper            mapper,
+    IRepository<TTransition> transitions,
+    IRepository<TWorkflow>   workflows,
+    ITypeResolver            resolver,
+    IServiceProvider         services) : IWorkflowManager<TWorkflow, TTransition, TResponse>, IWorkflowManager
     where TTransition : SchemataTransition, new()
     where TWorkflow : SchemataWorkflow, new()
     where TResponse : WorkflowResponse
 {
-    private readonly ISimpleMapper            _mapper;
-    private readonly ITypeResolver            _resolver;
-    private readonly IServiceProvider         _services;
-    private readonly IRepository<TTransition> _transitions;
-    private readonly IRepository<TWorkflow>   _workflows;
-
-    public SchemataWorkflowManager(
-        ISimpleMapper            mapper,
-        IRepository<TTransition> transitions,
-        IRepository<TWorkflow>   workflows,
-        ITypeResolver            resolver,
-        IServiceProvider         services) {
-        _mapper      = mapper;
-        _transitions = transitions;
-        _workflows   = workflows;
-        _resolver    = resolver;
-        _services    = services;
-    }
-
     #region IWorkflowManager Members
 
     Task<Type?> IWorkflowManager.GetInstanceTypeAsync(string type, CancellationToken ct) {
@@ -89,7 +74,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     #region IWorkflowManager<TWorkflow,TTransition,TResponse> Members
 
     public Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default) {
-        if (!_resolver.TryResolveType(type, out var it)) {
+        if (!resolver.TryResolveType(type, out var it)) {
             return Task.FromResult<Type?>(null);
         }
 
@@ -97,7 +82,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     public virtual async Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default) {
-        return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
+        return await workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
     }
 
     public virtual async Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default) {
@@ -125,7 +110,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     public virtual IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default) {
-        return _transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
+        return transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
     }
 
     public virtual async Task<TWorkflow?> CreateAsync(IStatefulEntity instance, CancellationToken ct = default) {
@@ -148,8 +133,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             InstanceType = instance.FullName!,
         };
 
-        await _workflows.AddAsync(workflow, ct);
-        await _workflows.CommitAsync(ct);
+        await workflows.AddAsync(workflow, ct);
+        await workflows.CommitAsync(ct);
 
         return workflow;
     }
@@ -203,7 +188,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             Transitions = transitions,
         };
 
-        var response = _mapper.Map<TResponse>(details);
+        var response = mapper.Map<TResponse>(details);
 
         return response;
     }
@@ -221,7 +206,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     protected virtual IRepository? ResolveRepository(Type type) {
         var rt         = typeof(IRepository<>).MakeGenericType(type);
-        var repository = (IRepository)_services.GetRequiredService(rt);
+        var repository = (IRepository)services.GetRequiredService(rt);
 
         return repository;
     }
@@ -237,7 +222,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     protected virtual StateMachine? ResolveStateMachine(Type type) {
         var mt      = typeof(StateMachineBase<>).MakeGenericType(type);
-        var machine = (StateMachine)_services.GetRequiredService(mt);
+        var machine = (StateMachine)services.GetRequiredService(mt);
 
         return machine;
     }

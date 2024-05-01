@@ -16,15 +16,9 @@ public class AdviceResultCache
     internal static readonly ConcurrentDictionary<string, string> AffectedKeys = [];
 }
 
-public class AdviceResultCache<TEntity, TResult, T> : AdviceResultCache, IRepositoryResultAdvice<TEntity, TResult, T>
+public class AdviceResultCache<TEntity, TResult, T>(IMemoryCache cache) : AdviceResultCache, IRepositoryResultAdvice<TEntity, TResult, T>
     where TEntity : class
 {
-    private readonly IMemoryCache _cache;
-
-    public AdviceResultCache(IMemoryCache cache) {
-        _cache = cache;
-    }
-
     #region IRepositoryQueryAsyncAdvice<TEntity,TResult,T> Members
 
     public int Order => SchemataConstants.Orders.Max;
@@ -48,7 +42,7 @@ public class AdviceResultCache<TEntity, TResult, T> : AdviceResultCache, IReposi
             return Task.FromResult(true);
         }
 
-        _cache.Set(key, context.Result, new MemoryCacheEntryOptions() {
+        cache.Set(key, context.Result, new MemoryCacheEntryOptions() {
             Priority = CacheItemPriority.Normal,
             SlidingExpiration = TimeSpan.FromMinutes(5),
         });

@@ -23,6 +23,20 @@ public sealed class Configurators
         };
     }
 
+    public void Set<T1, T2>(Action<T1, T2> action) {
+        var key = typeof((T1, T2));
+
+        if (!TryGet<T1, T2>(out var configure)) {
+            _configurators[key] = action;
+            return;
+        }
+
+        _configurators[key] = (T1 a1, T2 a2) => {
+            configure!.Invoke(a1, a2);
+            action(a1, a2);
+        };
+    }
+
     public bool TryGet<T>(out Action<T>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof(T), out var @object)) {
@@ -30,6 +44,20 @@ public sealed class Configurators
         }
 
         if (@object is not Action<T> configure) {
+            return false;
+        }
+
+        action = configure;
+        return true;
+    }
+
+    public bool TryGet<T1, T2>(out Action<T1, T2>? action) {
+        action = null;
+        if (!_configurators.TryGetValue(typeof((T1, T2)), out var @object)) {
+            return false;
+        }
+
+        if (@object is not Action<T1, T2> configure) {
             return false;
         }
 
@@ -45,18 +73,45 @@ public sealed class Configurators
         throw new KeyNotFoundException($"No configurator for {typeof(T)}");
     }
 
+    public Action<T1, T2> Get<T1, T2>() {
+        if (TryGet<T1, T2>(out var action)) {
+            return action!;
+        }
+
+        throw new KeyNotFoundException($"No configurator for ({typeof(T1)}, {typeof(T2)})");
+    }
+
     public Action<T> Pop<T>() {
         var action = Get<T>();
         _configurators.Remove(typeof(T));
         return action;
     }
 
+    public Action<T1, T2> Pop<T1, T2>() {
+        var action = Get<T1, T2>();
+        _configurators.Remove(typeof((T1, T2)));
+        return action;
+    }
+
     public Action<T> PopOrDefault<T>() {
-        try {
-            return Pop<T>();
-        } catch (KeyNotFoundException) {
+        if (!TryGet<T>(out var action)) {
             return _ => { };
         }
+
+        _configurators.Remove(typeof(T));
+
+        return action!;
+    }
+
+
+    public Action<T1, T2> PopOrDefault<T1, T2>() {
+        if (!TryGet<T1, T2>(out var action)) {
+            return (_, _) => { };
+        }
+
+        _configurators.Remove(typeof((T1, T2)));
+
+        return action!;
     }
 
     public IServiceCollection Invoke(IServiceCollection services) {

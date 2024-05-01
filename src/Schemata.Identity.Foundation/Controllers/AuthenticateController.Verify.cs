@@ -11,7 +11,7 @@ public sealed partial class AuthenticateController : ControllerBase
         [FromQuery] string? email,
         [FromQuery] string? phone,
         [FromQuery] string? code) {
-        if (!_options.CurrentValue.AllowAccountConfirmation) {
+        if (!options.CurrentValue.AllowAccountConfirmation) {
             return NotFound();
         }
 
@@ -29,8 +29,8 @@ public sealed partial class AuthenticateController : ControllerBase
         }
 
         var result = code switch {
-            var _ when !string.IsNullOrWhiteSpace(email) => await _userManager.ChangeEmailAsync(user, email, code),
-            var _ when !string.IsNullOrWhiteSpace(phone) => await _userManager.ChangePhoneNumberAsync(user, phone, code),
+            var _ when !string.IsNullOrWhiteSpace(email) => await userManager.ChangeEmailAsync(user, email, code),
+            var _ when !string.IsNullOrWhiteSpace(phone) => await userManager.ChangePhoneNumberAsync(user, phone, code),
             var _                                        => null,
         };
 
@@ -43,7 +43,7 @@ public sealed partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request) {
-        if (!_options.CurrentValue.AllowAccountConfirmation) {
+        if (!options.CurrentValue.AllowAccountConfirmation) {
             return NotFound();
         }
 

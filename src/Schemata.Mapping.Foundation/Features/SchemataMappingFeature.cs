@@ -19,6 +19,6 @@ public sealed class SchemataMappingFeature<T> : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        services.TryAddSingleton<ISimpleMapper, T>();
+        services.TryAddScoped<ISimpleMapper, T>();
     }
 }

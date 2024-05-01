@@ -31,6 +31,10 @@
     <None Remove="Schemata.Application.Modular.Targets.targets" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseTenancy)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseAuthorization)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
   </ItemGroup>

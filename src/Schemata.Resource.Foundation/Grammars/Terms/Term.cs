@@ -3,23 +3,15 @@ using Parlot;
 
 namespace Schemata.Resource.Foundation.Grammars.Terms;
 
-public class Term : IToken
+public class Term(TextPosition position, string? unary, ISimple simple) : IToken
 {
-    public Term(TextPosition position, string? unary, ISimple simple) {
-        Position = position;
+    public string? Modifier { get; } = unary;
 
-        Modifier = unary;
-
-        Simple = simple;
-    }
-
-    public string? Modifier { get; }
-
-    public ISimple Simple { get; }
+    public ISimple Simple { get; } = simple;
 
     #region IToken Members
 
-    public TextPosition Position { get; }
+    public TextPosition Position { get; } = position;
 
     public bool IsConstant => Simple.IsConstant;
 

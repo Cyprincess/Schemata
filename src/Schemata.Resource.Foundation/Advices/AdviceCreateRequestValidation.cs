@@ -9,16 +9,10 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceCreateRequestValidation<TEntity, TRequest> : IResourceCreateRequestAdvice<TEntity, TRequest>
+public sealed class AdviceCreateRequestValidation<TEntity, TRequest>(IServiceProvider services) : IResourceCreateRequestAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
-    private readonly IServiceProvider _services;
-
-    public AdviceCreateRequestValidation(IServiceProvider services) {
-        _services = services;
-    }
-
     #region IResourceCreateAdvice<TEntity,TRequest> Members
 
     public int Order => 100_000_000;
@@ -35,7 +29,7 @@ public sealed class AdviceCreateRequestValidation<TEntity, TRequest> : IResource
         }
 
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_services, ctx, Operations.Create, request, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(services, ctx, Operations.Create, request, errors, ct);
         if (pass) {
             return true;
         }

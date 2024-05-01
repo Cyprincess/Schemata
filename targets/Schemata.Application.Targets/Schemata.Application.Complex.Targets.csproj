@@ -9,6 +9,7 @@
   <PropertyGroup>
     <UseDSLTargets>true</UseDSLTargets>
     <UseModularTargets>true</UseModularTargets>
+    <UseTenancy>true</UseTenancy>
     <UseAuthorization>true</UseAuthorization>
     <UseIdentity>true</UseIdentity>
     <UseMapster>true</UseMapster>

@@ -41,7 +41,7 @@ public static class SchemataRepositoryBuilderExtensions
     public static SchemataRepositoryBuilder UseLinqToDb(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
         ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped) {
         return UseLinqToDb<DataConnection, DataConnection>(builder, configure, contextLifetime, optionsLifetime);
     }
@@ -49,7 +49,7 @@ public static class SchemataRepositoryBuilderExtensions
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
         ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
         where TContext : DataConnection {
         return UseLinqToDb<TContext, TContext>(builder, configure, contextLifetime, optionsLifetime);
@@ -58,7 +58,7 @@ public static class SchemataRepositoryBuilderExtensions
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Transient,
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
         ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
         where TContextImplementation : TContext
         where TContext : DataConnection {

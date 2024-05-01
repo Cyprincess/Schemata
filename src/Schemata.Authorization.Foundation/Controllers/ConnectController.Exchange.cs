@@ -31,7 +31,7 @@ public sealed partial class ConnectController : ControllerBase
             var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
             // Retrieve the user profile corresponding to the authorization code/refresh token.
-            var user = await _users.GetUserAsync(result.Principal!);
+            var user = await userManager.GetUserAsync(result.Principal!);
             if (user is null) {
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new(new Dictionary<string, string?> {
@@ -41,7 +41,7 @@ public sealed partial class ConnectController : ControllerBase
             }
 
             // Ensure the user is still allowed to sign in.
-            if (!await _sign.CanSignInAsync(user)) {
+            if (!await signInManager.CanSignInAsync(user)) {
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new(new Dictionary<string, string?> {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error]            = OpenIddictConstants.Errors.InvalidGrant,
@@ -56,12 +56,12 @@ public sealed partial class ConnectController : ControllerBase
 
             // Override the user claims present in the principal in case they
             // changed since the authorization code/refresh token was issued.
-            identity.SetClaim(OpenIddictConstants.Claims.Subject, await _users.GetUserIdAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.Email, await _users.GetEmailAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _users.GetPhoneNumberAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _users.GetUserNameAsync(user))
-                    .SetClaim(OpenIddictConstants.Claims.Nickname, await _users.GetDisplayNameAsync(user))
-                    .SetClaims(OpenIddictConstants.Claims.Role, (await _users.GetRolesAsync(user)).ToImmutableArray());
+            identity.SetClaim(OpenIddictConstants.Claims.Subject, await userManager.GetUserIdAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.Email, await userManager.GetEmailAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await userManager.GetPhoneNumberAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await userManager.GetUserNameAsync(user))
+                    .SetClaim(OpenIddictConstants.Claims.Nickname, await userManager.GetDisplayNameAsync(user))
+                    .SetClaims(OpenIddictConstants.Claims.Role, (await userManager.GetRolesAsync(user)).ToImmutableArray());
 
             identity.SetDestinations(GetDestinations);
 
@@ -73,7 +73,7 @@ public sealed partial class ConnectController : ControllerBase
             // Note: the client credentials are automatically validated by OpenIddict:
             // if client_id or client_secret are invalid, this action won't be invoked.
 
-            var application = await _applications.FindByClientIdAsync(request.ClientId!);
+            var application = await applicationManager.FindByClientIdAsync(request.ClientId!);
             if (application is null) {
                 throw new InvalidOperationException("The application details cannot be found in the database.");
             }
@@ -84,8 +84,8 @@ public sealed partial class ConnectController : ControllerBase
                 OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens (use the client_id as the subject identifier).
-            identity.SetClaim(OpenIddictConstants.Claims.Subject, await _applications.GetClientIdAsync(application));
-            identity.SetClaim(OpenIddictConstants.Claims.Name, await _applications.GetDisplayNameAsync(application));
+            identity.SetClaim(OpenIddictConstants.Claims.Subject, await applicationManager.GetClientIdAsync(application));
+            identity.SetClaim(OpenIddictConstants.Claims.Name, await applicationManager.GetDisplayNameAsync(application));
 
             // Note: In the original OAuth 2.0 specification, the client credentials grant
             // doesn't return an identity token, which is an OpenID Connect concept.
@@ -97,7 +97,7 @@ public sealed partial class ConnectController : ControllerBase
 
             // Set the list of scopes granted to the client application in access_token.
             identity.SetScopes(request.GetScopes());
-            identity.SetResources(await _scopes.ListResourcesAsync(identity.GetScopes()).ToListAsync());
+            identity.SetResources(await scopeManager.ListResourcesAsync(identity.GetScopes()).ToListAsync());
             identity.SetDestinations(GetDestinations);
 
             return SignIn(new(identity), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
