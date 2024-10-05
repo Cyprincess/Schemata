@@ -30,7 +30,7 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvice
             return Task.FromResult(true);
         }
 
-        freshness.EntityTag = $"W/\"{concurrency.Timestamp}\"";
+        freshness.EntityTag = $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"";
 
         return Task.FromResult(true);
     }

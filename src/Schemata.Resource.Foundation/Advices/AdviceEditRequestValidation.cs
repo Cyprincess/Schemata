@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advices;
 
@@ -25,17 +26,27 @@ public sealed class AdviceEditRequestValidation<TEntity, TRequest>(IServiceProvi
         TRequest          request,
         HttpContext       context,
         CancellationToken ct = default) {
+        var only = request is IValidation { ValidateOnly: true };
+
         if (ctx.Has<SuppressEditRequestValidation>()) {
+            if (only) {
+                throw new NoContentException();
+            }
+
             return true;
         }
 
         var errors = new List<KeyValuePair<string, string>>();
         var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(services, ctx, Operations.Update, request, errors, ct);
-        if (pass) {
-            return true;
+        if (!pass) {
+            throw new ValidationException(errors);
         }
 
-        throw new ValidationException(errors);
+        if (only) {
+            throw new NoContentException();
+        }
+
+        return true;
     }
 
     #endregion

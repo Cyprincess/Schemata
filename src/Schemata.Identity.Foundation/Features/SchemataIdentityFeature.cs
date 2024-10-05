@@ -10,8 +10,8 @@ using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
 

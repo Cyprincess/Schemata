@@ -10,7 +10,7 @@ public sealed class ClaimsStore : Dictionary<string, ClaimStore>
         }
 
         if (!TryGetValue(type!, out var store)) {
-            store       = new();
+            store       = [];
             this[type!] = store;
         }
 

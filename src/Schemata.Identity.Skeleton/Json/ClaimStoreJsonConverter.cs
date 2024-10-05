@@ -1,8 +1,9 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Schemata.Identity.Skeleton.Claims;
 
-namespace Schemata.Identity.Skeleton.Claims;
+namespace Schemata.Identity.Skeleton.Json;
 
 public sealed class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
 {

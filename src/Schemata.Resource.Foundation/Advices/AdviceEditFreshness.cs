@@ -2,9 +2,11 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advices;
 
@@ -39,13 +41,21 @@ public sealed class AdviceEditFreshness<TEntity, TRequest>(IServiceProvider serv
             return Task.FromResult(true);
         }
 
-        var freshness = context.Request.Headers.IfMatch.ToString();
+        var tag = request switch {
+            IFreshness freshness => freshness.EntityTag,
+            var _ when context.Request.Query.ContainsKey(SchemataConstants.Parameters.EntityTag) => context.Request.Query[SchemataConstants.Parameters.EntityTag].ToString(),
+            var _ => context.Request.Headers.IfMatch.ToString(),
+        };
 
-        if (!freshness.StartsWith("W/")) {
+        if (string.IsNullOrWhiteSpace(tag)) {
             return Task.FromResult(true);
         }
 
-        if (freshness != $"W/\"{concurrency.Timestamp}\"") {
+        if (!tag.StartsWith("W/")) {
+            return Task.FromResult(true);
+        }
+
+        if (tag != $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"") {
             throw new ConcurrencyException();
         }
 
