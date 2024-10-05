@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Humanizer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Parlot;
 using Schemata.Abstractions.Advices;
@@ -22,17 +23,19 @@ namespace Schemata.Resource.Http;
 [ResourceControllerConvention]
 [Route("~/Resources/[controller]")]
 public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
-    IServiceProvider     services,
-    IRepository<TEntity> repository,
-    ISimpleMapper        mapper) : ControllerBase
+    IServiceProvider              services,
+    IRepository<TEntity>          repository,
+    ISimpleMapper                 mapper,
+    ResourceJsonSerializerOptions serializer) : ControllerBase
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
     where TDetail : class, IIdentifier
     where TSummary : class, IIdentifier
 {
-    protected readonly ISimpleMapper        Mapper          = mapper;
-    protected readonly IRepository<TEntity> Repository      = repository;
-    protected readonly IServiceProvider     ServiceProvider = services;
+    protected readonly ResourceJsonSerializerOptions SerializerOptions = serializer;
+    protected readonly ISimpleMapper                 Mapper            = mapper;
+    protected readonly IRepository<TEntity>          Repository        = repository;
+    protected readonly IServiceProvider              ServiceProvider   = services;
 
     protected virtual EmptyResult EmptyResult { get; } = new();
 
@@ -137,7 +140,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        return Ok(response);
+        return new JsonResult(response, SerializerOptions.Options);
     }
 
     [HttpGet("{id}")]
@@ -165,7 +168,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        return Ok(detail);
+        return new JsonResult(detail, SerializerOptions.Options);
     }
 
     [HttpPost]
@@ -200,7 +203,11 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        return CreatedAtAction(nameof(Get), new { id = entity.Id }, detail);
+        HttpContext.Response.Headers.Location = Url.Action(nameof(Get), new { id = entity.Id });
+
+        return new JsonResult(detail, SerializerOptions.Options) {
+            StatusCode = StatusCodes.Status201Created,
+        };
     }
 
     [HttpPut("{id}")]
@@ -239,7 +246,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        return Ok(detail);
+        return new JsonResult(detail, SerializerOptions.Options);
     }
 
     [HttpDelete("{id}")]

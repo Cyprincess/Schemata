@@ -184,7 +184,7 @@ including [AutoMapper](https://www.nuget.org/packages/AutoMapper/)
 and [Mapster](https://www.nuget.org/packages/Mapster/), among others.
 
 It provides a unified interface for these libraries, enabling developers to switch between them without modifying their
-code.
+codes.
 
 ### Schemata.Resource.Foundation
 

@@ -28,7 +28,7 @@ public class PageToken
         gz.Write(bytes, 0, bytes.Length);
         gz.Close();
 
-        return Convert.ToBase64String(ms.ToArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        return ms.ToArray().ToBase64UrlString();
     }
 
     public static async Task<PageToken?> FromStringAsync(string? token) {
@@ -36,17 +36,7 @@ public class PageToken
             return null;
         }
 
-        var base64 = token.Replace('_', '/').Replace('-', '+');
-        switch (base64.Length % 4) {
-            case 2:
-                base64 += "==";
-                break;
-            case 3:
-                base64 += "=";
-                break;
-        }
-
-        var bytes = Convert.FromBase64String(base64);
+        var bytes = token.FromBase64UrlString();
 
         using var       ms = new MemoryStream(bytes);
         await using var gz = new BrotliStream(ms, CompressionMode.Decompress);

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advices;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -37,13 +38,21 @@ public sealed class AdviceDeleteFreshness<TEntity>(IServiceProvider services) : 
             return Task.FromResult(true);
         }
 
-        var freshness = context.Request.Headers.IfMatch.ToString();
+        var freshness = context.Request.Query[SchemataConstants.Parameters.EntityTag].ToString();
+
+        if (string.IsNullOrWhiteSpace(freshness)) {
+            freshness = context.Request.Headers.IfMatch.ToString();
+        }
+
+        if (string.IsNullOrWhiteSpace(freshness)) {
+            return Task.FromResult(true);
+        }
 
         if (!freshness.StartsWith("W/")) {
             return Task.FromResult(true);
         }
 
-        if (freshness != $"W/\"{concurrency.Timestamp}\"") {
+        if (freshness !=  $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"") {
             throw new ConcurrencyException();
         }
 

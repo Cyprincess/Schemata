@@ -22,4 +22,13 @@ public static class SchemataConstants
     }
 
     #endregion
+
+    #region Nested type: Parameters
+
+    public static class Parameters
+    {
+        public const string EntityTag = "etag";
+    }
+
+    #endregion
 }

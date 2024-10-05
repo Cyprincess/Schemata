@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation.Advices;
 
 namespace Schemata.Resource.Foundation.Features;
 
@@ -22,11 +20,6 @@ public sealed class SchemataResourceFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceRequestAdvice<>), typeof(AdviceRequestAuthorize<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvice<,>), typeof(AdviceCreateRequestValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditRequestAdvice<,>), typeof(AdviceEditRequestValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditAdvice<,>), typeof(AdviceEditFreshness<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvice<>), typeof(AdviceDeleteFreshness<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvice<,>), typeof(AdviceResponseFreshness<,>)));
+        services.AddResourceAdvices();
     }
 }

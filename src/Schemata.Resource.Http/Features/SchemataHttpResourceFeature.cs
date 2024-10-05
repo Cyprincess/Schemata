@@ -31,6 +31,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         services.AddSingleton(provider);
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
+        services.AddResourceJsonSerializerOptions();
+
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {
                      manager.FeatureProviders.Add(provider);

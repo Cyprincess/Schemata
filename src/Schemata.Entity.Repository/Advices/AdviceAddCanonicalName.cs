@@ -61,9 +61,9 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
 
             var value = property.GetValue(entity)?.ToString();
             if (string.IsNullOrWhiteSpace(value)) {
-                throw new ValidationException(new [] {
-                    new KeyValuePair<string, string>($"{matched}Name", "not_empty"),
-                });
+                throw new ValidationException([
+                    new($"{matched}Name", "not_empty"),
+                ]);
             }
 
             return value;

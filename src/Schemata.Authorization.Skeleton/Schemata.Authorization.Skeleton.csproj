@@ -12,7 +12,6 @@
 
   <ItemGroup>
     <PackageReference Include="OpenIddict.Core" />
-    <PackageReference Include="System.Memory" />
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 

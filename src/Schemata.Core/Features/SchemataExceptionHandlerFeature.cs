@@ -32,18 +32,21 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                     context.Response.StatusCode  = (int)HttpStatusCode.InternalServerError;
                     context.Response.ContentType = "application/json";
 
-                    await context.Response.WriteAsJsonAsync(new ErrorResponse {
-                        ErrorDescription = "An error occurred.",
-                    }, options.Value, context.RequestAborted);
+                    await context.Response.WriteAsJsonAsync(
+                        new ErrorResponse {
+                            ErrorDescription = "An error occurred.",
+                        },
+                        options.Value,
+                        context.RequestAborted
+                    );
 
                     return;
                 }
 
-                context.Response.StatusCode  = http.StatusCode;
-                context.Response.ContentType = "application/json";
+                context.Response.StatusCode = http.StatusCode;
 
                 var response = new ErrorResponse {
-                    ErrorDescription = !string.IsNullOrWhiteSpace(http.Message) ? http.Message : null,
+                    ErrorDescription = http.Message,
                 };
 
                 if (http.Errors is { Count: > 0 }) {
@@ -52,9 +55,10 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                     response.Error = http.Error;
                 }
 
-                if (response.Error is not null
-                 || response.Errors is not null
-                 || response.ErrorDescription is not null) {
+                if (response.Errors is not null
+                 || !string.IsNullOrWhiteSpace(response.Error)
+                 || !string.IsNullOrWhiteSpace(response.ErrorDescription)) {
+                    context.Response.ContentType = "application/json";
                     await context.Response.WriteAsJsonAsync(response, options.Value, context.RequestAborted);
                 }
             });

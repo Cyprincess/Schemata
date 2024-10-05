@@ -89,7 +89,7 @@ public class Member : IComparable
 
             var at = ctx.GetMethod(typeof(Enumerable),
                 "ElementAt",
-                new[] { type! },
+                [type!],
                 () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                         .Single(x => x.Name == "ElementAt"
                                                   && x.GetParameters().Length == 2
