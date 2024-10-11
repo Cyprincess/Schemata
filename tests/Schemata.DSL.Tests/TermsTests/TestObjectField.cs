@@ -19,7 +19,13 @@ public class TestObjectField
                 Foo bar{
                 id
                 }
-                """, "Foo", "bar", false, null, null, new[] { "id" })]
+                """,
+                "Foo",
+                "bar",
+                false,
+                null,
+                null,
+                new[] { "id" })]
     [InlineData("id = bar.id", null, "id", false, null, null, null, "bar.id")]
     [InlineData("timestamp foo = now()", "timestamp", "foo", false, null, null, null, "now")]
     [InlineData("string foo = \"bar\"", "string", "foo", false, null, null, null, "bar")]

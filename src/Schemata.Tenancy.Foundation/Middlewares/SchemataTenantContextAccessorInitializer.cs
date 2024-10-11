@@ -6,13 +6,18 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Middlewares;
 
-public class SchemataTenantContextAccessorInitializer<TTenant, TKey>(RequestDelegate next)
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class SchemataTenantContextAccessorInitializer<TTenant, TKey> where TTenant : SchemataTenant<TKey>
+                                                                     where TKey : struct, IEquatable<TKey>
 {
-    public async Task Invoke(HttpContext context, ITenantContextAccessor<TTenant, TKey> tenant) {
-        await tenant.InitializeAsync(context.RequestAborted);
+    private readonly RequestDelegate _next;
 
-        await next.Invoke(context);
+    public SchemataTenantContextAccessorInitializer(RequestDelegate next) {
+        _next = next;
+    }
+
+    public async Task Invoke(HttpContext http, ITenantContextAccessor<TTenant, TKey> tenant) {
+        await tenant.InitializeAsync(http.RequestAborted);
+
+        await _next.Invoke(http);
     }
 }

@@ -8,19 +8,26 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
-public class RequestHostResolver<TTenant, TKey>(IHttpContextAccessor accessor, ITenantManager<TTenant, TKey> manager) : ITenantResolver<TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class RequestHostResolver<TTenant, TKey> : ITenantResolver<TKey> where TTenant : SchemataTenant<TKey>
+                                                                        where TKey : struct, IEquatable<TKey>
 {
+    private readonly IHttpContextAccessor          _accessor;
+    private readonly ITenantManager<TTenant, TKey> _manager;
+
+    public RequestHostResolver(IHttpContextAccessor accessor, ITenantManager<TTenant, TKey> manager) {
+        _accessor = accessor;
+        _manager  = manager;
+    }
+
     #region ITenantResolver<TKey> Members
 
     public async Task<TKey?> ResolveAsync(CancellationToken ct = default) {
-        var hostname = accessor.HttpContext?.Request.Host.Host;
+        var hostname = _accessor.HttpContext?.Request.Host.Host;
         if (string.IsNullOrWhiteSpace(hostname)) {
             throw new TenantResolveException();
         }
 
-        var tenant = await manager.FindByHost(hostname, ct);
+        var tenant = await _manager.FindByHost(hostname, ct);
         if (tenant is not { TenantId: not null }) {
             throw new TenantResolveException();
         }

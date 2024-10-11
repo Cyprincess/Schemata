@@ -88,13 +88,13 @@ public class Member : IComparable
             var type = expression.Type.GetElementType() ?? expression.Type.GenericTypeArguments.FirstOrDefault();
 
             var at = ctx.GetMethod(typeof(Enumerable),
-                "ElementAt",
-                [type!],
-                () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                        .Single(x => x.Name == "ElementAt"
-                                                  && x.GetParameters().Length == 2
-                                                  && x.GetParameters().Last().ParameterType == typeof(int))
-                                        .MakeGenericMethod(type!));
+                                   "ElementAt",
+                                   [type!],
+                                   () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                           .Single(x => x.Name == "ElementAt"
+                                                                     && x.GetParameters().Length == 2
+                                                                     && x.GetParameters().Last().ParameterType == typeof(int))
+                                                           .MakeGenericMethod(type!));
 
             return Expression.Call(at!, expression, Expression.Constant((int)integer.Value));
         }

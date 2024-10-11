@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
   </ItemGroup>
 

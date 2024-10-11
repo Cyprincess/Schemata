@@ -21,15 +21,23 @@ public interface IWorkflowManager
 
     IAsyncEnumerable<SchemataTransition> ListTransitionsAsync(long id, CancellationToken ct = default);
 
-    Task<SchemataWorkflow?> CreateAsync(IStatefulEntity instance, CancellationToken ct = default);
+    Task<SchemataWorkflow?> CreateAsync(
+        IStatefulEntity?  instance,
+        ClaimsPrincipal?  principal = null,
+        CancellationToken ct        = default);
 
     Task<SchemataWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default);
 
-    Task RaiseAsync<TEvent>(SchemataWorkflow workflow, TEvent @event, CancellationToken ct = default)
-        where TEvent : class, IEvent;
+    Task RaiseAsync<TEvent>(
+        SchemataWorkflow? workflow,
+        TEvent            @event,
+        ClaimsPrincipal?  principal = null,
+        CancellationToken ct        = default) where TEvent : class, IEvent;
+
+    Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default) where TEvent : class, IEvent;
 
     Task<object?> MapAsync(
-        SchemataWorkflow        workflow,
+        SchemataWorkflow?       workflow,
         SchemataWorkflowOptions options,
         ClaimsPrincipal?        principal = null,
         CancellationToken       ct        = default);

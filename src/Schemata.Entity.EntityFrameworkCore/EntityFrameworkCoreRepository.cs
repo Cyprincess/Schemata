@@ -10,13 +10,18 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
-public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider sp, TContext context) : RepositoryBase<TEntity>(sp)
-    where TContext : DbContext
-    where TEntity : class
+public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<TEntity> where TContext : DbContext
+                                                                                        where TEntity : class
 {
-    protected virtual TContext Context => context;
+    private readonly TContext _context;
 
-    protected virtual DbSet<TEntity> DbSet => context.Set<TEntity>();
+    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) : base(sp) {
+        _context = context;
+    }
+
+    protected virtual TContext Context => _context;
+
+    protected virtual DbSet<TEntity> DbSet => _context.Set<TEntity>();
 
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
         return DbSet.AsAsyncEnumerable();
@@ -55,8 +60,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider s
 
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default)
-        where TResult : default {
+        CancellationToken                               ct = default) where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
@@ -72,8 +76,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider s
 
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default)
-        where TResult : default {
+        CancellationToken                               ct = default) where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
@@ -178,12 +181,10 @@ public class EntityFrameworkCoreRepository<TContext, TEntity>(IServiceProvider s
         CancellationToken                               ct) {
         ct.ThrowIfCancellationRequested();
 
-        var table = AsQueryable();
+        var container = AsQueryContainer();
 
-        var query = new QueryContainer<TEntity>(this, table);
+        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, container, ct);
 
-        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, query, ct);
-
-        return BuildQuery(query.Query, predicate);
+        return BuildQuery(container.Query, predicate);
     }
 }

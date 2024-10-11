@@ -14,13 +14,27 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 [ApiController]
 [Route("~/[controller]")]
-public sealed partial class ConnectController(
-    IOpenIddictApplicationManager     applicationManager,
-    IOpenIddictAuthorizationManager   authorizationManager,
-    IOpenIddictScopeManager           scopeManager,
-    SignInManager<SchemataUser>       signInManager,
-    SchemataUserManager<SchemataUser> userManager) : ControllerBase
+public sealed partial class ConnectController : ControllerBase
 {
+    private readonly IOpenIddictApplicationManager     _applicationManager;
+    private readonly IOpenIddictAuthorizationManager   _authorizationManager;
+    private readonly IOpenIddictScopeManager           _scopeManager;
+    private readonly SignInManager<SchemataUser>       _signInManager;
+    private readonly SchemataUserManager<SchemataUser> _userManager;
+
+    public ConnectController(
+        IOpenIddictApplicationManager     applicationManager,
+        IOpenIddictAuthorizationManager   authorizationManager,
+        IOpenIddictScopeManager           scopeManager,
+        SignInManager<SchemataUser>       signInManager,
+        SchemataUserManager<SchemataUser> userManager) {
+        _applicationManager   = applicationManager;
+        _authorizationManager = authorizationManager;
+        _scopeManager         = scopeManager;
+        _signInManager        = signInManager;
+        _userManager          = userManager;
+    }
+
     private IEnumerable<string> GetDestinations(Claim claim) {
         // Note: by default, claims are NOT automatically included in the access and identity tokens.
         // To allow OpenIddict to serialize them, you must attach them a destination, that specifies
@@ -73,7 +87,8 @@ public sealed partial class ConnectController(
                 yield break;
 
             // Never include the security stamp in the access and identity tokens, as it's a secret value.
-            case "AspNet.Identity.SecurityStamp": yield break;
+            case "AspNet.Identity.SecurityStamp":
+                yield break;
 
             default:
                 yield return OpenIddictConstants.Destinations.AccessToken;

@@ -7,9 +7,8 @@ namespace Schemata.Tenancy.Skeleton;
 
 public interface ITenantContextAccessor : ITenantContextAccessor<SchemataTenant<Guid>, Guid>;
 
-public interface ITenantContextAccessor<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public interface ITenantContextAccessor<TTenant, TKey> where TTenant : SchemataTenant<TKey>
+                                                       where TKey : struct, IEquatable<TKey>
 {
     TTenant? Tenant { get; }
 

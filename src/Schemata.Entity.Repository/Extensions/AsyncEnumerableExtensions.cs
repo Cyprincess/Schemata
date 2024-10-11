@@ -37,8 +37,7 @@ public static class AsyncEnumerableExtensions
     public static Task<Dictionary<TKey, TSource>> ToDictionaryAsync<TSource, TKey>(
         this IAsyncEnumerable<TSource>  source,
         Expression<Func<TSource, TKey>> keySelector,
-        CancellationToken               ct = default)
-        where TKey : notnull {
+        CancellationToken               ct = default) where TKey : notnull {
         return source.ToDictionaryAsync(keySelector, null, ct);
     }
 
@@ -46,8 +45,7 @@ public static class AsyncEnumerableExtensions
         this IAsyncEnumerable<TSource>  source,
         Expression<Func<TSource, TKey>> keySelector,
         IEqualityComparer<TKey>?        comparer,
-        CancellationToken               ct = default)
-        where TKey : notnull {
+        CancellationToken               ct = default) where TKey : notnull {
         return source.ToDictionaryAsync(keySelector, e => e, comparer, ct);
     }
 
@@ -55,8 +53,7 @@ public static class AsyncEnumerableExtensions
         this IAsyncEnumerable<TSource>      source,
         Expression<Func<TSource, TKey>>     keySelector,
         Expression<Func<TSource, TElement>> elementSelector,
-        CancellationToken                   ct = default)
-        where TKey : notnull {
+        CancellationToken                   ct = default) where TKey : notnull {
         return source.ToDictionaryAsync(keySelector, elementSelector, null, ct);
     }
 
@@ -65,8 +62,7 @@ public static class AsyncEnumerableExtensions
         Expression<Func<TSource, TKey>>     keySelector,
         Expression<Func<TSource, TElement>> elementSelector,
         IEqualityComparer<TKey>?            comparer,
-        CancellationToken                   ct = default)
-        where TKey : notnull {
+        CancellationToken                   ct = default) where TKey : notnull {
         var keyConverter     = keySelector.Compile();
         var elementConverter = elementSelector.Compile();
 

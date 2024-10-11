@@ -3,8 +3,7 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;
 
-public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser>
-    where TUser : SchemataUser
+public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser> where TUser : SchemataUser
 {
     #region IMessageSender<TUser> Members
 

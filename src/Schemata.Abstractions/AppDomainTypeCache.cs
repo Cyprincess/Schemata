@@ -66,6 +66,7 @@ public static class AppDomainTypeCache
         type = Type.GetType(name, false);
         if (!string.IsNullOrWhiteSpace(type?.FullName)) {
             Types[type!.FullName] = type;
+            Types[type!.Name]     = type;
             return type;
         }
 
@@ -76,6 +77,7 @@ public static class AppDomainTypeCache
             }
 
             Types[type!.FullName] = type;
+            Types[type!.Name]     = type;
             return type;
         }
 
@@ -87,10 +89,11 @@ public static class AppDomainTypeCache
             return properties;
         }
 
-        properties = type.GetProperties(BindingFlags.GetProperty
-                                      | BindingFlags.IgnoreCase
-                                      | BindingFlags.Public
-                                      | BindingFlags.Instance)
+        properties = type.GetProperties(
+                              BindingFlags.GetProperty
+                            | BindingFlags.IgnoreCase
+                            | BindingFlags.Public
+                            | BindingFlags.Instance)
                          .ToDictionary(m => m.Name, m => m);
         Properties[type.TypeHandle] = properties;
 

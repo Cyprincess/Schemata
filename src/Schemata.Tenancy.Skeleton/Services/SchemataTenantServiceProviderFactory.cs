@@ -11,11 +11,21 @@ public class SchemataTenantServiceProviderFactory
     protected static readonly ConcurrentDictionary<string, Lazy<IServiceProvider>> Providers = [];
 }
 
-public class SchemataTenantServiceProviderFactory<TTenant, TKey>(IServiceCollection services, Action<IServiceCollection, TTenant?> configure)
-    : SchemataTenantServiceProviderFactory, ITenantServiceProviderFactory<TTenant, TKey>
+public class SchemataTenantServiceProviderFactory<TTenant, TKey> : SchemataTenantServiceProviderFactory,
+                                                                   ITenantServiceProviderFactory<TTenant, TKey>
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
+    private readonly Action<IServiceCollection, TTenant?> _configure;
+    private readonly IServiceCollection                   _services;
+
+    public SchemataTenantServiceProviderFactory(
+        IServiceCollection                   services,
+        Action<IServiceCollection, TTenant?> configure) {
+        _services  = services;
+        _configure = configure;
+    }
+
     #region ITenantServiceProviderFactory<TTenant,TKey> Members
 
     public IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant, TKey> accessor) {
@@ -25,27 +35,32 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey>(IServiceCollect
             throw new InvalidOperationException("Tenant is not initialized successfully.");
         }
 
-        return Providers.GetOrAdd(id!, _ => new(() => {
-            var container = new ServiceCollection();
+        // TODO: avoid resolving IServiceProvider for non-existing tenant, it may cause memory leak or DoS attack.
 
-            foreach (var service in services) {
-                if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
-                    container.TryAddSingleton(accessor);
+        return Providers.GetOrAdd(id!,
+                                  _ => new(() => {
+                                      var container = new ServiceCollection();
 
-                    continue;
-                }
+                                      foreach (var service in _services) {
+                                          if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
+                                              container.TryAddSingleton(accessor);
 
-                if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(service.ServiceType)) {
-                    continue;
-                }
+                                              continue;
+                                          }
 
-                container.Add(service);
-            }
+                                          if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(
+                                                  service.ServiceType)) {
+                                              continue;
+                                          }
 
-            configure(container, accessor.Tenant);
+                                          container.Add(service);
+                                      }
 
-            return container.BuildServiceProvider();
-        })).Value;
+                                      _configure(container, accessor.Tenant);
+
+                                      return container.BuildServiceProvider();
+                                  }))
+                        .Value;
     }
 
     #endregion

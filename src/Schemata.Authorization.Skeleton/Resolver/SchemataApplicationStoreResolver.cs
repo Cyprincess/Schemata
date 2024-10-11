@@ -8,32 +8,45 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
-public sealed class SchemataApplicationStoreResolver(
-    IServiceProvider                       sp,
-    IMemoryCache                           cache,
-    IOptionsMonitor<OpenIddictCoreOptions> options) : IOpenIddictApplicationStoreResolver
+public sealed class SchemataApplicationStoreResolver : IOpenIddictApplicationStoreResolver
 {
+    private readonly IMemoryCache                           _cache;
+    private readonly IOptionsMonitor<OpenIddictCoreOptions> _options;
+    private readonly IServiceProvider                       _sp;
+
+    public SchemataApplicationStoreResolver(
+        IServiceProvider                       sp,
+        IMemoryCache                           cache,
+        IOptionsMonitor<OpenIddictCoreOptions> options) {
+        _sp      = sp;
+        _cache   = cache;
+        _options = options;
+    }
+
     #region IOpenIddictApplicationStoreResolver Members
 
-    public IOpenIddictApplicationStore<TApplication> Get<TApplication>()
-        where TApplication : class {
-        var store = sp.GetService<IOpenIddictApplicationStore<TApplication>>();
+    public IOpenIddictApplicationStore<TApplication> Get<TApplication>() where TApplication : class {
+        var store = _sp.GetService<IOpenIddictApplicationStore<TApplication>>();
         if (store is not null) {
             return store;
         }
 
         var entity = typeof(TApplication);
         var key    = (entity.FullName ?? entity.Name).ToCacheKey();
-        var type = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High);
+        var type = _cache.GetOrCreate(key,
+                                      entry => {
+                                          entry.SetPriority(CacheItemPriority.High);
 
-            var authorization = options.CurrentValue.DefaultAuthorizationType!;
-            var token         = options.CurrentValue.DefaultTokenType!;
+                                          var authorization = _options.CurrentValue.DefaultAuthorizationType!;
+                                          var token         = _options.CurrentValue.DefaultTokenType!;
 
-            return typeof(SchemataApplicationStore<,,>).MakeGenericType(entity, authorization, token);
-        })!;
+                                          return typeof(SchemataApplicationStore<,,>).MakeGenericType(
+                                              entity,
+                                              authorization,
+                                              token);
+                                      })!;
 
-        return (IOpenIddictApplicationStore<TApplication>)sp.GetRequiredService(type);
+        return (IOpenIddictApplicationStore<TApplication>)_sp.GetRequiredService(type);
     }
 
     #endregion

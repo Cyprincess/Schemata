@@ -2,7 +2,11 @@ using System.Text.Json;
 
 namespace Schemata.Resource.Http;
 
-public class ResourceJsonSerializerOptions(JsonSerializerOptions options)
+public class ResourceJsonSerializerOptions
 {
-    public JsonSerializerOptions Options { get; } = options;
+    public ResourceJsonSerializerOptions(JsonSerializerOptions options) {
+        Options = options;
+    }
+
+    public JsonSerializerOptions Options { get; }
 }

@@ -8,8 +8,7 @@ using Schemata.Abstractions.Advices;
 // ReSharper disable once CheckNamespace
 namespace Schemata;
 
-public static class Advices<TAdvice>
-    where TAdvice : IAdvice
+public static class Advices<TAdvice> where TAdvice : IAdvice
 {
     public static async Task<bool> AdviseAsync<T1>(
         IServiceProvider  sp,

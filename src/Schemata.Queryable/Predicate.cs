@@ -67,8 +67,8 @@ public static class Predicate
 
     private class ExpressionReplacer : ExpressionVisitor
     {
-        private readonly Expression _oldValue;
         private readonly Expression _newValue;
+        private readonly Expression _oldValue;
 
         private ExpressionReplacer(Expression oldValue, Expression newValue) {
             _oldValue = oldValue;

@@ -9,9 +9,14 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceAddValidation<TEntity>(IServiceProvider sp) : IRepositoryAddAsyncAdvice<TEntity>
-    where TEntity : class
+public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAsyncAdvice<TEntity> where TEntity : class
 {
+    private readonly IServiceProvider _sp;
+
+    public AdviceAddValidation(IServiceProvider sp) {
+        _sp = sp;
+    }
+
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 
     public int Order => SchemataConstants.Orders.Max;
@@ -28,7 +33,7 @@ public sealed class AdviceAddValidation<TEntity>(IServiceProvider sp) : IReposit
         }
 
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(sp, ctx, Operations.Create, entity, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TEntity>>.AdviseAsync(_sp, ctx, Operations.Create, entity, errors, ct);
         if (pass) {
             return true;
         }

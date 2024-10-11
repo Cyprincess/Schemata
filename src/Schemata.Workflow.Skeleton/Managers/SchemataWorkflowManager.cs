@@ -17,16 +17,31 @@ using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Skeleton.Managers;
 
-public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
-    ISimpleMapper            mapper,
-    IRepository<TTransition> transitions,
-    IRepository<TWorkflow>   workflows,
-    ITypeResolver            resolver,
-    IServiceProvider         services) : IWorkflowManager<TWorkflow, TTransition, TResponse>, IWorkflowManager
-    where TTransition : SchemataTransition, new()
+public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkflowManager<TWorkflow, TTransition, TResponse>,
+                                                                          IWorkflowManager
     where TWorkflow : SchemataWorkflow, new()
+    where TTransition : SchemataTransition, new()
     where TResponse : WorkflowResponse
 {
+    private readonly ISimpleMapper            _mapper;
+    private readonly ITypeResolver            _resolver;
+    private readonly IServiceProvider         _sp;
+    private readonly IRepository<TTransition> _transitions;
+    private readonly IRepository<TWorkflow>   _workflows;
+
+    public SchemataWorkflowManager(
+        IServiceProvider         sp,
+        ISimpleMapper            mapper,
+        IRepository<TTransition> transitions,
+        IRepository<TWorkflow>   workflows,
+        ITypeResolver            resolver) {
+        _sp          = sp;
+        _mapper      = mapper;
+        _transitions = transitions;
+        _workflows   = workflows;
+        _resolver    = resolver;
+    }
+
     #region IWorkflowManager Members
 
     Task<Type?> IWorkflowManager.GetInstanceTypeAsync(string type, CancellationToken ct) {
@@ -49,24 +64,35 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
         return ListTransitionsAsync(id, ct);
     }
 
-    async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(IStatefulEntity instance, CancellationToken ct) {
-        return await CreateAsync(instance, ct);
+    async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(
+        IStatefulEntity?  instance,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct) {
+        return await CreateAsync(instance, principal, ct);
     }
 
     async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(Type instance, long id, CancellationToken ct) {
         return await CreateAsync(instance, id, ct);
     }
 
-    Task IWorkflowManager.RaiseAsync<TEvent>(SchemataWorkflow workflow, TEvent @event, CancellationToken ct) {
-        return RaiseAsync((TWorkflow)workflow, @event, ct);
+    Task IWorkflowManager.RaiseAsync<TEvent>(
+        SchemataWorkflow? workflow,
+        TEvent            @event,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct) {
+        return RaiseAsync((TWorkflow?)workflow, @event, principal, ct);
+    }
+
+    Task IWorkflowManager.RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct) {
+        return RaiseAsync(id, @event, ct);
     }
 
     async Task<object?> IWorkflowManager.MapAsync(
-        SchemataWorkflow        workflow,
+        SchemataWorkflow?       workflow,
         SchemataWorkflowOptions options,
         ClaimsPrincipal?        principal,
         CancellationToken       ct) {
-        return await MapAsync((TWorkflow)workflow, options, principal, ct);
+        return await MapAsync((TWorkflow?)workflow, options, principal, ct);
     }
 
     #endregion
@@ -74,7 +100,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
     #region IWorkflowManager<TWorkflow,TTransition,TResponse> Members
 
     public Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default) {
-        if (!resolver.TryResolveType(type, out var it)) {
+        if (!_resolver.TryResolveType(type, out var it)) {
             return Task.FromResult<Type?>(null);
         }
 
@@ -82,7 +108,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
     }
 
     public virtual async Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default) {
-        return await workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
+        return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
     }
 
     public virtual async Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default) {
@@ -110,10 +136,17 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
     }
 
     public virtual IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default) {
-        return transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
+        return _transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
     }
 
-    public virtual async Task<TWorkflow?> CreateAsync(IStatefulEntity instance, CancellationToken ct = default) {
+    public virtual async Task<TWorkflow?> CreateAsync(
+        IStatefulEntity?  instance,
+        ClaimsPrincipal?  principal = null,
+        CancellationToken ct        = default) {
+        if (instance is null) {
+            throw new ArgumentNullException(nameof(instance));
+        }
+
         var type = instance.GetType();
 
         var repository = ResolveRepository(type);
@@ -133,14 +166,31 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
             InstanceType = instance.FullName!,
         };
 
-        await workflows.AddAsync(workflow, ct);
-        await workflows.CommitAsync(ct);
+        await _workflows.AddAsync(workflow, ct);
+        await _workflows.CommitAsync(ct);
 
         return workflow;
     }
 
-    public virtual async Task RaiseAsync<TEvent>(TWorkflow workflow, TEvent @event, CancellationToken ct = default)
+    public virtual async Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
         where TEvent : class, IEvent {
+        var workflow = await FindAsync(id, ct);
+
+        await RaiseAsync(workflow, @event, null, ct);
+    }
+
+    public virtual async Task RaiseAsync<TEvent>(
+        TWorkflow?        workflow,
+        TEvent            @event,
+        ClaimsPrincipal?  principal = null,
+        CancellationToken ct        = default) where TEvent : class, IEvent {
+        if (workflow is null) {
+            throw new ArgumentNullException(nameof(workflow));
+        }
+
+        @event.UpdatedById ??= principal?.GetUserId();
+        @event.UpdatedBy   ??= principal?.GetDisplayName();
+
         var instance = await GetInstanceAsync(workflow, ct);
         if (instance is null) {
             return;
@@ -151,18 +201,23 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
             return;
         }
 
-        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.RaiseEventAsync), BindingFlags.Static | BindingFlags.Public);
-        var invoke = method!.MakeGenericMethod(type, typeof(TEvent));
+        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.RaiseEventAsync),
+                                                                  BindingFlags.Static | BindingFlags.Public);
+        var invoke = method!.MakeGenericMethod(type, @event.GetType());
 
         await (Task)invoke.Invoke(null, [machine, instance, @event, ct])!;
     }
 
     public virtual async Task<TResponse?> MapAsync(
-        TWorkflow               workflow,
+        TWorkflow?              workflow,
         SchemataWorkflowOptions options,
         ClaimsPrincipal?        principal = null,
         CancellationToken       ct        = default) {
-        var transitions = await ListTransitionsAsync(workflow.Id, ct).ToListAsync(ct);
+        if (workflow is null) {
+            throw new ArgumentNullException(nameof(workflow));
+        }
+
+        var history = await ListTransitionsAsync(workflow.Id, ct).ToListAsync(ct);
 
         var instance = await GetInstanceAsync(workflow, ct);
         if (instance is null) {
@@ -174,21 +229,24 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
             return null;
         }
 
-        var visit = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetGraphAsync), BindingFlags.Static | BindingFlags.Public);
+        var visit = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetGraphAsync),
+                                                                 BindingFlags.Static | BindingFlags.Public);
         var graph = await (Task<StateMachineGraph>)visit!.MakeGenericMethod(type).Invoke(null, [machine, ct])!;
 
-        var next = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync), BindingFlags.Static | BindingFlags.Public);
-        var events = await (Task<IEnumerable<string>>)next!.MakeGenericMethod(type).Invoke(null, [machine, instance, ct])!;
+        var next = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync),
+                                                                BindingFlags.Static | BindingFlags.Public);
+        var events = await (Task<IEnumerable<string>>)next!.MakeGenericMethod(type)
+                                                           .Invoke(null, [machine, instance, ct])!;
 
         var details = new WorkflowDetails<TWorkflow, TTransition> {
             Workflow    = workflow,
             Instance    = instance,
             Graph       = graph,
             Events      = events.ToList(),
-            Transitions = transitions,
+            Transitions = history,
         };
 
-        var response = mapper.Map<TResponse>(details);
+        var response = _mapper.Map<TResponse>(details);
 
         return response;
     }
@@ -205,10 +263,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
     }
 
     protected virtual IRepository? ResolveRepository(Type type) {
-        var rt         = typeof(IRepository<>).MakeGenericType(type);
-        var repository = (IRepository)services.GetRequiredService(rt);
+        var rt      = typeof(IRepository<>).MakeGenericType(type);
+        var service = _sp.GetRequiredService(rt);
 
-        return repository;
+        return service as IRepository;
     }
 
     protected virtual async Task<(Type?, StateMachine?)> ResolveStateMachineAsync(TWorkflow workflow) {
@@ -222,7 +280,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse>(
 
     protected virtual StateMachine? ResolveStateMachine(Type type) {
         var mt      = typeof(StateMachineBase<>).MakeGenericType(type);
-        var machine = (StateMachine)services.GetRequiredService(mt);
+        var machine = (StateMachine)_sp.GetRequiredService(mt);
 
         return machine;
     }

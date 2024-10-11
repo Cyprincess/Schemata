@@ -10,6 +10,6 @@ public static class SchemataBuilderExtensions
     public static SchemataResourceBuilder UseResource(this SchemataBuilder builder) {
         builder.AddFeature<SchemataResourceFeature>();
 
-        return new(builder.Options, builder.Configurators);
+        return new(builder.Options, builder.Services);
     }
 }

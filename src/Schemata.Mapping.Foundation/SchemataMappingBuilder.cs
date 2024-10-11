@@ -1,10 +1,16 @@
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 
 namespace Schemata.Mapping.Foundation;
 
-public sealed class SchemataMappingBuilder(SchemataOptions schemata, Configurators configurators)
+public sealed class SchemataMappingBuilder
 {
-    public SchemataOptions Schemata => schemata;
+    public SchemataMappingBuilder(SchemataOptions schemata, IServiceCollection services) {
+        Schemata = schemata;
+        Services = services;
+    }
 
-    public Configurators Configurators => configurators;
+    public SchemataOptions Schemata { get; }
+
+    public IServiceCollection Services { get; }
 }

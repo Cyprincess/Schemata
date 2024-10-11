@@ -161,6 +161,40 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
+    #region Controllers Feature
+
+    public static SchemataBuilder UseControllers(
+        this SchemataBuilder builder,
+        Action<MvcOptions>?  configure = null,
+        Action<IMvcBuilder>? build     = null) {
+        configure ??= _ => { };
+        builder.Configure(configure);
+
+        build ??= _ => { };
+        builder.Configure(build);
+
+        builder.AddFeature<SchemataControllersFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
+    #region Json Serializer Feature
+
+    public static SchemataBuilder UseJsonSerializer(
+        this SchemataBuilder           builder,
+        Action<JsonSerializerOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configure(configure);
+
+        builder.AddFeature<SchemataJsonSerializerFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
     #region Authentication Feature
 
     public static SchemataBuilder UseAuthentication(this SchemataBuilder builder, Action<AuthenticationBuilder> build) {
@@ -219,40 +253,6 @@ public static class SchemataBuilderExtensions
         builder.Configure(configure);
 
         builder.AddFeature<SchemataSessionFeature<T>>();
-
-        return builder;
-    }
-
-    #endregion
-
-    #region Controllers Feature
-
-    public static SchemataBuilder UseControllers(
-        this SchemataBuilder builder,
-        Action<MvcOptions>?  configure = null,
-        Action<IMvcBuilder>? build     = null) {
-        configure ??= _ => { };
-        builder.Configure(configure);
-
-        build ??= _ => { };
-        builder.Configure(build);
-
-        builder.AddFeature<SchemataControllersFeature>();
-
-        return builder;
-    }
-
-    #endregion
-
-    #region Json Serializer Feature
-
-    public static SchemataBuilder UseJsonSerializer(
-        this SchemataBuilder           builder,
-        Action<JsonSerializerOptions>? configure = null) {
-        configure ??= _ => { };
-        builder.Configure(configure);
-
-        builder.AddFeature<SchemataJsonSerializerFeature>();
 
         return builder;
     }

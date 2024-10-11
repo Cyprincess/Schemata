@@ -10,6 +10,6 @@ public static class ClaimsPrincipalExtensions
     }
 
     public static long GetUserId(this ClaimsPrincipal principal) {
-        return long.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : default;
+        return long.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
     }
 }

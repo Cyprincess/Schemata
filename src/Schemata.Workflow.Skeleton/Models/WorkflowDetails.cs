@@ -4,9 +4,8 @@ using Schemata.Workflow.Skeleton.Entities;
 
 namespace Schemata.Workflow.Skeleton.Models;
 
-public sealed class WorkflowDetails<TWorkflow, TTransition>
-    where TTransition : SchemataTransition
-    where TWorkflow : SchemataWorkflow
+public sealed class WorkflowDetails<TWorkflow, TTransition> where TWorkflow : SchemataWorkflow
+                                                            where TTransition : SchemataTransition
 {
     public TWorkflow Workflow { get; set; } = null!;
 

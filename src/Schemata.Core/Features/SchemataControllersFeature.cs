@@ -6,14 +6,11 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataRoutingFeature>]
 [DependsOn<SchemataExceptionHandlerFeature>]
-[Information("Controllers depends on Routing feature, it will be added automatically.", Level = LogLevel.Debug)]
-[Information("Controllers depends on Exception Handler feature, it will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataControllersFeature : FeatureBase
 {
     public override int Priority => 210_000_000;

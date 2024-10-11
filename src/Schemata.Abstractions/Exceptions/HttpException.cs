@@ -3,9 +3,13 @@ using System.Collections.Generic;
 
 namespace Schemata.Abstractions.Exceptions;
 
-public class HttpException(int status, string? message = "") : Exception(message)
+public class HttpException : Exception
 {
-    public int StatusCode { get; } = status;
+    public HttpException(int status, string? message = "") : base(message) {
+        StatusCode = status;
+    }
+
+    public int StatusCode { get; }
 
     public Dictionary<string, string>? Errors { get; set; }
 

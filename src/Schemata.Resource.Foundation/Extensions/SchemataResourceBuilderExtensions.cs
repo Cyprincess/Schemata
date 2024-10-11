@@ -6,18 +6,14 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataResourceBuilderExtensions
 {
     public static SchemataResourceBuilder Use<TEntity>(this SchemataResourceBuilder builder) {
-        return builder.Use(typeof(TEntity));
+        return builder.Use<TEntity, TEntity, TEntity, TEntity>();
     }
 
     public static SchemataResourceBuilder Use<TEntity, TRequest>(this SchemataResourceBuilder builder) {
-        return builder.Use(typeof(TEntity), typeof(TRequest));
+        return builder.Use<TEntity, TRequest, TRequest, TRequest>();
     }
 
     public static SchemataResourceBuilder Use<TEntity, TRequest, TDetail>(this SchemataResourceBuilder builder) {
-        return builder.Use(typeof(TEntity), typeof(TRequest), typeof(TDetail));
-    }
-
-    public static SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(this SchemataResourceBuilder builder) {
-        return builder.Use(typeof(TEntity), typeof(TRequest), typeof(TDetail), typeof(TSummary));
+        return builder.Use<TEntity, TRequest, TDetail, TDetail>();
     }
 }

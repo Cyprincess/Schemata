@@ -25,12 +25,7 @@ public static class MapsterConfigurator
         var setter = config.NewConfig<TSource, TDestination>();
 
         foreach (var mapping in mappings) {
-            mapping.Invoke((
-                with,
-                destination,
-                source,
-                condition,
-                ignored) => {
+            mapping.Invoke((with, destination, source, condition, ignored) => {
                 if (with is Expression<Func<TSource, TDestination>> converter) {
                     setter.MapWith(converter);
                     return;
@@ -56,7 +51,7 @@ public static class MapsterConfigurator
                 }
 
                 setter.IgnoreIf(predicate, member);
-            });
+           });
         }
     }
 }

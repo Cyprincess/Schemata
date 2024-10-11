@@ -9,14 +9,11 @@ using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceDeleteFreshness<TEntity>(IServiceProvider services) : IResourceDeleteAdvice<TEntity>
-    where TEntity : class, IIdentifier
+public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvice<TEntity> where TEntity : class, IIdentifier
 {
-    private readonly IServiceProvider _services = services;
+    #region IResourceDeleteAdvice<TEntity> Members
 
-    #region IResourceUpdateAdvice<TEntity,TRequest> Members
-
-    public int Order => 100_000_000;
+    public int Order => 200_000_000;
 
     public int Priority => Order;
 
@@ -24,7 +21,7 @@ public sealed class AdviceDeleteFreshness<TEntity>(IServiceProvider services) : 
         AdviceContext     ctx,
         long              id,
         TEntity           entity,
-        HttpContext       context,
+        HttpContext       http,
         CancellationToken ct = default) {
         if (ctx.Has<SuppressDeleteFreshness>()) {
             return Task.FromResult(true);
@@ -38,10 +35,10 @@ public sealed class AdviceDeleteFreshness<TEntity>(IServiceProvider services) : 
             return Task.FromResult(true);
         }
 
-        var freshness = context.Request.Query[SchemataConstants.Parameters.EntityTag].ToString();
+        var freshness = http.Request.Query[SchemataConstants.Parameters.EntityTag].ToString();
 
         if (string.IsNullOrWhiteSpace(freshness)) {
-            freshness = context.Request.Headers.IfMatch.ToString();
+            freshness = http.Request.Headers.IfMatch.ToString();
         }
 
         if (string.IsNullOrWhiteSpace(freshness)) {
@@ -52,7 +49,7 @@ public sealed class AdviceDeleteFreshness<TEntity>(IServiceProvider services) : 
             return Task.FromResult(true);
         }
 
-        if (freshness !=  $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"") {
+        if (freshness != $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"") {
             throw new ConcurrencyException();
         }
 

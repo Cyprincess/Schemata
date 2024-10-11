@@ -16,7 +16,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
                                                         IActionDescriptorChangeProvider
 {
     private CancellationTokenSource             _cts = new();
-    public  Dictionary<Type, ResourceAttribute> Resources { get; set; } = [];
+    public  Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
 
     #region IActionDescriptorChangeProvider Members
 
@@ -29,18 +29,18 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     #region IApplicationFeatureProvider<ControllerFeature> Members
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
-        foreach (var (entity, resource) in Resources) {
+        foreach (var (_, resource) in Resources) {
             if (resource.Endpoints.Count != 0 && resource.Endpoints.All(e => e.Name != "HTTP")) {
                 continue;
             }
 
-            var name = entity.Name.Pluralize();
-            if (feature.Controllers.Any(t => t.Name == name || t.Name == $"{entity.Name}Controller")) {
+            var name = resource.Entity.Name.Pluralize();
+            if (feature.Controllers.Any(t => t.Name == name || t.Name == $"{resource.Entity.Name}Controller")) {
                 continue;
             }
 
             var controller = typeof(ResourceController<,,,>)
-                            .MakeGenericType(entity, resource.Request!, resource.Detail!, resource.Summary!)
+                            .MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
                             .GetTypeInfo();
 
             feature.Controllers.Add(controller);

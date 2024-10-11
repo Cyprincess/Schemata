@@ -7,6 +7,6 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     public static SchemataMappingBuilder UseMapping(this SchemataBuilder builder) {
-        return new(builder.Options, builder.Configurators);
+        return new(builder.Options, builder.Services);
     }
 }

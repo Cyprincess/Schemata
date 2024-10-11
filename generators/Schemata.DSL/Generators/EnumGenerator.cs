@@ -29,8 +29,8 @@ public static class EnumGenerator
 
         foreach (var value in @enum.Values) {
             sb.AppendLine(value.Value.Name == value.Value.Body
-                ? $"        {value.Value.Name},"
-                : $"        {value.Value.Name} = {value.Value.Body},");
+                              ? $"        {value.Value.Name},"
+                              : $"        {value.Value.Name} = {value.Value.Body},");
         }
     }
 }

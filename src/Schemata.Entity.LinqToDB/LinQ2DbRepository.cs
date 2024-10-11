@@ -16,9 +16,8 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
-    where TContext : DataConnection
-    where TEntity : class
+public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> where TContext : DataConnection
+                                                                            where TEntity : class
 {
     private ITable<TEntity>? _table;
 
@@ -74,8 +73,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default)
-        where TResult : default {
+        CancellationToken                               ct = default) where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
@@ -91,8 +89,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default)
-        where TResult : default {
+        CancellationToken                               ct = default) where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
@@ -215,13 +212,11 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         CancellationToken                               ct) {
         ct.ThrowIfCancellationRequested();
 
-        var table = AsQueryable();
+        var container = AsQueryContainer();
 
-        var query = new QueryContainer<TEntity>(this, table);
+        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, container, ct);
 
-        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, query, ct);
-
-        return BuildQuery(query.Query, predicate);
+        return BuildQuery(container.Query, predicate);
     }
 
     private async Task BeginTransactionAsync(CancellationToken ct) {

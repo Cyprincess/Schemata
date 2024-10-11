@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
         if (nonGenericInterface is null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
             throw new ArgumentException($"The type {implementationType} does not implement {serviceType}.",
-                nameof(implementationType));
+                                        nameof(implementationType));
         }
 
         services.TryAddScoped(serviceType, implementationType);

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Workflow.Foundation\Schemata.Workflow.Foundation.csproj" />
+  </ItemGroup>
+
+</Project>

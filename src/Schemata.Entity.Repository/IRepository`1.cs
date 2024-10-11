@@ -7,8 +7,7 @@ using Schemata.Abstractions.Advices;
 
 namespace Schemata.Entity.Repository;
 
-public interface IRepository<TEntity>
-    where TEntity : class
+public interface IRepository<TEntity> where TEntity : class
 {
     AdviceContext AdviceContext { get; }
 

@@ -13,6 +13,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advices;
 using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Models;
@@ -22,20 +23,27 @@ namespace Schemata.Resource.Http;
 [ApiController]
 [ResourceControllerConvention]
 [Route("~/Resources/[controller]")]
-public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
-    IServiceProvider              services,
-    IRepository<TEntity>          repository,
-    ISimpleMapper                 mapper,
-    ResourceJsonSerializerOptions serializer) : ControllerBase
+public class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
     where TDetail : class, IIdentifier
     where TSummary : class, IIdentifier
 {
-    protected readonly ResourceJsonSerializerOptions SerializerOptions = serializer;
-    protected readonly ISimpleMapper                 Mapper            = mapper;
-    protected readonly IRepository<TEntity>          Repository        = repository;
-    protected readonly IServiceProvider              ServiceProvider   = services;
+    protected readonly ISimpleMapper                 Mapper;
+    protected readonly IRepository<TEntity>          Repository;
+    protected readonly ResourceJsonSerializerOptions SerializerOptions;
+    protected readonly IServiceProvider              ServiceProvider;
+
+    public ResourceController(
+        IServiceProvider              sp,
+        IRepository<TEntity>          repository,
+        ISimpleMapper                 mapper,
+        ResourceJsonSerializerOptions serializer) {
+        Mapper            = mapper;
+        Repository        = repository;
+        SerializerOptions = serializer;
+        ServiceProvider   = sp;
+    }
 
     protected virtual EmptyResult EmptyResult { get; } = new();
 
@@ -47,11 +55,14 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        if (!await Advices<IResourceListRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
+        var container = new ResourceRequestContainer<TEntity>();
+
+        if (!await Advices<IResourceListRequestAdvice<TEntity>>.AdviseAsync(ServiceProvider, ctx, request, container, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
         }
 
-        var token = await PageToken.FromStringAsync(request.PageToken) ?? new PageToken {
+        var token = await PageToken.FromStringAsync(request.PageToken)
+     ?? new PageToken {
             Filter      = request.Filter,
             OrderBy     = request.OrderBy,
             ShowDeleted = request.ShowDeleted,
@@ -86,12 +97,10 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
 
         var repository = Repository.Once();
 
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> query = q => q;
-
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
             try {
                 var filter = Parser.Filter.Parse(request.Filter);
-                query = query.ApplyFiltering(filter);
+                container.ApplyFiltering(filter);
             } catch (ParseException) {
                 throw new InvalidArgumentException {
                     Errors = new() {
@@ -104,7 +113,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
             try {
                 var order = Parser.Order.Parse(request.OrderBy);
-                query = query.ApplyOrdering(order);
+                container.ApplyOrdering(order);
             } catch (ParseException) {
                 throw new InvalidArgumentException {
                     Errors = new() {
@@ -119,12 +128,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
         }
 
         var response = new ListResponse<TSummary> {
-            TotalSize = await repository.LongCountAsync(q => query(q), HttpContext.RequestAborted),
+            TotalSize = await repository.LongCountAsync(q => container.Query(q), HttpContext.RequestAborted),
         };
 
-        query = query.ApplyPaginating(token);
+        container.ApplyPaginating(token);
 
-        var entities = repository.ListAsync(q => query(q), HttpContext.RequestAborted);
+        var entities = repository.ListAsync(q => container.Query(q), HttpContext.RequestAborted);
 
         var summaries = await Mapper.EachAsync<TEntity, TSummary>(entities).ToListAsync();
 
@@ -143,7 +152,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
         return new JsonResult(response, SerializerOptions.Options);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:long}")]
     public virtual async Task<IActionResult> Get(long id) {
         var ctx = new AdviceContext();
 
@@ -179,7 +188,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
             return EmptyResult;
         }
 
-        request.Id = default;
+        request.Id = 0;
 
         if (!await Advices<IResourceCreateRequestAdvice<TEntity, TRequest>>.AdviseAsync(ServiceProvider, ctx, request, HttpContext, HttpContext.RequestAborted)) {
             return EmptyResult;
@@ -210,7 +219,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
         };
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:long}")]
     public virtual async Task<IActionResult> Update(long id, [FromBody] TRequest request) {
         var ctx = new AdviceContext();
 
@@ -249,7 +258,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary>(
         return new JsonResult(detail, SerializerOptions.Options);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:long}")]
     public virtual async Task<IActionResult> Delete(long id) {
         var ctx = new AdviceContext();
 

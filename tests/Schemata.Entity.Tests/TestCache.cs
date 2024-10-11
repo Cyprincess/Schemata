@@ -19,25 +19,28 @@ public class TestCache
                 .UseEntityFrameworkCore<TestingContext>((_, options) => options.UseInMemoryDatabase("TestingContext"))
                 .UseQueryCache();
 
-        var provider = services.BuildServiceProvider();
-        var scope    = provider.CreateScope();
+        var sp    = services.BuildServiceProvider();
+        var scope = sp.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<TestingContext>();
 
         await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
 
-        context.AddRange(
-            new Student { Name = "Alice" },
-            new Student { Name = "Bob", Age  = 21 }
-        );
+        var name = "Alice";
+
+        context.AddRange(new Student { Name = name },
+                         new Student {
+                             Name = "Bob",
+                             Age  = 21,
+                         });
 
         await context.SaveChangesAsync();
 
         var repository = new EntityFrameworkCoreRepository<TestingContext, Student>(scope.ServiceProvider, context);
 
         var alice = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Alice")).OrderByDescending(u => u.Name));
-        var bob   = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
+        var bob = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
 
         await repository.UpdateAsync(bob!);
     }

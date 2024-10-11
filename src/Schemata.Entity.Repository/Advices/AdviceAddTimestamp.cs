@@ -6,8 +6,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEntity>
-    where TEntity : class
+public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAsyncAdvice<TEntity> where TEntity : class
 {
     #region IRepositoryAddAsyncAdvice<TEntity> Members
 

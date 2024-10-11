@@ -10,19 +10,24 @@ public class TestFilterParser
     [Fact]
     public void ParseOrdering() {
         Assert.Equal(new() {
-            ["a"] = Ordering.Ascending,
-            ["b"] = Ordering.Ascending,
-        }, Parser.Order.Parse("a,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                         ["a"] = Ordering.Ascending,
+                         ["b"] = Ordering.Ascending,
+                     },
+                     Parser.Order.Parse("a,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
 
         Assert.Equal(new() {
-            ["a"] = Ordering.Descending,
-            ["b"] = Ordering.Ascending,
-        }, Parser.Order.Parse("a DESC,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                         ["a"] = Ordering.Descending,
+                         ["b"] = Ordering.Ascending,
+                     },
+                     Parser.Order.Parse("a DESC,b")
+                          ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
 
         Assert.Equal(new() {
-            ["a"] = Ordering.Ascending,
-            ["b"] = Ordering.Descending,
-        }, Parser.Order.Parse("a,b DESC")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                         ["a"] = Ordering.Ascending,
+                         ["b"] = Ordering.Descending,
+                     },
+                     Parser.Order.Parse("a,b DESC")
+                          ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
     }
 
     [Fact]
@@ -79,25 +84,25 @@ public class TestFilterParser
     [InlineData("foo >= (-2.4)", "[>= \"foo\" - 2.4]", false)]
     [InlineData("yesterday < request.time", "[< \"yesterday\" \"request\".\"time\"]", false)]
     [InlineData("experiment.rollout <= cohort(request.user)",
-        "[<= \"experiment\".\"rollout\" \"cohort\"(\"request\".\"user\")]",
-        false)]
+                "[<= \"experiment\".\"rollout\" \"cohort\"(\"request\".\"user\")]",
+                false)]
     [InlineData("prod", "\"prod\"", true)]
     [InlineData("regex(m.key, '^.*prod.*$')", "\"regex\"(\"m\".\"key\",\"^.*prod.*$\")", false)]
     [InlineData("math.mem('30mb')", "\"math\".\"mem\"(\"30mb\")", false)]
     [InlineData("(msg.endsWith('world') AND retries < 10)",
-        "[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]",
-        false)]
+                "[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]",
+                false)]
     [InlineData("(endsWith(msg, 'world') AND retries < 10)",
-        "[AND \"endsWith\"(\"msg\",\"world\") [< \"retries\" 10]]",
-        false)]
+                "[AND \"endsWith\"(\"msg\",\"world\") [< \"retries\" 10]]",
+                false)]
     [InlineData("time.now()", "\"time\".\"now\"()", false)]
     [InlineData("timestamp(\"2012-04-21T11:30:00-04:00\")", "\"timestamp\"(\"2012-04-21T11:30:00-04:00\")", false)]
     [InlineData("duration(\"32s\")", "\"duration\"(\"32s\")", false)]
     [InlineData("duration(\"4h0m0s\")", "\"duration\"(\"4h0m0s\")", false)]
     [InlineData(@"start_time > timestamp(""2006-01-02T15:04:05+07:00"") AND
         (driver = ""driver1"" OR start_driver = ""driver1"" OR end_driver = ""driver1"")",
-        @"[AND [> ""start_time"" ""timestamp""(""2006-01-02T15:04:05+07:00"")] [OR [= ""driver"" ""driver1""] [= ""start_driver"" ""driver1""] [= ""end_driver"" ""driver1""]]]",
-        false)]
+                @"[AND [> ""start_time"" ""timestamp""(""2006-01-02T15:04:05+07:00"")] [OR [= ""driver"" ""driver1""] [= ""start_driver"" ""driver1""] [= ""end_driver"" ""driver1""]]]",
+                false)]
     [InlineData("annotations:schedule", "[: \"annotations\" \"schedule\"]", false)]
     [InlineData("annotations.schedule = \"test\"", "[= \"annotations\".\"schedule\" \"test\"]", false)]
     public void ParseMoreVectors(string input, string expected, bool constant) {

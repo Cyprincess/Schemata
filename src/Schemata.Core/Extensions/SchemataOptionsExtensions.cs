@@ -19,8 +19,7 @@ public static class SchemataOptionsExtensions
         schemata.Set(SchemataConstants.Options.Features, value);
     }
 
-    public static void AddFeature<T>(this SchemataOptions schemata)
-        where T : ISimpleFeature {
+    public static void AddFeature<T>(this SchemataOptions schemata) where T : ISimpleFeature {
         AddFeature(schemata, typeof(T));
     }
 
@@ -44,12 +43,34 @@ public static class SchemataOptionsExtensions
             }
 
             if (at.Name == typeof(DependsOnAttribute<>).Name) {
-                AddFeature(schemata, at.GenericTypeArguments[0]);
+                var dependency = at.GenericTypeArguments[0];
+                if (HasFeature(schemata, dependency)) {
+                    continue;
+                }
+
+                schemata.Logger.Log(LogLevel.Debug, SchemataResources.GetResourceString(SchemataResources.ST0001), type.Name, dependency.Name);
+                AddFeature(schemata, dependency);
+                continue;
+            }
+
+            if (attribute is DependsOnAttribute depends) {
+                var dependency = AppDomainTypeCache.GetType(depends.Name);
+                if (dependency is not null && HasFeature(schemata, dependency)) {
+                    continue;
+                }
+
+                var level    = depends.Optional ? LogLevel.Information : LogLevel.Error;
+                var resource = depends.Optional ? SchemataResources.ST0003 : SchemataResources.ST0002;
+
+                schemata.Logger.Log(level, SchemataResources.GetResourceString(resource), type.Name, depends.Name);
+
                 continue;
             }
 
             if (attribute is InformationAttribute info && schemata.HasFeature<SchemataLoggingFeature>()) {
-                schemata.Logger.Log(info.Level, "{Message}", info.Message);
+#pragma warning disable CA2254
+                schemata.Logger.Log(info.Level, info.Message, info.Parameters);
+#pragma warning restore CA2254
             }
         }
 
@@ -57,8 +78,7 @@ public static class SchemataOptionsExtensions
         schemata.SetFeatures(features);
     }
 
-    public static bool HasFeature<T>(this SchemataOptions schemata)
-        where T : ISimpleFeature {
+    public static bool HasFeature<T>(this SchemataOptions schemata) where T : ISimpleFeature {
         return HasFeature(schemata, typeof(T));
     }
 

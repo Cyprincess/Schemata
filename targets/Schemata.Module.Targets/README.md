@@ -24,7 +24,7 @@ public class Module : ModuleBase
         //
     }
 
-    public void Configure(IApplicationBuilder app, IServiceProvider provider) {
+    public void Configure(IApplicationBuilder app, IServiceProvider sp) {
         //
     }
 }

@@ -8,8 +8,7 @@ using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.Foundation.Features;
 
-public sealed class SchemataMappingFeature<T> : FeatureBase
-    where T : class, ISimpleMapper
+public sealed class SchemataMappingFeature<T> : SchemataMappingFeature where T : class, ISimpleMapper
 {
     public override int Priority => 340_000_000;
 
@@ -22,3 +21,5 @@ public sealed class SchemataMappingFeature<T> : FeatureBase
         services.TryAddScoped<ISimpleMapper, T>();
     }
 }
+
+public abstract class SchemataMappingFeature : FeatureBase;

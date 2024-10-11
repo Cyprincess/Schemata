@@ -5,5 +5,4 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public interface IResourceListRequestAdvice<TEntity> : IAdvice<ListRequest, HttpContext>
-    where TEntity : class, IIdentifier;
+public interface IResourceListRequestAdvice<TEntity> : IAdvice<ListRequest, ResourceRequestContainer<TEntity>, HttpContext> where TEntity : class, IIdentifier;

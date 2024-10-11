@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
@@ -49,25 +48,25 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
 
         var properties = AppDomainTypeCache.GetProperties(type);
 
-        var name = ResourceNameRegex.Replace(attribute.ResourceName, m => {
-            var matched = m.Groups["name"].Value.Pascalize();
-            if (string.Equals(current, matched)) {
-                matched = string.Empty;
-            }
+        var name = ResourceNameRegex.Replace(attribute.ResourceName,
+                                             m => {
+                                                 var matched = m.Groups["name"].Value.Pascalize();
+                                                 if (string.Equals(current, matched)) {
+                                                     matched = string.Empty;
+                                                 }
 
-            if (!properties.TryGetValue($"{matched}Name", out var property)) {
-                throw new MissingFieldException(type.Name, $"{matched}Name");
-            }
+                                                 if (!properties.TryGetValue($"{matched}Name", out var property)) {
+                                                     throw new MissingFieldException(type.Name, $"{matched}Name");
+                                                 }
 
-            var value = property.GetValue(entity)?.ToString();
-            if (string.IsNullOrWhiteSpace(value)) {
-                throw new ValidationException([
-                    new($"{matched}Name", "not_empty"),
-                ]);
-            }
+                                                 var value = property.GetValue(entity)?.ToString();
+                                                 if (string.IsNullOrWhiteSpace(value)) {
+                                                     throw new ValidationException(
+                                                         [new($"{matched}Name", "not_empty")]);
+                                                 }
 
-            return value;
-        });
+                                                 return value;
+                                             });
 
         named.CanonicalName = name;
 

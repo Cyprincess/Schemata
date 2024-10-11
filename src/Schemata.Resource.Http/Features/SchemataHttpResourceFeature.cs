@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Options;
 using Schemata.Core;
@@ -15,8 +14,6 @@ namespace Schemata.Resource.Http.Features;
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataJsonSerializerFeature>]
 [DependsOn<SchemataResourceFeature>]
-[Information("Resource Service depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-[Information("Resource Service depends on JsonSerializer feature, it will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataHttpResourceFeature : FeatureBase
 {
     public override int Priority => 360_100_000;

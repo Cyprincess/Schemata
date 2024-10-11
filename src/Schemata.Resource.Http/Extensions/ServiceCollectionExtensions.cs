@@ -13,8 +13,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddResourceJsonSerializerOptions(this IServiceCollection services)
-    {
+    public static IServiceCollection AddResourceJsonSerializerOptions(this IServiceCollection services) {
         services.AddSingleton<ResourceJsonSerializerOptions>(sp => {
             var options = sp.GetRequiredService<IOptions<JsonSerializerOptions>>();
 

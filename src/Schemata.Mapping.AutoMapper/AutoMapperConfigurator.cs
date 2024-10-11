@@ -29,12 +29,7 @@ public static class AutoMapperConfigurator
         var setter = config.CreateMap<TSource, TDestination>();
 
         foreach (var mapping in mappings) {
-            mapping.Invoke((
-                with,
-                destination,
-                source,
-                condition,
-                ignored) => {
+            mapping.Invoke((with, destination, source, condition, ignored) => {
                 if (with is Expression<Func<TSource, TDestination>> converter) {
                     setter.ConstructUsing(converter);
                     return;
@@ -45,9 +40,7 @@ public static class AutoMapperConfigurator
                 }
 
                 if (ignored) {
-                    setter.ForMember(member, options => {
-                        options.Ignore();
-                    });
+                    setter.ForMember(member, options => { options.Ignore(); });
                     return;
                 }
 
@@ -65,7 +58,7 @@ public static class AutoMapperConfigurator
                     var negative = predicate.Compile();
                     options.Condition((s, d) => !negative(s, d));
                 });
-            });
+           });
         }
     }
 }

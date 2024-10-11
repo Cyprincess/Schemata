@@ -1,22 +1,26 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using Schemata.Resource.Foundation.Grammars.Terms;
-using Expression = System.Linq.Expressions.Expression;
 
 namespace Schemata.Resource.Foundation.Grammars;
 
-public class Container(IToken token)
+public class Container
 {
-    private static readonly Dictionary<string, MethodInfo> MethodCache = [];
+    private static readonly ConcurrentDictionary<string, MethodInfo> MethodCache = [];
+
+    public Container(IToken token) {
+        Token = token;
+    }
 
     public bool AllowFunctions { get; private set; }
 
     public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
 
-    private IToken Token { get; } = token;
+    private IToken Token { get; }
 
     private Dictionary<string, Expression> Expressions { get; } = [];
 
@@ -63,7 +67,7 @@ public class Container(IToken token)
             return Expressions.TryGetValue(name, out expression);
         }
 
-        expression = default;
+        expression = null;
         return false;
     }
 
@@ -82,15 +86,15 @@ public class Container(IToken token)
         Type[]?       types,
         BindingFlags? flag = null) {
         return GetMethod(type,
-            name,
-            types,
-            () => {
-                flag ??= BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
+                         name,
+                         types,
+                         () => {
+                             flag ??= BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
 
-                return types is null
-                    ? type.GetMethod(name, flag.Value)
-                    : type.GetMethod(name, flag.Value, null, types, null);
-            });
+                             return types is null
+                                 ? type.GetMethod(name, flag.Value)
+                                 : type.GetMethod(name, flag.Value, null, types, null);
+                         });
     }
 
     public MethodInfo? GetMethod(
@@ -111,7 +115,7 @@ public class Container(IToken token)
             return null;
         }
 
-        MethodCache.Add(qualified, method);
+        MethodCache[qualified] = method;
 
         return method;
     }
