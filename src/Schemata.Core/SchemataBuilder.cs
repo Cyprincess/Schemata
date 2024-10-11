@@ -8,24 +8,28 @@ using Schemata.Core.Features;
 
 namespace Schemata.Core;
 
-public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment)
+public sealed class SchemataBuilder
 {
-    public readonly Services        Services      = new();
-    public readonly Configurators   Configurators = new();
-    public readonly SchemataOptions Options       = new();
+    public readonly Configurators      Configurators = new();
+    public readonly SchemataOptions    Options       = new();
+    public readonly IServiceCollection Services      = new Services();
 
-    public IConfiguration      Configuration => configuration;
-    public IWebHostEnvironment Environment   => environment;
+    public SchemataBuilder(IConfiguration configuration, IWebHostEnvironment environment) {
+        Configuration = configuration;
+        Environment   = environment;
+    }
 
-    public SchemataBuilder AddFeature<T>()
-        where T : ISimpleFeature {
+    public IConfiguration Configuration { get; }
+
+    public IWebHostEnvironment Environment { get; }
+
+    public SchemataBuilder AddFeature<T>() where T : ISimpleFeature {
         Options.AddFeature<T>();
 
         return this;
     }
 
-    public bool HasFeature<T>()
-        where T : ISimpleFeature {
+    public bool HasFeature<T>() where T : ISimpleFeature {
         return Options.HasFeature<T>();
     }
 
@@ -43,8 +47,7 @@ public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnviro
         return Options.CreateLogger(type);
     }
 
-    public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
-        where TOptions : class {
+    public SchemataBuilder Configure<TOptions>(Action<TOptions> configure) where TOptions : class {
         Configurators.Set(configure);
 
         return this;
@@ -56,14 +59,18 @@ public sealed class SchemataBuilder(IConfiguration configuration, IWebHostEnviro
         return this;
     }
 
-    public SchemataBuilder ConfigureServices(Action<IServiceCollection> action) {
-        Services.Add(action);
+    public SchemataBuilder ConfigureServices(Action<IServiceCollection> configure) {
+        configure(Services);
 
         return this;
     }
 
     public SchemataBuilder Invoke(IServiceCollection services) {
-        Services.Invoke(services);
+        foreach (var service in Services) {
+            services.Add(service);
+        }
+
+        Services.Clear();
 
         var modules = Options.GetFeatures();
         if (modules is null) {

@@ -29,8 +29,7 @@ public abstract class RepositoryBase
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
 
         if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p
-                => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
+            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
             if (id is not null) {
                 keyProperties.Add(id);
             }
@@ -59,10 +58,15 @@ public abstract class RepositoryBase
     }
 }
 
-public abstract class RepositoryBase<TEntity>(IServiceProvider sp) : RepositoryBase, IRepository<TEntity>, IRepository
-    where TEntity : class
+public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository where TEntity : class
 {
-    protected virtual IServiceProvider ServiceProvider => sp;
+    private readonly IServiceProvider _sp;
+
+    protected RepositoryBase(IServiceProvider sp) {
+        _sp = sp;
+    }
+
+    protected virtual IServiceProvider ServiceProvider => _sp;
 
     #region IRepository Members
 
@@ -313,31 +317,39 @@ public abstract class RepositoryBase<TEntity>(IServiceProvider sp) : RepositoryB
     }
 
     public virtual IRepository<TEntity> SuppressAddValidation() {
-        AdviceContext.Set<SuppressAddValidation>(default);
+        AdviceContext.Set<SuppressAddValidation>(null);
         return this;
     }
 
     public virtual IRepository<TEntity> SuppressUpdateValidation() {
-        AdviceContext.Set<SuppressUpdateValidation>(default);
+        AdviceContext.Set<SuppressUpdateValidation>(null);
         return this;
     }
 
     public virtual IRepository<TEntity> SuppressUpdateConcurrency() {
-        AdviceContext.Set<SuppressUpdateConcurrency>(default);
+        AdviceContext.Set<SuppressUpdateConcurrency>(null);
         return this;
     }
 
     public virtual IRepository<TEntity> SuppressQuerySoftDelete() {
-        AdviceContext.Set<SuppressQuerySoftDelete>(default);
+        AdviceContext.Set<SuppressQuerySoftDelete>(null);
         return this;
     }
 
     public virtual IRepository<TEntity> SuppressRemoveSoftDelete() {
-        AdviceContext.Set<SuppressRemoveSoftDelete>(default);
+        AdviceContext.Set<SuppressRemoveSoftDelete>(null);
         return this;
     }
 
     #endregion
+
+    protected virtual QueryContainer<TEntity> AsQueryContainer() {
+        var query = AsQueryable();
+
+        var container = new QueryContainer<TEntity>(this, query);
+
+        return container;
+    }
 
     protected virtual IQueryable<TResult> BuildQuery<TResult>(
         IQueryable<TEntity>                             query,

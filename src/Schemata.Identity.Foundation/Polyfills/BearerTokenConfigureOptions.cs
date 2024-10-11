@@ -9,8 +9,13 @@ using Microsoft.Extensions.Options;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;
 
-internal sealed class BearerTokenConfigureOptions(IDataProtectionProvider dp) : IConfigureNamedOptions<BearerTokenOptions>
+internal sealed class BearerTokenConfigureOptions : IConfigureNamedOptions<BearerTokenOptions>
 {
+    private readonly IDataProtectionProvider _dp;
+    public BearerTokenConfigureOptions(IDataProtectionProvider dp) {
+        _dp = dp;
+    }
+
     private const string PrimaryPurpose = "Microsoft.AspNetCore.Authentication.BearerToken";
 
     #region IConfigureNamedOptions<BearerTokenOptions> Members
@@ -20,8 +25,8 @@ internal sealed class BearerTokenConfigureOptions(IDataProtectionProvider dp) : 
             return;
         }
 
-        options.BearerTokenProtector = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "BearerToken"));
-        options.RefreshTokenProtector = new TicketDataFormat(dp.CreateProtector(PrimaryPurpose, schemeName, "RefreshToken"));
+        options.BearerTokenProtector = new TicketDataFormat(_dp.CreateProtector(PrimaryPurpose, schemeName, "BearerToken"));
+        options.RefreshTokenProtector = new TicketDataFormat(_dp.CreateProtector(PrimaryPurpose, schemeName, "RefreshToken"));
     }
 
     public void Configure(BearerTokenOptions options) {

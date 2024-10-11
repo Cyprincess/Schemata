@@ -28,8 +28,7 @@ public sealed class SchemataOptions
         Logging = factory;
     }
 
-    public TOptions? Pop<TOptions>(string name)
-        where TOptions : class {
+    public TOptions? Pop<TOptions>(string name) where TOptions : class {
         if (!_options.Remove(name, out var value)) {
             return null;
         }
@@ -37,8 +36,7 @@ public sealed class SchemataOptions
         return value as TOptions;
     }
 
-    public TOptions? Get<TOptions>(string name)
-        where TOptions : class {
+    public TOptions? Get<TOptions>(string name) where TOptions : class {
         if (!_options.TryGetValue(name, out var value)) {
             return null;
         }
@@ -46,8 +44,7 @@ public sealed class SchemataOptions
         return value as TOptions;
     }
 
-    public void Set<TOptions>(string name, TOptions? options)
-        where TOptions : class {
+    public void Set<TOptions>(string name, TOptions? options) where TOptions : class {
         if (options is null) {
             _options.Remove(name);
             return;

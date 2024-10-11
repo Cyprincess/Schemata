@@ -2,7 +2,11 @@ using Schemata.Resource.Foundation;
 
 namespace Schemata.Resource.Http;
 
-public sealed class SchemataHttpResourceBuilder(SchemataResourceBuilder builder)
+public sealed class SchemataHttpResourceBuilder
 {
-    public SchemataResourceBuilder Builder => builder;
+    public SchemataHttpResourceBuilder(SchemataResourceBuilder builder) {
+        Builder = builder;
+    }
+
+    public SchemataResourceBuilder Builder { get; }
 }

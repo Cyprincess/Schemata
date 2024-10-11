@@ -10,13 +10,19 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceEditRequestValidation<TEntity, TRequest>(IServiceProvider services) : IResourceEditRequestAdvice<TEntity, TRequest>
+public sealed class AdviceEditRequestValidation<TEntity, TRequest> : IResourceEditRequestAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
-    #region IResourceUpdateAdvice<TEntity,TRequest> Members
+    private readonly IServiceProvider _sp;
 
-    public int Order => 100_000_000;
+    public AdviceEditRequestValidation(IServiceProvider sp) {
+        _sp = sp;
+    }
+
+    #region IResourceEditRequestAdvice<TEntity,TRequest> Members
+
+    public int Order => 200_000_000;
 
     public int Priority => Order;
 
@@ -24,7 +30,7 @@ public sealed class AdviceEditRequestValidation<TEntity, TRequest>(IServiceProvi
         AdviceContext     ctx,
         long              id,
         TRequest          request,
-        HttpContext       context,
+        HttpContext       http,
         CancellationToken ct = default) {
         var only = request is IValidation { ValidateOnly: true };
 
@@ -37,7 +43,8 @@ public sealed class AdviceEditRequestValidation<TEntity, TRequest>(IServiceProvi
         }
 
         var errors = new List<KeyValuePair<string, string>>();
-        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(services, ctx, Operations.Update, request, errors, ct);
+        var pass = await Advices<IValidationAsyncAdvice<TRequest>>.AdviseAsync(_sp, ctx, Operations.Update, request, errors, ct);
+
         if (!pass) {
             throw new ValidationException(errors);
         }

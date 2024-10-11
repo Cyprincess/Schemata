@@ -11,27 +11,30 @@ using Schemata.Identity.Skeleton.Stores;
 
 namespace Schemata.Identity.Skeleton.Managers;
 
-public class SchemataUserManager<TUser>(
-    IUserStore<TUser>                      store,
-    IOptions<IdentityOptions>              options,
-    IPasswordHasher<TUser>                 passwordHasher,
-    IEnumerable<IUserValidator<TUser>>     userValidators,
-    IEnumerable<IPasswordValidator<TUser>> passwordValidators,
-    ILookupNormalizer                      keyNormalizer,
-    IdentityErrorDescriber                 errors,
-    IServiceProvider                       sp,
-    ILogger<SchemataUserManager<TUser>>    logger) : UserManager<TUser>(store,
-    options,
-    passwordHasher,
-    userValidators,
-    passwordValidators,
-    keyNormalizer,
-    errors,
-    sp,
-    logger)
-    where TUser : class
+public class SchemataUserManager<TUser> : UserManager<TUser> where TUser : class
 {
-    private readonly IServiceProvider _sp = sp;
+    private readonly IServiceProvider _sp;
+
+    public SchemataUserManager(
+        IServiceProvider                       sp,
+        IUserStore<TUser>                      store,
+        IOptions<IdentityOptions>              options,
+        IPasswordHasher<TUser>                 passwordHasher,
+        IEnumerable<IUserValidator<TUser>>     userValidators,
+        IEnumerable<IPasswordValidator<TUser>> passwordValidators,
+        ILookupNormalizer                      keyNormalizer,
+        IdentityErrorDescriber                 errors,
+        ILogger<SchemataUserManager<TUser>>    logger) : base(store,
+                                                              options,
+                                                              passwordHasher,
+                                                              userValidators,
+                                                              passwordValidators,
+                                                              keyNormalizer,
+                                                              errors,
+                                                              sp,
+                                                              logger) {
+        _sp = sp;
+    }
 
     public virtual Task<string?> GetDisplayNameAsync(TUser user) {
         ThrowIfDisposed();

@@ -10,4 +10,8 @@
     <PackageTags>application;business;framework</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Update="**\*.resx" GenerateSource="true" GenerateResourcesCodeAsConstants="true" />
+  </ItemGroup>
+
 </Project>

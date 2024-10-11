@@ -23,11 +23,10 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder                       builder,
         Action<OpenIddictServerBuilder>?           serve     = null,
         Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
-        Action<OpenIddictCoreBuilder>?             store     = null)
-        where TApplication : SchemataApplication
-        where TAuthorization : SchemataAuthorization
-        where TScope : SchemataScope
-        where TToken : SchemataToken {
+        Action<OpenIddictCoreBuilder>?             store     = null) where TApplication : SchemataApplication
+                                                                     where TAuthorization : SchemataAuthorization
+                                                                     where TScope : SchemataScope
+                                                                     where TToken : SchemataToken {
         store ??= _ => { };
         builder.Configure(store);
 

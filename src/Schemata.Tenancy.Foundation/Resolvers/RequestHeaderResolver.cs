@@ -8,7 +8,7 @@ using Schemata.Tenancy.Skeleton;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
-public class RequestHeaderResolver<TKey>(IHttpContextAccessor accessor) : ITenantResolver<TKey>
+public class RequestHeaderResolver<TKey> : ITenantResolver<TKey>
 #if NET8_0_OR_GREATER
     where TKey : struct, IEquatable<TKey>, IParsable<TKey>
 #else
@@ -17,11 +17,17 @@ public class RequestHeaderResolver<TKey>(IHttpContextAccessor accessor) : ITenan
 #pragma warning restore CA2252
 #endif
 {
+    private readonly IHttpContextAccessor _accessor;
+
+    public RequestHeaderResolver(IHttpContextAccessor accessor) {
+        _accessor = accessor;
+    }
+
     #region ITenantResolver Members
 
     public Task<TKey?> ResolveAsync(CancellationToken ct = default) {
-        if (accessor.HttpContext?.Request.Headers.TryGetValue("x-tenant-id", out var values) != true) {
-            return Task.FromResult<TKey?>(default);
+        if (_accessor.HttpContext?.Request.Headers.TryGetValue("x-tenant-id", out var values) != true) {
+            return Task.FromResult<TKey?>(null);
         }
 
         var id = values.FirstOrDefault();

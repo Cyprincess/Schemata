@@ -19,12 +19,13 @@ using Schemata.Identity.Skeleton;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Authentication.BearerToken;
 
-internal sealed class BearerTokenHandler(
-    IOptionsMonitor<BearerTokenOptions> optionsMonitor,
-    ILoggerFactory                      loggerFactory,
-    UrlEncoder                          urlEncoder,
-    ISystemClock                        clock) : SignInAuthenticationHandler<BearerTokenOptions>(optionsMonitor, loggerFactory, urlEncoder, clock)
+internal sealed class BearerTokenHandler : SignInAuthenticationHandler<BearerTokenOptions>
 {
+    public BearerTokenHandler(IOptionsMonitor<BearerTokenOptions> optionsMonitor,
+                              ILoggerFactory                      loggerFactory,
+                              UrlEncoder                          urlEncoder,
+                              ISystemClock                        clock) : base(optionsMonitor, loggerFactory, urlEncoder, clock) { }
+
     private static readonly AuthenticateResult FailedUnprotectingToken = AuthenticateResult.Fail("Unprotected token failed");
 
     private static readonly AuthenticateResult TokenExpired = AuthenticateResult.Fail("Token expired");

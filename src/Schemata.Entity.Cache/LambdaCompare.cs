@@ -117,8 +117,7 @@ public static class LambdaCompare
     }
 
     private static bool IsAnonymousType(Type type) {
-        var hasCompilerGeneratedAttribute
-            = type.GetCustomAttributes(typeof(CompilerGeneratedAttribute), false).Length != 0;
+        var hasCompilerGeneratedAttribute = type.GetCustomAttributes(typeof(CompilerGeneratedAttribute), false).Length != 0;
         var nameContainsAnonymousType = type.FullName?.Contains("AnonymousType");
         var isAnonymousType           = hasCompilerGeneratedAttribute && nameContainsAnonymousType == true;
 
@@ -141,25 +140,25 @@ public static class LambdaCompare
         return bx.Cast<MemberAssignment>()
                  .OrderBy(b => b.Member.Name)
                  .Select((b, i) => new {
-                      Expr = b.Expression,
-                      b.Member,
-                      Index = i,
-                  })
+                             Expr = b.Expression,
+                             b.Member,
+                             Index = i,
+                         })
                  .Join(by.Cast<MemberAssignment>()
-                     .OrderBy(b => b.Member.Name)
-                     .Select((b, i) => new {
-                          Expr = b.Expression,
-                          b.Member,
-                          Index = i,
-                      }),
-                      o => o.Index,
-                      o => o.Index,
-                      (xe, ye) => new {
-                          XExpr   = xe.Expr,
-                          XMember = xe.Member,
-                          YExpr   = ye.Expr,
-                          YMember = ye.Member,
-                      })
+                      .OrderBy(b => b.Member.Name)
+                      .Select((b, i) => new {
+                                  Expr = b.Expression,
+                                  b.Member,
+                                  Index = i,
+                              }),
+                       o => o.Index,
+                       o => o.Index,
+                       (xe, ye) => new {
+                           XExpr   = xe.Expr,
+                           XMember = xe.Member,
+                           YExpr   = ye.Expr,
+                           YMember = ye.Member,
+                       })
                  .All(o => Equals(o.XMember, o.YMember) && ExpressionsEqual(o.XExpr, o.YExpr, rootX, rootY));
     }
 
@@ -222,19 +221,19 @@ public static class LambdaCompare
 
         return x.Count() == y.Count()
      && x.Select((e, i) => new {
-              Expr  = e,
-              Index = i,
-          })
+                     Expr  = e,
+                     Index = i,
+                 })
          .Join(y.Select((e, i) => new {
-                  Expr  = e,
-                  Index = i,
-              }),
-              o => o.Index,
-              o => o.Index,
-              (xe, ye) => new {
-                  X = xe.Expr,
-                  Y = ye.Expr,
-              })
+                            Expr  = e,
+                            Index = i,
+                        }),
+               o => o.Index,
+               o => o.Index,
+               (xe, ye) => new {
+                   X = xe.Expr,
+                   Y = ye.Expr,
+               })
          .All(o => ExpressionsEqual(o.X, o.Y, rootX, rootY));
     }
 
@@ -242,30 +241,35 @@ public static class LambdaCompare
         return x.Count == y.Count
      && x.Cast<object>()
          .Select((e, i) => new {
-              Expr  = e,
-              Index = i,
-          })
+                     Expr  = e,
+                     Index = i,
+                 })
          .Join(y.Cast<object>()
-             .Select((e, i) => new {
-                  Expr  = e,
-                  Index = i,
-              }),
-              o => o.Index,
-              o => o.Index,
-              (xe, ye) => new {
-                  X = xe.Expr,
-                  Y = ye.Expr,
-              })
+              .Select((e, i) => new {
+                          Expr  = e,
+                          Index = i,
+                      }),
+               o => o.Index,
+               o => o.Index,
+               (xe, ye) => new {
+                   X = xe.Expr,
+                   Y = ye.Expr,
+               })
          .All(o => Equals(o.X, o.Y));
     }
 
     #region Nested type: ConstantValue
 
-    private struct ConstantValue(bool isDefined, object? value)
+    private struct ConstantValue
     {
-        public bool IsDefined { get; } = isDefined;
+        public ConstantValue(bool isDefined, object? value) {
+            IsDefined = isDefined;
+            Value     = value;
+        }
 
-        public object? Value { get; } = value;
+        public bool IsDefined { get; }
+
+        public object? Value { get; }
     }
 
     #endregion

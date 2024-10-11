@@ -40,10 +40,7 @@ public static class ServiceCollectionExtensions
         Action<SchemataOptions>? configure) {
         var builder = new SchemataBuilder(configuration, environment);
 
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(
-            configuration,
-            environment
-        )));
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(configuration, environment)));
 
         services.TryAddSingleton(builder.Options);
 

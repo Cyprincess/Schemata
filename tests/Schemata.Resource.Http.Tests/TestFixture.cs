@@ -1,70 +1,146 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
-using Schemata.Mapping.Skeleton;
-using Schemata.Resource.Foundation.Advices;
 
 namespace Schemata.Resource.Http.Tests;
 
-public class TestFixture : IDisposable
+public class TestFixture
 {
-    public IServiceProvider ServiceProvider { get; }
-
-    public Mock<IRepository<Student>> Repository { get; } = new();
-
-    public HttpContext Context { get; }
-
-    public MemoryStream Body { get; } = new();
-
-    public ResourceController<Student, Student, Student, Student> Controller { get; }
-
     public TestFixture() {
-        var services = new ServiceCollection();
+        Students = [
+            new() {
+                Id        = 1,
+                Name      = "Alice",
+                Age       = 18,
+                Grade     = 1,
+                Timestamp = Guid.NewGuid(),
+            },
+            new() {
+                Id        = 2,
+                Name      = "Bob",
+                Age       = 19,
+                Grade     = 2,
+                Timestamp = Guid.NewGuid(),
+            },
+        ];
 
-        services.AddLogging();
+        Repository.Setup(r => r.Once()).Returns(() => Repository.Object).Verifiable();
+        Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(() => Repository.Object).Verifiable();
 
-        services.Configure<JsonSerializerOptions>(options => {
-            options.DictionaryKeyPolicy  = JsonNamingPolicy.SnakeCaseLower;
-            options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+        Repository
+           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
+           .Returns((Func<IQueryable<Student>, IQueryable<Student>> predicate, CancellationToken ct) => List(Students.AsQueryable(), predicate, ct))
+           .Verifiable();
 
-            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
-        });
+        Repository
+           .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync((Func<IQueryable<Student>, IQueryable<Student>> predicate, CancellationToken _) => predicate(Students.AsQueryable()).SingleOrDefault())
+           .Verifiable();
 
-        services.AddResourceJsonSerializerOptions();
+        Repository
+           .Setup(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync((Func<IQueryable<Student>, IQueryable<Student>> predicate, CancellationToken _) => predicate(Students.AsQueryable()).Count())
+           .Verifiable();
 
-        services.AddScoped(typeof(IResourceResponseAdvice<,>), typeof(AdviceResponseFreshness<,>));
+        Repository.Setup(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
+                  .Returns((Student entity, CancellationToken _) => {
+                       Students.Add(entity);
 
-        services.AddControllers();
+                       return Task.CompletedTask;
+                   })
+                  .Verifiable();
 
-        var provider = services.BuildServiceProvider();
-        var scope    = provider.CreateScope();
+        Repository.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
+                  .Returns((Student entity, CancellationToken _) => {
+                       var student = Students.First(s => s.Id == entity.Id);
+                       var index   = Students.IndexOf(student);
+
+                       Students.RemoveAt(index);
+                       Students.Insert(index, entity);
+
+                       return Task.CompletedTask;
+                   })
+                  .Verifiable();
+
+        Repository.Setup(r => r.RemoveAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
+                  .Returns((Student entity, CancellationToken _) => {
+                       Students.Remove(entity);
+
+                       return Task.CompletedTask;
+                   })
+                  .Verifiable();
+
+        Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
+                  .Returns((CancellationToken _) => ValueTask.FromResult(0))
+                  .Verifiable();
+
+        var url = new Mock<IUrlHelper>(MockBehavior.Strict);
+        url.Setup(u => u.Action(It.IsAny<UrlActionContext>())).Returns(() => "https://example.com").Verifiable();
+
+        var builder = WebApplication.CreateBuilder()
+                                    .UseSchemata(schema => {
+                                         schema.UseMapster().Map<Student, Student>();
+
+                                         schema.UseResource().MapHttp();
+
+                                         schema.Services.AddTransient<IRepository<Student>>(_ => Repository.Object);
+                                         schema.Services.AddTransient<IUrlHelper>(_ => url.Object);
+                                         schema.Services.AddScoped(typeof(ResourceController<,,,>));
+                                     });
+
+        var app = builder.Build();
+
+        var scope = app.Services.CreateScope();
 
         ServiceProvider = scope.ServiceProvider;
-
-        Repository.Setup(r => r.Once()).Returns(() => Repository.Object);
-        Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(() => Repository.Object);
-
-        var mapper = new Mock<ISimpleMapper>();
-        mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>())).Returns<Student>(x => x);
-
-        var serializer = ServiceProvider.GetRequiredService<ResourceJsonSerializerOptions>();
-
-        Context = new DefaultHttpContext {
-            RequestServices = ServiceProvider,
-            Response        = { Body = Body },
-        };
-
-        Controller = new(ServiceProvider, Repository.Object, mapper.Object, serializer) {
-            ControllerContext = { HttpContext = Context },
-        };
     }
 
-    public void Dispose() {
-        Body.Dispose();
+    public IServiceProvider ServiceProvider { get; }
+
+    public Mock<IRepository<Student>> Repository { get; } = new(MockBehavior.Strict);
+
+    public List<Student> Students { get; }
+
+    public (ResourceController<TEntity, TRequest, TDetail, TSummary>, MemoryStream) CreateResourceController<
+        TEntity, TRequest, TDetail, TSummary>() where TEntity : class, IIdentifier
+                                                where TRequest : class, IIdentifier
+                                                where TDetail : class, IIdentifier
+                                                where TSummary : class, IIdentifier {
+        var controller = ServiceProvider.GetRequiredService<ResourceController<TEntity, TRequest, TDetail, TSummary>>();
+        var url        = ServiceProvider.GetRequiredService<IUrlHelper>();
+
+        var body = new MemoryStream();
+        var context = new DefaultHttpContext {
+            RequestServices = ServiceProvider,
+            Response        = { Body = body },
+        };
+
+        controller.ControllerContext = new() {
+            HttpContext = context,
+        };
+        controller.Url = url;
+
+        return (controller, body);
+    }
+
+    private static async IAsyncEnumerable<T> List<T>(
+        IQueryable<T>                              entities,
+        Func<IQueryable<T>, IQueryable<T>>         predicate,
+        [EnumeratorCancellation] CancellationToken ct) {
+        foreach (var entity in predicate(entities.AsQueryable())) {
+            yield return await Task.FromResult(entity);
+        }
     }
 }

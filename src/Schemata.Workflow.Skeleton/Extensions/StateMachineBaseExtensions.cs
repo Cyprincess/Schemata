@@ -16,9 +16,8 @@ public static class StateMachineBaseExtensions
         this StateMachineBase<TI> machine,
         TI                        instance,
         TEvent                    @event,
-        CancellationToken         ct)
-        where TI : class, IStatefulEntity
-        where TEvent : class, IEvent {
+        CancellationToken         ct) where TI : class, IStatefulEntity
+                                      where TEvent : class, IEvent {
         ct.ThrowIfCancellationRequested();
         return machine.RaiseEvent(instance, _ => machine.GetEvent<TEvent>(@event.Event), @event, ct);
     }
@@ -26,8 +25,7 @@ public static class StateMachineBaseExtensions
     public static async Task<IEnumerable<string>> GetNextEventsAsync<TI>(
         this StateMachineBase<TI> machine,
         TI                        instance,
-        CancellationToken         ct)
-        where TI : class, IStatefulEntity {
+        CancellationToken         ct) where TI : class, IStatefulEntity {
         ct.ThrowIfCancellationRequested();
         var events = await machine.NextEvents(instance);
         return events.Select(e => e.Name);

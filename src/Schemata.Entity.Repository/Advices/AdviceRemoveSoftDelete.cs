@@ -6,8 +6,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advices;
 
-public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity>
-    where TEntity : class
+public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAsyncAdvice<TEntity> where TEntity : class
 {
     #region IRepositoryRemoveAsyncAdvice<TEntity> Members
 

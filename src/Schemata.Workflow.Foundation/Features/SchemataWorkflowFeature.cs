@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Mapping.Skeleton.Configurations;
@@ -16,11 +15,10 @@ namespace Schemata.Workflow.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataJsonSerializerFeature>]
-[Information("Workflow depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
-[Information("Workflow depends on JsonSerializer feature, it will be added automatically.", Level = LogLevel.Debug)]
+[DependsOn("SchemataSecurityFeature")]
 public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : FeatureBase
-    where TTransition : SchemataTransition, new()
     where TWorkflow : SchemataWorkflow, new()
+    where TTransition : SchemataTransition, new()
     where TResponse : WorkflowResponse
 {
     public override int Priority => 350_000_000;

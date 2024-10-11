@@ -15,49 +15,61 @@ using Schemata.Entity.Repository;
 namespace Schemata.Authorization.Skeleton.Stores;
 
 // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
-public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
-    IMemoryCache                cache,
-    IRepository<TApplication>   applications,
-    IRepository<TAuthorization> authorizations,
-    IRepository<TToken>         tokens) : IOpenIddictApplicationStore<TApplication>
+public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IOpenIddictApplicationStore<TApplication>
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization
     where TToken : SchemataToken
 {
+    private readonly IRepository<TApplication>   _applications;
+    private readonly IRepository<TAuthorization> _authorizations;
+    private readonly IMemoryCache                _cache;
+    private readonly IRepository<TToken>         _tokens;
+
+    public SchemataApplicationStore(
+        IMemoryCache                cache,
+        IRepository<TApplication>   applications,
+        IRepository<TAuthorization> authorizations,
+        IRepository<TToken>         tokens) {
+        _cache          = cache;
+        _applications   = applications;
+        _authorizations = authorizations;
+        _tokens         = tokens;
+    }
+
     #region IOpenIddictApplicationStore<TApplication> Members
 
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
-        return await applications.LongCountAsync<TApplication>(null, ct);
+        return await _applications.LongCountAsync<TApplication>(null, ct);
     }
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TApplication>, IQueryable<TResult>> query,
         CancellationToken                                   ct) {
-        return await applications.LongCountAsync(query, ct);
+        return await _applications.LongCountAsync(query, ct);
     }
 
     public virtual async ValueTask CreateAsync(TApplication application, CancellationToken ct) {
-        await applications.AddAsync(application, ct);
-        await applications.CommitAsync(ct);
+        await _applications.AddAsync(application, ct);
+        await _applications.CommitAsync(ct);
     }
 
     public virtual async ValueTask DeleteAsync(TApplication application, CancellationToken ct) {
-        await foreach (var authorization in authorizations.ListAsync(q => q.Where(t => t.ApplicationId == application.Id), ct)) {
+        await foreach (var authorization in _authorizations.ListAsync(q => q.Where(t => t.ApplicationId == application.Id), ct)) {
             ct.ThrowIfCancellationRequested();
-            await authorizations.RemoveAsync(authorization, ct);
+            await _authorizations.RemoveAsync(authorization, ct);
         }
 
-        await authorizations.CommitAsync(ct);
+        await _authorizations.CommitAsync(ct);
 
-        await foreach (var token in tokens.ListAsync(q => q.Where(t => t.ApplicationId == application.Id), ct)) {
+        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.ApplicationId == application.Id), ct)) {
             ct.ThrowIfCancellationRequested();
-            await tokens.RemoveAsync(token, ct);
+            await _tokens.RemoveAsync(token, ct);
         }
 
-        await tokens.CommitAsync(ct);
+        await _tokens.CommitAsync(ct);
 
-        await applications.RemoveAsync(application, ct);
-        await applications.CommitAsync(ct);
+        await _applications.RemoveAsync(application, ct);
+        await _applications.CommitAsync(ct);
     }
 
     public virtual ValueTask<TApplication?> FindByIdAsync(string identifier, CancellationToken ct) {
@@ -66,17 +78,17 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
     }
 
     public virtual async ValueTask<TApplication?> FindByClientIdAsync(string identifier, CancellationToken ct) {
-        return await applications.FirstOrDefaultAsync(q => q.Where(a => a.ClientId == identifier), ct);
+        return await _applications.FirstOrDefaultAsync(q => q.Where(a => a.ClientId == identifier), ct);
     }
 
     public virtual IAsyncEnumerable<TApplication> FindByPostLogoutRedirectUriAsync(string uri, CancellationToken ct) {
         var wrapped = $"\"{uri}\"";
-        return applications.ListAsync(q => q.Where(a => a.PostLogoutRedirectUris!.Contains(wrapped)), ct);
+        return _applications.ListAsync(q => q.Where(a => a.PostLogoutRedirectUris!.Contains(wrapped)), ct);
     }
 
     public virtual IAsyncEnumerable<TApplication> FindByRedirectUriAsync(string uri, CancellationToken ct) {
         var wrapped = $"\"{uri}\"";
-        return applications.ListAsync(q => q.Where(a => a.RedirectUris!.Contains(wrapped)), ct);
+        return _applications.ListAsync(q => q.Where(a => a.RedirectUris!.Contains(wrapped)), ct);
     }
 
     public virtual ValueTask<string?> GetApplicationTypeAsync(TApplication application, CancellationToken ct) {
@@ -87,7 +99,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
         CancellationToken                                           ct) {
-        return await applications.SingleOrDefaultAsync(q => query(q, state), ct);
+        return await _applications.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask<string?> GetClientIdAsync(TApplication application, CancellationToken ct) {
@@ -118,23 +130,24 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.DisplayNames!.ToCacheKey();
-        var names = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key,
+                                       entry => {
+                                           entry.SetPriority(CacheItemPriority.High)
+                                                .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames!);
-            if (names is null) {
-                return ImmutableDictionary<CultureInfo, string>.Empty;
-            }
+                                           var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames!);
+                                           if (names is null) {
+                                               return ImmutableDictionary<CultureInfo, string>.Empty;
+                                           }
 
-            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+                                           var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var kv in names) {
-                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-            }
+                                           foreach (var kv in names) {
+                                               builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+                                           }
 
-            return builder.ToImmutable();
-        })!;
+                                           return builder.ToImmutable();
+                                       })!;
 
         return new(names);
     }
@@ -149,12 +162,13 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.JsonWebKeySet!.ToCacheKey();
-        var set = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var set = _cache.GetOrCreate(key,
+                                     entry => {
+                                         entry.SetPriority(CacheItemPriority.High)
+                                              .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            return JsonWebKeySet.Create(application.JsonWebKeySet);
-        })!;
+                                         return JsonWebKeySet.Create(application.JsonWebKeySet);
+                                     })!;
 
         return new(set);
     }
@@ -167,14 +181,15 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.Permissions!.ToCacheKey();
-        var permissions = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var permissions = _cache.GetOrCreate(key,
+                                             entry => {
+                                                 entry.SetPriority(CacheItemPriority.High)
+                                                      .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions!);
+                                                 var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions!);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
+                                                 return result ?? ImmutableArray<string>.Empty;
+                                             })!;
 
         return new(permissions);
     }
@@ -187,14 +202,15 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.PostLogoutRedirectUris!.ToCacheKey();
-        var uris = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var uris = _cache.GetOrCreate(key,
+                                      entry => {
+                                          entry.SetPriority(CacheItemPriority.High)
+                                               .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris!);
+                                          var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris!);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
+                                          return result ?? ImmutableArray<string>.Empty;
+                                      })!;
 
         return new(uris);
     }
@@ -207,14 +223,16 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.Properties!.ToCacheKey();
-        var properties = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key,
+                                            entry => {
+                                                entry.SetPriority(CacheItemPriority.High)
+                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(application.Properties!);
+                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(
+                                                    application.Properties!);
 
-            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
-        })!;
+                                                return result ?? ImmutableDictionary<string, JsonElement>.Empty;
+                                            })!;
 
         return new(properties);
     }
@@ -227,14 +245,15 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.RedirectUris!.ToCacheKey();
-        var uris = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var uris = _cache.GetOrCreate(key,
+                                      entry => {
+                                          entry.SetPriority(CacheItemPriority.High)
+                                               .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris!);
+                                          var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris!);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
+                                          return result ?? ImmutableArray<string>.Empty;
+                                      })!;
 
         return new(uris);
     }
@@ -247,14 +266,15 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.Requirements!.ToCacheKey();
-        var requirements = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var requirements = _cache.GetOrCreate(key,
+                                              entry => {
+                                                  entry.SetPriority(CacheItemPriority.High)
+                                                       .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements!);
+                                                  var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements!);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
+                                                  return result ?? ImmutableArray<string>.Empty;
+                                              })!;
 
         return new(requirements);
     }
@@ -267,14 +287,16 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         var key = application.Settings!.ToCacheKey();
-        var settings = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var settings = _cache.GetOrCreate(key,
+                                          entry => {
+                                              entry.SetPriority(CacheItemPriority.High)
+                                                   .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(application.Settings!);
+                                              var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(
+                                                  application.Settings!);
 
-            return result ?? ImmutableDictionary<string, string>.Empty;
-        })!;
+                                              return result ?? ImmutableDictionary<string, string>.Empty;
+                                          })!;
 
         return new(settings);
     }
@@ -284,14 +306,14 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
     }
 
     public virtual IAsyncEnumerable<TApplication> ListAsync(int? count, int? offset, CancellationToken ct) {
-        return applications.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
+        return _applications.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
         CancellationToken                                           ct) {
-        return applications.ListAsync(q => query(q, state), ct);
+        return _applications.ListAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask SetApplicationTypeAsync(TApplication application, string? type, CancellationToken ct) {
@@ -335,6 +357,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
 
         var dictionary = names.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
         application.DisplayNames = JsonSerializer.Serialize(dictionary);
+
         return default;
     }
 
@@ -353,6 +376,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         application.Permissions = JsonSerializer.Serialize(permissions);
+
         return default;
     }
 
@@ -366,6 +390,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         application.PostLogoutRedirectUris = JsonSerializer.Serialize(uris);
+
         return default;
     }
 
@@ -393,6 +418,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         application.RedirectUris = JsonSerializer.Serialize(uris);
+
         return default;
     }
 
@@ -406,6 +432,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
         }
 
         application.Requirements = JsonSerializer.Serialize(requirements);
+
         return default;
     }
 
@@ -420,17 +447,18 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken>(
 
         var dictionary = settings.ToDictionary(kv => kv.Key, kv => kv.Value);
         application.Settings = JsonSerializer.Serialize(dictionary);
+
         return default;
     }
 
     public virtual async ValueTask UpdateAsync(TApplication application, CancellationToken ct) {
-        await applications.UpdateAsync(application, ct);
-        await applications.CommitAsync(ct);
+        await _applications.UpdateAsync(application, ct);
+        await _applications.CommitAsync(ct);
     }
 
     #endregion
 
     public virtual async ValueTask<TApplication?> FindByIdAsync(long id, CancellationToken ct) {
-        return await applications.FirstOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
+        return await _applications.FirstOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
     }
 }

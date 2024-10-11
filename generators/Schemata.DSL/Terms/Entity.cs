@@ -36,8 +36,7 @@ public class Entity : TermBase, INamedTerm
         return Parse<Entity>(mark, scanner);
     }
 
-    protected static T Parse<T>(Mark mark, Scanner scanner)
-        where T : Entity, new() {
+    protected static T Parse<T>(Mark mark, Scanner scanner) where T : Entity, new() {
         if (!scanner.ReadIdentifier(out var name)) {
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }

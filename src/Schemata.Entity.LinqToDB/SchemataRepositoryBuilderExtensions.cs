@@ -47,21 +47,19 @@ public static class SchemataRepositoryBuilderExtensions
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
-        this SchemataRepositoryBuilder                   builder,
+        this SchemataRepositoryBuilder builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
-        where TContext : DataConnection {
+        ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
+        ServiceLifetime optionsLifetime = ServiceLifetime.Scoped) where TContext : DataConnection {
         return UseLinqToDb<TContext, TContext>(builder, configure, contextLifetime, optionsLifetime);
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
-        this SchemataRepositoryBuilder                   builder,
+        this SchemataRepositoryBuilder builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped)
-        where TContextImplementation : TContext
-        where TContext : DataConnection {
+        ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
+        ServiceLifetime optionsLifetime = ServiceLifetime.Scoped) where TContextImplementation : TContext
+                                                                  where TContext : DataConnection {
         // Register default metadata reader for System.ComponentModel.DataAnnotations.Schema attributes
         // This is required for LINQ to DB to work with entities that have TableAttribute, ColumnAttribute, etc.
         MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
@@ -109,7 +107,9 @@ public static class SchemataRepositoryBuilderExtensions
 
     private enum OptionsParameterType
     {
-        DataOptionsTImpl, DataOptionsTContext, DataOptions,
+        DataOptionsTImpl,
+        DataOptionsTContext,
+        DataOptions,
     }
 
     #endregion

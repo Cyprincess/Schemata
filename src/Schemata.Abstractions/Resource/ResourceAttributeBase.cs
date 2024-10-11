@@ -2,7 +2,11 @@ using System;
 
 namespace Schemata.Abstractions.Resource;
 
-public class ResourceAttributeBase(string name) : Attribute
+public class ResourceAttributeBase : Attribute
 {
-    public string Name { get; } = name;
+    public ResourceAttributeBase(string name) {
+        Name = name;
+    }
+
+    public string Name { get; }
 }

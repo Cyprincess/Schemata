@@ -6,14 +6,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
 
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataJsonSerializerFeature>]
-[Information("Exception Handler depends on JsonSerializer feature, it will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataExceptionHandlerFeature : FeatureBase
 {
     public override int Priority => 100_010_000;
@@ -37,8 +35,7 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                             ErrorDescription = "An error occurred.",
                         },
                         options.Value,
-                        context.RequestAborted
-                    );
+                        context.RequestAborted);
 
                     return;
                 }

@@ -12,6 +12,8 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvice
     where TEntity : class, IIdentifier
     where TDetail : class, IIdentifier
 {
+    #region IResourceResponseAdvice<TEntity,TDetail> Members
+
     public int Order => 100_000_000;
 
     public int Priority => Order;
@@ -20,7 +22,7 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvice
         AdviceContext     ctx,
         TEntity?          entity,
         TDetail?          detail,
-        HttpContext       context,
+        HttpContext       http,
         CancellationToken ct = default) {
         if (entity is not IConcurrency concurrency || detail is not IFreshness freshness) {
             return Task.FromResult(true);
@@ -34,4 +36,6 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvice
 
         return Task.FromResult(true);
     }
+
+    #endregion
 }

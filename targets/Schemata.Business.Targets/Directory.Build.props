@@ -33,6 +33,10 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseSecurity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
   </ItemGroup>

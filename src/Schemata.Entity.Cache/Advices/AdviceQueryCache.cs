@@ -8,9 +8,15 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.Cache.Advices;
 
-public sealed class AdviceQueryCache<TEntity, TResult, T>(IMemoryCache cache) : IRepositoryQueryAsyncAdvice<TEntity, TResult, T>
+public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAsyncAdvice<TEntity, TResult, T>
     where TEntity : class
 {
+    private readonly IMemoryCache _cache;
+
+    public AdviceQueryCache(IMemoryCache cache) {
+        _cache = cache;
+    }
+
     #region IRepositoryQueryAsyncAdvice<TEntity,TResult,T> Members
 
     public int Order => SchemataConstants.Orders.Max;
@@ -30,7 +36,7 @@ public sealed class AdviceQueryCache<TEntity, TResult, T>(IMemoryCache cache) : 
             return Task.FromResult(true);
         }
 
-        if (!cache.TryGetValue(key, out var value)) {
+        if (!_cache.TryGetValue(key, out var value)) {
             return Task.FromResult(true);
         }
 

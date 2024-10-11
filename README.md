@@ -48,6 +48,7 @@ var builder = WebApplication.CreateBuilder(args)
                                        .UseHostResolver();
                                  schema.UseModular();
 
+                                 schema.UseSecurity();
                                  schema.UseIdentity();
                                  schema.UseAuthorization(options => {
                                             options.AddEphemeralEncryptionKey()
@@ -135,6 +136,7 @@ An extension feature can be activated in the same way as a built-in feature.
 
 | Priority      | Package                           | Feature              | Description                        |
 |---------------|-----------------------------------|----------------------|------------------------------------|
+| 300_100_000   | Schemata.Security.Foundation      | Security             | Schemata Security Foundation       |
 | 310_000_000   | Schemata.Identity.Foundation      | Identity             | Schemata Identity Foundation       |
 | 320_000_000   | Schemata.Authorization.Foundation | Authorization        | Schemata Authorization Foundation  |
 | 340_000_000   | Schemata.Mapping.Foundation       | Mapping              | Schemata Mapper Foundation         |
@@ -142,7 +144,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 360_000_000   | Schemata.Resource.Foundation      | Resource             | Schemata Resource Service          |
 | 360_100_000   | Schemata.Resource.Http            | Resource (`MapHttp`) | Schemata Resource Service for HTTP |
 | 2_147_100_000 | Schemata.Tenancy.Foundation       | Tenancy              | Schemata Tenancy Foundation        |
-| 2_147_400_000 | Schemata.Modular                  | Modular              | Modularization                     |
+| 2_147_200_000 | Schemata.Modular                  | Modular              | Modularization                     |
 
 ## Compliance
 

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Resolver;
 using Schemata.Authorization.Skeleton.Stores;
@@ -15,7 +14,6 @@ using Schemata.Core.Features;
 namespace Schemata.Authorization.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
-[Information("Authorization depends on Controllers feature, it will be added automatically.", Level = LogLevel.Debug)]
 public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization

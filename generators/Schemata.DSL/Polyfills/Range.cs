@@ -258,7 +258,7 @@ namespace System.Runtime.CompilerServices
                 // We know the type of the array to be exactly T[].
 
                 if (length == 0) {
-                    return Array.Empty<T>();
+                    return [];
                 }
 
                 var dest = new T[length];

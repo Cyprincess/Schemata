@@ -20,18 +20,16 @@ public static class SchemataBuilderExtensions
 
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TTenant, TKey>(
         this SchemataBuilder                  builder,
-        Action<IServiceCollection, TTenant?>? configure = null)
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
+        Action<IServiceCollection, TTenant?>? configure = null) where TTenant : SchemataTenant<TKey>
+                                                                where TKey : struct, IEquatable<TKey> {
         return UseTenancy<SchemataTenantManager<TTenant, TKey>, TTenant, TKey>(builder, configure);
     }
 
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TManager, TTenant, TKey>(
         this SchemataBuilder                  builder,
-        Action<IServiceCollection, TTenant?>? configure = null)
-        where TManager : class, ITenantManager<TTenant, TKey>
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
+        Action<IServiceCollection, TTenant?>? configure = null) where TManager : class, ITenantManager<TTenant, TKey>
+                                                                where TTenant : SchemataTenant<TKey>
+                                                                where TKey : struct, IEquatable<TKey> {
         configure ??= (_, _) => { };
         builder.Configure(configure);
 

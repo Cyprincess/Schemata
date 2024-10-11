@@ -15,6 +15,7 @@
     <UseMapster>true</UseMapster>
     <UseRepository>true</UseRepository>
     <UseResource>true</UseResource>
+    <UseSecurity>true</UseSecurity>
     <UseValidation>true</UseValidation>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>

@@ -56,6 +56,10 @@
     <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseSecurity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
   </ItemGroup>

@@ -39,7 +39,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
 
         if (t is null) {
-            return Array.Empty<MappingAttribute>();
+            return [];
         }
 
         var attr = new TableAttribute { IsColumnAttributeRequired = false };
@@ -53,7 +53,8 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         var names = name.Replace("[", "").Replace("]", "").Split('.');
 
         switch (names.Length) {
-            case 0: break;
+            case 0:
+                break;
             case 1:
                 attr.Name = names[0];
                 break;
@@ -99,7 +100,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
     /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />
     public MemberInfo[] GetDynamicColumns(Type type) {
-        return Array.Empty<MemberInfo>();
+        return [];
     }
 
     public string GetObjectID() {

@@ -23,9 +23,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
-        Action<IdentityBuilder>?         build     = null)
-        where TUser : SchemataUser
-        where TRole : SchemataRole {
+        Action<IdentityBuilder>?         build     = null) where TUser : SchemataUser
+                                                           where TRole : SchemataRole {
         return UseIdentity<TUser, TRole, SchemataUserStore<TUser>, SchemataRoleStore<TRole>>(builder, identify, configure, build);
     }
 
@@ -33,11 +32,10 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
-        Action<IdentityBuilder>?         build     = null)
-        where TUser : SchemataUser
-        where TRole : SchemataRole
-        where TUserStore : class, IUserStore<TUser>
-        where TRoleStore : class, IRoleStore<TRole> {
+        Action<IdentityBuilder>?         build     = null) where TUser : SchemataUser
+                                                           where TRole : SchemataRole
+                                                           where TUserStore : class, IUserStore<TUser>
+                                                           where TRoleStore : class, IRoleStore<TRole> {
         identify ??= _ => { };
         builder.Configure(identify);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ public class AdviceResultCache
 public class AdviceResultCache<TEntity, TResult, T>(IMemoryCache cache) : AdviceResultCache, IRepositoryResultAdvice<TEntity, TResult, T>
     where TEntity : class
 {
-    #region IRepositoryQueryAsyncAdvice<TEntity,TResult,T> Members
+    #region IRepositoryResultAdvice<TEntity,TResult,T> Members
 
     public int Order => SchemataConstants.Orders.Max;
 

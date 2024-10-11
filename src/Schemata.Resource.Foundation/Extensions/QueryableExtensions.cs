@@ -12,7 +12,7 @@ namespace System.Linq;
 
 public static class QueryableExtensions
 {
-    public static Func<IQueryable<T>, IQueryable<T>> ApplyFiltering<T>(
+    public static Func<IQueryable<T>, IQueryable<T>> WithFiltering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Filter?                                 filter) {
         if (filter is null) {
@@ -32,7 +32,7 @@ public static class QueryableExtensions
         return q => query(q).Where(predicate);
     }
 
-    public static Func<IQueryable<T>, IQueryable<T>> ApplyOrdering<T>(
+    public static Func<IQueryable<T>, IQueryable<T>> WithOrdering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Dictionary<Member, Ordering>?           order) {
         if (order is not { Count: > 0 }) {
@@ -52,13 +52,13 @@ public static class QueryableExtensions
 
             var build = query;
 
-            query = q => build(q).ApplyOrdering(select, ordering);
+            query = q => build(q).WithOrdering(select, ordering);
         }
 
         return query;
     }
 
-    public static Func<IQueryable<T>, IQueryable<T>> ApplyPaginating<T>(
+    public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         PageToken                               token) {
         var build = query;
@@ -68,7 +68,7 @@ public static class QueryableExtensions
         return query;
     }
 
-    public static IOrderedQueryable<T> ApplyOrdering<T>(
+    public static IOrderedQueryable<T> WithOrdering<T>(
         this IQueryable<T>          source,
         Expression<Func<T, object>> select,
         Ordering                    ordering = Ordering.Ascending) {

@@ -3,7 +3,11 @@ using System;
 namespace Schemata.Abstractions.Entities;
 
 [AttributeUsage(AttributeTargets.Class)]
-public sealed class CanonicalNameAttribute(string name) : Attribute
+public sealed class CanonicalNameAttribute : Attribute
 {
-    public string ResourceName { get; } = name;
+    public CanonicalNameAttribute(string name) {
+        ResourceName = name;
+    }
+
+    public string ResourceName { get; }
 }

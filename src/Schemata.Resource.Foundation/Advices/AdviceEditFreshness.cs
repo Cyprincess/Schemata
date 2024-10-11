@@ -10,15 +10,13 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advices;
 
-public sealed class AdviceEditFreshness<TEntity, TRequest>(IServiceProvider services) : IResourceEditAdvice<TEntity, TRequest>
+public sealed class AdviceEditFreshness<TEntity, TRequest> : IResourceEditAdvice<TEntity, TRequest>
     where TEntity : class, IIdentifier
     where TRequest : class, IIdentifier
 {
-    private readonly IServiceProvider _services = services;
+    #region IResourceEditAdvice<TEntity,TRequest> Members
 
-    #region IResourceUpdateAdvice<TEntity,TRequest> Members
-
-    public int Order => 100_000_000;
+    public int Order => 300_000_000;
 
     public int Priority => Order;
 
@@ -27,7 +25,7 @@ public sealed class AdviceEditFreshness<TEntity, TRequest>(IServiceProvider serv
         long              id,
         TRequest          request,
         TEntity           entity,
-        HttpContext       context,
+        HttpContext       http,
         CancellationToken ct = default) {
         if (ctx.Has<SuppressEditFreshness>()) {
             return Task.FromResult(true);
@@ -43,8 +41,8 @@ public sealed class AdviceEditFreshness<TEntity, TRequest>(IServiceProvider serv
 
         var tag = request switch {
             IFreshness freshness => freshness.EntityTag,
-            var _ when context.Request.Query.ContainsKey(SchemataConstants.Parameters.EntityTag) => context.Request.Query[SchemataConstants.Parameters.EntityTag].ToString(),
-            var _ => context.Request.Headers.IfMatch.ToString(),
+            var _ when http.Request.Query.ContainsKey(SchemataConstants.Parameters.EntityTag) => http.Request.Query[SchemataConstants.Parameters.EntityTag].ToString(),
+            var _ => http.Request.Headers.IfMatch.ToString(),
         };
 
         if (string.IsNullOrWhiteSpace(tag)) {

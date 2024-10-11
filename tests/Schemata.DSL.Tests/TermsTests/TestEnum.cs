@@ -34,14 +34,20 @@ public class TestEnum
                 Note 'FOOBAR'
                 Bar
                 }
-                """, "Foo", new[] { "Bar" }, "FOOBAR")]
+                """,
+                "Foo",
+                new[] { "Bar" },
+                "FOOBAR")]
     [InlineData("""
                 enum Foo {
                 Bar
                 Fub
                 Note 'FOOBAR'
                 }
-                """, "Foo", new[] { "Bar", "Fub" }, "FOOBAR")]
+                """,
+                "Foo",
+                new[] { "Bar", "Fub" },
+                "FOOBAR")]
     [InlineData("enum Name{Foo,Bar}", "Name", new[] { "Foo", "Bar" })]
     [InlineData("enum Name{Foo=Bar}", "Name", new[] { "Bar" })]
     [InlineData("enum Name{Foo=Bar{Note FOOBAR}}", "Name", new[] { "Bar" })]

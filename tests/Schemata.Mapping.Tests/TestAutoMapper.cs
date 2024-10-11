@@ -35,7 +35,7 @@ public class TestAutoMapper
 
         Assert.Equal("Mr. John", destination.DisplayName);
         Assert.Equal(source.Age, destination.Age);
-        Assert.Equal(default, destination.Grade);
+        Assert.Equal(0, destination.Grade);
         Assert.Equal(nameof(Sex.Male), destination.Sex);
     }
 }

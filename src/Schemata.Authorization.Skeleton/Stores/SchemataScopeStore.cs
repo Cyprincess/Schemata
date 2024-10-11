@@ -14,29 +14,36 @@ using Schemata.Entity.Repository;
 namespace Schemata.Authorization.Skeleton.Stores;
 
 // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
-public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> scopes) : IOpenIddictScopeStore<TScope>
-    where TScope : SchemataScope
+public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TScope : SchemataScope
 {
+    private readonly IMemoryCache        _cache;
+    private readonly IRepository<TScope> _scopes;
+
+    public SchemataScopeStore(IMemoryCache cache, IRepository<TScope> scopes) {
+        _cache  = cache;
+        _scopes = scopes;
+    }
+
     #region IOpenIddictScopeStore<TScope> Members
 
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
-        return await scopes.LongCountAsync<TScope>(null, ct);
+        return await _scopes.LongCountAsync<TScope>(null, ct);
     }
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TScope>, IQueryable<TResult>> query,
         CancellationToken                             ct) {
-        return await scopes.LongCountAsync(query, ct);
+        return await _scopes.LongCountAsync(query, ct);
     }
 
     public virtual async ValueTask CreateAsync(TScope scope, CancellationToken ct) {
-        await scopes.AddAsync(scope, ct);
-        await scopes.CommitAsync(ct);
+        await _scopes.AddAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
     public virtual async ValueTask DeleteAsync(TScope scope, CancellationToken ct) {
-        await scopes.RemoveAsync(scope, ct);
-        await scopes.CommitAsync(ct);
+        await _scopes.RemoveAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
     public virtual ValueTask<TScope?> FindByIdAsync(string identifier, CancellationToken ct) {
@@ -45,23 +52,23 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
     }
 
     public virtual async ValueTask<TScope?> FindByNameAsync(string name, CancellationToken ct) {
-        return await scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
+        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
     }
 
     public virtual IAsyncEnumerable<TScope> FindByNamesAsync(ImmutableArray<string> names, CancellationToken ct) {
-        return scopes.ListAsync(q => q.Where(s => names.Contains(s.Name!)), ct);
+        return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name!)), ct);
     }
 
     public virtual IAsyncEnumerable<TScope> FindByResourceAsync(string resource, CancellationToken ct) {
         var wrapped = $"\"{resource}\"";
-        return scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(wrapped)), ct);
+        return _scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(wrapped)), ct);
     }
 
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
         CancellationToken                                     ct) {
-        return await scopes.SingleOrDefaultAsync(q => query(q, state), ct);
+        return await _scopes.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask<string?> GetDescriptionAsync(TScope scope, CancellationToken ct) {
@@ -76,23 +83,25 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
         }
 
         var key = scope.Descriptions!.ToCacheKey();
-        var descriptions = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var descriptions = _cache.GetOrCreate(key,
+                                              entry => {
+                                                  entry.SetPriority(CacheItemPriority.High)
+                                                       .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions!);
-            if (descriptions is null) {
-                return ImmutableDictionary<CultureInfo, string>.Empty;
-            }
+                                                  var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions!);
+                                                  if (descriptions is null) {
+                                                      return ImmutableDictionary<CultureInfo, string>.Empty;
+                                                  }
 
-            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+                                                  var builder = ImmutableDictionary
+                                                     .CreateBuilder<CultureInfo, string>();
 
-            foreach (var kv in descriptions) {
-                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-            }
+                                                  foreach (var kv in descriptions) {
+                                                      builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+                                                  }
 
-            return builder.ToImmutable();
-        })!;
+                                                  return builder.ToImmutable();
+                                              })!;
 
         return new(descriptions);
     }
@@ -109,23 +118,24 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
         }
 
         var key = scope.DisplayNames!.ToCacheKey();
-        var names = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key,
+                                       entry => {
+                                           entry.SetPriority(CacheItemPriority.High)
+                                                .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames!);
-            if (names is null) {
-                return ImmutableDictionary<CultureInfo, string>.Empty;
-            }
+                                           var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames!);
+                                           if (names is null) {
+                                               return ImmutableDictionary<CultureInfo, string>.Empty;
+                                           }
 
-            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+                                           var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-            foreach (var kv in names) {
-                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-            }
+                                           foreach (var kv in names) {
+                                               builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+                                           }
 
-            return builder.ToImmutable();
-        })!;
+                                           return builder.ToImmutable();
+                                       })!;
 
         return new(names);
     }
@@ -146,14 +156,15 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
         }
 
         var key = scope.Properties!.ToCacheKey();
-        var properties = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key,
+                                            entry => {
+                                                entry.SetPriority(CacheItemPriority.High)
+                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties!);
+                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties!);
 
-            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
-        })!;
+                                                return result ?? ImmutableDictionary<string, JsonElement>.Empty;
+                                            })!;
 
         return new(properties);
     }
@@ -164,14 +175,15 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
         }
 
         var key = scope.Resources!.ToCacheKey();
-        var resources = cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High)
-                 .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var resources = _cache.GetOrCreate(key,
+                                           entry => {
+                                               entry.SetPriority(CacheItemPriority.High)
+                                                    .SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources!);
+                                               var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources!);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
+                                               return result ?? ImmutableArray<string>.Empty;
+                                           })!;
 
         return new(resources);
     }
@@ -181,14 +193,14 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
     }
 
     public virtual IAsyncEnumerable<TScope> ListAsync(int? count, int? offset, CancellationToken ct) {
-        return scopes.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
+        return _scopes.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
         CancellationToken                                     ct) {
-        return scopes.ListAsync(q => query(q, state), ct);
+        return _scopes.ListAsync(q => query(q, state), ct);
     }
 
     public virtual ValueTask SetDescriptionAsync(TScope scope, string? description, CancellationToken ct) {
@@ -207,6 +219,7 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
 
         var dictionary = descriptions.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
         scope.Descriptions = JsonSerializer.Serialize(dictionary);
+
         return default;
     }
 
@@ -226,6 +239,7 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
 
         var dictionary = names.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
         scope.DisplayNames = JsonSerializer.Serialize(dictionary);
+
         return default;
     }
 
@@ -255,17 +269,18 @@ public class SchemataScopeStore<TScope>(IMemoryCache cache, IRepository<TScope> 
         }
 
         scope.Resources = JsonSerializer.Serialize(resources);
+
         return default;
     }
 
     public virtual async ValueTask UpdateAsync(TScope scope, CancellationToken ct) {
-        await scopes.UpdateAsync(scope, ct);
-        await scopes.CommitAsync(ct);
+        await _scopes.UpdateAsync(scope, ct);
+        await _scopes.CommitAsync(ct);
     }
 
     #endregion
 
     public virtual async ValueTask<TScope?> FindByIdAsync(long id, CancellationToken ct) {
-        return await scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
+        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
     }
 }

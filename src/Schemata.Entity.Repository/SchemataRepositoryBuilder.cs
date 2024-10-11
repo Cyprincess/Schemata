@@ -2,7 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Entity.Repository;
 
-public sealed class SchemataRepositoryBuilder(IServiceCollection services)
+public sealed class SchemataRepositoryBuilder
 {
-    public IServiceCollection Services => services;
+    public SchemataRepositoryBuilder(IServiceCollection services) {
+        Services = services;
+    }
+
+    public IServiceCollection Services { get; }
 }
