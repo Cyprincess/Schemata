@@ -1,7 +1,6 @@
 using System;
 using Mapster;
 using MapsterMapper;
-using Microsoft.Extensions.Options;
 using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.Mapster;
@@ -10,11 +9,7 @@ public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly Mapper _mapper;
 
-    public SimpleMapper(IOptions<SchemataMappingOptions> options) {
-        var config = TypeAdapterConfig.GlobalSettings;
-
-        MapsterConfigurator.Configure(config, options.Value);
-
+    public SimpleMapper(TypeAdapterConfig config) {
         _mapper = new(config);
     }
 

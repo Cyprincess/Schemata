@@ -9,9 +9,7 @@ public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly IMapper _mapper;
 
-    public SimpleMapper(IOptions<SchemataMappingOptions> options) {
-        var config = new MapperConfiguration(mapper => { AutoMapperConfigurator.Configure(mapper, options.Value); });
-
+    public SimpleMapper(MapperConfiguration config) {
         _mapper = new Mapper(config);
     }
 

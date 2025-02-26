@@ -4,7 +4,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Http.Tests;
 
-public record Student : IIdentifier, IConcurrency, IFreshness
+public class Student : IIdentifier, IConcurrency, IFreshness
 {
     public string? Name { get; set; }
 
