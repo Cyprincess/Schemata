@@ -1,6 +1,5 @@
-using Mapster;
-using MapsterMapper;
-using Schemata.Mapping.Mapster;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Mapping.Skeleton;
 using Schemata.Mapping.Tests.Models;
 using Xunit;
@@ -11,18 +10,22 @@ public class TestMapster
 {
     [Fact]
     public void Map() {
-        var config  = TypeAdapterConfig.GlobalSettings;
-        var options = new SchemataMappingOptions();
-        options.AddMapping<Source, Destination>(map => {
-            map.For(d => d.DisplayName).From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
-            map.For(d => d.Age).From(s => s.Age).Ignore((s, _) => s.Age < 18);
-            map.For(d => d.Grade).Ignore();
-            map.For(d => d.Sex).From(s => s.Sex.ToString());
-        });
+        var builder = WebApplication.CreateBuilder()
+                                    .UseSchemata(schema => {
+                                         schema.UseMapster()
+                                               .Map<Source, Destination>(map => {
+                                                    map.For(d => d.DisplayName).From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
+                                                    map.For(d => d.Age).From(s => s.Age).Ignore((s, _) => s.Age < 18);
+                                                    map.For(d => d.Grade).Ignore();
+                                                    map.For(d => d.Sex).From(s => s.Sex.ToString());
+                                                });
+                                     });
 
-        MapsterConfigurator.Configure(config, options);
+        var app = builder.Build();
 
-        var mapper = new Mapper(config);
+        var scope = app.Services.CreateScope();
+
+        var mapper = scope.ServiceProvider.GetRequiredService<ISimpleMapper>();
 
         var source = new Source {
             Name  = "John",
@@ -33,9 +36,9 @@ public class TestMapster
 
         var destination = mapper.Map<Destination>(source);
 
-        Assert.Equal("Mr. John", destination.DisplayName);
-        Assert.Equal(source.Age, destination.Age);
-        Assert.Equal(0, destination.Grade);
-        Assert.Equal(nameof(Sex.Male), destination.Sex);
+        Assert.Equal("Mr. John", destination?.DisplayName);
+        Assert.Equal(source.Age, destination?.Age);
+        Assert.Equal(0, destination?.Grade);
+        Assert.Equal(nameof(Sex.Male), destination?.Sex);
     }
 }

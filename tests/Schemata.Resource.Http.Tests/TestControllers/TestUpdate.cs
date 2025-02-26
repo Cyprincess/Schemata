@@ -13,7 +13,12 @@ public class TestUpdate
     public async Task Update() {
         var student = _fixture.Students.First();
 
-        var request = student with { Grade = 2 };
+        var request = new Student {
+            Id    = 1,
+            Name  = "Alice",
+            Age   = 18,
+            Grade = 2,
+        };
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
         var result = await controller.Update(student.Id, request);

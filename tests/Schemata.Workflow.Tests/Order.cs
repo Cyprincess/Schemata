@@ -5,7 +5,7 @@ using Schemata.Workflow.Skeleton.Entities;
 
 namespace Schemata.Workflow.Tests;
 
-public record Order : IConcurrency, IFreshness, IStatefulEntity
+public class Order : IConcurrency, IFreshness, IStatefulEntity
 {
     #region IConcurrency Members
 
