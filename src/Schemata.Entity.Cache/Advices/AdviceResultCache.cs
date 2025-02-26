@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
@@ -12,14 +9,14 @@ using Schemata.Entity.Repository.Advices;
 
 namespace Schemata.Entity.Cache.Advices;
 
-public class AdviceResultCache
+public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvice<TEntity, TResult, T> where TEntity : class
 {
-    internal static readonly ConcurrentDictionary<string, string> AffectedKeys = [];
-}
+    private readonly IMemoryCache _cache;
 
-public class AdviceResultCache<TEntity, TResult, T>(IMemoryCache cache) : AdviceResultCache, IRepositoryResultAdvice<TEntity, TResult, T>
-    where TEntity : class
-{
+    public AdviceResultCache(IMemoryCache cache) {
+        _cache = cache;
+    }
+
     #region IRepositoryResultAdvice<TEntity,TResult,T> Members
 
     public int Order => SchemataConstants.Orders.Max;
@@ -43,32 +40,12 @@ public class AdviceResultCache<TEntity, TResult, T>(IMemoryCache cache) : Advice
             return Task.FromResult(true);
         }
 
-        cache.Set(key, context.Result, new MemoryCacheEntryOptions() {
-            Priority = CacheItemPriority.Normal,
-            SlidingExpiration = TimeSpan.FromMinutes(5),
-        });
-
-        if (context.Query.Expression is not MethodCallExpression expression) {
-            return Task.FromResult(true);
-        }
-
-        var type = typeof(TEntity);
-        var name = type.FullName ?? type.Name;
-
-        var result = typeof(T);
-        if (result is { IsValueType: true, IsPrimitive: true }) {
-            AffectedKeys[$"{name}.\x1e{result.Name}"] = key!;
-
-            return Task.FromResult(true);
-        }
-
-        var visitor = new PropertyVisitor(type);
-        visitor.Visit(expression);
-
-        foreach (var property in visitor.Properties) {
-            var value = property.GetValue(context.Result);
-            AffectedKeys[$"{name}.{property.Name}={value}"] = key!;
-        }
+        _cache.Set(key,
+                   context.Result,
+                   new MemoryCacheEntryOptions {
+                       Priority          = CacheItemPriority.Normal,
+                       SlidingExpiration = TimeSpan.FromMinutes(5),
+                   });
 
         return Task.FromResult(true);
     }
