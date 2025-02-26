@@ -14,8 +14,6 @@ public static class SchemataRepositoryBuilderExtensions
 
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAsyncAdvice<,,>), typeof(AdviceQueryCache<,,>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryResultAdvice<,,>), typeof(AdviceResultCache<,,>)));
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAsyncAdvice<>), typeof(AdviceRemoveCache<>)));
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAsyncAdvice<>), typeof(AdviceRemoveCache<>)));
 
         return builder;
     }
