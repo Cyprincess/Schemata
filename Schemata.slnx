@@ -1,0 +1,59 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="eng\Versions.props" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="NuGet.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="generators\Schemata.DSL\Schemata.DSL.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Abstractions\Schemata.Abstractions.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Core\Schemata.Core.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Entity.Cache\Schemata.Entity.Cache.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Mapping.AutoMapper\Schemata.Mapping.AutoMapper.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Mapping.Foundation\Schemata.Mapping.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Modular\Schemata.Modular.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Pipeline\Schemata.Pipeline.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Queryable\Schemata.Queryable.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Tenancy.Skeleton\Schemata.Tenancy.Skeleton.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Workflow.Foundation\Schemata.Workflow.Foundation.csproj" Type="Classic C#" />
+    <Project Path="src\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/targets/">
+    <Project Path="targets\Schemata.Application.Targets\Schemata.Application.Complex.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Application.Targets\Schemata.Application.Modular.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Application.Targets\Schemata.Application.Persisting.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Application.Targets\Schemata.Application.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Business.Targets\Schemata.Business.Complex.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Business.Targets\Schemata.Business.Persisting.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Business.Targets\Schemata.Business.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Module.Targets\Schemata.Module.Complex.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Module.Targets\Schemata.Module.Persisting.Targets.csproj" Type="Classic C#" />
+    <Project Path="targets\Schemata.Module.Targets\Schemata.Module.Targets.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\Schemata.DSL.Tests\Schemata.DSL.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Schemata.Entity.Tests\Schemata.Entity.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Schemata.Mapping.Tests\Schemata.Mapping.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Schemata.Resource.Http.Tests\Schemata.Resource.Http.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Schemata.Resource.Tests\Schemata.Resource.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Schemata.Workflow.Tests\Schemata.Workflow.Tests.csproj" Type="Classic C#" />
+  </Folder>
+</Solution>

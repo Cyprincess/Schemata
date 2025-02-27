@@ -48,7 +48,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
 
     public virtual ValueTask<TScope?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return FindByIdAsync(id, ct);
+
+        return _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
     }
 
     public virtual async ValueTask<TScope?> FindByNameAsync(string name, CancellationToken ct) {
@@ -151,7 +152,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TScope            scope,
         CancellationToken ct) {
-        if (string.IsNullOrEmpty(scope.Properties)) {
+        if (string.IsNullOrWhiteSpace(scope.Properties)) {
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
@@ -170,7 +171,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetResourcesAsync(TScope scope, CancellationToken ct) {
-        if (string.IsNullOrEmpty(scope.Resources)) {
+        if (string.IsNullOrWhiteSpace(scope.Resources)) {
             return new(ImmutableArray<string>.Empty);
         }
 
@@ -279,8 +280,4 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     }
 
     #endregion
-
-    public virtual async ValueTask<TScope?> FindByIdAsync(long id, CancellationToken ct) {
-        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
-    }
 }

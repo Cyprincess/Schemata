@@ -23,11 +23,11 @@ public sealed class AuthorizationCachingFeature : IAuthorizationFeature
         OpenIddictServerBuilder              builder,
         OpenIddictServerAspNetCoreBuilder    integration) {
         if (features.OfType<AuthorizationCodeFlowFeature>().Any()) {
-            integration.EnableAuthorizationRequestCaching();
+            builder.EnableAuthorizationRequestCaching();
         }
 
-        if (features.OfType<AuthorizationLogoutFeature>().Any()) {
-            integration.EnableLogoutRequestCaching();
+        if (features.OfType<AuthorizationEndSessionFeature>().Any()) {
+            builder.EnableEndSessionRequestCaching();
         }
     }
 
