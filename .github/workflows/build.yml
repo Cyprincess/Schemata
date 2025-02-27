@@ -14,6 +14,14 @@ on:
       - rel/*
     paths-ignore:
       - '**/*.md'
+  workflow_dispatch:
+
+env:
+  DOTNET_MULTILEVEL_LOOKUP: 0
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION: 1
+  NUGET_XMLDOC_MODE: skip
+  TERM: xterm
 
 jobs:
   build:
@@ -33,13 +41,15 @@ jobs:
             os_name: windows
 
     steps:
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup NuGet
-        uses: nuget/setup-nuget@v2
-        with:
-          nuget-version: 'latest'
 
       - name: Set Build ID
         if: ${{ startsWith(github.ref, 'refs/pull/') == false }}
@@ -54,36 +64,27 @@ jobs:
 
       - name: Build, Test and Package
         if: ${{ runner.os == 'Windows' }}
-        run: eng\common\CIBuild.cmd -configuration Release -prepareMachine -integrationTest /p:SuppressSymbolPackageFormatValidation=true
-        env:
-          DOTNET_MULTILEVEL_LOOKUP: 0
-          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-          NUGET_XMLDOC_MODE: skip
+        run: .\eng\common\CIBuild.cmd -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
 
       - name: Build, Test and Package
-        shell: pwsh
         if: ${{ runner.os != 'Windows' }}
-        run: ./eng/common/cibuild.sh -configuration Release -prepareMachine -integrationTest /p:SuppressSymbolPackageFormatValidation=true
-        env:
-          DOTNET_MULTILEVEL_LOOKUP: 0
-          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-          NUGET_XMLDOC_MODE: skip
+        run: ./eng/common/cibuild.sh -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
 
       - name: Publish logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: logs-${{ matrix.os_name }}
           path: ./artifacts/log/Release
 
       - name: Publish NuGet packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: packages-${{ matrix.os_name }}
           path: ./artifacts/packages/Release/Shipping
 
       - name: Publish test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: testresults-${{ matrix.os_name }}

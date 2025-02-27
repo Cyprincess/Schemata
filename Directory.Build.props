@@ -3,20 +3,22 @@
   <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
 
   <PropertyGroup>
-    <EnableSourceLink>false</EnableSourceLink>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>preview</LangVersion>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <AnalysisLevel>preview</AnalysisLevel>
-    <NoWarn>$(NoWarn);CS1591;NU5118;NU5128;AD0001</NoWarn>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591;NU5118;NU5128;AD0001</NoWarn>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>false</ImplicitUsings>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <SuppressSymbolPackageFormatValidation>true</SuppressSymbolPackageFormatValidation>
+    <EnableXlfLocalization>false</EnableXlfLocalization>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
-    <ImplicitUsings>false</ImplicitUsings>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -64,6 +66,10 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('generators')) OR $(RepoRelativeProjectDir.Contains('targets')) ">
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('generators')) OR $(RepoRelativeProjectDir.Contains('targets')) ">
     <IsPackable>true</IsPackable>
     <IsShipping>true</IsShipping>
     <SignAssembly>true</SignAssembly>
@@ -89,7 +95,10 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
-    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <PropertyGroup>

@@ -91,9 +91,11 @@ public class TestFixture
 
         var builder = WebApplication.CreateBuilder()
                                     .UseSchemata(schema => {
-                                         schema.UseMapster().Map<Student, Student>();
+                                         schema.UseMapster()
+                                               .Map<Student, Student>();
 
-                                         schema.UseResource().MapHttp();
+                                         schema.UseResource()
+                                               .MapHttp();
 
                                          schema.Services.AddTransient<IRepository<Student>>(_ => Repository.Object);
                                          schema.Services.AddTransient<IUrlHelper>(_ => url.Object);

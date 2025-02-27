@@ -1,0 +1,87 @@
+name: analysis
+
+on:
+  push:
+    branches:
+      - master
+      - rel/*
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+env:
+  DOTNET_MULTILEVEL_LOOKUP: 0
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION: 1
+  NUGET_XMLDOC_MODE: skip
+  TERM: xterm
+  SONAR_PROJECT_KEY: Schemata
+  SONAR_ORGANIZATION: cyprincess
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+
+jobs:
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+
+      - name: Setup SonarScanner for .NET
+        run: |
+          echo "/root/.dotnet/tools" >> $GITHUB_PATH
+          dotnet tool install --global dotnet-sonarscanner
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Begin SonarScanner
+        if: github.event_name != 'pull_request'
+        run: |
+          dotnet sonarscanner begin \
+                 /k:"$SONAR_PROJECT_KEY" \
+                 /o:"$SONAR_ORGANIZATION" \
+                 /d:sonar.token="$SONAR_TOKEN" \
+                 /d:sonar.host.url="$SONAR_HOST_URL" \
+                 /d:sonar.branch.name="$GITHUB_REF" \
+                 /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+                 /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Begin SonarScanner
+        if: github.event_name == 'pull_request'
+        run: |
+          dotnet sonarscanner begin \
+                 /k:"$SONAR_PROJECT_KEY" \
+                 /o:"$SONAR_ORGANIZATION" \
+                 /d:sonar.token="$SONAR_TOKEN" \
+                 /d:sonar.host.url="$SONAR_HOST_URL" \
+                 /d:sonar.pullrequest.key="${{ github.event.number }}" \
+                 /d:sonar.pullrequest.branch="$GITHUB_HEAD_REF" \
+                 /d:sonar.pullrequest.base="$GITHUB_BASE_REF" \
+                 /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+                 /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Run VSTest
+        run: |
+          dotnet build --no-incremental
+          dotnet test --no-build \
+                 --logger trx \
+                 --collect:"XPlat Code Coverage;Format=opencover"
+
+      - name: End SonarScanner
+        run: |
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

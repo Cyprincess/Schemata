@@ -39,13 +39,13 @@ public sealed partial class ConnectController : ControllerBase
         // authentication options shouldn't be used, a specific scheme can be specified here.
         var result = await HttpContext.AuthenticateAsync();
         if (result is not { Succeeded: true }
-         || request.HasPrompt(OpenIddictConstants.Prompts.Login)
+         || request.HasPromptValue(OpenIddictConstants.PromptValues.Login)
          || (request.MaxAge is not null
           && result.Properties?.IssuedUtc is not null
           && DateTimeOffset.UtcNow - result.Properties.IssuedUtc > TimeSpan.FromSeconds(request.MaxAge.Value))) {
             // If the client application requested promptless authentication,
             // return an error indicating that the user is not logged in.
-            if (request.HasPrompt(OpenIddictConstants.Prompts.None)) {
+            if (request.HasPromptValue(OpenIddictConstants.PromptValues.None)) {
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                               properties: new(new Dictionary<string, string?> {
                                   [Properties.Error]            = OpenIddictConstants.Errors.LoginRequired,
@@ -55,7 +55,7 @@ public sealed partial class ConnectController : ControllerBase
 
             // To avoid endless login -> authorization redirects, the prompt=login flag
             // is removed from the authorization request payload before redirecting the user.
-            var prompt = string.Join(" ", request.GetPrompts().Remove(OpenIddictConstants.Prompts.Login));
+            var prompt = string.Join(" ", request.GetPromptValues().Remove(OpenIddictConstants.PromptValues.Login));
 
             var parameters = Request.HasFormContentType
                 ? Request.Form.Where(parameter => parameter.Key != OpenIddictConstants.Parameters.Prompt).ToList()
@@ -66,7 +66,7 @@ public sealed partial class ConnectController : ControllerBase
             /*
             // For applications that want to allow the client to select the external authentication provider
             // that will be used to authenticate the user, the identity_provider parameter can be used for that.
-            if (!string.IsNullOrEmpty(request.IdentityProvider))
+            if (!string.IsNullOrWhiteSpace(request.IdentityProvider))
             {
                 var registrations = await _clientService.GetClientRegistrationsAsync();
                 if (!registrations.Any(registration => string.Equals(registration.ProviderName,
@@ -137,7 +137,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.ConsentTypes.Implicit:
             case OpenIddictConstants.ConsentTypes.External when authorizations.Count is not 0:
             case OpenIddictConstants.ConsentTypes.Explicit when authorizations.Count is not 0
-                                                             && !request.HasPrompt(OpenIddictConstants.Prompts.Consent):
+                                                             && !request.HasPromptValue(OpenIddictConstants.PromptValues.Consent):
                 // Create the claims-based identity that will be used by OpenIddict to generate tokens.
                 var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
                                                   OpenIddictConstants.Claims.Subject,
@@ -174,8 +174,8 @@ public sealed partial class ConnectController : ControllerBase
 
             // At this point, no authorization was found in the database and an error must be returned
             // if the client application specified prompt=none in the authorization request.
-            case OpenIddictConstants.ConsentTypes.Explicit when request.HasPrompt(OpenIddictConstants.Prompts.None):
-            case OpenIddictConstants.ConsentTypes.Systematic when request.HasPrompt(OpenIddictConstants.Prompts.None):
+            case OpenIddictConstants.ConsentTypes.Explicit when request.HasPromptValue(OpenIddictConstants.PromptValues.None):
+            case OpenIddictConstants.ConsentTypes.Systematic when request.HasPromptValue(OpenIddictConstants.PromptValues.None):
                 return Forbid(authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                               properties: new(new Dictionary<string, string?> {
                                   [Properties.Error]            = OpenIddictConstants.Errors.ConsentRequired,

@@ -32,7 +32,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override string? GetQueryString<T>(IQueryable<T> query) {
-#if NET6_0_OR_GREATER
+#if NET8_0_OR_GREATER
         return query.ToQueryString();
 #else
         return query.ToSql();
