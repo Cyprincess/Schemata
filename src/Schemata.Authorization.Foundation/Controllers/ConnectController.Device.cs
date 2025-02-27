@@ -25,7 +25,7 @@ public sealed partial class ConnectController : ControllerBase
     public async Task<IActionResult> Verify() {
         // Retrieve the claims principal associated with the user code.
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        if (result.Succeeded && !string.IsNullOrEmpty(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
+        if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Retrieve the application details from the database using the client_id stored in the principal.
             var application = await _applicationManager.FindByClientIdAsync(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId)!)
                            ?? throw new InvalidOperationException("Details concerning the calling client application cannot be found.");
@@ -51,7 +51,7 @@ public sealed partial class ConnectController : ControllerBase
 
         // If a user code was specified (e.g as part of the verification_uri_complete)
         // but is not valid, render a form asking the user to enter the user code manually.
-        if (!string.IsNullOrEmpty(
+        if (!string.IsNullOrWhiteSpace(
                 result.Properties?.GetTokenValue(OpenIddictServerAspNetCoreConstants.Tokens.UserCode))) {
             return BadRequest(new ErrorResponse {
                                   Error = OpenIddictConstants.Errors.InvalidToken,
@@ -72,7 +72,7 @@ public sealed partial class ConnectController : ControllerBase
 
         // Retrieve the claims principal associated with the user code.
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        if (result.Succeeded && !string.IsNullOrEmpty(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
+        if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Create the claims-based identity that will be used by OpenIddict to generate tokens.
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
                                               OpenIddictConstants.Claims.Subject,

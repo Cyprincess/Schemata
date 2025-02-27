@@ -44,7 +44,7 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetHostsAsync(TTenant tenant, CancellationToken ct) {
-        if (string.IsNullOrEmpty(tenant.Hosts)) {
+        if (string.IsNullOrWhiteSpace(tenant.Hosts)) {
             return new(ImmutableArray<string>.Empty);
         }
 

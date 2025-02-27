@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -47,48 +48,54 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         await _tokens.CommitAsync(ct);
     }
 
-    public virtual IAsyncEnumerable<TToken> FindAsync(string subject, string client, CancellationToken ct) {
-        var id = long.Parse(client);
-        return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id && t.Subject == subject), ct);
-    }
+    public virtual async IAsyncEnumerable<TToken> FindAsync(
+        string?                                    subject,
+        string?                                    client,
+        string?                                    status,
+        string?                                    type,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var predicate = Predicate.True<TToken>();
 
-    public virtual IAsyncEnumerable<TToken> FindAsync(
-        string            subject,
-        string            client,
-        string            status,
-        CancellationToken ct) {
-        var id = long.Parse(client);
-        return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id && t.Subject == subject && t.Status == status),
-                                 ct);
-    }
+        if (!string.IsNullOrEmpty(subject)) {
+            predicate = predicate.And(t => t.Subject == subject);
+        }
 
-    public virtual IAsyncEnumerable<TToken> FindAsync(
-        string            subject,
-        string            client,
-        string            status,
-        string            type,
-        CancellationToken ct) {
-        var id = long.Parse(client);
-        return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id
-                                                && t.Subject == subject
-                                                && t.Status == status
-                                                && t.Type == type),
-                                 ct);
+        if (!string.IsNullOrEmpty(client)) {
+            var id = long.Parse(client);
+
+            predicate = predicate.And(t => t.ApplicationId == id);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status)) {
+            predicate = predicate.And(t => t.Status == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(type)) {
+            predicate = predicate.And(t => t.Type == type);
+        }
+
+        await foreach (var token in _tokens.ListAsync(q => q.Where(predicate), ct)) {
+            ct.ThrowIfCancellationRequested();
+            yield return token;
+        }
     }
 
     public virtual IAsyncEnumerable<TToken> FindByApplicationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return FindByApplicationIdAsync(id, ct);
+
+        return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id), ct);
     }
 
     public virtual IAsyncEnumerable<TToken> FindByAuthorizationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return FindByAuthorizationIdAsync(id, ct);
+
+        return _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == id), ct);
     }
 
     public virtual ValueTask<TToken?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
-        return FindByIdAsync(id, ct);
+
+        return _tokens.SingleOrDefaultAsync(q => q.Where(t => t.Id == id), ct);
     }
 
     public virtual async ValueTask<TToken?> FindByReferenceIdAsync(string identifier, CancellationToken ct) {
@@ -141,7 +148,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TToken            token,
         CancellationToken ct) {
-        if (string.IsNullOrEmpty(token.Properties)) {
+        if (string.IsNullOrWhiteSpace(token.Properties)) {
             return new(ImmutableDictionary.Create<string, JsonElement>());
         }
 
@@ -203,7 +210,9 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
                                                  || t.ExpireTime < DateTime.UtcNow;
         var count = 0L;
 
-        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query), ct)) {
+        await foreach (var token in _tokens.ListAsync(
+                           q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query),
+                           ct)) {
             ct.ThrowIfCancellationRequested();
             await _tokens.RemoveAsync(token, ct);
             count++;
@@ -214,18 +223,47 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         return count;
     }
 
-    public virtual async ValueTask<long> RevokeByAuthorizationIdAsync(string identifier, CancellationToken ct) {
+    public virtual async ValueTask<long> RevokeAsync(
+        string?           subject,
+        string?           client,
+        string?           status,
+        string?           type,
+        CancellationToken ct) {
         var count = 0L;
 
-        await foreach (var token in FindByAuthorizationIdAsync(identifier, ct)) {
+        await foreach (var token in FindAsync(subject, client, status, type, ct)) {
             ct.ThrowIfCancellationRequested();
-            await _tokens.RemoveAsync(token, ct);
+            token.Status = Statuses.Revoked;
+            await _tokens.UpdateAsync(token, ct);
             count++;
         }
 
         await _tokens.CommitAsync(ct);
 
         return count;
+    }
+
+    public virtual ValueTask<long> RevokeByApplicationIdAsync(string identifier, CancellationToken ct) {
+        return RevokeAsync(null, identifier, null, null, ct);
+    }
+
+    public virtual async ValueTask<long> RevokeByAuthorizationIdAsync(string identifier, CancellationToken ct) {
+        var count = 0L;
+
+        await foreach (var token in FindByAuthorizationIdAsync(identifier, ct)) {
+            ct.ThrowIfCancellationRequested();
+            token.Status = Statuses.Revoked;
+            await _tokens.UpdateAsync(token, ct);
+            count++;
+        }
+
+        await _tokens.CommitAsync(ct);
+
+        return count;
+    }
+
+    public virtual ValueTask<long> RevokeBySubjectAsync(string subject, CancellationToken ct) {
+        return RevokeAsync(subject, null, null, null, ct);
     }
 
     public virtual ValueTask SetApplicationIdAsync(TToken token, string? identifier, CancellationToken ct) {
@@ -298,16 +336,4 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
     }
 
     #endregion
-
-    public virtual IAsyncEnumerable<TToken> FindByApplicationIdAsync(long id, CancellationToken ct) {
-        return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id), ct);
-    }
-
-    public virtual IAsyncEnumerable<TToken> FindByAuthorizationIdAsync(long id, CancellationToken ct) {
-        return _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == id), ct);
-    }
-
-    public virtual async ValueTask<TToken?> FindByIdAsync(long id, CancellationToken ct) {
-        return await _tokens.SingleOrDefaultAsync(q => q.Where(t => t.Id == id), ct);
-    }
 }

@@ -111,7 +111,7 @@ public sealed partial class AuthenticateController : ControllerBase
         if (!result.IsTwoFactorEnabled) {
             await _userManager.ResetAuthenticatorKeyAsync(user);
             var key = await _userManager.GetAuthenticatorKeyAsync(user);
-            if (string.IsNullOrEmpty(key)) {
+            if (string.IsNullOrWhiteSpace(key)) {
                 throw new NotSupportedException("The user manager must produce an authenticator key after reset.");
             }
 

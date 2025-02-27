@@ -32,8 +32,8 @@ public static class SchemataAuthorizationBuilderExtensions
         return builder;
     }
 
-    public static SchemataAuthorizationBuilder UseLogout(this SchemataAuthorizationBuilder builder) {
-        AddFeature<AuthorizationLogoutFeature>(builder);
+    public static SchemataAuthorizationBuilder UseEndSession(this SchemataAuthorizationBuilder builder) {
+        AddFeature<AuthorizationEndSessionFeature>(builder);
         return builder;
     }
 

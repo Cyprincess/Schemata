@@ -15,9 +15,9 @@ public sealed class AuthorizationDeviceFlowFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder) {
-        builder.AllowDeviceCodeFlow()
-               .SetDeviceEndpointUris("/Connect/Device")
-               .SetVerificationEndpointUris("/Connect/Verify")
+        builder.AllowDeviceAuthorizationFlow()
+               .SetDeviceAuthorizationEndpointUris("/Connect/Device")
+               .SetEndUserVerificationEndpointUris("/Connect/Verify")
                .SetTokenEndpointUris("/Connect/Token");
     }
 
@@ -27,7 +27,7 @@ public sealed class AuthorizationDeviceFlowFeature : IAuthorizationFeature
         OpenIddictServerBuilder              builder,
         OpenIddictServerAspNetCoreBuilder    integration) {
         integration.EnableTokenEndpointPassthrough()
-                   .EnableVerificationEndpointPassthrough();
+                   .EnableEndUserVerificationEndpointPassthrough();
     }
 
     #endregion

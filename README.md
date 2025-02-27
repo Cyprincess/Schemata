@@ -8,8 +8,8 @@ Application Framework aims on modular business applications.
 
 ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)
 ![netstandard2.1](https://img.shields.io/badge/netstandard-2.1-brightgreen.svg)
-![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg)
 ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg)
+![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg)
 
 ## Quick Start
 
@@ -89,8 +89,9 @@ app.Run();
 - Event
 - [Identity](https://nuget.org/packages/Schemata.Identity.Foundation)
 - [Mapping](https://nuget.org/packages/Schemata.Mapping.Foundation)
+- [Repository](https://nuget.org/packages/Schemata.Entity.Repository)
 - Task
-- Tenant
+- [Tenant](https://nuget.org/packages/Schemata.Tenancy.Foundation)
 - [Validation](https://nuget.org/packages/Schemata.Validation)
 - [Workflow](https://nuget.org/packages/Schemata.Workflow.Foundation)
 
@@ -148,22 +149,23 @@ An extension feature can be activated in the same way as a built-in feature.
 
 ## Compliance
 
-Schemata is designed to comply with .NET Standard 2.0, .NET Standard 2.1, and the two most recent .NET Long-Term
-Support (LTS) versions, which are .NET 6.0 and .NET 8.0 at the time of writing.
+Schemata is designed to be compatible with .NET Standard 2.0, .NET Standard 2.1, the latest .NET Long-Term Support (LTS)
+version, and the most recent .NET version.
 
 Some packages may have additional compliance requirements, which are documented below.
 
 | Package                           | Compliance                                                                                                                      |
 |-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | Schemata.DSL                      | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                 |
-| Schemata.Core                     | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Modular                  | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Authorization.Foundation | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Identity.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Mapping.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Resource.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Tenancy.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
-| Schemata.Workflow.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
+| Schemata.Core                     | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Modular                  | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Authorization.Foundation | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Identity.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Mapping.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Resource.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Security.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Tenancy.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Workflow.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
 

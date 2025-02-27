@@ -31,7 +31,7 @@ public class TestObjectField
     [InlineData("string foo = \"bar\"", "string", "foo", false, null, null, null, "bar")]
     public void ShouldParseObjectField(
         string    syntax,
-        string    type,
+        string?   type,
         string    name,
         bool      nullable = false,
         string?   note     = null,

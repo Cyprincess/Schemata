@@ -41,9 +41,9 @@ public sealed partial class AuthenticateController : ControllerBase
         var result = await _signInManager.PasswordSignInAsync(request.Username, request.Password, false, true);
 
         if (result.RequiresTwoFactor) {
-            if (!string.IsNullOrEmpty(request.TwoFactorCode)) {
+            if (!string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
                 result = await _signInManager.TwoFactorAuthenticatorSignInAsync(request.TwoFactorCode, false, false);
-            } else if (!string.IsNullOrEmpty(request.TwoFactorRecoveryCode)) {
+            } else if (!string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
                 result = await _signInManager.TwoFactorRecoveryCodeSignInAsync(request.TwoFactorRecoveryCode);
             }
         }
