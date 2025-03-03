@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Parlot;
 using static System.StringComparison;
@@ -6,6 +7,8 @@ namespace Schemata.DSL.Terms;
 
 public class Use : TermBase, INamedTerm
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Use).AsSpan();
+
     #region INamedTerm Members
 
     public string Name { get; set; } = null!;
@@ -14,7 +17,7 @@ public class Use : TermBase, INamedTerm
 
     // Use = "Use" WS QualifiedName { [WS] , [WS] QualifiedName }
     public static IEnumerable<Use>? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Use), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 
@@ -29,7 +32,7 @@ public class Use : TermBase, INamedTerm
                 throw new ParseException("Expected a full-qualified name", scanner.Cursor.Position);
             }
 
-            yield return new() { Name = name.GetText() };
+            yield return new() { Name = name.ToString() };
 
             scanner.SkipWhiteSpace();
 

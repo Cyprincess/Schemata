@@ -12,7 +12,7 @@ public class ResourceRequestContainer<T>
 {
     public Func<IQueryable<T>, IQueryable<T>> Query { get; private set; } = q => q;
 
-    public void ApplyFiltering(Filter filter) {
+    public void ApplyFiltering(Filter? filter) {
         Query = Query.WithFiltering(filter);
     }
 

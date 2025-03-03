@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Parlot;
 using static System.StringComparison;
@@ -6,6 +7,8 @@ namespace Schemata.DSL.Terms;
 
 public class Object : TermBase, INamedTerm
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Object).AsSpan();
+
     public Note? Note { get; set; }
 
     public Dictionary<string, ObjectField>? Fields { get; set; }
@@ -18,7 +21,7 @@ public class Object : TermBase, INamedTerm
 
     // Object = "Object" WS Name LC [ Note | ObjectField ] RC
     public static Object? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Object), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 
@@ -28,7 +31,7 @@ public class Object : TermBase, INamedTerm
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }
 
-        var @object = new Object { Name = name.GetText() };
+        var @object = new Object { Name = name.ToString() };
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 

@@ -1,3 +1,4 @@
+using System;
 using Parlot;
 using static System.StringComparison;
 
@@ -5,11 +6,13 @@ namespace Schemata.DSL.Terms;
 
 public class Note : TermBase
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Note).AsSpan();
+
     public string Comment { get; set; } = null!;
 
     // Note = "Note" WS Value
     public static Note? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Note), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 

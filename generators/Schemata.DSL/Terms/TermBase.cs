@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Parlot;
@@ -32,7 +33,7 @@ public abstract class TermBase
         return $"{mark.Namespace?.Name}.{type}";
     }
 
-    protected static bool ReadNamespacedIdentifier(Scanner scanner, out TokenResult result) {
+    protected static bool ReadNamespacedIdentifier(Scanner scanner, out ReadOnlySpan<char> result) {
         return scanner.ReadFirstThenOthers(static x => Character.IsIdentifierStart(x),
                                            static x => x == '.' || Character.IsIdentifierPart(x),
                                            out result);
@@ -87,11 +88,11 @@ public abstract class TermBase
             return;
         }
 
-        if (allowBracket && result.Span[0] == '}') {
+        if (allowBracket && result[0] == '}') {
             scanner.Cursor.ResetPosition(position);
             return;
         }
 
-        throw new ParseException($"Expected line break, ‘{result.GetText()}’ given", scanner.Cursor.Position);
+        throw new ParseException($"Expected line break, ‘{result.ToString()}’ given", scanner.Cursor.Position);
     }
 }

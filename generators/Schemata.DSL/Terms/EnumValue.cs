@@ -22,7 +22,7 @@ public class EnumValue : TermBase, INamedTerm
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 
-        var identifier = name.GetText();
+        var identifier = name.ToString();
 
         string? body = null;
         if (scanner.ReadChar('=')) {

@@ -7,6 +7,8 @@ namespace Schemata.DSL.Terms;
 
 public class Entity : TermBase, INamedTerm
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Entity).AsSpan();
+
     public Note? Note { get; set; }
 
     public List<Use>? Uses { get; set; }
@@ -27,7 +29,7 @@ public class Entity : TermBase, INamedTerm
 
     // Entity = "Entity" WS Name [ [WS] : Name { [WS] , [WS] Name } ] [WS] LC [ Note | Enum | Trait | Dto | Index | Use | Field ] RC
     public static Entity? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Entity), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 
@@ -41,7 +43,7 @@ public class Entity : TermBase, INamedTerm
             throw new ParseException("Expected a name", scanner.Cursor.Position);
         }
 
-        var table = new T { Name = name.GetText() };
+        var table = new T { Name = name.ToString() };
 
         // TODO: inherit
 

@@ -10,6 +10,7 @@ public class TestFilterContainer
     [Fact]
     public void TranslateExample1() {
         var filter = Parser.Filter.Parse("a b AND c AND d");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("q", typeof(string)).Build();
         var func       = (Func<string, bool>)expression!.Compile();
@@ -21,6 +22,7 @@ public class TestFilterContainer
     [Fact]
     public void TranslateExample2() {
         var filter = Parser.Filter.Parse("New York Giants OR Yankees");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("q", typeof(string)).Build();
         var func       = (Func<string, bool>)expression!.Compile();
@@ -32,6 +34,7 @@ public class TestFilterContainer
     [Fact]
     public void TranslateExample3() {
         var filter = Parser.Filter.Parse("a < 10 OR a >= 100");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("a", typeof(long)).Build();
         var expected   = new Func<long, bool>(a => a is < 10 or >= 100);
@@ -44,6 +47,7 @@ public class TestFilterContainer
     [Fact]
     public void TranslateExample4() {
         var filter = Parser.Filter.Parse("expr.type_map.1.type = bar");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("expr", typeof(MyVector4)).Build();
         var func       = (Func<MyVector4, bool>)expression!.Compile();
@@ -60,6 +64,7 @@ public class TestFilterContainer
     [Fact]
     public void TranslateExample5() {
         var filter = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter)
                                   .AllowFunction<string>("endsWith")

@@ -10,16 +10,8 @@
     <PackageTags>application;business;framework;tenant;tenancy</PackageTags>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '6.0')) ">
-    <EnablePreviewFeatures>true</EnablePreviewFeatures>
-  </PropertyGroup>
-
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '6.0')) ">
-    <PackageReference Include="System.Runtime.Experimental" />
   </ItemGroup>
 
   <ItemGroup>

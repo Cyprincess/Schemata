@@ -37,13 +37,13 @@ public class ObjectField : TermBase, INamedTerm
         }
 
         var field = new ObjectField {
-            Name     = type.GetText(),
+            Name     = type.ToString(),
             Nullable = nullable,
         };
 
         if (scanner.ReadIdentifier(out var name)) {
-            field.Type = NormalizeType(mark, @object, type.GetText());
-            field.Name = name.GetText();
+            field.Type = NormalizeType(mark, @object, type.ToString());
+            field.Name = name.ToString();
         }
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
@@ -97,7 +97,7 @@ public class ObjectField : TermBase, INamedTerm
             if (function is not null) {
                 field.Map = function;
             } else if (ReadNamespacedIdentifier(scanner, out var token)) {
-                field.Map = new Ref { Body = token.GetText() };
+                field.Map = new Ref { Body = token.ToString() };
             } else {
                 field.Map = Value.Parse(mark, scanner);
             }
