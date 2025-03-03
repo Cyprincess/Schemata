@@ -9,7 +9,7 @@ using Schemata.Resource.Foundation.Advices;
 namespace Schemata.Resource.Foundation.Features;
 
 [DependsOn<SchemataRoutingFeature>]
-[DependsOn("SchemataMappingFeature")]
+[DependsOn("SchemataMappingFeature`1")]
 [DependsOn("SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {

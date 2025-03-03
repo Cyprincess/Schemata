@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
@@ -40,7 +41,11 @@ public sealed class SchemataResourceBuilder
         return this;
     }
 
-    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(IEnumerable<ResourceAttributeBase>? endpoints = null) {
+    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(IEnumerable<ResourceAttributeBase>? endpoints = null)
+        where TEntity : class, IIdentifier
+        where TRequest : class, IIdentifier
+        where TDetail : class, IIdentifier
+        where TSummary : class, IIdentifier {
         var entity  = typeof(TEntity);
         var request = typeof(TRequest);
         var detail  = typeof(TDetail);
