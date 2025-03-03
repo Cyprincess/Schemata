@@ -8,6 +8,8 @@ namespace Schemata.DSL.Terms;
 
 public class Index : TermBase, INamedTerm
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Index).AsSpan();
+
     public Entity Table { get; set; } = null!;
 
     public List<string> Fields { get; set; } = [];
@@ -25,7 +27,7 @@ public class Index : TermBase, INamedTerm
     // Index = "Index" WS Name { WS Name } [ [WS] LB [ Option { [WS] , [WS] Option } ] RB ] [ [WS] LC Note RC]
     // Index.Option = "Unique" | "BTree" | "B Tree" | "Hash"
     public static Index? Parse(Mark mark, Entity table, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Index), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 
@@ -37,7 +39,7 @@ public class Index : TermBase, INamedTerm
 
         var index = new Index {
             Table  = table,
-            Fields = { field.GetText() },
+            Fields = { field.ToString() },
         };
 
         while (true) {
@@ -47,7 +49,7 @@ public class Index : TermBase, INamedTerm
                 break;
             }
 
-            index.Fields.Add(name.GetText());
+            index.Fields.Add(name.ToString());
         }
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);

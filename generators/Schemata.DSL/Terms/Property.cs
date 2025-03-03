@@ -30,7 +30,7 @@ public class Property : TermBase
         EnsureLineEnd(scanner, true);
 
         return new() {
-            Name = name.GetText(),
+            Name = name.ToString(),
             Body = value.Body,
         };
     }

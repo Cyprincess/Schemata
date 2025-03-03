@@ -22,12 +22,12 @@ public class Value : TermBase, IValueTerm
                 Type = typeof(string),
             },
             var _ when scanner.ReadQuotedString(out var quoted) => new() {
-                Body = quoted.Span[1..^1].ToString(), //
+                Body = quoted[1..^1].ToString(), //
                 Type = typeof(string),
             },
             var _ when scanner.ReadDecimal(out var number) => new() {
-                Body = number.GetText(), //
-                Type = number.GetText().IndexOf('.') >= 0 ? typeof(decimal) : typeof(long),
+                Body = number.ToString(), //
+                Type = number.IndexOf('.') >= 0 ? typeof(decimal) : typeof(long),
             },
             var _ when ReadSingleLineString(scanner, out var simple) => new() {
                 Body = simple, //
@@ -59,7 +59,7 @@ public class Value : TermBase, IValueTerm
 
     private static bool ReadSingleLineString(Scanner scanner, out string @string) {
         if (scanner.ReadWhile(x => !Character.IsWhiteSpaceOrNewLine(x) && !x.IsStopWord(), out var result)) {
-            @string = result.GetText();
+            @string = result.ToString();
             return true;
         }
 

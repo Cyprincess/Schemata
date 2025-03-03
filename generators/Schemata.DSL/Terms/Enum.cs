@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Parlot;
 using static System.StringComparison;
@@ -6,6 +7,8 @@ namespace Schemata.DSL.Terms;
 
 public class Enum : TermBase, INamedTerm
 {
+    public static ReadOnlySpan<char> Keyword => nameof(Enum).AsSpan();
+
     public Note? Note { get; set; }
 
     public Dictionary<string, EnumValue>? Values { get; set; }
@@ -18,7 +21,7 @@ public class Enum : TermBase, INamedTerm
 
     // Enum = "Enum" WS Name [WS] LC [EnumValue | Note] RC
     public static Enum? Parse(Mark mark, Scanner scanner) {
-        if (!scanner.ReadText(nameof(Enum), InvariantCultureIgnoreCase)) {
+        if (!scanner.ReadText(Keyword, InvariantCultureIgnoreCase)) {
             return null;
         }
 
@@ -34,7 +37,7 @@ public class Enum : TermBase, INamedTerm
             throw new ParseException("Expected Enum definition", scanner.Cursor.Position);
         }
 
-        var @enum = new Enum { Name = name.GetText() };
+        var @enum = new Enum { Name = name.ToString() };
 
         while (true) {
             scanner.ReadChar(',');

@@ -42,8 +42,8 @@ public class Field : TermBase, INamedTerm
         }
 
         var field = new Field {
-            Type     = NormalizeType(mark, table, type.GetText()),
-            Name     = name.GetText(),
+            Type     = NormalizeType(mark, table, type.ToString()),
+            Name     = name.ToString(),
             Nullable = nullable,
         };
 

@@ -122,4 +122,8 @@
     <None Include="$(ReadmeFile)" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Update="System.Memory" />
+  </ItemGroup>
+
 </Project>

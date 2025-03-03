@@ -21,7 +21,7 @@ public class Function : TermBase, IValueTerm
             return null;
         }
 
-        var function = new Function { Body = name.GetText() };
+        var function = new Function { Body = name.ToString() };
 
         SkipWhiteSpaceOrCommentOrNewLine(scanner);
 

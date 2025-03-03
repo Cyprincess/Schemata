@@ -34,6 +34,7 @@ public class TestFilterParser
     public void ParseExample1() {
         var expression = Parser.Filter.Parse("a b AND c AND d");
 
+        Assert.NotNull(expression);
         Assert.Equal("[AND {\"a\" \"b\"} \"c\" \"d\"]", expression.ToString());
         Assert.True(expression.IsConstant);
     }
@@ -42,6 +43,7 @@ public class TestFilterParser
     public void ParseExample2() {
         var expression = Parser.Filter.Parse("New York Giants OR Yankees");
 
+        Assert.NotNull(expression);
         Assert.Equal("{\"New\" \"York\" [OR \"Giants\" \"Yankees\"]}", expression.ToString());
         Assert.True(expression.IsConstant);
     }
@@ -50,6 +52,7 @@ public class TestFilterParser
     public void ParseExample3() {
         var expression = Parser.Filter.Parse("a < 10 OR a >= 100");
 
+        Assert.NotNull(expression);
         Assert.Equal("[OR [< \"a\" 10] [>= \"a\" 100]]", expression.ToString());
         Assert.False(expression.IsConstant);
     }
@@ -58,6 +61,7 @@ public class TestFilterParser
     public void ParseExample4() {
         var expression = Parser.Filter.Parse("expr.type_map.1.type");
 
+        Assert.NotNull(expression);
         Assert.Equal("\"expr\".\"type_map\".1.\"type\"", expression.ToString());
         Assert.False(expression.IsConstant);
     }
@@ -66,6 +70,7 @@ public class TestFilterParser
     public void ParseExample5() {
         var expression = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
 
+        Assert.NotNull(expression);
         Assert.Equal("[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]", expression.ToString());
         Assert.False(expression.IsConstant);
     }

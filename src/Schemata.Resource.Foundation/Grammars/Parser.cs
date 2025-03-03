@@ -29,9 +29,9 @@ public class Parser
         var not   = Parsers.Terms.Text("NOT");
         var minus = Parsers.Terms.Char('-');
 
-        var number = Parsers.Terms.Decimal(NumberOptions.AllowSign)
+        var number = Parsers.Terms.Decimal(NumberOptions.AllowLeadingSign)
                             .Then((c, n) => new Number(c.Scanner.Cursor.Position, n));
-        var integer = Parsers.Terms.Integer(NumberOptions.AllowSign)
+        var integer = Parsers.Terms.Integer(NumberOptions.AllowLeadingSign)
                              .Then((c, i) => new Integer(c.Scanner.Cursor.Position, i));
         var truth = Parsers.Terms.Text("TRUE")
                            .Or(Parsers.Terms.Text("FALSE"))
