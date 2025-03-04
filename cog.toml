@@ -20,7 +20,8 @@ ci = {}
 chore = { changelog_title = "", omit_from_changelog = true }
 
 [changelog]
-path = "CHANGELOG.md"
+path = "docs/CHANGELOG.md"
+template = "docs/CHANGELOG.tera"
 authors = []
 
 [bump_profiles]
