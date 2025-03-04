@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -50,9 +52,94 @@ public abstract class RepositoryBase
     }
 }
 
-public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>
+public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
+    #region IRepository Members
+
+    async IAsyncEnumerable<object> IRepository.ListAsync<T>(
+        Expression<Func<T, bool>>?                 predicate,
+        [EnumeratorCancellation] CancellationToken ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        await foreach (var item in ListAsync(expression, ct)) {
+            ct.ThrowIfCancellationRequested();
+            yield return item;
+        }
+    }
+
+    async ValueTask<object?> IRepository.FirstOrDefaultAsync<T>(
+        Expression<Func<T, bool>>? predicate,
+        CancellationToken          ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        return await FirstOrDefaultAsync(expression, ct);
+    }
+
+    async ValueTask<object?> IRepository.SingleOrDefaultAsync<T>(
+        Expression<Func<T, bool>>? predicate,
+        CancellationToken          ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        return await SingleOrDefaultAsync(expression, ct);
+    }
+
+    ValueTask<bool> IRepository.AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        return AnyAsync(expression, ct);
+    }
+
+    ValueTask<int> IRepository.CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        return CountAsync(expression, ct);
+    }
+
+    ValueTask<long> IRepository.LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
+        var query = Predicate.Cast<T, TEntity>(predicate);
+
+        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
+
+        return LongCountAsync(expression, ct);
+    }
+
+    Task IRepository.AddAsync(object entity, CancellationToken ct) {
+        if (entity is not TEntity e) {
+            return Task.CompletedTask;
+        }
+
+        return AddAsync(e, ct);
+    }
+
+    Task IRepository.UpdateAsync(object entity, CancellationToken ct) {
+        if (entity is not TEntity e) {
+            return Task.CompletedTask;
+        }
+
+        return UpdateAsync(e, ct);
+    }
+
+    Task IRepository.RemoveAsync(object entity, CancellationToken ct) {
+        if (entity is not TEntity e) {
+            return Task.CompletedTask;
+        }
+
+        return RemoveAsync(e, ct);
+    }
+
+    #endregion
+
     #region IRepository<TEntity> Members
 
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();

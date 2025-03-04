@@ -1,5 +1,5 @@
-// Some code is borrowed from linq2db's SystemComponentModelDataAnnotationsSchemaAttributeReader.cs
-// https://github.com/linq2db/linq2db/blob/33b9d1369f34395b2c922f57ae41ac0b7b6324fa/Source/LinqToDB/Metadata/SystemComponentModelDataAnnotationsSchemaAttributeReader.cs
+// Some code is borrowed from linq2db
+// https://github.com/linq2db/linq2db/blob/fcf358851ac47c9d7a6ef2dd99e9561edd7fa985/Source/LinqToDB/Metadata/SystemComponentModelDataAnnotationsSchemaAttributeReader.cs
 // The borrowed code is licensed under the MIT License:
 //
 // Copyright (c) 2024 Igor Tkachev, Ilya Chudin, Svyatoslav Danyliv, Dmitry Lukashenko

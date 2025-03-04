@@ -56,6 +56,7 @@ var builder = WebApplication.CreateBuilder(args)
                                        .UseDeviceFlow()
                                        .UseIntrospection()
                                        .UseCaching();
+                                 schema.UseWorkflow();
 
                                  // You can also utilize UseAutoMapper() once you've incorporated the Schemata.Mapping.AutoMapper package into your project.
                                  schema.UseMapster()
@@ -85,7 +86,7 @@ app.Run();
 - Task
 - Tenant
 - [Validation](https://nuget.org/packages/Schemata.Validation)
-- [Workflow](https://nuget.org/packages/Schemata.Workflow)
+- [Workflow](https://nuget.org/packages/Schemata.Workflow.Foundation)
 
 ## Features
 
@@ -130,6 +131,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 310_000_000 | Schemata.Identity.Foundation      | Identity      | Schemata Identity Foundation      |
 | 320_000_000 | Schemata.Authorization.Foundation | Authorization | Schemata Authorization Foundation |
 | 330_000_000 | Schemata.Mapping.Foundation       | Mapping       | Schemata Mapper Foundation        |
+| 340_000_000 | Schemata.Workflow.Foundation      | Workflow      | Schemata Workflow Foundation      |
 
 ## Compliance
 
@@ -146,6 +148,7 @@ Some packages may have additional compliance requirements, which are documented 
 | Schemata.Authorization.Foundation | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Identity.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 | Schemata.Mapping.Foundation       | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
+| Schemata.Workflow.Foundation      | ![net6.0](https://img.shields.io/badge/Net-6.0-brightgreen.svg) ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
 
@@ -169,3 +172,8 @@ and [Mapster](https://www.nuget.org/packages/Mapster/), among others.
 
 It provides a unified interface for these libraries, enabling developers to switch between them without modifying their
 code.
+
+### Schemata.Workflow.Foundation
+
+Unfortunately, the Schemata Workflow Foundation is not yet compliant with enterprise standards such
+as [BPMN 2.0](https://www.omg.org/spec/BPMN/2.0.2/).

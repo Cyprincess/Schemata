@@ -1,53 +1,24 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Schemata.Entity.Repository;
 
-public interface IRepository<TEntity>
-    where TEntity : class
+public interface IRepository
 {
-    IAsyncEnumerable<TEntity> AsAsyncEnumerable();
+    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
-    IQueryable<TEntity> AsQueryable();
+    ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>?  predicate, CancellationToken ct = default);
+    ValueTask<object?> SingleOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<bool>    AnyAsync<T>(Expression<Func<T, bool>>?             predicate, CancellationToken ct = default);
+    ValueTask<int>     CountAsync<T>(Expression<Func<T, bool>>?           predicate, CancellationToken ct = default);
+    ValueTask<long>    LongCountAsync<T>(Expression<Func<T, bool>>?       predicate, CancellationToken ct = default);
 
-    IAsyncEnumerable<TResult> ListAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
-
-    ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
-
-    ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    ValueTask<bool> AnyAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    ValueTask<int> CountAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    ValueTask<long> LongCountAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
-
-    Task AddAsync(TEntity                   entity,   CancellationToken ct = default);
-    Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
-
-    Task UpdateAsync(TEntity entity, CancellationToken ct = default);
-
-    Task RemoveAsync(TEntity                   entity,   CancellationToken ct = default);
-    Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
+    Task AddAsync(object    entity, CancellationToken ct = default);
+    Task UpdateAsync(object entity, CancellationToken ct = default);
+    Task RemoveAsync(object entity, CancellationToken ct = default);
 
     ValueTask<int> CommitAsync(CancellationToken ct = default);
 }

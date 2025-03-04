@@ -18,10 +18,14 @@ public class SchemataJsonSerializerFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
+        var @enum = new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower);
+
         services.Configure<JsonSerializerOptions>(options => {
             options.MaxDepth             = 32;
             options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+
+            options.Converters.Add(@enum);
 
             options.TypeInfoResolver = JsonSerializer.IsReflectionEnabledByDefault
                 ? new DefaultJsonTypeInfoResolver()
@@ -31,6 +35,8 @@ public class SchemataJsonSerializerFeature : FeatureBase
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
             options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             options.SerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+
+            options.SerializerOptions.Converters.Add(@enum);
         });
 
         if (services.All(s => s.ServiceType != typeof(IActionDescriptorChangeProvider))) {
@@ -40,6 +46,8 @@ public class SchemataJsonSerializerFeature : FeatureBase
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
             options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+
+            options.JsonSerializerOptions.Converters.Add(@enum);
         });
     }
 }

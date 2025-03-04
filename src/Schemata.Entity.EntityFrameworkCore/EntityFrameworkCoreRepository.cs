@@ -88,6 +88,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
@@ -95,6 +97,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
@@ -103,6 +107,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, this, entity, ct);
         if (!next) return;
 
@@ -116,6 +122,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct) {
+        ct.ThrowIfCancellationRequested();
+
         var table = AsQueryable();
 
         var query = new QueryContainer<TEntity>(table);
