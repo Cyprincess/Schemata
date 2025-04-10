@@ -19,14 +19,14 @@ public class OrderStateMachine : StateMachineBase<Order>
                When(Cancel).TransitionTo(Expired));
     }
 
-    public State Progressing { get; private set; } = null!;
-    public State Voided      { get; private set; } = null!;
-    public State Expired     { get; private set; } = null!;
-    public State Denied      { get; private set; } = null!;
+    public State Progressing { get; } = null!;
+    public State Voided      { get; } = null!;
+    public State Expired     { get; } = null!;
+    public State Denied      { get; } = null!;
 
-    public Event<OrderEvent> Pay    { get; private set; } = null!;
-    public Event<OrderEvent> Accept { get; private set; } = null!;
-    public Event<OrderEvent> Void   { get; private set; } = null!;
-    public Event<OrderEvent> Cancel { get; private set; } = null!;
-    public Event<OrderEvent> Deny   { get; private set; } = null!;
+    public Event<OrderEvent> Pay    { get; } = null!;
+    public Event<OrderEvent> Accept { get; } = null!;
+    public Event<OrderEvent> Void   { get; } = null!;
+    public Event<OrderEvent> Cancel { get; } = null!;
+    public Event<OrderEvent> Deny   { get; } = null!;
 }

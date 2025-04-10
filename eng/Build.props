@@ -4,7 +4,7 @@
     <ProjectToBuild Include="$(RepoRoot)generators\**\*.csproj" />
     <ProjectToBuild Include="$(RepoRoot)src\**\*.csproj" />
     <ProjectToBuild Include="$(RepoRoot)targets\**\*.csproj" />
-    <ProjectToBuild Include="$(RepoRoot)test\**\*.csproj" />
+    <ProjectToBuild Include="$(RepoRoot)tests\**\*.csproj" />
   </ItemGroup>
-  
+
 </Project>

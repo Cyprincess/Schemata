@@ -5,48 +5,58 @@ using Xunit;
 
 namespace Schemata.Resource.Tests;
 
-public class TestFilterContainer
+public class FilterContainerShould
 {
     [Fact]
-    public void TranslateExample1() {
+    public void Build_WithSimpleAndExpression_ReturnsCompiledExpression() {
         var filter = Parser.Filter.Parse("a b AND c AND d");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("q", typeof(string)).Build();
-        var func       = (Func<string, bool>)expression!.Compile();
+        Assert.NotNull(expression);
 
+        var func = (Func<string, bool>)expression.Compile();
         Assert.True(func("a b c d"));
         Assert.False(func("a b c"));
     }
 
     [Fact]
-    public void TranslateExample2() {
+    public void Build_WithSimpleOrExpression_ReturnsCompiledExpression() {
         var filter = Parser.Filter.Parse("New York Giants OR Yankees");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("q", typeof(string)).Build();
-        var func       = (Func<string, bool>)expression!.Compile();
+        Assert.NotNull(expression);
 
+        var func = (Func<string, bool>)expression.Compile();
         Assert.True(func("New York Giants"));
         Assert.False(func("New Giants Yankees"));
     }
 
     [Fact]
-    public void TranslateExample3() {
+    public void Build_WithNumericComparison_ReturnsCompiledExpression() {
         var filter = Parser.Filter.Parse("a < 10 OR a >= 100");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("a", typeof(long)).Build();
-        var expected   = new Func<long, bool>(a => a is < 10 or >= 100);
-        var actual     = (Func<long, bool>)expression!.Compile();
+        Assert.NotNull(expression);
+
+        var expected = new Func<long, bool>(a => a is < 10 or >= 100);
+        var actual   = (Func<long, bool>)expression.Compile();
 
         Assert.Equal(expected(10), actual(10));
         Assert.Equal(expected(100), actual(100));
     }
 
     [Fact]
-    public void TranslateExample4() {
+    public void Build_WithNestedProperty_ReturnsCompiledExpression() {
         var filter = Parser.Filter.Parse("expr.type_map.1.type = bar");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter).Bind("expr", typeof(MyVector4)).Build();
-        var func       = (Func<MyVector4, bool>)expression!.Compile();
+        Assert.NotNull(expression);
+
+        var func = (Func<MyVector4, bool>)expression.Compile();
 
         var vector = new MyVector4 {
             type_map = [
@@ -54,20 +64,23 @@ public class TestFilterContainer
                 new() { type = "bar" },
             ],
         };
+
         Assert.True(func(vector));
     }
 
     [Fact]
-    public void TranslateExample5() {
+    public void Build_WithFunctionCall_ReturnsCompiledExpression() {
         var filter = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
+        Assert.NotNull(filter);
 
         var expression = Container.Build(filter)
                                   .AllowFunction<string>("endsWith")
                                   .Bind("msg", typeof(string))
                                   .Bind("retries", typeof(int))
                                   .Build();
-        var func = (Func<string, int, bool>)expression!.Compile();
+        Assert.NotNull(expression);
 
+        var func = (Func<string, int, bool>)expression.Compile();
         Assert.True(func("hello world", 9));
         Assert.False(func("hello world", 10));
     }

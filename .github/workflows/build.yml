@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
 
 env:
-  DOTNET_MULTILEVEL_LOOKUP: 0
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION: 1
+  NUGET_PACKAGES: ${{ github.workspace }}/.packages
   NUGET_XMLDOC_MODE: skip
   TERM: xterm
 
@@ -41,13 +41,6 @@ jobs:
             os_name: windows
 
     steps:
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.x
-            9.x
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -62,6 +55,14 @@ jobs:
           $BuildId = $Now.ToString("yyyyMMdd") + "." + $Revision
           Write-Output "_ComputedOfficialBuildId=${BuildId}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Cache packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            .dotnet
+            .packages
+          key: ${{ runner.os }}-packages
+
       - name: Build, Test and Package
         if: ${{ runner.os == 'Windows' }}
         run: .\eng\common\CIBuild.cmd -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
@@ -71,6 +72,7 @@ jobs:
         run: ./eng/common/cibuild.sh -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
 
       - name: Publish logs
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
@@ -78,12 +80,14 @@ jobs:
           path: ./artifacts/log/Release
 
       - name: Publish NuGet packages
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.os_name }}
           path: ./artifacts/packages/Release/Shipping
 
       - name: Publish test results
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:

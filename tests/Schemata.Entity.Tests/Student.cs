@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Schemata.Entity.Tests.Entity;
+namespace Schemata.Entity.Tests;
 
 public class Student
 {

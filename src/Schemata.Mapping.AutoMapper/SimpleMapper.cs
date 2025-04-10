@@ -1,6 +1,5 @@
 using System;
 using AutoMapper;
-using Microsoft.Extensions.Options;
 using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.AutoMapper;

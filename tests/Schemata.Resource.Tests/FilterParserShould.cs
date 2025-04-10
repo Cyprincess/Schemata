@@ -5,67 +5,73 @@ using Xunit;
 
 namespace Schemata.Resource.Tests;
 
-public class TestFilterParser
+public class FilterParserShould
 {
     [Fact]
-    public void ParseOrdering() {
+    public void ParseOrder_WithValidExpression_ReturnsOrderingDictionary() {
+        var result1 = Parser.Order.Parse("a,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
+        Assert.NotNull(result1);
         Assert.Equal(new() {
                          ["a"] = Ordering.Ascending,
                          ["b"] = Ordering.Ascending,
                      },
-                     Parser.Order.Parse("a,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                     result1);
 
+        var result2 = Parser.Order.Parse("a DESC,b")
+                           ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
+        Assert.NotNull(result2);
         Assert.Equal(new() {
                          ["a"] = Ordering.Descending,
                          ["b"] = Ordering.Ascending,
                      },
-                     Parser.Order.Parse("a DESC,b")
-                          ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                     result2);
 
+        var result3 = Parser.Order.Parse("a,b DESC")
+                           ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
+        Assert.NotNull(result3);
         Assert.Equal(new() {
                          ["a"] = Ordering.Ascending,
                          ["b"] = Ordering.Descending,
                      },
-                     Parser.Order.Parse("a,b DESC")
-                          ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value));
+                     result3);
     }
 
     [Fact]
-    public void ParseExample1() {
+    public void ParseFilter_WithSimpleAndExpression_ReturnsExpression() {
         var expression = Parser.Filter.Parse("a b AND c AND d");
-
+        Assert.NotNull(expression);
         Assert.Equal("[AND {\"a\" \"b\"} \"c\" \"d\"]", expression.ToString());
         Assert.True(expression.IsConstant);
     }
 
     [Fact]
-    public void ParseExample2() {
+    public void ParseFilter_WithSimpleOrExpression_ReturnsExpression() {
         var expression = Parser.Filter.Parse("New York Giants OR Yankees");
-
+        Assert.NotNull(expression);
         Assert.Equal("{\"New\" \"York\" [OR \"Giants\" \"Yankees\"]}", expression.ToString());
         Assert.True(expression.IsConstant);
     }
 
     [Fact]
-    public void ParseExample3() {
+    public void ParseFilter_WithNumericComparison_ReturnsExpression() {
         var expression = Parser.Filter.Parse("a < 10 OR a >= 100");
-
+        Assert.NotNull(expression);
         Assert.Equal("[OR [< \"a\" 10] [>= \"a\" 100]]", expression.ToString());
         Assert.False(expression.IsConstant);
     }
 
     [Fact]
-    public void ParseExample4() {
+    public void ParseFilter_WithNestedProperty_ReturnsExpression() {
         var expression = Parser.Filter.Parse("expr.type_map.1.type");
-
+        Assert.NotNull(expression);
         Assert.Equal("\"expr\".\"type_map\".1.\"type\"", expression.ToString());
         Assert.False(expression.IsConstant);
     }
 
     [Fact]
-    public void ParseExample5() {
+    public void ParseFilter_WithFunctionCall_ReturnsExpression() {
         var expression = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
-
+        Assert.NotNull(expression);
         Assert.Equal("[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]", expression.ToString());
         Assert.False(expression.IsConstant);
     }
@@ -99,16 +105,19 @@ public class TestFilterParser
     [InlineData("timestamp(\"2012-04-21T11:30:00-04:00\")", "\"timestamp\"(\"2012-04-21T11:30:00-04:00\")", false)]
     [InlineData("duration(\"32s\")", "\"duration\"(\"32s\")", false)]
     [InlineData("duration(\"4h0m0s\")", "\"duration\"(\"4h0m0s\")", false)]
-    [InlineData(@"start_time > timestamp(""2006-01-02T15:04:05+07:00"") AND
-        (driver = ""driver1"" OR start_driver = ""driver1"" OR end_driver = ""driver1"")",
-                @"[AND [> ""start_time"" ""timestamp""(""2006-01-02T15:04:05+07:00"")] [OR [= ""driver"" ""driver1""] [= ""start_driver"" ""driver1""] [= ""end_driver"" ""driver1""]]]",
-                false)]
+    [InlineData(
+        @"start_time > timestamp(""2006-01-02T15:04:05+07:00"") AND (driver = ""driver1"" OR start_driver = ""driver1"" OR end_driver = ""driver1"")",
+        @"[AND [> ""start_time"" ""timestamp""(""2006-01-02T15:04:05+07:00"")] [OR [= ""driver"" ""driver1""] [= ""start_driver"" ""driver1""] [= ""end_driver"" ""driver1""]]]",
+        false)]
     [InlineData("annotations:schedule", "[: \"annotations\" \"schedule\"]", false)]
     [InlineData("annotations.schedule = \"test\"", "[= \"annotations\".\"schedule\" \"test\"]", false)]
-    public void ParseMoreVectors(string input, string expected, bool constant) {
+    public void ParseFilter_WithVariousExpressions_ReturnsExpectedExpression(
+        string input,
+        string expected,
+        bool   constant) {
         var expression = Parser.Filter.Parse(input);
-
-        Assert.Equal(expected, expression?.ToString());
-        Assert.Equal(constant, expression?.IsConstant);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+        Assert.Equal(constant, expression.IsConstant);
     }
 }

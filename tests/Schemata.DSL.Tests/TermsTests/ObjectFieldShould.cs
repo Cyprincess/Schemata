@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Schemata.DSL.Tests.TermsTests;
 
-public class TestObjectField
+public class ObjectFieldShould
 {
     [Theory]
     [InlineData("bar", null, "bar")]
@@ -29,7 +29,7 @@ public class TestObjectField
     [InlineData("id = bar.id", null, "id", false, null, null, null, "bar.id")]
     [InlineData("timestamp foo = now()", "timestamp", "foo", false, null, null, null, "now")]
     [InlineData("string foo = \"bar\"", "string", "foo", false, null, null, null, "bar")]
-    public void ShouldParseObjectField(
+    public void ParseObjectField_WithValidSyntax_ReturnsCorrectExpression(
         string    syntax,
         string?   type,
         string    name,
@@ -41,12 +41,14 @@ public class TestObjectField
         var mark    = new Mark();
         var scanner = new Scanner(syntax);
         var term    = ObjectField.Parse(mark, null, scanner);
-        Assert.Equal(type, term?.Type);
-        Assert.Equal(name, term?.Name);
-        Assert.Equal(nullable, term?.Nullable);
-        Assert.Equal(note, term?.Note?.Comment);
-        Assert.Equal(options ?? [], term?.Options?.Select(o => o.Name) ?? []);
-        Assert.Equal(fields ?? [], term?.Fields?.Select(f => f.Key) ?? []);
-        Assert.Equal(map, term?.Map?.Body);
+
+        Assert.NotNull(term);
+        Assert.Equal(type, term.Type);
+        Assert.Equal(name, term.Name);
+        Assert.Equal(nullable, term.Nullable);
+        Assert.Equal(note, term.Note?.Comment);
+        Assert.Equal(options, term.Options?.Select(o => o.Name).ToArray());
+        Assert.Equal(fields, term.Fields?.Select(f => f.Key).ToArray());
+        Assert.Equal(map, term.Map?.Body);
     }
 }

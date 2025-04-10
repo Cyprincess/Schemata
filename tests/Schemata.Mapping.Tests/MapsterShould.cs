@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Schemata.Mapping.Tests;
 
-public class TestMapster
+public class MapsterShould
 {
     [Fact]
-    public void Map() {
+    public void Map_WithValidSource_MapsToDestinationWithCorrectValues() {
         var builder = WebApplication.CreateBuilder()
                                     .UseSchemata(schema => {
                                          schema.UseMapster()
@@ -23,7 +23,7 @@ public class TestMapster
 
         var app = builder.Build();
 
-        var scope = app.Services.CreateScope();
+        using var scope = app.Services.CreateScope();
 
         var mapper = scope.ServiceProvider.GetRequiredService<ISimpleMapper>();
 
@@ -35,10 +35,10 @@ public class TestMapster
         };
 
         var destination = mapper.Map<Destination>(source);
-
-        Assert.Equal("Mr. John", destination?.DisplayName);
-        Assert.Equal(source.Age, destination?.Age);
-        Assert.Equal(0, destination?.Grade);
-        Assert.Equal(nameof(Sex.Male), destination?.Sex);
+        Assert.NotNull(destination);
+        Assert.Equal("Mr. John", destination.DisplayName);
+        Assert.Equal(source.Age, destination.Age);
+        Assert.Equal(0, destination.Grade);
+        Assert.Equal(nameof(Sex.Male), destination.Sex);
     }
 }

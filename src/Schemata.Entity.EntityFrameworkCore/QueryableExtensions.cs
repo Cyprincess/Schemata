@@ -16,7 +16,7 @@ public static class QueryableExtensions
         var       factory = relationalCommandCache?.Private<IQuerySqlGeneratorFactory>("_querySqlGeneratorFactory");
 
         var sqlGenerator = factory?.Create();
-        var command      = sqlGenerator?.GetCommand(selectExpression);
+        var command = sqlGenerator?.GetCommand(selectExpression);
 
         var sql = command?.CommandText;
         return sql;

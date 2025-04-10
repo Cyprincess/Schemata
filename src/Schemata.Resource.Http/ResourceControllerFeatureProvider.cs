@@ -15,7 +15,7 @@ namespace Schemata.Resource.Http;
 public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>,
                                                         IActionDescriptorChangeProvider
 {
-    private CancellationTokenSource             _cts = new();
+    private CancellationTokenSource                          _cts = new();
     public  Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
 
     #region IActionDescriptorChangeProvider Members

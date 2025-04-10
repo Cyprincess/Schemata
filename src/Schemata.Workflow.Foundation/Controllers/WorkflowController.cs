@@ -22,21 +22,21 @@ namespace Schemata.Workflow.Foundation.Controllers;
 [Route("~/[controller]")]
 public sealed class WorkflowController : ControllerBase
 {
-    private readonly        ILogger<WorkflowController>              _logger;
-    private readonly        ISimpleMapper                            _mapper;
-    private readonly        IOptionsMonitor<SchemataWorkflowOptions> _options;
+    private readonly ILogger<WorkflowController>              _logger;
+    private readonly ISimpleMapper                            _mapper;
+    private readonly IOptionsMonitor<SchemataWorkflowOptions> _options;
 
-    private readonly IServiceProvider        _sp;
+    private readonly IServiceProvider _sp;
 
     public WorkflowController(
         IServiceProvider                         sp,
         ISimpleMapper                            mapper,
         IOptionsMonitor<SchemataWorkflowOptions> options,
         ILogger<WorkflowController>              logger) {
-        _sp        = sp;
-        _mapper    = mapper;
-        _options   = options;
-        _logger    = logger;
+        _sp      = sp;
+        _mapper  = mapper;
+        _options = options;
+        _logger  = logger;
     }
 
     private EmptyResult EmptyResult { get; } = new();

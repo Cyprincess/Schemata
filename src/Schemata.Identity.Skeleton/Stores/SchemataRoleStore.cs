@@ -215,10 +215,11 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         }
 
         await RoleClaimsRepository.AddAsync(new() {
-            RoleId     = role.Id,
-            ClaimType  = claim.Type,
-            ClaimValue = claim.Value,
-        }, ct);
+                                                RoleId     = role.Id,
+                                                ClaimType  = claim.Type,
+                                                ClaimValue = claim.Value,
+                                            },
+                                            ct);
         await RoleClaimsRepository.CommitAsync(ct);
     }
 
@@ -233,7 +234,9 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(claim));
         }
 
-        var claims = RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Id) && rc.ClaimValue == claim.Value && rc.ClaimType == claim.Type), ct);
+        var claims = RoleClaimsRepository.ListAsync(
+            q => q.Where(rc => rc.RoleId.Equals(role.Id) && rc.ClaimValue == claim.Value && rc.ClaimType == claim.Type),
+            ct);
         await foreach (var c in claims) {
             await RoleClaimsRepository.RemoveAsync(c, ct);
         }

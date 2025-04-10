@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Schemata.DSL.Tests.TermsTests;
 
-public class TestIndex
+public class IndexShould
 {
     [Theory]
     [InlineData("Index category_id", "IX_Post_CategoryId", new[] { "category_id" })]
@@ -18,7 +18,7 @@ public class TestIndex
                 new[] { "user_id", "creation_date" },
                 new[] { SkmConstants.Options.Hash },
                 "FOOBAR")]
-    public void ShouldParseIndex(
+    public void ParseIndex_WithValidSyntax_ReturnsCorrectExpression(
         string    syntax,
         string    name,
         string[]  fields,
@@ -28,9 +28,12 @@ public class TestIndex
         var entity  = new Entity { Name = "Post" };
         var scanner = new Scanner(syntax);
         var term    = Index.Parse(mark, entity, scanner);
-        Assert.Equal(name, term?.Name);
-        Assert.Equal(fields, term?.Fields ?? []);
-        Assert.Equal(options ?? [], term?.Options?.Select(o => o.Name) ?? []);
-        Assert.Equal(note, term?.Note?.Comment);
+
+        Assert.NotNull(term);
+        Assert.Equal(name, term.Name);
+        Assert.NotNull(term.Fields);
+        Assert.Equal(fields, term.Fields);
+        Assert.Equal(options, term.Options?.Select(o => o.Name).ToArray());
+        Assert.Equal(note, term.Note?.Comment);
     }
 }

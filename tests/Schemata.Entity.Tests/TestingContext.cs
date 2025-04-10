@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Schemata.Entity.Tests.Entity;
 
 namespace Schemata.Entity.Tests;
 

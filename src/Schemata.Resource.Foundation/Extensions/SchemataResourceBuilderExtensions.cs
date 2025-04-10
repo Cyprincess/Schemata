@@ -20,7 +20,7 @@ public static class SchemataResourceBuilderExtensions
     public static SchemataResourceBuilder Use<TEntity, TRequest, TDetail>(this SchemataResourceBuilder builder)
         where TEntity : class, IIdentifier
         where TRequest : class, IIdentifier
-        where TDetail : class, IIdentifier{
+        where TDetail : class, IIdentifier {
         return builder.Use<TEntity, TRequest, TDetail, TDetail>();
     }
 }

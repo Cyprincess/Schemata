@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Schemata.DSL.Tests.TermsTests;
 
-public class TestField
+public class FieldShould
 {
     [Theory]
     [InlineData("Foo bar", "Foo", "bar")]
@@ -40,7 +40,7 @@ public class TestField
                 null,
                 new[] { "Required" },
                 new[] { "Default", "" })]
-    public void ShouldParseField(
+    public void ParseField_WithValidSyntax_ReturnsCorrectExpression(
         string    syntax,
         string    type,
         string    name,
@@ -51,11 +51,13 @@ public class TestField
         var mark    = new Mark();
         var scanner = new Scanner(syntax);
         var term    = Field.Parse(mark, null, scanner);
-        Assert.Equal(type, term?.Type);
-        Assert.Equal(name, term?.Name);
-        Assert.Equal(nullable, term?.Nullable);
-        Assert.Equal(note, term?.Note?.Comment);
-        Assert.Equal(options ?? [], term?.Options?.Select(o => o.Name) ?? []);
-        Assert.Equal(properties ?? [], term?.Properties?.SelectMany(p => new[] { p.Key, p.Value.Body }) ?? []);
+
+        Assert.NotNull(term);
+        Assert.Equal(type, term.Type);
+        Assert.Equal(name, term.Name);
+        Assert.Equal(nullable, term.Nullable);
+        Assert.Equal(note, term.Note?.Comment);
+        Assert.Equal(options, term.Options?.Select(o => o.Name).ToArray());
+        Assert.Equal(properties, term.Properties?.SelectMany(p => new[] { p.Key, p.Value.Body }).ToArray());
     }
 }
