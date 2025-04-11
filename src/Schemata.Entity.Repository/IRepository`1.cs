@@ -15,8 +15,6 @@ public interface IRepository<TEntity> where TEntity : class
 
     IQueryable<TEntity> AsQueryable();
 
-    string? GetQueryString<T>(IQueryable<T> query);
-
     IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default);
@@ -62,6 +60,8 @@ public interface IRepository<TEntity> where TEntity : class
     Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 
     ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    void Detach(TEntity entity);
 
     IRepository<TEntity> Once();
     IRepository<TEntity> SuppressAddValidation();

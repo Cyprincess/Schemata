@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <OpenIddictVersion>6.1.1</OpenIddictVersion>
+    <OpenIddictVersion>6.2.0</OpenIddictVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,27 +22,27 @@
     <PackageVersion Include="OpenIddict.Validation.AspNetCore" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="OpenIddict.Validation.ServerIntegration" Version="$(OpenIddictVersion)" />
     <PackageVersion Include="Parlot" Version="0.0.26" />
-    <PackageVersion Include="System.Text.Json" Version="9.0.2" />
+    <PackageVersion Include="System.Text.Json" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '9.0')) ">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="9.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.2" />
-    <PackageVersion Include="System.Collections.Immutable" Version="9.0.2" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.4" />
+    <PackageVersion Include="System.Collections.Immutable" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '8.0')) ">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.13" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.15" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="8.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="8.0.15" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
   </ItemGroup>

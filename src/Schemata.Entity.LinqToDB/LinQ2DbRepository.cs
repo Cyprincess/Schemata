@@ -10,7 +10,6 @@ using System.Transactions;
 using Humanizer;
 using LinqToDB;
 using LinqToDB.Data;
-using LinqToDB.Linq;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advices;
 
@@ -45,11 +44,6 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
 
     public override IQueryable<TEntity> AsQueryable() {
         return Table.AsQueryable();
-    }
-
-    public override string? GetQueryString<T>(IQueryable<T> query) {
-        var expression = Internals.CreateExpressionQueryInstance<T>(Context, query.Expression);
-        return expression.ToString();
     }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
@@ -206,6 +200,8 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
 
         return rows;
     }
+
+    public override void Detach(TEntity entity) { }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,

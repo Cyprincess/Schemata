@@ -31,14 +31,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return DbSet.AsQueryable();
     }
 
-    public override string? GetQueryString<T>(IQueryable<T> query) {
-#if NET8_0_OR_GREATER
-        return query.ToQueryString();
-#else
-        return query.ToSql();
-#endif
-    }
-
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default) {
@@ -157,7 +149,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
             return;
         }
 
-        Context.Entry(entity).State = EntityState.Detached;
+        Detach(entity);
+
         Context.Update(entity);
     }
 
@@ -174,6 +167,10 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
 
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         return await Context.SaveChangesAsync(ct);
+    }
+
+    public override void Detach(TEntity entity) {
+        Context.Entry(entity).State = EntityState.Detached;
     }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(

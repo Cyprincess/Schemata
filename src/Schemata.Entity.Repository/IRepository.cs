@@ -26,6 +26,8 @@ public interface IRepository
 
     ValueTask<int> CommitAsync(CancellationToken ct = default);
 
+    void Detach(object entity);
+
     IRepository Once();
     IRepository SuppressAddValidation();
     IRepository SuppressUpdateValidation();

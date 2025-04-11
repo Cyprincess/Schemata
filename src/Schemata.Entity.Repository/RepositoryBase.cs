@@ -166,6 +166,14 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return RemoveAsync(e, ct);
     }
 
+    void IRepository.Detach(object entity) {
+        if (entity is not TEntity e) {
+            return;
+        }
+
+        Detach(e);
+    }
+
     IRepository IRepository.Once() {
         return (IRepository)Once();
     }
@@ -199,8 +207,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
     public abstract IQueryable<TEntity> AsQueryable();
-
-    public abstract string? GetQueryString<T>(IQueryable<T> query);
 
     public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -310,6 +316,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     }
 
     public abstract ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    public abstract void Detach(TEntity entity);
 
     public virtual IRepository<TEntity> Once() {
         var type = GetType();
