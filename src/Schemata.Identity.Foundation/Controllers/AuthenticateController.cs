@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
@@ -21,19 +22,23 @@ public sealed partial class AuthenticateController : ControllerBase
     private readonly SignInManager<SchemataUser>              _signInManager;
     private readonly SchemataUserManager<SchemataUser>        _userManager;
 
+    private readonly IServiceProvider _sp;
+
     public AuthenticateController(
         SignInManager<SchemataUser>              signInManager,
         SchemataUserManager<SchemataUser>        userManager,
         IMailSender<SchemataUser>                mailSender,
         IMessageSender<SchemataUser>             messageSender,
         IOptionsMonitor<BearerTokenOptions>      bearerToken,
-        IOptionsMonitor<SchemataIdentityOptions> options) {
+        IOptionsMonitor<SchemataIdentityOptions> options,
+        IServiceProvider                         sp) {
         _signInManager = signInManager;
         _userManager   = userManager;
         _mailSender    = mailSender;
         _messageSender = messageSender;
         _bearerToken   = bearerToken;
         _options       = options;
+        _sp            = sp;
     }
 
     private EmptyResult EmptyResult { get; } = new();

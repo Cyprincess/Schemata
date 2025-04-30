@@ -2,6 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Schemata.Abstractions.Advices;
+using Schemata.Identity.Foundation.Advices;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
 
@@ -15,6 +17,12 @@ public sealed partial class AuthenticateController : ControllerBase
             return NotFound();
         }
 
+        var ctx = new AdviceContext();
+
+        if (!await Advices<IIdentityRegisterRequestAdvice>.AdviseAsync(_sp, ctx, request, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
+
         var username = request.EmailAddress ?? request.PhoneNumber;
 
         var user = new SchemataUser {
@@ -22,6 +30,10 @@ public sealed partial class AuthenticateController : ControllerBase
             Email       = request.EmailAddress,
             PhoneNumber = request.PhoneNumber,
         };
+        
+        if (!await Advices<IIdentityRegisterUserAdvice>.AdviseAsync(_sp, ctx, user, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
+        }
 
         var result = await _userManager.CreateAsync(user, request.Password);
 
@@ -31,6 +43,10 @@ public sealed partial class AuthenticateController : ControllerBase
 
         if (_userManager.Options.SignIn.RequireConfirmedAccount) {
             await SendConfirmationCodeAsync(user, request.EmailAddress, request.PhoneNumber);
+        }
+
+        if (!await Advices<IIdentityRegisterAdvice>.AdviseAsync(_sp, ctx, user, HttpContext, HttpContext.RequestAborted)) {
+            return EmptyResult;
         }
 
         return NoContent();
