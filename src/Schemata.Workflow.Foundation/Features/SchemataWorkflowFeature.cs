@@ -15,7 +15,7 @@ namespace Schemata.Workflow.Foundation.Features;
 
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataJsonSerializerFeature>]
-[DependsOn("SchemataSecurityFeature")]
+[DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : FeatureBase
     where TWorkflow : SchemataWorkflow, new()
     where TTransition : SchemataTransition, new()

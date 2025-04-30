@@ -57,7 +57,7 @@ public sealed partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
-        var protector = _bearerToken.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
+        var protector = _bearerToken.Get(IdentityConstants.BearerScheme).RefreshTokenProtector;
         var ticket    = protector.Unprotect(request.RefreshToken);
 
         if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc
@@ -68,6 +68,6 @@ public sealed partial class AuthenticateController : ControllerBase
 
         var principal = await _signInManager.CreateUserPrincipalAsync(user);
 
-        return SignIn(principal, IdentityConstants.ApplicationScheme);
+        return SignIn(principal, IdentityConstants.BearerScheme);
     }
 }

@@ -66,7 +66,6 @@ public static class AppDomainTypeCache
         type = Type.GetType(name, false);
         if (!string.IsNullOrWhiteSpace(type?.FullName)) {
             Types[type!.FullName] = type;
-            Types[type!.Name]     = type;
             return type;
         }
 
@@ -77,7 +76,6 @@ public static class AppDomainTypeCache
             }
 
             Types[type!.FullName] = type;
-            Types[type!.Name]     = type;
             return type;
         }
 

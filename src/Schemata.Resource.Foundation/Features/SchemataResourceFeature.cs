@@ -9,8 +9,8 @@ using Schemata.Resource.Foundation.Advices;
 namespace Schemata.Resource.Foundation.Features;
 
 [DependsOn<SchemataRoutingFeature>]
-[DependsOn("SchemataMappingFeature`1")]
-[DependsOn("SchemataSecurityFeature")]
+[DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
+[DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
     public override int Priority => 360_000_000;

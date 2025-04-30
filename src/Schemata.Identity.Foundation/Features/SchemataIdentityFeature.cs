@@ -58,8 +58,8 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
 
         services.AddMemoryCache();
 
-        services.AddAuthentication(IdentityConstants.ApplicationScheme)
-                .AddBearerToken(IdentityConstants.ApplicationScheme);
+        services.AddAuthentication(IdentityConstants.BearerScheme)
+                .AddBearerToken(IdentityConstants.BearerScheme);
 
         services.TryAddTransient(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddTransient(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
