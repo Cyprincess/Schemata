@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
@@ -27,7 +26,7 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                 var feature = context.Features.Get<IExceptionHandlerPathFeature>();
 
                 if (feature?.Error is not HttpException http) {
-                    context.Response.StatusCode  = (int)HttpStatusCode.InternalServerError;
+                    context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
 
                     await context.Response.WriteAsJsonAsync(
