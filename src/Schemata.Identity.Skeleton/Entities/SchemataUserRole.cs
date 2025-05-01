@@ -7,14 +7,13 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Identity.Skeleton.Entities;
 
 [Table("SchemataUserRole")]
-public class SchemataUserRole : IdentityUserRole<long>, IIdentifier, ITimestamp
+public class SchemataUserRole : IdentityUserRole<long>, ITimestamp
 {
-    #region IIdentifier Members
+    [Key]
+    public override long UserId { get; set; }
 
     [Key]
-    public virtual long Id { get; set; }
-
-    #endregion
+    public override long RoleId { get; set; }
 
     #region ITimestamp Members
 

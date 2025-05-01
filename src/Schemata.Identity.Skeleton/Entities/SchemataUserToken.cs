@@ -7,15 +7,14 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Identity.Skeleton.Entities;
 
 [Table("SchemataUserTokens")]
-public class SchemataUserToken : IdentityUserToken<long>, IIdentifier, ITimestamp
+public class SchemataUserToken : IdentityUserToken<long>, ITimestamp
 {
-    #region IIdentifier Members
+    public override long UserId { get; set; }
 
-    [Key]
-    public virtual long Id { get; set; }
+    public override string LoginProvider { get; set; } = null!;
 
-    #endregion
-
+    public override string Name { get; set; } = null!;
+    
     #region ITimestamp Members
 
     public virtual DateTime? CreateTime { get; set; }
