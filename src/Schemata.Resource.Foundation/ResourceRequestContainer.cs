@@ -25,6 +25,7 @@ public class ResourceRequestContainer<T>
     }
 
     public void ApplyModification(Expression<Func<T, bool>> predicate) {
-        Query = q => Query(q).Where(predicate);
+        var query = Query;
+        Query = q => query(q).Where(predicate);
     }
 }
