@@ -51,18 +51,20 @@ public sealed class AdviceAddCanonicalName<TEntity> : AdviceAddCanonicalName, IR
         var name = ResourceNameRegex.Replace(attribute.ResourceName,
                                              m => {
                                                  var matched = m.Groups["name"].Value.Pascalize();
-                                                 if (string.Equals(current, matched)) {
-                                                     matched = string.Empty;
-                                                 }
 
-                                                 if (!properties.TryGetValue($"{matched}Name", out var property)) {
-                                                     throw new MissingFieldException(type.Name, $"{matched}Name");
+                                                 var field = matched switch {
+                                                     "Parent"                                   => "Parent",
+                                                     var _ when string.Equals(current, matched) => "Name",
+                                                     var _                                      => $"{matched}Name",
+                                                 };
+
+                                                 if (!properties.TryGetValue(field, out var property)) {
+                                                     throw new MissingFieldException(type.Name, field);
                                                  }
 
                                                  var value = property.GetValue(entity)?.ToString();
                                                  if (string.IsNullOrWhiteSpace(value)) {
-                                                     throw new ValidationException(
-                                                         [new($"{matched}Name", "not_empty")]);
+                                                     throw new ValidationException([new(field, "not_empty")]);
                                                  }
 
                                                  return value;
