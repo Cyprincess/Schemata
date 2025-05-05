@@ -1,4 +1,3 @@
-#if NET8_0_OR_GREATER
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
@@ -28,4 +27,3 @@ public sealed class SchemataQuotaFeature : FeatureBase
         app.UseRateLimiter();
     }
 }
-#endif

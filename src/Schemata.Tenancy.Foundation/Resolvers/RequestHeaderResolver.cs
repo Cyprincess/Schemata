@@ -9,13 +9,7 @@ using Schemata.Tenancy.Skeleton;
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
 public class RequestHeaderResolver<TKey> : ITenantResolver<TKey>
-#if NET8_0_OR_GREATER
     where TKey : struct, IEquatable<TKey>, IParsable<TKey>
-#else
-#pragma warning disable CA2252
-    where TKey : struct, IEquatable<TKey>, IParseable<TKey>
-#pragma warning restore CA2252
-#endif
 {
     private readonly IHttpContextAccessor _accessor;
 
