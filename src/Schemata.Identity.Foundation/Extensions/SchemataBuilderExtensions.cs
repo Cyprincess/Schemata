@@ -1,4 +1,5 @@
 using System;
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Options;
 using Schemata.Core;
@@ -15,7 +16,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
-        Action<IdentityBuilder>?         build     = null) {
+        Action<IdentityBuilder>?         build     = null,
+        Action<BearerTokenOptions>?      bearer    = null) {
         return UseIdentity<SchemataUser, SchemataRole>(builder, identify, configure, build);
     }
 
@@ -23,7 +25,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
-        Action<IdentityBuilder>?         build     = null) where TUser : SchemataUser
+        Action<IdentityBuilder>?         build     = null,
+        Action<BearerTokenOptions>?      bearer    = null) where TUser : SchemataUser
                                                            where TRole : SchemataRole {
         return UseIdentity<TUser, TRole, SchemataUserStore<TUser>, SchemataRoleStore<TRole>>(builder, identify, configure, build);
     }
@@ -32,7 +35,8 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
-        Action<IdentityBuilder>?         build     = null) where TUser : SchemataUser
+        Action<IdentityBuilder>?         build     = null,
+        Action<BearerTokenOptions>?      bearer    = null) where TUser : SchemataUser
                                                            where TRole : SchemataRole
                                                            where TUserStore : class, IUserStore<TUser>
                                                            where TRoleStore : class, IRoleStore<TRole> {
@@ -44,6 +48,9 @@ public static class SchemataBuilderExtensions
 
         build ??= _ => { };
         builder.Configure(build);
+
+        bearer ??= _ => { };
+        builder.Configure(bearer);
 
         builder.AddFeature<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
 

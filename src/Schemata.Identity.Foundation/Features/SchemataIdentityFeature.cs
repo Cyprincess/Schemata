@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -34,6 +35,7 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         IWebHostEnvironment environment) {
         var configure = configurators.Pop<IdentityOptions>();
         var build     = configurators.Pop<IdentityBuilder>();
+        var bearer    = configurators.Pop<BearerTokenOptions>();
 
         var identify = configurators.Pop<SchemataIdentityOptions>();
         services.Configure(identify);
@@ -59,7 +61,7 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.AddMemoryCache();
 
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
-                .AddBearerToken(IdentityConstants.ApplicationScheme);
+                .AddBearerToken(IdentityConstants.ApplicationScheme, bearer);
 
         services.TryAddTransient(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddTransient(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
