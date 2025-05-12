@@ -1,4 +1,9 @@
+using System;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -7,6 +12,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -60,8 +67,13 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
 
         services.AddMemoryCache();
 
-        services.AddAuthentication(IdentityConstants.ApplicationScheme)
-                .AddBearerToken(IdentityConstants.ApplicationScheme, bearer);
+        services.AddAuthentication("Identity.BearerAndApplication")
+                .AddScheme<AuthenticationSchemeOptions, CompositeIdentityHandler>("Identity.BearerAndApplication", null, composite => {
+                     composite.ForwardDefault      = IdentityConstants.BearerScheme;
+                     composite.ForwardAuthenticate = "Identity.BearerAndApplication";
+                 })
+                .AddBearerToken(IdentityConstants.BearerScheme, bearer)
+                .AddIdentityCookies();
 
         services.TryAddTransient(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddTransient(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
@@ -84,5 +96,29 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         IConfiguration        configuration,
         IWebHostEnvironment   environment) {
         endpoints.UseIdentity<TUser, TRole>();
+    }
+
+    private sealed class CompositeIdentityHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder) : SignInAuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
+            var result = await Context.AuthenticateAsync(IdentityConstants.BearerScheme);
+
+            if (!result.None) {
+                return result;
+            }
+
+            return await Context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        }
+
+        protected override Task HandleSignInAsync(ClaimsPrincipal user, AuthenticationProperties? properties) {
+            throw new NotImplementedException();
+        }
+
+        protected override Task HandleSignOutAsync(AuthenticationProperties? properties) {
+            throw new NotImplementedException();
+        }
     }
 }
