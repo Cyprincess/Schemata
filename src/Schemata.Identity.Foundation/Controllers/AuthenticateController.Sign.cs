@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advices;
 using Schemata.Identity.Foundation.Advices;
 using Schemata.Identity.Skeleton.Entities;
@@ -54,13 +55,17 @@ public sealed partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Login))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request) {
-        var result = await _signInManager.PasswordSignInAsync(request.Username, request.Password, false, true);
+        var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
+        
+        signInManager.AuthenticationScheme = IdentityConstants.BearerScheme;
+
+        var result = await signInManager.PasswordSignInAsync(request.Username, request.Password, false, true);
 
         if (result.RequiresTwoFactor) {
             if (!string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
-                result = await _signInManager.TwoFactorAuthenticatorSignInAsync(request.TwoFactorCode, false, false);
+                result = await signInManager.TwoFactorAuthenticatorSignInAsync(request.TwoFactorCode, false, false);
             } else if (!string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
-                result = await _signInManager.TwoFactorRecoveryCodeSignInAsync(request.TwoFactorRecoveryCode);
+                result = await signInManager.TwoFactorRecoveryCodeSignInAsync(request.TwoFactorRecoveryCode);
             }
         }
 
@@ -73,16 +78,18 @@ public sealed partial class AuthenticateController : ControllerBase
 
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
+        var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
+        
         var protector = _bearerToken.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
         var ticket    = protector.Unprotect(request.RefreshToken);
 
         if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc
          || DateTimeOffset.UtcNow >= expiresUtc
-         || await _signInManager.ValidateSecurityStampAsync(ticket.Principal) is not { } user) {
+         || await signInManager.ValidateSecurityStampAsync(ticket.Principal) is not { } user) {
             return Challenge();
         }
 
-        var principal = await _signInManager.CreateUserPrincipalAsync(user);
+        var principal = await signInManager.CreateUserPrincipalAsync(user);
 
         return SignIn(principal, IdentityConstants.ApplicationScheme);
     }

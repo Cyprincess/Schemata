@@ -5,10 +5,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.BearerToken;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -88,14 +86,6 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
                               .AddDefaultTokenProviders();
 
         build(builder);
-    }
-
-    public override void ConfigureEndpoints(
-        IApplicationBuilder   app,
-        IEndpointRouteBuilder endpoints,
-        IConfiguration        configuration,
-        IWebHostEnvironment   environment) {
-        endpoints.UseIdentity<TUser, TRole>();
     }
 
     private sealed class CompositeIdentityHandler(

@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.BearerToken;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Options;
@@ -19,20 +18,17 @@ public sealed partial class AuthenticateController : ControllerBase
     private readonly IMailSender<SchemataUser>                _mailSender;
     private readonly IMessageSender<SchemataUser>             _messageSender;
     private readonly IOptionsMonitor<SchemataIdentityOptions> _options;
-    private readonly SignInManager<SchemataUser>              _signInManager;
     private readonly SchemataUserManager<SchemataUser>        _userManager;
 
     private readonly IServiceProvider _sp;
 
     public AuthenticateController(
-        SignInManager<SchemataUser>              signInManager,
         SchemataUserManager<SchemataUser>        userManager,
         IMailSender<SchemataUser>                mailSender,
         IMessageSender<SchemataUser>             messageSender,
         IOptionsMonitor<BearerTokenOptions>      bearerToken,
         IOptionsMonitor<SchemataIdentityOptions> options,
         IServiceProvider                         sp) {
-        _signInManager = signInManager;
         _userManager   = userManager;
         _mailSender    = mailSender;
         _messageSender = messageSender;

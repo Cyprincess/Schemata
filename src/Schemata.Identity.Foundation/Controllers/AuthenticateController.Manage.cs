@@ -2,7 +2,10 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Foundation.Controllers;
@@ -103,6 +106,8 @@ public sealed partial class AuthenticateController : ControllerBase
         if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
+        
+        var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
 
         var result = new AuthenticatorResponse {
             IsTwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
@@ -120,7 +125,7 @@ public sealed partial class AuthenticateController : ControllerBase
             result.SharedKey     = key;
             result.RecoveryCodes = codes?.ToArray();
         } else {
-            result.IsMachineRemembered = await _signInManager.IsTwoFactorClientRememberedAsync(user);
+            result.IsMachineRemembered = await signInManager.IsTwoFactorClientRememberedAsync(user);
             result.RecoveryCodesLeft   = await _userManager.CountRecoveryCodesAsync(user);
         }
 
