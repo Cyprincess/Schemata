@@ -18,7 +18,7 @@ public static class SchemataBuilderExtensions
         Action<IdentityOptions>?         configure = null,
         Action<IdentityBuilder>?         build     = null,
         Action<BearerTokenOptions>?      bearer    = null) {
-        return UseIdentity<SchemataUser, SchemataRole>(builder, identify, configure, build);
+        return UseIdentity<SchemataUser, SchemataRole>(builder, identify, configure, build, bearer);
     }
 
     public static SchemataBuilder UseIdentity<TUser, TRole>(
@@ -28,7 +28,7 @@ public static class SchemataBuilderExtensions
         Action<IdentityBuilder>?         build     = null,
         Action<BearerTokenOptions>?      bearer    = null) where TUser : SchemataUser
                                                            where TRole : SchemataRole {
-        return UseIdentity<TUser, TRole, SchemataUserStore<TUser>, SchemataRoleStore<TRole>>(builder, identify, configure, build);
+        return UseIdentity<TUser, TRole, SchemataUserStore<TUser>, SchemataRoleStore<TRole>>(builder, identify, configure, build, bearer);
     }
 
     public static SchemataBuilder UseIdentity<TUser, TRole, TUserStore, TRoleStore>(
