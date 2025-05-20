@@ -42,9 +42,10 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         void Configure(JsonSerializerOptions options) {
             options.DictionaryKeyPolicy  = JsonNamingPolicy.SnakeCaseLower;
             options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            options.NumberHandling       = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString;
+            options.NumberHandling       = JsonNumberHandling.AllowReadingFromString;
 
             options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
+            options.Converters.Add(new JsonStringNumberConverter());
 
             options.TypeInfoResolver = new PolymorphicTypeResolver();
 
