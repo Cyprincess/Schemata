@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 
 namespace Schemata.Core.Features;
@@ -12,6 +13,8 @@ public sealed class SchemataForwardedHeadersFeature : FeatureBase
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment) {
-        app.UseForwardedHeaders();
+        app.UseForwardedHeaders(new() {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        });
     }
 }
