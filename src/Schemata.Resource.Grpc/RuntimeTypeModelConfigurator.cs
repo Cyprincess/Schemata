@@ -6,8 +6,9 @@ using ProtoBuf;
 using ProtoBuf.Meta;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
+using Schemata.Resource.Foundation;
 
 namespace Schemata.Resource.Grpc;
 
@@ -105,8 +106,6 @@ internal static class RuntimeTypeModelConfigurator
 
         var meta  = model[response];
         var field = meta.GetFields().FirstOrDefault(f => f.Name == "entities");
-        if (field is not null) {
-            field.Name = entity.Name.Pluralize().Underscore();
-        }
+        field?.Name = ResourceNameDescriptor.ForType(entity).Plural.Underscore();
     }
 }

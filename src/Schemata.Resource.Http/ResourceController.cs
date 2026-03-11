@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
 

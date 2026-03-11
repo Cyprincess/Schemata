@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Schemata.Abstractions;
+using Schemata.Common;
 
 namespace Schemata.Mapping.Foundation;
 

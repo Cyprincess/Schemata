@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
+using Schemata.Common;
 using Schemata.Core.Features;
 
 // ReSharper disable once CheckNamespace

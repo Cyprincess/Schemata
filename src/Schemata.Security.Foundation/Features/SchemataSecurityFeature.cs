@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Security.Foundation.Providers;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Security.Foundation.Features;

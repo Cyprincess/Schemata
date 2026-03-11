@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Modular;
+using Schemata.Modular;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Core;

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -63,8 +62,6 @@ public sealed class SchemataResourceFeature : FeatureBase
         resource.Endpoints ??= resource.Entity.GetCustomAttributes<ResourceEndpointAttributeBase>()
                                        .Select(a => a.Endpoint)
                                        .ToArray();
-
-        resource.Package ??= resource.Entity.GetCustomAttribute<ResourcePackageAttribute>()?.Package;
 
         var entity  = resource.Entity;
         var request = resource.Request!;

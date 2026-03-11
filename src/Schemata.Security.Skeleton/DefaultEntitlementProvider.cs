@@ -3,9 +3,8 @@ using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Security.Skeleton;
 
-namespace Schemata.Security.Foundation.Providers;
+namespace Schemata.Security.Skeleton;
 
 public sealed class DefaultEntitlementProvider<T, TContext> : IEntitlementProvider<T, TContext>
 {

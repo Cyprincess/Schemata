@@ -11,22 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Humanizer.Core" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.0')) ">
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
-    <PackageReference Include="System.ComponentModel.Annotations" />
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFrameworkIdentifier)' == '.NETStandard' And $([MSBuild]::VersionEquals($(TargetFrameworkVersion), '2.1')) ">
-    <PackageReference Include="System.ComponentModel.Annotations" />
-  </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
     <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
-    <ProjectReference Include="..\Schemata.Queryable\Schemata.Queryable.csproj" />
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Validation.Skeleton\Schemata.Validation.Skeleton.csproj" />
   </ItemGroup>
 

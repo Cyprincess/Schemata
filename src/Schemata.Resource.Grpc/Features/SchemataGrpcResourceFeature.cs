@@ -11,10 +11,10 @@ using Microsoft.Extensions.Options;
 using ProtoBuf.Grpc.Configuration;
 using ProtoBuf.Grpc.Reflection;
 using ProtoBuf.Meta;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
 using Schemata.Resource.Grpc.Interceptors;
 
@@ -56,10 +56,9 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         });
 
         services.TryAddSingleton(sp => {
-            var options    = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
             var model      = sp.GetRequiredService<RuntimeTypeModel>();
             var marshaller = ProtoBufMarshallerFactory.Create(model);
-            return BinderConfiguration.Create([marshaller], new ResourceServiceBinder(options.Value));
+            return BinderConfiguration.Create([marshaller], new ResourceServiceBinder());
         });
 
         // Register ReflectionService lazily from resource options
@@ -68,11 +67,11 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
             var binder  = sp.GetService<BinderConfiguration>();
 
             var types = options.Value.Resources
-                            .Where(r => r.Value.Endpoints is null
-                                     || r.Value.Endpoints.Count == 0
-                                     || r.Value.Endpoints.Any(e => e == GrpcResourceAttribute.Name))
-                            .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
-                            .ToArray();
+                               .Where(r => r.Value.Endpoints is null
+                                        || r.Value.Endpoints.Count == 0
+                                        || r.Value.Endpoints.Any(e => e == GrpcResourceAttribute.Name))
+                               .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
+                               .ToArray();
 
             return binder is not null ? new ReflectionService(binder, types) : new(types);
         });

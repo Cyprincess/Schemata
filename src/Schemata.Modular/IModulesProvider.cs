@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
 

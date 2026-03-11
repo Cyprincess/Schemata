@@ -27,6 +27,4 @@ public class ResourceAttribute : Attribute
     public Type? Summary { get; }
 
     public IList<string>? Endpoints { get; set; }
-
-    public string? Package { get; set; }
 }

@@ -16,6 +16,7 @@
     <Project Path="src/Schemata.Advice/Schemata.Advice.csproj" />
     <Project Path="src/Schemata.Authorization.Foundation/Schemata.Authorization.Foundation.csproj" />
     <Project Path="src/Schemata.Authorization.Skeleton/Schemata.Authorization.Skeleton.csproj" />
+    <Project Path="src/Schemata.Common/Schemata.Common.csproj" />
     <Project Path="src/Schemata.Core/Schemata.Core.csproj" />
     <Project Path="src/Schemata.Entity.Cache/Schemata.Entity.Cache.csproj" />
     <Project Path="src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
@@ -28,7 +29,6 @@
     <Project Path="src/Schemata.Mapping.Mapster/Schemata.Mapping.Mapster.csproj" />
     <Project Path="src/Schemata.Mapping.Skeleton/Schemata.Mapping.Skeleton.csproj" />
     <Project Path="src/Schemata.Modular/Schemata.Modular.csproj" />
-    <Project Path="src/Schemata.Queryable/Schemata.Queryable.csproj" />
     <Project Path="src/Schemata.Resource.Foundation/Schemata.Resource.Foundation.csproj" />
     <Project Path="src/Schemata.Resource.Grpc/Schemata.Resource.Grpc.csproj" />
     <Project Path="src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />

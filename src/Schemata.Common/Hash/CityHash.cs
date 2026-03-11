@@ -39,7 +39,7 @@ using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Schemata.Abstractions.Hash;
+namespace Schemata.Common.Hash;
 
 /// <summary>
 ///     CityHash provides hash functions for strings. The functions mix the

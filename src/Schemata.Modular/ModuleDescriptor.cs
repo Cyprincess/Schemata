@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace Schemata.Abstractions.Modular;
+namespace Schemata.Modular;
 
 public class ModuleDescriptor
 {

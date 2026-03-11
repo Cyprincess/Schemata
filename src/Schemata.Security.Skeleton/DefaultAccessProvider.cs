@@ -1,9 +1,8 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Security.Skeleton;
 
-namespace Schemata.Security.Foundation.Providers;
+namespace Schemata.Security.Skeleton;
 
 public class DefaultAccessProvider<T, TContext> : IAccessProvider<T, TContext>
 {

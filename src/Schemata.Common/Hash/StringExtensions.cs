@@ -1,5 +1,5 @@
 using Schemata.Abstractions;
-using Schemata.Abstractions.Hash;
+using Schemata.Common.Hash;
 
 // ReSharper disable once CheckNamespace
 namespace System;

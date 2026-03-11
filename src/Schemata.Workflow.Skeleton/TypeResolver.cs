@@ -1,5 +1,5 @@
 using System;
-using Schemata.Abstractions;
+using Schemata.Common;
 
 namespace Schemata.Workflow.Skeleton;
 

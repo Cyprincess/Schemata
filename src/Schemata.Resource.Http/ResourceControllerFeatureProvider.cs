@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using Humanizer;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 
 namespace Schemata.Resource.Http;
 
@@ -34,7 +34,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
                 continue;
             }
 
-            var name = resource.Entity.Name.Pluralize();
+            var name = ResourceNameDescriptor.ForType(resource.Entity).Plural;
             if (feature.Controllers.Any(t => t.Name == name || t.Name == $"{resource.Entity.Name}Controller")) {
                 continue;
             }

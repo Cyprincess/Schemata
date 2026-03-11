@@ -1,6 +1,6 @@
 using System;
 
-namespace Schemata.Abstractions.Options;
+namespace Schemata.Workflow.Skeleton;
 
 public sealed class SchemataWorkflowOptions
 {

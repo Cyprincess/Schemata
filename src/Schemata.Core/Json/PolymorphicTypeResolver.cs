@@ -5,8 +5,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Json;
+using Schemata.Common;
 
 namespace Schemata.Core.Json;
 

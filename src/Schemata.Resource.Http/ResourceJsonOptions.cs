@@ -4,11 +4,11 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
+using Schemata.Resource.Foundation;
 
 namespace Schemata.Resource.Http;
 
@@ -23,10 +23,10 @@ internal static class ResourceJsonOptions
     private static JsonSerializerOptions Configure(JsonSerializerOptions source, SchemataResourceOptions options) {
         var json = new JsonSerializerOptions(source);
 
-        var entityNames = new Dictionary<Type, string>();
+        var entityDescriptors = new Dictionary<Type, ResourceNameDescriptor>();
         foreach (var (_, resource) in options.Resources) {
             if (resource.Summary is not null) {
-                entityNames[resource.Summary] = resource.Entity.Name;
+                entityDescriptors[resource.Summary] = ResourceNameDescriptor.ForType(resource.Entity);
             }
         }
 
@@ -50,9 +50,10 @@ internal static class ResourceJsonOptions
 
                 if (property is not null) {
                     var summaryType = info.Type.GetGenericArguments()[0];
-                    var name = entityNames.TryGetValue(summaryType, out var entityName)
-                        ? entityName.Pluralize()
-                        : summaryType.Name.Pluralize();
+                    var descriptor = entityDescriptors.TryGetValue(summaryType, out var d)
+                        ? d
+                        : ResourceNameDescriptor.ForType(summaryType);
+                    var name = descriptor.Plural;
                     property.Name = json.PropertyNamingPolicy is not null
                         ? json.PropertyNamingPolicy.ConvertName(name)
                         : name;

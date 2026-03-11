@@ -10,8 +10,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Repository;

@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
   </ItemGroup>
 
 </Project>

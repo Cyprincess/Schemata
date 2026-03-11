@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
 
 namespace Schemata.Resource.Http.Features;
@@ -31,8 +31,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
         services.AddOptions<MvcOptions>()
-                .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
-                     mvc.Conventions.Add(new ResourceControllerConvention(opts));
+                .Configure(mvc => {
+                     mvc.Conventions.Add(new ResourceControllerConvention());
                  });
 
         services.AddMvcCore()

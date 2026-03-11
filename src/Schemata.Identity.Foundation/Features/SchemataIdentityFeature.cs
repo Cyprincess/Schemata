@@ -12,7 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Skeleton.Entities;

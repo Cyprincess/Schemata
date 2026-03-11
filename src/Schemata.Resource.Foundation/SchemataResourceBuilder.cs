@@ -3,7 +3,6 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -53,10 +52,7 @@ public sealed class SchemataResourceBuilder
         return this;
     }
 
-    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
-        string?        package   = null,
-        IList<string>? endpoints = null
-    )
+    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(IList<string>? endpoints = null)
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
         where TDetail : class, ICanonicalName
@@ -70,10 +66,6 @@ public sealed class SchemataResourceBuilder
 
         if (endpoints is null) {
             resource.Endpoints = endpoints;
-        }
-
-        if (package is not null) {
-            resource.Package = package;
         }
 
         SchemataResourceFeature.RegisterResource(Services, resource);

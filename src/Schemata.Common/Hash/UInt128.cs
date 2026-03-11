@@ -36,7 +36,7 @@
 
 using System;
 
-namespace Schemata.Abstractions.Hash;
+namespace Schemata.Common.Hash;
 
 /// <summary>
 ///     Represents a 128-bit unsigned integer.

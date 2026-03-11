@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Resource;
 
-namespace Schemata.Abstractions.Options;
+namespace Schemata.Resource.Foundation;
 
 public sealed class SchemataResourceOptions
 {

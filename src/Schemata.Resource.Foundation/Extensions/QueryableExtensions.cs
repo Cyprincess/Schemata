@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using Humanizer;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Grammars.Terms;
 using Schemata.Resource.Foundation.Models;
