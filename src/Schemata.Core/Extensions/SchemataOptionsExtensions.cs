@@ -15,21 +15,23 @@ public static class SchemataOptionsExtensions
 
     public static void SetFeatures(
         this SchemataOptions                           schemata,
-        Dictionary<RuntimeTypeHandle, ISimpleFeature>? value) {
+        Dictionary<RuntimeTypeHandle, ISimpleFeature>? value
+    ) {
         schemata.Set(SchemataConstants.Options.Features, value);
     }
 
-    public static void AddFeature<T>(this SchemataOptions schemata) where T : ISimpleFeature {
-        AddFeature(schemata, typeof(T));
+    public static void AddFeature<T>(this SchemataOptions schemata)
+        where T : ISimpleFeature {
+        schemata.AddFeature(typeof(T));
     }
 
     public static void AddFeature(this SchemataOptions schemata, Type type) {
         var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))!;
-        AddFeature(schemata, type, feature);
+        schemata.AddFeature(type, feature);
     }
 
     public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
-        var features = GetFeatures(schemata) ?? [];
+        var features = schemata.GetFeatures() ?? [];
         if (features.ContainsKey(type.TypeHandle)) {
             return;
         }
@@ -44,18 +46,19 @@ public static class SchemataOptionsExtensions
 
             if (at.Name == typeof(DependsOnAttribute<>).Name) {
                 var dependency = at.GenericTypeArguments[0];
-                if (HasFeature(schemata, dependency)) {
+                if (schemata.HasFeature(dependency)) {
                     continue;
                 }
 
-                schemata.Logger.Log(LogLevel.Debug, SchemataResources.GetResourceString(SchemataResources.ST0001), type.Name, dependency.Name);
-                AddFeature(schemata, dependency);
+                schemata.Logger.Log(LogLevel.Debug, SchemataResources.GetResourceString(SchemataResources.ST0001),
+                                    type.Name, dependency.Name);
+                schemata.AddFeature(dependency);
                 continue;
             }
 
             if (attribute is DependsOnAttribute depends) {
                 var dependency = AppDomainTypeCache.GetType(depends.Name);
-                if (dependency is not null && HasFeature(schemata, dependency)) {
+                if (dependency is not null && schemata.HasFeature(dependency)) {
                     continue;
                 }
 
@@ -78,12 +81,13 @@ public static class SchemataOptionsExtensions
         schemata.SetFeatures(features);
     }
 
-    public static bool HasFeature<T>(this SchemataOptions schemata) where T : ISimpleFeature {
-        return HasFeature(schemata, typeof(T));
+    public static bool HasFeature<T>(this SchemataOptions schemata)
+        where T : ISimpleFeature {
+        return schemata.HasFeature(typeof(T));
     }
 
     public static bool HasFeature(this SchemataOptions schemata, Type type) {
-        var features = GetFeatures(schemata);
+        var features = schemata.GetFeatures();
         return features?.ContainsKey(type.TypeHandle) ?? false;
     }
 }

@@ -18,7 +18,7 @@ public static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<IOptions<JsonSerializerOptions>>();
 
             var inner = new JsonSerializerOptions(options.Value) {
-                TypeInfoResolver = new PolymorphicTypeResolver(),
+                TypeInfoResolver = PolymorphicTypeResolver.Instance,
             };
 
             var entities = inner.PropertyNamingPolicy is not null

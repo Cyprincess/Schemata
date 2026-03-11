@@ -23,13 +23,15 @@ public sealed class SchemataBuilder
 
     public IWebHostEnvironment Environment { get; }
 
-    public SchemataBuilder AddFeature<T>() where T : ISimpleFeature {
+    public SchemataBuilder AddFeature<T>()
+        where T : ISimpleFeature {
         Options.AddFeature<T>();
 
         return this;
     }
 
-    public bool HasFeature<T>() where T : ISimpleFeature {
+    public bool HasFeature<T>()
+        where T : ISimpleFeature {
         return Options.HasFeature<T>();
     }
 
@@ -39,15 +41,12 @@ public sealed class SchemataBuilder
         return this;
     }
 
-    public ILogger<T> CreateLogger<T>() {
-        return Options.CreateLogger<T>();
-    }
+    public ILogger<T> CreateLogger<T>() { return Options.CreateLogger<T>(); }
 
-    public object? CreateLogger(Type type) {
-        return Options.CreateLogger(type);
-    }
+    public object? CreateLogger(Type type) { return Options.CreateLogger(type); }
 
-    public SchemataBuilder Configure<TOptions>(Action<TOptions> configure) where TOptions : class {
+    public SchemataBuilder Configure<TOptions>(Action<TOptions> configure)
+        where TOptions : class {
         Configurators.Set(configure);
 
         return this;

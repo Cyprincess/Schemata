@@ -15,13 +15,15 @@ public sealed class AuthorizationCachingFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) { }
+        OpenIddictServerBuilder              builder
+    ) { }
 
     public void ConfigureServerAspNetCore(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) {
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) {
         if (features.OfType<AuthorizationCodeFlowFeature>().Any()) {
             builder.EnableAuthorizationRequestCaching();
         }

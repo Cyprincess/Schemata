@@ -20,9 +20,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
 
     #region IActionDescriptorChangeProvider Members
 
-    public IChangeToken GetChangeToken() {
-        return new CancellationChangeToken(_cts.Token);
-    }
+    public IChangeToken GetChangeToken() { return new CancellationChangeToken(_cts.Token); }
 
     #endregion
 

@@ -8,9 +8,7 @@ public class LessThanOrEqual : IBinary
 {
     public const string Name = "<=";
 
-    public LessThanOrEqual(TextPosition position) {
-        Position = position;
-    }
+    public LessThanOrEqual(TextPosition position) { Position = position; }
 
     #region IBinary Members
 
@@ -18,19 +16,13 @@ public class LessThanOrEqual : IBinary
 
     public bool IsConstant => false;
 
-    public Expression? ToExpression(Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Container ctx) { return null; }
 
     public ExpressionType? Type => ExpressionType.LessThanOrEqual;
 
-    public Expression? ToExpression(Expression left, Expression right, Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Expression left, Expression right, Container ctx) { return null; }
 
     #endregion
 
-    public override string ToString() {
-        return $"{Name}";
-    }
+    public override string ToString() { return $"{Name}"; }
 }

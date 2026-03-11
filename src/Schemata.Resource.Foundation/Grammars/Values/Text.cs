@@ -35,7 +35,5 @@ public class Text : IValue
 
     #endregion
 
-    public override string ToString() {
-        return $"\"{Value}\"";
-    }
+    public override string ToString() { return $"\"{Value}\""; }
 }

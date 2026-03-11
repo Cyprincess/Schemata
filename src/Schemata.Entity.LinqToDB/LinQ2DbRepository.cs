@@ -10,13 +10,16 @@ using System.Transactions;
 using Humanizer;
 using LinqToDB;
 using LinqToDB.Data;
+using Schemata.Abstractions.Advisors;
+using Schemata.Advice;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advices;
+using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.LinqToDB;
 
-public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> where TContext : DataConnection
-                                                                            where TEntity : class
+public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
+    where TContext : DataConnection
+    where TEntity : class
 {
     private ITable<TEntity>? _table;
 
@@ -38,17 +41,14 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
 
     public virtual string TableName { get; }
 
-    public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() {
-        return Table.AsAsyncEnumerable();
-    }
+    public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() { return Table.AsAsyncEnumerable(); }
 
-    public override IQueryable<TEntity> AsQueryable() {
-        return Table.AsQueryable();
-    }
+    public override IQueryable<TEntity> AsQueryable() { return Table.AsQueryable(); }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        [EnumeratorCancellation] CancellationToken      ct = default) {
+        [EnumeratorCancellation] CancellationToken      ct = default
+    ) {
         var query = await BuildQueryAsync(predicate, ct);
 
         var enumerable = query.AsAsyncEnumerable().WithCancellation(ct);
@@ -61,96 +61,194 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
 
     public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) {
+        CancellationToken                               ct = default
+    ) {
         throw new NotImplementedException();
     }
 
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) where TResult : default {
+        CancellationToken                               ct = default
+    )
+        where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
-        if (!next) {
-            return context.Result;
+
+        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+                return context.Result;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         context.Result = await query.FirstOrDefaultAsync(ct);
-        await Advices<IRepositoryResultAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+
+        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, TResult>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
+
         return context.Result;
     }
 
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) where TResult : default {
+        CancellationToken                               ct = default
+    )
+        where TResult : default {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
-        if (!next) {
-            return context.Result;
+
+        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+                return context.Result;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         context.Result = await query.SingleOrDefaultAsync(ct);
-        await Advices<IRepositoryResultAdvice<TEntity, TResult, TResult>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+
+        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, TResult>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
+
         return context.Result;
     }
 
     public override async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) {
+        CancellationToken                               ct = default
+    ) {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, bool>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, bool>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
-        if (!next) {
-            return context.Result;
+
+        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+                return context.Result;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         context.Result = await query.AnyAsync(ct);
-        await Advices<IRepositoryResultAdvice<TEntity, TResult, bool>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+
+        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, bool>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
+
         return context.Result;
     }
 
     public override async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) {
+        CancellationToken                               ct = default
+    ) {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, int>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, int>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
-        if (!next) {
-            return context.Result;
+
+        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+                return context.Result;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         context.Result = await query.CountAsync(ct);
-        await Advices<IRepositoryResultAdvice<TEntity, TResult, int>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+
+        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, int>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
+
         return context.Result;
     }
 
     public override async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default) {
+        CancellationToken                               ct = default
+    ) {
         var query = await BuildQueryAsync(predicate, ct);
 
         var context = new QueryContext<TEntity, TResult, long>(this, query);
-        var next = await Advices<IRepositoryQueryAsyncAdvice<TEntity, TResult, long>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
-        if (!next) {
-            return context.Result;
+
+        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+                return context.Result;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         context.Result = await query.LongCountAsync(ct);
-        await Advices<IRepositoryResultAdvice<TEntity, TResult, long>>.AdviseAsync(ServiceProvider, AdviceContext, context, ct);
+
+        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, long>>()
+                             .RunAsync(AdviceContext, context, ct)) {
+            case AdviseResult.Block:
+                return default;
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
+
         return context.Result;
     }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryAddAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
-        if (!next) {
-            return;
+        switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, this, entity, ct)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         RowsAffected += await Context.InsertAsync(entity, TableName, token: ct);
@@ -159,9 +257,14 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryUpdateAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
-        if (!next) {
-            return;
+        switch (await Advisor.For<IRepositoryUpdateAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, this, entity, ct)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         RowsAffected += await Context.UpdateAsync(entity, TableName, token: ct);
@@ -170,9 +273,14 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
-        var next = await Advices<IRepositoryRemoveAsyncAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, this, entity, ct);
-        if (!next) {
-            return;
+        switch (await Advisor.For<IRepositoryRemoveAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, this, entity, ct)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return;
+            case AdviseResult.Continue:
+            default:
+                break;
         }
 
         RowsAffected += await Context.DeleteAsync(entity, TableName, token: ct);
@@ -205,12 +313,20 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity> wher
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct) {
+        CancellationToken                               ct
+    ) {
         ct.ThrowIfCancellationRequested();
 
         var container = AsQueryContainer();
 
-        await Advices<IRepositoryBuildQueryAdvice<TEntity>>.AdviseAsync(ServiceProvider, AdviceContext, container, ct);
+        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, container, ct)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+            case AdviseResult.Continue:
+            default:
+                break;
+        }
 
         return BuildQuery(container.Query, predicate);
     }

@@ -27,21 +27,16 @@ public class RepositoryCacheShould
         await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
 
-        context.AddRange(new Student {
-                             Id   = 1,
-                             Name = "Alice",
-                         },
-                         new Student {
-                             Id   = 2,
-                             Name = "Bob",
-                             Age  = 21,
+        context.AddRange(new Student { Id = 1, Name = "Alice" }, new Student {
+                             Id = 2, Name = "Bob", Age = 21,
                          });
 
         await context.SaveChangesAsync();
 
         var repository = new EntityFrameworkCoreRepository<TestingContext, Student>(scope.ServiceProvider, context);
 
-        var alice = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Alice")).OrderByDescending(u => u.Name));
+        var alice = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Alice"))
+                                                                .OrderByDescending(u => u.Name));
         Assert.NotNull(alice);
         Assert.Equal("Alice", alice.Name);
 
@@ -53,17 +48,17 @@ public class RepositoryCacheShould
         repository.Detach(bob);
 
         await repository.UpdateAsync(new() {
-            Id = bob.Id,
-            Name = bob.Name,
-            Age = 22,
-        });
+                                         Id = bob.Id, Name = bob.Name, Age = 22,
+                                     });
 
         var cached = await repository.SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
         Assert.NotNull(cached);
         Assert.Equal(bob.Name, cached.Name);
         Assert.Equal(bob.Age, cached.Age);
 
-        var fresh = await repository.Once().SuppressQueryCache().SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
+        var fresh = await repository.Once()
+                                    .SuppressQueryCache()
+                                    .SingleOrDefaultAsync(q => q.Where(u => u.Name!.Contains("Bob") && u.Age > 20));
         Assert.NotNull(fresh);
         Assert.Equal(bob.Name, fresh.Name);
         Assert.Equal(22, fresh.Age);

@@ -11,7 +11,8 @@ public class ResourceAttribute : Attribute
         Type  entity,
         Type? request = null,
         Type? detail  = null,
-        Type? summary = null) {
+        Type? summary = null
+    ) {
         Entity  = entity;
         Request = request ?? entity;
         Detail  = detail ?? entity;

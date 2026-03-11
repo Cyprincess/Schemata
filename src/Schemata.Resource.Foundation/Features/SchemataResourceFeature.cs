@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation.Advices;
+using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation.Features;
 
@@ -20,11 +20,12 @@ public sealed class SchemataResourceFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvice<,>), typeof(AdviceCreateRequestValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditRequestAdvice<,>), typeof(AdviceEditRequestValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditAdvice<,>), typeof(AdviceEditFreshness<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvice<>), typeof(AdviceDeleteFreshness<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvice<,>), typeof(AdviceResponseFreshness<,>)));
+        IWebHostEnvironment environment
+    ) {
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateFreshness<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvisor<>), typeof(AdviceDeleteFreshness<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseFreshness<,>)));
     }
 }

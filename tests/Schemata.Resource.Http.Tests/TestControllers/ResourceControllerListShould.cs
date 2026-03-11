@@ -28,9 +28,7 @@ public class ResourceControllerListShould
         Assert.Equal(_fixture.Students.Count, response.TotalSize);
         Assert.Null(response.NextPageToken);
 
-        var action = new ActionContext {
-            HttpContext = controller.HttpContext,
-        };
+        var action = new ActionContext { HttpContext = controller.HttpContext };
         await json.ExecuteResultAsync(action);
 
         var raw = Encoding.UTF8.GetString(body.ToArray());

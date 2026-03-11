@@ -14,7 +14,8 @@ public sealed class AuthorizationEndSessionFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.SetEndSessionEndpointUris("/Connect/Logout");
     }
 
@@ -22,7 +23,8 @@ public sealed class AuthorizationEndSessionFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) {
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) {
         integration.EnableEndSessionEndpointPassthrough();
     }
 

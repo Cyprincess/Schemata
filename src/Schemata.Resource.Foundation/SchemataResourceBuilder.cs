@@ -7,7 +7,7 @@ using Schemata.Abstractions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation.Advices;
+using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Security;
 
 namespace Schemata.Resource.Foundation;
@@ -19,29 +19,28 @@ public sealed class SchemataResourceBuilder
         Services = services;
     }
 
-    public SchemataResourceBuilder(IServiceCollection services) {
-        Services = services;
-    }
+    private SchemataOptions Schemata { get; }
 
-    private SchemataOptions? Schemata { get; }
+    private IServiceCollection Services { get; }
 
-    private IServiceCollection? Services { get; }
-
-    public void AddFeature<T>() where T : ISimpleFeature {
-        Schemata?.AddFeature(typeof(T));
+    public void AddFeature<T>()
+        where T : ISimpleFeature {
+        Schemata.AddFeature(typeof(T));
     }
 
     public SchemataResourceBuilder WithAuthorization() {
-        Services?.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvice<>), typeof(AdviceListRequestAuthorize<>)));
-        Services?.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvice<>), typeof(AdviceGetRequestAuthorize<>)));
-        Services?.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvice<,>), typeof(AdviceCreateRequestAuthorize<,>)));
-        Services?.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceEditRequestAdvice<,>), typeof(AdviceEditRequestAuthorize<,>)));
-        Services?.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvice<>), typeof(AdviceDeleteRequestAuthorize<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAuthorize<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAuthorize<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAuthorize<,>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAuthorize<,>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAuthorize<>)));
 
         return this;
     }
 
-    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(IEnumerable<ResourceAttributeBase>? endpoints = null)
+    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
+        IEnumerable<ResourceAttributeBase>? endpoints = null
+    )
         where TEntity : class, IIdentifier
         where TRequest : class, IIdentifier
         where TDetail : class, IIdentifier
@@ -61,7 +60,9 @@ public sealed class SchemataResourceBuilder
         Services?.AddAccessProvider<TEntity, ResourceRequestContext<ListRequest>, ResourceAccessProvider<TEntity, ListRequest>>();
         Services?.AddAccessProvider<TEntity, ResourceRequestContext<TRequest>, ResourceAccessProvider<TEntity, TRequest>>();
 
-        Services?.Configure<SchemataResourceOptions>(options => { options.Resources[resource.Entity.TypeHandle] = resource; });
+        Services?.Configure<SchemataResourceOptions>(options => {
+            options.Resources[resource.Entity.TypeHandle] = resource;
+        });
 
         return this;
     }

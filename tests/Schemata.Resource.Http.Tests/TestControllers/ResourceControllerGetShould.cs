@@ -25,12 +25,10 @@ public class ResourceControllerGetShould
         var response = Assert.IsType<Student>(json.Value);
         Assert.NotNull(response);
         Assert.Equal(student.Id, response.Id);
-        Assert.Equal(student.Name, response.Name);
+        Assert.Equal(student.FullName, response.FullName);
         Assert.Equal(student.Timestamp, response.Timestamp);
 
-        var action = new ActionContext {
-            HttpContext = controller.HttpContext,
-        };
+        var action = new ActionContext { HttpContext = controller.HttpContext };
         await json.ExecuteResultAsync(action);
 
         var raw = Encoding.UTF8.GetString(body.ToArray());

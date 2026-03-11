@@ -51,7 +51,7 @@ public sealed partial class AuthenticateController : ControllerBase
         var confirmed = request switch {
             var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) => await _userManager.IsEmailConfirmedAsync(user),
             var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber)  => await _userManager.IsPhoneNumberConfirmedAsync(user),
-            var _                                                       => false,
+            var _ => false,
         };
 
         if (!confirmed) {

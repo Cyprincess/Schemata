@@ -27,7 +27,8 @@ public sealed partial class ConnectController : ControllerBase
         IOpenIddictAuthorizationManager   authorizationManager,
         IOpenIddictScopeManager           scopeManager,
         SignInManager<SchemataUser>       signInManager,
-        SchemataUserManager<SchemataUser> userManager) {
+        SchemataUserManager<SchemataUser> userManager
+    ) {
         _applicationManager   = applicationManager;
         _authorizationManager = authorizationManager;
         _scopeManager         = scopeManager;
@@ -44,7 +45,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.Claims.Name or OpenIddictConstants.Claims.PreferredUsername:
                 yield return OpenIddictConstants.Destinations.AccessToken;
 
-                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Profile) == true) {
+                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Profile) is true) {
                     yield return OpenIddictConstants.Destinations.IdentityToken;
                 }
 
@@ -53,7 +54,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.Claims.Nickname:
                 yield return OpenIddictConstants.Destinations.AccessToken;
 
-                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Profile) == true) {
+                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Profile) is true) {
                     yield return OpenIddictConstants.Destinations.IdentityToken;
                 }
 
@@ -62,7 +63,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.Claims.Email:
                 yield return OpenIddictConstants.Destinations.AccessToken;
 
-                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Email) == true) {
+                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Email) is true) {
                     yield return OpenIddictConstants.Destinations.IdentityToken;
                 }
 
@@ -71,7 +72,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.Claims.PhoneNumber:
                 yield return OpenIddictConstants.Destinations.AccessToken;
 
-                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Phone) == true) {
+                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Phone) is true) {
                     yield return OpenIddictConstants.Destinations.IdentityToken;
                 }
 
@@ -80,7 +81,7 @@ public sealed partial class ConnectController : ControllerBase
             case OpenIddictConstants.Claims.Role:
                 yield return OpenIddictConstants.Destinations.AccessToken;
 
-                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Roles) == true) {
+                if (claim.Subject?.HasScope(OpenIddictConstants.Permissions.Scopes.Roles) is true) {
                     yield return OpenIddictConstants.Destinations.IdentityToken;
                 }
 

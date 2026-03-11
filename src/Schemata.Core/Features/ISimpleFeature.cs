@@ -14,7 +14,8 @@ public interface ISimpleFeature : IFeature
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment);
+        IWebHostEnvironment environment
+    );
 
     void ConfigureApplication(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 
@@ -22,5 +23,6 @@ public interface ISimpleFeature : IFeature
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment);
+        IWebHostEnvironment   environment
+    );
 }

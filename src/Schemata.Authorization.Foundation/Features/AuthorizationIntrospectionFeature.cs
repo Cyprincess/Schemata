@@ -14,7 +14,8 @@ public sealed class AuthorizationIntrospectionFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.SetIntrospectionEndpointUris("/Connect/Introspect");
     }
 
@@ -22,7 +23,8 @@ public sealed class AuthorizationIntrospectionFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) { }
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) { }
 
     #endregion
 }

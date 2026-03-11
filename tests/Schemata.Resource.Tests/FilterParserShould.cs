@@ -11,29 +11,17 @@ public class FilterParserShould
     public void ParseOrder_WithValidExpression_ReturnsOrderingDictionary() {
         var result1 = Parser.Order.Parse("a,b")?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
         Assert.NotNull(result1);
-        Assert.Equal(new() {
-                         ["a"] = Ordering.Ascending,
-                         ["b"] = Ordering.Ascending,
-                     },
-                     result1);
+        Assert.Equal(new() { ["a"] = Ordering.Ascending, ["b"] = Ordering.Ascending }, result1);
 
         var result2 = Parser.Order.Parse("a DESC,b")
                            ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
         Assert.NotNull(result2);
-        Assert.Equal(new() {
-                         ["a"] = Ordering.Descending,
-                         ["b"] = Ordering.Ascending,
-                     },
-                     result2);
+        Assert.Equal(new() { ["a"] = Ordering.Descending, ["b"] = Ordering.Ascending }, result2);
 
         var result3 = Parser.Order.Parse("a,b DESC")
                            ?.ToDictionary(kv => kv.Key.Value.Value!.ToString()!, kv => kv.Value);
         Assert.NotNull(result3);
-        Assert.Equal(new() {
-                         ["a"] = Ordering.Ascending,
-                         ["b"] = Ordering.Descending,
-                     },
-                     result3);
+        Assert.Equal(new() { ["a"] = Ordering.Ascending, ["b"] = Ordering.Descending }, result3);
     }
 
     [Fact]
@@ -90,16 +78,13 @@ public class FilterParserShould
     [InlineData("foo >= (-2.4)", "[>= \"foo\" - 2.4]", false)]
     [InlineData("yesterday < request.time", "[< \"yesterday\" \"request\".\"time\"]", false)]
     [InlineData("experiment.rollout <= cohort(request.user)",
-                "[<= \"experiment\".\"rollout\" \"cohort\"(\"request\".\"user\")]",
-                false)]
+                "[<= \"experiment\".\"rollout\" \"cohort\"(\"request\".\"user\")]", false)]
     [InlineData("prod", "\"prod\"", true)]
     [InlineData("regex(m.key, '^.*prod.*$')", "\"regex\"(\"m\".\"key\",\"^.*prod.*$\")", false)]
     [InlineData("math.mem('30mb')", "\"math\".\"mem\"(\"30mb\")", false)]
-    [InlineData("(msg.endsWith('world') AND retries < 10)",
-                "[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]",
+    [InlineData("(msg.endsWith('world') AND retries < 10)", "[AND \"msg\".\"endsWith\"(\"world\") [< \"retries\" 10]]",
                 false)]
-    [InlineData("(endsWith(msg, 'world') AND retries < 10)",
-                "[AND \"endsWith\"(\"msg\",\"world\") [< \"retries\" 10]]",
+    [InlineData("(endsWith(msg, 'world') AND retries < 10)", "[AND \"endsWith\"(\"msg\",\"world\") [< \"retries\" 10]]",
                 false)]
     [InlineData("time.now()", "\"time\".\"now\"()", false)]
     [InlineData("timestamp(\"2012-04-21T11:30:00-04:00\")", "\"timestamp\"(\"2012-04-21T11:30:00-04:00\")", false)]
@@ -114,7 +99,8 @@ public class FilterParserShould
     public void ParseFilter_WithVariousExpressions_ReturnsExpectedExpression(
         string input,
         string expected,
-        bool   constant) {
+        bool   constant
+    ) {
         var expression = Parser.Filter.Parse(input);
         Assert.NotNull(expression);
         Assert.Equal(expected, expression.ToString());

@@ -16,7 +16,8 @@ public sealed class SchemataAuthenticationFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var authenticate = configurators.PopOrDefault<AuthenticationOptions>();
         var builder      = services.AddAuthentication(authenticate);
 
@@ -30,7 +31,8 @@ public sealed class SchemataAuthenticationFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseAuthentication();
         app.UseAuthorization();
     }

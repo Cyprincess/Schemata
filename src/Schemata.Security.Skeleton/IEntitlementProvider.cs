@@ -11,5 +11,6 @@ public interface IEntitlementProvider<T, TContext>
     Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
         TContext?         context,
         ClaimsPrincipal?  principal,
-        CancellationToken ct = default);
+        CancellationToken ct = default
+    );
 }

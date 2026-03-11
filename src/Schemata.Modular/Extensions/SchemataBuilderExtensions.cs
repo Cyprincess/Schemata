@@ -8,12 +8,12 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     public static SchemataBuilder UseModular(this SchemataBuilder builder) {
-        return UseModular<DefaultModulesRunner, DefaultModulesProvider>(builder);
+        return builder.UseModular<DefaultModulesRunner, DefaultModulesProvider>();
     }
 
     public static SchemataBuilder UseModular<TRunner>(this SchemataBuilder builder)
         where TRunner : class, IModulesRunner {
-        return UseModular<TRunner, DefaultModulesProvider>(builder);
+        return builder.UseModular<TRunner, DefaultModulesProvider>();
     }
 
     public static SchemataBuilder UseModular<TRunner, TProvider>(this SchemataBuilder builder)

@@ -46,7 +46,5 @@ public class Term : IToken
 
     #endregion
 
-    public override string? ToString() {
-        return Modifier is not null ? $"{Modifier} {Simple}" : Simple.ToString();
-    }
+    public override string? ToString() { return Modifier is not null ? $"{Modifier} {Simple}" : Simple.ToString(); }
 }

@@ -34,7 +34,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         ISimpleMapper            mapper,
         IRepository<TTransition> transitions,
         IRepository<TWorkflow>   workflows,
-        ITypeResolver            resolver) {
+        ITypeResolver            resolver
+    ) {
         _sp          = sp;
         _mapper      = mapper;
         _transitions = transitions;
@@ -67,7 +68,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(
         IStatefulEntity?  instance,
         ClaimsPrincipal?  principal,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         return await CreateAsync(instance, principal, ct);
     }
 
@@ -79,7 +81,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         SchemataWorkflow? workflow,
         TEvent            @event,
         ClaimsPrincipal?  principal,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         return RaiseAsync((TWorkflow?)workflow, @event, principal, ct);
     }
 
@@ -91,7 +94,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         SchemataWorkflow?       workflow,
         SchemataWorkflowOptions options,
         ClaimsPrincipal?        principal,
-        CancellationToken       ct) {
+        CancellationToken       ct
+    ) {
         return await MapAsync((TWorkflow?)workflow, options, principal, ct);
     }
 
@@ -142,7 +146,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     public virtual async Task<TWorkflow?> CreateAsync(
         IStatefulEntity?  instance,
         ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default) {
+        CancellationToken ct        = default
+    ) {
         if (instance is null) {
             throw new ArgumentNullException(nameof(instance));
         }
@@ -161,10 +166,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     public virtual async Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default) {
-        var workflow = new TWorkflow {
-            InstanceId   = id,
-            InstanceType = instance.FullName!,
-        };
+        var workflow = new TWorkflow { InstanceId = id, InstanceType = instance.FullName! };
 
         await _workflows.AddAsync(workflow, ct);
         await _workflows.CommitAsync(ct);
@@ -183,7 +185,9 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         TWorkflow?        workflow,
         TEvent            @event,
         ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default) where TEvent : class, IEvent {
+        CancellationToken ct        = default
+    )
+        where TEvent : class, IEvent {
         if (workflow is null) {
             throw new ArgumentNullException(nameof(workflow));
         }
@@ -212,7 +216,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         TWorkflow?              workflow,
         SchemataWorkflowOptions options,
         ClaimsPrincipal?        principal = null,
-        CancellationToken       ct        = default) {
+        CancellationToken       ct        = default
+    ) {
         if (workflow is null) {
             throw new ArgumentNullException(nameof(workflow));
         }

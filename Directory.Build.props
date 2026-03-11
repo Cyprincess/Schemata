@@ -87,6 +87,11 @@
     <PackageReference Include="ConfigureAwait.Fody" PrivateAssets="all" />
     <PackageReference Include="Fody" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup Condition=" $(RepoRelativeProjectDir.Contains('src')) ">
+    <ProjectReference Include="$(RepoRoot)generators\Schemata.Advice.Generator\Schemata.Advice.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
 
   <PropertyGroup Condition=" $(RepoRelativeProjectDir.Contains('tests')) ">
     <IsPackable>false</IsPackable>

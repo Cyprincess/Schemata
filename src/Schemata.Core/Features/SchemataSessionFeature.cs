@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Schemata.Core.Features;
 
 [DependsOn<SchemataCookiePolicyFeature>]
-public sealed class SchemataSessionFeature<T> : FeatureBase where T : class, ISessionStore
+public sealed class SchemataSessionFeature<T> : FeatureBase
+    where T : class, ISessionStore
 {
     public override int Priority => 170_000_000;
 
@@ -17,7 +18,8 @@ public sealed class SchemataSessionFeature<T> : FeatureBase where T : class, ISe
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<SessionOptions>();
         services.TryAddTransient<ISessionStore, T>();
         services.AddSession(configure);
@@ -26,7 +28,8 @@ public sealed class SchemataSessionFeature<T> : FeatureBase where T : class, ISe
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseSession();
     }
 }

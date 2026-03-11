@@ -42,24 +42,29 @@ public static class SchemataRepositoryBuilderExtensions
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
         ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped) {
-        return UseLinqToDb<DataConnection, DataConnection>(builder, configure, contextLifetime, optionsLifetime);
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+    ) {
+        return builder.UseLinqToDb<DataConnection, DataConnection>(configure, contextLifetime, optionsLifetime);
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
-        this SchemataRepositoryBuilder builder,
+        this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime optionsLifetime = ServiceLifetime.Scoped) where TContext : DataConnection {
-        return UseLinqToDb<TContext, TContext>(builder, configure, contextLifetime, optionsLifetime);
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+    )
+        where TContext : DataConnection {
+        return builder.UseLinqToDb<TContext, TContext>(configure, contextLifetime, optionsLifetime);
     }
 
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
-        this SchemataRepositoryBuilder builder,
+        this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime optionsLifetime = ServiceLifetime.Scoped) where TContextImplementation : TContext
-                                                                  where TContext : DataConnection {
+        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+    )
+        where TContextImplementation : TContext
+        where TContext : DataConnection {
         // Register default metadata reader for System.ComponentModel.DataAnnotations.Schema attributes
         // This is required for LINQ to DB to work with entities that have TableAttribute, ColumnAttribute, etc.
         MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
@@ -88,7 +93,8 @@ public static class SchemataRepositoryBuilderExtensions
         where TContext : IDataContext {
         var constructors = typeof(TContextImplementation).GetConstructors(BindingFlags.Public | BindingFlags.Instance);
 
-        if (constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(DataOptions<TContextImplementation>)))) {
+        if (constructors.Any(c => c.GetParameters()
+                                   .Any(p => p.ParameterType == typeof(DataOptions<TContextImplementation>)))) {
             return OptionsParameterType.DataOptionsTImpl;
         }
 
@@ -100,16 +106,18 @@ public static class SchemataRepositoryBuilderExtensions
             return OptionsParameterType.DataOptions;
         }
 
-        throw new ArgumentException($"Missing constructor accepting '{nameof(DataOptions)}' on type {typeof(TContextImplementation).Name}.");
+        throw new ArgumentException($"Missing constructor accepting '{
+            nameof(DataOptions)
+        }' on type {
+            typeof(TContextImplementation).Name
+        }.");
     }
 
     #region Nested type: OptionsParameterType
 
     private enum OptionsParameterType
     {
-        DataOptionsTImpl,
-        DataOptionsTContext,
-        DataOptions,
+        DataOptionsTImpl, DataOptionsTContext, DataOptions,
     }
 
     #endregion

@@ -8,9 +8,7 @@ public class GreaterThan : IBinary
 {
     public const char Char = '>';
 
-    public GreaterThan(TextPosition position) {
-        Position = position;
-    }
+    public GreaterThan(TextPosition position) { Position = position; }
 
     #region IBinary Members
 
@@ -18,19 +16,13 @@ public class GreaterThan : IBinary
 
     public bool IsConstant => false;
 
-    public Expression? ToExpression(Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Container ctx) { return null; }
 
     public ExpressionType? Type => ExpressionType.GreaterThan;
 
-    public Expression? ToExpression(Expression left, Expression right, Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Expression left, Expression right, Container ctx) { return null; }
 
     #endregion
 
-    public override string ToString() {
-        return $"{Char}";
-    }
+    public override string ToString() { return $"{Char}"; }
 }

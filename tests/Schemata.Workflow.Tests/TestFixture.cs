@@ -21,14 +21,10 @@ public class TestFixture
     public TestFixture() {
         Orders = [
             new() {
-                Id        = 1,
-                State     = nameof(OrderStateMachine.Initial),
-                Timestamp = Guid.NewGuid(),
+                Id = 1, State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
             },
             new() {
-                Id        = 2,
-                State     = nameof(OrderStateMachine.Initial),
-                Timestamp = Guid.NewGuid(),
+                Id = 2, State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
             },
         ];
 
@@ -36,14 +32,10 @@ public class TestFixture
 
         Workflows = [
             new() {
-                Id           = 1,
-                InstanceType = typeof(Order).FullName!,
-                InstanceId   = 1,
+                Id = 1, InstanceType = typeof(Order).FullName!, InstanceId = 1,
             },
             new() {
-                Id           = 2,
-                InstanceType = typeof(Order).FullName!,
-                InstanceId   = 2,
+                Id = 2, InstanceType = typeof(Order).FullName!, InstanceId = 2,
             },
         ];
 
@@ -68,12 +60,20 @@ public class TestFixture
 
         TransitionRepository
            .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>>>(), It.IsAny<CancellationToken>()))
-           .Returns((Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>> predicate, CancellationToken ct) => List(Transitions.AsQueryable(), predicate, ct))
+           .Returns((
+                        Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>> predicate,
+                        CancellationToken                                                    ct
+                    ) => List(Transitions.AsQueryable(), predicate, ct))
            .Verifiable();
 
         WorkflowRepository
-           .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(), It.IsAny<CancellationToken>()))
-           .ReturnsAsync((Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate, CancellationToken _) => predicate(Workflows.AsQueryable()).SingleOrDefault())
+           .Setup(r => r.SingleOrDefaultAsync(
+                      It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(),
+                      It.IsAny<CancellationToken>()))
+           .ReturnsAsync((
+                             Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate, 
+                             CancellationToken                                                _
+                         ) => predicate(Workflows.AsQueryable()).SingleOrDefault())
            .Verifiable();
 
         WorkflowRepository.Setup(r => r.AddAsync(It.IsAny<SchemataWorkflow>(), It.IsAny<CancellationToken>()))
@@ -92,8 +92,7 @@ public class TestFixture
                                     .UseSchemata(schema => {
                                          schema.UseMapster();
 
-                                         schema.UseWorkflow()
-                                               .Use<OrderStateMachine, Order>();
+                                         schema.UseWorkflow().Use<OrderStateMachine, Order>();
 
                                          schema.Services.AddTransient<IRepository<Order>>(_ => OrderRepository.Object);
                                          schema.Services.AddTransient<IRepository<SchemataTransition>>(_ => TransitionRepository.Object);
@@ -125,15 +124,10 @@ public class TestFixture
     public (WorkflowController, MemoryStream) CreateWorkflowController() {
         var controller = ServiceProvider.GetRequiredService<WorkflowController>();
 
-        var body = new MemoryStream();
-        var context = new DefaultHttpContext {
-            RequestServices = ServiceProvider,
-            Response        = { Body = body },
-        };
+        var body    = new MemoryStream();
+        var context = new DefaultHttpContext { RequestServices = ServiceProvider, Response = { Body = body } };
 
-        controller.ControllerContext = new() {
-            HttpContext = context,
-        };
+        controller.ControllerContext = new() { HttpContext = context };
 
         return (controller, body);
     }
@@ -141,7 +135,8 @@ public class TestFixture
     private static async IAsyncEnumerable<T> List<T>(
         IQueryable<T>                              entities,
         Func<IQueryable<T>, IQueryable<T>>         predicate,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         foreach (var entity in predicate(entities.AsQueryable())) {
             yield return await Task.FromResult(entity);
         }

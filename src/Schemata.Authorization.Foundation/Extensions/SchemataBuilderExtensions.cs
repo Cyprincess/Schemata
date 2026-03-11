@@ -15,18 +15,21 @@ public static class SchemataBuilderExtensions
         this SchemataBuilder                       builder,
         Action<OpenIddictServerBuilder>?           serve     = null,
         Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
-        Action<OpenIddictCoreBuilder>?             store     = null) {
-        return UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(builder, serve, integrate, store);
+        Action<OpenIddictCoreBuilder>?             store     = null
+    ) {
+        return builder.UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(serve, integrate, store);
     }
 
     public static SchemataAuthorizationBuilder UseAuthorization<TApplication, TAuthorization, TScope, TToken>(
         this SchemataBuilder                       builder,
         Action<OpenIddictServerBuilder>?           serve     = null,
         Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
-        Action<OpenIddictCoreBuilder>?             store     = null) where TApplication : SchemataApplication
-                                                                     where TAuthorization : SchemataAuthorization
-                                                                     where TScope : SchemataScope
-                                                                     where TToken : SchemataToken {
+        Action<OpenIddictCoreBuilder>?             store     = null
+    )
+        where TApplication : SchemataApplication
+        where TAuthorization : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken {
         store ??= _ => { };
         builder.Configure(store);
 

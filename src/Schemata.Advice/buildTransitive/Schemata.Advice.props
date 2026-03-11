@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <Analyzer Include="$(MSBuildThisFileDirectory)..\analyzers\dotnet\cs\Schemata.Advice.Generator.dll" />
+  </ItemGroup>
+</Project>

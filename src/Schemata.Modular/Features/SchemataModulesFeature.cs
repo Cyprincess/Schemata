@@ -10,8 +10,9 @@ using Schemata.Core.Features;
 
 namespace Schemata.Modular.Features;
 
-public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase where TProvider : class, IModulesProvider
-                                                                             where TRunner : class, IModulesRunner
+public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
+    where TProvider : class, IModulesProvider
+    where TRunner : class, IModulesRunner
 {
     public override int Priority => 2_147_200_000;
 
@@ -20,7 +21,8 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase whe
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var provider = typeof(TProvider);
         var modules = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment)!
                                .GetModules()
@@ -40,7 +42,8 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase whe
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var runner = app.ApplicationServices.GetRequiredService<IModulesRunner>();
         runner.ConfigureApplication(app, configuration, environment);
     }
@@ -49,7 +52,8 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase whe
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment) {
+        IWebHostEnvironment   environment
+    ) {
         var runner = app.ApplicationServices.GetRequiredService<IModulesRunner>();
         runner.ConfigureEndpoints(app, endpoints, configuration, environment);
     }

@@ -18,7 +18,8 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
         IRepository<TRole>             roles,
         IRepository<SchemataRoleClaim> roleClaims,
         IRepository<SchemataUserRole>  userRole,
-        IdentityErrorDescriber?        describer = null) : base(roles, roleClaims, userRole, describer) { }
+        IdentityErrorDescriber?        describer = null
+    ) : base(roles, roleClaims, userRole, describer) { }
 }
 
 public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
@@ -36,7 +37,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         IRepository<TRole>      roles,
         IRepository<TRoleClaim> roleClaims,
         IRepository<TUserRole>  userRole,
-        IdentityErrorDescriber? describer = null) {
+        IdentityErrorDescriber? describer = null
+    ) {
         RoleClaimsRepository = roleClaims;
         RolesRepository      = roles;
         UserRoleRepository   = userRole;
@@ -86,8 +88,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        var users = UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Id)), ct);
-        await foreach (var user in users) {
+        await foreach (var user in UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Id)))
+                                                     .WithCancellation(ct)) {
             await UserRoleRepository.RemoveAsync(user, ct);
         }
 
@@ -137,25 +139,6 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         return Task.CompletedTask;
     }
 
-#nullable disable
-    /// <inheritdoc />
-    public virtual async Task<TRole> FindByIdAsync(string id, CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
-        var roleId = long.Parse(id);
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == roleId), ct);
-    }
-#nullable restore
-
-#nullable disable
-    /// <inheritdoc />
-    public virtual async Task<TRole> FindByNameAsync(string normalizedName, CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedName == normalizedName), ct);
-    }
-#nullable restore
-
     /// <inheritdoc />
     public virtual Task<string?> GetNormalizedRoleNameAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
@@ -180,9 +163,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     }
 
     /// <inheritdoc />
-    public virtual void Dispose() {
-        _disposed = true;
-    }
+    public virtual void Dispose() { _disposed = true; }
 
     /// <inheritdoc />
     public virtual IQueryable<TRole> Roles => RolesRepository.AsQueryable();
@@ -215,11 +196,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         }
 
         await RoleClaimsRepository.AddAsync(new() {
-                                                RoleId     = role.Id,
-                                                ClaimType  = claim.Type,
-                                                ClaimValue = claim.Value,
-                                            },
-                                            ct);
+                                                RoleId = role.Id, ClaimType = claim.Type, ClaimValue = claim.Value,
+                                            }, ct);
         await RoleClaimsRepository.CommitAsync(ct);
     }
 
@@ -234,10 +212,11 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(claim));
         }
 
-        var claims = RoleClaimsRepository.ListAsync(
-            q => q.Where(rc => rc.RoleId.Equals(role.Id) && rc.ClaimValue == claim.Value && rc.ClaimType == claim.Type),
-            ct);
-        await foreach (var c in claims) {
+        await foreach (var c in RoleClaimsRepository
+                               .ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Id)
+                                                          && rc.ClaimValue == claim.Value
+                                                          && rc.ClaimType == claim.Type))
+                               .WithCancellation(ct)) {
             await RoleClaimsRepository.RemoveAsync(c, ct);
         }
 
@@ -252,5 +231,21 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         }
 
         throw new ObjectDisposedException(GetType().Name);
+    }
+
+#nullable disable
+    /// <inheritdoc />
+    public virtual async Task<TRole> FindByIdAsync(string id, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        var roleId = long.Parse(id);
+        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == roleId), ct);
+    }
+
+    /// <inheritdoc />
+    public virtual async Task<TRole> FindByNameAsync(string normalizedName, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedName == normalizedName), ct);
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Entity.Repository;
 
@@ -31,7 +31,8 @@ public interface IRepository
     IRepository Once();
     IRepository SuppressAddValidation();
     IRepository SuppressUpdateValidation();
-    IRepository SuppressUpdateConcurrency();
+    IRepository SuppressConcurrency();
     IRepository SuppressQuerySoftDelete();
-    IRepository SuppressRemoveSoftDelete();
+    IRepository SuppressSoftDelete();
+    IRepository SuppressTimestamp();
 }

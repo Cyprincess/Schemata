@@ -14,7 +14,8 @@ public sealed class AuthorizationCodeFlowFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.AllowAuthorizationCodeFlow()
                .RequireProofKeyForCodeExchange()
                .SetAuthorizationEndpointUris("/Connect/Authorize")
@@ -25,7 +26,8 @@ public sealed class AuthorizationCodeFlowFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) {
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) {
         integration.EnableAuthorizationEndpointPassthrough()
                    .EnableTokenEndpointPassthrough();
     }

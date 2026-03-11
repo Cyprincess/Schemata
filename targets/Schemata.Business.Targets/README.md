@@ -19,4 +19,4 @@ dotnet add package --prerelease Schemata.Business.Complex.Targets
 ## See Also
 
 - [Schemata.Application.Complex.Targets](https://nuget.org/packages/Schemata.Application.Complex.Targets)
-- [Schemata.DSL](https://nuget.org/packages/Schemata.DSL)
+- [Schemata.Modeling.Generator](https://nuget.org/packages/Schemata.Modeling.Generator)

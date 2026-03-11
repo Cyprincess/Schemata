@@ -18,7 +18,8 @@ public sealed class SchemataScopeStoreResolver : IOpenIddictScopeStoreResolver
 
     #region IOpenIddictScopeStoreResolver Members
 
-    public IOpenIddictScopeStore<TScope> Get<TScope>() where TScope : class {
+    public IOpenIddictScopeStore<TScope> Get<TScope>()
+        where TScope : class {
         var store = _sp.GetService<IOpenIddictScopeStore<TScope>>();
         if (store is not null) {
             return store;
@@ -26,12 +27,11 @@ public sealed class SchemataScopeStoreResolver : IOpenIddictScopeStoreResolver
 
         var entity = typeof(TScope);
         var key    = (entity.FullName ?? entity.Name).ToCacheKey();
-        var type = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High);
+        var type = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High);
 
-                                          return typeof(SchemataScopeStore<>).MakeGenericType(entity);
-                                      })!;
+            return typeof(SchemataScopeStore<>).MakeGenericType(entity);
+        })!;
 
         return (IOpenIddictScopeStore<TScope>)_sp.GetRequiredService(type);
     }

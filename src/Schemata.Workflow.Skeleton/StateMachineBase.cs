@@ -13,9 +13,7 @@ public abstract class StateMachineBase<TI> : AutomatonymousStateMachine<TI>, IDi
 
     protected StateMachineBase() { }
 
-    protected StateMachineBase(StateObserver<TI> observer) {
-        _stateObserver = this.ConnectStateObserver(observer);
-    }
+    protected StateMachineBase(StateObserver<TI> observer) { _stateObserver = this.ConnectStateObserver(observer); }
 
     protected StateMachineBase(EventObserver<TI> eventObserver, StateObserver<TI> stateObserver) {
         _eventObserver = this.ConnectEventObserver(eventObserver);
@@ -31,13 +29,9 @@ public abstract class StateMachineBase<TI> : AutomatonymousStateMachine<TI>, IDi
 
     #endregion
 
-    public Event<T> GetEvent<T>(string name) {
-        return Event<T>(name);
-    }
+    public Event<T> GetEvent<T>(string name) { return Event<T>(name); }
 
-    public State<TI> GetCurrentState(TI instance) {
-        return GetState(instance.State);
-    }
+    public State<TI> GetCurrentState(TI instance) { return GetState(instance.State); }
 
     protected virtual void Dispose(bool disposing) {
         if (_disposed) {

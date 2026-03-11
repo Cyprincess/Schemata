@@ -22,14 +22,14 @@ public class TestFixture
         Students = [
             new() {
                 Id        = 1,
-                Name      = "Alice",
+                FullName  = "Alice",
                 Age       = 18,
                 Grade     = 1,
                 Timestamp = Guid.NewGuid(),
             },
             new() {
                 Id        = 2,
-                Name      = "Bob",
+                FullName  = "Bob",
                 Age       = 19,
                 Grade     = 2,
                 Timestamp = Guid.NewGuid(),
@@ -116,23 +116,19 @@ public class TestFixture
     public List<Student> Students { get; }
 
     public (ResourceController<TEntity, TRequest, TDetail, TSummary>, MemoryStream) CreateResourceController<
-        TEntity, TRequest, TDetail, TSummary>() where TEntity : class, IIdentifier
-                                                where TRequest : class, IIdentifier
-                                                where TDetail : class, IIdentifier
-                                                where TSummary : class, IIdentifier {
+        TEntity, TRequest, TDetail, TSummary>()
+        where TEntity : class, IIdentifier
+        where TRequest : class, IIdentifier
+        where TDetail : class, IIdentifier
+        where TSummary : class, IIdentifier {
         var controller = ServiceProvider.GetRequiredService<ResourceController<TEntity, TRequest, TDetail, TSummary>>();
         var url        = ServiceProvider.GetRequiredService<IUrlHelper>();
 
-        var body = new MemoryStream();
-        var context = new DefaultHttpContext {
-            RequestServices = ServiceProvider,
-            Response        = { Body = body },
-        };
+        var body    = new MemoryStream();
+        var context = new DefaultHttpContext { RequestServices = ServiceProvider, Response = { Body = body } };
 
-        controller.ControllerContext = new() {
-            HttpContext = context,
-        };
-        controller.Url = url;
+        controller.ControllerContext = new() { HttpContext = context };
+        controller.Url               = url;
 
         return (controller, body);
     }
@@ -140,7 +136,8 @@ public class TestFixture
     private static async IAsyncEnumerable<T> List<T>(
         IQueryable<T>                              entities,
         Func<IQueryable<T>, IQueryable<T>>         predicate,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         foreach (var entity in predicate(entities.AsQueryable())) {
             yield return await Task.FromResult(entity);
         }

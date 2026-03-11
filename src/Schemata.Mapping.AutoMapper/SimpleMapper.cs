@@ -8,15 +8,11 @@ public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly IMapper _mapper;
 
-    public SimpleMapper(MapperConfiguration config) {
-        _mapper = new Mapper(config);
-    }
+    public SimpleMapper(MapperConfiguration config) { _mapper = new Mapper(config); }
 
     #region ISimpleMapper Members
 
-    public T? Map<T>(object source) {
-        return _mapper.Map<T>(source);
-    }
+    public T? Map<T>(object source) { return _mapper.Map<T>(source); }
 
     public T? Map<T>(object source, Type sourceType, Type destinationType) {
         return (T?)_mapper.Map(source, sourceType, destinationType);
@@ -38,7 +34,8 @@ public sealed class SimpleMapper : ISimpleMapper
         object source,
         object destination,
         Type   sourceType,
-        Type   destinationType) {
+        Type   destinationType
+    ) {
         _mapper.Map(source, destination, sourceType, destinationType);
     }
 

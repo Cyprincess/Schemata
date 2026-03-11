@@ -7,14 +7,13 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Middlewares;
 
-public class SchemataTenantServiceProviderReplacer<TTenant, TKey> where TTenant : SchemataTenant<TKey>
-                                                                  where TKey : struct, IEquatable<TKey>
+public class SchemataTenantServiceProviderReplacer<TTenant, TKey>
+    where TTenant : SchemataTenant<TKey>
+    where TKey : struct, IEquatable<TKey>
 {
     private readonly RequestDelegate _next;
 
-    public SchemataTenantServiceProviderReplacer(RequestDelegate next) {
-        _next = next;
-    }
+    public SchemataTenantServiceProviderReplacer(RequestDelegate next) { _next = next; }
 
     public async Task Invoke(HttpContext http, ITenantServiceScopeFactory<TTenant, TKey> factory) {
         var feature = http.Features.Get<IServiceProvidersFeature>()!;

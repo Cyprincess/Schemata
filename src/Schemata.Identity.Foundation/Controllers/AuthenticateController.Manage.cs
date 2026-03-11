@@ -106,7 +106,7 @@ public sealed partial class AuthenticateController : ControllerBase
         if (await _userManager.GetUserAsync(User) is not { } user) {
             return NotFound();
         }
-        
+
         var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
 
         var result = new AuthenticatorResponse {

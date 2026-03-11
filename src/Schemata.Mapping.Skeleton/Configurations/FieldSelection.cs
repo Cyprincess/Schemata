@@ -8,9 +8,7 @@ public sealed class FieldSelection<TSource, TDestination>
 {
     private readonly Mapping<TSource, TDestination> _mapping;
 
-    internal FieldSelection(Mapping<TSource, TDestination> mapping) {
-        _mapping = mapping;
-    }
+    internal FieldSelection(Mapping<TSource, TDestination> mapping) { _mapping = mapping; }
 
     public FieldSelection<TSource, TDestination> From(Expression<Func<TSource, object?>> sourceField) {
         _mapping.SetSourceField(sourceField);
@@ -18,7 +16,8 @@ public sealed class FieldSelection<TSource, TDestination>
     }
 
     public FieldSelection<TSource, TDestination> Ignore(
-        Expression<Func<TSource, TDestination, bool>>? condition = null) {
+        Expression<Func<TSource, TDestination, bool>>? condition = null
+    ) {
         if (condition is null) {
             _mapping.SetIgnored();
             return new(_mapping);
@@ -33,7 +32,5 @@ public sealed class FieldSelection<TSource, TDestination>
         return new(mapping);
     }
 
-    internal IEnumerable<IMapping> Compile() {
-        return _mapping.Map.Compile();
-    }
+    internal IEnumerable<IMapping> Compile() { return _mapping.Map.Compile(); }
 }

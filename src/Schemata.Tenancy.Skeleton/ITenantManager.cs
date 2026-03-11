@@ -9,8 +9,9 @@ namespace Schemata.Tenancy.Skeleton;
 
 public interface ITenantManager : ITenantManager<SchemataTenant<Guid>, Guid>;
 
-public interface ITenantManager<TTenant, TKey> where TTenant : SchemataTenant<TKey>
-                                               where TKey : struct, IEquatable<TKey>
+public interface ITenantManager<TTenant, TKey>
+    where TTenant : SchemataTenant<TKey>
+    where TKey : struct, IEquatable<TKey>
 {
     ValueTask<TTenant?> FindByIdAsync(long id, CancellationToken ct);
 
@@ -27,7 +28,8 @@ public interface ITenantManager<TTenant, TKey> where TTenant : SchemataTenant<TK
     ValueTask SetDisplayNamesAsync(
         TTenant                                  tenant,
         ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct);
+        CancellationToken                        ct
+    );
 
     ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct);
 

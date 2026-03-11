@@ -21,7 +21,8 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey> : SchemataTenan
 
     public SchemataTenantServiceProviderFactory(
         IServiceCollection                   services,
-        Action<IServiceCollection, TTenant?> configure) {
+        Action<IServiceCollection, TTenant?> configure
+    ) {
         _services  = services;
         _configure = configure;
     }
@@ -37,29 +38,27 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey> : SchemataTenan
 
         // TODO: avoid resolving IServiceProvider for non-existing tenant, it may cause memory leak or DoS attack.
 
-        return Providers.GetOrAdd(id!,
-                                  _ => new(() => {
-                                      var container = new ServiceCollection();
+        return Providers.GetOrAdd(id!, _ => new(() => {
+                             var container = new ServiceCollection();
 
-                                      foreach (var service in _services) {
-                                          if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
-                                              container.TryAddSingleton(accessor);
+                             foreach (var service in _services) {
+                                 if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
+                                     container.TryAddSingleton(accessor);
 
-                                              continue;
-                                          }
+                                     continue;
+                                 }
 
-                                          if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(
-                                                  service.ServiceType)) {
-                                              continue;
-                                          }
+                                 if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(service.ServiceType)) {
+                                     continue;
+                                 }
 
-                                          container.Add(service);
-                                      }
+                                 container.Add(service);
+                             }
 
-                                      _configure(container, accessor.Tenant);
+                             _configure(container, accessor.Tenant);
 
-                                      return container.BuildServiceProvider();
-                                  }))
+                             return container.BuildServiceProvider();
+                         }))
                         .Value;
     }
 

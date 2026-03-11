@@ -14,7 +14,8 @@ public sealed class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.AllowRefreshTokenFlow()
                .SetTokenEndpointUris("/Connect/Token");
     }
@@ -23,7 +24,8 @@ public sealed class AuthorizationRefreshTokenFlowFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) {
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) {
         integration.EnableTokenEndpointPassthrough();
     }
 

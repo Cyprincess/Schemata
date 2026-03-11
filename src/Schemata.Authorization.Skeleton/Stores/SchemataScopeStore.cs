@@ -13,8 +13,8 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
-// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
-public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TScope : SchemataScope
+public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
+    where TScope : SchemataScope
 {
     private readonly IMemoryCache        _cache;
     private readonly IRepository<TScope> _scopes;
@@ -32,7 +32,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TScope>, IQueryable<TResult>> query,
-        CancellationToken                             ct) {
+        CancellationToken                             ct
+    ) {
         return await _scopes.LongCountAsync(query, ct);
     }
 
@@ -68,7 +69,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
-        CancellationToken                                     ct) {
+        CancellationToken                                     ct
+    ) {
         return await _scopes.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
@@ -78,31 +80,29 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
 
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDescriptionsAsync(
         TScope            scope,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(scope.Descriptions)) {
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
         var key = scope.Descriptions!.ToCacheKey();
-        var descriptions = _cache.GetOrCreate(key,
-                                              entry => {
-                                                  entry.SetPriority(CacheItemPriority.High)
-                                                       .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var descriptions = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                  var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions!);
-                                                  if (descriptions is null) {
-                                                      return ImmutableDictionary<CultureInfo, string>.Empty;
-                                                  }
+            var descriptions = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.Descriptions!);
+            if (descriptions is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
 
-                                                  var builder = ImmutableDictionary
-                                                     .CreateBuilder<CultureInfo, string>();
+            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-                                                  foreach (var kv in descriptions) {
-                                                      builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-                                                  }
+            foreach (var kv in descriptions) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+            }
 
-                                                  return builder.ToImmutable();
-                                              })!;
+            return builder.ToImmutable();
+        })!;
 
         return new(descriptions);
     }
@@ -113,30 +113,29 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
 
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
         TScope            scope,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(scope.DisplayNames)) {
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
         var key = scope.DisplayNames!.ToCacheKey();
-        var names = _cache.GetOrCreate(key,
-                                       entry => {
-                                           entry.SetPriority(CacheItemPriority.High)
-                                                .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                           var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames!);
-                                           if (names is null) {
-                                               return ImmutableDictionary<CultureInfo, string>.Empty;
-                                           }
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(scope.DisplayNames!);
+            if (names is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
 
-                                           var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-                                           foreach (var kv in names) {
-                                               builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-                                           }
+            foreach (var kv in names) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+            }
 
-                                           return builder.ToImmutable();
-                                       })!;
+            return builder.ToImmutable();
+        })!;
 
         return new(names);
     }
@@ -145,27 +144,24 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
         return new(scope.Id.ToString());
     }
 
-    public virtual ValueTask<string?> GetNameAsync(TScope scope, CancellationToken ct) {
-        return new(scope.Name);
-    }
+    public virtual ValueTask<string?> GetNameAsync(TScope scope, CancellationToken ct) { return new(scope.Name); }
 
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TScope            scope,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(scope.Properties)) {
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
         var key = scope.Properties!.ToCacheKey();
-        var properties = _cache.GetOrCreate(key,
-                                            entry => {
-                                                entry.SetPriority(CacheItemPriority.High)
-                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties!);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(scope.Properties!);
 
-                                                return result ?? ImmutableDictionary<string, JsonElement>.Empty;
-                                            })!;
+            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
+        })!;
 
         return new(properties);
     }
@@ -176,15 +172,13 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
         }
 
         var key = scope.Resources!.ToCacheKey();
-        var resources = _cache.GetOrCreate(key,
-                                           entry => {
-                                               entry.SetPriority(CacheItemPriority.High)
-                                                    .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var resources = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                               var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(scope.Resources!);
 
-                                               return result ?? ImmutableArray<string>.Empty;
-                                           })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(resources);
     }
@@ -200,7 +194,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
-        CancellationToken                                     ct) {
+        CancellationToken                                     ct
+    ) {
         return _scopes.ListAsync(q => query(q, state), ct);
     }
 
@@ -212,7 +207,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual ValueTask SetDescriptionsAsync(
         TScope                                   scope,
         ImmutableDictionary<CultureInfo, string> descriptions,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (descriptions is not { Count: > 0 }) {
             scope.Descriptions = null;
             return default;
@@ -232,7 +228,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual ValueTask SetDisplayNamesAsync(
         TScope                                   scope,
         ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (names is not { Count: > 0 }) {
             scope.DisplayNames = null;
             return default;
@@ -252,7 +249,8 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope> where TS
     public virtual ValueTask SetPropertiesAsync(
         TScope                                   scope,
         ImmutableDictionary<string, JsonElement> properties,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (properties is not { Count: > 0 }) {
             scope.Properties = null;
             return default;

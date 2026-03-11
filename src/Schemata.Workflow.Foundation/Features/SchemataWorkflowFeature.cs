@@ -28,12 +28,15 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var mapping = configurators.Pop<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>();
 
         var part = new SchemataExtensionPart<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
         services.AddMvcCore()
-                .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
+                .ConfigureApplicationPartManager(manager => {
+                     manager.ApplicationParts.Add(part);
+                 });
 
         services.TryAddSingleton<ITypeResolver, TypeResolver>();
 
@@ -41,9 +44,7 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
         services.TryAddTransient<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
         services.TryAddTransient<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
 
-        services.Map<Vertex, string>(map => {
-            map.With(s => s.Title);
-        });
+        services.Map<Vertex, string>(map => { map.With(s => s.Title); });
 
         services.Map(mapping);
     }

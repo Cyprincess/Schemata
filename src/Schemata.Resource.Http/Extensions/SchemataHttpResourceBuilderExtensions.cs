@@ -25,7 +25,9 @@ public static class SchemataHttpResourceBuilderExtensions
         return builder.Use<TEntity, TRequest, TDetail, TDetail>();
     }
 
-    public static SchemataHttpResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(this SchemataHttpResourceBuilder builder)
+    public static SchemataHttpResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
+        this SchemataHttpResourceBuilder builder
+    )
         where TEntity : class, IIdentifier
         where TRequest : class, IIdentifier
         where TDetail : class, IIdentifier

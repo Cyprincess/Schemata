@@ -5,9 +5,7 @@ namespace Schemata.Mapping.Skeleton.Configurations;
 
 public sealed class Mapping<TSource, TDestination> : IMapping
 {
-    internal Mapping(Map<TSource, TDestination> map) {
-        Map = map;
-    }
+    internal Mapping(Map<TSource, TDestination> map) { Map = map; }
 
     internal Mapping(Map<TSource, TDestination> map, Expression<Func<TDestination, object?>> destinationField) {
         Map              = map;
@@ -44,17 +42,13 @@ public sealed class Mapping<TSource, TDestination> : IMapping
 
     #endregion
 
-    internal void SetSourceField(Expression<Func<TSource, object?>> sourceField) {
-        SourceField = sourceField;
-    }
+    internal void SetSourceField(Expression<Func<TSource, object?>> sourceField) { SourceField = sourceField; }
 
     internal void SetIgnoreCondition(Expression<Func<TSource, TDestination, bool>> condition) {
         IgnoreCondition = condition;
     }
 
-    internal void SetWithExpression(Expression<Func<TSource, TDestination>> expression) {
-        WithExpression = expression;
-    }
+    internal void SetWithExpression(Expression<Func<TSource, TDestination>> expression) { WithExpression = expression; }
 
     internal void SetIgnored(bool ignored = true) {
         IsIgnored       = ignored;

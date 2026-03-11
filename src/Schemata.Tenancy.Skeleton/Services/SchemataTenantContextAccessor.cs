@@ -11,7 +11,8 @@ public class SchemataTenantContextAccessor : SchemataTenantContextAccessor<Schem
     public SchemataTenantContextAccessor(
         IServiceProvider                           sp,
         ITenantResolver<Guid>                      resolver,
-        ITenantManager<SchemataTenant<Guid>, Guid> manager) : base(sp, resolver, manager) { }
+        ITenantManager<SchemataTenant<Guid>, Guid> manager
+    ) : base(sp, resolver, manager) { }
 }
 
 public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccessor<TTenant, TKey>
@@ -25,7 +26,8 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
     public SchemataTenantContextAccessor(
         IServiceProvider              sp,
         ITenantResolver<TKey>         resolver,
-        ITenantManager<TTenant, TKey> manager) {
+        ITenantManager<TTenant, TKey> manager
+    ) {
         _sp       = sp;
         _resolver = resolver;
         _manager  = manager;
@@ -56,9 +58,7 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
         return Task.CompletedTask;
     }
 
-    public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) {
-        return Task.FromResult(_sp);
-    }
+    public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) { return Task.FromResult(_sp); }
 
     #endregion
 }

@@ -13,7 +13,8 @@ public class DefaultAccessProvider<T, TContext> : IAccessProvider<T, TContext>
         T?                entity,
         TContext?         context,
         ClaimsPrincipal?  principal,
-        CancellationToken ct = default) {
+        CancellationToken ct = default
+    ) {
         return Task.FromResult(true);
     }
 

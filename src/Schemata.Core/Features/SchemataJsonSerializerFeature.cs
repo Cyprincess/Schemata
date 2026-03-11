@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core.Json;
@@ -16,7 +17,8 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.PopOrDefault<JsonSerializerOptions>();
 
         services.Configure<JsonSerializerOptions>(options => {
@@ -25,9 +27,7 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
             Configure(options);
         });
 
-        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
-            Configure(options.SerializerOptions);
-        });
+        services.Configure<JsonOptions>(options => { Configure(options.SerializerOptions); });
 
         if (!schemata.HasFeature<SchemataControllersFeature>()) {
             return;
@@ -45,9 +45,9 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
             options.NumberHandling       = JsonNumberHandling.AllowReadingFromString;
 
             options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
-            options.Converters.Add(new JsonStringNumberConverter());
+            options.Converters.Add(JsonStringNumberConverter.Instance);
 
-            options.TypeInfoResolver = new PolymorphicTypeResolver();
+            options.TypeInfoResolver = PolymorphicTypeResolver.Instance;
 
             configure(options);
         }

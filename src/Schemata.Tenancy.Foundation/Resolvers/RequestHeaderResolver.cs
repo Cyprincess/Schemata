@@ -13,11 +13,9 @@ public class RequestHeaderResolver<TKey> : ITenantResolver<TKey>
 {
     private readonly IHttpContextAccessor _accessor;
 
-    public RequestHeaderResolver(IHttpContextAccessor accessor) {
-        _accessor = accessor;
-    }
+    public RequestHeaderResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
-    #region ITenantResolver Members
+    #region ITenantResolver<TKey> Members
 
     public Task<TKey?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.Headers.TryGetValue("x-tenant-id", out var values) != true) {

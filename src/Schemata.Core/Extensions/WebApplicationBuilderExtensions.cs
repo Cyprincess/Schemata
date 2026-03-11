@@ -8,19 +8,21 @@ namespace Microsoft.AspNetCore.Builder;
 public static class WebApplicationBuilderExtensions
 {
     public static WebApplicationBuilder UseSchemata(this WebApplicationBuilder builder) {
-        return UseSchemata(builder, _ => { }, _ => { });
+        return builder.UseSchemata(_ => { }, _ => { });
     }
 
     public static WebApplicationBuilder UseSchemata(
         this WebApplicationBuilder builder,
-        Action<SchemataBuilder>?   schema) {
-        return UseSchemata(builder, schema, _ => { });
+        Action<SchemataBuilder>?   schema
+    ) {
+        return builder.UseSchemata(schema, _ => { });
     }
 
     public static WebApplicationBuilder UseSchemata(
         this WebApplicationBuilder builder,
         Action<SchemataBuilder>?   schema,
-        Action<SchemataOptions>?   configure) {
+        Action<SchemataOptions>?   configure
+    ) {
         builder.Services.AddSchemata(builder.Configuration, builder.Environment, schema, configure);
 
         return builder;

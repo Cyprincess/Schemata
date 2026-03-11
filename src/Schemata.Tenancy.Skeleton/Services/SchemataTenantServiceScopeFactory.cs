@@ -15,7 +15,8 @@ public class SchemataTenantServiceScopeFactory<TTenant, TKey> : ITenantServiceSc
     public SchemataTenantServiceScopeFactory(
         IServiceProvider                             root,
         ITenantContextAccessor<TTenant, TKey>        accessor,
-        ITenantServiceProviderFactory<TTenant, TKey> factory) {
+        ITenantServiceProviderFactory<TTenant, TKey> factory
+    ) {
         _root     = root;
         _accessor = accessor;
         _factory  = factory;

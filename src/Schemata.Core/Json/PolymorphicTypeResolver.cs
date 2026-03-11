@@ -14,7 +14,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
     private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>?> _types = [];
 
-    public PolymorphicTypeResolver() {
+    private PolymorphicTypeResolver() {
         var types = AppDomainTypeCache.Types.Values.Where(t => t.HasCustomAttribute<PolymorphicAttribute>(false));
         foreach (var type in types) {
             var attribute = type.GetCustomAttribute<PolymorphicAttribute>();
@@ -27,6 +27,8 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
             value!.Add(new(type, attribute.Name ?? type.FullName ?? type.Name));
         }
     }
+
+    public static PolymorphicTypeResolver Instance { get; } = new();
 
     public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options) {
         var info = base.GetTypeInfo(type, options);

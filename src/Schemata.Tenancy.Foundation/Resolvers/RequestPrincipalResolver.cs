@@ -12,11 +12,9 @@ public class RequestPrincipalResolver<TKey> : ITenantResolver<TKey>
 {
     private readonly IHttpContextAccessor _accessor;
 
-    public RequestPrincipalResolver(IHttpContextAccessor accessor) {
-        _accessor = accessor;
-    }
+    public RequestPrincipalResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
-    #region ITenantResolver Members
+    #region ITenantResolver<TKey> Members
 
     public Task<TKey?> ResolveAsync(CancellationToken ct = default) {
         var claim = _accessor.HttpContext?.User.FindFirst("Tenant");

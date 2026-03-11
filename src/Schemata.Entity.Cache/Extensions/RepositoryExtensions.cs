@@ -1,4 +1,4 @@
-using Schemata.Entity.Cache.Advices;
+using Schemata.Entity.Cache.Advisors;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Entity.Repository;

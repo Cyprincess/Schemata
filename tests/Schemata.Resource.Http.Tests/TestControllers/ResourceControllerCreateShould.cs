@@ -13,9 +13,7 @@ public class ResourceControllerCreateShould
     [Fact]
     public async Task Create_InputIsValidStudent_ReturnJsonResult() {
         var student = new Student {
-            Name  = "Charlie",
-            Age   = 18,
-            Grade = 1,
+            FullName = "Charlie", Age = 18, Grade = 1,
         };
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
@@ -29,13 +27,13 @@ public class ResourceControllerCreateShould
         var response = Assert.IsType<Student>(json.Value);
         Assert.NotNull(response);
         Assert.Equal(student.Id, response.Id);
-        Assert.Equal(student.Name, response.Name);
+        Assert.Equal(student.FullName, response.FullName);
         Assert.Equal(student.Timestamp, response.Timestamp);
 
         var entity = _fixture.Students.LastOrDefault();
         Assert.NotNull(entity);
         Assert.Equal(student.Id, entity.Id);
-        Assert.Equal(student.Name, entity.Name);
+        Assert.Equal(student.FullName, entity.FullName);
         Assert.Equal(student.Timestamp, entity.Timestamp);
     }
 }

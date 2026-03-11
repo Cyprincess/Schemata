@@ -23,7 +23,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var provider = new ResourceControllerFeatureProvider();
         services.AddSingleton(provider);
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
@@ -39,7 +40,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var sp = app.ApplicationServices;
 
         var provider = sp.GetRequiredService<ResourceControllerFeatureProvider>();

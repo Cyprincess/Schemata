@@ -27,7 +27,8 @@ public sealed class DefaultModulesRunner : IModulesRunner
     public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var modules = _schemata.GetModules();
         if (modules is not { Count: > 0 }) {
             return;
@@ -55,7 +56,8 @@ public sealed class DefaultModulesRunner : IModulesRunner
     public void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var sp = app.ApplicationServices;
 
         var startups = sp.GetServices<IModule>().ToList();
@@ -76,7 +78,8 @@ public sealed class DefaultModulesRunner : IModulesRunner
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment) {
+        IWebHostEnvironment   environment
+    ) {
         var sp = app.ApplicationServices;
 
         var startups = sp.GetServices<IModule>().ToList();

@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Microsoft.AspNetCore.RateLimiting;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -41,7 +41,8 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseHttpLogging(
         this SchemataBuilder        builder,
-        Action<HttpLoggingOptions>? configure = null) {
+        Action<HttpLoggingOptions>? configure = null
+    ) {
         configure ??= _ => { };
         builder.Configure(configure);
 
@@ -56,7 +57,8 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseW3CLogging(
         this SchemataBuilder      builder,
-        Action<W3CLoggerOptions>? configure = null) {
+        Action<W3CLoggerOptions>? configure = null
+    ) {
         configure ??= _ => { };
         builder.Configure(configure);
 
@@ -81,7 +83,8 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseForwardedHeaders(
         this SchemataBuilder             builder,
-        Action<ForwardedHeadersOptions>? configure = null) {
+        Action<ForwardedHeadersOptions>? configure = null
+    ) {
         configure ??= options => {
             options.ForwardedHeaders = ForwardedHeaders.All;
             options.KnownNetworks.Clear();
@@ -110,7 +113,8 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseCookiePolicy(
         this SchemataBuilder         builder,
-        Action<CookiePolicyOptions>? configure = null) {
+        Action<CookiePolicyOptions>? configure = null
+    ) {
         configure ??= _ => { };
         builder.Configure(configure);
 
@@ -162,7 +166,8 @@ public static class SchemataBuilderExtensions
     public static SchemataBuilder UseControllers(
         this SchemataBuilder builder,
         Action<MvcOptions>?  configure = null,
-        Action<IMvcBuilder>? build     = null) {
+        Action<IMvcBuilder>? build     = null
+    ) {
         configure ??= _ => { };
         builder.Configure(configure);
 
@@ -180,7 +185,8 @@ public static class SchemataBuilderExtensions
 
     public static SchemataBuilder UseJsonSerializer(
         this SchemataBuilder           builder,
-        Action<JsonSerializerOptions>? configure = null) {
+        Action<JsonSerializerOptions>? configure = null
+    ) {
         configure ??= _ => { };
         builder.Configure(configure);
 
@@ -194,33 +200,37 @@ public static class SchemataBuilderExtensions
     #region Authentication Feature
 
     public static SchemataBuilder UseAuthentication(this SchemataBuilder builder, Action<AuthenticationBuilder> build) {
-        return UseAuthentication(builder, build, null, null);
+        return builder.UseAuthentication(build, null, null);
     }
 
     public static SchemataBuilder UseAuthentication(
         this SchemataBuilder          builder,
-        Action<AuthenticationOptions> authenticate) {
-        return UseAuthentication(builder, null, authenticate, null);
+        Action<AuthenticationOptions> authenticate
+    ) {
+        return builder.UseAuthentication(null, authenticate, null);
     }
 
     public static SchemataBuilder UseAuthentication(
         this SchemataBuilder         builder,
-        Action<AuthorizationOptions> authorize) {
-        return UseAuthentication(builder, null, null, authorize);
+        Action<AuthorizationOptions> authorize
+    ) {
+        return builder.UseAuthentication(null, null, authorize);
     }
 
     public static SchemataBuilder UseAuthentication(
         this SchemataBuilder          builder,
         Action<AuthenticationBuilder> build,
-        Action<AuthorizationOptions>  authorize) {
-        return UseAuthentication(builder, build, null, authorize);
+        Action<AuthorizationOptions>  authorize
+    ) {
+        return builder.UseAuthentication(build, null, authorize);
     }
 
     public static SchemataBuilder UseAuthentication(
         this SchemataBuilder           builder,
         Action<AuthenticationBuilder>? build,
         Action<AuthenticationOptions>? authenticate,
-        Action<AuthorizationOptions>?  authorize) {
+        Action<AuthorizationOptions>?  authorize
+    ) {
         build ??= _ => { };
         builder.Configure(build);
 
@@ -240,7 +250,7 @@ public static class SchemataBuilderExtensions
     #region Session Feature
 
     public static SchemataBuilder UseSession(this SchemataBuilder builder, Action<SessionOptions>? configure = null) {
-        return UseSession<DistributedSessionStore>(builder, configure);
+        return builder.UseSession<DistributedSessionStore>(configure);
     }
 
     public static SchemataBuilder UseSession<T>(this SchemataBuilder builder, Action<SessionOptions>? configure = null)

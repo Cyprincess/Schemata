@@ -9,10 +9,12 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataRepositoryBuilderExtensions
 {
     public static SchemataRepositoryBuilder UseEntityFrameworkCore<TContext>(
-        this SchemataRepositoryBuilder builder,
+        this SchemataRepositoryBuilder                     builder,
         Action<IServiceProvider, DbContextOptionsBuilder>? configure,
-        ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime optionsLifetime = ServiceLifetime.Scoped) where TContext : DbContext {
+        ServiceLifetime                                    contextLifetime = ServiceLifetime.Scoped,
+        ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped
+    )
+        where TContext : DbContext {
         builder.Services.AddDbContext<TContext, TContext>(configure, contextLifetime, optionsLifetime);
 
         return builder;
@@ -22,7 +24,8 @@ public static class SchemataRepositoryBuilderExtensions
         this SchemataRepositoryBuilder                     builder,
         Action<IServiceProvider, DbContextOptionsBuilder>? configure,
         ServiceLifetime                                    contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped)
+        ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped
+    )
         where TContextImplementation : DbContext, TContextService {
         builder.Services.AddDbContext<TContextService, TContextImplementation>(configure, contextLifetime, optionsLifetime);
 

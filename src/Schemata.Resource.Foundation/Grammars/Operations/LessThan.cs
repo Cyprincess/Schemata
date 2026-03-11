@@ -8,9 +8,7 @@ public class LessThan : IBinary
 {
     public const char Char = '<';
 
-    public LessThan(TextPosition position) {
-        Position = position;
-    }
+    public LessThan(TextPosition position) { Position = position; }
 
     #region IBinary Members
 
@@ -18,19 +16,13 @@ public class LessThan : IBinary
 
     public bool IsConstant => false;
 
-    public Expression? ToExpression(Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Container ctx) { return null; }
 
     public ExpressionType? Type => ExpressionType.LessThan;
 
-    public Expression? ToExpression(Expression left, Expression right, Container ctx) {
-        return null;
-    }
+    public Expression? ToExpression(Expression left, Expression right, Container ctx) { return null; }
 
     #endregion
 
-    public override string ToString() {
-        return $"{Char}";
-    }
+    public override string ToString() { return $"{Char}"; }
 }

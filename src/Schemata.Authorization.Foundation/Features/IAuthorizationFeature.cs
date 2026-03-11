@@ -9,11 +9,13 @@ public interface IAuthorizationFeature : IFeature
     void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder);
+        OpenIddictServerBuilder              builder
+    );
 
     void ConfigureServerAspNetCore(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration);
+        OpenIddictServerAspNetCoreBuilder    integration
+    );
 }

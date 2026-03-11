@@ -12,7 +12,8 @@ public sealed class SchemataHttpsFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         if (environment.IsDevelopment()) {
             return;
         }

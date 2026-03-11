@@ -3,17 +3,14 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;
 
-public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser> where TUser : SchemataUser
+public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser>
+    where TUser : SchemataUser
 {
     #region IMessageSender<TUser> Members
 
-    public Task SendConfirmationCodeAsync(TUser user, string email, string code) {
-        return Task.CompletedTask;
-    }
+    public Task SendConfirmationCodeAsync(TUser user, string email, string code) { return Task.CompletedTask; }
 
-    public Task SendPasswordResetCodeAsync(TUser user, string email, string code) {
-        return Task.CompletedTask;
-    }
+    public Task SendPasswordResetCodeAsync(TUser user, string email, string code) { return Task.CompletedTask; }
 
     #endregion
 }

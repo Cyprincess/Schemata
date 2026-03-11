@@ -18,7 +18,8 @@ public sealed class SchemataHttpLoggingFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<HttpLoggingOptions>();
         services.AddHttpLogging(configure);
     }
@@ -26,7 +27,8 @@ public sealed class SchemataHttpLoggingFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseHttpLogging();
     }
 }

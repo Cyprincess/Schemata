@@ -3,7 +3,8 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;
 
-public interface IMessageSender<in TUser> where TUser : SchemataUser
+public interface IMessageSender<in TUser>
+    where TUser : SchemataUser
 {
     Task SendConfirmationCodeAsync(TUser user, string phone, string code);
 

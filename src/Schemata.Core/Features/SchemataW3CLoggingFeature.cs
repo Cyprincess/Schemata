@@ -18,7 +18,8 @@ public sealed class SchemataW3CLoggingFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<W3CLoggerOptions>();
         services.AddW3CLogging(configure);
     }
@@ -26,7 +27,8 @@ public sealed class SchemataW3CLoggingFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseW3CLogging();
     }
 }

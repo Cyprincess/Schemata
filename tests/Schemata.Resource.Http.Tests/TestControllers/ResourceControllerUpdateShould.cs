@@ -14,10 +14,10 @@ public class ResourceControllerUpdateShould
         var student = _fixture.Students.First();
 
         var request = new Student {
-            Id    = 1,
-            Name  = "Alice",
-            Age   = 18,
-            Grade = 2,
+            Id       = 1,
+            FullName = "Alice",
+            Age      = 18,
+            Grade    = 2,
         };
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
@@ -30,7 +30,7 @@ public class ResourceControllerUpdateShould
 
         var response = Assert.IsType<Student>(json.Value);
         Assert.NotNull(response);
-        Assert.Equal(student.Name, response.Name);
+        Assert.Equal(student.FullName, response.FullName);
         Assert.Equal(request.Grade, response.Grade);
     }
 }

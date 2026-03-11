@@ -26,7 +26,8 @@ public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, T
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var store     = configurators.Pop<OpenIddictCoreBuilder>();
         var serve     = configurators.Pop<OpenIddictServerBuilder>();
         var integrate = configurators.Pop<OpenIddictServerAspNetCoreBuilder>();
@@ -38,7 +39,9 @@ public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, T
 
         var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
         services.AddMvcCore()
-                .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
+                .ConfigureApplicationPartManager(manager => {
+                     manager.ApplicationParts.Add(part);
+                 });
 
         services.AddOpenIddict()
                 .AddCore(builder => {

@@ -14,7 +14,8 @@ public sealed class SchemataLoggingFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<ILoggingBuilder>();
         services.AddLogging(configure);
     }

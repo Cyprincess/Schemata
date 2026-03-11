@@ -20,7 +20,8 @@ public sealed class SchemataControllersFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.PopOrDefault<MvcOptions>();
         var build     = configurators.PopOrDefault<IMvcBuilder>();
 
@@ -43,7 +44,8 @@ public sealed class SchemataControllersFeature : FeatureBase
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment) {
+        IWebHostEnvironment   environment
+    ) {
         endpoints.MapDefaultControllerRoute();
     }
 }

@@ -14,7 +14,8 @@ public sealed class AuthorizationRevocationFeature : IAuthorizationFeature
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.SetRevocationEndpointUris("/Connect/Revocation");
     }
 
@@ -22,7 +23,8 @@ public sealed class AuthorizationRevocationFeature : IAuthorizationFeature
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) { }
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) { }
 
     #endregion
 }

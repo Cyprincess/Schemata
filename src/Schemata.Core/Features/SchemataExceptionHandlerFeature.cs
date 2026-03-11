@@ -18,10 +18,12 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseExceptionHandler(error => {
             error.Run(async context => {
-                var options = context.RequestServices.GetRequiredService<IOptions<JsonSerializerOptions>>();
+                var options = context.RequestServices
+                                     .GetRequiredService<IOptions<JsonSerializerOptions>>();
 
                 var feature = context.Features.Get<IExceptionHandlerPathFeature>();
 
@@ -29,21 +31,16 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                     context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
 
-                    await context.Response.WriteAsJsonAsync(
-                        new ErrorResponse {
-                            ErrorDescription = "An error occurred.",
-                        },
-                        options.Value,
-                        context.RequestAborted);
+                    await context.Response.WriteAsJsonAsync(new ErrorResponse {
+                        ErrorDescription = "An error occurred.", //
+                    }, options.Value, context.RequestAborted);
 
                     return;
                 }
 
                 context.Response.StatusCode = http.StatusCode;
 
-                var response = new ErrorResponse {
-                    ErrorDescription = http.Message,
-                };
+                var response = new ErrorResponse { ErrorDescription = http.Message };
 
                 if (http.Errors is { Count: > 0 }) {
                     response.Errors = http.Errors;

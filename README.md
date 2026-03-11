@@ -81,7 +81,7 @@ app.Run();
 
 ## Fields
 
-- [DSL](https://nuget.org/packages/Schemata.DSL)
+- [DSL](https://nuget.org/packages/Schemata.Modeling.Generator)
 - [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets)
 - Audit
 - [Authorization](https://nuget.org/packages/Schemata.Authorization.Foundation)
@@ -114,7 +114,7 @@ A built-in feature can be activated by calling the `UseXXX` method on the `Schem
 also have additional configuration methods.
 
 | Priority    | Feature                | Description                                                                           |
-|-------------|------------------------|---------------------------------------------------------------------------------------|
+| ----------- | ---------------------- | ------------------------------------------------------------------------------------- |
 | 100_010_000 | ExceptionHandler       | Asp.Net Exception Handler Middleware                                                  |
 | 100_110_000 | Logging                | Asp.Net Logging Middleware                                                            |
 | 100_120_000 | HttpLogging            | Asp.Net HTTP Logging Middleware                                                       |
@@ -136,7 +136,7 @@ also have additional configuration methods.
 An extension feature can be activated in the same way as a built-in feature.
 
 | Priority      | Package                           | Feature              | Description                        |
-|---------------|-----------------------------------|----------------------|------------------------------------|
+| ------------- | --------------------------------- | -------------------- | ---------------------------------- |
 | 300_100_000   | Schemata.Security.Foundation      | Security             | Schemata Security Foundation       |
 | 310_000_000   | Schemata.Identity.Foundation      | Identity             | Schemata Identity Foundation       |
 | 320_000_000   | Schemata.Authorization.Foundation | Authorization        | Schemata Authorization Foundation  |
@@ -155,8 +155,8 @@ version, and the most recent .NET version.
 Some packages may have additional compliance requirements, which are documented below.
 
 | Package                           | Compliance                                                                                                                      |
-|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| Schemata.DSL                      | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Schemata.Modeling.Generator       | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                 |
 | Schemata.Core                     | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
 | Schemata.Modular                  | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
 | Schemata.Authorization.Foundation | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |

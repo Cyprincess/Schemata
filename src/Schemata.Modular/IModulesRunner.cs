@@ -16,5 +16,6 @@ public interface IModulesRunner
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment);
+        IWebHostEnvironment   environment
+    );
 }

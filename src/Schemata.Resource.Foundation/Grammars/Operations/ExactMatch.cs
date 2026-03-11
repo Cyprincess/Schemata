@@ -6,13 +6,9 @@ public class ExactMatch : Match
 {
     public const string Name = "=@";
 
-    public ExactMatch(TextPosition position) {
-        Position = position;
-    }
+    public ExactMatch(TextPosition position) { Position = position; }
 
     public override TextPosition Position { get; }
 
-    public override string ToString() {
-        return $"{Name}";
-    }
+    public override string ToString() { return $"{Name}"; }
 }

@@ -5,9 +5,7 @@ namespace Schemata.Abstractions.Exceptions;
 
 public class HttpException : Exception
 {
-    public HttpException(int status, string? message = "") : base(message) {
-        StatusCode = status;
-    }
+    public HttpException(int status, string? message = "") : base(message) { StatusCode = status; }
 
     public int StatusCode { get; }
 

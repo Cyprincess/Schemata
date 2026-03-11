@@ -21,13 +21,9 @@ public class Truth : IValue
 
     public bool IsConstant => true;
 
-    public Expression ToExpression(Container ctx) {
-        return Expression.Constant(Value);
-    }
+    public Expression ToExpression(Container ctx) { return Expression.Constant(Value); }
 
     #endregion
 
-    public override string ToString() {
-        return Value ? "\u2611" : "\u2612";
-    }
+    public override string ToString() { return Value ? "\u2611" : "\u2612"; }
 }

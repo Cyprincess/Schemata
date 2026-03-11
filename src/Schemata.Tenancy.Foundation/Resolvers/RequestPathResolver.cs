@@ -12,11 +12,9 @@ public class RequestPathResolver<TKey> : ITenantResolver<TKey>
 {
     private readonly IHttpContextAccessor _accessor;
 
-    public RequestPathResolver(IHttpContextAccessor accessor) {
-        _accessor = accessor;
-    }
+    public RequestPathResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
-    #region ITenantResolver Members
+    #region ITenantResolver<TKey> Members
 
     public Task<TKey?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.RouteValues.TryGetValue("Tenant", out var value) != true) {

@@ -14,22 +14,27 @@ public static class SchemataBuilderExtensions
 {
     public static SchemataTenancyBuilder<SchemataTenant<Guid>, Guid> UseTenancy(
         this SchemataBuilder                               builder,
-        Action<IServiceCollection, SchemataTenant<Guid>?>? configure = null) {
-        return UseTenancy<SchemataTenant<Guid>, Guid>(builder, configure);
+        Action<IServiceCollection, SchemataTenant<Guid>?>? configure = null
+    ) {
+        return builder.UseTenancy<SchemataTenant<Guid>, Guid>(configure);
     }
 
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TTenant, TKey>(
         this SchemataBuilder                  builder,
-        Action<IServiceCollection, TTenant?>? configure = null) where TTenant : SchemataTenant<TKey>
-                                                                where TKey : struct, IEquatable<TKey> {
-        return UseTenancy<SchemataTenantManager<TTenant, TKey>, TTenant, TKey>(builder, configure);
+        Action<IServiceCollection, TTenant?>? configure = null
+    )
+        where TTenant : SchemataTenant<TKey>
+        where TKey : struct, IEquatable<TKey> {
+        return builder.UseTenancy<SchemataTenantManager<TTenant, TKey>, TTenant, TKey>(configure);
     }
 
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TManager, TTenant, TKey>(
         this SchemataBuilder                  builder,
-        Action<IServiceCollection, TTenant?>? configure = null) where TManager : class, ITenantManager<TTenant, TKey>
-                                                                where TTenant : SchemataTenant<TKey>
-                                                                where TKey : struct, IEquatable<TKey> {
+        Action<IServiceCollection, TTenant?>? configure = null
+    )
+        where TManager : class, ITenantManager<TTenant, TKey>
+        where TTenant : SchemataTenant<TKey>
+        where TKey : struct, IEquatable<TKey> {
         configure ??= (_, _) => { };
         builder.Configure(configure);
 

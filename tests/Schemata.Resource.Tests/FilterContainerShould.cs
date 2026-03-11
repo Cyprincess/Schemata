@@ -58,12 +58,7 @@ public class FilterContainerShould
 
         var func = (Func<MyVector4, bool>)expression.Compile();
 
-        var vector = new MyVector4 {
-            type_map = [
-                new() { type = "foo" },
-                new() { type = "bar" },
-            ],
-        };
+        var vector = new MyVector4 { type_map = [new() { type = "foo" }, new() { type = "bar" }] };
 
         Assert.True(func(vector));
     }

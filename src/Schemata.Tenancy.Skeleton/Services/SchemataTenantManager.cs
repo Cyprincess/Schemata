@@ -17,8 +17,9 @@ public class SchemataTenantManager : SchemataTenantManager<SchemataTenant<Guid>,
         base(cache, tenants) { }
 }
 
-public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey> where TTenant : SchemataTenant<TKey>
-                                                                                  where TKey : struct, IEquatable<TKey>
+public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey>
+    where TTenant : SchemataTenant<TKey>
+    where TKey : struct, IEquatable<TKey>
 {
     private readonly IMemoryCache         _cache;
     private readonly IRepository<TTenant> _tenants;
@@ -49,15 +50,13 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
         }
 
         var key = tenant.Hosts!.ToCacheKey();
-        var hosts = _cache.GetOrCreate(key,
-                                       entry => {
-                                           entry.SetPriority(CacheItemPriority.High)
-                                                .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var hosts = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                           var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(tenant.Hosts!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(tenant.Hosts!);
 
-                                           return result ?? ImmutableArray<string>.Empty;
-                                       })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(hosts);
     }
@@ -75,7 +74,8 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     public virtual ValueTask SetDisplayNamesAsync(
         TTenant                                  tenant,
         ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (names is not { Count: > 0 }) {
             tenant.DisplayNames = null;
             return default;

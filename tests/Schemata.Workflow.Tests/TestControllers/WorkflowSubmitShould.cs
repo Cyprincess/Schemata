@@ -16,10 +16,7 @@ public class WorkflowSubmitShould
     public async Task Submit_WithValidOrder_ReturnsOkObjectResult() {
         var instance = new Order();
 
-        var request = new WorkflowRequest<IStateful> {
-            Type     = instance.GetType().FullName,
-            Instance = instance,
-        };
+        var request = new WorkflowRequest<IStateful> { Type = instance.GetType().FullName, Instance = instance };
 
         var (controller, _) = _fixture.CreateWorkflowController();
 

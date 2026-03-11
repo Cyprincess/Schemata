@@ -14,7 +14,8 @@ public class WorkflowAccessProvider<T, TRequest> : IAccessProvider<T, WorkflowRe
         T?                                workflow,
         WorkflowRequestContext<TRequest>? context,
         ClaimsPrincipal?                  principal,
-        CancellationToken                 ct = default) {
+        CancellationToken                 ct = default
+    ) {
         const string role = "workflow-{operation}-{entity}";
 
         var entity    = typeof(T).Name.Kebaberize();

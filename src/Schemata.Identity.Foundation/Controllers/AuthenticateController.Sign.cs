@@ -3,8 +3,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Advices;
-using Schemata.Identity.Foundation.Advices;
+using Schemata.Abstractions.Advisors;
+using Schemata.Advice;
+using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
 
@@ -18,22 +19,30 @@ public sealed partial class AuthenticateController : ControllerBase
             return NotFound();
         }
 
-        var ctx = new AdviceContext();
+        var ctx = new AdviceContext(_sp);
 
-        if (!await Advices<IIdentityRegisterRequestAdvice>.AdviseAsync(_sp, ctx, request, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IIdentityRegisterRequestAdvisor>()
+                             .RunAsync(ctx, request, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         var username = request.EmailAddress ?? request.PhoneNumber;
 
         var user = new SchemataUser {
-            UserName    = username,
-            Email       = request.EmailAddress,
-            PhoneNumber = request.PhoneNumber,
+            UserName = username, Email = request.EmailAddress, PhoneNumber = request.PhoneNumber,
         };
-        
-        if (!await Advices<IIdentityRegisterUserAdvice>.AdviseAsync(_sp, ctx, user, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+
+        switch (await Advisor.For<IIdentityRegisterUserAdvisor>()
+                             .RunAsync(ctx, user, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -46,8 +55,13 @@ public sealed partial class AuthenticateController : ControllerBase
             await SendConfirmationCodeAsync(user, request.EmailAddress, request.PhoneNumber);
         }
 
-        if (!await Advices<IIdentityRegisterAdvice>.AdviseAsync(_sp, ctx, user, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IIdentityRegisterAdvisor>()
+                             .RunAsync(ctx, user, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         return NoContent();
@@ -56,7 +70,7 @@ public sealed partial class AuthenticateController : ControllerBase
     [HttpPost(nameof(Login))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request) {
         var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
-        
+
         signInManager.AuthenticationScheme = IdentityConstants.BearerScheme;
 
         var result = await signInManager.PasswordSignInAsync(request.Username, request.Password, false, true);
@@ -79,12 +93,12 @@ public sealed partial class AuthenticateController : ControllerBase
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
         var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
-        
+
         var protector = _bearerToken.Get(IdentityConstants.ApplicationScheme).RefreshTokenProtector;
         var ticket    = protector.Unprotect(request.RefreshToken);
 
-        if (ticket?.Properties?.ExpiresUtc is not { } expiresUtc
-         || DateTimeOffset.UtcNow >= expiresUtc
+        if (ticket?.Properties?.ExpiresUtc is not { } expires
+         || DateTimeOffset.UtcNow >= expires
          || await signInManager.ValidateSecurityStampAsync(ticket.Principal) is not { } user) {
             return Challenge();
         }

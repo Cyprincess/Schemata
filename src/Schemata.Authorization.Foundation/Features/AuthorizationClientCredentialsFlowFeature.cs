@@ -14,7 +14,8 @@ public sealed class AuthorizationClientCredentialsFlowFeature : IAuthorizationFe
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
-        OpenIddictServerBuilder              builder) {
+        OpenIddictServerBuilder              builder
+    ) {
         builder.AllowClientCredentialsFlow()
                .SetTokenEndpointUris("/Connect/Token");
     }
@@ -23,7 +24,8 @@ public sealed class AuthorizationClientCredentialsFlowFeature : IAuthorizationFe
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
         OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration) {
+        OpenIddictServerAspNetCoreBuilder    integration
+    ) {
         integration.EnableTokenEndpointPassthrough();
     }
 

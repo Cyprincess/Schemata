@@ -11,7 +11,8 @@ using Schemata.Identity.Skeleton.Stores;
 
 namespace Schemata.Identity.Skeleton.Managers;
 
-public class SchemataUserManager<TUser> : UserManager<TUser> where TUser : class
+public class SchemataUserManager<TUser> : UserManager<TUser>
+    where TUser : class
 {
     private readonly IServiceProvider _sp;
 
@@ -24,15 +25,8 @@ public class SchemataUserManager<TUser> : UserManager<TUser> where TUser : class
         IEnumerable<IPasswordValidator<TUser>> passwordValidators,
         ILookupNormalizer                      keyNormalizer,
         IdentityErrorDescriber                 errors,
-        ILogger<SchemataUserManager<TUser>>    logger) : base(store,
-                                                              options,
-                                                              passwordHasher,
-                                                              userValidators,
-                                                              passwordValidators,
-                                                              keyNormalizer,
-                                                              errors,
-                                                              sp,
-                                                              logger) {
+        ILogger<SchemataUserManager<TUser>>    logger
+    ) : base(store, options, passwordHasher, userValidators, passwordValidators, keyNormalizer, errors, sp, logger) {
         _sp = sp;
     }
 

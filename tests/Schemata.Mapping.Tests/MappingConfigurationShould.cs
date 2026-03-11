@@ -36,9 +36,7 @@ public class MappingConfigurationShould
         var options = new SchemataMappingOptions();
 
         Assert.Throws<InvalidOperationException>(() => {
-            options.AddMapping<Source, Destination>(map => {
-                map.For(d => d.DisplayName);
-            });
+            options.AddMapping<Source, Destination>(map => { map.For(d => d.DisplayName); });
         });
     }
 }

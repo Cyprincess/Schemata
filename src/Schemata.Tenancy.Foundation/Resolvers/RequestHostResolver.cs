@@ -8,8 +8,9 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
-public class RequestHostResolver<TTenant, TKey> : ITenantResolver<TKey> where TTenant : SchemataTenant<TKey>
-                                                                        where TKey : struct, IEquatable<TKey>
+public class RequestHostResolver<TTenant, TKey> : ITenantResolver<TKey>
+    where TTenant : SchemataTenant<TKey>
+    where TKey : struct, IEquatable<TKey>
 {
     private readonly IHttpContextAccessor          _accessor;
     private readonly ITenantManager<TTenant, TKey> _manager;

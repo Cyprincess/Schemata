@@ -26,9 +26,7 @@ public static class Evaluator
         private          HashSet<Expression>?   _candidates;
         private          bool                   _cannotBeEvaluated;
 
-        internal Nominator(Func<Expression, bool> fnCanBeEvaluated) {
-            _fnCanBeEvaluated = fnCanBeEvaluated;
-        }
+        internal Nominator(Func<Expression, bool> fnCanBeEvaluated) { _fnCanBeEvaluated = fnCanBeEvaluated; }
 
         internal HashSet<Expression> Nominate(Expression expression) {
             _candidates = [];
@@ -71,13 +69,9 @@ public static class Evaluator
     {
         private readonly HashSet<Expression> _candidates;
 
-        internal SubtreeEvaluator(HashSet<Expression> candidates) {
-            _candidates = candidates;
-        }
+        internal SubtreeEvaluator(HashSet<Expression> candidates) { _candidates = candidates; }
 
-        internal Expression? Eval(Expression? exp) {
-            return Visit(exp);
-        }
+        internal Expression? Eval(Expression? exp) { return Visit(exp); }
 
         public override Expression? Visit(Expression? exp) {
             if (exp == null) {

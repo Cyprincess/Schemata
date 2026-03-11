@@ -1,18 +1,18 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
 
 public sealed class DefaultModulesProvider : IModulesProvider
 {
-    private static readonly List<ModuleDescriptor> Modules = [];
+    private static readonly ConcurrentBag<ModuleDescriptor> Modules = [];
 
-    public DefaultModulesProvider(ILogger<DefaultModulesProvider> logger) {
-        if (Modules.Count != 0) {
+    public DefaultModulesProvider() {
+        if (!Modules.IsEmpty) {
             return;
         }
 
@@ -52,9 +52,7 @@ public sealed class DefaultModulesProvider : IModulesProvider
 
     #region IModulesProvider Members
 
-    public IEnumerable<ModuleDescriptor> GetModules() {
-        return Modules;
-    }
+    public IEnumerable<ModuleDescriptor> GetModules() { return Modules; }
 
     #endregion
 

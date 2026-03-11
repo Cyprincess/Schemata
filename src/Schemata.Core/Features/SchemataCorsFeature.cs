@@ -15,7 +15,8 @@ public sealed class SchemataCorsFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<CorsOptions>();
         services.AddCors(configure);
     }
@@ -23,7 +24,8 @@ public sealed class SchemataCorsFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseCors();
     }
 }

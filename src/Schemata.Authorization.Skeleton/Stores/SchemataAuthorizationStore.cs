@@ -14,7 +14,6 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
-// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
 public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : IOpenIddictAuthorizationStore<TAuthorization>
     where TAuthorization : SchemataAuthorization
     where TApplication : SchemataApplication
@@ -28,7 +27,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         IMemoryCache                cache,
         IRepository<TApplication>   applications,
         IRepository<TAuthorization> authorizations,
-        IRepository<TToken>         tokens) {
+        IRepository<TToken>         tokens
+    ) {
         _cache          = cache;
         _authorizations = authorizations;
         _tokens         = tokens;
@@ -42,7 +42,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TAuthorization>, IQueryable<TResult>> query,
-        CancellationToken                                     ct) {
+        CancellationToken                                     ct
+    ) {
         return await _authorizations.LongCountAsync(query, ct);
     }
 
@@ -52,7 +53,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     }
 
     public virtual async ValueTask DeleteAsync(TAuthorization authorization, CancellationToken ct) {
-        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == authorization.Id), ct)) {
+        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == authorization.Id))
+                                           .WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             await _tokens.RemoveAsync(token, ct);
         }
@@ -69,7 +71,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         string?                                    status,
         string?                                    type,
         ImmutableArray<string>?                    scopes,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         var predicate = Predicate.True<TAuthorization>();
 
         if (!string.IsNullOrWhiteSpace(subject)) {
@@ -97,7 +100,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
             }
         }
 
-        await foreach (var authorization in _authorizations.ListAsync(q => q.Where(predicate), ct)) {
+        await foreach (var authorization in _authorizations.ListAsync(q => q.Where(predicate)).WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             yield return authorization;
         }
@@ -126,7 +129,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
-        CancellationToken                                             ct) {
+        CancellationToken                                             ct
+    ) {
         return await _authorizations.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
@@ -144,42 +148,41 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
 
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TAuthorization    authorization,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(authorization.Properties)) {
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
         var key = authorization.Properties!.ToCacheKey();
-        var properties = _cache.GetOrCreate(key,
-                                            entry => {
-                                                entry.SetPriority(CacheItemPriority.High)
-                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties!);
+            var result = JsonSerializer
+               .Deserialize<ImmutableDictionary<string, JsonElement>>(authorization.Properties!);
 
-                                                return result ?? ImmutableDictionary<string, JsonElement>.Empty;
-                                            })!;
+            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
+        })!;
 
         return new(properties);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetScopesAsync(
         TAuthorization    authorization,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(authorization.Scopes)) {
             return new(ImmutableArray<string>.Empty);
         }
 
         var key = authorization.Scopes!.ToCacheKey();
-        var uris = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High)
-                                               .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var uris = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                          var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(authorization.Scopes!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(authorization.Scopes!);
 
-                                          return result ?? ImmutableArray<string>.Empty;
-                                      })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(uris);
     }
@@ -207,17 +210,19 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
-        CancellationToken                                             ct) {
+        CancellationToken                                             ct
+    ) {
         return _authorizations.ListAsync(q => query(q, state), ct);
     }
 
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         var count = 0L;
 
-        await foreach (var authorization in _authorizations.ListAsync(
-                           q => q.Where(a => a.CreateTime < threshold.UtcDateTime)
-                                 .Where(a => a.Status != Statuses.Valid || a.Type == AuthorizationTypes.AdHoc),
-                           ct)) {
+        await foreach (var authorization in _authorizations
+                                           .ListAsync(q => q.Where(a => a.CreateTime < threshold.UtcDateTime)
+                                                            .Where(a => a.Status != Statuses.Valid
+                                                                     || a.Type == AuthorizationTypes.AdHoc))
+                                           .WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             await _authorizations.RemoveAsync(authorization, ct);
             count++;
@@ -233,7 +238,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         string?           client,
         string?           status,
         string?           type,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         var count = 0L;
 
         await foreach (var authorization in FindAsync(subject, client, status, type, null, ct)) {
@@ -259,7 +265,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual ValueTask SetApplicationIdAsync(
         TAuthorization    authorization,
         string?           identifier,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         authorization.ApplicationId = identifier is not null ? long.Parse(identifier) : null;
         return default;
     }
@@ -267,7 +274,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual ValueTask SetCreationDateAsync(
         TAuthorization    authorization,
         DateTimeOffset?   date,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         authorization.CreateTime = date?.UtcDateTime;
         return default;
     }
@@ -275,7 +283,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual ValueTask SetPropertiesAsync(
         TAuthorization                           authorization,
         ImmutableDictionary<string, JsonElement> properties,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (properties is not { Count: > 0 }) {
             authorization.Properties = null;
             return default;
@@ -289,7 +298,8 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     public virtual ValueTask SetScopesAsync(
         TAuthorization         authorization,
         ImmutableArray<string> scopes,
-        CancellationToken      ct) {
+        CancellationToken      ct
+    ) {
         if (scopes.IsDefaultOrEmpty) {
             authorization.Scopes = null;
             return default;

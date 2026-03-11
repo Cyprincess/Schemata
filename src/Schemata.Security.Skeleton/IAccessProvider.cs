@@ -10,5 +10,6 @@ public interface IAccessProvider<T, TContext>
         T?                entity,
         TContext?         context,
         ClaimsPrincipal?  principal,
-        CancellationToken ct = default);
+        CancellationToken ct = default
+    );
 }

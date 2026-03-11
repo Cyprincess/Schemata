@@ -5,13 +5,9 @@ namespace System.Linq;
 
 public static class Predicate
 {
-    public static Expression<Func<T, bool>> True<T>() {
-        return q => true;
-    }
+    public static Expression<Func<T, bool>> True<T>() { return q => true; }
 
-    public static Expression<Func<T, bool>> False<T>() {
-        return q => false;
-    }
+    public static Expression<Func<T, bool>> False<T>() { return q => false; }
 
     public static Expression<Func<TResult, bool>>? Cast<T, TResult>(Expression<Func<T, bool>>? predicate) {
         if (predicate is null) {
@@ -27,20 +23,23 @@ public static class Predicate
 
     public static Expression<Func<TEntity, bool>> And<TEntity>(
         this Expression<Func<TEntity, bool>>? left,
-        Expression<Func<TEntity, bool>>?      right) {
-        return Combine(left, right, ExpressionType.AndAlso);
+        Expression<Func<TEntity, bool>>?      right
+    ) {
+        return left.Combine(right, ExpressionType.AndAlso);
     }
 
     public static Expression<Func<TEntity, bool>> Or<TEntity>(
         this Expression<Func<TEntity, bool>>? left,
-        Expression<Func<TEntity, bool>>?      right) {
-        return Combine(left, right, ExpressionType.OrElse);
+        Expression<Func<TEntity, bool>>?      right
+    ) {
+        return left.Combine(right, ExpressionType.OrElse);
     }
 
     private static Expression<Func<T, bool>> Combine<T>(
         this Expression<Func<T, bool>>? left,
         Expression<Func<T, bool>>?      right,
-        ExpressionType                  type) {
+        ExpressionType                  type
+    ) {
         if (left is null && right is null) {
             return False<T>();
         }
@@ -84,9 +83,7 @@ public static class Predicate
             return visitor.Visit(expression.Body);
         }
 
-        public override Expression? Visit(Expression? node) {
-            return node == _oldValue ? _newValue : base.Visit(node);
-        }
+        public override Expression? Visit(Expression? node) { return node == _oldValue ? _newValue : base.Visit(node); }
     }
 
     #endregion

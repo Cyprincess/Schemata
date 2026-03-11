@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 
 namespace Schemata.Tenancy.Skeleton;
 
-public interface ITenantResolver<TKey> where TKey : struct, IEquatable<TKey>
+public interface ITenantResolver<TKey>
+    where TKey : struct, IEquatable<TKey>
 {
     Task<TKey?> ResolveAsync(CancellationToken ct);
 }

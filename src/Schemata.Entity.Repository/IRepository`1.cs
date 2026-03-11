@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Entity.Repository;
 
-public interface IRepository<TEntity> where TEntity : class
+public interface IRepository<TEntity>
+    where TEntity : class
 {
     AdviceContext AdviceContext { get; }
 
@@ -17,11 +18,13 @@ public interface IRepository<TEntity> where TEntity : class
 
     IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
 
@@ -33,23 +36,28 @@ public interface IRepository<TEntity> where TEntity : class
 
     ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     Task AddAsync(TEntity                   entity,   CancellationToken ct = default);
     Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
@@ -66,7 +74,8 @@ public interface IRepository<TEntity> where TEntity : class
     IRepository<TEntity> Once();
     IRepository<TEntity> SuppressAddValidation();
     IRepository<TEntity> SuppressUpdateValidation();
-    IRepository<TEntity> SuppressUpdateConcurrency();
+    IRepository<TEntity> SuppressConcurrency();
     IRepository<TEntity> SuppressQuerySoftDelete();
-    IRepository<TEntity> SuppressRemoveSoftDelete();
+    IRepository<TEntity> SuppressSoftDelete();
+    IRepository<TEntity> SuppressTimestamp();
 }

@@ -13,9 +13,7 @@ public sealed class Map<TSource, TDestination>
         return mapping;
     }
 
-    internal void Remove(IMapping mapping) {
-        _mappings.Remove(mapping);
-    }
+    internal void Remove(IMapping mapping) { _mappings.Remove(mapping); }
 
     public FieldSelection<TSource, TDestination> For(Expression<Func<TDestination, object?>> destinationField) {
         var mapping = Add(new(this, destinationField));

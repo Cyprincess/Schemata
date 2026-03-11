@@ -17,7 +17,8 @@ public sealed class SchemataAuthorizationStoreResolver : IOpenIddictAuthorizatio
     public SchemataAuthorizationStoreResolver(
         IServiceProvider                       sp,
         IMemoryCache                           cache,
-        IOptionsMonitor<OpenIddictCoreOptions> options) {
+        IOptionsMonitor<OpenIddictCoreOptions> options
+    ) {
         _sp      = sp;
         _cache   = cache;
         _options = options;
@@ -25,7 +26,8 @@ public sealed class SchemataAuthorizationStoreResolver : IOpenIddictAuthorizatio
 
     #region IOpenIddictAuthorizationStoreResolver Members
 
-    public IOpenIddictAuthorizationStore<TAuthorization> Get<TAuthorization>() where TAuthorization : class {
+    public IOpenIddictAuthorizationStore<TAuthorization> Get<TAuthorization>()
+        where TAuthorization : class {
         var store = _sp.GetService<IOpenIddictAuthorizationStore<TAuthorization>>();
         if (store is not null) {
             return store;
@@ -33,18 +35,14 @@ public sealed class SchemataAuthorizationStoreResolver : IOpenIddictAuthorizatio
 
         var entity = _options.CurrentValue.DefaultAuthorizationType!;
         var key    = (entity.FullName ?? entity.Name).ToCacheKey();
-        var type = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High);
+        var type = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High);
 
-                                          var application = _options.CurrentValue.DefaultApplicationType!;
-                                          var token       = _options.CurrentValue.DefaultTokenType!;
+            var application = _options.CurrentValue.DefaultApplicationType!;
+            var token       = _options.CurrentValue.DefaultTokenType!;
 
-                                          return typeof(SchemataAuthorizationStore<,,>).MakeGenericType(
-                                              entity,
-                                              application,
-                                              token);
-                                      })!;
+            return typeof(SchemataAuthorizationStore<,,>).MakeGenericType(entity, application, token);
+        })!;
 
         return (IOpenIddictAuthorizationStore<TAuthorization>)_sp.GetRequiredService(type);
     }

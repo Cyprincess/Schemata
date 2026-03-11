@@ -14,7 +14,8 @@ public class ModuleDescriptor
         string?  description = null,
         string?  company     = null,
         string?  copyright   = null,
-        string?  version     = null) {
+        string?  version     = null
+    ) {
         Name         = name;
         DisplayName  = display ?? name;
         Description  = description;

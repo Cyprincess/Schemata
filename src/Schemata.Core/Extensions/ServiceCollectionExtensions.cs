@@ -12,24 +12,27 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSchemata(
         this IServiceCollection services,
         IConfiguration          configuration,
-        IWebHostEnvironment     environment) {
-        return AddSchemata(services, configuration, environment, _ => { }, _ => { });
+        IWebHostEnvironment     environment
+    ) {
+        return services.AddSchemata(configuration, environment, _ => { }, _ => { });
     }
 
     public static IServiceCollection AddSchemata(
         this IServiceCollection  services,
         IConfiguration           configuration,
         IWebHostEnvironment      environment,
-        Action<SchemataBuilder>? schema) {
-        return AddSchemata(services, configuration, environment, schema, _ => { });
+        Action<SchemataBuilder>? schema
+    ) {
+        return services.AddSchemata(configuration, environment, schema, _ => { });
     }
 
     public static IServiceCollection AddSchemata(
         this IServiceCollection  services,
         IConfiguration           configuration,
         IWebHostEnvironment      environment,
-        Action<SchemataOptions>? configure) {
-        return AddSchemata(services, configuration, environment, _ => { }, configure);
+        Action<SchemataOptions>? configure
+    ) {
+        return services.AddSchemata(configuration, environment, _ => { }, configure);
     }
 
     public static IServiceCollection AddSchemata(
@@ -37,7 +40,8 @@ public static class ServiceCollectionExtensions
         IConfiguration           configuration,
         IWebHostEnvironment      environment,
         Action<SchemataBuilder>? schema,
-        Action<SchemataOptions>? configure) {
+        Action<SchemataOptions>? configure
+    ) {
         var builder = new SchemataBuilder(configuration, environment);
 
         services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(configuration, environment)));

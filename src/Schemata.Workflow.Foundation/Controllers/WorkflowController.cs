@@ -6,11 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advices;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Options;
+using Schemata.Advice;
 using Schemata.Mapping.Skeleton;
-using Schemata.Workflow.Foundation.Advices;
+using Schemata.Workflow.Foundation.Advisors;
 using Schemata.Workflow.Skeleton.Entities;
 using Schemata.Workflow.Skeleton.Managers;
 using Schemata.Workflow.Skeleton.Models;
@@ -32,7 +33,8 @@ public sealed class WorkflowController : ControllerBase
         IServiceProvider                         sp,
         ISimpleMapper                            mapper,
         IOptionsMonitor<SchemataWorkflowOptions> options,
-        ILogger<WorkflowController>              logger) {
+        ILogger<WorkflowController>              logger
+    ) {
         _sp      = sp;
         _mapper  = mapper;
         _options = options;
@@ -57,10 +59,15 @@ public sealed class WorkflowController : ControllerBase
             return NotFound();
         }
 
-        var ctx = new AdviceContext();
+        var ctx = new AdviceContext(_sp);
 
-        if (!await Advices<IWorkflowGetAdvice>.AdviseAsync(_sp, ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IWorkflowGetAdvisor>()
+                             .RunAsync(ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
@@ -73,10 +80,15 @@ public sealed class WorkflowController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
-        var ctx = new AdviceContext();
+        var ctx = new AdviceContext(_sp);
 
-        if (!await Advices<IWorkflowSubmitAdvice>.AdviseAsync(_sp, ctx, request, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IWorkflowSubmitAdvisor>()
+                             .RunAsync(ctx, request, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         if (request.Instance is null || string.IsNullOrWhiteSpace(request.Type)) {
@@ -132,14 +144,24 @@ public sealed class WorkflowController : ControllerBase
             return NotFound();
         }
 
-        var ctx = new AdviceContext();
+        var ctx = new AdviceContext(_sp);
 
-        if (!await Advices<IWorkflowGetAdvice>.AdviseAsync(_sp, ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IWorkflowGetAdvisor>()
+                             .RunAsync(ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
-        if (!await Advices<IWorkflowRaiseAdvice>.AdviseAsync(_sp, ctx, workflow, request, HttpContext, HttpContext.RequestAborted)) {
-            return EmptyResult;
+        switch (await Advisor.For<IWorkflowRaiseAdvisor>()
+                             .RunAsync(ctx, workflow, request, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Block:
+            case AdviseResult.Handle:
+                return EmptyResult;
+            case AdviseResult.Continue:
+                break;
         }
 
         try {

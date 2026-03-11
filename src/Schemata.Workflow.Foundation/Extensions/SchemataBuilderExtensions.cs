@@ -15,23 +15,26 @@ public static class SchemataBuilderExtensions
     public static SchemataWorkflowBuilder UseWorkflow(
         this SchemataBuilder                                                                  builder,
         Action<SchemataWorkflowOptions>?                                                      configure = null,
-        Action<Map<WorkflowDetails<SchemataWorkflow, SchemataTransition>, WorkflowResponse>>? mapping   = null) {
-        return UseWorkflow<SchemataWorkflow, SchemataTransition>(builder, configure, mapping);
+        Action<Map<WorkflowDetails<SchemataWorkflow, SchemataTransition>, WorkflowResponse>>? mapping   = null
+    ) {
+        return builder.UseWorkflow<SchemataWorkflow, SchemataTransition>(configure, mapping);
     }
 
     public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition>(
         this SchemataBuilder                                                    builder,
         Action<SchemataWorkflowOptions>?                                        configure = null,
-        Action<Map<WorkflowDetails<TWorkflow, TTransition>, WorkflowResponse>>? mapping   = null)
+        Action<Map<WorkflowDetails<TWorkflow, TTransition>, WorkflowResponse>>? mapping   = null
+    )
         where TWorkflow : SchemataWorkflow, new()
         where TTransition : SchemataTransition, new() {
-        return UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(builder, configure, mapping);
+        return builder.UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(configure, mapping);
     }
 
     public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition, TResponse>(
         this SchemataBuilder                                             builder,
         Action<SchemataWorkflowOptions>?                                 configure = null,
-        Action<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>? mapping   = null)
+        Action<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>? mapping   = null
+    )
         where TWorkflow : SchemataWorkflow, new()
         where TTransition : SchemataTransition, new()
         where TResponse : WorkflowResponse {

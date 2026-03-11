@@ -55,7 +55,8 @@ public static class Utilities
         IServiceProvider sp,
         object           instance,
         string           method,
-        params object?[] parameters) {
+        params object?[] parameters
+    ) {
         CallMethod(sp, instance, method, parameters.ToList());
     }
 
@@ -63,7 +64,8 @@ public static class Utilities
         IServiceProvider? sp,
         object            instance,
         string            method,
-        List<object?>?    parameters = null) {
+        List<object?>?    parameters = null
+    ) {
         var mi = instance.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.Public);
         if (mi is null) {
             return;

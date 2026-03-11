@@ -14,7 +14,8 @@ public class ResourceAccessProvider<T, TRequest> : IAccessProvider<T, ResourceRe
         T?                                resource,
         ResourceRequestContext<TRequest>? context,
         ClaimsPrincipal?                  principal,
-        CancellationToken                 ct = default) {
+        CancellationToken                 ct = default
+    ) {
         const string role = "resource-{operation}-{entity}";
 
         var entity    = typeof(T).Name.Kebaberize();

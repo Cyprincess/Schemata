@@ -14,7 +14,8 @@ public sealed class SchemataCookiePolicyFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.PopOrDefault<CookiePolicyOptions>();
         services.AddCookiePolicy(configure);
     }
@@ -22,7 +23,8 @@ public sealed class SchemataCookiePolicyFeature : FeatureBase
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseCookiePolicy();
     }
 }

@@ -11,8 +11,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advices;
-using Schemata.Entity.Repository.Advices;
+using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Repository;
 
@@ -29,7 +29,8 @@ public abstract class RepositoryBase
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
 
         if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
+            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id",
+                                                                     StringComparison.InvariantCultureIgnoreCase));
             if (id is not null) {
                 keyProperties.Add(id);
             }
@@ -58,15 +59,15 @@ public abstract class RepositoryBase
     }
 }
 
-public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository where TEntity : class
+public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
+    where TEntity : class
 {
-    private readonly IServiceProvider _sp;
-
     protected RepositoryBase(IServiceProvider sp) {
-        _sp = sp;
+        ServiceProvider = sp;
+        AdviceContext   = new(sp);
     }
 
-    protected virtual IServiceProvider ServiceProvider => _sp;
+    protected virtual IServiceProvider ServiceProvider { get; }
 
     #region IRepository Members
 
@@ -74,12 +75,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
 
-        await foreach (var item in ListAsync(expression, ct)) {
+        await foreach (var item in ListAsync(expression).WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             yield return item;
         }
@@ -87,12 +89,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     async IAsyncEnumerable<object> IRepository.SearchAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
 
-        await foreach (var item in ListAsync(expression, ct)) {
+        await foreach (var item in ListAsync(expression).WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             yield return item;
         }
@@ -100,7 +103,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     async ValueTask<object?> IRepository.FirstOrDefaultAsync<T>(
         Expression<Func<T, bool>>? predicate,
-        CancellationToken          ct) {
+        CancellationToken          ct
+    ) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
@@ -110,7 +114,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     async ValueTask<object?> IRepository.SingleOrDefaultAsync<T>(
         Expression<Func<T, bool>>? predicate,
-        CancellationToken          ct) {
+        CancellationToken          ct
+    ) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
         Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
@@ -174,35 +179,25 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         Detach(e);
     }
 
-    IRepository IRepository.Once() {
-        return (IRepository)Once();
-    }
+    IRepository IRepository.Once() { return (IRepository)Once(); }
 
-    IRepository IRepository.SuppressAddValidation() {
-        return (IRepository)SuppressAddValidation();
-    }
+    IRepository IRepository.SuppressAddValidation() { return (IRepository)SuppressAddValidation(); }
 
-    IRepository IRepository.SuppressUpdateValidation() {
-        return (IRepository)SuppressUpdateValidation();
-    }
+    IRepository IRepository.SuppressUpdateValidation() { return (IRepository)SuppressUpdateValidation(); }
 
-    IRepository IRepository.SuppressUpdateConcurrency() {
-        return (IRepository)SuppressUpdateConcurrency();
-    }
+    IRepository IRepository.SuppressConcurrency() { return (IRepository)SuppressConcurrency(); }
 
-    IRepository IRepository.SuppressQuerySoftDelete() {
-        return (IRepository)SuppressQuerySoftDelete();
-    }
+    IRepository IRepository.SuppressQuerySoftDelete() { return (IRepository)SuppressQuerySoftDelete(); }
 
-    IRepository IRepository.SuppressRemoveSoftDelete() {
-        return (IRepository)SuppressRemoveSoftDelete();
-    }
+    IRepository IRepository.SuppressSoftDelete() { return (IRepository)SuppressSoftDelete(); }
+
+    IRepository IRepository.SuppressTimestamp() { return (IRepository)SuppressTimestamp(); }
 
     #endregion
 
     #region IRepository<TEntity> Members
 
-    public virtual AdviceContext AdviceContext { get; } = new();
+    public virtual AdviceContext AdviceContext { get; }
 
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
@@ -210,11 +205,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public virtual ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default) {
         return GetAsync<TEntity>(entity, ct);
@@ -279,23 +276,28 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public abstract ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default);
+        CancellationToken                               ct = default
+    );
 
     public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
 
@@ -334,8 +336,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return this;
     }
 
-    public virtual IRepository<TEntity> SuppressUpdateConcurrency() {
-        AdviceContext.Set<SuppressUpdateConcurrency>(null);
+    public virtual IRepository<TEntity> SuppressConcurrency() {
+        AdviceContext.Set<SuppressConcurrency>(null);
         return this;
     }
 
@@ -344,8 +346,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return this;
     }
 
-    public virtual IRepository<TEntity> SuppressRemoveSoftDelete() {
-        AdviceContext.Set<SuppressRemoveSoftDelete>(null);
+    public virtual IRepository<TEntity> SuppressSoftDelete() {
+        AdviceContext.Set<SuppressSoftDelete>(null);
+        return this;
+    }
+
+    public virtual IRepository<TEntity> SuppressTimestamp() {
+        AdviceContext.Set<SuppressTimestamp>(null);
         return this;
     }
 
@@ -361,7 +368,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     protected virtual IQueryable<TResult> BuildQuery<TResult>(
         IQueryable<TEntity>                             query,
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate) {
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate
+    ) {
         if (predicate is not null) {
             return predicate(query);
         }

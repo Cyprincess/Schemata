@@ -16,7 +16,8 @@ public static class ApplicationBuilderExtensions
     public static IApplicationBuilder UseSchemata(
         this IApplicationBuilder app,
         IConfiguration           configuration,
-        IWebHostEnvironment      environment) {
+        IWebHostEnvironment      environment
+    ) {
         var sp = app.ApplicationServices;
 
         var schemata = sp.GetRequiredService<SchemataOptions>();

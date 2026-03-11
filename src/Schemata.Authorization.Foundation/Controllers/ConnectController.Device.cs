@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -40,10 +39,10 @@ public sealed partial class ConnectController : ControllerBase
             var scopes = _scopeManager.FindByNamesAsync(result.Principal.GetScopes());
             await foreach (var scope in scopes) {
                 response.Scopes.Add(new() {
-                                        Name        = await _scopeManager.GetNameAsync(scope),
-                                        DisplayName = await _scopeManager.GetLocalizedDisplayNameAsync(scope),
-                                        Description = await _scopeManager.GetLocalizedDescriptionAsync(scope),
-                                    });
+                    Name        = await _scopeManager.GetNameAsync(scope),
+                    DisplayName = await _scopeManager.GetLocalizedDisplayNameAsync(scope),
+                    Description = await _scopeManager.GetLocalizedDescriptionAsync(scope),
+                });
             }
 
             return Ok(response);
@@ -51,12 +50,11 @@ public sealed partial class ConnectController : ControllerBase
 
         // If a user code was specified (e.g as part of the verification_uri_complete)
         // but is not valid, render a form asking the user to enter the user code manually.
-        if (!string.IsNullOrWhiteSpace(
-                result.Properties?.GetTokenValue(OpenIddictServerAspNetCoreConstants.Tokens.UserCode))) {
+        if (!string.IsNullOrWhiteSpace(result.Properties?.GetTokenValue(OpenIddictServerAspNetCoreConstants.Tokens.UserCode))) {
             return BadRequest(new ErrorResponse {
-                                  Error = OpenIddictConstants.Errors.InvalidToken,
-                                  ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
-                              });
+                Error            = OpenIddictConstants.Errors.InvalidToken,
+                ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
+            });
         }
 
         // Otherwise, render a form asking the user to enter the user code manually.
@@ -74,9 +72,7 @@ public sealed partial class ConnectController : ControllerBase
         var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         if (result.Succeeded && !string.IsNullOrWhiteSpace(result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId))) {
             // Create the claims-based identity that will be used by OpenIddict to generate tokens.
-            var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType,
-                                              OpenIddictConstants.Claims.Subject,
-                                              OpenIddictConstants.Claims.Role);
+            var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, OpenIddictConstants.Claims.Subject, OpenIddictConstants.Claims.Role);
 
             // Add the claims that will be persisted in the tokens.
             identity.SetClaim(OpenIddictConstants.Claims.Subject, await _userManager.GetUserIdAsync(user))
@@ -84,7 +80,7 @@ public sealed partial class ConnectController : ControllerBase
                     .SetClaim(OpenIddictConstants.Claims.PhoneNumber, await _userManager.GetPhoneNumberAsync(user))
                     .SetClaim(OpenIddictConstants.Claims.PreferredUsername, await _userManager.GetUserNameAsync(user))
                     .SetClaim(OpenIddictConstants.Claims.Nickname, await _userManager.GetDisplayNameAsync(user))
-                    .SetClaims(OpenIddictConstants.Claims.Role, (await _userManager.GetRolesAsync(user)).ToImmutableArray());
+                    .SetClaims(OpenIddictConstants.Claims.Role, [..await _userManager.GetRolesAsync(user)]);
 
             // Note: in this sample, the granted scopes match the requested scope
             // but you may want to allow the user to uncheck specific scopes.
@@ -104,8 +100,8 @@ public sealed partial class ConnectController : ControllerBase
 
         // Redisplay the form when the user code is not valid.
         return BadRequest(new ErrorResponse {
-                              Error = OpenIddictConstants.Errors.InvalidToken,
-                              ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
-                          });
+            Error            = OpenIddictConstants.Errors.InvalidToken,
+            ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
+        });
     }
 }

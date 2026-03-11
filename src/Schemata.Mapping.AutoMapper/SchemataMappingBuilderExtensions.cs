@@ -17,9 +17,7 @@ public static class SchemataMappingBuilderExtensions
         builder.Services.TryAddSingleton(sp => {
             var options = sp.GetRequiredService<IOptions<SchemataMappingOptions>>();
 
-            return new MapperConfiguration(mapper => {
-                AutoMapperConfigurator.Configure(mapper, options.Value);
-            });
+            return new MapperConfiguration(mapper => { AutoMapperConfigurator.Configure(mapper, options.Value); });
         });
 
         builder.Schemata.AddFeature<SchemataMappingFeature<SimpleMapper>>();

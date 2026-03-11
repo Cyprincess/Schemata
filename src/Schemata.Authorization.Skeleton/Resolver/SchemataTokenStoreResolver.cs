@@ -18,7 +18,8 @@ public sealed class SchemataTokenStoreResolver : IOpenIddictTokenStoreResolver
 
     #region IOpenIddictTokenStoreResolver Members
 
-    public IOpenIddictTokenStore<TToken> Get<TToken>() where TToken : class {
+    public IOpenIddictTokenStore<TToken> Get<TToken>()
+        where TToken : class {
         var store = _sp.GetService<IOpenIddictTokenStore<TToken>>();
         if (store is not null) {
             return store;
@@ -26,12 +27,11 @@ public sealed class SchemataTokenStoreResolver : IOpenIddictTokenStoreResolver
 
         var entity = typeof(TToken);
         var key    = (entity.FullName ?? entity.Name).ToCacheKey();
-        var type = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High);
+        var type = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High);
 
-                                          return typeof(SchemataTokenStore<>).MakeGenericType(entity);
-                                      })!;
+            return typeof(SchemataTokenStore<>).MakeGenericType(entity);
+        })!;
 
         return (IOpenIddictTokenStore<TToken>)_sp.GetRequiredService(type);
     }

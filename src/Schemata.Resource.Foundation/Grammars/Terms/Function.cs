@@ -80,7 +80,5 @@ public class Function : IComparable
 
     #endregion
 
-    public override string ToString() {
-        return $"{Member}({string.Join(',', Args)})";
-    }
+    public override string ToString() { return $"{Member}({string.Join(',', Args)})"; }
 }

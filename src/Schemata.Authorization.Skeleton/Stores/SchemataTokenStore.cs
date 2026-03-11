@@ -15,8 +15,8 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
-// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
-public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TToken : SchemataToken
+public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
+    where TToken : SchemataToken
 {
     private readonly IMemoryCache        _cache;
     private readonly IRepository<TToken> _tokens;
@@ -34,7 +34,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TToken>, IQueryable<TResult>> query,
-        CancellationToken                             ct) {
+        CancellationToken                             ct
+    ) {
         return await _tokens.LongCountAsync(query, ct);
     }
 
@@ -53,7 +54,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         string?                                    client,
         string?                                    status,
         string?                                    type,
-        [EnumeratorCancellation] CancellationToken ct) {
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
         var predicate = Predicate.True<TToken>();
 
         if (!string.IsNullOrEmpty(subject)) {
@@ -74,7 +76,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
             predicate = predicate.And(t => t.Type == type);
         }
 
-        await foreach (var token in _tokens.ListAsync(q => q.Where(predicate), ct)) {
+        await foreach (var token in _tokens.ListAsync(q => q.Where(predicate)).WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             yield return token;
         }
@@ -113,7 +115,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TToken>, TState, IQueryable<TResult>> query,
         TState                                                state,
-        CancellationToken                                     ct) {
+        CancellationToken                                     ct
+    ) {
         return await _tokens.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
@@ -141,27 +144,24 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         return new(token.Id.ToString());
     }
 
-    public virtual ValueTask<string?> GetPayloadAsync(TToken token, CancellationToken ct) {
-        return new(token.Payload);
-    }
+    public virtual ValueTask<string?> GetPayloadAsync(TToken token, CancellationToken ct) { return new(token.Payload); }
 
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TToken            token,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(token.Properties)) {
             return new(ImmutableDictionary.Create<string, JsonElement>());
         }
 
         var key = token.Properties!.ToCacheKey();
-        var properties = _cache.GetOrCreate(key,
-                                            entry => {
-                                                entry.SetPriority(CacheItemPriority.High)
-                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(token.Properties!);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(token.Properties!);
 
-                                                return result ?? ImmutableDictionary.Create<string, JsonElement>();
-                                            })!;
+            return result ?? ImmutableDictionary.Create<string, JsonElement>();
+        })!;
 
         return new(properties);
     }
@@ -178,17 +178,11 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         return new(token.ReferenceId);
     }
 
-    public virtual ValueTask<string?> GetStatusAsync(TToken token, CancellationToken ct) {
-        return new(token.Status);
-    }
+    public virtual ValueTask<string?> GetStatusAsync(TToken token, CancellationToken ct) { return new(token.Status); }
 
-    public virtual ValueTask<string?> GetSubjectAsync(TToken token, CancellationToken ct) {
-        return new(token.Subject);
-    }
+    public virtual ValueTask<string?> GetSubjectAsync(TToken token, CancellationToken ct) { return new(token.Subject); }
 
-    public virtual ValueTask<string?> GetTypeAsync(TToken token, CancellationToken ct) {
-        return new(token.Type);
-    }
+    public virtual ValueTask<string?> GetTypeAsync(TToken token, CancellationToken ct) { return new(token.Type); }
 
     public virtual ValueTask<TToken> InstantiateAsync(CancellationToken ct) {
         return new(Activator.CreateInstance<TToken>());
@@ -201,7 +195,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TToken>, TState, IQueryable<TResult>> query,
         TState                                                state,
-        CancellationToken                                     ct) {
+        CancellationToken                                     ct
+    ) {
         return _tokens.ListAsync(q => query(q, state), ct);
     }
 
@@ -210,9 +205,9 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
                                                  || t.ExpireTime < DateTime.UtcNow;
         var count = 0L;
 
-        await foreach (var token in _tokens.ListAsync(
-                           q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query),
-                           ct)) {
+        await foreach (var token in _tokens
+                                   .ListAsync(q => q.Where(t => t.CreateTime < threshold.UtcDateTime).Where(query))
+                                   .WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             await _tokens.RemoveAsync(token, ct);
             count++;
@@ -228,7 +223,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
         string?           client,
         string?           status,
         string?           type,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         var count = 0L;
 
         await foreach (var token in FindAsync(subject, client, status, type, ct)) {
@@ -294,7 +290,8 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken> where TT
     public virtual ValueTask SetPropertiesAsync(
         TToken                                   token,
         ImmutableDictionary<string, JsonElement> properties,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (properties is not { Count: > 0 }) {
             token.Properties = null;
             return default;

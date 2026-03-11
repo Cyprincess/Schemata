@@ -19,18 +19,21 @@ public abstract class FeatureBase : ISimpleFeature
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) { }
+        IWebHostEnvironment environment
+    ) { }
 
     public virtual void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) { }
+        IWebHostEnvironment environment
+    ) { }
 
     public virtual void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
-        IWebHostEnvironment   environment) { }
+        IWebHostEnvironment   environment
+    ) { }
 
     #endregion
 }

@@ -14,5 +14,10 @@ public interface ISimpleMapper
 
     object? Map(object source, Type sourceType, Type destinationType);
 
-    void Map(object source, object destination, Type sourceType, Type destinationType);
+    void Map(
+        object source,
+        object destination,
+        Type   sourceType,
+        Type   destinationType
+    );
 }

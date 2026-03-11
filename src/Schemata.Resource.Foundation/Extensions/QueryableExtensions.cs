@@ -14,7 +14,8 @@ public static class QueryableExtensions
 {
     public static Func<IQueryable<T>, IQueryable<T>> WithFiltering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        Filter?                                 filter) {
+        Filter?                                 filter
+    ) {
         if (filter is null) {
             return query;
         }
@@ -34,7 +35,8 @@ public static class QueryableExtensions
 
     public static Func<IQueryable<T>, IQueryable<T>> WithOrdering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        Dictionary<Member, Ordering>?           order) {
+        Dictionary<Member, Ordering>?           order
+    ) {
         if (order is not { Count: > 0 }) {
             return query;
         }
@@ -60,7 +62,8 @@ public static class QueryableExtensions
 
     public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        PageToken                               token) {
+        PageToken                               token
+    ) {
         var build = query;
 
         query = q => build(q).Skip(token.Skip).Take(token.PageSize);
@@ -71,7 +74,8 @@ public static class QueryableExtensions
     public static IOrderedQueryable<T> WithOrdering<T>(
         this IQueryable<T>          source,
         Expression<Func<T, object>> select,
-        Ordering                    ordering = Ordering.Ascending) {
+        Ordering                    ordering = Ordering.Ascending
+    ) {
         if (typeof(IOrderedQueryable<T>).IsAssignableFrom(source.Expression.Type)) {
             return ordering == Ordering.Ascending
                 ? ((IOrderedQueryable<T>)source).ThenBy(select)

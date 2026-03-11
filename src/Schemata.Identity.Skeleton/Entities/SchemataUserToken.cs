@@ -13,7 +13,7 @@ public class SchemataUserToken : IdentityUserToken<long>, ITimestamp
     public override string LoginProvider { get; set; } = null!;
 
     public override string Name { get; set; } = null!;
-    
+
     #region ITimestamp Members
 
     public virtual DateTime? CreateTime { get; set; }

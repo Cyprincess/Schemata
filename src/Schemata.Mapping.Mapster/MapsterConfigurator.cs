@@ -51,7 +51,7 @@ public static class MapsterConfigurator
                 }
 
                 setter.IgnoreIf(predicate, member);
-           });
+            });
         }
     }
 }

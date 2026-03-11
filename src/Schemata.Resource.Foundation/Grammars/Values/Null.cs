@@ -6,9 +6,7 @@ namespace Schemata.Resource.Foundation.Grammars.Values;
 
 public class Null : IValue
 {
-    public Null(TextPosition position) {
-        Position = position;
-    }
+    public Null(TextPosition position) { Position = position; }
 
     #region IValue Members
 
@@ -18,13 +16,9 @@ public class Null : IValue
 
     public bool IsConstant => true;
 
-    public Expression ToExpression(Container ctx) {
-        return Expression.Constant(null);
-    }
+    public Expression ToExpression(Container ctx) { return Expression.Constant(null); }
 
     #endregion
 
-    public override string ToString() {
-        return "\u2205";
-    }
+    public override string ToString() { return "\u2205"; }
 }

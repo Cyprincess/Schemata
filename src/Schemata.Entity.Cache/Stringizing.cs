@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 
@@ -97,8 +97,8 @@ public class Stringizing : ExpressionVisitor
     }
 
     protected override Expression VisitMethodCall(MethodCallExpression node) {
-        var method = node.Method.Name;
-        var source = node.Object ?? node.Arguments[0];
+        var method    = node.Method.Name;
+        var source    = node.Object ?? node.Arguments[0];
         var arguments = node.Object != null ? node.Arguments : node.Arguments.Skip(1);
 
         Visit(source);
@@ -110,6 +110,7 @@ public class Stringizing : ExpressionVisitor
             if (!first) {
                 _builder.Append(", ");
             }
+
             first = false;
             Visit(argument);
         }
@@ -133,7 +134,5 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
-    public override string ToString() {
-        return _builder.ToString();
-    }
+    public override string ToString() { return _builder.ToString(); }
 }

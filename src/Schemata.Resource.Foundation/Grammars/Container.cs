@@ -12,9 +12,7 @@ public class Container
 {
     private static readonly ConcurrentDictionary<string, MethodInfo> MethodCache = [];
 
-    public Container(IToken token) {
-        Token = token;
-    }
+    public Container(IToken token) { Token = token; }
 
     public bool AllowFunctions { get; private set; }
 
@@ -26,13 +24,9 @@ public class Container
 
     private Dictionary<string, ParameterExpression> Parameters { get; } = [];
 
-    public static Container Build(IToken token) {
-        return new(token);
-    }
+    public static Container Build(IToken token) { return new(token); }
 
-    public Container AllowFunction<T>(string method) {
-        return AllowFunction(typeof(T), method);
-    }
+    public Container AllowFunction<T>(string method) { return AllowFunction(typeof(T), method); }
 
     public Container AllowFunction(Type type, string method) {
         AllowFunctions = true;
@@ -84,24 +78,23 @@ public class Container
         Type          type,
         string        name,
         Type[]?       types,
-        BindingFlags? flag = null) {
-        return GetMethod(type,
-                         name,
-                         types,
-                         () => {
-                             flag ??= BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
+        BindingFlags? flag = null
+    ) {
+        return GetMethod(type, name, types, () => {
+            flag ??= BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
 
-                             return types is null
-                                 ? type.GetMethod(name, flag.Value)
-                                 : type.GetMethod(name, flag.Value, null, types, null);
-                         });
+            return types is null
+                ? type.GetMethod(name, flag.Value)
+                : type.GetMethod(name, flag.Value, null, types, null);
+        });
     }
 
     public MethodInfo? GetMethod(
         Type               type,
         string             name,
         IEnumerable<Type>? types,
-        Func<MethodInfo?>  getter) {
+        Func<MethodInfo?>  getter
+    ) {
         var typ       = types?.Aggregate("", (s, i) => $"{s}{i.Name},");
         var qualified = $"{type.FullName}.{name}({typ})";
 

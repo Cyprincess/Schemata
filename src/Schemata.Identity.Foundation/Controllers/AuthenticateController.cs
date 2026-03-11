@@ -18,9 +18,9 @@ public sealed partial class AuthenticateController : ControllerBase
     private readonly IMailSender<SchemataUser>                _mailSender;
     private readonly IMessageSender<SchemataUser>             _messageSender;
     private readonly IOptionsMonitor<SchemataIdentityOptions> _options;
-    private readonly SchemataUserManager<SchemataUser>        _userManager;
 
-    private readonly IServiceProvider _sp;
+    private readonly IServiceProvider                  _sp;
+    private readonly SchemataUserManager<SchemataUser> _userManager;
 
     public AuthenticateController(
         SchemataUserManager<SchemataUser>        userManager,
@@ -28,7 +28,8 @@ public sealed partial class AuthenticateController : ControllerBase
         IMessageSender<SchemataUser>             messageSender,
         IOptionsMonitor<BearerTokenOptions>      bearerToken,
         IOptionsMonitor<SchemataIdentityOptions> options,
-        IServiceProvider                         sp) {
+        IServiceProvider                         sp
+    ) {
         _userManager   = userManager;
         _mailSender    = mailSender;
         _messageSender = messageSender;

@@ -13,11 +13,9 @@ public class RequestQueryResolver<TKey> : ITenantResolver<TKey>
 {
     private readonly IHttpContextAccessor _accessor;
 
-    public RequestQueryResolver(IHttpContextAccessor accessor) {
-        _accessor = accessor;
-    }
+    public RequestQueryResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
-    #region ITenantResolver Members
+    #region ITenantResolver<TKey> Members
 
     public Task<TKey?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.Query.TryGetValue("Tenant", out var values) != true) {

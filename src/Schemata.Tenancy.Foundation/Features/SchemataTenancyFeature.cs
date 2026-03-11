@@ -28,7 +28,8 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         services.TryAddScoped<ITenantManager<TTenant, TKey>, TManager>();
 
         services.TryAddScoped<SchemataTenantContextAccessor<TTenant, TKey>>();
@@ -54,7 +55,8 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         app.UseMiddleware<SchemataTenantContextAccessorInitializer<TTenant, TKey>>();
         app.UseMiddleware<SchemataTenantServiceProviderReplacer<TTenant, TKey>>();
     }

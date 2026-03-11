@@ -14,7 +14,8 @@ public sealed class DefaultEntitlementProvider<T, TContext> : IEntitlementProvid
     public Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
         TContext?         context,
         ClaimsPrincipal?  principal,
-        CancellationToken ct = default) {
+        CancellationToken ct = default
+    ) {
         return Task.FromResult<Expression<Func<T, bool>>?>(_ => true);
     }
 

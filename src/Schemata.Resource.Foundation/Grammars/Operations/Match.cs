@@ -12,9 +12,7 @@ public abstract class Match : IBinary
 
     public virtual bool IsConstant => false;
 
-    public virtual Expression? ToExpression(Container ctx) {
-        return null;
-    }
+    public virtual Expression? ToExpression(Container ctx) { return null; }
 
     public Expression ToExpression(Expression left, Expression right, Container ctx) {
         var method = this switch {

@@ -37,7 +37,8 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         var configure = configurators.Pop<IdentityOptions>();
         var build     = configurators.Pop<IdentityBuilder>();
         var bearer    = configurators.Pop<BearerTokenOptions>();
@@ -45,18 +46,16 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         var identify = configurators.Pop<SchemataIdentityOptions>();
         services.Configure(identify);
 
-        var converter = new ClaimStoreJsonConverter();
-
         services.Configure<JsonSerializerOptions>(options => {
-            options.Converters.Add(converter);
+            options.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
 
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
-            options.SerializerOptions.Converters.Add(converter);
+            options.SerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
-            options.JsonSerializerOptions.Converters.Add(converter);
+            options.JsonSerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
 
         var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
@@ -66,10 +65,11 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.AddMemoryCache();
 
         services.AddAuthentication("Identity.BearerAndApplication")
-                .AddScheme<AuthenticationSchemeOptions, CompositeIdentityHandler>("Identity.BearerAndApplication", null, composite => {
-                     composite.ForwardDefault      = IdentityConstants.BearerScheme;
-                     composite.ForwardAuthenticate = "Identity.BearerAndApplication";
-                 })
+                .AddScheme<AuthenticationSchemeOptions, CompositeIdentityHandler>(
+                     "Identity.BearerAndApplication", null, composite => {
+                         composite.ForwardDefault      = IdentityConstants.BearerScheme;
+                         composite.ForwardAuthenticate = "Identity.BearerAndApplication";
+                     })
                 .AddBearerToken(IdentityConstants.BearerScheme, bearer)
                 .AddIdentityCookies();
 
@@ -88,10 +88,13 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         build(builder);
     }
 
+    #region Nested type: CompositeIdentityHandler
+
     private sealed class CompositeIdentityHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder) : SignInAuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+        ILoggerFactory                               logger,
+        UrlEncoder                                   encoder
+    ) : SignInAuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
             var result = await Context.AuthenticateAsync(IdentityConstants.BearerScheme);
@@ -111,4 +114,6 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
             throw new NotImplementedException();
         }
     }
+
+    #endregion
 }

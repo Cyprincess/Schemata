@@ -14,7 +14,6 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
-// ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
 public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IOpenIddictApplicationStore<TApplication>
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization
@@ -29,7 +28,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         IMemoryCache                cache,
         IRepository<TApplication>   applications,
         IRepository<TAuthorization> authorizations,
-        IRepository<TToken>         tokens) {
+        IRepository<TToken>         tokens
+    ) {
         _cache          = cache;
         _applications   = applications;
         _authorizations = authorizations;
@@ -44,7 +44,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
 
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TApplication>, IQueryable<TResult>> query,
-        CancellationToken                                   ct) {
+        CancellationToken                                   ct
+    ) {
         return await _applications.LongCountAsync(query, ct);
     }
 
@@ -54,16 +55,17 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     }
 
     public virtual async ValueTask DeleteAsync(TApplication application, CancellationToken ct) {
-        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.ApplicationId == application.Id), ct)) {
+        await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.ApplicationId == application.Id))
+                                           .WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             await _tokens.RemoveAsync(token, ct);
         }
 
         await _tokens.CommitAsync(ct);
 
-        await foreach (var authorization in _authorizations.ListAsync(
-                           q => q.Where(t => t.ApplicationId == application.Id),
-                           ct)) {
+        await foreach (var authorization in _authorizations
+                                           .ListAsync(q => q.Where(t => t.ApplicationId == application.Id))
+                                           .WithCancellation(ct)) {
             ct.ThrowIfCancellationRequested();
             await _authorizations.RemoveAsync(authorization, ct);
         }
@@ -101,7 +103,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
-        CancellationToken                                           ct) {
+        CancellationToken                                           ct
+    ) {
         return await _applications.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
@@ -127,30 +130,29 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
 
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.DisplayNames)) {
             return new(ImmutableDictionary<CultureInfo, string>.Empty);
         }
 
         var key = application.DisplayNames!.ToCacheKey();
-        var names = _cache.GetOrCreate(key,
-                                       entry => {
-                                           entry.SetPriority(CacheItemPriority.High)
-                                                .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var names = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                           var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames!);
-                                           if (names is null) {
-                                               return ImmutableDictionary<CultureInfo, string>.Empty;
-                                           }
+            var names = JsonSerializer.Deserialize<Dictionary<string, string>>(application.DisplayNames!);
+            if (names is null) {
+                return ImmutableDictionary<CultureInfo, string>.Empty;
+            }
 
-                                           var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
+            var builder = ImmutableDictionary.CreateBuilder<CultureInfo, string>();
 
-                                           foreach (var kv in names) {
-                                               builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
-                                           }
+            foreach (var kv in names) {
+                builder[CultureInfo.GetCultureInfo(kv.Key)] = kv.Value;
+            }
 
-                                           return builder.ToImmutable();
-                                       })!;
+            return builder.ToImmutable();
+        })!;
 
         return new(names);
     }
@@ -165,139 +167,131 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         }
 
         var key = application.JsonWebKeySet!.ToCacheKey();
-        var set = _cache.GetOrCreate(key,
-                                     entry => {
-                                         entry.SetPriority(CacheItemPriority.High)
-                                              .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var set = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                         return JsonWebKeySet.Create(application.JsonWebKeySet);
-                                     })!;
+            return JsonWebKeySet.Create(application.JsonWebKeySet);
+        })!;
 
         return new(set);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetPermissionsAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.Permissions)) {
             return new(ImmutableArray<string>.Empty);
         }
 
         var key = application.Permissions!.ToCacheKey();
-        var permissions = _cache.GetOrCreate(key,
-                                             entry => {
-                                                 entry.SetPriority(CacheItemPriority.High)
-                                                      .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var permissions = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                 var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Permissions!);
 
-                                                 return result ?? ImmutableArray<string>.Empty;
-                                             })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(permissions);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetPostLogoutRedirectUrisAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.PostLogoutRedirectUris)) {
             return new(ImmutableArray<string>.Empty);
         }
 
         var key = application.PostLogoutRedirectUris!.ToCacheKey();
-        var uris = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High)
-                                               .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var uris = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                          var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.PostLogoutRedirectUris!);
 
-                                          return result ?? ImmutableArray<string>.Empty;
-                                      })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(uris);
     }
 
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.Properties)) {
             return new(ImmutableDictionary<string, JsonElement>.Empty);
         }
 
         var key = application.Properties!.ToCacheKey();
-        var properties = _cache.GetOrCreate(key,
-                                            entry => {
-                                                entry.SetPriority(CacheItemPriority.High)
-                                                     .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var properties = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(application.Properties!);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, JsonElement>>(application.Properties!);
 
-                                                return result ?? ImmutableDictionary<string, JsonElement>.Empty;
-                                            })!;
+            return result ?? ImmutableDictionary<string, JsonElement>.Empty;
+        })!;
 
         return new(properties);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetRedirectUrisAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.RedirectUris)) {
             return new(ImmutableArray<string>.Empty);
         }
 
         var key = application.RedirectUris!.ToCacheKey();
-        var uris = _cache.GetOrCreate(key,
-                                      entry => {
-                                          entry.SetPriority(CacheItemPriority.High)
-                                               .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var uris = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                          var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.RedirectUris!);
 
-                                          return result ?? ImmutableArray<string>.Empty;
-                                      })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(uris);
     }
 
     public virtual ValueTask<ImmutableArray<string>> GetRequirementsAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.Requirements)) {
             return new(ImmutableArray<string>.Empty);
         }
 
         var key = application.Requirements!.ToCacheKey();
-        var requirements = _cache.GetOrCreate(key,
-                                              entry => {
-                                                  entry.SetPriority(CacheItemPriority.High)
-                                                       .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var requirements = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                                  var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements!);
+            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(application.Requirements!);
 
-                                                  return result ?? ImmutableArray<string>.Empty;
-                                              })!;
+            return result ?? ImmutableArray<string>.Empty;
+        })!;
 
         return new(requirements);
     }
 
     public virtual ValueTask<ImmutableDictionary<string, string>> GetSettingsAsync(
         TApplication      application,
-        CancellationToken ct) {
+        CancellationToken ct
+    ) {
         if (string.IsNullOrWhiteSpace(application.Settings)) {
             return new(ImmutableDictionary<string, string>.Empty);
         }
 
         var key = application.Settings!.ToCacheKey();
-        var settings = _cache.GetOrCreate(key,
-                                          entry => {
-                                              entry.SetPriority(CacheItemPriority.High)
-                                                   .SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var settings = _cache.GetOrCreate(key, entry => {
+            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
 
-                                              var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(application.Settings!);
+            var result = JsonSerializer.Deserialize<ImmutableDictionary<string, string>>(application.Settings!);
 
-                                              return result ?? ImmutableDictionary<string, string>.Empty;
-                                          })!;
+            return result ?? ImmutableDictionary<string, string>.Empty;
+        })!;
 
         return new(settings);
     }
@@ -313,7 +307,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
-        CancellationToken                                           ct) {
+        CancellationToken                                           ct
+    ) {
         return _applications.ListAsync(q => query(q, state), ct);
     }
 
@@ -350,7 +345,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetDisplayNamesAsync(
         TApplication                             application,
         ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (names is not { Count: > 0 }) {
             application.DisplayNames = null;
             return default;
@@ -370,7 +366,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetPermissionsAsync(
         TApplication           application,
         ImmutableArray<string> permissions,
-        CancellationToken      ct) {
+        CancellationToken      ct
+    ) {
         if (permissions.IsDefaultOrEmpty) {
             application.Permissions = null;
             return default;
@@ -384,7 +381,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetPostLogoutRedirectUrisAsync(
         TApplication           application,
         ImmutableArray<string> uris,
-        CancellationToken      ct) {
+        CancellationToken      ct
+    ) {
         if (uris.IsDefaultOrEmpty) {
             application.PostLogoutRedirectUris = null;
             return default;
@@ -398,7 +396,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetPropertiesAsync(
         TApplication                             application,
         ImmutableDictionary<string, JsonElement> properties,
-        CancellationToken                        ct) {
+        CancellationToken                        ct
+    ) {
         if (properties is not { Count: > 0 }) {
             application.Properties = null;
             return default;
@@ -412,7 +411,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetRedirectUrisAsync(
         TApplication           application,
         ImmutableArray<string> uris,
-        CancellationToken      ct) {
+        CancellationToken      ct
+    ) {
         if (uris.IsDefaultOrEmpty) {
             application.RedirectUris = null;
             return default;
@@ -426,7 +426,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetRequirementsAsync(
         TApplication           application,
         ImmutableArray<string> requirements,
-        CancellationToken      ct) {
+        CancellationToken      ct
+    ) {
         if (requirements.IsDefaultOrEmpty) {
             application.Requirements = null;
             return default;
@@ -440,7 +441,8 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     public virtual ValueTask SetSettingsAsync(
         TApplication                        application,
         ImmutableDictionary<string, string> settings,
-        CancellationToken                   ct) {
+        CancellationToken                   ct
+    ) {
         if (settings is not { Count: > 0 }) {
             application.Settings = null;
             return default;

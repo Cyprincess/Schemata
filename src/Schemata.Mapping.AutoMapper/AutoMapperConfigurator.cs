@@ -13,7 +13,8 @@ public static class AutoMapperConfigurator
 {
     public static IMapperConfigurationExpression Configure(
         IMapperConfigurationExpression config,
-        SchemataMappingOptions         options) {
+        SchemataMappingOptions         options
+    ) {
         var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map), BindingFlags.Static | BindingFlags.NonPublic);
         foreach (var group in options.Mappings.GroupBy(m => (m.SourceType, m.DestinationType))) {
             var invoke = method!.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
@@ -25,7 +26,8 @@ public static class AutoMapperConfigurator
 
     private static void Map<TSource, TDestination>(
         IMapperConfigurationExpression config,
-        IEnumerable<IMapping>          mappings) {
+        IEnumerable<IMapping>          mappings
+    ) {
         var setter = config.CreateMap<TSource, TDestination>();
 
         foreach (var mapping in mappings) {

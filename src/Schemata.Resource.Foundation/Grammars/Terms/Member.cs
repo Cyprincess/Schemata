@@ -87,9 +87,7 @@ public class Member : IComparable
 
             var type = expression.Type.GetElementType() ?? expression.Type.GenericTypeArguments.FirstOrDefault();
 
-            var at = ctx.GetMethod(typeof(Enumerable),
-                                   "ElementAt",
-                                   [type!],
+            var at = ctx.GetMethod(typeof(Enumerable), "ElementAt", [type!],
                                    () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                                            .Single(x => x.Name == "ElementAt"
                                                                      && x.GetParameters().Length == 2

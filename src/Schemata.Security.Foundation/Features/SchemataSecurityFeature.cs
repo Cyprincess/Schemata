@@ -18,7 +18,8 @@ public sealed class SchemataSecurityFeature : FeatureBase
         SchemataOptions     schemata,
         Configurators       configurators,
         IConfiguration      configuration,
-        IWebHostEnvironment environment) {
+        IWebHostEnvironment environment
+    ) {
         services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,>));
         services.TryAddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
     }
