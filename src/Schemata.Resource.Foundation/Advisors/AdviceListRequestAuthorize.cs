@@ -10,7 +10,7 @@ using Schemata.Security.Skeleton;
 namespace Schemata.Resource.Foundation.Advisors;
 
 public sealed class AdviceListRequestAuthorize<TEntity> : IResourceListRequestAdvisor<TEntity>
-    where TEntity : class, IIdentifier
+    where TEntity : class, ICanonicalName
 {
     private readonly IAccessProvider<TEntity, ResourceRequestContext<ListRequest>>      _access;
     private readonly IEntitlementProvider<TEntity, ResourceRequestContext<ListRequest>> _entitlement;

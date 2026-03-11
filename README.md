@@ -144,6 +144,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 350_000_000   | Schemata.Workflow.Foundation      | Workflow             | Schemata Workflow Foundation       |
 | 360_000_000   | Schemata.Resource.Foundation      | Resource             | Schemata Resource Service          |
 | 360_100_000   | Schemata.Resource.Http            | Resource (`MapHttp`) | Schemata Resource Service for HTTP |
+| 360_200_000   | Schemata.Resource.Grpc            | Resource (`MapGrpc`) | Schemata Resource Service for gRPC |
 | 2_147_100_000 | Schemata.Tenancy.Foundation       | Tenancy              | Schemata Tenancy Foundation        |
 | 2_147_200_000 | Schemata.Modular                  | Modular              | Modularization                     |
 

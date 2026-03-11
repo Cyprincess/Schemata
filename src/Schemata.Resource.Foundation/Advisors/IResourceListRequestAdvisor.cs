@@ -6,4 +6,4 @@ using Schemata.Abstractions.Resource;
 namespace Schemata.Resource.Foundation.Advisors;
 
 public interface IResourceListRequestAdvisor<TEntity> : IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, HttpContext?>
-    where TEntity : class, IIdentifier;
+    where TEntity : class, ICanonicalName;

@@ -14,7 +14,8 @@
     <UseIdentity>true</UseIdentity>
     <UseMapster>true</UseMapster>
     <UseRepository>true</UseRepository>
-    <UseResource>true</UseResource>
+    <UseResourceGrpc>true</UseResourceGrpc>
+    <UseResourceHttp>true</UseResourceHttp>
     <UseSecurity>true</UseSecurity>
     <UseValidation>true</UseValidation>
     <UseWorkflow>true</UseWorkflow>

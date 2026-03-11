@@ -7,4 +7,10 @@ namespace Schemata.Abstractions.Options;
 public sealed class SchemataResourceOptions
 {
     public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; } = [];
+
+    public bool SuppressCreateValidation { get; set; }
+
+    public bool SuppressUpdateValidation { get; set; }
+
+    public bool SuppressFreshness { get; set; }
 }

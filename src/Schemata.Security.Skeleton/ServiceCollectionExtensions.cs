@@ -14,6 +14,17 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    public static IServiceCollection AddAccessProvider(
+        this IServiceCollection services,
+        Type                    entityType,
+        Type                    contextType,
+        Type                    providerType
+    ) {
+        services.TryAddScoped(typeof(IAccessProvider<,>).MakeGenericType(entityType, contextType), providerType);
+
+        return services;
+    }
+
     public static IServiceCollection AddEntitlementProvider(this IServiceCollection services, Type implementation) {
         services.TryAddScoped(typeof(IEntitlementProvider<,>), implementation);
 

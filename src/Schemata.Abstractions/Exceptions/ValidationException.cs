@@ -3,13 +3,14 @@ using System.Linq;
 
 namespace Schemata.Abstractions.Exceptions;
 
-public sealed class ValidationException : HttpException
+public sealed class ValidationException : SchemataException
 {
     public ValidationException(
         IEnumerable<KeyValuePair<string, string>> errors,
-        int                                       code    = 422,
+        int                                       status  = 422,
+        string?                                   code    = "INVALID_ARGUMENT",
         string?                                   message = "An error occurred while validating the entity."
-    ) : base(code, message) {
+    ) : base(status, code, message) {
         Errors = errors.GroupBy(kv => kv.Key)
                        .ToDictionary(g => g.Key, pairs => string.Join(",", pairs.Select(kv => kv.Value)));
     }

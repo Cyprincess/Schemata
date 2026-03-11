@@ -1,16 +1,15 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEntity>
-    where TEntity : class, IIdentifier
+    where TEntity : class, ICanonicalName
 {
     #region IResourceDeleteAdvisor<TEntity> Members
 
@@ -20,38 +19,26 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
-        long              id,
         TEntity           entity,
+        DeleteRequest     request,
         HttpContext?      http,
         CancellationToken ct = default
     ) {
-        if (ctx.Has<SuppressFreshness>()) {
+        if (request.Force) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (entity is not IConcurrency concurrency) {
+        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (concurrency.Timestamp == null || concurrency.Timestamp.Value == Guid.Empty) {
+        var tag = request.Etag;
+
+        if (string.IsNullOrWhiteSpace(tag) || !tag.StartsWith("W/")) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var freshness = http?.Request.Query[SchemataConstants.Parameters.EntityTag].ToString();
-
-        if (string.IsNullOrWhiteSpace(freshness)) {
-            freshness = http?.Request.Headers.IfMatch.ToString();
-        }
-
-        if (string.IsNullOrWhiteSpace(freshness)) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
-        if (!freshness.StartsWith("W/")) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
-        if (freshness != $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"") {
+        if (tag != expected) {
             throw new ConcurrencyException();
         }
 

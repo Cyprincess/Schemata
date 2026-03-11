@@ -15,7 +15,8 @@ public static class AutoMapperConfigurator
         IMapperConfigurationExpression config,
         SchemataMappingOptions         options
     ) {
-        var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map), BindingFlags.Static | BindingFlags.NonPublic);
+        var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map),
+                                                              BindingFlags.Static | BindingFlags.NonPublic);
         foreach (var group in options.Mappings.GroupBy(m => (m.SourceType, m.DestinationType))) {
             var invoke = method!.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
             invoke.Invoke(null, [config, group]);
@@ -30,10 +31,13 @@ public static class AutoMapperConfigurator
     ) {
         var setter = config.CreateMap<TSource, TDestination>();
 
+        setter.ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+        setter.PreserveReferences();
+
         foreach (var mapping in mappings) {
             mapping.Invoke((with, destination, source, condition, ignored) => {
                 if (with is Expression<Func<TSource, TDestination>> converter) {
-                    setter.ConstructUsing(converter);
+                    setter.ConvertUsing(converter);
                     return;
                 }
 
@@ -57,10 +61,10 @@ public static class AutoMapperConfigurator
                         return;
                     }
 
-                    var negative = predicate.Compile();
-                    options.Condition((s, d) => !negative(s, d));
+                    var shouldIgnore = predicate.Compile();
+                    options.Condition((s, d) => !shouldIgnore(s, d));
                 });
-           });
+            });
         }
     }
 }

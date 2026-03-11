@@ -1,6 +1,10 @@
 namespace Schemata.Abstractions.Exceptions;
 
-public class NoContentException : HttpException
+public class NoContentException : SchemataException
 {
-    public NoContentException(int code = 204, string? message = null) : base(code, message) { }
+    public NoContentException(
+        int     status  = 204,
+        string? code    = "OK",
+        string? message = null
+    ) : base(status, code, message) { }
 }

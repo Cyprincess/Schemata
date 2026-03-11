@@ -9,8 +9,8 @@ using Schemata.Security.Skeleton;
 namespace Schemata.Resource.Foundation.Advisors;
 
 public sealed class AdviceUpdateRequestAuthorize<TEntity, TRequest> : IResourceUpdateRequestAdvisor<TEntity, TRequest>
-    where TEntity : class, IIdentifier
-    where TRequest : class, IIdentifier
+    where TEntity : class, ICanonicalName
+    where TRequest : class, ICanonicalName
 {
     private readonly IAccessProvider<TEntity, ResourceRequestContext<TRequest>> _access;
 

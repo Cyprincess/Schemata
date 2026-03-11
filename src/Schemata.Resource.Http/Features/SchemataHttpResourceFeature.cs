@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +30,10 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         services.AddSingleton(provider);
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
-        services.AddResourceJsonSerializerOptions();
+        services.AddOptions<MvcOptions>()
+                .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
+                     mvc.Conventions.Add(new ResourceControllerConvention(opts));
+                 });
 
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {

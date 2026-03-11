@@ -16,7 +16,7 @@ public class ResourceControllerDeleteShould
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
 
-        var result = await controller.Delete(student.Id);
+        var result = await controller.DeleteAsync(student.Id.ToString());
 
         var empty = Assert.IsType<NoContentResult>(result);
         Assert.NotNull(empty);

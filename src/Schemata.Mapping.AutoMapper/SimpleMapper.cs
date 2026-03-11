@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using AutoMapper;
+using Schemata.Mapping.Foundation;
 using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.AutoMapper;
@@ -24,6 +26,10 @@ public sealed class SimpleMapper : ISimpleMapper
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination) {
         _mapper.Map(source, destination);
+    }
+
+    public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields) {
+        SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
     }
 
     public object? Map(object source, Type sourceType, Type destinationType) {

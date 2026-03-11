@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 
 namespace Schemata.Abstractions.Resource;
 
@@ -17,8 +16,6 @@ public class ResourceAttribute : Attribute
         Request = request ?? entity;
         Detail  = detail ?? entity;
         Summary = summary ?? detail ?? entity;
-
-        Endpoints.AddRange(Entity.GetCustomAttributes<ResourceAttributeBase>());
     }
 
     public Type Entity { get; }
@@ -29,5 +26,7 @@ public class ResourceAttribute : Attribute
 
     public Type? Summary { get; }
 
-    public List<ResourceAttributeBase> Endpoints { get; } = [];
+    public IList<string>? Endpoints { get; set; }
+
+    public string? Package { get; set; }
 }

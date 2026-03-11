@@ -27,7 +27,7 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
 
                 var feature = context.Features.Get<IExceptionHandlerPathFeature>();
 
-                if (feature?.Error is not HttpException http) {
+                if (feature?.Error is not SchemataException http) {
                     context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
 

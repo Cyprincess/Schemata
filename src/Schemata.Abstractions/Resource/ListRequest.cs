@@ -2,6 +2,8 @@ namespace Schemata.Abstractions.Resource;
 
 public class ListRequest
 {
+    public virtual string? Parent { get; set; }
+
     public virtual string? Filter { get; set; }
 
     public virtual string? OrderBy { get; set; }

@@ -30,6 +30,7 @@
     <Project Path="src/Schemata.Modular/Schemata.Modular.csproj" />
     <Project Path="src/Schemata.Queryable/Schemata.Queryable.csproj" />
     <Project Path="src/Schemata.Resource.Foundation/Schemata.Resource.Foundation.csproj" />
+    <Project Path="src/Schemata.Resource.Grpc/Schemata.Resource.Grpc.csproj" />
     <Project Path="src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />

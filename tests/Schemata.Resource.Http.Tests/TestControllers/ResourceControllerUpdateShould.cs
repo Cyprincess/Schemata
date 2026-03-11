@@ -22,7 +22,7 @@ public class ResourceControllerUpdateShould
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
 
-        var result = await controller.Update(student.Id, request);
+        var result = await controller.UpdateAsync(student.Id.ToString(), request);
 
         var json = Assert.IsType<JsonResult>(result);
         Assert.NotNull(json);

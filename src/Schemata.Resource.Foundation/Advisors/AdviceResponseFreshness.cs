@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -9,8 +8,8 @@ using Schemata.Abstractions.Resource;
 namespace Schemata.Resource.Foundation.Advisors;
 
 public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvisor<TEntity, TDetail>
-    where TEntity : class, IIdentifier
-    where TDetail : class, IIdentifier
+    where TEntity : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
@@ -25,15 +24,15 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdviso
         HttpContext?      http,
         CancellationToken ct = default
     ) {
-        if (entity is not IConcurrency concurrency || detail is not IFreshness freshness) {
+        if (entity is null || detail is not IFreshness freshness) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (concurrency.Timestamp == null || concurrency.Timestamp.Value == Guid.Empty) {
+        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var tag)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        freshness.EntityTag = $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"";
+        freshness.EntityTag = tag;
 
         return Task.FromResult(AdviseResult.Continue);
     }

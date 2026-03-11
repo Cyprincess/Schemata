@@ -6,4 +6,4 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Resource.Foundation.Advisors;
 
 public interface IResourceListResponseAdvisor<TSummary> : IAdvisor<ImmutableArray<TSummary>?, HttpContext?>
-    where TSummary : class, IIdentifier;
+    where TSummary : class, ICanonicalName;

@@ -3,7 +3,7 @@ using System;
 namespace Schemata.Abstractions.Resource;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class HttpResourceAttribute : ResourceAttributeBase
+public sealed class HttpResourceAttribute() : ResourceEndpointAttributeBase(Name)
 {
-    public HttpResourceAttribute() : base("HTTP") { }
+    public const string Name = "HTTP";
 }

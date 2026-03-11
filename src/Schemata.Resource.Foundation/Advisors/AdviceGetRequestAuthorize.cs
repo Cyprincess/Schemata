@@ -4,16 +4,17 @@ using Microsoft.AspNetCore.Http;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvisor<TEntity>
-    where TEntity : class, IIdentifier
+    where TEntity : class, ICanonicalName
 {
-    private readonly IAccessProvider<TEntity, ResourceRequestContext<long>> _access;
+    private readonly IAccessProvider<TEntity, ResourceRequestContext<GetRequest>> _access;
 
-    public AdviceGetRequestAuthorize(IAccessProvider<TEntity, ResourceRequestContext<long>> access) {
+    public AdviceGetRequestAuthorize(IAccessProvider<TEntity, ResourceRequestContext<GetRequest>> access) {
         _access = access;
     }
 
@@ -25,11 +26,11 @@ public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvi
 
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
-        long              id,
+        GetRequest        request,
         HttpContext?      http,
         CancellationToken ct = default
     ) {
-        var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Get, Request = id }, http?.User, ct);
+        var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Get, Request = request }, http?.User, ct);
 
         if (!result) {
             throw new AuthorizationException();

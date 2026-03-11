@@ -54,7 +54,12 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(UseResource)' == 'true' ">
+  <ItemGroup Condition=" '$(UseResourceGrpc)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseResourceHttp)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
   </ItemGroup>

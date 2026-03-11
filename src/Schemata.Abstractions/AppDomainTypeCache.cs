@@ -14,6 +14,8 @@ public static class AppDomainTypeCache
 
     public static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> Properties;
 
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, PropertyInfo[]> WritableProperties = [];
+
     static AppDomainTypeCache() {
         Assemblies = [];
         Types      = [];
@@ -96,6 +98,13 @@ public static class AppDomainTypeCache
         Properties[type.TypeHandle] = properties;
 
         return properties;
+    }
+
+    public static PropertyInfo[] GetWritableProperties(Type type) {
+        return WritableProperties.GetOrAdd(type.TypeHandle,
+                                           _ => GetProperties(type)
+                                               .Values.Where(p => p is { CanRead: true, CanWrite: true })
+                                               .ToArray());
     }
 
     public static PropertyInfo? GetProperty(Type type, string name) {

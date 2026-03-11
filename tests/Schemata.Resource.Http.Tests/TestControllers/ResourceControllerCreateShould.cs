@@ -18,7 +18,7 @@ public class ResourceControllerCreateShould
 
         var (controller, _) = _fixture.CreateResourceController<Student, Student, Student, Student>();
 
-        var result = await controller.Create(student);
+        var result = await controller.CreateAsync(student);
 
         var json = Assert.IsType<JsonResult>(result);
         Assert.NotNull(json);

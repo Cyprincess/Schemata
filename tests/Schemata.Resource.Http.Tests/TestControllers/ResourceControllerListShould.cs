@@ -15,13 +15,13 @@ public class ResourceControllerListShould
     public async Task List_InputIsEmpty_ReturnJsonResult_WithEntitiesProperty() {
         var (controller, body) = _fixture.CreateResourceController<Student, Student, Student, Student>();
 
-        var result = await controller.List(new());
+        var result = await controller.ListAsync(new());
 
         var json = Assert.IsType<JsonResult>(result);
         Assert.NotNull(json);
         Assert.Null(json.StatusCode);
 
-        var response = Assert.IsType<ListResponse<Student>>(json.Value);
+        var response = Assert.IsType<ListResult<Student>>(json.Value);
         Assert.NotNull(response);
         Assert.NotNull(response.Entities);
         Assert.Equal(_fixture.Students.Count, response.Entities.Count());

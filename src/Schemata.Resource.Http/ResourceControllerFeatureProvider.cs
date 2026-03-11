@@ -15,8 +15,9 @@ namespace Schemata.Resource.Http;
 public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>,
                                                         IActionDescriptorChangeProvider
 {
-    private CancellationTokenSource                          _cts = new();
-    public  Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
+    private CancellationTokenSource _cts = new();
+
+    public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
 
     #region IActionDescriptorChangeProvider Members
 
@@ -28,7 +29,8 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
         foreach (var (_, resource) in Resources) {
-            if (resource.Endpoints.Count != 0 && resource.Endpoints.All(e => e.Name != "HTTP")) {
+            if (resource.Endpoints?.Count != 0
+             && resource.Endpoints?.All(e => e != HttpResourceAttribute.Name) == true) {
                 continue;
             }
 

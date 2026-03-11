@@ -91,11 +91,9 @@ public class TestFixture
 
         var builder = WebApplication.CreateBuilder()
                                     .UseSchemata(schema => {
-                                         schema.UseMapster()
-                                               .Map<Student, Student>();
+                                         schema.UseMapster().Map<Student, Student>();
 
-                                         schema.UseResource()
-                                               .MapHttp();
+                                         schema.UseResource().MapHttp();
 
                                          schema.Services.AddTransient<IRepository<Student>>(_ => Repository.Object);
                                          schema.Services.AddTransient<IUrlHelper>(_ => url.Object);
@@ -115,12 +113,11 @@ public class TestFixture
 
     public List<Student> Students { get; }
 
-    public (ResourceController<TEntity, TRequest, TDetail, TSummary>, MemoryStream) CreateResourceController<
-        TEntity, TRequest, TDetail, TSummary>()
-        where TEntity : class, IIdentifier
-        where TRequest : class, IIdentifier
-        where TDetail : class, IIdentifier
-        where TSummary : class, IIdentifier {
+    public (ResourceController<TEntity, TRequest, TDetail, TSummary>, MemoryStream) CreateResourceController<TEntity, TRequest, TDetail, TSummary>()
+        where TEntity : class, ICanonicalName
+        where TRequest : class, ICanonicalName
+        where TDetail : class, ICanonicalName
+        where TSummary : class, ICanonicalName {
         var controller = ServiceProvider.GetRequiredService<ResourceController<TEntity, TRequest, TDetail, TSummary>>();
         var url        = ServiceProvider.GetRequiredService<IUrlHelper>();
 

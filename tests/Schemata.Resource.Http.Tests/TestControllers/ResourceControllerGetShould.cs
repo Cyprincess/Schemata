@@ -16,7 +16,7 @@ public class ResourceControllerGetShould
 
         var (controller, body) = _fixture.CreateResourceController<Student, Student, Student, Student>();
 
-        var result = await controller.Get(student.Id);
+        var result = await controller.GetAsync(student.Id.ToString());
 
         var json = Assert.IsType<JsonResult>(result);
         Assert.NotNull(json);

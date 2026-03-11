@@ -1,11 +1,12 @@
 namespace Schemata.Abstractions.Exceptions;
 
-public sealed class ConcurrencyException : HttpException
+public sealed class ConcurrencyException : SchemataException
 {
     public ConcurrencyException(
         int     status  = 409,
+        string? code    = "ABORTED",
         string? message = "A concurrency violation is encountered while saving to the database."
-    ) : base(status, message) {
+    ) : base(status, code, message) {
         Error = "concurrency_mismatch";
     }
 }

@@ -8,7 +8,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation.Advisors;
-using Schemata.Resource.Foundation.Security;
+using Schemata.Resource.Foundation.Features;
 
 namespace Schemata.Resource.Foundation;
 
@@ -38,13 +38,29 @@ public sealed class SchemataResourceBuilder
         return this;
     }
 
+    public SchemataResourceBuilder WithoutCreateValidation() {
+        Services.Configure<SchemataResourceOptions>(o => o.SuppressCreateValidation = true);
+        return this;
+    }
+
+    public SchemataResourceBuilder WithoutUpdateValidation() {
+        Services.Configure<SchemataResourceOptions>(o => o.SuppressUpdateValidation = true);
+        return this;
+    }
+
+    public SchemataResourceBuilder WithoutFreshness() {
+        Services.Configure<SchemataResourceOptions>(o => o.SuppressFreshness = true);
+        return this;
+    }
+
     public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
-        IEnumerable<ResourceAttributeBase>? endpoints = null
+        string?        package   = null,
+        IList<string>? endpoints = null
     )
-        where TEntity : class, IIdentifier
-        where TRequest : class, IIdentifier
-        where TDetail : class, IIdentifier
-        where TSummary : class, IIdentifier {
+        where TEntity : class, ICanonicalName
+        where TRequest : class, ICanonicalName
+        where TDetail : class, ICanonicalName
+        where TSummary : class, ICanonicalName {
         var entity  = typeof(TEntity);
         var request = typeof(TRequest);
         var detail  = typeof(TDetail);
@@ -52,17 +68,15 @@ public sealed class SchemataResourceBuilder
 
         var resource = entity.GetCustomAttribute<ResourceAttribute>() ?? new(entity, request, detail, summary);
 
-        if (endpoints is not null) {
-            resource.Endpoints.AddRange(endpoints);
+        if (endpoints is null) {
+            resource.Endpoints = endpoints;
         }
 
-        Services?.AddAccessProvider<TEntity, ResourceRequestContext<long>, ResourceAccessProvider<TEntity, long>>();
-        Services?.AddAccessProvider<TEntity, ResourceRequestContext<ListRequest>, ResourceAccessProvider<TEntity, ListRequest>>();
-        Services?.AddAccessProvider<TEntity, ResourceRequestContext<TRequest>, ResourceAccessProvider<TEntity, TRequest>>();
+        if (package is not null) {
+            resource.Package = package;
+        }
 
-        Services?.Configure<SchemataResourceOptions>(options => {
-            options.Resources[resource.Entity.TypeHandle] = resource;
-        });
+        SchemataResourceFeature.RegisterResource(Services, resource);
 
         return this;
     }

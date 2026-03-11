@@ -11,4 +11,6 @@ public sealed class SchemataWorkflowOptions
     public Type TransitionType { get; set; } = null!;
 
     public Type TransitionResponseType { get; set; } = null!;
+
+    public string? Package { get; set; }
 }
