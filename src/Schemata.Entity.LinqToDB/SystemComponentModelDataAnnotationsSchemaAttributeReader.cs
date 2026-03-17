@@ -99,13 +99,9 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     }
 
     /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />
-    public MemberInfo[] GetDynamicColumns(Type type) {
-        return [];
-    }
+    public MemberInfo[] GetDynamicColumns(Type type) { return []; }
 
-    public string GetObjectID() {
-        return $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}.";
-    }
+    public string GetObjectID() { return $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}."; }
 
     #endregion
 }

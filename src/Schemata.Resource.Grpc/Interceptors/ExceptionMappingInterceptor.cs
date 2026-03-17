@@ -1,8 +1,12 @@
 using System;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Resource.Grpc.Proto;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Grpc.Interceptors;
 
@@ -18,65 +22,20 @@ public class ExceptionMappingInterceptor : Interceptor
         } catch (RpcException) {
             throw;
         } catch (SchemataException ex) {
-            throw MapToRpcException(ex);
-        } catch (Exception ex) {
-            throw new RpcException(new(StatusCode.Internal, ex.Message));
+            throw BuildRpcException(ex, context);
+        } catch (Exception) {
+            throw BuildRpcException(new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1018)), context);
         }
     }
 
-    private static RpcException MapToRpcException(SchemataException ex) {
-        var statusCode = MapStatusCode(ex);
+    private static RpcException BuildRpcException(SchemataException ex, ServerCallContext context) {
+        var httpContext = context.GetHttpContext();
+        var requestId   = httpContext.TraceIdentifier;
 
-        if (ex is NoContentException) {
-            return new(new(StatusCode.OK, string.Empty));
-        }
+        var rpcStatus = RpcStatusBuilder.Build(ex, requestId);
 
-        var message = ex.Message ?? string.Empty;
+        var metadata = new Metadata { { "grpc-status-details-bin", rpcStatus.ToByteArray() } };
 
-        if (ex.Errors is { Count: > 0 }) {
-            var metadata = new Metadata();
-            foreach (var (key, value) in ex.Errors) {
-                metadata.Add($"error-{key}", value);
-            }
-
-            return new(new(statusCode, message), metadata);
-        }
-
-        if (!string.IsNullOrWhiteSpace(ex.Error)) {
-            var metadata = new Metadata { { "error", ex.Error } };
-            return new(new(statusCode, message), metadata);
-        }
-
-        return new(new(statusCode, message));
-    }
-
-    private static StatusCode MapStatusCode(SchemataException ex) {
-        return ex.Code switch {
-            "PERMISSION_DENIED" => StatusCode.PermissionDenied,
-            "INVALID_ARGUMENT"  => StatusCode.InvalidArgument,
-            "ABORTED"           => StatusCode.Aborted,
-            "NOT_FOUND"         => StatusCode.NotFound,
-            "OK"                => StatusCode.OK,
-            var _               => MapFromHttpStatus(ex.StatusCode),
-        };
-    }
-
-    private static StatusCode MapFromHttpStatus(int httpStatus) {
-        return httpStatus switch {
-            400   => StatusCode.InvalidArgument,
-            401   => StatusCode.Unauthenticated,
-            403   => StatusCode.PermissionDenied,
-            404   => StatusCode.NotFound,
-            409   => StatusCode.Aborted,
-            412   => StatusCode.FailedPrecondition,
-            422   => StatusCode.InvalidArgument,
-            429   => StatusCode.ResourceExhausted,
-            499   => StatusCode.Cancelled,
-            500   => StatusCode.Internal,
-            501   => StatusCode.Unimplemented,
-            503   => StatusCode.Unavailable,
-            504   => StatusCode.DeadlineExceeded,
-            var _ => StatusCode.Internal,
-        };
+        return new(new((StatusCode)rpcStatus.Code, ex.Message), metadata);
     }
 }

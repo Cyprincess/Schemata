@@ -36,6 +36,10 @@ public sealed class AdviceListRequestAuthorize<TEntity> : IResourceListRequestAd
         HttpContext?                      http,
         CancellationToken                 ct = default
     ) {
+        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.List)) {
+            return AdviseResult.Continue;
+        }
+
         var context = new ResourceRequestContext<ListRequest> { Operation = Operations.List, Request = request };
 
         var result = await _access.HasAccessAsync(null, context, http?.User, ct);

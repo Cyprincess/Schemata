@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
@@ -30,7 +31,7 @@ internal static class ValidationHelper
             return AdviseResult.Continue;
         }
 
-        var errors = new List<KeyValuePair<string, string>>();
+        var errors = new List<ErrorFieldViolation>();
         switch (await Advisor.For<IValidationAdvisor<TRequest>>()
                              .RunAsync(ctx, operation, request, errors, ct)) {
             case AdviseResult.Block:

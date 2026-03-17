@@ -25,7 +25,7 @@ public static class Utilities
 
     public static string ToCamelCase(string @string) {
         return @string.Split(["_", " "], RemoveEmptyEntries)
-                      .Select(s => char.ToUpperInvariant(s[0]) + s.Substring(1, s.Length - 1))
+                      .Select(s => char.ToUpperInvariant(s[0]) + s[1..])
                       .Aggregate(string.Empty, (s1, s2) => s1 + s2);
     }
 }

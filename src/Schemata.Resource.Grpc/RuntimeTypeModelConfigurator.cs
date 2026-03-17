@@ -4,11 +4,11 @@ using System.Linq;
 using Humanizer;
 using ProtoBuf;
 using ProtoBuf.Meta;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Grpc;
 
@@ -71,7 +71,7 @@ internal static class RuntimeTypeModelConfigurator
                     break;
 
                 case nameof(IFreshness.EntityTag) when typeof(IFreshness).IsAssignableFrom(type):
-                    name = SchemataConstants.Parameters.EntityTag;
+                    name = Parameters.EntityTag;
                     break;
             }
 

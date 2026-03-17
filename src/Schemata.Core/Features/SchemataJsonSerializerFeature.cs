@@ -1,9 +1,14 @@
+using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Core.Json;
 
 namespace Schemata.Core.Features;
@@ -40,14 +45,27 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         return;
 
         void Configure(JsonSerializerOptions options) {
-            options.DictionaryKeyPolicy  = JsonNamingPolicy.SnakeCaseLower;
-            options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            options.NumberHandling       = JsonNumberHandling.AllowReadingFromString;
+            options.DictionaryKeyPolicy    = JsonNamingPolicy.SnakeCaseLower;
+            options.PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower;
+            options.NumberHandling         = JsonNumberHandling.AllowReadingFromString;
+            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 
             options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
             options.Converters.Add(JsonStringNumberConverter.Instance);
 
-            options.TypeInfoResolver = PolymorphicTypeResolver.Instance;
+            options.TypeInfoResolver = PolymorphicTypeResolver.Instance.WithAddedModifier(info => {
+                // Rename details type to "@type" per AIP conventions
+
+                if (!typeof(IErrorDetail).IsAssignableFrom(info.Type)) {
+                    return;
+                }
+
+                var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
+                    Name: nameof(IErrorDetail.Type),
+                });
+
+                property?.Name = SchemataConstants.Parameters.Type;
+            });
 
             configure(options);
         }

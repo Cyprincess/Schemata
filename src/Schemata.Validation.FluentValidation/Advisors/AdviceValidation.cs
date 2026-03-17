@@ -7,6 +7,7 @@ using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Validation.FluentValidation.Advisors;
@@ -24,11 +25,11 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
     public int Priority => Order;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext                       ctx,
-        Operations                          operation,
-        T                                   request,
-        IList<KeyValuePair<string, string>> errors,
-        CancellationToken                   ct = default
+        AdviceContext              ctx,
+        Operations                 operation,
+        T                          request,
+        IList<ErrorFieldViolation> errors,
+        CancellationToken          ct = default
     ) {
         var validator = _sp.GetService<IValidator<T>>();
         if (validator is null) {
@@ -69,7 +70,11 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
                 }
             }
 
-            errors.Add(new(field, code));
+            errors.Add(new() {
+                Field       = field,
+                Reason      = code,
+                Description = error.ErrorMessage,
+            });
         }
 
         return AdviseResult.Continue;

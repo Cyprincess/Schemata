@@ -24,7 +24,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
                 _types[handle] = value;
             }
 
-            value!.Add(new(type, attribute.Name ?? type.FullName ?? type.Name));
+            value!.Add(attribute.Name is not null ? new(type, attribute.Name) : new(type));
         }
     }
 

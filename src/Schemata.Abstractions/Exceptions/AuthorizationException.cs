@@ -1,10 +1,12 @@
+using static Schemata.Abstractions.SchemataConstants;
+
 namespace Schemata.Abstractions.Exceptions;
 
 public class AuthorizationException : SchemataException
 {
     public AuthorizationException(
         int     status  = 403,
-        string? code    = "PERMISSION_DENIED",
-        string? message = "You do not have permission to perform this action."
-    ) : base(status, code, message) { }
+        string? code    = ErrorCodes.PermissionDenied,
+        string? message = null
+    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1005)) { }
 }

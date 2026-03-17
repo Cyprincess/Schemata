@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Validation.Skeleton.Advisors;
@@ -29,7 +30,7 @@ public sealed class AdviceUpdateValidation<TEntity> : IRepositoryUpdateAdvisor<T
             return AdviseResult.Continue;
         }
 
-        var errors = new List<KeyValuePair<string, string>>();
+        var errors = new List<ErrorFieldViolation>();
         switch (await Advisor.For<IValidationAdvisor<TEntity>>()
                              .RunAsync(ctx, Operations.Update, entity, errors, ct)) {
             case AdviseResult.Block:

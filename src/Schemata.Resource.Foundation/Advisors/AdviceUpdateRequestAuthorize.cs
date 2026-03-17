@@ -30,6 +30,10 @@ public sealed class AdviceUpdateRequestAuthorize<TEntity, TRequest> : IResourceU
         HttpContext?      http,
         CancellationToken ct = default
     ) {
+        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.Update)) {
+            return AdviseResult.Continue;
+        }
+
         var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Update, Request = request }, http?.User, ct);
 
         if (!result) {

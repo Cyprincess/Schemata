@@ -64,7 +64,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         // Register ReflectionService lazily from resource options
         services.TryAddSingleton(sp => {
             var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
-            var binder  = sp.GetService<BinderConfiguration>();
+            var binder  = sp.GetRequiredService<BinderConfiguration>();
 
             var types = options.Value.Resources
                                .Where(r => r.Value.Endpoints is null
@@ -73,7 +73,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                                .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
                                .ToArray();
 
-            return binder is not null ? new ReflectionService(binder, types) : new(types);
+            return ReflectionServiceFactory.Create(binder, types);
         });
     }
 
@@ -98,7 +98,12 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                 var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
 
                 // Call endpoints.MapGrpcService<T>() via reflection
-                MapGrpcService(endpoints, service);
+                var result    = MapGrpcService(endpoints, service);
+                var attribute = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
+                if (attribute is not null && result is GrpcServiceEndpointConventionBuilder builder) {
+                    builder.RequireRateLimiting(attribute.PolicyName);
+                }
+
                 hasGrpcResources = true;
             }
 
@@ -108,7 +113,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         });
     }
 
-    private static void MapGrpcService(IEndpointRouteBuilder endpoints, Type serviceType) {
-        MapGrpcServiceMethod?.MakeGenericMethod(serviceType).Invoke(null, [endpoints]);
+    private static object? MapGrpcService(IEndpointRouteBuilder endpoints, Type serviceType) {
+        return MapGrpcServiceMethod?.MakeGenericMethod(serviceType).Invoke(null, [endpoints]);
     }
 }

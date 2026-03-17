@@ -30,6 +30,10 @@ public sealed class AdviceDeleteRequestAuthorize<TEntity> : IResourceDeleteReque
         HttpContext?      http,
         CancellationToken ct = default
     ) {
+        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.Delete)) {
+            return AdviseResult.Continue;
+        }
+
         var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Delete, Request = request }, http?.User, ct);
 
         if (!result) {

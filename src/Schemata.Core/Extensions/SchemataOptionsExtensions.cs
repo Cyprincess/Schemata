@@ -89,6 +89,25 @@ public static class SchemataOptionsExtensions
 
     public static bool HasFeature(this SchemataOptions schemata, Type type) {
         var features = schemata.GetFeatures();
-        return features?.ContainsKey(type.TypeHandle) ?? false;
+        if (features is null) {
+            return false;
+        }
+
+        if (features.ContainsKey(type.TypeHandle)) {
+            return true;
+        }
+
+        if (!type.IsGenericTypeDefinition) {
+            return false;
+        }
+
+        foreach (var handle in features.Keys) {
+            var registered = Type.GetTypeFromHandle(handle);
+            if (registered is not null && registered.IsGenericType && registered.GetGenericTypeDefinition() == type) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

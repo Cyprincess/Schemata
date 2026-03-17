@@ -1,4 +1,7 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.RateLimiting;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
 namespace Schemata.Resource.Http;
@@ -26,6 +29,13 @@ public sealed class ResourceControllerConvention : IControllerModelConvention
 
         foreach (var selector in controller.Selectors) {
             selector.AttributeRouteModel?.Template = route;
+        }
+
+        var attribute = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
+        if (attribute is not null) {
+            foreach (var selector in controller.Selectors) {
+                selector.EndpointMetadata.Add(new EnableRateLimitingAttribute(attribute.PolicyName));
+            }
         }
     }
 

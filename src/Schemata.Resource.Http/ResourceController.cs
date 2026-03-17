@@ -3,11 +3,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Resource.Foundation;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Http;
 
@@ -36,6 +36,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpGet]
     public virtual async Task<IActionResult> ListAsync([FromQuery] ListRequest request) {
+        request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
+
         var result = await Handler.ListAsync(request, HttpContext, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
             return EmptyResult;
@@ -46,10 +48,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     [HttpGet("{name}")]
     public virtual async Task<IActionResult> GetAsync(string name) {
-        var entity = await Handler.FindByNameAsync(name, HttpContext.RequestAborted);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{name}' not found.");
-        }
+        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
 
         var result = await Handler.GetAsync(entity, HttpContext, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
@@ -74,7 +73,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     [HttpPatch("{name}")]
     public virtual async Task<IActionResult> UpdateAsync(string name, [FromBody] TRequest request) {
         if (request is IFreshness freshness && string.IsNullOrWhiteSpace(freshness.EntityTag)) {
-            var tag = HttpContext.Request.Query[SchemataConstants.Parameters.EntityTag].ToString();
+            var tag = HttpContext.Request.Query[Parameters.EntityTag].ToString();
             if (string.IsNullOrWhiteSpace(tag)) {
                 tag = HttpContext.Request.Headers.IfMatch.ToString();
             }
@@ -84,10 +83,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             }
         }
 
-        var entity = await Handler.FindByNameAsync(name, HttpContext.RequestAborted);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{name}' not found.");
-        }
+        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
 
         var result = await Handler.UpdateAsync(request, entity, HttpContext, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
@@ -103,10 +99,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         [FromQuery] string? etag  = null,
         [FromQuery] bool?   force = null
     ) {
-        var entity = await Handler.FindByNameAsync(name, HttpContext.RequestAborted);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{name}' not found.");
-        }
+        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
 
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {

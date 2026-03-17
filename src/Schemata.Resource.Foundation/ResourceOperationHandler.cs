@@ -10,8 +10,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Parlot;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
@@ -21,6 +23,7 @@ using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Models;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -41,36 +44,88 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     public async Task<TEntity?> FindByNameAsync(string? name, CancellationToken? ct) {
+        return await FindByNameAsync(name, null, ct);
+    }
+
+    public async Task<TEntity?> FindByNameAsync(
+        string?                     name,
+        Dictionary<string, string>? parentValues,
+        CancellationToken?          ct
+    ) {
         if (string.IsNullOrWhiteSpace(name)) {
-            throw new InvalidArgumentException(400, "Resource name is required.");
+            throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1010)) {
+                Details = [new BadRequestDetail {
+                    FieldViolations = [new() {
+                        Field       = "name",
+                        Description = SchemataResources.GetResourceString(SchemataResources.ST1010),
+                        Reason      = FieldReasons.Required,
+                    }],
+                }],
+            };
         }
 
         ct ??= CancellationToken.None;
 
         var repository = _repository.Once().SuppressQuerySoftDelete();
 
-        return await repository.SingleOrDefaultAsync(q => q.Where(BuildNamePredicate(name)), ct.Value);
+        if (parentValues is null or { Count: 0 }) {
+            return await repository.SingleOrDefaultAsync(q => q.Where(BuildNamePredicate(name)), ct.Value);
+        }
+
+        var descriptor      = ResourceNameDescriptor.ForType<TEntity>();
+        var parentPredicate = descriptor.BuildParentPredicate<TEntity>(parentValues);
+        var namePredicate   = BuildNamePredicate(name);
+
+        if (parentPredicate is null) {
+            return await repository.SingleOrDefaultAsync(q => q.Where(namePredicate), ct.Value);
+        }
+
+        return await repository.SingleOrDefaultAsync(q => q.Where(namePredicate).Where(parentPredicate), ct.Value);
     }
 
     public async Task<TEntity?> FindByCanonicalNameAsync(string? name, CancellationToken? ct) {
         if (string.IsNullOrWhiteSpace(name)) {
-            throw new InvalidArgumentException(400, "Resource name is required.");
+            throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1010)) {
+                Details = [new BadRequestDetail {
+                    FieldViolations = [new() {
+                        Field       = "name",
+                        Description = SchemataResources.GetResourceString(SchemataResources.ST1010),
+                        Reason      = FieldReasons.Required,
+                    }],
+                }],
+            };
         }
 
         ct ??= CancellationToken.None;
 
-        var repository = _repository.Once().SuppressQuerySoftDelete();
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        var parsed     = descriptor.ParseCanonicalName(name);
 
-        var slash = name.LastIndexOf('/');
-        var leaf  = slash >= 0 ? name[(slash + 1)..] : name;
-
-        var entity = await repository.SingleOrDefaultAsync(q => q.Where(BuildNamePredicate(leaf)), ct.Value);
-
-        if (entity?.CanonicalName != name) {
+        if (parsed is null) {
             return null;
         }
 
-        return entity;
+        var (parentValues, leafName) = parsed.Value;
+        return await FindByNameAsync(leafName, parentValues, ct);
+    }
+
+    public async Task<TEntity> GetByNameAsync(
+        string?                     name,
+        Dictionary<string, string>? parentValues,
+        CancellationToken?          ct
+    ) {
+        return await FindByNameAsync(name, parentValues, ct) ?? throw ResourceNotFound(name);
+    }
+
+    public Task<TEntity> GetByNameAsync(string? name, HttpContext? http, CancellationToken? ct) {
+        var parentValues = http is not null
+            ? ResourceNameDescriptor.ForType<TEntity>().ExtractParentValues(http.Request.RouteValues)
+            : null;
+        return GetByNameAsync(name, parentValues, ct);
+    }
+
+    public async Task<TEntity> GetByCanonicalNameAsync(string? name, CancellationToken? ct) {
+        return await FindByCanonicalNameAsync(name, ct) ?? throw ResourceNotFound(name);
     }
 
     public async Task<ListResult<TSummary>> ListAsync(ListRequest request, HttpContext? http, CancellationToken? ct) {
@@ -102,15 +157,48 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return ListResult<TSummary>.Blocked;
         }
 
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        if (!string.IsNullOrWhiteSpace(request.Parent)) {
+            var parentValues = descriptor.ParseParent(request.Parent);
+            if (parentValues is not null) {
+                if (parentValues.Any(kv => kv.Value == "-") && !descriptor.SupportsReadAcross) {
+                    throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1013)) {
+                        Details = [new BadRequestDetail {
+                            FieldViolations = [new() {
+                                Field       = "parent",
+                                Description = SchemataResources.GetResourceString(SchemataResources.ST1013),
+                                Reason      = FieldReasons.CrossParentUnsupported,
+                            }],
+                        }],
+                    };
+                }
+
+                var predicate = descriptor.BuildParentPredicate<TEntity>(parentValues);
+                if (predicate is not null) {
+                    container.ApplyModification(predicate);
+                }
+            }
+        }
+
         var token = await PageToken.FromStringAsync(request.PageToken)
                  ?? new PageToken {
-                        Filter = request.Filter, OrderBy = request.OrderBy, ShowDeleted = request.ShowDeleted,
+                        Parent      = request.Parent,
+                        Filter      = request.Filter,
+                        OrderBy     = request.OrderBy,
+                        ShowDeleted = request.ShowDeleted,
                     };
-        if (token.Filter != request.Filter
+        if (token.Parent != request.Parent
+         || token.Filter != request.Filter
          || token.OrderBy != request.OrderBy
          || token.ShowDeleted != request.ShowDeleted) {
-            throw new InvalidArgumentException {
-                Errors = new() { [nameof(request.PageToken).Underscore()] = "invalid" },
+            throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1015)) {
+                Details = [new BadRequestDetail {
+                    FieldViolations = [new() {
+                        Field       = nameof(request.PageToken).Underscore(),
+                        Description = SchemataResources.GetResourceString(SchemataResources.ST1015),
+                        Reason      = FieldReasons.InvalidPageToken,
+                    }],
+                }],
             };
         }
 
@@ -139,8 +227,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 var filter = Parser.Filter.Parse(request.Filter);
                 container.ApplyFiltering(filter);
             } catch (ParseException) {
-                throw new InvalidArgumentException {
-                    Errors = new() { [nameof(request.Filter).Underscore()] = "invalid" },
+                throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1016)) {
+                    Details = [new BadRequestDetail {
+                        FieldViolations = [new() {
+                            Field       = nameof(request.Filter).Underscore(),
+                            Description = SchemataResources.GetResourceString(SchemataResources.ST1016),
+                            Reason      = FieldReasons.InvalidFilter,
+                        }],
+                    }],
                 };
             }
         }
@@ -150,8 +244,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 var order = Parser.Order.Parse(request.OrderBy);
                 container.ApplyOrdering(order);
             } catch (ParseException) {
-                throw new InvalidArgumentException {
-                    Errors = new() { [nameof(request.OrderBy).Underscore()] = "invalid" },
+                throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1017)) {
+                    Details = [new BadRequestDetail {
+                        FieldViolations = [new() {
+                            Field       = nameof(request.OrderBy).Underscore(),
+                            Description = SchemataResources.GetResourceString(SchemataResources.ST1017),
+                            Reason      = FieldReasons.InvalidOrderBy,
+                        }],
+                    }],
                 };
             }
         }
@@ -160,7 +260,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
             repository = repository.SuppressQuerySoftDelete();
         }
 
-        var totalSize = await repository.LongCountAsync(q => container.Query(q), ct.Value);
+        var totalSize = await repository.CountAsync(q => container.Query(q), ct.Value);
 
         container.ApplyPaginating(token);
 
@@ -271,7 +371,19 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         var entity = _mapper.Map<TRequest, TEntity>(request);
         if (entity is null) {
-            throw new InvalidArgumentException(400, "Invalid request payload.");
+            throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1012)) {
+                Details = [new BadRequestDetail {
+                    FieldViolations = [new() {
+                        Field       = "request",
+                        Description = SchemataResources.GetResourceString(SchemataResources.ST1012),
+                        Reason      = FieldReasons.InvalidPayload,
+                    }],
+                }],
+            };
+        }
+
+        if (http is not null) {
+            ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(entity, http.Request.RouteValues);
         }
 
         switch (await Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
@@ -349,6 +461,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         request.Name          = null;
         request.CanonicalName = null;
+
+        ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
 
         if (request is IIdentifier requestId) {
             requestId.Id = default;
@@ -433,6 +547,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         await _repository.CommitAsync(ct.Value);
 
         return true;
+    }
+
+    private static NotFoundException ResourceNotFound(string? name) {
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        return new(message: string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), name)) {
+            Details = [new ResourceInfoDetail { ResourceType = descriptor.Singular, ResourceName = name }],
+        };
     }
 
     private AdviceContext CreateAdviceContext() {

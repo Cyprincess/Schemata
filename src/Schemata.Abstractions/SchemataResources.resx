@@ -32,4 +32,58 @@
   <data name="ST0003" xml:space="preserve">
         <value>{0} suggests adding {1}.</value>
     </data>
+  <data name="ST1001" xml:space="preserve">
+        <value>The request contains an invalid argument.</value>
+    </data>
+  <data name="ST1002" xml:space="preserve">
+        <value>Unable to resolve tenant for the current request.</value>
+    </data>
+  <data name="ST1003" xml:space="preserve">
+        <value>The request cannot be executed in the current system state.</value>
+    </data>
+  <data name="ST1004" xml:space="preserve">
+        <value>The request does not have valid authentication credentials.</value>
+    </data>
+  <data name="ST1005" xml:space="preserve">
+        <value>You do not have permission to perform this action.</value>
+    </data>
+  <data name="ST1006" xml:space="preserve">
+        <value>The requested resource was not found.</value>
+    </data>
+  <data name="ST1007" xml:space="preserve">
+        <value>The resource already exists.</value>
+    </data>
+  <data name="ST1008" xml:space="preserve">
+        <value>A concurrency conflict occurred while saving to the database.</value>
+    </data>
+  <data name="ST1009" xml:space="preserve">
+        <value>One or more validation errors occurred.</value>
+    </data>
+  <data name="ST1010" xml:space="preserve">
+        <value>Resource name is required.</value>
+    </data>
+  <data name="ST1011" xml:space="preserve">
+        <value>Rate limit exceeded.</value>
+    </data>
+  <data name="ST1012" xml:space="preserve">
+        <value>Invalid request payload.</value>
+    </data>
+  <data name="ST1013" xml:space="preserve">
+        <value>Cross-parent reading is not supported for this resource.</value>
+    </data>
+  <data name="ST1014" xml:space="preserve">
+        <value>Resource '{0}' not found.</value>
+    </data>
+  <data name="ST1015" xml:space="preserve">
+        <value>The page token is invalid or has expired.</value>
+    </data>
+  <data name="ST1016" xml:space="preserve">
+        <value>The filter expression is malformed.</value>
+    </data>
+  <data name="ST1017" xml:space="preserve">
+        <value>The order_by expression is malformed.</value>
+    </data>
+  <data name="ST1018" xml:space="preserve">
+        <value>An error occurred.</value>
+    </data>
 </root>

@@ -39,10 +39,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     }
 
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var entity = await Handler.FindByCanonicalNameAsync(request.CanonicalName, Http?.RequestAborted);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{request.CanonicalName}' not found.");
-        }
+        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, Http?.RequestAborted);
 
         var result = await Handler.GetAsync(entity, Http, Http?.RequestAborted);
         if (!result.IsAllowed()) {
@@ -66,10 +63,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
-        var entity = await Handler.FindByCanonicalNameAsync(request.CanonicalName, ct);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{request.CanonicalName}' not found.");
-        }
+        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, ct);
 
         var result = await Handler.UpdateAsync(request, entity, Http, ct);
         if (!result.IsAllowed()) {
@@ -82,10 +76,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     public virtual async ValueTask DeleteAsync(DeleteRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
-        var entity = await Handler.FindByCanonicalNameAsync(request.CanonicalName, ct);
-        if (entity is null) {
-            throw new NotFoundException(message: $"Resource '{request.CanonicalName}' not found.");
-        }
+        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, ct);
 
         await Handler.DeleteAsync(entity, request.Etag, request.Force, Http, ct);
     }

@@ -4,11 +4,11 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Http;
 
@@ -66,9 +66,7 @@ internal static class ResourceJsonOptions
                     Name: nameof(IFreshness.EntityTag),
                 });
 
-                if (property is not null) {
-                    property.Name = SchemataConstants.Parameters.EntityTag;
-                }
+                property?.Name = Parameters.EntityTag;
             }
         });
 

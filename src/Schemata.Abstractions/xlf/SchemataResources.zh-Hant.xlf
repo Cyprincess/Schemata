@@ -17,6 +17,96 @@
         <target state="new">{0} suggests adding {1}.</target>
         <note />
       </trans-unit>
+      <trans-unit id="ST1001">
+        <source>The request contains an invalid argument.</source>
+        <target state="new">The request contains an invalid argument.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1002">
+        <source>Unable to resolve tenant for the current request.</source>
+        <target state="new">Unable to resolve tenant for the current request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1003">
+        <source>The request cannot be executed in the current system state.</source>
+        <target state="new">The request cannot be executed in the current system state.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1004">
+        <source>The request does not have valid authentication credentials.</source>
+        <target state="new">The request does not have valid authentication credentials.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1005">
+        <source>You do not have permission to perform this action.</source>
+        <target state="new">You do not have permission to perform this action.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1006">
+        <source>The requested resource was not found.</source>
+        <target state="new">The requested resource was not found.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1007">
+        <source>The resource already exists.</source>
+        <target state="new">The resource already exists.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1008">
+        <source>A concurrency conflict occurred while saving to the database.</source>
+        <target state="new">A concurrency conflict occurred while saving to the database.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1009">
+        <source>One or more validation errors occurred.</source>
+        <target state="new">One or more validation errors occurred.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1010">
+        <source>Resource name is required.</source>
+        <target state="new">Resource name is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1011">
+        <source>Rate limit exceeded.</source>
+        <target state="new">Rate limit exceeded.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1012">
+        <source>Invalid request payload.</source>
+        <target state="new">Invalid request payload.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1013">
+        <source>Cross-parent reading is not supported for this resource.</source>
+        <target state="new">Cross-parent reading is not supported for this resource.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1014">
+        <source>Resource '{0}' not found.</source>
+        <target state="new">Resource '{0}' not found.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1015">
+        <source>The page token is invalid or has expired.</source>
+        <target state="new">The page token is invalid or has expired.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1016">
+        <source>The filter expression is malformed.</source>
+        <target state="new">The filter expression is malformed.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1017">
+        <source>The order_by expression is malformed.</source>
+        <target state="new">The order_by expression is malformed.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1018">
+        <source>An error occurred.</source>
+        <target state="new">An error occurred.</target>
+        <note />
+      </trans-unit>
     </body>
   </file>
 </xliff>

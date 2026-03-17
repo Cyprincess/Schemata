@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
@@ -51,9 +50,9 @@ public sealed partial class ConnectController : ControllerBase
         // If a user code was specified (e.g as part of the verification_uri_complete)
         // but is not valid, render a form asking the user to enter the user code manually.
         if (!string.IsNullOrWhiteSpace(result.Properties?.GetTokenValue(OpenIddictServerAspNetCoreConstants.Tokens.UserCode))) {
-            return BadRequest(new ErrorResponse {
-                Error            = OpenIddictConstants.Errors.InvalidToken,
-                ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
+            return BadRequest(new {
+                error             = OpenIddictConstants.Errors.InvalidToken,
+                error_description = "The specified user code is not valid. Please make sure you typed it correctly.",
             });
         }
 
@@ -99,9 +98,9 @@ public sealed partial class ConnectController : ControllerBase
         }
 
         // Redisplay the form when the user code is not valid.
-        return BadRequest(new ErrorResponse {
-            Error            = OpenIddictConstants.Errors.InvalidToken,
-            ErrorDescription = "The specified user code is not valid. Please make sure you typed it correctly.",
+        return BadRequest(new {
+            error             = OpenIddictConstants.Errors.InvalidToken,
+            error_description = "The specified user code is not valid. Please make sure you typed it correctly.",
         });
     }
 }

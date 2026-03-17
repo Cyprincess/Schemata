@@ -1,20 +1,19 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Abstractions.Errors;
 
 namespace Schemata.Abstractions.Exceptions;
 
 public class SchemataException : Exception
 {
     public SchemataException(int status, string? code = null, string? message = null) : base(message) {
-        StatusCode = status;
-        Code       = code;
+        Status = status;
+        Code   = code;
     }
 
-    public int StatusCode { get; }
+    public int Status { get; }
 
     public string? Code { get; }
 
-    public Dictionary<string, string>? Errors { get; set; }
-
-    public string? Error { get; set; }
+    public List<IErrorDetail>? Details { get; set; }
 }

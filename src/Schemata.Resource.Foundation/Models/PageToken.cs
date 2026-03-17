@@ -13,6 +13,8 @@ public class PageToken
 
     public virtual string? OrderBy { get; set; }
 
+    public virtual string? Parent { get; set; }
+
     public virtual bool? ShowDeleted { get; set; }
 
     public virtual int PageSize { get; set; }

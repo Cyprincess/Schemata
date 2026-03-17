@@ -1,3 +1,4 @@
+using System.Net.Mime;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
@@ -6,7 +7,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
@@ -29,30 +33,44 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
 
                 if (feature?.Error is not SchemataException http) {
                     context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
-                    context.Response.ContentType = "application/json";
+                    context.Response.ContentType = MediaTypeNames.Application.Json;
 
                     await context.Response.WriteAsJsonAsync(new ErrorResponse {
-                        ErrorDescription = "An error occurred.", //
+                        Error = new() {
+                            Code    = ErrorCodes.Internal,
+                            Message = SchemataResources.GetResourceString(SchemataResources.ST1018),
+                            Details = [
+                                new RequestInfoDetail {
+                                    RequestId = context.TraceIdentifier,
+                                },
+                            ],
+                        },
                     }, options.Value, context.RequestAborted);
 
                     return;
                 }
 
-                context.Response.StatusCode = http.StatusCode;
+                context.Response.StatusCode = http.Status;
 
-                var response = new ErrorResponse { ErrorDescription = http.Message };
+                var body = new ErrorBody {
+                    Code    = http.Code,
+                    Message = http.Message,
+                };
 
-                if (http.Errors is { Count: > 0 }) {
-                    response.Errors = http.Errors;
-                } else {
-                    response.Error = http.Error;
+                if (http.Details is { Count: > 0 }) {
+                    body.Details = http.Details;
                 }
 
-                if (response.Errors is not null
-                 || !string.IsNullOrWhiteSpace(response.Error)
-                 || !string.IsNullOrWhiteSpace(response.ErrorDescription)) {
-                    context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsJsonAsync(response, options.Value, context.RequestAborted);
+                body.Details ??= [];
+                body.Details.Add(new RequestInfoDetail { RequestId = context.TraceIdentifier });
+
+                if (body.Message is not null
+                 || body.Code is not null
+                 || body.Details is not null) {
+                    context.Response.ContentType = MediaTypeNames.Application.Json;
+                    await context.Response.WriteAsJsonAsync(new ErrorResponse {
+                        Error = body,
+                    }, options.Value, context.RequestAborted);
                 }
             });
         });
