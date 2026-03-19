@@ -106,4 +106,199 @@ public class FilterParserShould
         Assert.Equal(expected, expression.ToString());
         Assert.Equal(constant, expression.IsConstant);
     }
+
+    [Theory]
+    [InlineData("a = 1", "[= \"a\" 1]")]
+    [InlineData("a != 1", "[!= \"a\" 1]")]
+    [InlineData("a < 10", "[< \"a\" 10]")]
+    [InlineData("a <= 10", "[<= \"a\" 10]")]
+    [InlineData("a > 10", "[> \"a\" 10]")]
+    [InlineData("a >= 10", "[>= \"a\" 10]")]
+    [InlineData("a : 'foo'", "[: \"a\" \"foo\"]")]
+    public void ParseAllComparators(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+        Assert.False(expression.IsConstant);
+    }
+
+    [Theory]
+    [InlineData("a = 1 AND b = 2")]
+    [InlineData("a = 1 OR b = 2")]
+    [InlineData("NOT a = 1")]
+    [InlineData("-a")]
+    [InlineData("a b")]
+    [InlineData("(a OR b) AND c")]
+    public void ParseLogicOperators(string input) {
+        var result = Parser.Filter.Parse(input);
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public void ParseLogicOperator_And_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("a = 1 AND b = 2");
+        Assert.NotNull(expression);
+        Assert.Equal("[AND [= \"a\" 1] [= \"b\" 2]]", expression.ToString());
+    }
+
+    [Fact]
+    public void ParseLogicOperator_Or_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("a = 1 OR b = 2");
+        Assert.NotNull(expression);
+        Assert.Equal("[OR [= \"a\" 1] [= \"b\" 2]]", expression.ToString());
+    }
+
+    [Fact]
+    public void ParseLogicOperator_Not_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("NOT a = 1");
+        Assert.NotNull(expression);
+        Assert.Equal("NOT [= \"a\" 1]", expression.ToString());
+    }
+
+    [Fact]
+    public void ParseLogicOperator_Minus_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("-a");
+        Assert.NotNull(expression);
+        Assert.Equal("- \"a\"", expression.ToString());
+    }
+
+    [Fact]
+    public void ParseLogicOperator_ImplicitAnd_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("a b");
+        Assert.NotNull(expression);
+        Assert.Equal("{\"a\" \"b\"}", expression.ToString());
+        Assert.True(expression.IsConstant);
+    }
+
+    [Fact]
+    public void ParseLogicOperator_CompositeWithExplicitAnd_ReturnsExpectedStructure() {
+        var expression = Parser.Filter.Parse("(a OR b) AND c");
+        Assert.NotNull(expression);
+        Assert.Equal("[AND [OR \"a\" \"b\"] \"c\"]", expression.ToString());
+    }
+
+    [Theory]
+    [InlineData("a = 42", "[= \"a\" 42]", false)]
+    [InlineData("a = 'hello'", "[= \"a\" \"hello\"]", false)]
+    [InlineData("a = foo", "[= \"a\" \"foo\"]", false)]
+    public void ParseValueTypes(string input, string expected, bool constant) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+        Assert.Equal(constant, expression.IsConstant);
+    }
+
+    [Theory]
+    [InlineData("a = TRUE", "[= \"a\" \u2611]")]
+    [InlineData("a = FALSE", "[= \"a\" \u2612]")]
+    [InlineData("a = true", "[= \"a\" \u2611]")]
+    [InlineData("a = false", "[= \"a\" \u2612]")]
+    [InlineData("a = True", "[= \"a\" \u2611]")]
+    public void ParseTruthValue(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
+
+    [Theory]
+    [InlineData("a and b", "[AND \"a\" \"b\"]")]
+    [InlineData("a or b", "[OR \"a\" \"b\"]")]
+    [InlineData("not a", "NOT \"a\"")]
+    [InlineData("a = null", "[= \"a\" \u2205]")]
+    public void ParseCaseInsensitiveKeywords(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
+
+    [Theory]
+    [InlineData("ANDROID", "\"ANDROID\"")]
+    [InlineData("ORDER", "\"ORDER\"")]
+    [InlineData("NOTHING", "\"NOTHING\"")]
+    [InlineData("NOTICE", "\"NOTICE\"")]
+    [InlineData("TRUEBLOOD", "\"TRUEBLOOD\"")]
+    [InlineData("NULLABLE", "\"NULLABLE\"")]
+    [InlineData("ANDROID = 1", "[= \"ANDROID\" 1]")]
+    [InlineData("NOTHING = 1", "[= \"NOTHING\" 1]")]
+    public void ParseIdentifierWithKeywordPrefix(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
+
+    [Fact]
+    public void ParseValueType_Null() {
+        var expression = Parser.Filter.Parse("a = NULL");
+        Assert.NotNull(expression);
+        Assert.Contains("\"a\"", expression.ToString());
+        Assert.False(expression.IsConstant);
+    }
+
+    [Fact]
+    public void ParseValueType_Decimal() {
+        var expression = Parser.Filter.Parse("a = 3.14");
+        Assert.NotNull(expression);
+        Assert.Equal("[= \"a\" 3.14]", expression.ToString());
+        Assert.False(expression.IsConstant);
+    }
+
+    [Fact]
+    public void ParseDeeplyNested() {
+        var result = Parser.Filter.Parse("((a OR b) AND (c OR d))");
+        Assert.NotNull(result);
+        Assert.Equal("[AND [OR \"a\" \"b\"] [OR \"c\" \"d\"]]", result.ToString());
+    }
+
+    [Theory]
+    [InlineData("a.b.c = 1", "[= \"a\".\"b\".\"c\" 1]")]
+    [InlineData("expr.type_map.1.type = 'bar'", "[= \"expr\".\"type_map\".1.\"type\" \"bar\"]")]
+    public void ParseMemberTraversal(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+        Assert.False(expression.IsConstant);
+    }
+
+    [Theory]
+    [InlineData("msg.endsWith('world')", "\"msg\".\"endsWith\"(\"world\")")]
+    [InlineData("regex(m.key, '^.*prod.*$')", "\"regex\"(\"m\".\"key\",\"^.*prod.*$\")")]
+    [InlineData("time.now()", "\"time\".\"now\"()")]
+    public void ParseFunctionCalls(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+        Assert.False(expression.IsConstant);
+    }
+
+    [Theory]
+    [InlineData("foo()", "\"foo\"()")]
+    [InlineData("foo.bar()", "\"foo\".\"bar\"()")]
+    [InlineData("foo.bar.baz('a')", "\"foo\".\"bar\".\"baz\"(\"a\")")]
+    public void ParseFunctionWithNameBasedPath(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
+
+    [Theory]
+    [InlineData("a = 3.14", "[= \"a\" 3.14]")]
+    [InlineData("a = -0.5", "[= \"a\" -0.5]")]
+    [InlineData("a = 42", "[= \"a\" 42]")]
+    [InlineData("a = 0.1", "[= \"a\" 0.1]")]
+    public void ParseNumericValues(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
+
+    [Theory]
+    [InlineData("a = hello", "[= \"a\" \"hello\"]")]
+    [InlineData("a = 'hello'", "[= \"a\" \"hello\"]")]
+    [InlineData("hello", "\"hello\"")]
+    [InlineData("'hello'", "\"hello\"")]
+    public void ParseTextAndStringValues(string input, string expected) {
+        var expression = Parser.Filter.Parse(input);
+        Assert.NotNull(expression);
+        Assert.Equal(expected, expression.ToString());
+    }
 }

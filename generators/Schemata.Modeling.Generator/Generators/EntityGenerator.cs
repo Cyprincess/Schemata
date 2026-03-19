@@ -1,84 +1,93 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Schemata.Modeling.Generator.Terms;
+using Schemata.Modeling.Generator.Expressions;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-public static class EntityGenerator
+internal static class EntityGenerator
 {
-    public static void Generate(this Entity entity, SourceProductionContext spc, Mark mark) {
+    public static void Generate(SourceProductionContext spc, Entity entity, Document doc) {
         var sb = new StringBuilder();
 
-        if (!string.IsNullOrWhiteSpace(mark.Namespace?.Name)) {
-            sb.AppendLine($"namespace {mark.Namespace?.Name} {{");
+        if (!string.IsNullOrWhiteSpace(doc.Namespace)) {
+            sb.AppendLine($"namespace {doc.Namespace} {{");
         }
 
         sb.Append($"    public record {entity.Name}");
 
-        GenerateUses(sb, entity, mark);
+        GenerateUses(sb, entity.Uses, entity.Bases, doc);
 
         sb.AppendLine("{");
 
-        GenerateEnums(sb, entity, mark);
+        GenerateEnums(sb, entity);
 
-        GenerateFields(sb, entity, mark);
+        GenerateFields(sb, entity.Fields);
 
         sb.AppendLine("    }");
 
-        if (!string.IsNullOrWhiteSpace(mark.Namespace?.Name)) {
+        if (!string.IsNullOrWhiteSpace(doc.Namespace)) {
             sb.AppendLine("}");
         }
 
         spc.AddSource($"{entity.Name}", sb.ToString());
     }
 
-    public static void GenerateUses(StringBuilder sb, Entity entity, Mark mark) {
-        if (entity.Uses is null) {
+    internal static void GenerateUses(
+        StringBuilder          sb,
+        EquatableArray<Use>    uses,
+        EquatableArray<string> bases,
+        Document               doc
+    ) {
+        // Collect all base type names from Uses and Bases
+        var names = new List<string>();
+
+        foreach (var use in uses) {
+            foreach (var name in use.QualifiedNames) {
+                var resolved = name;
+                if (doc.Traits.Any(t => t.Name == name)) {
+                    resolved = $"I{name}";
+                }
+
+                names.Add(resolved);
+            }
+        }
+
+        foreach (var name in bases) {
+            var resolved = name;
+            if (doc.Traits.Any(t => t.Name == name)) {
+                resolved = $"I{name}";
+            }
+
+            if (!names.Contains(resolved)) {
+                names.Add(resolved);
+            }
+        }
+
+        if (names.Count == 0) {
             return;
         }
 
         sb.Append(" : ");
 
-        foreach (var use in entity.Uses) {
-            var name = use.Name;
-            if (mark.Traits?.ContainsKey(name) == true) {
-                name = $"I{name}";
-            }
-
-            sb.Append($"{name}, ");
-        }
-
-        sb.Remove(sb.Length - 2, 2);
-    }
-
-    private static void GenerateEnums(StringBuilder sb, Entity entity, Mark mark) {
-        if (mark.Enums is null) {
-            return;
-        }
-
-        foreach (var @enum in mark.Enums) {
-            var scope = @enum.Key;
-            var name  = @enum.Value.Name;
-            scope = scope.Remove(scope.Length - name.Length - 1, name.Length + 1);
-            if (string.IsNullOrWhiteSpace(scope)) {
-                continue;
-            }
-
-            if (mark.Tables?.ContainsKey(scope) == true) {
-                @enum.Value.Generate(sb, null);
-            }
+        for (var i = 0; i < names.Count; i++) {
+            if (i > 0) sb.Append(", ");
+            sb.Append(names[i]);
         }
     }
 
-    private static void GenerateFields(StringBuilder sb, Entity entity, Mark mark) {
-        if (entity.Fields is null) {
-            return;
+    private static void GenerateEnums(StringBuilder sb, Entity entity) {
+        foreach (var @enum in entity.Enumerations) {
+            EnumGenerator.Generate(sb, @enum, null);
         }
+    }
 
-        foreach (var field in entity.Fields) {
-            var type  = field.Value.Type;
-            var name  = field.Value.Name;
+    private static void GenerateFields(StringBuilder sb, EquatableArray<Field> fields) {
+        foreach (var field in fields) {
+            var type  = field.Type;
+            var name  = field.Name;
             var value = "default";
 
             var clr = Utilities.GetClrType(type);
@@ -90,7 +99,7 @@ public static class EntityGenerator
                 }
             }
 
-            if (field.Value.Nullable) {
+            if (field.Nullable) {
                 type  += "?";
                 value =  "null";
             }

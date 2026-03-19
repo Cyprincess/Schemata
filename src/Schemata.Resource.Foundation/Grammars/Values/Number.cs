@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using Parlot;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
@@ -25,5 +25,5 @@ public class Number : IValue
 
     #endregion
 
-    public override string ToString() { return Value.ToString("F"); }
+    public override string ToString() { return Value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
 }

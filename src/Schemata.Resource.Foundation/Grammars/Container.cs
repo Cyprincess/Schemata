@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars;
 
@@ -14,9 +14,7 @@ public class Container
 
     public Container(IToken token) { Token = token; }
 
-    public bool AllowFunctions { get; private set; }
-
-    public Dictionary<Type, Dictionary<string, bool>> Functions { get; } = [];
+    public Dictionary<string, FilterFunction> Functions { get; } = [];
 
     private IToken Token { get; }
 
@@ -26,19 +24,8 @@ public class Container
 
     public static Container Build(IToken token) { return new(token); }
 
-    public Container AllowFunction<T>(string method) { return AllowFunction(typeof(T), method); }
-
-    public Container AllowFunction(Type type, string method) {
-        AllowFunctions = true;
-
-        if (!Functions.TryGetValue(type, out var methods)) {
-            methods = new();
-
-            Functions[type] = methods;
-        }
-
-        methods[method] = true;
-
+    public Container RegisterFunction(string name, Func<Expression[], Container, Expression> factory) {
+        Functions[name] = new FilterFunction(factory);
         return this;
     }
 

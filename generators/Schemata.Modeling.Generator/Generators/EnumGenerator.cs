@@ -1,36 +1,40 @@
 using System.Text;
-using Schemata.Modeling.Generator.Terms;
+using Schemata.Modeling.Generator.Expressions;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-public static class EnumGenerator
+internal static class EnumGenerator
 {
-    public static void Generate(this Enum @enum, StringBuilder sb, Mark? mark) {
-        if (!string.IsNullOrWhiteSpace(mark?.Namespace?.Name)) {
-            sb.AppendLine($"namespace {mark?.Namespace?.Name} {{");
+    public static void Generate(StringBuilder sb, Enumeration @enum, Document? doc) {
+        if (doc is not null && !string.IsNullOrWhiteSpace(doc.Namespace)) {
+            sb.AppendLine($"namespace {doc.Namespace} {{");
         }
 
         sb.AppendLine($"    public enum {@enum.Name} {{");
 
-        GenerateValues(sb, @enum, mark);
+        GenerateValues(sb, @enum);
 
         sb.AppendLine("    }");
 
-        if (!string.IsNullOrWhiteSpace(mark?.Namespace?.Name)) {
+        if (doc is not null && !string.IsNullOrWhiteSpace(doc.Namespace)) {
             sb.AppendLine("}");
         }
     }
 
-    private static void GenerateValues(StringBuilder sb, Enum @enum, Mark? mark) {
-        if (@enum.Values is null) {
-            return;
-        }
-
+    private static void GenerateValues(StringBuilder sb, Enumeration @enum) {
         foreach (var value in @enum.Values) {
-            sb.AppendLine(value.Value.Name == value.Value.Body
-                              ? $"        {value.Value.Name},"
-                              : $"        {value.Value.Name} = {value.Value.Body},");
+            if (value.Assignment is null) {
+                sb.AppendLine($"        {value.Name},");
+            } else {
+                var body = value.Assignment switch {
+                    NumberLiteral n => n.Raw,
+                    Literal s       => $"\"{s.Value}\"",
+                    Reference r     => r.QualifiedName,
+                    var _           => value.Assignment.ToString(),
+                };
+                sb.AppendLine($"        {value.Name} = {body},");
+            }
         }
     }
 }

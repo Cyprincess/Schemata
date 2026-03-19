@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using Parlot;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 

@@ -4,7 +4,7 @@ using Parlot;
 using Parlot.Fluent;
 using Schemata.Abstractions.Entities;
 using Schemata.Resource.Foundation.Grammars.Operations;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars;
@@ -15,6 +15,12 @@ public class Parser
 
     public static readonly Parser<Dictionary<Member, Ordering>> Order;
 
+    private static Parser<string> WithWordBoundary(Parser<string> parser) =>
+        parser.When((ctx, _) => {
+            var cursor = ctx.Scanner.Cursor;
+            return cursor.Eof || !Character.IsIdentifierPart(cursor.Current);
+        });
+
     static Parser() {
         var filter = Parsers.Deferred<Filter>();
 
@@ -23,25 +29,47 @@ public class Parser
         var lparen   = Parsers.Terms.Char('(');
         var rparen   = Parsers.Terms.Char(')');
 
-        var and = Parsers.Terms.Text("AND");
-        var or  = Parsers.Terms.Text("OR");
+        var and = WithWordBoundary(Parsers.Terms.Text("AND", caseInsensitive: true));
+        var or  = WithWordBoundary(Parsers.Terms.Text("OR",  caseInsensitive: true));
 
-        var not   = Parsers.Terms.Text("NOT");
+        var not   = WithWordBoundary(Parsers.Terms.Text("NOT", caseInsensitive: true))
+                        .Then(_ => "NOT");
         var minus = Parsers.Terms.Char('-');
 
-        var number = Parsers.Terms.Decimal(NumberOptions.AllowSign)
+        var number = Parsers.Terms.Decimal()
                             .Then((c, n) => new Number(c.Scanner.Cursor.Position, n));
-        var integer = Parsers.Terms.Integer(NumberOptions.AllowSign)
+        var integer = Parsers.Terms.Integer()
+                             .When((ctx, _) => {
+                                  var cursor = ctx.Scanner.Cursor;
+                                  if (cursor.Eof || cursor.Current != '.') return true;
+                                  var saved = cursor.Position;
+                                  cursor.Advance();
+                                  var isDecimal = !cursor.Eof && char.IsDigit(cursor.Current);
+                                  cursor.ResetPosition(saved);
+                                  return !isDecimal;
+                              })
                              .Then((c, i) => new Integer(c.Scanner.Cursor.Position, i));
-        var truth = Parsers.Terms.Text("TRUE")
-                           .Or(Parsers.Terms.Text("FALSE"))
-                           .Then((c, t) => new Truth(c.Scanner.Cursor.Position, string.Equals("true", t)));
-        var @null = Parsers.Terms.Text("NULL").Then((c, _) => new Null(c.Scanner.Cursor.Position));
-        var @string = Parsers.Not(and.Or(or).Or(not))
-                             .SkipAnd(Parsers.Terms.Pattern(c => Character.IsIdentifierPart(c) || !char.IsAscii(c)));
-        var text = Parsers.Terms.String()
-                          .Or(@string)
-                          .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
+        var @true = WithWordBoundary(Parsers.Terms.Text("TRUE", caseInsensitive: true))
+                           .Then((c, _) => new Truth(c.Scanner.Cursor.Position, true));
+        var @false = WithWordBoundary(Parsers.Terms.Text("FALSE", caseInsensitive: true))
+                            .Then((c, _) => new Truth(c.Scanner.Cursor.Position, false));
+        var truth = @true.Or(@false);
+        var @null = WithWordBoundary(Parsers.Terms.Text("NULL", caseInsensitive: true))
+                           .Then((c, _) => new Null(c.Scanner.Cursor.Position));
+        var @string = Parsers.Terms.Pattern(c => Character.IsIdentifierPart(c) || !char.IsAscii(c))
+                             .When((ctx, span) => {
+                                  var s = span.Span.ToString();
+                                  return !string.Equals(s, "AND",   System.StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(s, "OR",    System.StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(s, "NOT",   System.StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(s, "TRUE",  System.StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(s, "FALSE", System.StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(s, "NULL",  System.StringComparison.OrdinalIgnoreCase);
+                              });
+        var unquoted = @string
+                                  .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
+        var quoted = Parsers.Terms.String()
+                                  .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
 
         var le = Parsers.Terms.Text(LessThanOrEqual.Name)
                         .Then((c, _) => new LessThanOrEqual(c.Scanner.Cursor.Position));
@@ -49,10 +77,6 @@ public class Parser
         var ge = Parsers.Terms.Text(GreaterThanOrEqual.Name)
                         .Then((c, _) => new GreaterThanOrEqual(c.Scanner.Cursor.Position));
         var gt  = Parsers.Terms.Char(GreaterThan.Char).Then((c, _) => new GreaterThan(c.Scanner.Cursor.Position));
-        var em  = Parsers.Terms.Text(ExactMatch.Name).Then((c,  _) => new ExactMatch(c.Scanner.Cursor.Position));
-        var fm  = Parsers.Terms.Text(FuzzyMatch.Name).Then((c,  _) => new FuzzyMatch(c.Scanner.Cursor.Position));
-        var pm  = Parsers.Terms.Text(PrefixMatch.Name).Then((c, _) => new PrefixMatch(c.Scanner.Cursor.Position));
-        var sm  = Parsers.Terms.Text(SuffixMatch.Name).Then((c, _) => new SuffixMatch(c.Scanner.Cursor.Position));
         var ne  = Parsers.Terms.Text(NotEqual.Name).Then((c,    _) => new NotEqual(c.Scanner.Cursor.Position));
         var eq  = Parsers.Terms.Char(Equal.Char).Then((c,       _) => new Equal(c.Scanner.Cursor.Position));
         var has = Parsers.Terms.Char(Has.Char).Then((c,         _) => new Has(c.Scanner.Cursor.Position));
@@ -65,7 +89,8 @@ public class Parser
                            .Or(number.Then<IValue>(v => v))
                            .Or(truth.Then<IValue>(v => v))
                            .Or(@null.Then<IValue>(v => v))
-                           .Or(text.Then<IValue>(v => v));
+                           .Or(unquoted.Then<IValue>(v => v))
+                           .Or(quoted.Then<IValue>(v => v));
 
         // composite
         // : LPAREN expression RPAREN
@@ -85,10 +110,6 @@ public class Parser
                            .Or(lt.Then<IBinary>(b => b))
                            .Or(ge.Then<IBinary>(b => b))
                            .Or(gt.Then<IBinary>(b => b))
-                           .Or(em.Then<IBinary>(b => b))
-                           .Or(fm.Then<IBinary>(b => b))
-                           .Or(pm.Then<IBinary>(b => b))
-                           .Or(sm.Then<IBinary>(b => b))
                            .Or(ne.Then<IBinary>(b => b))
                            .Or(eq.Then<IBinary>(b => b))
                            .Or(has.Then<IBinary>(b => b));
@@ -98,16 +119,33 @@ public class Parser
         // | AND
         // | OR
         // ;
+        var keyword = Parsers.Terms.Pattern(c => Character.IsIdentifierPart(c) || !char.IsAscii(c))
+                             .When((ctx, span) => {
+                                  var s = span.Span.ToString();
+                                  return string.Equals(s, "AND", System.StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(s, "OR",  System.StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(s, "NOT", System.StringComparison.OrdinalIgnoreCase);
+                              })
+                             .Then((c, k) => new Text(c.Scanner.Cursor.Position, k.Span.ToString()));
+
         // field
         // : value
         // | keyword
         // ;
+        var field = value.Or(keyword.Then<IValue>(v => v));
 
         // member
         // : value {DOT field}
         // ;
-        var member = value.And(Parsers.ZeroOrMany(accessor.SkipAnd(value)))
+        var member = value.And(Parsers.ZeroOrMany(accessor.SkipAnd(field)))
                           .Then((c, m) => new Member(c.Scanner.Cursor.Position, m.Item1, m.Item2));
+
+        // name: text or keyword (identifier-like tokens only, per EBNF)
+        var name = unquoted.Then<IValue>(v => v).Or(keyword.Then<IValue>(v => v));
+
+        // path: name { "." name } — restricted member for function paths
+        var path = name.And(Parsers.ZeroOrMany(accessor.SkipAnd(name)))
+                       .Then((c, m) => new Member(c.Scanner.Cursor.Position, m.Item1, m.Item2));
 
         var comparable = Parsers.Deferred<IComparable>();
 
@@ -126,8 +164,8 @@ public class Parser
         // function
         // : name {DOT name} LPAREN [argList] RPAREN
         // ;
-        var function = member.And(Parsers.Between(lparen, Parsers.ZeroOrOne(args), rparen))
-                             .Then((c, f) => new Function(c.Scanner.Cursor.Position, f.Item1, f.Item2));
+        var function = path.And(Parsers.Between(lparen, Parsers.ZeroOrOne(args), rparen))
+                                   .Then((c, f) => new Function(c.Scanner.Cursor.Position, f.Item1, f.Item2));
 
         // comparable
         // : member
@@ -180,8 +218,8 @@ public class Parser
         // : { member [ASC | DESC] }
         // ;
 
-        var asc  = Parsers.Terms.Text("ASC").Then(_ => Ordering.Ascending);
-        var desc = Parsers.Terms.Text("DESC").Then(_ => Ordering.Descending);
+        var asc  = WithWordBoundary(Parsers.Terms.Text("ASC",  caseInsensitive: true)).Then(_ => Ordering.Ascending);
+        var desc = WithWordBoundary(Parsers.Terms.Text("DESC", caseInsensitive: true)).Then(_ => Ordering.Descending);
 
         Order = Parsers.Separated(comma, member.And(Parsers.ZeroOrOne(asc.Or(desc))))
                        .Then(o => o.ToDictionary(kv => kv.Item1, kv => kv.Item2))

@@ -41,9 +41,7 @@ namespace System
         }
 
         // The following private constructors mainly created for perf reason to avoid the checks
-        private Index(int value) {
-            _value = value;
-        }
+        private Index(int value) { _value = value; }
 
         /// <summary>Create an Index pointing at first element.</summary>
         public static Index Start => new(0);
@@ -115,25 +113,17 @@ namespace System
 
         /// <summary>Indicates whether the current Index object is equal to another object of the same type.</summary>
         /// <param name="value">An object to compare with this object</param>
-        public override bool Equals(object? value) {
-            return value is Index && _value == ((Index)value)._value;
-        }
+        public override bool Equals(object? value) { return value is Index && _value == ((Index)value)._value; }
 
         /// <summary>Indicates whether the current Index object is equal to another Index object.</summary>
         /// <param name="other">An object to compare with this object</param>
-        public bool Equals(Index other) {
-            return _value == other._value;
-        }
+        public bool Equals(Index other) { return _value == other._value; }
 
         /// <summary>Returns the hash code for this instance.</summary>
-        public override int GetHashCode() {
-            return _value;
-        }
+        public override int GetHashCode() { return _value; }
 
         /// <summary>Converts integer number to an Index.</summary>
-        public static implicit operator Index(int value) {
-            return FromStart(value);
-        }
+        public static implicit operator Index(int value) { return FromStart(value); }
 
         /// <summary>Converts the value of the current Index object to its equivalent string representation.</summary>
         public override string ToString() {
@@ -178,29 +168,19 @@ namespace System
 
         /// <summary>Indicates whether the current Range object is equal to another Range object.</summary>
         /// <param name="other">An object to compare with this object</param>
-        public bool Equals(Range other) {
-            return other.Start.Equals(Start) && other.End.Equals(End);
-        }
+        public bool Equals(Range other) { return other.Start.Equals(Start) && other.End.Equals(End); }
 
         /// <summary>Returns the hash code for this instance.</summary>
-        public override int GetHashCode() {
-            return Start.GetHashCode() * 31 + End.GetHashCode();
-        }
+        public override int GetHashCode() { return Start.GetHashCode() * 31 + End.GetHashCode(); }
 
         /// <summary>Converts the value of the current Range object to its equivalent string representation.</summary>
-        public override string ToString() {
-            return Start + ".." + End;
-        }
+        public override string ToString() { return Start + ".." + End; }
 
         /// <summary>Create a Range object starting from start index to the end of the collection.</summary>
-        public static Range StartAt(Index start) {
-            return new(start, Index.End);
-        }
+        public static Range StartAt(Index start) { return new(start, Index.End); }
 
         /// <summary>Create a Range object starting from first element in the collection to the end Index.</summary>
-        public static Range EndAt(Index end) {
-            return new(Index.Start, end);
-        }
+        public static Range EndAt(Index end) { return new(Index.Start, end); }
 
         /// <summary>Create a Range object starting from first element to the end.</summary>
         public static Range All => new(Index.Start, Index.End);

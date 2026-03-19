@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Parlot;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
@@ -65,7 +65,7 @@ public abstract class Logical : IToken
             throw new ParseException("Expect arg", token.Position);
         }
 
-        var restriction = new Restriction(token.Position, member, (new ExactMatch(token.Position), arg));
+        var restriction = new Restriction(token.Position, member, (new Has(token.Position), arg));
 
         return restriction.ToExpression(ctx);
     }

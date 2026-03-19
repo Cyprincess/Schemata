@@ -1,6 +1,7 @@
 # Schemata DSL (Schemata Modeling Language, aka SKM)
 
-A Roslyn source generator that compiles `.skm` schema files into C# entity classes, DTOs, mappings, and validation rules at build time.
+A Roslyn source generator that compiles `.skm` schema files into C# entity classes, DTOs, mappings, and validation rules
+at build time.
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Cyprincess/Schemata/build.yml)](https://github.com/Cyprincess/Schemata/actions/workflows/build.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/Cyprincess/Schemata.svg)](https://codecov.io/gh/Cyprincess/Schemata)
@@ -12,7 +13,8 @@ A Roslyn source generator that compiles `.skm` schema files into C# entity class
 dotnet add package --prerelease Schemata.Modeling.Generator
 ```
 
-Add `.skm` files to your project with **Build Action: `AdditionalFiles`** (or use one of the business/module target packages that configure this automatically). The generator runs at compile time and produces C# files in `obj/`.
+Add `.skm` files to your project with **Build Action: `AdditionalFiles`** (or use one of the business/module target
+packages that configure this automatically). The generator runs at compile time and produces C# files in `obj/`.
 
 ## Grammar Overview
 
@@ -91,19 +93,19 @@ Enum BookStatus {
 
 ## Field Types
 
-| SKM Type | C# Type |
-|----------|---------|
-| `string` | `string` |
-| `text` | `string` |
-| `int` / `integer` / `int32` / `int4` | `int` |
-| `long` / `int64` / `int8` | `long` |
-| `biginteger` / `bigint` | `System.Numerics.BigInteger` |
-| `float` | `float` |
-| `double` | `double` |
-| `decimal` | `decimal` |
-| `boolean` | `bool` |
-| `datetime` / `timestamp` | `DateTimeOffset` |
-| `guid` | `Guid` |
+| SKM Type                             | C# Type                      |
+|--------------------------------------|------------------------------|
+| `string`                             | `string`                     |
+| `text`                               | `string`                     |
+| `int` / `integer` / `int32` / `int4` | `int`                        |
+| `long` / `int64` / `int8`            | `long`                       |
+| `biginteger` / `bigint`              | `System.Numerics.BigInteger` |
+| `float`                              | `float`                      |
+| `double`                             | `double`                     |
+| `decimal`                            | `decimal`                    |
+| `boolean`                            | `bool`                       |
+| `datetime` / `timestamp`             | `DateTimeOffset`             |
+| `guid`                               | `Guid`                       |
 
 Append `?` for nullable: `string? author`, `timestamp? delete_time`.
 
@@ -111,15 +113,15 @@ Append `?` for nullable: `string? author`, `timestamp? delete_time`.
 
 Declared in square brackets after the field name. Multiple options are comma-separated.
 
-| Option | Effect |
-|--------|--------|
-| `primary key` | Primary key constraint |
-| `auto increment` | Auto-incrementing primary key |
-| `not null` | Non-nullable column constraint |
-| `required` | Required field |
-| `unique` | Unique index |
-| `b tree` | B-tree index |
-| `hash` | Hash index |
+| Option           | Effect                         |
+|------------------|--------------------------------|
+| `primary key`    | Primary key constraint         |
+| `auto increment` | Auto-incrementing primary key  |
+| `not null`       | Non-nullable column constraint |
+| `required`       | Required field                 |
+| `unique`         | Unique index                   |
+| `b tree`         | B-tree index                   |
+| `hash`           | Hash index                     |
 
 ```
 long   id    [primary key]
@@ -131,11 +133,11 @@ string? bio  [b tree]
 
 Declared in curly braces after options. Provide column-level metadata:
 
-| Property | Effect |
-|----------|--------|
-| `Length: N` | Maximum string length |
-| `Precision: N` | Decimal precision |
-| `Default: value` | Default column value |
+| Property          | Effect                             |
+|-------------------|------------------------------------|
+| `Length: N`       | Maximum string length              |
+| `Precision: N`    | Decimal precision                  |
+| `Default: value`  | Default column value               |
 | `Algorithm: name` | Hash algorithm (for hashed fields) |
 
 ```
@@ -145,25 +147,29 @@ decimal price            { Precision: 2 }
 
 ## Object Blocks
 
-`Object` blocks define DTO projections. Each block generates one or more C# Record types (isomers) depending on the fields declared.
+`Object` blocks define DTO projections. Each block generates one or more C# Record types (isomers) depending on the
+fields declared.
 
 ### Field kinds
 
-| Syntax | Description |
-|--------|-------------|
-| `field_name` | Always present in every generated variant |
-| `field_name [omit]` | Excluded from the base variant; each `[omit]` field adds a dimension of optional inclusion |
+| Syntax                          | Description                                                                                 |
+|---------------------------------|---------------------------------------------------------------------------------------------|
+| `field_name`                    | Always present in every generated variant                                                   |
+| `field_name [omit]`             | Excluded from the base variant; each `[omit]` field adds a dimension of optional inclusion  |
 | `field_name [omit all] { ... }` | Only the fields listed in `{ ... }` are kept, all others in the referenced type are omitted |
-| `field_name = expression` | Computed field; value derived via the given expression |
+| `field_name = expression`       | Computed field; value derived via the given expression                                      |
 
 ### Isomer generation (`[omit]`)
 
-Fields marked `[omit]` are excluded from the base Object. The generator produces additional Record types for every combination of included/excluded omit fields:
+Fields marked `[omit]` are excluded from the base Object. The generator produces additional Record types for every
+combination of included/excluded omit fields:
 
 - 1 omit field → base + 1 isomer = 2 types
 - n omit fields → base + C(1,n) + C(2,n) + … = 2ⁿ − 1 + 1 types total
 
-Each isomer is instantiated via a static factory method named after the fields it includes — `WithEmailAddress()`, `WithPhoneNumber()`, `WithEmailAddressAndPhoneNumber()`, etc. Because Object types are Records, you can also build custom variants with the `with` keyword.
+Each isomer is instantiated via a static factory method named after the fields it includes — `WithEmailAddress()`,
+`WithPhoneNumber()`, `WithEmailAddressAndPhoneNumber()`, etc. Because Object types are Records, you can also build
+custom variants with the `with` keyword.
 
 ```
 ; User.response has 4 [omit] fields:
@@ -193,7 +199,8 @@ Entity User {
 
 ### Embedded fields with `[omit all]`
 
-When an field references another Object type, `[omit all]` creates an inline isomer of that type containing only the fields explicitly listed in the `{ ... }` block.
+When an field references another Object type, `[omit all]` creates an inline isomer of that type containing only the
+fields explicitly listed in the `{ ... }` block.
 
 ```
 Entity Post {
@@ -224,5 +231,7 @@ Entity Post {
 
 ## See Also
 
-- [Schemata.Business.Complex.Targets](https://nuget.org/packages/Schemata.Business.Complex.Targets) — includes DSL for business libraries
-- [Schemata.Module.Complex.Targets](https://nuget.org/packages/Schemata.Module.Complex.Targets) — includes DSL for module libraries
+- [Schemata.Business.Complex.Targets](https://nuget.org/packages/Schemata.Business.Complex.Targets) — includes DSL for
+  business libraries
+- [Schemata.Module.Complex.Targets](https://nuget.org/packages/Schemata.Module.Complex.Targets) — includes DSL for
+  module libraries

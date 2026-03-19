@@ -1,0 +1,189 @@
+(* ================================================================ *)
+(*   Schemata Modeling Language (SKM)                                *)
+(* ================================================================ *)
+(*                                                                   *)
+(*   Whitespace (spaces, tabs, newlines) and comments are freely     *)
+(*   permitted between any two tokens and are not shown in the       *)
+(*   production rules. At least one whitespace character is          *)
+(*   required between adjacent identifier or keyword tokens.         *)
+(*   Keywords are matched case-insensitively.                        *)
+(*                                                                   *)
+
+(* ── 1  Document ──────────────────────────────────────────────── *)
+
+model = [ namespace ], { declaration } ;
+
+declaration = entity
+            | trait
+            | enumeration ;
+
+(* ── 2  Declarations ──────────────────────────────────────────── *)
+
+namespace = "Namespace", qualified name ;
+
+(* At most one per document; must precede all other declarations. *)
+
+entity = "Entity", identifier,
+         [ ":", name list ],
+         "{", { entity member }, "}" ;
+
+entity member = note | use | enumeration | trait
+              | view | pointer | field ;
+
+trait = "Trait", identifier,
+        [ ":", name list ],
+        "{", { trait member }, "}" ;
+
+trait member = note | use | field ;
+
+(* Base lists and Use declarations are semantically equivalent.
+   "Entity Foo : Bar, Baz" is sugar for declaring
+   "Use Bar, Baz" at the top of the body. Both resolve through
+   the same field-incorporation mechanism. *)
+
+enumeration = "Enum", identifier,
+              "{", { [","], ( note | enum value ) }, "}" ;
+
+enum value = identifier,
+             [ "=", literal ],
+             [ "{", { note }, "}" ] ;
+
+(* ── 3  Field ─────────────────────────────────────────────────── *)
+
+field = type specifier, identifier,
+        [ field options ],
+        [ "{", { note | property }, "}" ] ;
+
+type specifier = qualified name, [ "?" ] ;
+
+(* Builtin type names: String, Text, Integer, Int, Int32, Int4,
+   Long, Int64, Int8, BigInteger, BigInt, Float, Double, Decimal,
+   Boolean, DateTime, Timestamp, Guid. Any other qualified name
+   resolves via scoped types and the current namespace. *)
+
+(* ── 4  View ──────────────────────────────────────────────────── *)
+
+view = "Object", identifier,
+       "{", { note | view field }, "}" ;
+
+view field = qualified name, [ "?" ],
+             [ identifier ],
+             [ view options ],
+             [ "{", { note | view field }, "}" ],
+             [ "=", expression ] ;
+
+(* When an identifier follows the qualified name, the qualified
+   name with optional "?" is the type specifier and the identifier
+   is the field name. Otherwise the qualified name is the field
+   name with no explicit type.
+
+   Type inference for view fields (in priority order):
+     1. Explicit type  — type specifier is present.
+     2. Expression type — "= expression" return type overrides.
+     3. Inherited type  — inferred from the same-named field
+                          in the parent entity.
+   If both (1) and (2) are present and their types conflict,
+   the compiler reports an error. If none can be resolved,
+   the compiler reports an error. *)
+
+(* ── 5  Pointer ───────────────────────────────────────────────── *)
+
+pointer = "Index", identifier, { identifier },
+          [ pointer options ],
+          [ "{", { note }, "}" ] ;
+
+(* Identifiers after "Index" name the indexed columns.
+   The pointer name is derived: IX_{Entity}_{Col1}_{Col2}_... *)
+
+(* ── 6  Annotations ───────────────────────────────────────────── *)
+
+note = "Note", string ;
+
+property = identifier, expression ;
+
+(* Recognized property keys: Default, Length, Precision, Algorithm.
+   Arbitrary keys are accepted syntactically. *)
+
+(* ── 7  Options ───────────────────────────────────────────────── *)
+
+field options = "[", field option, { ",", field option }, "]" ;
+
+field option = "Required" | ( "Not", "Null" )
+             | "Unique"
+             | "PrimaryKey" | ( "Primary", "Key" )
+             | "AutoIncrement" | ( "Auto", "Increment" )
+             | "BTree" | ( "B", "Tree" )
+             | "Hash" ;
+
+(* "Not Null" is aliased to "Required" after parsing. *)
+
+view options = "[", view option, { ",", view option }, "]" ;
+
+view option = "Omit"
+            | "OmitAll" | ( "Omit", "All" ) ;
+
+pointer options = "[", pointer option, { ",", pointer option }, "]" ;
+
+pointer option = "Unique"
+               | "BTree" | ( "B", "Tree" )
+               | "Hash" ;
+
+(* All options are case-insensitive. Multi-word forms and their
+   concatenated CamelCase equivalents are interchangeable. *)
+
+(* ── 8  Composition ───────────────────────────────────────────── *)
+
+use = "Use", name list ;
+
+name list = qualified name, { ",", qualified name } ;
+
+(* ── 9  Expressions ───────────────────────────────────────────── *)
+
+expression = literal
+           | function call
+           | reference ;
+
+function call = qualified name, "(", [ expression, { ",", expression } ], ")" ;
+
+reference = qualified name ;
+
+(* Disambiguation: literals are tested first; then function call
+   (qualified name followed by "("); then reference. *)
+
+(* ── 10  Literals ─────────────────────────────────────────────── *)
+
+literal = string | boolean | "null" | number ;
+
+string = multiline string | quoted string ;
+
+multiline string = "'''", ? any characters ?, "'''"
+                 | '"""', ? any characters ?, '"""' ;
+
+quoted string = "'", ? characters except unescaped "'" ?, "'"
+              | '"', ? characters except unescaped '"' ?, '"' ;
+
+number = [ "+" | "-" ],
+         digit, { digit | "," },
+         [ ".", digit, { digit } ],
+         [ ( "e" | "E" ), [ "+" | "-" ], digit, { digit } ] ;
+
+(* Group separator "," may appear in the integer part for
+   readability (e.g. 1,234). Exponent part uses "e" or "E"
+   followed by an optional sign and one or more digits. *)
+
+boolean = "true" | "false" ;
+
+(* ── 11  Lexical ──────────────────────────────────────────────── *)
+
+qualified name = identifier, { ".", identifier } ;
+
+identifier = ( letter | "_" ), { letter | digit | "_" } ;
+
+letter = ? Unicode letter or ASCII A-Z, a-z ? ;
+
+digit = ? ASCII digit 0-9 ? ;
+
+line comment = "//", { ? any character except newline ? },
+               ( ? newline ? | ? end of input ? ) ;
+
+block comment = "/*", { ? any character ? }, "*/" ;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using Schemata.Resource.Foundation.Grammars;
 using Xunit;
 
@@ -69,7 +70,10 @@ public class FilterContainerShould
         Assert.NotNull(filter);
 
         var expression = Container.Build(filter)
-                                  .AllowFunction<string>("endsWith")
+                                  .RegisterFunction("endsWith", (args, ctx) => {
+                                       var method = ctx.GetMethod(typeof(string), "EndsWith", [typeof(string)]);
+                                       return Expression.Call(args[0], method!, args[1]);
+                                   })
                                   .Bind("msg", typeof(string))
                                   .Bind("retries", typeof(int))
                                   .Build();
@@ -79,6 +83,155 @@ public class FilterContainerShould
         Assert.True(func("hello world", 9));
         Assert.False(func("hello world", 10));
     }
+
+    [Fact]
+    public void Build_WithRegisteredFunction_Standalone() {
+        var filter = Parser.Filter.Parse("startsWith(name, 'hel')");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter)
+                                  .RegisterFunction("startsWith", (args, ctx) => {
+                                       var method = ctx.GetMethod(typeof(string), "StartsWith", [typeof(string)]);
+                                       return Expression.Call(args[0], method!, args[1]);
+                                   })
+                                  .Bind("name", typeof(string))
+                                  .Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<string, bool>)expression.Compile();
+        Assert.True(func("hello world"));
+        Assert.False(func("goodbye hello"));
+    }
+
+    [Fact]
+    public void Build_WithWildcardContains_CompilesContains() {
+        var filter = Parser.Filter.Parse("name = '*ello*'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("name", typeof(string)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<string, bool>)expression.Compile();
+        Assert.True(func("hello world"));
+        Assert.False(func("goodbye"));
+    }
+
+    [Fact]
+    public void Build_WithWildcardPrefix_CompilesStartsWith() {
+        var filter = Parser.Filter.Parse("name = 'hel*'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("name", typeof(string)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<string, bool>)expression.Compile();
+        Assert.True(func("hello world"));
+        Assert.False(func("goodbye hello"));
+    }
+
+    [Fact]
+    public void Build_WithWildcardSuffix_CompilesEndsWith() {
+        var filter = Parser.Filter.Parse("name = '*rld'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("name", typeof(string)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<string, bool>)expression.Compile();
+        Assert.True(func("hello world"));
+        Assert.False(func("hello world!"));
+    }
+
+    [Fact]
+    public void Build_WithHasOperator_StringContains() {
+        var filter = Parser.Filter.Parse("name : 'ello'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("name", typeof(string)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<string, bool>)expression.Compile();
+        Assert.True(func("hello world"));
+        Assert.False(func("goodbye"));
+    }
+
+    [Fact]
+    public void Build_WithHasOperator_ListContains() {
+        var filter = Parser.Filter.Parse("tags : 42");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("tags", typeof(List<long>)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<List<long>, bool>)expression.Compile();
+        Assert.True(func([1L, 42L, 100L]));
+        Assert.False(func([1L, 2L, 3L]));
+    }
+
+    [Fact]
+    public void Build_WithHasOperator_DictionaryContainsKey() {
+        var filter = Parser.Filter.Parse("metadata : 'key1'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter)
+                                  .Bind("metadata", typeof(Dictionary<string, string>))
+                                  .Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<Dictionary<string, string>, bool>)expression.Compile();
+        Assert.True(func(new() { ["key1"]  = "value1" }));
+        Assert.False(func(new() { ["key2"] = "value2" }));
+    }
+
+    [Fact]
+    public void Build_WithHasOperator_PresenceTest() {
+        var filter = Parser.Filter.Parse("tags : '*'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("tags", typeof(List<long>)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<List<long>, bool>)expression.Compile();
+        Assert.True(func([1L]));
+        Assert.False(func([]));
+    }
+
+    [Fact]
+    public void Build_WithNotOnBoolExpression_ReturnsLogicalNegation() {
+        var filter = Parser.Filter.Parse("NOT a = 1");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("a", typeof(long)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<long, bool>)expression.Compile();
+        Assert.True(func(2));
+        Assert.False(func(1));
+    }
+
+    [Fact]
+    public void Build_WithKeywordAsField_CompilesPropertyAccess() {
+        var filter = Parser.Filter.Parse("obj.and = 'test'");
+        Assert.NotNull(filter);
+
+        var expression = Container.Build(filter).Bind("obj", typeof(KeywordEntity)).Build();
+        Assert.NotNull(expression);
+
+        var func = (Func<KeywordEntity, bool>)expression.Compile();
+        Assert.True(func(new() { and  = "test" }));
+        Assert.False(func(new() { and = "other" }));
+    }
+
+    #region Nested type: KeywordEntity
+
+    public class KeywordEntity
+    {
+        public string and { get; set; } = string.Empty;
+        public string or  { get; set; } = string.Empty;
+        public string not { get; set; } = string.Empty;
+    }
+
+    #endregion
 
     #region Nested type: MyVector4
 

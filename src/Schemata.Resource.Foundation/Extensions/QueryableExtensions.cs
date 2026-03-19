@@ -4,7 +4,7 @@ using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Schemata.Resource.Foundation.Grammars;
-using Schemata.Resource.Foundation.Grammars.Terms;
+using Schemata.Resource.Foundation.Grammars.Expressions;
 using Schemata.Resource.Foundation.Models;
 
 // ReSharper disable once CheckNamespace
@@ -14,7 +14,8 @@ public static class QueryableExtensions
 {
     public static Func<IQueryable<T>, IQueryable<T>> WithFiltering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        Filter?                                 filter
+        Filter?                                 filter,
+        Action<Container>?                      configure = null
     ) {
         if (filter is null) {
             return query;
@@ -22,6 +23,7 @@ public static class QueryableExtensions
 
         var container = Container.Build(filter);
         BindProperties<T>(container);
+        configure?.Invoke(container);
 
         var expression = container.Build();
 

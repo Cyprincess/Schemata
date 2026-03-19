@@ -1,0 +1,114 @@
+(* ================================================================ *)
+(*   Schemata Resource Filtering & Ordering Grammar                  *)
+(*                                                                   *)
+(*   Based on Google AIP-160 (filtering) and AIP-132 (ordering),    *)
+(*   with Schemata-specific extensions noted below.                  *)
+(* ================================================================ *)
+(*                                                                   *)
+(*   Whitespace between tokens is implicit and insignificant.        *)
+(*   Keywords (AND, OR, NOT, TRUE, FALSE, NULL, ASC, DESC) are      *)
+(*   matched case-insensitively.                                     *)
+(*                                                                   *)
+
+(* ── 1  Filter ────────────────────────────────────────────────── *)
+
+filter = [ expression ] ;
+
+expression = sequence, { "AND", sequence } ;
+
+sequence = factor, { factor } ;
+
+(* Juxtaposed factors form an implicit AND. Explicit "AND" is
+   required only between sequences for clarity or grouping. *)
+
+factor = term, { "OR", term } ;
+
+term = [ "NOT" | "-" ], simple ;
+
+simple = restriction
+       | composite ;
+
+restriction = comparable, [ comparator, arg ] ;
+
+composite = "(", expression, ")" ;
+
+(* ── 2  Comparable ────────────────────────────────────────────── *)
+
+comparable = function
+           | member ;
+
+member = value, { ".", field } ;
+
+field = value
+      | keyword ;
+
+(* Keywords are excluded from value/text in isolation, but are
+   valid as field names after a dot accessor per AIP-160,
+   e.g. "msg.and", "x.not". The field rule re-introduces them. *)
+
+function = name, { ".", name }, "(", [ arg list ], ")" ;
+
+name = ? TEXT ? | keyword ;
+
+keyword = "NOT" | "AND" | "OR" ;
+
+arg list = arg, { ",", arg } ;
+
+arg = comparable
+    | composite ;
+
+(* ── 3  Comparators ───────────────────────────────────────────── *)
+
+comparator = "<=" | "<" | ">=" | ">"
+           | "!=" | "="
+           | ":" ;
+
+(* AIP-160 standard operators:
+     <=  less than or equal          <   less than
+     >=  greater than or equal       >   greater than
+     !=  not equal                   =   equal (supports wildcard *)
+     :   has (existence / membership / contains)             *)
+
+(* ── 4  Values ────────────────────────────────────────────────── *)
+
+value = integer | number | truth | null | text | string ;
+
+(* AIP-160 defines value as TEXT | STRING only. Schemata extends
+   this with typed value tokens.
+
+   Disambiguation order:
+     1. integer  (digits with optional sign; rejected if followed
+                  by "." + digit, which defers to number)
+     2. number   (decimal with mandatory decimal point)
+     3. truth    (TRUE / FALSE, case-insensitive, word-bounded)
+     4. null     (NULL, case-insensitive, word-bounded)
+     5. text     (unquoted identifier-like token,
+                  full-word exclusion of AND, OR, NOT,
+                  TRUE, FALSE, NULL)
+     6. string   (quoted string)                               *)
+
+integer = [ "-" ], digit, { digit } ;
+
+number = [ "-" ], digit, { digit }, ".", digit, { digit } ;
+
+truth = "TRUE" | "FALSE" ;
+
+null = "NULL" ;
+
+text = ? one or more identifier characters or non-ASCII characters,
+         excluding keywords (AND, OR, NOT, TRUE, FALSE, NULL) ? ;
+
+string = ? single or double quoted string ? ;
+
+(* ── 5  Order ─────────────────────────────────────────────────── *)
+
+(* Per AIP-132: comma-separated list of fields with optional
+   sort direction. Default is ascending. *)
+
+order = order term, { ",", order term } ;
+
+order term = member, [ "ASC" | "DESC" ] ;
+
+(* ── 6  Lexical ───────────────────────────────────────────────── *)
+
+digit = ? ASCII digit 0-9 ? ;
