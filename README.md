@@ -9,7 +9,7 @@ Application Framework aims on modular business applications.
 ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)
 ![netstandard2.1](https://img.shields.io/badge/netstandard-2.1-brightgreen.svg)
 ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg)
-![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg)
+![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg)
 
 ## Quick Start
 
@@ -155,18 +155,18 @@ version, and the most recent .NET version.
 
 Some packages may have additional compliance requirements, which are documented below.
 
-| Package                           | Compliance                                                                                                                      |
-|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| Schemata.Modeling.Generator       | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                 |
-| Schemata.Core                     | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Modular                  | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Authorization.Foundation | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Identity.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Mapping.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Resource.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Security.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Tenancy.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
-| Schemata.Workflow.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net9.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Package                           | Compliance                                                                                                                       |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| Schemata.Modeling.Generator       | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                  |
+| Schemata.Core                     | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Modular                  | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Authorization.Foundation | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Identity.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Mapping.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Resource.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Security.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Tenancy.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
+| Schemata.Workflow.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-9.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
 

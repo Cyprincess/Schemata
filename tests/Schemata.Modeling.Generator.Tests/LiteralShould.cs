@@ -10,7 +10,7 @@ public class LiteralShould
     [InlineData("\"world\"", "world")]
     public void ParseQuotedString(string input, string expected) {
         var result = Parser.Literal.Parse(input);
-        var s      = Assert.IsType<StringLiteral>(result);
+        var s      = Assert.IsType<Literal>(result);
         Assert.Equal(expected, s.Value);
     }
 
@@ -18,7 +18,7 @@ public class LiteralShould
     [InlineData("'''multi\nline'''", "multi\nline")]
     public void ParseTripleSingleQuotedString(string input, string expected) {
         var result = Parser.Literal.Parse(input);
-        var s      = Assert.IsType<StringLiteral>(result);
+        var s      = Assert.IsType<Literal>(result);
         Assert.Equal(expected, s.Value);
     }
 
@@ -26,7 +26,7 @@ public class LiteralShould
     public void ParseTripleDoubleQuotedString() {
         var input  = "\"\"\"triple\ndouble\"\"\"";
         var result = Parser.Literal.Parse(input);
-        var s      = Assert.IsType<StringLiteral>(result);
+        var s      = Assert.IsType<Literal>(result);
         Assert.Equal("triple\ndouble", s.Value);
     }
 

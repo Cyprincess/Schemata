@@ -45,7 +45,7 @@ public class FunctionCallShould
     public void ParseLiteralArg() {
         var result = Parser.Expression.Parse("greet('hello')");
         var fn     = Assert.IsType<FunctionCall>(result);
-        var arg    = Assert.IsType<StringLiteral>(fn.Arguments[0]);
+        var arg    = Assert.IsType<Literal>(fn.Arguments[0]);
         Assert.Equal("hello", arg.Value);
     }
 }

@@ -33,9 +33,9 @@ public class ExpressionShould
     }
 
     [Fact]
-    public void ParseStringLiteral() {
+    public void ParseLiteral() {
         var result = Parser.Expression.Parse("'hello'");
-        Assert.IsType<StringLiteral>(result);
+        Assert.IsType<Literal>(result);
     }
 
     [Fact]

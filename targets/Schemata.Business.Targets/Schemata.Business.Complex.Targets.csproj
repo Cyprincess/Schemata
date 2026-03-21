@@ -13,7 +13,6 @@
     <UseMapping>true</UseMapping>
     <UseRepository>true</UseRepository>
     <UseSecurity>true</UseSecurity>
-    <UseValidation>true</UseValidation>
     <UseWorkflow>true</UseWorkflow>
   </PropertyGroup>
 

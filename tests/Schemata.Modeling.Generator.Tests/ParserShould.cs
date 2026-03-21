@@ -297,7 +297,7 @@ public class ParserShould
         var status = post.Fields.First(f => f.Name == "status");
         Assert.Single(status.Properties);
         Assert.Equal("default", status.Properties[0].Key);
-        var lit = Assert.IsType<StringLiteral>(status.Properties[0].Value);
+        var lit = Assert.IsType<Literal>(status.Properties[0].Value);
         Assert.Equal("Published", lit.Value);
     }
 

@@ -40,10 +40,6 @@
     <ProjectReference Include="..\..\src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
-  </ItemGroup>
-
   <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" />
   </ItemGroup>

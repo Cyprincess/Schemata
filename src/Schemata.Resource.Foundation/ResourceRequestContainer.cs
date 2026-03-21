@@ -15,7 +15,7 @@ public class ResourceRequestContainer<T>
 
     public Func<IQueryable<T>, IQueryable<T>> Query { get; private set; } = q => q;
 
-    public void ApplyFiltering(Filter filter) { Query = Query.WithFiltering(filter, FilterConfigure); }
+    public void ApplyFiltering(Filter? filter) { Query = Query.WithFiltering(filter, FilterConfigure); }
 
     public void ApplyOrdering(Dictionary<Member, Ordering>? order) { Query = Query.WithOrdering(order); }
 

@@ -1,10 +1,11 @@
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
 // ReSharper disable once CheckNamespace
-namespace System.Collections.Generic;
+namespace System.Linq;
 
 public static class AsyncEnumerableExtensions
 {
@@ -24,6 +25,7 @@ public static class AsyncEnumerableExtensions
         }
     }
 
+#if !NET10_0_OR_GREATER
     public static async Task<List<T>> ToListAsync<T>(this IAsyncEnumerable<T> source, CancellationToken ct = default) {
         var result = new List<T>();
 
@@ -34,6 +36,7 @@ public static class AsyncEnumerableExtensions
 
         return result;
     }
+#endif
 
     public static Task<Dictionary<TKey, TSource>> ToDictionaryAsync<TSource, TKey>(
         this IAsyncEnumerable<TSource>  source,

@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Core;
 using Schemata.Mapping.AutoMapper;
@@ -16,8 +17,9 @@ public static class SchemataMappingBuilderExtensions
     public static SchemataMappingBuilder UseAutoMapper(this SchemataMappingBuilder builder) {
         builder.Services.TryAddSingleton(sp => {
             var options = sp.GetRequiredService<IOptions<SchemataMappingOptions>>();
+            var logging = sp.GetRequiredService<ILoggerFactory>();
 
-            return new MapperConfiguration(mapper => { AutoMapperConfigurator.Configure(mapper, options.Value); });
+            return new MapperConfiguration(mapper => { AutoMapperConfigurator.Configure(mapper, options.Value); }, logging);
         });
 
         builder.Schemata.AddFeature<SchemataMappingFeature<SimpleMapper>>();
