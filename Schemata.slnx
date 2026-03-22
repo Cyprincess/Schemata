@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/generators/">
-    <Project Path="generators/Schemata.Modeling.Generator/Schemata.Modeling.Generator.csproj" />
     <Project Path="generators/Schemata.Advice.Generator/Schemata.Advice.Generator.csproj" />
+    <Project Path="generators/Schemata.Modeling.Generator/Schemata.Modeling.Generator.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="eng/Versions.props" />
@@ -54,11 +54,19 @@
     <Project Path="targets/Schemata.Module.Targets/Schemata.Module.Targets.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Schemata.Entity.Repository.Tests/Schemata.Entity.Repository.Tests.csproj" />
+    <Project Path="tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Entity.LinqToDB.Integration.Tests/Schemata.Entity.LinqToDB.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Entity.Cache.Tests/Schemata.Entity.Cache.Tests.csproj" />
+    <Project Path="tests/Schemata.Core.Integration.Tests/Schemata.Core.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
+    <Project Path="tests/Schemata.Mapping.AutoMapper.Integration.Tests/Schemata.Mapping.AutoMapper.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Mapping.Mapster.Integration.Tests/Schemata.Mapping.Mapster.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Modeling.Generator.Tests/Schemata.Modeling.Generator.Tests.csproj" />
-    <Project Path="tests/Schemata.Entity.Tests/Schemata.Entity.Tests.csproj" />
-    <Project Path="tests/Schemata.Mapping.Tests/Schemata.Mapping.Tests.csproj" />
+    <Project Path="tests/Schemata.Resource.Foundation.Integration.Tests/Schemata.Resource.Foundation.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Resource.Foundation.Tests/Schemata.Resource.Foundation.Tests.csproj" />
+    <Project Path="tests/Schemata.Resource.Grpc.Tests/Schemata.Resource.Grpc.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Http.Tests/Schemata.Resource.Http.Tests.csproj" />
-    <Project Path="tests/Schemata.Resource.Tests/Schemata.Resource.Tests.csproj" />
     <Project Path="tests/Schemata.Workflow.Tests/Schemata.Workflow.Tests.csproj" />
   </Folder>
 </Solution>

@@ -125,15 +125,12 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
         string constructedAdvisorType;
         if (symbol.TypeParameters.Length > 0) {
             var paramNames = string.Join(", ", symbol.TypeParameters.Select(tp => tp.Name));
-            constructedAdvisorType
-                = $"{
-                    symbol.ToDisplayString(FullyQualified)
-                          .Replace(
-                               $"<{
-                                   string.Join(
-                                       ", ", symbol.TypeParameters.Select(tp => tp.ToDisplayString(FullyQualified)))
-                               }>", $"<{paramNames}>")
-                }";
+            constructedAdvisorType = $"{
+                symbol.ToDisplayString(FullyQualified)
+                      .Replace($"<{
+                          string.Join(", ", symbol.TypeParameters.Select(tp => tp.ToDisplayString(FullyQualified)))
+                      }>", $"<{paramNames}>")
+            }";
         } else {
             constructedAdvisorType = symbol.ToDisplayString(FullyQualified);
         }
