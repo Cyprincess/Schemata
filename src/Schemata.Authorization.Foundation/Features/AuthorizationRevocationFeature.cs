@@ -3,14 +3,26 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Enables the OAuth 2.0 Token Revocation endpoint (RFC 7009).
+/// </summary>
+/// <remarks>
+///     Allows clients to notify the authorization server that a token is no longer needed.
+///     Configures the <c>/Connect/Revocation</c> endpoint.
+/// </remarks>
 public sealed class AuthorizationRevocationFeature : IAuthorizationFeature
 {
     #region IAuthorizationFeature Members
 
-    public int Order => 2_200;
+    public const int DefaultOrder = AuthorizationIntrospectionFeature.DefaultOrder + 10_000;
 
-    public int Priority => Order;
+    /// <inheritdoc />
+    public int Order => DefaultOrder;
 
+    /// <inheritdoc />
+    public int Priority => DefaultOrder;
+
+    /// <inheritdoc />
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
@@ -19,6 +31,7 @@ public sealed class AuthorizationRevocationFeature : IAuthorizationFeature
         builder.SetRevocationEndpointUris("/Connect/Revocation");
     }
 
+    /// <inheritdoc />
     public void ConfigureServerAspNetCore(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,

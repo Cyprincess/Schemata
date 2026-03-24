@@ -8,8 +8,18 @@ using Schemata.Validation.Skeleton.Advisors;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for registering FluentValidation validators and their corresponding validation advisors.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers a FluentValidation validator and auto-registers <see cref="AdviceValidation{T}"/> and <see cref="AdviceValidationErrors{T}"/>.
+    /// </summary>
+    /// <typeparam name="TValidator">The validator implementation type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="lifetime">The service lifetime for the validator registration.</param>
+    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddValidator<TValidator>(
         this IServiceCollection services,
         ServiceLifetime         lifetime = ServiceLifetime.Scoped
@@ -30,6 +40,14 @@ public static class ServiceCollectionExtensions
         return AddValidator(services, serviceType, implementationType, lifetime);
     }
 
+    /// <summary>
+    /// Registers a FluentValidation validator for a specific entity type and auto-registers the validation advisors.
+    /// </summary>
+    /// <typeparam name="T">The entity type being validated.</typeparam>
+    /// <typeparam name="TValidator">The validator implementation type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="lifetime">The service lifetime for the validator registration.</param>
+    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddValidator<T, TValidator>(
         this IServiceCollection services,
         ServiceLifetime         lifetime = ServiceLifetime.Scoped

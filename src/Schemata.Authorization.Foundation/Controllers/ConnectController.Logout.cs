@@ -10,6 +10,10 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public sealed partial class ConnectController : ControllerBase
 {
+    /// <summary>
+    ///     Handles the OpenID Connect end-session (logout) request (POST).
+    ///     Signs out the user and redirects to the post-logout URI.
+    /// </summary>
     [HttpPost(nameof(Logout))]
     public async Task<IActionResult> Logout() {
         // Ask ASP.NET Core Identity to delete the local and external cookies created

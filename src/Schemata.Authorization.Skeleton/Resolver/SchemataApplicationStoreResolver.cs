@@ -8,12 +8,23 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
+/// <summary>
+///     Resolves the appropriate <see cref="IOpenIddictApplicationStore{TApplication}" /> implementation
+///     for the configured application entity type.
+/// </summary>
+/// <remarks>
+///     This is an infrastructure type registered by <c>SchemataAuthorizationFeature</c> to replace
+///     the default OpenIddict application store resolver with one backed by the Schemata repository.
+/// </remarks>
 public sealed class SchemataApplicationStoreResolver : IOpenIddictApplicationStoreResolver
 {
     private readonly IMemoryCache                           _cache;
     private readonly IOptionsMonitor<OpenIddictCoreOptions> _options;
     private readonly IServiceProvider                       _sp;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataApplicationStoreResolver" /> class.
+    /// </summary>
     public SchemataApplicationStoreResolver(
         IServiceProvider                       sp,
         IMemoryCache                           cache,
@@ -26,6 +37,7 @@ public sealed class SchemataApplicationStoreResolver : IOpenIddictApplicationSto
 
     #region IOpenIddictApplicationStoreResolver Members
 
+    /// <inheritdoc />
     public IOpenIddictApplicationStore<TApplication> Get<TApplication>()
         where TApplication : class {
         var store = _sp.GetService<IOpenIddictApplicationStore<TApplication>>();

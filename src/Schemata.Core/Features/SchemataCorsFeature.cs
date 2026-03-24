@@ -6,9 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures Cross-Origin Resource Sharing (CORS) middleware.
+/// </summary>
 public sealed class SchemataCorsFeature : FeatureBase
 {
-    public override int Priority => 150_000_000;
+    public const int DefaultPriority = SchemataQuotaFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

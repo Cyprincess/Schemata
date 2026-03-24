@@ -20,6 +20,10 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public sealed partial class ConnectController : ControllerBase
 {
+    /// <summary>
+    ///     Handles the OAuth 2.0 token exchange endpoint (POST).
+    ///     Supports authorization code, device code, refresh token, and client credentials grant types.
+    /// </summary>
     [HttpPost(nameof(Token))]
     public async Task<IActionResult> Token() {
         var request = HttpContext.GetOpenIddictServerRequest()

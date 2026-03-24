@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsTestProject)' == 'true' AND '$(Coverage)' == 'true'">
-    <TestRunnerAdditionalArguments>$(TestRunnerAdditionalArguments) --collect:"XPlat Code Coverage;Format=opencover"</TestRunnerAdditionalArguments>
+    <TestRunnerAdditionalArguments>$(TestRunnerAdditionalArguments) --collect:"XPlat Code Coverage;Format=opencover;Include=[Schemata.*]*;Exclude=[*.Tests]*"</TestRunnerAdditionalArguments>
     <TestRunnerAdditionalArguments>$(TestRunnerAdditionalArguments) --test-adapter-path "$(Pkgcoverlet_collector)/build/netstandard2.0"</TestRunnerAdditionalArguments>
   </PropertyGroup>
 

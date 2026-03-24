@@ -45,7 +45,7 @@ internal static class ResourceJsonOptions
             // Rename Entities to pluralized entity name per AIP-132
             if (info.Type is { IsGenericType: true } && info.Type.GetGenericTypeDefinition() == typeof(ListResult<>)) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(ListResult<long>.Entities),
+                    Name: nameof(ListResult<>.Entities),
                 });
 
                 if (property is not null) {

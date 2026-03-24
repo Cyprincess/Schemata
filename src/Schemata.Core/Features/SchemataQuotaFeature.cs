@@ -10,9 +10,14 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures rate limiting middleware with structured error responses on rejection.
+/// </summary>
 public sealed class SchemataQuotaFeature : FeatureBase
 {
-    public override int Priority => 141_100_000;
+    public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

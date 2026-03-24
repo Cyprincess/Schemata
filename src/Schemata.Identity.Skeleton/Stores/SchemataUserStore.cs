@@ -11,8 +11,14 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
+/// <summary>
+///     User store using the default Schemata entity types.
+/// </summary>
 public class SchemataUserStore : SchemataUserStore<SchemataUser>
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataUserStore"/> class.
+    /// </summary>
     public SchemataUserStore(
         IRepository<SchemataUser>      users,
         IRepository<SchemataRole>      roles,
@@ -24,9 +30,16 @@ public class SchemataUserStore : SchemataUserStore<SchemataUser>
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
+/// <summary>
+///     User store with a custom user type and default supporting entity types.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     where TUser : SchemataUser
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataUserStore{TUser}"/> class.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<SchemataRole>      roles,
@@ -38,11 +51,19 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
+/// <summary>
+///     User store with custom user and role types and default supporting entity types.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
+/// <typeparam name="TRole">The role entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
     SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
     where TUser : SchemataUser
     where TRole : SchemataRole
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataUserStore{TUser, TRole}"/> class.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<TRole>             roles,
@@ -54,6 +75,18 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
+/// <summary>
+///     Full repository-backed implementation of the ASP.NET Core Identity user store, implementing
+///     <see cref="IUserDisplayNameStore{TUser}"/>, <see cref="IUserPhoneStore{TUser}"/>,
+///     <see cref="IUserPrincipalNameStore{TUser}"/>, and <see cref="IProtectedUserStore{TUser}"/>.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
+/// <typeparam name="TRole">The role entity type.</typeparam>
+/// <typeparam name="TUserClaim">The user claim entity type.</typeparam>
+/// <typeparam name="TUserRole">The user-role join entity type.</typeparam>
+/// <typeparam name="TUserLogin">The user login entity type.</typeparam>
+/// <typeparam name="TUserToken">The user token entity type.</typeparam>
+/// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
     IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
@@ -65,13 +98,39 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     where TUserToken : SchemataUserToken, new()
     where TRoleClaim : SchemataRoleClaim, new()
 {
-    protected readonly IRepository<TRole>      RolesRepository;
+    /// <summary>
+    ///     The repository for role entities.
+    /// </summary>
+    protected readonly IRepository<TRole> RolesRepository;
+
+    /// <summary>
+    ///     The repository for user claim entities.
+    /// </summary>
     protected readonly IRepository<TUserClaim> UserClaimsRepository;
+
+    /// <summary>
+    ///     The repository for user login entities.
+    /// </summary>
     protected readonly IRepository<TUserLogin> UserLoginsRepository;
-    protected readonly IRepository<TUserRole>  UserRoleRepository;
-    protected readonly IRepository<TUser>      UsersRepository;
+
+    /// <summary>
+    ///     The repository for user-role join entities.
+    /// </summary>
+    protected readonly IRepository<TUserRole> UserRoleRepository;
+
+    /// <summary>
+    ///     The repository for user entities.
+    /// </summary>
+    protected readonly IRepository<TUser> UsersRepository;
+
+    /// <summary>
+    ///     The repository for user token entities.
+    /// </summary>
     protected readonly IRepository<TUserToken> UserTokensRepository;
 
+    /// <summary>
+    ///     Initializes a new instance of the user store with the specified repositories.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>      users,
         IRepository<TRole>      roles,
@@ -89,6 +148,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         UserTokensRepository = userTokens;
     }
 
+    /// <summary>
+    ///     Gets or sets a value indicating whether changes are automatically committed after each operation.
+    /// </summary>
     public virtual bool AutoSaveChanges { get; set; } = true;
 
     /// <inheritdoc />
@@ -96,6 +158,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserDisplayNameStore<TUser> Members
 
+    /// <inheritdoc />
     public virtual Task<string?> GetDisplayNameAsync(TUser user, CancellationToken ct) {
         return Task.FromResult(user.DisplayName);
     }
@@ -160,6 +223,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return IdentityResult.Success;
     }
 
+    /// <inheritdoc />
     public virtual async Task<TUser?> FindByPhoneAsync(string phone, CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -171,12 +235,17 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserPrincipalNameStore<TUser> Members
 
+    /// <inheritdoc />
     public virtual Task<string?> GetUserPrincipalNameAsync(TUser user, CancellationToken ct) {
         return GetNormalizedUserNameAsync(user, ct);
     }
 
     #endregion
 
+    /// <summary>
+    ///     Commits pending changes to the user repository if <see cref="AutoSaveChanges"/> is enabled.
+    /// </summary>
+    /// <param name="ct">A token to cancel the operation.</param>
     protected virtual async Task SaveChanges(CancellationToken ct) {
         if (!AutoSaveChanges) {
             return;

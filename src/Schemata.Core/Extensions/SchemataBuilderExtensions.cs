@@ -16,6 +16,9 @@ using Schemata.Core.Features;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Fluent extension methods for registering Schemata features on <see cref="SchemataBuilder" />.
+/// </summary>
 public static class SchemataBuilderExtensions
 {
     #region Logging Feature

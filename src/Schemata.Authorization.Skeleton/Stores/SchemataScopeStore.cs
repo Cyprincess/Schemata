@@ -13,12 +13,19 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
+/// <summary>
+///     Provides a Schemata repository-backed implementation of the OpenIddict scope store.
+/// </summary>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
 public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
     where TScope : SchemataScope
 {
     private readonly IMemoryCache        _cache;
     private readonly IRepository<TScope> _scopes;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataScopeStore{TScope}" /> class.
+    /// </summary>
     public SchemataScopeStore(IMemoryCache cache, IRepository<TScope> scopes) {
         _cache  = cache;
         _scopes = scopes;
@@ -26,10 +33,12 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
 
     #region IOpenIddictScopeStore<TScope> Members
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
         return await _scopes.LongCountAsync<TScope>(null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TScope>, IQueryable<TResult>> query,
         CancellationToken                             ct
@@ -37,35 +46,42 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return await _scopes.LongCountAsync(query, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask CreateAsync(TScope scope, CancellationToken ct) {
         await _scopes.AddAsync(scope, ct);
         await _scopes.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask DeleteAsync(TScope scope, CancellationToken ct) {
         await _scopes.RemoveAsync(scope, ct);
         await _scopes.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TScope?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Id == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TScope?> FindByNameAsync(string name, CancellationToken ct) {
         return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TScope> FindByNamesAsync(ImmutableArray<string> names, CancellationToken ct) {
         return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name!)), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TScope> FindByResourceAsync(string resource, CancellationToken ct) {
         var wrapped = $"\"{resource}\"";
         return _scopes.ListAsync(q => q.Where(s => s.Resources!.Contains(wrapped)), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
@@ -74,10 +90,12 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return await _scopes.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetDescriptionAsync(TScope scope, CancellationToken ct) {
         return new(scope.Description);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDescriptionsAsync(
         TScope            scope,
         CancellationToken ct
@@ -107,10 +125,12 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return new(descriptions);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetDisplayNameAsync(TScope scope, CancellationToken ct) {
         return new(scope.DisplayName);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
         TScope            scope,
         CancellationToken ct
@@ -140,12 +160,15 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return new(names);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetIdAsync(TScope scope, CancellationToken ct) {
         return new(scope.Id.ToString());
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetNameAsync(TScope scope, CancellationToken ct) { return new(scope.Name); }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TScope            scope,
         CancellationToken ct
@@ -166,6 +189,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return new(properties);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetResourcesAsync(TScope scope, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(scope.Resources)) {
             return new(ImmutableArray<string>.Empty);
@@ -183,14 +207,17 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return new(resources);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TScope> InstantiateAsync(CancellationToken ct) {
         return new(Activator.CreateInstance<TScope>());
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TScope> ListAsync(int? count, int? offset, CancellationToken ct) {
         return _scopes.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TScope>, TState, IQueryable<TResult>> query,
         TState                                                state,
@@ -199,11 +226,13 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return _scopes.ListAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDescriptionAsync(TScope scope, string? description, CancellationToken ct) {
         scope.Description = description;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDescriptionsAsync(
         TScope                                   scope,
         ImmutableDictionary<CultureInfo, string> descriptions,
@@ -220,11 +249,13 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDisplayNameAsync(TScope scope, string? name, CancellationToken ct) {
         scope.DisplayName = name;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDisplayNamesAsync(
         TScope                                   scope,
         ImmutableDictionary<CultureInfo, string> names,
@@ -241,11 +272,13 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetNameAsync(TScope scope, string? name, CancellationToken ct) {
         scope.Name = name;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPropertiesAsync(
         TScope                                   scope,
         ImmutableDictionary<string, JsonElement> properties,
@@ -261,6 +294,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetResourcesAsync(TScope scope, ImmutableArray<string> resources, CancellationToken ct) {
         if (resources.IsDefaultOrEmpty) {
             scope.Resources = null;
@@ -272,6 +306,7 @@ public class SchemataScopeStore<TScope> : IOpenIddictScopeStore<TScope>
         return default;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask UpdateAsync(TScope scope, CancellationToken ct) {
         await _scopes.UpdateAsync(scope, ct);
         await _scopes.CommitAsync(ct);

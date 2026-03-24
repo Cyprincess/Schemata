@@ -22,6 +22,10 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public sealed partial class ConnectController : ControllerBase
 {
+    /// <summary>
+    ///     Handles the OAuth 2.0 authorization request (GET).
+    ///     Returns a consent form or signs in the user automatically when prior consent exists.
+    /// </summary>
     [HttpGet(nameof(Authorize))]
     public async Task<IActionResult> Authorize() {
         var request = HttpContext.GetOpenIddictServerRequest()
@@ -199,6 +203,9 @@ public sealed partial class ConnectController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     Accepts the user's consent and issues an authorization code (POST).
+    /// </summary>
     [Authorize]
     [HttpPost(nameof(Authorize))]
     public async Task<IActionResult> Accept() {

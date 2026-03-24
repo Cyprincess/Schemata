@@ -79,7 +79,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             var found = await repository.FirstOrDefaultAsync(q => q.Where(s => s.FullName == "Alice"));
 
             Assert.NotNull(found);
-            Assert.Equal("Alice", found!.FullName);
+            Assert.Equal("Alice", found.FullName);
         }
     }
 
@@ -100,7 +100,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             var found = await repository.SingleOrDefaultAsync(q => q.Where(s => s.FullName == "Bob"));
 
             Assert.NotNull(found);
-            Assert.Equal("Bob", found!.FullName);
+            Assert.Equal("Bob", found.FullName);
         }
     }
 

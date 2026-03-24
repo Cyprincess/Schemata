@@ -10,6 +10,9 @@ using Schemata.Common;
 
 namespace Schemata.Core.Json;
 
+/// <summary>
+///     JSON type info resolver that auto-discovers <see cref="PolymorphicAttribute" /> types and wires polymorphic serialization.
+/// </summary>
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
     private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>?> _types = [];
@@ -28,8 +31,12 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
         }
     }
 
+    /// <summary>
+    ///     Gets the singleton instance.
+    /// </summary>
     public static PolymorphicTypeResolver Instance { get; } = new();
 
+    /// <inheritdoc />
     public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options) {
         var info = base.GetTypeInfo(type, options);
 

@@ -15,6 +15,9 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Common;
 
+/// <summary>
+///     Parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building canonical names.
+/// </summary>
 public sealed class ResourceNameDescriptor
 {
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, ResourceNameDescriptor> Cache = new();
@@ -133,8 +136,18 @@ public sealed class ResourceNameDescriptor
     /// </summary>
     public bool SupportsReadAcross { get; }
 
+    /// <summary>
+    ///     Gets or creates a cached descriptor for the specified entity type.
+    /// </summary>
+    /// <param name="type">The entity type.</param>
+    /// <returns>The resource name descriptor.</returns>
     public static ResourceNameDescriptor ForType(Type type) { return Cache.GetOrAdd(type.TypeHandle, _ => new(type)); }
 
+    /// <summary>
+    ///     Gets or creates a cached descriptor for the specified entity type.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <returns>The resource name descriptor.</returns>
     public static ResourceNameDescriptor ForType<T>() { return ForType(typeof(T)); }
 
     /// <summary>

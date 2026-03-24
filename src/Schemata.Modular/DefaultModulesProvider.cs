@@ -7,10 +7,16 @@ using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
 
+/// <summary>
+/// Default module provider that discovers modules from <see cref="ModuleAttribute"/> annotations on the entry assembly.
+/// </summary>
 public sealed class DefaultModulesProvider : IModulesProvider
 {
     private static readonly ConcurrentBag<ModuleDescriptor> Modules = [];
 
+    /// <summary>
+    /// Initializes the provider, scanning the entry assembly for <see cref="ModuleAttribute"/> instances.
+    /// </summary>
     public DefaultModulesProvider() {
         if (!Modules.IsEmpty) {
             return;
@@ -52,6 +58,7 @@ public sealed class DefaultModulesProvider : IModulesProvider
 
     #region IModulesProvider Members
 
+    /// <inheritdoc />
     public IEnumerable<ModuleDescriptor> GetModules() { return Modules; }
 
     #endregion

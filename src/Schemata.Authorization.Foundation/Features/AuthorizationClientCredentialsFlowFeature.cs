@@ -3,14 +3,26 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Enables the OAuth 2.0 Client Credentials flow.
+/// </summary>
+/// <remarks>
+///     Use this flow for machine-to-machine communication where the client authenticates
+///     with its own credentials (no user involvement). Configures the <c>/Connect/Token</c> endpoint.
+/// </remarks>
 public sealed class AuthorizationClientCredentialsFlowFeature : IAuthorizationFeature
 {
     #region IAuthorizationFeature Members
 
-    public int Order => 1_300;
+    public const int DefaultOrder = AuthorizationRefreshTokenFlowFeature.DefaultOrder + 10_000;
 
-    public int Priority => Order;
+    /// <inheritdoc />
+    public int Order => DefaultOrder;
 
+    /// <inheritdoc />
+    public int Priority => DefaultOrder;
+
+    /// <inheritdoc />
     public void ConfigureServer(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,
@@ -20,6 +32,7 @@ public sealed class AuthorizationClientCredentialsFlowFeature : IAuthorizationFe
                .SetTokenEndpointUris("/Connect/Token");
     }
 
+    /// <inheritdoc />
     public void ConfigureServerAspNetCore(
         IReadOnlyList<IAuthorizationFeature> features,
         IServiceCollection                   services,

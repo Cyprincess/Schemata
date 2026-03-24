@@ -1,0 +1,76 @@
+- name: Overview
+  href: overview.md
+- name: Core
+  href: core/overview.md
+  items:
+    - name: Overview
+      href: core/overview.md
+    - name: Feature System
+      href: core/feature-system.md
+    - name: Advice Pipeline
+      href: core/advice-pipeline.md
+    - name: Built-in Features
+      href: core/built-in-features.md
+    - name: JSON Serialization
+      href: core/json-serialization.md
+    - name: Error Model
+      href: core/error-model.md
+- name: Entity
+  href: entity/overview.md
+  items:
+    - name: Overview
+      href: entity/overview.md
+    - name: Traits
+      href: entity/traits.md
+- name: Repository
+  href: repository/overview.md
+  items:
+    - name: Overview
+      href: repository/overview.md
+    - name: Mutation Pipeline
+      href: repository/mutation-pipeline.md
+    - name: Query Pipeline
+      href: repository/query-pipeline.md
+    - name: Caching
+      href: repository/caching.md
+    - name: Providers
+      href: repository/providers.md
+- name: Resource
+  href: resource/overview.md
+  items:
+    - name: Overview
+      href: resource/overview.md
+    - name: Create Pipeline
+      href: resource/create-pipeline.md
+    - name: Read Pipeline
+      href: resource/read-pipeline.md
+    - name: Update Pipeline
+      href: resource/update-pipeline.md
+    - name: Delete Pipeline
+      href: resource/delete-pipeline.md
+    - name: Resource Naming
+      href: resource/resource-naming.md
+    - name: HTTP Transport
+      href: resource/http-transport.md
+    - name: gRPC Transport
+      href: resource/grpc-transport.md
+    - name: Filtering
+      href: resource/filtering.md
+- name: Mapping
+  href: mapping.md
+- name: Validation
+  href: validation.md
+- name: Security
+  href: security.md
+- name: Identity
+  href: identity.md
+- name: Authorization
+  href: authorization.md
+- name: Tenancy
+  href: tenancy.md
+- name: Workflow
+  href: workflow.md
+- name: Modules
+  href: modules.md
+- name: Packages
+  href: packages.md

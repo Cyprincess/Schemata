@@ -42,7 +42,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             using (scope) {
                 var found = await repository.FindAsync([id]);
                 Assert.NotNull(found);
-                Assert.Equal("Alice", found!.FullName);
+                Assert.Equal("Alice", found.FullName);
             }
         }
     }
@@ -70,7 +70,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             using (scope) {
                 var entity = await repository.FindAsync([id]);
                 Assert.NotNull(entity);
-                entity!.FullName = "Bob Updated";
+                entity.FullName = "Bob Updated";
                 await repository.UpdateAsync(entity);
                 await repository.CommitAsync();
             }
@@ -108,7 +108,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             using (scope) {
                 var entity = await repository.FindAsync([id]);
                 Assert.NotNull(entity);
-                await repository.RemoveAsync(entity!);
+                await repository.RemoveAsync(entity);
                 await repository.CommitAsync();
             }
         }

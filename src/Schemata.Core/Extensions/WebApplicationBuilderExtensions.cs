@@ -5,6 +5,9 @@ using Schemata.Core;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for registering Schemata on <see cref="WebApplicationBuilder" />.
+/// </summary>
 public static class WebApplicationBuilderExtensions
 {
     public static WebApplicationBuilder UseSchemata(this WebApplicationBuilder builder) {

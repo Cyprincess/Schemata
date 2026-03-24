@@ -5,10 +5,18 @@ using Microsoft.Extensions.Options;
 
 namespace Schemata.Core;
 
+/// <summary>
+///     Registry for deferred configuration actions that are accumulated during builder setup and applied later.
+/// </summary>
 public sealed class Configurators
 {
     private readonly Dictionary<Type, object> _configurators = [];
 
+    /// <summary>
+    ///     Registers or chains a configuration action for the specified type.
+    /// </summary>
+    /// <typeparam name="T">The options type to configure.</typeparam>
+    /// <param name="action">The configuration action.</param>
     public void Set<T>(Action<T> action) {
         var key = typeof(T);
 
@@ -23,6 +31,12 @@ public sealed class Configurators
         };
     }
 
+    /// <summary>
+    ///     Registers or chains a configuration action with two parameters.
+    /// </summary>
+    /// <typeparam name="T1">The first parameter type.</typeparam>
+    /// <typeparam name="T2">The second parameter type.</typeparam>
+    /// <param name="action">The configuration action.</param>
     public void Set<T1, T2>(Action<T1, T2> action) {
         var key = typeof((T1, T2));
 
@@ -37,6 +51,12 @@ public sealed class Configurators
         };
     }
 
+    /// <summary>
+    ///     Attempts to retrieve a configuration action for the specified type.
+    /// </summary>
+    /// <typeparam name="T">The options type.</typeparam>
+    /// <param name="action">When this method returns, contains the action if found.</param>
+    /// <returns><see langword="true" /> if an action was found.</returns>
     public bool TryGet<T>(out Action<T>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof(T), out var @object)) {
@@ -51,6 +71,13 @@ public sealed class Configurators
         return true;
     }
 
+    /// <summary>
+    ///     Attempts to retrieve a two-parameter configuration action.
+    /// </summary>
+    /// <typeparam name="T1">The first parameter type.</typeparam>
+    /// <typeparam name="T2">The second parameter type.</typeparam>
+    /// <param name="action">When this method returns, contains the action if found.</param>
+    /// <returns><see langword="true" /> if an action was found.</returns>
     public bool TryGet<T1, T2>(out Action<T1, T2>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof((T1, T2)), out var @object)) {
@@ -65,6 +92,12 @@ public sealed class Configurators
         return true;
     }
 
+    /// <summary>
+    ///     Retrieves a configuration action, throwing if not found.
+    /// </summary>
+    /// <typeparam name="T">The options type.</typeparam>
+    /// <returns>The configuration action.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when no configurator is registered for the type.</exception>
     public Action<T> Get<T>() {
         if (TryGet<T>(out var action)) {
             return action!;
@@ -73,6 +106,13 @@ public sealed class Configurators
         throw new KeyNotFoundException($"No configurator for {typeof(T)}");
     }
 
+    /// <summary>
+    ///     Retrieves a two-parameter configuration action, throwing if not found.
+    /// </summary>
+    /// <typeparam name="T1">The first parameter type.</typeparam>
+    /// <typeparam name="T2">The second parameter type.</typeparam>
+    /// <returns>The configuration action.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when no configurator is registered for the type pair.</exception>
     public Action<T1, T2> Get<T1, T2>() {
         if (TryGet<T1, T2>(out var action)) {
             return action!;
@@ -81,18 +121,34 @@ public sealed class Configurators
         throw new KeyNotFoundException($"No configurator for ({typeof(T1)}, {typeof(T2)})");
     }
 
+    /// <summary>
+    ///     Retrieves and removes a configuration action, throwing if not found.
+    /// </summary>
+    /// <typeparam name="T">The options type.</typeparam>
+    /// <returns>The configuration action.</returns>
     public Action<T> Pop<T>() {
         var action = Get<T>();
         _configurators.Remove(typeof(T));
         return action;
     }
 
+    /// <summary>
+    ///     Retrieves and removes a two-parameter configuration action, throwing if not found.
+    /// </summary>
+    /// <typeparam name="T1">The first parameter type.</typeparam>
+    /// <typeparam name="T2">The second parameter type.</typeparam>
+    /// <returns>The configuration action.</returns>
     public Action<T1, T2> Pop<T1, T2>() {
         var action = Get<T1, T2>();
         _configurators.Remove(typeof((T1, T2)));
         return action;
     }
 
+    /// <summary>
+    ///     Retrieves and removes a configuration action, returning a no-op if not found.
+    /// </summary>
+    /// <typeparam name="T">The options type.</typeparam>
+    /// <returns>The configuration action, or a no-op action.</returns>
     public Action<T> PopOrDefault<T>() {
         if (!TryGet<T>(out var action)) {
             return _ => { };
@@ -103,6 +159,12 @@ public sealed class Configurators
         return action!;
     }
 
+    /// <summary>
+    ///     Retrieves and removes a two-parameter configuration action, returning a no-op if not found.
+    /// </summary>
+    /// <typeparam name="T1">The first parameter type.</typeparam>
+    /// <typeparam name="T2">The second parameter type.</typeparam>
+    /// <returns>The configuration action, or a no-op action.</returns>
     public Action<T1, T2> PopOrDefault<T1, T2>() {
         if (!TryGet<T1, T2>(out var action)) {
             return (_, _) => { };

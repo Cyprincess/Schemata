@@ -5,17 +5,27 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 
 namespace Schemata.Modular.Features;
 
+/// <summary>
+/// Feature that bootstraps the modular system by discovering modules and running their lifecycle methods.
+/// </summary>
+/// <typeparam name="TProvider">The module provider type.</typeparam>
+/// <typeparam name="TRunner">The module runner type.</typeparam>
 public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
 {
-    public override int Priority => 2_147_200_000;
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 80_000_000;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -39,6 +49,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         services.TryAddSingleton<IModulesRunner>(_ => context);
     }
 
+    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
@@ -48,6 +59,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         runner.ConfigureApplication(app, configuration, environment);
     }
 
+    /// <inheritdoc />
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

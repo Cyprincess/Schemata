@@ -12,6 +12,9 @@ using Schemata.Identity.Skeleton.Managers;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     OAuth 2.0 / OpenID Connect endpoints for authorization, token exchange, device verification, and logout.
+/// </summary>
 [ApiController]
 [Route("~/[controller]")]
 public sealed partial class ConnectController : ControllerBase
@@ -22,6 +25,9 @@ public sealed partial class ConnectController : ControllerBase
     private readonly SignInManager<SchemataUser>       _signInManager;
     private readonly SchemataUserManager<SchemataUser> _userManager;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ConnectController" /> class.
+    /// </summary>
     public ConnectController(
         IOpenIddictApplicationManager     applicationManager,
         IOpenIddictAuthorizationManager   authorizationManager,

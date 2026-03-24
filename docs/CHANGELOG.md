@@ -2,7 +2,35 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
-## 1.0.0-preview - 2025-03-04
+
+## 9.0.0-preview - 2026-03-25
+#### Bug Fixes
+- **(Identity)** BearerTokenOptions when UseIdentity - (13c8ba7) - Chino Chang
+- **(Identity)** set scheme to issue tokens - (bb0b463) - Chino Chang
+- **(Identity)** fix schemes for Identity API - (34fbea2) - Chino Chang
+- **(Identity)** Identity.Application scheme - (1ad2c65) - Chino Chang
+- **(Identity)** primary key mismatch - (2267c35) - Chino Chang
+- **(Identity)** user role names - (420600a) - Chino Chang
+- **(Resource)** stack overflow - (61d4be6) - Chino Chang
+- **(Resource)** fix runtime issues - (234b9e8) - Chino Chang
+#### Documentation
+- update copyright year - (5fbc1de) - Chino Chang
+#### Features
+- **(Core)** set ForwardedHeaders - (ee00588) - Chino Chang
+- **(Core)** write long as string for JSON - (ec2c7d6) - Chino Chang
+- **(Entity)** support "parent" for canonical name - (9244ad0) - Chino Chang
+- **(Entity)** use visitor for cache - (a8fc426) - Chino Chang
+- **(Identity)** configure BearerTokenOptions - (7b82eed) - Chino Chang
+- **(Identity)** add advices to Register - (fc9e643) - Chino Chang
+#### Refactoring
+- **(Core)** use StatusCodes not HttpStatusCode - (3ceb6bd) - Chino Chang
+- upgrade to .Net 9 - (7cc3bf5) - Chino Chang
+#### Style
+- remove NET8_0_OR_GREATER marco - (2691b3b) - Chino Chang
+
+- - -
+
+## 1.0.0-preview - 2026-03-25
 #### Bug Fixes
 - **(Core)** fix InvokerUtilities - (7961cbd) - Chino Chang
 - **(Core)** fix features - (3af7b25) - Chino Chang

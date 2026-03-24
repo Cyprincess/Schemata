@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -8,15 +9,30 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+public static class AdviceDeleteFreshness
+{
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
+}
+
+/// <summary>
+/// Enforces optimistic concurrency for delete operations by comparing the request ETag with the entity timestamp.
+/// </summary>
+/// <typeparam name="TEntity">The entity type being deleted.</typeparam>
+/// <remarks>
+/// Order: 200,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature"/>.
+/// Skipped when the <see cref="Schemata.Abstractions.Resource.DeleteRequest.Force"/> flag is set on the delete request.
+/// Throws <see cref="Schemata.Abstractions.Exceptions.ConcurrencyException"/> when the ETag does not match.
+/// Suppressed when <see cref="SuppressFreshness"/> is present in the advice context.
+/// </remarks>
 public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
     #region IResourceDeleteAdvisor<TEntity> Members
 
-    public int Order => 200_000_000;
+    /// <inheritdoc />
+    public int Order => AdviceDeleteFreshness.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity           entity,

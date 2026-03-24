@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using FluentValidation;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
@@ -12,18 +13,36 @@ using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Validation.FluentValidation.Advisors;
 
+public static class AdviceValidation
+{
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
+}
+
+/// <summary>
+/// Validation advisor that integrates FluentValidation into the Schemata validation pipeline.
+/// </summary>
+/// <typeparam name="T">The type being validated.</typeparam>
+/// <remarks>
+/// Resolves <see cref="IValidator{T}"/> from the service provider and runs validation,
+/// translating FluentValidation failures into <see cref="ErrorFieldViolation"/> entries.
+/// Auto-registered when <see cref="ServiceCollectionExtensions.AddValidator{TValidator}"/> is called.
+/// </remarks>
 public sealed class AdviceValidation<T> : IValidationAdvisor<T>
 {
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    /// Initializes a new instance with the specified service provider.
+    /// </summary>
+    /// <param name="sp">The service provider for resolving validators.</param>
     public AdviceValidation(IServiceProvider sp) { _sp = sp; }
 
     #region IValidationAdvisor<T> Members
 
-    public int Order => 100_000_000;
+    /// <inheritdoc />
+    public int Order => AdviceValidation.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext              ctx,
         Operations                 operation,

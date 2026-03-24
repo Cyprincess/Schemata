@@ -10,8 +10,19 @@ using Schemata.Resource.Foundation.Models;
 // ReSharper disable once CheckNamespace
 namespace System.Linq;
 
+/// <summary>
+/// Extension methods for composing queryable filtering, ordering, and pagination operations.
+/// </summary>
 public static class QueryableExtensions
 {
+    /// <summary>
+    /// Composes a filter expression onto an existing query function.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="query">The existing query function to extend.</param>
+    /// <param name="filter">The parsed filter expression.</param>
+    /// <param name="configure">Optional callback to customize the filter container.</param>
+    /// <returns>A new query function that applies the filter.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithFiltering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Filter?                                 filter,
@@ -35,6 +46,13 @@ public static class QueryableExtensions
         return q => query(q).Where(predicate);
     }
 
+    /// <summary>
+    /// Composes ordering specifications onto an existing query function.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="query">The existing query function to extend.</param>
+    /// <param name="order">The member-to-ordering mapping.</param>
+    /// <returns>A new query function that applies the ordering.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithOrdering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Dictionary<Member, Ordering>?           order
@@ -62,6 +80,13 @@ public static class QueryableExtensions
         return query;
     }
 
+    /// <summary>
+    /// Composes skip/take pagination onto an existing query function.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="query">The existing query function to extend.</param>
+    /// <param name="token">The page token containing skip and page size.</param>
+    /// <returns>A new query function that applies pagination.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         PageToken                               token
@@ -73,6 +98,14 @@ public static class QueryableExtensions
         return query;
     }
 
+    /// <summary>
+    /// Applies an ordering expression, chaining as <see cref="System.Linq.Queryable.ThenBy{TSource,TKey}(IOrderedQueryable{TSource}, System.Linq.Expressions.Expression{Func{TSource,TKey}})">ThenBy</see> when the source is already ordered.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="source">The queryable source.</param>
+    /// <param name="select">The property selector expression.</param>
+    /// <param name="ordering">The sort direction.</param>
+    /// <returns>An ordered queryable.</returns>
     public static IOrderedQueryable<T> WithOrdering<T>(
         this IQueryable<T>          source,
         Expression<Func<T, object>> select,

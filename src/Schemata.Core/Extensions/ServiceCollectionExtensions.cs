@@ -7,6 +7,9 @@ using Schemata.Core;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+///     Extension methods for registering Schemata on <see cref="IServiceCollection" />.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddSchemata(

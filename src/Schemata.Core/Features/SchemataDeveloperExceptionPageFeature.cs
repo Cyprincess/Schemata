@@ -6,10 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Enables the developer exception page in the Development environment.
+/// </summary>
 [Information("Developer Exception Page will only be enabled in Development environment.", Level = LogLevel.Debug)]
 public sealed class SchemataDeveloperExceptionPageFeature : FeatureBase
 {
-    public override int Priority => 110_000_000;
+    public const int DefaultPriority = SchemataForwardedHeadersFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

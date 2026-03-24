@@ -5,9 +5,13 @@ using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton.Services;
 
+/// <summary>
+///     Default tenant context accessor using <see cref="SchemataTenant{TKey}" /> with <see cref="Guid" /> keys.
+/// </summary>
 public class SchemataTenantContextAccessor : SchemataTenantContextAccessor<SchemataTenant<Guid>, Guid>,
                                              ITenantContextAccessor
 {
+    /// <inheritdoc />
     public SchemataTenantContextAccessor(
         IServiceProvider                           sp,
         ITenantResolver<Guid>                      resolver,
@@ -15,6 +19,11 @@ public class SchemataTenantContextAccessor : SchemataTenantContextAccessor<Schem
     ) : base(sp, resolver, manager) { }
 }
 
+/// <summary>
+///     Resolves and caches the current tenant for the request scope.
+/// </summary>
+/// <typeparam name="TTenant">The tenant entity type.</typeparam>
+/// <typeparam name="TKey">The tenant identifier type.</typeparam>
 public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccessor<TTenant, TKey>
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
@@ -23,6 +32,9 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
     private readonly ITenantResolver<TKey>         _resolver;
     private readonly IServiceProvider              _sp;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataTenantContextAccessor{TTenant, TKey}" /> class.
+    /// </summary>
     public SchemataTenantContextAccessor(
         IServiceProvider              sp,
         ITenantResolver<TKey>         resolver,
@@ -35,8 +47,10 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
 
     #region ITenantContextAccessor<TTenant,TKey> Members
 
+    /// <inheritdoc />
     public TTenant? Tenant { get; private set; }
 
+    /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken ct) {
         var id = await _resolver.ResolveAsync(ct);
 
@@ -52,12 +66,14 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
         await InitializeAsync(tenant, ct);
     }
 
+    /// <inheritdoc />
     public Task InitializeAsync(TTenant tenant, CancellationToken ct) {
         Tenant = tenant;
 
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) { return Task.FromResult(_sp); }
 
     #endregion

@@ -4,6 +4,13 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
+/// <summary>
+/// Represents a text (string) literal or identifier value in the filter grammar.
+/// </summary>
+/// <remarks>
+/// During expression building, text values are first resolved against bound parameters and expressions
+/// in the container before falling back to a constant string.
+/// </remarks>
 public class Text : IValue
 {
     public Text(TextPosition position, string value) {
@@ -11,6 +18,9 @@ public class Text : IValue
         Position = position;
     }
 
+    /// <summary>
+    /// Gets the text value.
+    /// </summary>
     public string Value { get; }
 
     #region IValue Members

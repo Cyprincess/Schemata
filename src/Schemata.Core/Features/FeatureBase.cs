@@ -6,14 +6,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Base class for features providing default no-op implementations of the <see cref="ISimpleFeature" /> methods.
+/// </summary>
 public abstract class FeatureBase : ISimpleFeature
 {
     #region ISimpleFeature Members
 
+    /// <inheritdoc />
     public virtual int Order => Priority;
 
+    /// <inheritdoc />
     public virtual int Priority => int.MaxValue;
 
+    /// <inheritdoc />
     public virtual void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -22,12 +28,14 @@ public abstract class FeatureBase : ISimpleFeature
         IWebHostEnvironment environment
     ) { }
 
+    /// <inheritdoc />
     public virtual void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) { }
 
+    /// <inheritdoc />
     public virtual void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

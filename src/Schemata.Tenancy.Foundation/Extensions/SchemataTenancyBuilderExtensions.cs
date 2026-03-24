@@ -8,8 +8,12 @@ using Schemata.Tenancy.Skeleton.Entities;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for <see cref="SchemataTenancyBuilder{TTenant, TKey}" /> to register tenant resolvers.
+/// </summary>
 public static class SchemataTenancyBuilderExtensions
 {
+    /// <summary>Registers the <c>x-tenant-id</c> HTTP header resolver.</summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UseHeaderResolver<TTenant, TKey>(
         this SchemataTenancyBuilder<TTenant, TKey> builder
     )
@@ -20,6 +24,7 @@ public static class SchemataTenancyBuilderExtensions
         return builder;
     }
 
+    /// <summary>Registers the request <c>Host</c> header resolver, matching against tenant host names.</summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UseHostResolver<TTenant, TKey>(
         this SchemataTenancyBuilder<TTenant, TKey> builder
     )
@@ -30,6 +35,7 @@ public static class SchemataTenancyBuilderExtensions
         return builder;
     }
 
+    /// <summary>Registers the <c>{Tenant}</c> route parameter resolver.</summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UsePathResolver<TTenant, TKey>(
         this SchemataTenancyBuilder<TTenant, TKey> builder
     )
@@ -40,6 +46,7 @@ public static class SchemataTenancyBuilderExtensions
         return builder;
     }
 
+    /// <summary>Registers the authenticated principal <c>Tenant</c> claim resolver.</summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UsePrincipalResolver<TTenant, TKey>(
         this SchemataTenancyBuilder<TTenant, TKey> builder
     )
@@ -50,6 +57,7 @@ public static class SchemataTenancyBuilderExtensions
         return builder;
     }
 
+    /// <summary>Registers the <c>Tenant</c> query string parameter resolver.</summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UseQueryResolver<TTenant, TKey>(
         this SchemataTenancyBuilder<TTenant, TKey> builder
     )

@@ -8,8 +8,14 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
+/// <summary>
+/// Represents the has operator (<c>:</c>) supporting presence checks, collection containment, dictionary key lookup, and string contains.
+/// </summary>
 public class Has : IBinary
 {
+    /// <summary>
+    /// The character representing the has operator.
+    /// </summary>
     public const char Char = ':';
 
     public Has(TextPosition position) { Position = position; }

@@ -140,7 +140,6 @@ public class IntegrationFixture : IAsyncLifetime
         #region IRepositoryAddAdvisor<Student> Members
 
         public int Order    => 0;
-        public int Priority => 0;
 
         public Task<AdviseResult> AdviseAsync(
             AdviceContext        ctx,

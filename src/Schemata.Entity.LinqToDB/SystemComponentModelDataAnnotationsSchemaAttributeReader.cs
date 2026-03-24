@@ -31,10 +31,26 @@ using LinqToDB.Metadata;
 
 namespace Schemata.Entity.LinqToDB;
 
+/// <summary>
+///     LINQ to DB metadata reader that maps <c>System.ComponentModel.DataAnnotations.Schema</c> attributes to LINQ to DB mapping attributes.
+/// </summary>
+/// <remarks>
+///     Translates <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />,
+///     <see cref="System.ComponentModel.DataAnnotations.Schema.ColumnAttribute" />,
+///     <see cref="System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute" />,
+///     <see cref="System.ComponentModel.DataAnnotations.KeyAttribute" />, and
+///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />
+///     into their LINQ to DB equivalents.
+/// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
     #region IMetadataReader Members
 
+    /// <summary>
+    ///     Returns LINQ to DB mapping attributes for the specified type by reading <c>System.ComponentModel.DataAnnotations.Schema.TableAttribute</c>.
+    /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type) {
         var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
 
@@ -69,6 +85,12 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         return [attr];
     }
 
+    /// <summary>
+    ///     Returns LINQ to DB mapping attributes for the specified member by reading <c>System.ComponentModel.DataAnnotations</c> attributes.
+    /// </summary>
+    /// <param name="type">The declaring type.</param>
+    /// <param name="member">The member to inspect.</param>
+    /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
         if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
             return [new NotColumnAttribute()];
@@ -101,6 +123,10 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />
     public MemberInfo[] GetDynamicColumns(Type type) { return []; }
 
+    /// <summary>
+    ///     Returns a unique identifier for this metadata reader instance.
+    /// </summary>
+    /// <returns>A string identifier.</returns>
     public string GetObjectID() { return $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}."; }
 
     #endregion

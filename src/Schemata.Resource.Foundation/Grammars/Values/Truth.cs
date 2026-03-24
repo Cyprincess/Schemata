@@ -4,6 +4,9 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
+/// <summary>
+/// Represents a boolean literal value (TRUE/FALSE) in the filter grammar.
+/// </summary>
 public class Truth : IValue
 {
     public Truth(TextPosition position, bool value) {
@@ -11,6 +14,9 @@ public class Truth : IValue
         Position = position;
     }
 
+    /// <summary>
+    /// Gets the boolean value.
+    /// </summary>
     public bool Value { get; }
 
     #region IValue Members

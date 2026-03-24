@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Tenancy.Foundation.Middlewares;
@@ -14,15 +15,27 @@ using Schemata.Tenancy.Skeleton.Services;
 
 namespace Schemata.Tenancy.Foundation.Features;
 
+/// <summary>
+///     Configures multi-tenancy services, context accessors, and request pipeline middleware.
+/// </summary>
+/// <typeparam name="TManager">The tenant manager implementation type.</typeparam>
+/// <typeparam name="TTenant">The tenant entity type.</typeparam>
+/// <typeparam name="TKey">The tenant identifier type.</typeparam>
 public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBase
     where TManager : class, ITenantManager<TTenant, TKey>
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    public override int Order => 2_147_100_000;
+    public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 10_000_000;
+    public const int DefaultOrder    = SchemataConstants.Orders.Max;
 
-    public override int Priority => 100_100_000;
+    /// <inheritdoc />
+    public override int Order => DefaultOrder;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -52,6 +65,7 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
         services.TryAddTransient<ITenantServiceProviderFactory<TTenant, TKey>>(sp => sp.GetRequiredService<SchemataTenantServiceProviderFactory<TTenant, TKey>>());
     }
 
+    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

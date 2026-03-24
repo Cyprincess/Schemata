@@ -6,10 +6,14 @@ using Schemata.Common;
 
 namespace Schemata.Resource.Http;
 
+/// <summary>
+/// MVC convention that configures route templates and rate limiting for generic resource controllers.
+/// </summary>
 public sealed class ResourceControllerConvention : IControllerModelConvention
 {
     #region IControllerModelConvention Members
 
+    /// <inheritdoc />
     public void Apply(ControllerModel controller) {
         if (!controller.ControllerType.IsGenericType
          || controller.ControllerType.GetGenericTypeDefinition() != typeof(ResourceController<,,,>)) {

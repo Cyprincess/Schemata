@@ -10,8 +10,14 @@ using Schemata.Tenancy.Skeleton.Services;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for <see cref="SchemataBuilder" /> to enable multi-tenancy.
+/// </summary>
 public static class SchemataBuilderExtensions
 {
+    /// <summary>
+    ///     Adds multi-tenancy using the default entity type and <see cref="Guid" /> keys.
+    /// </summary>
     public static SchemataTenancyBuilder<SchemataTenant<Guid>, Guid> UseTenancy(
         this SchemataBuilder                               builder,
         Action<IServiceCollection, SchemataTenant<Guid>?>? configure = null
@@ -19,6 +25,9 @@ public static class SchemataBuilderExtensions
         return builder.UseTenancy<SchemataTenant<Guid>, Guid>(configure);
     }
 
+    /// <summary>
+    ///     Adds multi-tenancy using a custom tenant entity type with the default manager.
+    /// </summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TTenant, TKey>(
         this SchemataBuilder                  builder,
         Action<IServiceCollection, TTenant?>? configure = null
@@ -28,6 +37,9 @@ public static class SchemataBuilderExtensions
         return builder.UseTenancy<SchemataTenantManager<TTenant, TKey>, TTenant, TKey>(configure);
     }
 
+    /// <summary>
+    ///     Adds multi-tenancy using custom manager and tenant entity types.
+    /// </summary>
     public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TManager, TTenant, TKey>(
         this SchemataBuilder                  builder,
         Action<IServiceCollection, TTenant?>? configure = null

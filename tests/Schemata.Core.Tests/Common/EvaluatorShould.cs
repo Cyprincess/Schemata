@@ -18,7 +18,7 @@ public class EvaluatorShould
 
         // The closure reference (threshold) should be replaced with a constant.
         // Verify by compiling the result and checking it still works.
-        var lambda   = (LambdaExpression)result!;
+        var lambda   = (LambdaExpression)result;
         var compiled = ((Expression<Func<int, bool>>)lambda).Compile();
 
         Assert.True(compiled(15));
@@ -38,7 +38,7 @@ public class EvaluatorShould
 
         Assert.NotNull(result);
 
-        var lambda   = (LambdaExpression)result!;
+        var lambda   = (LambdaExpression)result;
         var compiled = ((Expression<Func<int, int>>)lambda).Compile();
 
         Assert.Equal(6, compiled(5));

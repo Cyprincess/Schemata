@@ -9,8 +9,14 @@ using Schemata.Core.Features;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for <see cref="SchemataBuilder" /> to enable authorization.
+/// </summary>
 public static class SchemataBuilderExtensions
 {
+    /// <summary>
+    ///     Adds OpenIddict-based authorization using the default entity types.
+    /// </summary>
     public static SchemataAuthorizationBuilder UseAuthorization(
         this SchemataBuilder                       builder,
         Action<OpenIddictServerBuilder>?           serve     = null,
@@ -20,6 +26,9 @@ public static class SchemataBuilderExtensions
         return builder.UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(serve, integrate, store);
     }
 
+    /// <summary>
+    ///     Adds OpenIddict-based authorization using custom entity types.
+    /// </summary>
     public static SchemataAuthorizationBuilder UseAuthorization<TApplication, TAuthorization, TScope, TToken>(
         this SchemataBuilder                       builder,
         Action<OpenIddictServerBuilder>?           serve     = null,

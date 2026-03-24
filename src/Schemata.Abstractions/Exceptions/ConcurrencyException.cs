@@ -3,8 +3,12 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Abstractions.Exceptions;
 
+/// <summary>
+///     Thrown when an optimistic concurrency check fails (HTTP 409, ABORTED).
+/// </summary>
 public sealed class ConcurrencyException : SchemataException
 {
+    /// <inheritdoc />
     public ConcurrencyException(
         int     status  = 409,
         string? code    = ErrorCodes.Aborted,

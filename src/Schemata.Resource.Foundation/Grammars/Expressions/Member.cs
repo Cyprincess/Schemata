@@ -9,8 +9,17 @@ using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
+/// <summary>
+/// Represents a member access expression (e.g. <c>entity.property</c>) in the filter grammar.
+/// </summary>
 public class Member : IComparable
 {
+    /// <summary>
+    /// Initializes a new member with a root value and optional field chain.
+    /// </summary>
+    /// <param name="position">The position in the source text.</param>
+    /// <param name="value">The root value token.</param>
+    /// <param name="fields">The chain of field accesses following the root.</param>
     public Member(TextPosition position, IValue value, IReadOnlyCollection<IField>? fields) {
         Position = position;
 
@@ -21,8 +30,14 @@ public class Member : IComparable
         }
     }
 
+    /// <summary>
+    /// Gets the root value token of this member access.
+    /// </summary>
     public IValue Value { get; }
 
+    /// <summary>
+    /// Gets the chain of field accesses following the root value.
+    /// </summary>
     public List<IField> Fields { get; } = [];
 
     #region IComparable Members
@@ -43,6 +58,11 @@ public class Member : IComparable
 
     #endregion
 
+    /// <summary>
+    /// Builds the member access expression chain up to (but not including) the last field.
+    /// </summary>
+    /// <param name="ctx">The expression-building container.</param>
+    /// <returns>The intermediate member expression.</returns>
     public Expression ToMemberExpression(Container ctx) {
         var expression = Value.ToExpression(ctx);
 

@@ -9,6 +9,10 @@ using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
+/// <summary>
+///     API controller providing identity endpoints for registration, login, token refresh,
+///     profile management, password reset, account confirmation, and two-factor authentication.
+/// </summary>
 [ApiController]
 [Route("~/[controller]")]
 public sealed partial class AuthenticateController : ControllerBase
@@ -21,6 +25,9 @@ public sealed partial class AuthenticateController : ControllerBase
     private readonly IServiceProvider                  _sp;
     private readonly SchemataUserManager<SchemataUser> _userManager;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="AuthenticateController"/> class.
+    /// </summary>
     public AuthenticateController(
         SchemataUserManager<SchemataUser>        userManager,
         IMailSender<SchemataUser>                mailSender,

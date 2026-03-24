@@ -7,11 +7,19 @@ using Microsoft.Extensions.Hosting;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Resolver;
 using Schemata.Authorization.Skeleton.Stores;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Configures OpenIddict authorization services, entity stores, and ASP.NET Core integration.
+/// </summary>
+/// <typeparam name="TApplication">The application entity type.</typeparam>
+/// <typeparam name="TAuthorization">The authorization entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
 [DependsOn<SchemataControllersFeature>]
 public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
     where TApplication : SchemataApplication
@@ -19,8 +27,12 @@ public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, T
     where TScope : SchemataScope
     where TToken : SchemataToken
 {
-    public override int Priority => 320_000_000;
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 20_000_000;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

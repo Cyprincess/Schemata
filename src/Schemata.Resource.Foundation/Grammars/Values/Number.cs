@@ -4,6 +4,9 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
+/// <summary>
+/// Represents a decimal number literal value in the filter grammar.
+/// </summary>
 public class Number : IValue
 {
     public Number(TextPosition position, decimal value) {
@@ -11,6 +14,9 @@ public class Number : IValue
         Position = position;
     }
 
+    /// <summary>
+    /// Gets the decimal value.
+    /// </summary>
     public decimal Value { get; }
 
     #region IValue Members

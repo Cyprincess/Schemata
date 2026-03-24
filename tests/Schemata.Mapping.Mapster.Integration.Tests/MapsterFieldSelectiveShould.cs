@@ -44,7 +44,7 @@ public class MapsterFieldSelectiveShould
             Sex         = "Unknown",
         };
 
-        mapper.Map<Source, Destination>(source, destination, new List<string> { "Age" });
+        mapper.Map(source, destination, new List<string> { "Age" });
 
         Assert.Equal(30, destination.Age);
         Assert.Equal("Original", destination.DisplayName);
@@ -70,7 +70,7 @@ public class MapsterFieldSelectiveShould
             Sex         = "PresetSex",
         };
 
-        mapper.Map<Source, Destination>(source, destination, new List<string> { "DisplayName", "Sex" });
+        mapper.Map(source, destination, new List<string> { "DisplayName", "Sex" });
 
         Assert.Equal("Mr. Bob", destination.DisplayName);
         Assert.Equal(nameof(Sex.Male), destination.Sex);

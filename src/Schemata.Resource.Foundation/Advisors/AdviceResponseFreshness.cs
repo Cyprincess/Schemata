@@ -1,22 +1,39 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+public static class AdviceResponseFreshness
+{
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
+}
+
+/// <summary>
+/// Sets the ETag on response detail DTOs that implement <see cref="Schemata.Abstractions.Resource.IFreshness"/>.
+/// </summary>
+/// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type returned to the caller.</typeparam>
+/// <remarks>
+/// Order: 100,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature"/>.
+/// Computes a weak ETag from the entity's <see cref="Schemata.Abstractions.Entities.IConcurrency.Timestamp"/>
+/// and assigns it to the detail's <see cref="Schemata.Abstractions.Resource.IFreshness.EntityTag"/> property.
+/// Suppressed when <see cref="SuppressFreshness"/> is present in the advice context.
+/// </remarks>
 public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvisor<TEntity, TDetail>
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName
 {
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
-    public int Order => 100_000_000;
+    /// <inheritdoc />
+    public int Order => AdviceResponseFreshness.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity?          entity,

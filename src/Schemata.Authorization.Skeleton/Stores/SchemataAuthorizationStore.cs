@@ -14,6 +14,12 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
+/// <summary>
+///     Provides a Schemata repository-backed implementation of the OpenIddict authorization store.
+/// </summary>
+/// <typeparam name="TAuthorization">The authorization entity type.</typeparam>
+/// <typeparam name="TApplication">The application entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
 public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : IOpenIddictAuthorizationStore<TAuthorization>
     where TAuthorization : SchemataAuthorization
     where TApplication : SchemataApplication
@@ -23,6 +29,9 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
     private readonly IMemoryCache                _cache;
     private readonly IRepository<TToken>         _tokens;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataAuthorizationStore{TAuthorization, TApplication, TToken}" /> class.
+    /// </summary>
     public SchemataAuthorizationStore(
         IMemoryCache                cache,
         IRepository<TApplication>   applications,
@@ -36,10 +45,12 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
 
     #region IOpenIddictAuthorizationStore<TAuthorization> Members
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
         return await _authorizations.LongCountAsync<TAuthorization>(null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TAuthorization>, IQueryable<TResult>> query,
         CancellationToken                                     ct
@@ -47,11 +58,13 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return await _authorizations.LongCountAsync(query, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask CreateAsync(TAuthorization authorization, CancellationToken ct) {
         await _authorizations.AddAsync(authorization, ct);
         await _authorizations.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask DeleteAsync(TAuthorization authorization, CancellationToken ct) {
         await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == authorization.Id))
                                            .WithCancellation(ct)) {
@@ -65,6 +78,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         await _authorizations.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async IAsyncEnumerable<TAuthorization> FindAsync(
         string?                                    subject,
         string?                                    client,
@@ -106,26 +120,31 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         }
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TAuthorization> FindByApplicationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _authorizations.ListAsync(q => q.Where(a => a.ApplicationId == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TAuthorization?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _authorizations.SingleOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TAuthorization> FindBySubjectAsync(string subject, CancellationToken ct) {
         return _authorizations.ListAsync(q => q.Where(a => a.Subject == subject), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetApplicationIdAsync(TAuthorization authorization, CancellationToken ct) {
         return new(authorization.ApplicationId?.ToString());
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
@@ -134,6 +153,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return await _authorizations.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<DateTimeOffset?> GetCreationDateAsync(TAuthorization authorization, CancellationToken ct) {
         if (authorization.CreateTime is null) {
             return new(result: null);
@@ -142,10 +162,12 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return new(DateTime.SpecifyKind(authorization.CreateTime.Value, DateTimeKind.Utc));
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetIdAsync(TAuthorization authorization, CancellationToken ct) {
         return new(authorization.Id.ToString());
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TAuthorization    authorization,
         CancellationToken ct
@@ -167,6 +189,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return new(properties);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetScopesAsync(
         TAuthorization    authorization,
         CancellationToken ct
@@ -187,26 +210,32 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return new(uris);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetStatusAsync(TAuthorization authorization, CancellationToken ct) {
         return new(authorization.Status);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetSubjectAsync(TAuthorization authorization, CancellationToken ct) {
         return new(authorization.Subject);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetTypeAsync(TAuthorization authorization, CancellationToken ct) {
         return new(authorization.Type);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TAuthorization> InstantiateAsync(CancellationToken ct) {
         return new(Activator.CreateInstance<TAuthorization>());
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TAuthorization> ListAsync(int? count, int? offset, CancellationToken ct) {
         return _authorizations.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TAuthorization>, TState, IQueryable<TResult>> query,
         TState                                                        state,
@@ -215,6 +244,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return _authorizations.ListAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         var count = 0L;
 
@@ -233,6 +263,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return count;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> RevokeAsync(
         string?           subject,
         string?           client,
@@ -254,14 +285,17 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return count;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<long> RevokeByApplicationIdAsync(string identifier, CancellationToken ct) {
         return RevokeAsync(null, identifier, null, null, ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<long> RevokeBySubjectAsync(string subject, CancellationToken ct) {
         return RevokeAsync(subject, null, null, null, ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetApplicationIdAsync(
         TAuthorization    authorization,
         string?           identifier,
@@ -271,6 +305,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetCreationDateAsync(
         TAuthorization    authorization,
         DateTimeOffset?   date,
@@ -280,6 +315,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPropertiesAsync(
         TAuthorization                           authorization,
         ImmutableDictionary<string, JsonElement> properties,
@@ -295,6 +331,7 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetScopesAsync(
         TAuthorization         authorization,
         ImmutableArray<string> scopes,
@@ -310,21 +347,25 @@ public class SchemataAuthorizationStore<TAuthorization, TApplication, TToken> : 
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetStatusAsync(TAuthorization authorization, string? status, CancellationToken ct) {
         authorization.Status = status;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetSubjectAsync(TAuthorization authorization, string? subject, CancellationToken ct) {
         authorization.Subject = subject;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetTypeAsync(TAuthorization authorization, string? type, CancellationToken ct) {
         authorization.Type = type;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask UpdateAsync(TAuthorization authorization, CancellationToken ct) {
         await _authorizations.UpdateAsync(authorization, ct);
         await _authorizations.CommitAsync(ct);

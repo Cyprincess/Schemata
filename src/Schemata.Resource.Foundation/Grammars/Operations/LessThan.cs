@@ -4,8 +4,14 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
+/// <summary>
+/// Represents the less-than operator (<c>&lt;</c>).
+/// </summary>
 public class LessThan : IBinary
 {
+    /// <summary>
+    /// The character representing the less-than operator.
+    /// </summary>
     public const char Char = '<';
 
     public LessThan(TextPosition position) { Position = position; }

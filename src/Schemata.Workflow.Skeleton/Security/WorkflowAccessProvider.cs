@@ -6,10 +6,20 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Workflow.Skeleton.Security;
 
+/// <summary>
+/// Role-based access provider for workflow operations.
+/// </summary>
+/// <typeparam name="T">The workflow entity type.</typeparam>
+/// <typeparam name="TRequest">The request context type.</typeparam>
+/// <remarks>
+/// Checks for claims in the format <c>workflow-{operation}-{entity}</c> with wildcard support for
+/// either the operation or entity segment.
+/// </remarks>
 public class WorkflowAccessProvider<T, TRequest> : IAccessProvider<T, WorkflowRequestContext<TRequest>>
 {
     #region IAccessProvider<T,WorkflowRequestContext<TRequest>> Members
 
+    /// <inheritdoc />
     public Task<bool> HasAccessAsync(
         T?                                workflow,
         WorkflowRequestContext<TRequest>? context,

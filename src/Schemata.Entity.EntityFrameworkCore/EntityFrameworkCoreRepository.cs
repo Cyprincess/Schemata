@@ -12,22 +12,41 @@ using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
+/// <summary>
+///     Entity Framework Core implementation of <see cref="RepositoryBase{TEntity}" />.
+/// </summary>
+/// <typeparam name="TContext">The <see cref="DbContext" /> type.</typeparam>
+/// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
 public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DbContext
     where TEntity : class
 {
     private readonly TContext _context;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="EntityFrameworkCoreRepository{TContext, TEntity}" /> class.
+    /// </summary>
+    /// <param name="sp">The service provider.</param>
+    /// <param name="context">The EF Core database context.</param>
     public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) : base(sp) { _context = context; }
 
+    /// <summary>
+    ///     Gets the underlying <typeparamref name="TContext" />.
+    /// </summary>
     protected virtual TContext Context => _context;
 
+    /// <summary>
+    ///     Gets the <see cref="DbSet{TEntity}" /> for the managed entity type.
+    /// </summary>
     protected virtual DbSet<TEntity> DbSet => _context.Set<TEntity>();
 
+    /// <inheritdoc />
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() { return DbSet.AsAsyncEnumerable(); }
 
+    /// <inheritdoc />
     public override IQueryable<TEntity> AsQueryable() { return DbSet.AsQueryable(); }
 
+    /// <inheritdoc />
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default
@@ -42,6 +61,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         }
     }
 
+    /// <inheritdoc />
     public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -49,6 +69,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc />
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -84,6 +105,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -119,6 +141,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -153,6 +176,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -187,6 +211,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -221,6 +246,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -237,6 +263,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         await Context.AddAsync(entity, ct);
     }
 
+    /// <inheritdoc />
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -255,6 +282,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Context.Update(entity);
     }
 
+    /// <inheritdoc />
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -271,10 +299,12 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Context.Remove(entity);
     }
 
+    /// <inheritdoc />
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         return await Context.SaveChangesAsync(ct);
     }
 
+    /// <inheritdoc />
     public override void Detach(TEntity entity) { Context.Entry(entity).State = EntityState.Detached; }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(

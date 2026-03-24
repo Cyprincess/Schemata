@@ -4,16 +4,22 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures MVC controllers and endpoint routing.
+/// </summary>
 [DependsOn<SchemataRoutingFeature>]
 [DependsOn<SchemataExceptionHandlerFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
 {
-    public override int Priority => 210_000_000;
+    public const int DefaultPriority = SchemataSessionFeature<ISessionStore>.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

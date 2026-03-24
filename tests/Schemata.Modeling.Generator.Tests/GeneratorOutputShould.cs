@@ -11,7 +11,7 @@ public class GeneratorOutputShould
         var input = "Namespace Test.Output\n\nEntity User {\n  string name\n}";
         var doc   = Parser.Document.Parse(input);
         Assert.NotNull(doc);
-        Assert.Equal("Test.Output", doc!.Namespace);
+        Assert.Equal("Test.Output", doc.Namespace);
         Assert.Single(doc.Entities);
         Assert.Equal("User", doc.Entities[0].Name);
     }
@@ -32,7 +32,7 @@ public class GeneratorOutputShould
             """;
         var doc = Parser.Document.Parse(input);
         Assert.NotNull(doc);
-        Assert.Single(doc!.Entities);
+        Assert.Single(doc.Entities);
         var post = doc.Entities[0];
         Assert.Single(post.Enumerations);
         Assert.Equal("Status", post.Enumerations[0].Name);
@@ -55,7 +55,7 @@ public class GeneratorOutputShould
             """;
         var doc = Parser.Document.Parse(input);
         Assert.NotNull(doc);
-        Assert.Single(doc!.Traits);
+        Assert.Single(doc.Traits);
         Assert.Single(doc.Entities);
         Assert.Single(doc.Entities[0].Uses);
     }
@@ -65,7 +65,7 @@ public class GeneratorOutputShould
         var text = File.ReadAllText("vector1.skm");
         var doc  = Parser.Document.Parse(text);
         Assert.NotNull(doc);
-        Assert.Equal("DSL.Tests.Vectors", doc!.Namespace);
+        Assert.Equal("DSL.Tests.Vectors", doc.Namespace);
         Assert.Equal(3, doc.Traits.Length);
         Assert.Equal(3, doc.Entities.Length);
         Assert.Equal(0, doc.Enumerations.Length);

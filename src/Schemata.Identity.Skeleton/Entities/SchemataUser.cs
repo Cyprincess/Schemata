@@ -7,11 +7,22 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Represents a user in the Schemata identity system.
+/// </summary>
+/// <remarks>
+///     Extends ASP.NET Core <see cref="IdentityUser{TKey}"/> with Schemata entity interfaces
+///     for canonical naming, display names, optimistic concurrency, and audit timestamps.
+///     Stored in the <c>SchemataUsers</c> table with a <see langword="long"/> primary key.
+/// </remarks>
 [DisplayName("User")]
 [Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
 public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
 {
+    /// <summary>
+    ///     Gets or sets the concurrency stamp, backed by the <see cref="Timestamp"/> GUID.
+    /// </summary>
     [NotMapped]
     public override string? ConcurrencyStamp
     {
@@ -21,28 +32,34 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDi
 
     #region ICanonicalName Members
 
+    /// <inheritdoc />
     public virtual string? Name { get; set; }
 
+    /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IConcurrency Members
 
+    /// <inheritdoc />
     public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IDisplayName Members
 
+    /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
+    /// <inheritdoc />
     public virtual string? DisplayNames { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
+    /// <inheritdoc />
     [Key]
     public override long Id { get; set; }
 
@@ -50,8 +67,10 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDi
 
     #region ITimestamp Members
 
+    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
+    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

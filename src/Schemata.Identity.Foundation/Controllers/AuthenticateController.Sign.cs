@@ -13,6 +13,11 @@ namespace Schemata.Identity.Foundation.Controllers;
 
 public sealed partial class AuthenticateController : ControllerBase
 {
+    /// <summary>
+    ///     Registers a new user account, running the registration advisor pipeline.
+    /// </summary>
+    /// <param name="request">The registration request containing credentials.</param>
+    /// <returns>204 No Content on success, or an error result.</returns>
     [HttpPost(nameof(Register))]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request) {
         if (!_options.CurrentValue.AllowRegistration) {
@@ -67,6 +72,11 @@ public sealed partial class AuthenticateController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    ///     Authenticates a user with username/password, with optional two-factor verification.
+    /// </summary>
+    /// <param name="request">The login request containing credentials.</param>
+    /// <returns>A bearer token on success, or an error result.</returns>
     [HttpPost(nameof(Login))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request) {
         var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();
@@ -90,6 +100,11 @@ public sealed partial class AuthenticateController : ControllerBase
         return EmptyResult;
     }
 
+    /// <summary>
+    ///     Exchanges a valid refresh token for a new authentication ticket.
+    /// </summary>
+    /// <param name="request">The refresh request containing the refresh token.</param>
+    /// <returns>A new sign-in result, or a challenge if the token is invalid or expired.</returns>
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request) {
         var signInManager = _sp.GetRequiredService<SignInManager<SchemataUser>>();

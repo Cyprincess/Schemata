@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -8,6 +9,22 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+public static class AdviceCreateRequestAuthorize
+{
+    public const int DefaultOrder = AdviceCreateRequestIdempotency.DefaultOrder + 10_000_000;
+}
+
+/// <summary>
+/// Authorizes create requests by checking role-based access for the current user.
+/// </summary>
+/// <typeparam name="TEntity">The entity type being created.</typeparam>
+/// <typeparam name="TRequest">The request DTO type carrying creation data.</typeparam>
+/// <remarks>
+/// Order: 100,000,000. Registered by <see cref="SchemataResourceBuilder.WithAuthorization"/>;
+/// not auto-registered by <see cref="Features.SchemataResourceFeature"/>.
+/// Skips authorization when the entity is decorated with <see cref="Schemata.Abstractions.Resource.AnonymousAttribute"/> for the Create operation.
+/// Throws <see cref="Schemata.Abstractions.Exceptions.AuthorizationException"/> if access is denied.
+/// </remarks>
 public sealed class AdviceCreateRequestAuthorize<TEntity, TRequest> : IResourceCreateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -20,10 +37,10 @@ public sealed class AdviceCreateRequestAuthorize<TEntity, TRequest> : IResourceC
 
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    public int Order => 100_000_000;
+    /// <inheritdoc />
+    public int Order => AdviceCreateRequestAuthorize.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TRequest          request,

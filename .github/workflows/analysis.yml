@@ -55,6 +55,7 @@ jobs:
                 /d:sonar.token="$SONAR_TOKEN" \
                 /d:sonar.host.url="$SONAR_HOST_URL" \
                 /d:sonar.branch.name="$GITHUB_REF_NAME" \
+                /d:sonar.exclusions="docs/**,eng/**,.dotnet/**,.packages/**" \
                 /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
                 /d:sonar.cs.vstest.reportsPaths="**/TestResults/**/*.trx"
         env:
@@ -71,6 +72,7 @@ jobs:
                 /d:sonar.pullrequest.key="${{ github.event.number }}" \
                 /d:sonar.pullrequest.branch="$GITHUB_HEAD_REF" \
                 /d:sonar.pullrequest.base="$GITHUB_BASE_REF" \
+                /d:sonar.exclusions="docs/**,eng/**,.dotnet/**,.packages/**" \
                 /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
                 /d:sonar.cs.vstest.reportsPaths="**/TestResults/**/*.trx"
         env:

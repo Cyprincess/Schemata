@@ -4,12 +4,26 @@ using System.Linq.Expressions;
 // ReSharper disable once CheckNamespace
 namespace System.Linq;
 
+/// <summary>
+///     Partially evaluates expression trees by collapsing subtrees that do not depend on parameters into constants.
+/// </summary>
 public static class Evaluator
 {
+    /// <summary>
+    ///     Partially evaluates the expression, collapsing sub-expressions that satisfy the predicate into constants.
+    /// </summary>
+    /// <param name="expression">The expression to evaluate.</param>
+    /// <param name="fnCanBeEvaluated">A predicate that determines whether a sub-expression can be locally evaluated.</param>
+    /// <returns>The simplified expression.</returns>
     public static Expression? PartialEval(Expression expression, Func<Expression, bool> fnCanBeEvaluated) {
         return new SubtreeEvaluator(new Nominator(fnCanBeEvaluated).Nominate(expression)).Eval(expression);
     }
 
+    /// <summary>
+    ///     Partially evaluates the expression, collapsing all sub-expressions that do not reference parameters.
+    /// </summary>
+    /// <param name="expression">The expression to evaluate.</param>
+    /// <returns>The simplified expression.</returns>
     public static Expression? PartialEval(Expression expression) {
         return PartialEval(expression, CanBeEvaluatedLocally);
     }

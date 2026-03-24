@@ -9,10 +9,19 @@ using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars;
 
+/// <summary>
+/// Provides compiled Parlot parsers for the AIP-160 filter and order-by grammars.
+/// </summary>
 public class Parser
 {
+    /// <summary>
+    /// Gets the compiled parser for AIP-160 filter expressions.
+    /// </summary>
     public static readonly Parser<Filter> Filter;
 
+    /// <summary>
+    /// Gets the compiled parser for order-by clauses (comma-separated member/direction pairs).
+    /// </summary>
     public static readonly Parser<Dictionary<Member, Ordering>> Order;
 
     private static Parser<string> WithWordBoundary(Parser<string> parser) =>
