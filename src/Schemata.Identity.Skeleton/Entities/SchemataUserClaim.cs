@@ -6,11 +6,15 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Represents a claim associated with a <see cref="SchemataUser"/>.
+/// </summary>
 [Table("SchemataUserClaims")]
 public class SchemataUserClaim : IdentityUserClaim<long>, IIdentifier, ITimestamp
 {
     #region IIdentifier Members
 
+    /// <inheritdoc />
     [Key]
     public new virtual long Id { get; set; }
 
@@ -18,8 +22,10 @@ public class SchemataUserClaim : IdentityUserClaim<long>, IIdentifier, ITimestam
 
     #region ITimestamp Members
 
+    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
+    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

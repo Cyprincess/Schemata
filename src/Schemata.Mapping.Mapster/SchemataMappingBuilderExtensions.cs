@@ -11,8 +11,16 @@ using Schemata.Mapping.Skeleton;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+/// Extension methods for selecting Mapster as the mapping engine on <see cref="SchemataMappingBuilder"/>.
+/// </summary>
 public static class SchemataMappingBuilderExtensions
 {
+    /// <summary>
+    /// Configures Mapster as the mapping engine, registering <see cref="TypeAdapterConfig"/> as a singleton.
+    /// </summary>
+    /// <param name="builder">The mapping builder.</param>
+    /// <returns>The mapping builder for chaining.</returns>
     public static SchemataMappingBuilder UseMapster(this SchemataMappingBuilder builder) {
         builder.Services.TryAddSingleton(sp => {
             var options = sp.GetRequiredService<IOptions<SchemataMappingOptions>>();

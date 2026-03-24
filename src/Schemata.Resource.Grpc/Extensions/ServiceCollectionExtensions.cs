@@ -13,8 +13,17 @@ using ProtoBuf.Grpc.Configuration;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for registering code-first gRPC services.
+/// </summary>
 public static class ServicesExtensions
 {
+    /// <summary>
+    /// Adds gRPC services with code-first (protobuf-net) support and exception interception.
+    /// </summary>
+    /// <param name="services">The DI service collection.</param>
+    /// <param name="configureOptions">Optional callback to configure gRPC service options.</param>
+    /// <returns>The gRPC server builder for further configuration.</returns>
     public static IGrpcServerBuilder AddCodeFirstGrpc(
         this IServiceCollection     services,
         Action<GrpcServiceOptions>? configureOptions

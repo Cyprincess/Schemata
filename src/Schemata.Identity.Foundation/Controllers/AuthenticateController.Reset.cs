@@ -6,6 +6,11 @@ namespace Schemata.Identity.Foundation.Controllers;
 
 public sealed partial class AuthenticateController : ControllerBase
 {
+    /// <summary>
+    ///     Initiates the password reset flow by sending a reset code to the user's confirmed contact.
+    /// </summary>
+    /// <param name="request">The forget request identifying the user by email or phone.</param>
+    /// <returns>202 Accepted regardless of whether the user exists, to prevent user enumeration.</returns>
     [HttpPost(nameof(Forgot))]
     public async Task<IActionResult> Forgot([FromBody] ForgetRequest request) {
         if (!_options.CurrentValue.AllowPasswordReset) {
@@ -37,6 +42,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return Accepted();
     }
 
+    /// <summary>
+    ///     Resets the user's password using a previously issued reset code.
+    /// </summary>
+    /// <param name="request">The reset request containing the code and new password.</param>
     [HttpPost(nameof(Reset))]
     public async Task<IActionResult> Reset([FromBody] ResetRequest request) {
         if (!_options.CurrentValue.AllowPasswordReset) {

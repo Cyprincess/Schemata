@@ -165,6 +165,8 @@ public class FilterContainerShould
 
     #region Test types
 
+    // ReSharper disable InconsistentNaming
+
     public class KeywordEntity
     {
         public string and { get; set; } = string.Empty;
@@ -183,6 +185,8 @@ public class FilterContainerShould
 
         #endregion
     }
+
+    // ReSharper restore InconsistentNaming
 
     #endregion
 }

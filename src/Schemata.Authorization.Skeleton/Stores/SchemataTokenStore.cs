@@ -15,12 +15,19 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
+/// <summary>
+///     Provides a Schemata repository-backed implementation of the OpenIddict token store.
+/// </summary>
+/// <typeparam name="TToken">The token entity type.</typeparam>
 public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
     where TToken : SchemataToken
 {
     private readonly IMemoryCache        _cache;
     private readonly IRepository<TToken> _tokens;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataTokenStore{TToken}" /> class.
+    /// </summary>
     public SchemataTokenStore(IMemoryCache cache, IRepository<TToken> tokens) {
         _cache  = cache;
         _tokens = tokens;
@@ -28,10 +35,12 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
 
     #region IOpenIddictTokenStore<TToken> Members
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
         return await _tokens.LongCountAsync<TToken>(null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TToken>, IQueryable<TResult>> query,
         CancellationToken                             ct
@@ -39,16 +48,19 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return await _tokens.LongCountAsync(query, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask CreateAsync(TToken token, CancellationToken ct) {
         await _tokens.AddAsync(token, ct);
         await _tokens.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask DeleteAsync(TToken token, CancellationToken ct) {
         await _tokens.RemoveAsync(token, ct);
         await _tokens.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async IAsyncEnumerable<TToken> FindAsync(
         string?                                    subject,
         string?                                    client,
@@ -82,36 +94,43 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         }
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TToken> FindByApplicationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _tokens.ListAsync(q => q.Where(t => t.ApplicationId == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TToken> FindByAuthorizationIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _tokens.ListAsync(q => q.Where(t => t.AuthorizationId == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TToken?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _tokens.SingleOrDefaultAsync(q => q.Where(t => t.Id == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TToken?> FindByReferenceIdAsync(string identifier, CancellationToken ct) {
         return await _tokens.SingleOrDefaultAsync(q => q.Where(t => t.ReferenceId == identifier), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TToken> FindBySubjectAsync(string subject, CancellationToken ct) {
         return _tokens.ListAsync(q => q.Where(t => t.Subject == subject), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetApplicationIdAsync(TToken token, CancellationToken ct) {
         return new(token.ApplicationId?.ToString());
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TToken>, TState, IQueryable<TResult>> query,
         TState                                                state,
@@ -120,10 +139,12 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return await _tokens.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetAuthorizationIdAsync(TToken token, CancellationToken ct) {
         return new(token.AuthorizationId?.ToString());
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<DateTimeOffset?> GetCreationDateAsync(TToken token, CancellationToken ct) {
         if (token.CreateTime is null) {
             return new(result: null);
@@ -132,6 +153,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return new(DateTime.SpecifyKind(token.CreateTime.Value, DateTimeKind.Utc));
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<DateTimeOffset?> GetExpirationDateAsync(TToken token, CancellationToken ct) {
         if (token.ExpireTime is null) {
             return new(result: null);
@@ -140,12 +162,15 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return new(DateTime.SpecifyKind(token.ExpireTime.Value, DateTimeKind.Utc));
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetIdAsync(TToken token, CancellationToken ct) {
         return new(token.Id.ToString());
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetPayloadAsync(TToken token, CancellationToken ct) { return new(token.Payload); }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TToken            token,
         CancellationToken ct
@@ -166,6 +191,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return new(properties);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<DateTimeOffset?> GetRedemptionDateAsync(TToken token, CancellationToken ct) {
         if (token.RedeemTime is null) {
             return new(result: null);
@@ -174,24 +200,31 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return new(DateTime.SpecifyKind(token.RedeemTime.Value, DateTimeKind.Utc));
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetReferenceIdAsync(TToken token, CancellationToken ct) {
         return new(token.ReferenceId);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetStatusAsync(TToken token, CancellationToken ct) { return new(token.Status); }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetSubjectAsync(TToken token, CancellationToken ct) { return new(token.Subject); }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetTypeAsync(TToken token, CancellationToken ct) { return new(token.Type); }
 
+    /// <inheritdoc />
     public virtual ValueTask<TToken> InstantiateAsync(CancellationToken ct) {
         return new(Activator.CreateInstance<TToken>());
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TToken> ListAsync(int? count, int? offset, CancellationToken ct) {
         return _tokens.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TToken>, TState, IQueryable<TResult>> query,
         TState                                                state,
@@ -200,6 +233,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return _tokens.ListAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> PruneAsync(DateTimeOffset threshold, CancellationToken ct) {
         Expression<Func<TToken, bool>> query = t => (t.Status != Statuses.Inactive && t.Status != Statuses.Valid)
                                                  || t.ExpireTime < DateTime.UtcNow;
@@ -218,6 +252,7 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return count;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> RevokeAsync(
         string?           subject,
         string?           client,
@@ -239,10 +274,12 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return count;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<long> RevokeByApplicationIdAsync(string identifier, CancellationToken ct) {
         return RevokeAsync(null, identifier, null, null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> RevokeByAuthorizationIdAsync(string identifier, CancellationToken ct) {
         var count = 0L;
 
@@ -258,35 +295,42 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return count;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<long> RevokeBySubjectAsync(string subject, CancellationToken ct) {
         return RevokeAsync(subject, null, null, null, ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetApplicationIdAsync(TToken token, string? identifier, CancellationToken ct) {
         token.ApplicationId = identifier is not null ? long.Parse(identifier) : null;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetAuthorizationIdAsync(TToken token, string? identifier, CancellationToken ct) {
         token.AuthorizationId = identifier is not null ? long.Parse(identifier) : null;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetCreationDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
         token.CreateTime = date?.UtcDateTime;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetExpirationDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
         token.ExpireTime = date?.UtcDateTime;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPayloadAsync(TToken token, string? payload, CancellationToken ct) {
         token.Payload = payload;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPropertiesAsync(
         TToken                                   token,
         ImmutableDictionary<string, JsonElement> properties,
@@ -302,31 +346,37 @@ public class SchemataTokenStore<TToken> : IOpenIddictTokenStore<TToken>
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetRedemptionDateAsync(TToken token, DateTimeOffset? date, CancellationToken ct) {
         token.RedeemTime = date?.UtcDateTime;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetReferenceIdAsync(TToken token, string? identifier, CancellationToken ct) {
         token.ReferenceId = identifier;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetStatusAsync(TToken token, string? status, CancellationToken ct) {
         token.Status = status;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetSubjectAsync(TToken token, string? subject, CancellationToken ct) {
         token.Subject = subject;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetTypeAsync(TToken token, string? type, CancellationToken ct) {
         token.Type = type;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask UpdateAsync(TToken token, CancellationToken ct) {
         await _tokens.UpdateAsync(token, ct);
         await _tokens.CommitAsync(ct);

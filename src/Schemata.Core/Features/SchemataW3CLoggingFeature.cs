@@ -7,11 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures W3C-format request logging middleware.
+/// </summary>
 [Information("W3CLogger can reduce the performance of an app.", Level = LogLevel.Warning)]
 [Information("W3CLogger can potentially log personally identifiable information (PII). Fields could contain PII aren't logged.", Level = LogLevel.Warning)]
 public sealed class SchemataW3CLoggingFeature : FeatureBase
 {
-    public override int Priority => 100_130_000;
+    public const int DefaultPriority = SchemataHttpLoggingFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

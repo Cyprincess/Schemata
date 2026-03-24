@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Skeleton.Entities;
@@ -21,6 +22,14 @@ using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Features;
 
+/// <summary>
+///     Schemata feature that configures ASP.NET Core Identity with bearer token authentication,
+///     composite authentication handling, and the Schemata user/role stores.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
+/// <typeparam name="TRole">The role entity type.</typeparam>
+/// <typeparam name="TUserStore">The user store implementation type.</typeparam>
+/// <typeparam name="TRoleStore">The role store implementation type.</typeparam>
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
 public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
@@ -29,8 +38,12 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
     where TUserStore : class, IUserStore<TUser>
     where TRoleStore : class, IRoleStore<TRole>
 {
-    public override int Priority => 310_000_000;
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 10_000_000;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

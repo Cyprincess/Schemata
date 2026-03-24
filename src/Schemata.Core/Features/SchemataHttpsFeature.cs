@@ -5,9 +5,14 @@ using Microsoft.Extensions.Hosting;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures HSTS and HTTPS redirection in non-Development environments.
+/// </summary>
 public sealed class SchemataHttpsFeature : FeatureBase
 {
-    public override int Priority => 120_000_000;
+    public const int DefaultPriority = SchemataW3CLoggingFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

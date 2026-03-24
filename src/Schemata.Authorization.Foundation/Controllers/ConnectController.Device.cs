@@ -18,6 +18,10 @@ namespace Schemata.Authorization.Foundation.Controllers;
 
 public sealed partial class ConnectController : ControllerBase
 {
+    /// <summary>
+    ///     Displays the device flow verification form (GET).
+    ///     Returns scope details when a valid user code is present.
+    /// </summary>
     [Authorize]
     [HttpGet(nameof(Verify))]
     public async Task<IActionResult> Verify() {
@@ -60,6 +64,9 @@ public sealed partial class ConnectController : ControllerBase
         return Ok(new VerifyResponse());
     }
 
+    /// <summary>
+    ///     Accepts the device flow verification and issues tokens (POST).
+    /// </summary>
     [Authorize]
     [HttpPost(nameof(Verify))]
     public async Task<IActionResult> VerifyAccept() {

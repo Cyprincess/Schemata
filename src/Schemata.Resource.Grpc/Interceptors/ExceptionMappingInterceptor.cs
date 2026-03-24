@@ -10,8 +10,12 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Grpc.Interceptors;
 
+/// <summary>
+/// gRPC interceptor that maps <see cref="SchemataException"/> instances to structured <see cref="RpcException"/> with Google RPC status details.
+/// </summary>
 public class ExceptionMappingInterceptor : Interceptor
 {
+    /// <inheritdoc />
     public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(
         TRequest                               request,
         ServerCallContext                      context,

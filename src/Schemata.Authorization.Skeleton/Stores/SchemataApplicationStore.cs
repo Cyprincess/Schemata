@@ -14,6 +14,12 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Stores;
 
+/// <summary>
+///     Provides a Schemata repository-backed implementation of the OpenIddict application store.
+/// </summary>
+/// <typeparam name="TApplication">The application entity type.</typeparam>
+/// <typeparam name="TAuthorization">The authorization entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
 public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IOpenIddictApplicationStore<TApplication>
     where TApplication : SchemataApplication
     where TAuthorization : SchemataAuthorization
@@ -24,6 +30,9 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
     private readonly IMemoryCache                _cache;
     private readonly IRepository<TToken>         _tokens;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataApplicationStore{TApplication, TAuthorization, TToken}" /> class.
+    /// </summary>
     public SchemataApplicationStore(
         IMemoryCache                cache,
         IRepository<TApplication>   applications,
@@ -38,10 +47,12 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
 
     #region IOpenIddictApplicationStore<TApplication> Members
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync(CancellationToken ct) {
         return await _applications.LongCountAsync<TApplication>(null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<long> CountAsync<TResult>(
         Func<IQueryable<TApplication>, IQueryable<TResult>> query,
         CancellationToken                                   ct
@@ -49,11 +60,13 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return await _applications.LongCountAsync(query, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask CreateAsync(TApplication application, CancellationToken ct) {
         await _applications.AddAsync(application, ct);
         await _applications.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask DeleteAsync(TApplication application, CancellationToken ct) {
         await foreach (var token in _tokens.ListAsync(q => q.Where(t => t.ApplicationId == application.Id))
                                            .WithCancellation(ct)) {
@@ -76,30 +89,36 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         await _applications.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TApplication?> FindByIdAsync(string identifier, CancellationToken ct) {
         var id = long.Parse(identifier);
 
         return _applications.FirstOrDefaultAsync(q => q.Where(a => a.Id == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TApplication?> FindByClientIdAsync(string identifier, CancellationToken ct) {
         return await _applications.FirstOrDefaultAsync(q => q.Where(a => a.ClientId == identifier), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TApplication> FindByPostLogoutRedirectUriAsync(string uri, CancellationToken ct) {
         var wrapped = $"\"{uri}\"";
         return _applications.ListAsync(q => q.Where(a => a.PostLogoutRedirectUris!.Contains(wrapped)), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TApplication> FindByRedirectUriAsync(string uri, CancellationToken ct) {
         var wrapped = $"\"{uri}\"";
         return _applications.ListAsync(q => q.Where(a => a.RedirectUris!.Contains(wrapped)), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetApplicationTypeAsync(TApplication application, CancellationToken ct) {
         return new(application.ApplicationType);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TResult?> GetAsync<TState, TResult>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
@@ -108,26 +127,32 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return await _applications.SingleOrDefaultAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetClientIdAsync(TApplication application, CancellationToken ct) {
         return new(application.ClientId);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetClientSecretAsync(TApplication application, CancellationToken ct) {
         return new(application.ClientSecret);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetClientTypeAsync(TApplication application, CancellationToken ct) {
         return new(application.ClientType);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetConsentTypeAsync(TApplication application, CancellationToken ct) {
         return new(application.ConsentType);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetDisplayNameAsync(TApplication application, CancellationToken ct) {
         return new(application.DisplayName);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<CultureInfo, string>> GetDisplayNamesAsync(
         TApplication      application,
         CancellationToken ct
@@ -157,10 +182,12 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(names);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<string?> GetIdAsync(TApplication application, CancellationToken ct) {
         return new(application.Id.ToString());
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<JsonWebKeySet?> GetJsonWebKeySetAsync(TApplication application, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(application.JsonWebKeySet)) {
             return new(result: null);
@@ -176,6 +203,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(set);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetPermissionsAsync(
         TApplication      application,
         CancellationToken ct
@@ -196,6 +224,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(permissions);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetPostLogoutRedirectUrisAsync(
         TApplication      application,
         CancellationToken ct
@@ -216,6 +245,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(uris);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<string, JsonElement>> GetPropertiesAsync(
         TApplication      application,
         CancellationToken ct
@@ -236,6 +266,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(properties);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetRedirectUrisAsync(
         TApplication      application,
         CancellationToken ct
@@ -256,6 +287,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(uris);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableArray<string>> GetRequirementsAsync(
         TApplication      application,
         CancellationToken ct
@@ -276,6 +308,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(requirements);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<ImmutableDictionary<string, string>> GetSettingsAsync(
         TApplication      application,
         CancellationToken ct
@@ -296,14 +329,17 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return new(settings);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TApplication> InstantiateAsync(CancellationToken ct) {
         return new(Activator.CreateInstance<TApplication>());
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TApplication> ListAsync(int? count, int? offset, CancellationToken ct) {
         return _applications.ListAsync(q => q.Skip(offset ?? 0).Take(count ?? int.MaxValue), ct);
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TResult> ListAsync<TState, TResult>(
         Func<IQueryable<TApplication>, TState, IQueryable<TResult>> query,
         TState                                                      state,
@@ -312,36 +348,43 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return _applications.ListAsync(q => query(q, state), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetApplicationTypeAsync(TApplication application, string? type, CancellationToken ct) {
         application.ApplicationType = type;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetClientIdAsync(TApplication application, string? identifier, CancellationToken ct) {
         application.ClientId = identifier;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetClientSecretAsync(TApplication application, string? secret, CancellationToken ct) {
         application.ClientSecret = secret;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetClientTypeAsync(TApplication application, string? type, CancellationToken ct) {
         application.ClientType = type;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetConsentTypeAsync(TApplication application, string? type, CancellationToken ct) {
         application.ConsentType = type;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDisplayNameAsync(TApplication application, string? name, CancellationToken ct) {
         application.DisplayName = name;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetDisplayNamesAsync(
         TApplication                             application,
         ImmutableDictionary<CultureInfo, string> names,
@@ -358,11 +401,13 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetJsonWebKeySetAsync(TApplication application, JsonWebKeySet? set, CancellationToken ct) {
         application.JsonWebKeySet = set is not null ? JsonSerializer.Serialize(set) : null;
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPermissionsAsync(
         TApplication           application,
         ImmutableArray<string> permissions,
@@ -378,6 +423,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPostLogoutRedirectUrisAsync(
         TApplication           application,
         ImmutableArray<string> uris,
@@ -393,6 +439,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetPropertiesAsync(
         TApplication                             application,
         ImmutableDictionary<string, JsonElement> properties,
@@ -408,6 +455,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetRedirectUrisAsync(
         TApplication           application,
         ImmutableArray<string> uris,
@@ -423,6 +471,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetRequirementsAsync(
         TApplication           application,
         ImmutableArray<string> requirements,
@@ -438,6 +487,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual ValueTask SetSettingsAsync(
         TApplication                        application,
         ImmutableDictionary<string, string> settings,
@@ -454,6 +504,7 @@ public class SchemataApplicationStore<TApplication, TAuthorization, TToken> : IO
         return default;
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask UpdateAsync(TApplication application, CancellationToken ct) {
         await _applications.UpdateAsync(application, ct);
         await _applications.CommitAsync(ct);

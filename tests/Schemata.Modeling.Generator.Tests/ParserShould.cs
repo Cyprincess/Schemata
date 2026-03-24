@@ -11,7 +11,7 @@ public class ParserShould
         var text = File.ReadAllText("vector1.skm");
         var doc  = Parser.Document.Parse(text);
         Assert.NotNull(doc);
-        return doc!;
+        return doc;
     }
 
     [Fact]

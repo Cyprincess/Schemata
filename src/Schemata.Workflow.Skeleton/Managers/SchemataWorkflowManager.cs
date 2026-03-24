@@ -16,6 +16,16 @@ using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Skeleton.Managers;
 
+/// <summary>
+/// Default implementation of <see cref="IWorkflowManager{TWorkflow,TTransition,TResponse}"/> and <see cref="IWorkflowManager"/>.
+/// </summary>
+/// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
+/// <typeparam name="TTransition">The transition entity type.</typeparam>
+/// <typeparam name="TResponse">The response DTO type.</typeparam>
+/// <remarks>
+/// Coordinates repositories, state machines, and mappers to manage the full workflow lifecycle
+/// including creation, event raising, transition recording, and response mapping.
+/// </remarks>
 public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkflowManager<TWorkflow, TTransition, TResponse>,
                                                                           IWorkflowManager
     where TWorkflow : SchemataWorkflow, new()
@@ -28,6 +38,14 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     private readonly IRepository<TTransition> _transitions;
     private readonly IRepository<TWorkflow>   _workflows;
 
+    /// <summary>
+    /// Initializes a new instance of the workflow manager.
+    /// </summary>
+    /// <param name="sp">The service provider for resolving repositories and state machines.</param>
+    /// <param name="mapper">The mapper for converting workflow details to response objects.</param>
+    /// <param name="transitions">The transition repository.</param>
+    /// <param name="workflows">The workflow repository.</param>
+    /// <param name="resolver">The type resolver for entity types.</param>
     public SchemataWorkflowManager(
         IServiceProvider         sp,
         ISimpleMapper            mapper,
@@ -102,6 +120,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     #region IWorkflowManager<TWorkflow,TTransition,TResponse> Members
 
+    /// <inheritdoc />
     public Task<Type?> GetInstanceTypeAsync(string type, CancellationToken ct = default) {
         if (!_resolver.TryResolveType(type, out var it)) {
             return Task.FromResult<Type?>(null);
@@ -110,10 +129,12 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return Task.FromResult(it);
     }
 
+    /// <inheritdoc />
     public virtual async Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default) {
         return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual async Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default) {
         var workflow = await FindAsync(id, ct);
         if (workflow is null) {
@@ -123,6 +144,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return await GetInstanceAsync(workflow, ct);
     }
 
+    /// <inheritdoc />
     public virtual async Task<IStatefulEntity?> GetInstanceAsync(TWorkflow workflow, CancellationToken ct = default) {
         var (type, repository) = await ResolveRepositoryAsync(workflow);
         if (type is null || repository is null) {
@@ -138,10 +160,12 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return (IStatefulEntity?)instance;
     }
 
+    /// <inheritdoc />
     public virtual IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default) {
         return _transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
     }
 
+    /// <inheritdoc />
     public virtual async Task<TWorkflow?> CreateAsync(
         IStatefulEntity?  instance,
         ClaimsPrincipal?  principal = null,
@@ -164,6 +188,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return await CreateAsync(type, instance.Id, ct);
     }
 
+    /// <inheritdoc />
     public virtual async Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default) {
         var workflow = new TWorkflow { InstanceId = id, InstanceType = instance.FullName! };
 
@@ -173,6 +198,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return workflow;
     }
 
+    /// <inheritdoc />
     public virtual async Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
         where TEvent : class, IEvent {
         var workflow = await FindAsync(id, ct);
@@ -180,6 +206,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         await RaiseAsync(workflow, @event, null, ct);
     }
 
+    /// <inheritdoc />
     public virtual async Task RaiseAsync<TEvent>(
         TWorkflow?        workflow,
         TEvent            @event,
@@ -211,6 +238,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         await (Task)invoke.Invoke(null, [machine, instance, @event, ct])!;
     }
 
+    /// <inheritdoc />
     public virtual async Task<TResponse?> MapAsync(
         TWorkflow?              workflow,
         SchemataWorkflowOptions options,
@@ -257,6 +285,11 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     #endregion
 
+    /// <summary>
+    /// Resolves the entity type and its repository for the given workflow.
+    /// </summary>
+    /// <param name="workflow">The workflow whose instance type to resolve.</param>
+    /// <returns>A tuple of the resolved type and repository, either of which may be <see langword="null"/>.</returns>
     protected virtual async Task<(Type?, IRepository?)> ResolveRepositoryAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
         if (it is null) {
@@ -266,6 +299,11 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return (it, ResolveRepository(it));
     }
 
+    /// <summary>
+    /// Resolves the repository for the given entity type from the service provider.
+    /// </summary>
+    /// <param name="type">The entity type.</param>
+    /// <returns>The repository, or <see langword="null"/> if it cannot be cast.</returns>
     protected virtual IRepository? ResolveRepository(Type type) {
         var rt      = typeof(IRepository<>).MakeGenericType(type);
         var service = _sp.GetRequiredService(rt);
@@ -273,15 +311,25 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return service as IRepository;
     }
 
+    /// <summary>
+    /// Resolves the entity type and its state machine for the given workflow.
+    /// </summary>
+    /// <param name="workflow">The workflow whose state machine to resolve.</param>
+    /// <returns>A tuple of the resolved type and state machine, either of which may be <see langword="null"/>.</returns>
     protected virtual async Task<(Type?, StateMachine?)> ResolveStateMachineAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
         if (it is null) {
             return (null, null);
         }
 
-        return (it, ResolveStateMachine(it!));
+        return (it, ResolveStateMachine(it));
     }
 
+    /// <summary>
+    /// Resolves the state machine for the given entity type from the service provider.
+    /// </summary>
+    /// <param name="type">The entity type.</param>
+    /// <returns>The state machine instance.</returns>
     protected virtual StateMachine? ResolveStateMachine(Type type) {
         var mt      = typeof(StateMachineBase<>).MakeGenericType(type);
         var machine = (StateMachine)_sp.GetRequiredService(mt);

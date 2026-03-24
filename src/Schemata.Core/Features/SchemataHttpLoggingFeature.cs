@@ -7,11 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures HTTP request/response logging middleware.
+/// </summary>
 [Information("HTTP Logging can reduce the performance of an app", Level = LogLevel.Warning)]
 [Information("HTTP Logging can potentially log personally identifiable information (PII).", Level = LogLevel.Warning)]
 public sealed class SchemataHttpLoggingFeature : FeatureBase
 {
-    public override int Priority => 100_120_000;
+    public const int DefaultPriority = SchemataLoggingFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

@@ -5,9 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures request routing middleware.
+/// </summary>
 public sealed class SchemataRoutingFeature : FeatureBase
 {
-    public override int Priority => 140_000_000;
+    public const int DefaultPriority = SchemataCookiePolicyFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

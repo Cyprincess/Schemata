@@ -4,6 +4,9 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
+/// <summary>
+/// Represents an integer literal value in the filter grammar.
+/// </summary>
 public class Integer : IValue
 {
     public Integer(TextPosition position, long value) {
@@ -11,6 +14,9 @@ public class Integer : IValue
         Position = position;
     }
 
+    /// <summary>
+    /// Gets the integer value.
+    /// </summary>
     public long Value { get; }
 
     #region IValue Members

@@ -1,0 +1,53 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "..",
+          "files": ["src/**/*.csproj"],
+          "exclude": ["**/bin/**", "**/obj/**"]
+        }
+      ],
+      "dest": "api",
+      "properties": {
+        "TargetFramework": "net10.0",
+        "SchemataSkipGenerators": "true"
+      },
+      "includePrivateMembers": false,
+      "disableGitFeatures": false,
+      "disableDefaultFilter": false
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": ["api/**.yml", "api/index.md"]
+      },
+      {
+        "files": ["guides/**.md", "guides/toc.yml"]
+      },
+      {
+        "files": [
+          "documents/**.md",
+          "documents/**/**.md",
+          "documents/**/toc.yml",
+          "documents/toc.yml"
+        ]
+      },
+      {
+        "files": ["modeling/**.md", "modeling/toc.yml"]
+      },
+      {
+        "files": ["toc.yml", "index.md"]
+      }
+    ],
+    "resource": [
+      {
+        "files": ["ebnf-filtering.txt", "ebnf-modeling.txt"]
+      }
+    ],
+    "dest": "_site",
+    "template": ["default", "modern"],
+    "markdownEngineName": "markdig"
+  }
+}

@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Mapping.Foundation.Features;
 using Schemata.Mapping.Skeleton.Configurations;
 using Schemata.Workflow.Skeleton;
 using Schemata.Workflow.Skeleton.Entities;
@@ -13,16 +15,25 @@ using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Foundation.Features;
 
+/// <summary>
+/// Feature that registers the workflow manager, type resolver, and mapping configuration.
+/// </summary>
+/// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
+/// <typeparam name="TTransition">The transition entity type.</typeparam>
+/// <typeparam name="TResponse">The workflow response DTO type.</typeparam>
 [DependsOn<SchemataControllersFeature>]
-[DependsOn<SchemataJsonSerializerFeature>]
 [DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> : FeatureBase
     where TWorkflow : SchemataWorkflow, new()
     where TTransition : SchemataTransition, new()
     where TResponse : WorkflowResponse
 {
-    public override int Priority => 350_000_000;
+    public const int DefaultPriority = SchemataMappingFeature.DefaultPriority + 10_000_000;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

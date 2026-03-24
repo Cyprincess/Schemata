@@ -27,7 +27,7 @@ public class AdviceQueryCacheShould
         var key = context.ToCacheKey();
         Assert.NotNull(key);
         var cached = new Student { Id = 1, FullName = "Cached Alice" };
-        cache.Set(key!, cached);
+        cache.Set(key, cached);
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
 

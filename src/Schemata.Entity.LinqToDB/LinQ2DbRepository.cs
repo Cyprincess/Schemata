@@ -18,10 +18,20 @@ using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.LinqToDB;
 
+/// <summary>
+///     LINQ to DB implementation of <see cref="RepositoryBase{TEntity}" />.
+/// </summary>
+/// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
+/// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
 public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="LinQ2DbRepository{TContext, TEntity}" /> class.
+    /// </summary>
+    /// <param name="sp">The service provider.</param>
+    /// <param name="context">The LINQ to DB data connection.</param>
     public LinQ2DbRepository(IServiceProvider sp, TContext context) : base(sp) {
         Context = context;
 
@@ -30,20 +40,38 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
     }
 
+    /// <summary>
+    ///     Gets the underlying <typeparamref name="TContext" />.
+    /// </summary>
     protected virtual TContext Context { get; }
 
+    /// <summary>
+    ///     Gets the LINQ to DB table for the managed entity type.
+    /// </summary>
     protected virtual ITable<TEntity> Table => field ??= Context.GetTable<TEntity>().TableName(TableName);
 
+    /// <summary>
+    ///     Gets or sets the current transaction, if any.
+    /// </summary>
     protected virtual DataConnectionTransaction? Transaction { get; set; }
 
+    /// <summary>
+    ///     Gets or sets the cumulative number of rows affected by operations in the current transaction.
+    /// </summary>
     protected virtual int RowsAffected { get; set; }
 
+    /// <summary>
+    ///     Gets the table name used for CRUD operations, derived from <see cref="TableAttribute" /> or pluralized entity name.
+    /// </summary>
     public virtual string TableName { get; }
 
+    /// <inheritdoc />
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() { return Table.AsAsyncEnumerable(); }
 
+    /// <inheritdoc />
     public override IQueryable<TEntity> AsQueryable() { return Table.AsQueryable(); }
 
+    /// <inheritdoc />
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default
@@ -58,6 +86,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         }
     }
 
+    /// <inheritdoc />
     public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -65,6 +94,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc />
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -100,6 +130,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -135,6 +166,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -169,6 +201,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -203,6 +236,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -237,6 +271,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return context.Result;
     }
 
+    /// <inheritdoc />
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
@@ -253,6 +288,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         RowsAffected += await Context.InsertAsync(entity, TableName, token: ct);
     }
 
+    /// <inheritdoc />
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
@@ -269,6 +305,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         RowsAffected += await Context.UpdateAsync(entity, TableName, token: ct);
     }
 
+    /// <inheritdoc />
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         await BeginTransactionAsync(ct);
 
@@ -285,6 +322,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         RowsAffected += await Context.DeleteAsync(entity, TableName, token: ct);
     }
 
+    /// <inheritdoc />
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -308,6 +346,7 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return rows;
     }
 
+    /// <inheritdoc />
     public override void Detach(TEntity entity) { }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(

@@ -10,8 +10,18 @@ using Schemata.Workflow.Skeleton.Models;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+/// Extension methods for configuring the workflow subsystem on <see cref="SchemataBuilder"/>.
+/// </summary>
 public static class SchemataBuilderExtensions
 {
+    /// <summary>
+    /// Enables the workflow subsystem using default <see cref="SchemataWorkflow"/> and <see cref="SchemataTransition"/> types.
+    /// </summary>
+    /// <param name="builder">The Schemata builder.</param>
+    /// <param name="configure">Optional configuration for workflow options.</param>
+    /// <param name="mapping">Optional mapping configuration for the workflow response.</param>
+    /// <returns>A <see cref="SchemataWorkflowBuilder"/> for further configuration.</returns>
     public static SchemataWorkflowBuilder UseWorkflow(
         this SchemataBuilder                                                                  builder,
         Action<SchemataWorkflowOptions>?                                                      configure = null,
@@ -20,6 +30,15 @@ public static class SchemataBuilderExtensions
         return builder.UseWorkflow<SchemataWorkflow, SchemataTransition>(configure, mapping);
     }
 
+    /// <summary>
+    /// Enables the workflow subsystem with custom workflow and transition types, using the default <see cref="WorkflowResponse"/>.
+    /// </summary>
+    /// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
+    /// <typeparam name="TTransition">The transition entity type.</typeparam>
+    /// <param name="builder">The Schemata builder.</param>
+    /// <param name="configure">Optional configuration for workflow options.</param>
+    /// <param name="mapping">Optional mapping configuration for the workflow response.</param>
+    /// <returns>A <see cref="SchemataWorkflowBuilder"/> for further configuration.</returns>
     public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition>(
         this SchemataBuilder                                                    builder,
         Action<SchemataWorkflowOptions>?                                        configure = null,
@@ -30,6 +49,16 @@ public static class SchemataBuilderExtensions
         return builder.UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(configure, mapping);
     }
 
+    /// <summary>
+    /// Enables the workflow subsystem with fully custom workflow, transition, and response types.
+    /// </summary>
+    /// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
+    /// <typeparam name="TTransition">The transition entity type.</typeparam>
+    /// <typeparam name="TResponse">The workflow response DTO type.</typeparam>
+    /// <param name="builder">The Schemata builder.</param>
+    /// <param name="configure">Optional configuration for workflow options.</param>
+    /// <param name="mapping">Optional mapping configuration for the workflow response.</param>
+    /// <returns>A <see cref="SchemataWorkflowBuilder"/> for further configuration.</returns>
     public static SchemataWorkflowBuilder UseWorkflow<TWorkflow, TTransition, TResponse>(
         this SchemataBuilder                                             builder,
         Action<SchemataWorkflowOptions>?                                 configure = null,

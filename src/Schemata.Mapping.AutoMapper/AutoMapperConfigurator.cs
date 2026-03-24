@@ -9,8 +9,17 @@ using Schemata.Mapping.Skeleton.Configurations;
 
 namespace Schemata.Mapping.AutoMapper;
 
+/// <summary>
+/// Translates Schemata mapping configurations into AutoMapper profile rules.
+/// </summary>
 public static class AutoMapperConfigurator
 {
+    /// <summary>
+    /// Applies all <see cref="SchemataMappingOptions"/> mappings to the given AutoMapper configuration.
+    /// </summary>
+    /// <param name="config">The AutoMapper configuration expression.</param>
+    /// <param name="options">The Schemata mapping options containing compiled mapping definitions.</param>
+    /// <returns>The configuration expression for chaining.</returns>
     public static IMapperConfigurationExpression Configure(
         IMapperConfigurationExpression config,
         SchemataMappingOptions         options

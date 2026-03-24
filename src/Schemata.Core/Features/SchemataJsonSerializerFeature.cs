@@ -13,9 +13,14 @@ using Schemata.Core.Json;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures JSON serialization with snake_case naming, polymorphic type resolution, and AIP conventions.
+/// </summary>
 public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
-    public override int Priority => 210_100_000;
+    public const int DefaultPriority = SchemataControllersFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,
@@ -26,11 +31,7 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
     ) {
         var configure = configurators.PopOrDefault<JsonSerializerOptions>();
 
-        services.Configure<JsonSerializerOptions>(options => {
-            options.MaxDepth = 32;
-
-            Configure(options);
-        });
+        services.Configure<JsonSerializerOptions>(Configure);
 
         services.Configure<JsonOptions>(options => { Configure(options.SerializerOptions); });
 
@@ -45,6 +46,8 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         return;
 
         void Configure(JsonSerializerOptions options) {
+            options.MaxDepth = 32;
+
             options.DictionaryKeyPolicy    = JsonNamingPolicy.SnakeCaseLower;
             options.PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower;
             options.NumberHandling         = JsonNumberHandling.AllowReadingFromString;

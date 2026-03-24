@@ -6,6 +6,9 @@ using Schemata.Resource.Foundation.Grammars.Operations;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
+/// <summary>
+/// Represents terms joined by logical OR in the filter grammar.
+/// </summary>
 public class Factor : Logical, IToken
 {
     public Factor(TextPosition position, Term term, IReadOnlyCollection<Term>? terms) {
@@ -18,6 +21,9 @@ public class Factor : Logical, IToken
         }
     }
 
+    /// <summary>
+    /// Gets the list of terms that are combined with logical OR.
+    /// </summary>
     public List<Term> Terms { get; } = [];
 
     public override IEnumerable<IToken> Tokens => Terms;

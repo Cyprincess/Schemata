@@ -3,6 +3,9 @@ using Parlot;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
+/// <summary>
+/// Represents an optionally negated simple expression (NOT/- prefix) in the filter grammar.
+/// </summary>
 public class Term : IToken
 {
     public Term(TextPosition position, string? unary, ISimple simple) {
@@ -11,8 +14,14 @@ public class Term : IToken
         Position = position;
     }
 
+    /// <summary>
+    /// Gets the unary modifier ("NOT" or "-"), or <see langword="null"/> if not negated.
+    /// </summary>
     public string? Modifier { get; }
 
+    /// <summary>
+    /// Gets the inner simple expression.
+    /// </summary>
     public ISimple Simple { get; }
 
     #region IToken Members

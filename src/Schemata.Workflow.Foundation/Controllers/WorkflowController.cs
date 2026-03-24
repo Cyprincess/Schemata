@@ -18,6 +18,14 @@ using Schemata.Workflow.Skeleton.Models;
 
 namespace Schemata.Workflow.Foundation.Controllers;
 
+/// <summary>
+/// API controller that exposes workflow operations: Get, Submit, and Raise.
+/// </summary>
+/// <remarks>
+/// Each action runs its corresponding advisor pipeline (<see cref="IWorkflowGetAdvisor"/>,
+/// <see cref="IWorkflowSubmitAdvisor"/>, <see cref="IWorkflowRaiseAdvisor"/>) before
+/// delegating to the <see cref="IWorkflowManager"/>.
+/// </remarks>
 [Authorize]
 [ApiController]
 [Route("~/[controller]")]
@@ -29,6 +37,13 @@ public sealed class WorkflowController : ControllerBase
 
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    /// Initializes a new instance of the workflow controller.
+    /// </summary>
+    /// <param name="sp">The service provider.</param>
+    /// <param name="mapper">The object mapper.</param>
+    /// <param name="options">The workflow options monitor.</param>
+    /// <param name="logger">The logger.</param>
     public WorkflowController(
         IServiceProvider                         sp,
         ISimpleMapper                            mapper,
@@ -43,6 +58,11 @@ public sealed class WorkflowController : ControllerBase
 
     private EmptyResult EmptyResult { get; } = new();
 
+    /// <summary>
+    /// Retrieves a workflow by identifier, running the Get advisor pipeline.
+    /// </summary>
+    /// <param name="id">The workflow identifier.</param>
+    /// <returns>The workflow response, or 404 if not found.</returns>
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Get(long id) {
         var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
@@ -78,6 +98,11 @@ public sealed class WorkflowController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Submits a new workflow, running the Submit advisor pipeline.
+    /// </summary>
+    /// <param name="request">The workflow creation request containing the entity type and instance data.</param>
+    /// <returns>The created workflow response, or 400 on validation failure.</returns>
     [HttpPost]
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
         var ctx = new AdviceContext(_sp);
@@ -128,6 +153,12 @@ public sealed class WorkflowController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Raises an event on an existing workflow, running the Get and Raise advisor pipelines.
+    /// </summary>
+    /// <param name="id">The workflow identifier.</param>
+    /// <param name="request">The event data to raise.</param>
+    /// <returns>The updated workflow response, or 404/400 on failure.</returns>
     [HttpPost("{id:long}")]
     public async Task<IActionResult> Raise(long id, IEvent request) {
         var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,

@@ -6,8 +6,18 @@ using Schemata.Entity.Repository.Advisors;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+///     Extension methods for registering repository services on <see cref="IServiceCollection" />.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    ///     Registers the specified repository implementation and all built-in advisors (timestamp, concurrency, validation, soft-delete, canonical name).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="implementationType">A type that implements both <see cref="IRepository" /> and <see cref="IRepository{TEntity}" />.</param>
+    /// <returns>A <see cref="SchemataRepositoryBuilder" /> for fluent configuration of additional providers and advisors.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="implementationType" /> does not implement the required repository interfaces.</exception>
     public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type implementationType) {
         var serviceType = typeof(IRepository<>);
 

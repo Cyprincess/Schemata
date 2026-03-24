@@ -16,10 +16,18 @@ using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Repository;
 
+/// <summary>
+///     Non-generic base class providing shared key-property caching logic for repository implementations.
+/// </summary>
 public abstract class RepositoryBase
 {
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties = [];
 
+    /// <summary>
+    ///     Returns the cached list of key properties for the specified type, discovering them by <see cref="KeyAttribute" /> or by convention (property named "Id").
+    /// </summary>
+    /// <param name="type">The entity type to inspect.</param>
+    /// <returns>The list of key property infos.</returns>
     protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
         if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
             return pi;
@@ -40,6 +48,11 @@ public abstract class RepositoryBase
         return keyProperties;
     }
 
+    /// <summary>
+    ///     Returns the cached list of mapped (non-virtual, readable, not <see cref="NotMappedAttribute" />) properties for the specified type.
+    /// </summary>
+    /// <param name="type">The entity type to inspect.</param>
+    /// <returns>The list of mapped property infos.</returns>
     protected static IList<PropertyInfo> TypePropertiesCache(Type type) {
         var properties = AppDomainTypeCache.GetProperties(type).Values.Where(IsNotVirtual).ToList();
         return properties;
@@ -59,20 +72,33 @@ public abstract class RepositoryBase
     }
 }
 
+/// <summary>
+///     Abstract base class for repository implementations providing advisor pipeline integration and common CRUD logic.
+/// </summary>
+/// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
 public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="RepositoryBase{TEntity}" /> class.
+    /// </summary>
+    /// <param name="sp">The service provider for resolving advisors and creating new instances.</param>
     protected RepositoryBase(IServiceProvider sp) {
         ServiceProvider = sp;
         AdviceContext   = new(sp);
     }
 
+    /// <summary>
+    ///     Gets the service provider used to resolve advisors and create new repository instances.
+    /// </summary>
     protected virtual IServiceProvider ServiceProvider { get; }
 
     #region IRepository Members
 
+    /// <inheritdoc />
     AdviceContext IRepository.AdviceContext => AdviceContext;
 
+    /// <inheritdoc />
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
         [EnumeratorCancellation] CancellationToken ct
@@ -87,6 +113,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         }
     }
 
+    /// <inheritdoc />
     async IAsyncEnumerable<object> IRepository.SearchAsync<T>(
         Expression<Func<T, bool>>?                 predicate,
         [EnumeratorCancellation] CancellationToken ct
@@ -101,6 +128,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         }
     }
 
+    /// <inheritdoc />
     async ValueTask<object?> IRepository.FirstOrDefaultAsync<T>(
         Expression<Func<T, bool>>? predicate,
         CancellationToken          ct
@@ -112,6 +140,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return await FirstOrDefaultAsync(expression, ct);
     }
 
+    /// <inheritdoc />
     async ValueTask<object?> IRepository.SingleOrDefaultAsync<T>(
         Expression<Func<T, bool>>? predicate,
         CancellationToken          ct
@@ -123,6 +152,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return await SingleOrDefaultAsync(expression, ct);
     }
 
+    /// <inheritdoc />
     ValueTask<bool> IRepository.AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
@@ -131,6 +161,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return AnyAsync(expression, ct);
     }
 
+    /// <inheritdoc />
     ValueTask<int> IRepository.CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
@@ -139,6 +170,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return CountAsync(expression, ct);
     }
 
+    /// <inheritdoc />
     ValueTask<long> IRepository.LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
         var query = Predicate.Cast<T, TEntity>(predicate);
 
@@ -147,6 +179,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return LongCountAsync(expression, ct);
     }
 
+    /// <inheritdoc />
     Task IRepository.AddAsync(object entity, CancellationToken ct) {
         if (entity is not TEntity e) {
             return Task.CompletedTask;
@@ -155,6 +188,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return AddAsync(e, ct);
     }
 
+    /// <inheritdoc />
     Task IRepository.UpdateAsync(object entity, CancellationToken ct) {
         if (entity is not TEntity e) {
             return Task.CompletedTask;
@@ -163,6 +197,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return UpdateAsync(e, ct);
     }
 
+    /// <inheritdoc />
     Task IRepository.RemoveAsync(object entity, CancellationToken ct) {
         if (entity is not TEntity e) {
             return Task.CompletedTask;
@@ -171,6 +206,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return RemoveAsync(e, ct);
     }
 
+    /// <inheritdoc />
     void IRepository.Detach(object entity) {
         if (entity is not TEntity e) {
             return;
@@ -179,44 +215,58 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         Detach(e);
     }
 
+    /// <inheritdoc />
     IRepository IRepository.Once() { return (IRepository)Once(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressAddValidation() { return (IRepository)SuppressAddValidation(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressUpdateValidation() { return (IRepository)SuppressUpdateValidation(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressConcurrency() { return (IRepository)SuppressConcurrency(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressQuerySoftDelete() { return (IRepository)SuppressQuerySoftDelete(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressSoftDelete() { return (IRepository)SuppressSoftDelete(); }
 
+    /// <inheritdoc />
     IRepository IRepository.SuppressTimestamp() { return (IRepository)SuppressTimestamp(); }
 
     #endregion
 
     #region IRepository<TEntity> Members
 
+    /// <inheritdoc />
     public virtual AdviceContext AdviceContext { get; }
 
+    /// <inheritdoc />
     public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
 
+    /// <inheritdoc />
     public abstract IQueryable<TEntity> AsQueryable();
 
+    /// <inheritdoc />
     public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public virtual ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default) {
         return GetAsync<TEntity>(entity, ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default) {
         var type = entity.GetType();
 
@@ -238,10 +288,12 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return FindAsync<TResult>(keys.ToArray(), ct);
     }
 
+    /// <inheritdoc />
     public virtual ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
         return FindAsync<TEntity>(keys, ct);
     }
 
+    /// <inheritdoc />
     public virtual async ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -274,83 +326,102 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return await SingleOrDefaultAsync<TResult>(q => q.Where(predicate).OfType<TResult>(), ct);
     }
 
+    /// <inheritdoc />
     public abstract ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
 
+    /// <inheritdoc />
     public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
 
+    /// <inheritdoc />
     public virtual Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
         var tasks = entities.Select(e => AddAsync(e, ct)).ToArray();
 
-        return Task.WhenAny(tasks);
+        return Task.WhenAll(tasks);
     }
 
+    /// <inheritdoc />
     public abstract Task UpdateAsync(TEntity entity, CancellationToken ct = default);
 
+    /// <inheritdoc />
     public abstract Task RemoveAsync(TEntity entity, CancellationToken ct = default);
 
+    /// <inheritdoc />
     public virtual Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
         var tasks = entities.Select(e => RemoveAsync(e, ct)).ToArray();
 
-        return Task.WhenAny(tasks);
+        return Task.WhenAll(tasks);
     }
 
+    /// <inheritdoc />
     public abstract ValueTask<int> CommitAsync(CancellationToken ct = default);
 
+    /// <inheritdoc />
     public abstract void Detach(TEntity entity);
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> Once() {
         var type = GetType();
         return (IRepository<TEntity>)ActivatorUtilities.CreateInstance(ServiceProvider, type);
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressAddValidation() {
         AdviceContext.Set<SuppressAddValidation>(null);
         return this;
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressUpdateValidation() {
         AdviceContext.Set<SuppressUpdateValidation>(null);
         return this;
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressConcurrency() {
         AdviceContext.Set<SuppressConcurrency>(null);
         return this;
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressQuerySoftDelete() {
         AdviceContext.Set<SuppressQuerySoftDelete>(null);
         return this;
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressSoftDelete() {
         AdviceContext.Set<SuppressSoftDelete>(null);
         return this;
     }
 
+    /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressTimestamp() {
         AdviceContext.Set<SuppressTimestamp>(null);
         return this;
@@ -358,6 +429,10 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     #endregion
 
+    /// <summary>
+    ///     Creates a <see cref="QueryContainer{TEntity}" /> from the current queryable, for use by the build-query advisor pipeline.
+    /// </summary>
+    /// <returns>A new query container wrapping this repository and its queryable.</returns>
     protected virtual QueryContainer<TEntity> AsQueryContainer() {
         var query = AsQueryable();
 
@@ -366,6 +441,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return container;
     }
 
+    /// <summary>
+    ///     Applies the user-supplied predicate to the query, or falls back to <see cref="Queryable.OfType{TResult}" />.
+    /// </summary>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="query">The base queryable after build-query advisors have run.</param>
+    /// <param name="predicate">An optional query transformation.</param>
+    /// <returns>The final projected queryable.</returns>
     protected virtual IQueryable<TResult> BuildQuery<TResult>(
         IQueryable<TEntity>                             query,
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate

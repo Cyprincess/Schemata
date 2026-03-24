@@ -5,9 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures cookie policy middleware.
+/// </summary>
 public sealed class SchemataCookiePolicyFeature : FeatureBase
 {
-    public override int Priority => 130_000_000;
+    public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 20_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

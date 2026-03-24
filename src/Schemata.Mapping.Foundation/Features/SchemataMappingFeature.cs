@@ -2,17 +2,24 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Mapping.Skeleton;
 
 namespace Schemata.Mapping.Foundation.Features;
 
+/// <summary>
+/// Feature that registers a concrete <see cref="ISimpleMapper"/> implementation as a scoped service.
+/// </summary>
+/// <typeparam name="T">The mapper implementation type.</typeparam>
 public sealed class SchemataMappingFeature<T> : SchemataMappingFeature
     where T : class, ISimpleMapper
 {
-    public override int Priority => 340_000_000;
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -24,4 +31,10 @@ public sealed class SchemataMappingFeature<T> : SchemataMappingFeature
     }
 }
 
-public abstract class SchemataMappingFeature : FeatureBase;
+/// <summary>
+/// Base feature class for mapping subsystem features.
+/// </summary>
+public abstract class SchemataMappingFeature : FeatureBase
+{
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 30_000_000;
+}

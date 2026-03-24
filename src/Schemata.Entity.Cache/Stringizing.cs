@@ -4,10 +4,18 @@ using System.Text;
 
 namespace Schemata.Entity.Cache;
 
-public class Stringizing : ExpressionVisitor
+/// <summary>
+///     Expression visitor that serializes a LINQ expression tree into a deterministic string representation suitable for use as a cache key.
+/// </summary>
+internal class Stringizing : ExpressionVisitor
 {
     private readonly StringBuilder _builder = new();
 
+    /// <summary>
+    ///     Converts the specified expression into a deterministic string representation.
+    /// </summary>
+    /// <param name="expression">The expression to serialize.</param>
+    /// <returns>A string representation of the expression tree.</returns>
     public static string ToString(Expression expression) {
         var stringizing = new Stringizing();
 
@@ -16,6 +24,7 @@ public class Stringizing : ExpressionVisitor
         return stringizing.ToString();
     }
 
+    /// <inheritdoc />
     protected override Expression VisitLambda<T>(Expression<T> node) {
         _builder.Append('(');
 
@@ -35,11 +44,13 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
     protected override Expression VisitParameter(ParameterExpression node) {
         _builder.Append(node.Name ?? $"p{node.GetHashCode()}");
         return node;
     }
 
+    /// <inheritdoc />
     protected override Expression VisitConstant(ConstantExpression node) {
         switch (node.Value) {
             case null:
@@ -54,6 +65,7 @@ public class Stringizing : ExpressionVisitor
         }
     }
 
+    /// <inheritdoc />
     protected override Expression VisitBinary(BinaryExpression node) {
         _builder.Append('(');
 
@@ -88,6 +100,7 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
     protected override Expression VisitMember(MemberExpression node) {
         Visit(node.Expression);
 
@@ -96,6 +109,7 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
     protected override Expression VisitMethodCall(MethodCallExpression node) {
         var method    = node.Method.Name;
         var source    = node.Object ?? node.Arguments[0];
@@ -120,6 +134,7 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
     protected override Expression VisitUnary(UnaryExpression node) {
         _builder.Append(node.NodeType switch {
             ExpressionType.Not       => "!",
@@ -134,5 +149,6 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
+    /// <inheritdoc />
     public override string ToString() { return _builder.ToString(); }
 }

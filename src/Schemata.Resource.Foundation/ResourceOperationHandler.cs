@@ -27,6 +27,24 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
+/// <summary>
+/// Orchestrates CRUD operations for a resource, running the advisor pipeline around each step.
+/// </summary>
+/// <typeparam name="TEntity">The persistent entity type.</typeparam>
+/// <typeparam name="TRequest">The request DTO type for create and update operations.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type returned from get, create, and update operations.</typeparam>
+/// <typeparam name="TSummary">The summary DTO type returned from list operations.</typeparam>
+/// <remarks>
+/// <para>The handler follows a consistent advisor pipeline for each operation:</para>
+/// <list type="number">
+///   <item><see cref="Advisors.IResourceRequestAdvisor{TEntity}"/> -- general request-level check</item>
+///   <item>Operation-specific request advisor (e.g. <see cref="Advisors.IResourceCreateRequestAdvisor{TEntity, TRequest}"/>)</item>
+///   <item>Operation-specific entity advisor (e.g. <see cref="Advisors.IResourceCreateAdvisor{TEntity, TRequest}"/>)</item>
+///   <item>Persistence (add/update/remove + commit)</item>
+///   <item><see cref="Advisors.IResourceResponseAdvisor{TEntity, TDetail}"/> -- response post-processing</item>
+/// </list>
+/// <para>Registered as a scoped service by <see cref="Features.SchemataResourceFeature"/>.</para>
+/// </remarks>
 public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -37,16 +55,35 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     private readonly IRepository<TEntity> _repository;
     private readonly IServiceProvider     _sp;
 
+    /// <summary>
+    /// Initializes a new instance of the handler with its required dependencies.
+    /// </summary>
+    /// <param name="sp">The service provider for resolving advisors and options.</param>
+    /// <param name="repository">The entity repository.</param>
+    /// <param name="mapper">The mapper for converting between entity and DTO types.</param>
     public ResourceOperationHandler(IServiceProvider sp, IRepository<TEntity> repository, ISimpleMapper mapper) {
         _sp         = sp;
         _repository = repository;
         _mapper     = mapper;
     }
 
+    /// <summary>
+    /// Finds an entity by its resource name, including soft-deleted entities.
+    /// </summary>
+    /// <param name="name">The resource name to look up.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity if found; otherwise <see langword="null"/>.</returns>
     public async Task<TEntity?> FindByNameAsync(string? name, CancellationToken? ct) {
         return await FindByNameAsync(name, null, ct);
     }
 
+    /// <summary>
+    /// Finds an entity by its resource name and optional parent values, including soft-deleted entities.
+    /// </summary>
+    /// <param name="name">The resource name to look up.</param>
+    /// <param name="parentValues">Optional parent resource identifiers for hierarchical resources.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity if found; otherwise <see langword="null"/>.</returns>
     public async Task<TEntity?> FindByNameAsync(
         string?                     name,
         Dictionary<string, string>? parentValues,
@@ -83,6 +120,12 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return await repository.SingleOrDefaultAsync(q => q.Where(namePredicate).Where(parentPredicate), ct.Value);
     }
 
+    /// <summary>
+    /// Finds an entity by its canonical name, parsing parent segments automatically.
+    /// </summary>
+    /// <param name="name">The full canonical resource name (e.g. <c>publishers/123/books/456</c>).</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity if found; otherwise <see langword="null"/>.</returns>
     public async Task<TEntity?> FindByCanonicalNameAsync(string? name, CancellationToken? ct) {
         if (string.IsNullOrWhiteSpace(name)) {
             throw new InvalidArgumentException(message: SchemataResources.GetResourceString(SchemataResources.ST1010)) {
@@ -109,6 +152,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return await FindByNameAsync(leafName, parentValues, ct);
     }
 
+    /// <summary>
+    /// Gets an entity by name or throws <see cref="Schemata.Abstractions.Exceptions.NotFoundException"/> if not found.
+    /// </summary>
+    /// <param name="name">The resource name.</param>
+    /// <param name="parentValues">Optional parent resource identifiers for hierarchical resources.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity.</returns>
     public async Task<TEntity> GetByNameAsync(
         string?                     name,
         Dictionary<string, string>? parentValues,
@@ -117,6 +167,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return await FindByNameAsync(name, parentValues, ct) ?? throw ResourceNotFound(name);
     }
 
+    /// <summary>
+    /// Gets an entity by name, extracting parent values from the HTTP route, or throws if not found.
+    /// </summary>
+    /// <param name="name">The resource name.</param>
+    /// <param name="http">The HTTP context for extracting parent route values.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity.</returns>
     public Task<TEntity> GetByNameAsync(string? name, HttpContext? http, CancellationToken? ct) {
         var parentValues = http is not null
             ? ResourceNameDescriptor.ForType<TEntity>().ExtractParentValues(http.Request.RouteValues)
@@ -124,10 +181,23 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return GetByNameAsync(name, parentValues, ct);
     }
 
+    /// <summary>
+    /// Gets an entity by canonical name or throws <see cref="Schemata.Abstractions.Exceptions.NotFoundException"/> if not found.
+    /// </summary>
+    /// <param name="name">The full canonical resource name.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The entity.</returns>
     public async Task<TEntity> GetByCanonicalNameAsync(string? name, CancellationToken? ct) {
         return await FindByCanonicalNameAsync(name, ct) ?? throw ResourceNotFound(name);
     }
 
+    /// <summary>
+    /// Lists entities with filtering, ordering, pagination, and the full advisor pipeline.
+    /// </summary>
+    /// <param name="request">The list request containing filter, order, paging, and parent parameters.</param>
+    /// <param name="http">The optional HTTP context.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>A paginated list result with summaries and an optional next page token.</returns>
     public async Task<ListResult<TSummary>> ListAsync(ListRequest request, HttpContext? http, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
@@ -292,6 +362,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         };
     }
 
+    /// <summary>
+    /// Gets a single entity detail through the advisor pipeline.
+    /// </summary>
+    /// <param name="entity">The entity to retrieve details for.</param>
+    /// <param name="http">The optional HTTP context.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The get result containing the detail DTO.</returns>
     public async Task<GetResult<TDetail>> GetAsync(TEntity entity, HttpContext? http, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
@@ -335,6 +412,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return new() { Detail = detail };
     }
 
+    /// <summary>
+    /// Creates a new entity from the request through the full advisor pipeline.
+    /// </summary>
+    /// <param name="request">The creation request DTO.</param>
+    /// <param name="http">The optional HTTP context for route value extraction.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The create result containing the new entity's detail DTO.</returns>
     public async Task<CreateResult<TDetail>> CreateAsync(TRequest request, HttpContext? http, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
@@ -416,6 +500,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return new() { Detail = detail };
     }
 
+    /// <summary>
+    /// Updates an existing entity from the request through the full advisor pipeline.
+    /// </summary>
+    /// <param name="request">The update request DTO.</param>
+    /// <param name="entity">The existing entity to update.</param>
+    /// <param name="http">The optional HTTP context.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The update result containing the updated detail DTO.</returns>
     public async Task<UpdateResult<TDetail>> UpdateAsync(
         TRequest           request,
         TEntity            entity,
@@ -495,6 +587,15 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return new() { Detail = detail };
     }
 
+    /// <summary>
+    /// Deletes an entity through the full advisor pipeline.
+    /// </summary>
+    /// <param name="entity">The entity to delete.</param>
+    /// <param name="etag">The optional ETag for concurrency checking.</param>
+    /// <param name="force">Whether to bypass the freshness check.</param>
+    /// <param name="http">The optional HTTP context.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns><see langword="true"/> if the entity was deleted or the operation was handled; <see langword="false"/> if blocked.</returns>
     public async Task<bool> DeleteAsync(
         TEntity            entity,
         string?            etag,

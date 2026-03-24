@@ -12,11 +12,23 @@ using Schemata.Core;
 
 namespace Schemata.Modular;
 
+/// <summary>
+/// Default module runner that invokes lifecycle methods on discovered <see cref="IModule"/> instances.
+/// </summary>
+/// <remarks>
+/// Modules are instantiated once during <see cref="IModulesRunner.ConfigureServices"/>, sorted by <see cref="Schemata.Abstractions.Modular.ModuleBase.Order"/>,
+/// then reused during <see cref="IModulesRunner.ConfigureApplication"/> and <see cref="IModulesRunner.ConfigureEndpoints"/> sorted by <see cref="Schemata.Abstractions.Modular.ModuleBase.Priority"/>.
+/// </remarks>
 public sealed class DefaultModulesRunner : IModulesRunner
 {
     private readonly ILogger<DefaultModulesRunner> _logger;
     private readonly SchemataOptions               _schemata;
 
+    /// <summary>
+    /// Initializes a new instance of the module runner.
+    /// </summary>
+    /// <param name="schemata">The Schemata options containing discovered module descriptors.</param>
+    /// <param name="logger">The logger.</param>
     public DefaultModulesRunner(SchemataOptions schemata, ILogger<DefaultModulesRunner> logger) {
         _logger   = logger;
         _schemata = schemata;
@@ -24,6 +36,7 @@ public sealed class DefaultModulesRunner : IModulesRunner
 
     #region IModulesRunner Members
 
+    /// <inheritdoc />
     public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
@@ -53,6 +66,7 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
+    /// <inheritdoc />
     public void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
@@ -74,6 +88,7 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
+    /// <inheritdoc />
     public void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

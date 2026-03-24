@@ -4,6 +4,9 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
+/// <summary>
+/// Represents a null literal value in the filter grammar.
+/// </summary>
 public class Null : IValue
 {
     public Null(TextPosition position) { Position = position; }

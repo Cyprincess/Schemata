@@ -4,9 +4,16 @@ using System.Text.Json.Serialization;
 
 namespace Schemata.Core.Json;
 
+/// <summary>
+///     JSON converter that serializes <see langword="long" /> values as strings to preserve precision in JavaScript clients.
+/// </summary>
 public class JsonStringNumberConverter : JsonConverter<long>
 {
     private JsonStringNumberConverter() { }
+
+    /// <summary>
+    ///     Gets the singleton instance.
+    /// </summary>
     public static JsonStringNumberConverter Instance { get; } = new();
 
     public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {

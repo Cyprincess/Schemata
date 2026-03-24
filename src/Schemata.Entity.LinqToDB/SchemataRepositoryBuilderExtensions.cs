@@ -36,8 +36,19 @@ using Schemata.Entity.Repository;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to configure LINQ to DB as the repository provider.
+/// </summary>
 public static class SchemataRepositoryBuilderExtensions
 {
+    /// <summary>
+    ///     Registers the default <see cref="DataConnection" /> as the LINQ to DB data provider.
+    /// </summary>
+    /// <param name="builder">The repository builder.</param>
+    /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
+    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
@@ -47,6 +58,15 @@ public static class SchemataRepositoryBuilderExtensions
         return builder.UseLinqToDb<DataConnection, DataConnection>(configure, contextLifetime, optionsLifetime);
     }
 
+    /// <summary>
+    ///     Registers a custom <see cref="DataConnection" /> type as the LINQ to DB data provider.
+    /// </summary>
+    /// <typeparam name="TContext">The <see cref="DataConnection" /> type (used as both service and implementation type).</typeparam>
+    /// <param name="builder">The repository builder.</param>
+    /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
+    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,
@@ -57,6 +77,17 @@ public static class SchemataRepositoryBuilderExtensions
         return builder.UseLinqToDb<TContext, TContext>(configure, contextLifetime, optionsLifetime);
     }
 
+    /// <summary>
+    ///     Registers a LINQ to DB <see cref="DataConnection" /> with separate service and implementation types.
+    /// </summary>
+    /// <typeparam name="TContext">The service type for the data connection.</typeparam>
+    /// <typeparam name="TContextImplementation">The implementation type for the data connection.</typeparam>
+    /// <param name="builder">The repository builder.</param>
+    /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
+    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <returns>The same builder for chaining.</returns>
+    /// <exception cref="ArgumentException">Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor accepting <see cref="DataOptions" />.</exception>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,

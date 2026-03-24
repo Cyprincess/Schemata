@@ -7,16 +7,24 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation;
 
+/// <summary>
+/// Distributed-cache-backed implementation of <see cref="IIdempotencyStore"/> for storing idempotent request results.
+/// </summary>
 public sealed class IdempotencyStore : IIdempotencyStore
 {
     private static readonly TimeSpan DefaultExpiry = TimeSpan.FromHours(24);
 
     private readonly IDistributedCache _cache;
 
+    /// <summary>
+    /// Initializes a new instance backed by the specified distributed cache.
+    /// </summary>
+    /// <param name="cache">The distributed cache implementation.</param>
     public IdempotencyStore(IDistributedCache cache) { _cache = cache; }
 
     #region IIdempotencyStore Members
 
+    /// <inheritdoc />
     public async Task<T?> GetAsync<T>(string requestId, CancellationToken ct = default) {
         var bytes = await _cache.GetAsync(requestId, ct);
         if (bytes is null) {
@@ -26,6 +34,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
         return JsonSerializer.Deserialize<T>(bytes);
     }
 
+    /// <inheritdoc />
     public async Task SetAsync<T>(
         string            requestId,
         T                 value,

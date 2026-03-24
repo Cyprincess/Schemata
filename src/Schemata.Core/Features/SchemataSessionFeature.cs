@@ -7,11 +7,17 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures session middleware with a custom session store.
+/// </summary>
+/// <typeparam name="T">The session store implementation type.</typeparam>
 [DependsOn<SchemataCookiePolicyFeature>]
 public sealed class SchemataSessionFeature<T> : FeatureBase
     where T : class, ISessionStore
 {
-    public override int Priority => 170_000_000;
+    public const int DefaultPriority = SchemataAuthenticationFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

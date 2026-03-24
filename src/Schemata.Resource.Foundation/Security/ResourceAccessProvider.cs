@@ -6,10 +6,20 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Security;
 
+/// <summary>
+/// Default role-based access provider that checks for <c>resource-{operation}-{entity}</c> claims.
+/// </summary>
+/// <typeparam name="T">The entity type.</typeparam>
+/// <typeparam name="TRequest">The request type.</typeparam>
+/// <remarks>
+/// Supports wildcard claims: <c>resource-*-{entity}</c> (all operations on an entity)
+/// and <c>resource-{operation}-*</c> (an operation on all entities).
+/// </remarks>
 public class ResourceAccessProvider<T, TRequest> : IAccessProvider<T, ResourceRequestContext<TRequest>>
 {
     #region IAccessProvider<T,ResourceRequestContext<TRequest>> Members
 
+    /// <inheritdoc />
     public Task<bool> HasAccessAsync(
         T?                                resource,
         ResourceRequestContext<TRequest>? context,

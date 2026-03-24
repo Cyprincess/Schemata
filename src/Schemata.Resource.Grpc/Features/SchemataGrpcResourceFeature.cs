@@ -20,6 +20,9 @@ using Schemata.Resource.Grpc.Interceptors;
 
 namespace Schemata.Resource.Grpc.Features;
 
+/// <summary>
+/// Feature that configures gRPC transport for resources, including protobuf-net serialization, service mapping, and gRPC reflection.
+/// </summary>
 [DependsOn<SchemataResourceFeature>]
 public sealed class SchemataGrpcResourceFeature : FeatureBase
 {
@@ -30,8 +33,12 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                                                                    IsGenericMethodDefinition: true,
                                                                } && m.GetParameters().Length == 1);
 
-    public override int Priority => 360_200_000;
+    public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 20_000_000;
 
+    /// <inheritdoc />
+    public override int Priority => DefaultPriority;
+
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -77,6 +84,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         });
     }
 
+    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

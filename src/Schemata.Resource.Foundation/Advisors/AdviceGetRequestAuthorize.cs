@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -9,6 +10,21 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+public static class AdviceGetRequestAuthorize
+{
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
+}
+
+/// <summary>
+/// Authorizes get requests by checking role-based access for the current user.
+/// </summary>
+/// <typeparam name="TEntity">The entity type being retrieved.</typeparam>
+/// <remarks>
+/// Order: 100,000,000. Registered by <see cref="SchemataResourceBuilder.WithAuthorization"/>;
+/// not auto-registered by <see cref="Features.SchemataResourceFeature"/>.
+/// Skips authorization when the entity is decorated with <see cref="Schemata.Abstractions.Resource.AnonymousAttribute"/> for the Get operation.
+/// Throws <see cref="Schemata.Abstractions.Exceptions.AuthorizationException"/> if access is denied.
+/// </remarks>
 public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
@@ -20,10 +36,10 @@ public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvi
 
     #region IResourceGetRequestAdvisor<TEntity> Members
 
-    public int Order => 100_000_000;
+    /// <inheritdoc />
+    public int Order => AdviceGetRequestAuthorize.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         GetRequest        request,

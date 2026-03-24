@@ -14,10 +14,15 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures global exception handling, converting <see cref="SchemataException" /> to structured JSON error responses.
+/// </summary>
 [DependsOn<SchemataJsonSerializerFeature>]
 public sealed class SchemataExceptionHandlerFeature : FeatureBase
 {
-    public override int Priority => 100_010_000;
+    public const int DefaultPriority = SchemataDeveloperExceptionPageFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

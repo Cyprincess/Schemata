@@ -6,6 +6,7 @@ using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Advice;
 
+/// <inheritdoc cref="AdviceRunner{TAdvisor, T1}" />
 public static class AdviceRunner<TAdvisor, T1, T2, T3, T4, T5, T6, T7>
     where TAdvisor : IAdvisor<T1, T2, T3, T4, T5, T6, T7>
 {

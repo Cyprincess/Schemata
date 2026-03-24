@@ -6,6 +6,9 @@ using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
+/// <summary>
+/// Represents a function call expression (e.g. <c>contains(field, value)</c>) in the filter grammar.
+/// </summary>
 public class Function : IComparable
 {
     public Function(TextPosition position, Member member, IReadOnlyCollection<IArg>? args) {
@@ -18,8 +21,14 @@ public class Function : IComparable
         }
     }
 
+    /// <summary>
+    /// Gets the member path that forms the function name.
+    /// </summary>
     public Member Member { get; }
 
+    /// <summary>
+    /// Gets the list of arguments passed to the function.
+    /// </summary>
     public List<IArg> Args { get; } = [];
 
     #region IComparable Members

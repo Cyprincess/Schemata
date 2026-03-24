@@ -39,7 +39,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
             using (scope) {
                 var found = await repository.FirstOrDefaultAsync(q => q.Where(s => s.Name == "tx-alice"));
                 Assert.NotNull(found);
-                Assert.Equal("Tx-Alice", found!.FullName);
+                Assert.Equal("Tx-Alice", found.FullName);
             }
         }
     }

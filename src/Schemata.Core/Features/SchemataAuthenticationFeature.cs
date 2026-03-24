@@ -7,9 +7,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Core.Features;
 
+/// <summary>
+///     Configures authentication and authorization middleware.
+/// </summary>
 public sealed class SchemataAuthenticationFeature : FeatureBase
 {
-    public override int Priority => 160_000_000;
+    public const int DefaultPriority = SchemataCorsFeature.DefaultPriority + 10_000_000;
+
+    public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,

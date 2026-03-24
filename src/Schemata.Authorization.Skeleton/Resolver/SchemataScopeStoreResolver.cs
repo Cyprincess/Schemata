@@ -6,11 +6,22 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
+/// <summary>
+///     Resolves the appropriate <see cref="IOpenIddictScopeStore{TScope}" /> implementation
+///     for the configured scope entity type.
+/// </summary>
+/// <remarks>
+///     This is an infrastructure type registered by <c>SchemataAuthorizationFeature</c> to replace
+///     the default OpenIddict scope store resolver with one backed by the Schemata repository.
+/// </remarks>
 public sealed class SchemataScopeStoreResolver : IOpenIddictScopeStoreResolver
 {
     private readonly IMemoryCache     _cache;
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataScopeStoreResolver" /> class.
+    /// </summary>
     public SchemataScopeStoreResolver(IServiceProvider sp, IMemoryCache cache) {
         _sp    = sp;
         _cache = cache;
@@ -18,6 +29,7 @@ public sealed class SchemataScopeStoreResolver : IOpenIddictScopeStoreResolver
 
     #region IOpenIddictScopeStoreResolver Members
 
+    /// <inheritdoc />
     public IOpenIddictScopeStore<TScope> Get<TScope>()
         where TScope : class {
         var store = _sp.GetService<IOpenIddictScopeStore<TScope>>();

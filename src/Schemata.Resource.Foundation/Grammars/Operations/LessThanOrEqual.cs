@@ -4,8 +4,14 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
+/// <summary>
+/// Represents the less-than-or-equal operator (<c>&lt;=</c>).
+/// </summary>
 public class LessThanOrEqual : IBinary
 {
+    /// <summary>
+    /// The string literal representing the less-than-or-equal operator.
+    /// </summary>
     public const string Name = "<=";
 
     public LessThanOrEqual(TextPosition position) { Position = position; }

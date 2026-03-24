@@ -6,6 +6,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace Schemata.Core;
 
+/// <summary>
+///     Startup filter that wires the Schemata middleware pipeline and endpoint configuration.
+/// </summary>
 public sealed class SchemataStartup : IStartupFilter
 {
     private readonly IConfiguration      _configuration;
@@ -18,6 +21,7 @@ public sealed class SchemataStartup : IStartupFilter
 
     #region IStartupFilter Members
 
+    /// <inheritdoc />
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) {
         return app => {
             app.UseSchemata(_configuration, _environment);
@@ -34,6 +38,12 @@ public sealed class SchemataStartup : IStartupFilter
 
     #endregion
 
+    /// <summary>
+    ///     Creates a new instance of <see cref="SchemataStartup" />.
+    /// </summary>
+    /// <param name="configuration">The application configuration.</param>
+    /// <param name="environment">The web host environment.</param>
+    /// <returns>A new <see cref="SchemataStartup" /> instance.</returns>
     public static SchemataStartup Create(IConfiguration configuration, IWebHostEnvironment environment) {
         return new(configuration, environment);
     }

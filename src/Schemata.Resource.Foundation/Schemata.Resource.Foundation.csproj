@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Schemata.Resource.Foundation.Tests"
+                        Key="0024000004800000940000000602000000240000525341310004000001000100e19cf2f2055c24af8f7fc169f95ccdabdaf6853248d6e33a32e4e1666e99bb2221a70a1ac649a7fb2a96f42625276ae7927c68a6525afb9d6ed5a969c859a3f26fba36673697f33f192f4b65be517c054f292ed322673e65dae1186b995e83a1b547e95aa2a47f7265a95ef19d84de373cfd0225d8100282e04c3bef45cafcce" />
+  </ItemGroup>
+
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

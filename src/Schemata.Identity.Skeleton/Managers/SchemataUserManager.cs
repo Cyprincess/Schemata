@@ -11,11 +11,19 @@ using Schemata.Identity.Skeleton.Stores;
 
 namespace Schemata.Identity.Skeleton.Managers;
 
+/// <summary>
+///     Extended user manager that adds display name, UPN, phone lookup, and claims projection
+///     on top of the base ASP.NET Core <see cref="UserManager{TUser}"/>.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
 public class SchemataUserManager<TUser> : UserManager<TUser>
     where TUser : class
 {
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataUserManager{TUser}"/> class.
+    /// </summary>
     public SchemataUserManager(
         IServiceProvider                       sp,
         IUserStore<TUser>                      store,
@@ -30,6 +38,12 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         _sp = sp;
     }
 
+    /// <summary>
+    ///     Gets the display name for the specified user.
+    /// </summary>
+    /// <param name="user">The user whose display name to retrieve.</param>
+    /// <returns>The display name, or <see langword="null"/> if not set.</returns>
+    /// <exception cref="NotSupportedException">The store does not implement <see cref="IUserDisplayNameStore{TUser}"/>.</exception>
     public virtual Task<string?> GetDisplayNameAsync(TUser user) {
         ThrowIfDisposed();
         var store = GetDisplayNameStore();
@@ -41,6 +55,12 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return store.GetDisplayNameAsync(user, CancellationToken);
     }
 
+    /// <summary>
+    ///     Gets the user principal name (UPN) for the specified user.
+    /// </summary>
+    /// <param name="user">The user whose UPN to retrieve.</param>
+    /// <returns>The UPN, or <see langword="null"/> if not set.</returns>
+    /// <exception cref="NotSupportedException">The store does not implement <see cref="IUserPrincipalNameStore{TUser}"/>.</exception>
     public virtual Task<string?> GetUserPrincipalNameAsync(TUser user) {
         ThrowIfDisposed();
         var store = GetUserPrincipalNameStore();
@@ -52,6 +72,11 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return store.GetUserPrincipalNameAsync(user, CancellationToken);
     }
 
+    /// <summary>
+    ///     Projects the user's identity properties and roles into a <see cref="ClaimsStore"/>.
+    /// </summary>
+    /// <param name="user">The user to project.</param>
+    /// <returns>A claims store containing the user's standard claims and roles.</returns>
     public virtual async Task<ClaimsStore> ToClaimsAsync(TUser user) {
         var claims = new ClaimsStore();
 
@@ -68,6 +93,12 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return claims;
     }
 
+    /// <summary>
+    ///     Finds a user by phone number, including protected data lookup when enabled.
+    /// </summary>
+    /// <param name="phone">The phone number to search for.</param>
+    /// <returns>The user if found; otherwise, <see langword="null"/>.</returns>
+    /// <exception cref="NotSupportedException">The store does not implement <see cref="IUserPhoneStore{TUser}"/>.</exception>
     public virtual async Task<TUser?> FindByPhoneAsync(string phone) {
         ThrowIfDisposed();
         var store = GetPhoneNumberStore();

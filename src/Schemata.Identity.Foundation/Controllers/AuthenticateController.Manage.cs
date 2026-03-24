@@ -12,6 +12,9 @@ namespace Schemata.Identity.Foundation.Controllers;
 
 public sealed partial class AuthenticateController : ControllerBase
 {
+    /// <summary>
+    ///     Returns the current user's profile as a claims store.
+    /// </summary>
     [Authorize]
     [HttpGet("~/Account/Profile")]
     public async Task<IActionResult> Profile() {
@@ -24,6 +27,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return Ok(store);
     }
 
+    /// <summary>
+    ///     Initiates an email address change by sending a confirmation code.
+    /// </summary>
+    /// <param name="request">The profile request containing the new email address.</param>
     [Authorize]
     [HttpPut("~/Account/Profile/Email")]
     public async Task<IActionResult> Email([FromBody] ProfileRequest request) {
@@ -48,6 +55,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return Accepted();
     }
 
+    /// <summary>
+    ///     Initiates a phone number change by sending a confirmation code.
+    /// </summary>
+    /// <param name="request">The profile request containing the new phone number.</param>
     [Authorize]
     [HttpPut("~/Account/Profile/Phone")]
     public async Task<IActionResult> Phone([FromBody] ProfileRequest request) {
@@ -72,6 +83,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return Accepted();
     }
 
+    /// <summary>
+    ///     Changes the current user's password.
+    /// </summary>
+    /// <param name="request">The profile request containing old and new passwords.</param>
     [Authorize]
     [HttpPut("~/Account/Profile/Password")]
     public async Task<IActionResult> Password([FromBody] ProfileRequest request) {
@@ -96,6 +111,9 @@ public sealed partial class AuthenticateController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    ///     Returns the current two-factor authenticator status, generating a new shared key if not yet enabled.
+    /// </summary>
     [Authorize]
     [HttpGet(nameof(Authenticator))]
     public async Task<IActionResult> Authenticator() {
@@ -132,6 +150,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    ///     Enrolls the user in two-factor authentication by verifying a TOTP code.
+    /// </summary>
+    /// <param name="request">The authenticator request containing the verification code.</param>
     [Authorize]
     [HttpPost(nameof(Authenticator))]
     public async Task<IActionResult> Enroll([FromBody] AuthenticatorRequest request) {
@@ -156,6 +178,10 @@ public sealed partial class AuthenticateController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    ///     Disables two-factor authentication after verifying a TOTP or recovery code.
+    /// </summary>
+    /// <param name="request">The authenticator request containing the verification or recovery code.</param>
     [Authorize]
     [HttpPatch(nameof(Authenticator))]
     public async Task<IActionResult> Downgrade([FromBody] AuthenticatorRequest request) {

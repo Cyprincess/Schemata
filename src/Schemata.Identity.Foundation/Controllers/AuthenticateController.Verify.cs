@@ -6,6 +6,12 @@ namespace Schemata.Identity.Foundation.Controllers;
 
 public sealed partial class AuthenticateController : ControllerBase
 {
+    /// <summary>
+    ///     Confirms an email address or phone number change using a verification code.
+    /// </summary>
+    /// <param name="email">The email address to confirm.</param>
+    /// <param name="phone">The phone number to confirm.</param>
+    /// <param name="code">The verification code.</param>
     [HttpGet(nameof(Confirm))]
     public async Task<IActionResult> Confirm(
         [FromQuery] string? email,
@@ -42,6 +48,11 @@ public sealed partial class AuthenticateController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    ///     Sends a new confirmation code to the user's email or phone.
+    /// </summary>
+    /// <param name="request">The request identifying the contact to send the code to.</param>
+    /// <returns>202 Accepted regardless of whether the user exists, to prevent user enumeration.</returns>
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request) {
         if (!_options.CurrentValue.AllowAccountConfirmation) {

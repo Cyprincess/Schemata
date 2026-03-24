@@ -6,6 +6,9 @@ using Schemata.Resource.Foundation.Grammars.Operations;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
+/// <summary>
+/// Represents factors implicitly joined by logical AND (whitespace-separated) in the filter grammar.
+/// </summary>
 public class Sequence : Logical, IToken
 {
     public Sequence(TextPosition position, IEnumerable<Factor> factors) {
@@ -14,6 +17,9 @@ public class Sequence : Logical, IToken
         Factors.AddRange(factors);
     }
 
+    /// <summary>
+    /// Gets the list of factors that are implicitly combined with logical AND.
+    /// </summary>
     public List<Factor> Factors { get; } = [];
 
     public override IEnumerable<IToken> Tokens => Factors;

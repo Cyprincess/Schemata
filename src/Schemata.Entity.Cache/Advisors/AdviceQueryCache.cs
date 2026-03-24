@@ -8,19 +8,40 @@ using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Cache.Advisors;
 
+public static class AdviceQueryCache
+{
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
+}
+
+/// <summary>
+///     Query advisor that returns cached results when a matching cache key exists, short-circuiting database execution.
+/// </summary>
+/// <typeparam name="TEntity">The root entity type being queried.</typeparam>
+/// <typeparam name="TResult">The projected result type of the query.</typeparam>
+/// <typeparam name="T">The scalar or aggregate return type.</typeparam>
+/// <remarks>
+///     <para>Order: <see cref="SchemataConstants.Orders.Max" /> (2,147,400,000). Runs last among query advisors.</para>
+///     <para>Registered by <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />; not auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.</para>
+///     <para>Returns <see cref="AdviseResult.Handle" /> when a cache hit occurs, preventing database execution.</para>
+///     <para>Suppressed when <see cref="SuppressQueryCache" /> is present in the advice context.</para>
+/// </remarks>
 public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvisor<TEntity, TResult, T>
     where TEntity : class
 {
     private readonly IMemoryCache _cache;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="AdviceQueryCache{TEntity, TResult, T}" /> class.
+    /// </summary>
+    /// <param name="cache">The memory cache instance.</param>
     public AdviceQueryCache(IMemoryCache cache) { _cache = cache; }
 
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
 
-    public int Order => SchemataConstants.Orders.Max;
+    /// <inheritdoc />
+    public int Order => AdviceQueryCache.DefaultOrder;
 
-    public int Priority => Order;
-
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         QueryContext<TEntity, TResult, T> context,

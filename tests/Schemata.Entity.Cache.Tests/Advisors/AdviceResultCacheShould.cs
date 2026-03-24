@@ -31,7 +31,7 @@ public class AdviceResultCacheShould
 
         var key = context.ToCacheKey();
         Assert.NotNull(key);
-        Assert.True(cache.TryGetValue(key!, out var stored));
+        Assert.True(cache.TryGetValue(key, out var stored));
         Assert.NotNull(stored);
         var student = Assert.IsType<Student>(stored);
         Assert.Equal("Alice", student.FullName);

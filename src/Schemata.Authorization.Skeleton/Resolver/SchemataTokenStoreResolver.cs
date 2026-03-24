@@ -6,11 +6,22 @@ using Schemata.Authorization.Skeleton.Stores;
 
 namespace Schemata.Authorization.Skeleton.Resolver;
 
+/// <summary>
+///     Resolves the appropriate <see cref="IOpenIddictTokenStore{TToken}" /> implementation
+///     for the configured token entity type.
+/// </summary>
+/// <remarks>
+///     This is an infrastructure type registered by <c>SchemataAuthorizationFeature</c> to replace
+///     the default OpenIddict token store resolver with one backed by the Schemata repository.
+/// </remarks>
 public sealed class SchemataTokenStoreResolver : IOpenIddictTokenStoreResolver
 {
     private readonly IMemoryCache     _cache;
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SchemataTokenStoreResolver" /> class.
+    /// </summary>
     public SchemataTokenStoreResolver(IServiceProvider sp, IMemoryCache cache) {
         _sp    = sp;
         _cache = cache;
@@ -18,6 +29,7 @@ public sealed class SchemataTokenStoreResolver : IOpenIddictTokenStoreResolver
 
     #region IOpenIddictTokenStoreResolver Members
 
+    /// <inheritdoc />
     public IOpenIddictTokenStore<TToken> Get<TToken>()
         where TToken : class {
         var store = _sp.GetService<IOpenIddictTokenStore<TToken>>();
