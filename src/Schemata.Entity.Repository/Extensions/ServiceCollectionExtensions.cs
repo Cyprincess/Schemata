@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -12,20 +13,26 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers the specified repository implementation and all built-in advisors (timestamp, concurrency, validation, soft-delete, canonical name).
+    ///     Registers the specified repository implementation and all built-in advisors (timestamp, concurrency, validation,
+    ///     soft-delete, canonical name).
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="implementationType">A type that implements both <see cref="IRepository" /> and <see cref="IRepository{TEntity}" />.</param>
+    /// <param name="implementationType">
+    ///     A type that implements both <see cref="IRepository" /> and
+    ///     <see cref="IRepository{TEntity}" />.
+    /// </param>
     /// <returns>A <see cref="SchemataRepositoryBuilder" /> for fluent configuration of additional providers and advisors.</returns>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="implementationType" /> does not implement the required repository interfaces.</exception>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when <paramref name="implementationType" /> does not implement the required
+    ///     repository interfaces.
+    /// </exception>
     public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type implementationType) {
         var serviceType = typeof(IRepository<>);
 
         var nonGenericInterface     = implementationType.GetInterface(nameof(IRepository));
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
         if (nonGenericInterface is null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
-            throw new ArgumentException($"The type {implementationType} does not implement {serviceType}.",
-                                        nameof(implementationType));
+            throw new ArgumentException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1029), implementationType, serviceType));
         }
 
         services.TryAddScoped(serviceType, implementationType);

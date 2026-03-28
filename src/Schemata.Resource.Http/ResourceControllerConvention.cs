@@ -1,5 +1,7 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -7,9 +9,10 @@ using Schemata.Common;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-/// MVC convention that configures route templates and rate limiting for generic resource controllers.
+///     MVC convention that configures route templates, rate limiting, and optional authentication scheme
+///     for generic resource controllers.
 /// </summary>
-public sealed class ResourceControllerConvention : IControllerModelConvention
+public sealed class ResourceControllerConvention(string? scheme = null) : IControllerModelConvention
 {
     #region IControllerModelConvention Members
 
@@ -35,11 +38,16 @@ public sealed class ResourceControllerConvention : IControllerModelConvention
             selector.AttributeRouteModel?.Template = route;
         }
 
-        var attribute = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
-        if (attribute is not null) {
+        var quota = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
+        if (quota is not null) {
             foreach (var selector in controller.Selectors) {
-                selector.EndpointMetadata.Add(new EnableRateLimitingAttribute(attribute.PolicyName));
+                selector.EndpointMetadata.Add(new EnableRateLimitingAttribute(quota.PolicyName));
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(scheme)) {
+            var policy = new AuthorizationPolicyBuilder(scheme).RequireAssertion(_ => true).Build();
+            controller.Filters.Add(new AuthorizeFilter(policy));
         }
     }
 

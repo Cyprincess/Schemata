@@ -12,7 +12,7 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// </summary>
 /// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
-///     Returns <see langword="null"/> when no <c>Tenant</c> claim is present.
+///     Returns <see langword="null" /> when no <c>Tenant</c> claim is present.
 ///     Throws <see cref="TenantResolveException" /> when the claim value cannot be parsed.
 /// </remarks>
 public class RequestPrincipalResolver<TKey> : ITenantResolver<TKey>

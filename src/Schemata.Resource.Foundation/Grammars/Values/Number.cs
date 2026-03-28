@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq.Expressions;
 using Parlot;
 using Schemata.Resource.Foundation.Grammars.Expressions;
@@ -5,7 +6,7 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-/// Represents a decimal number literal value in the filter grammar.
+///     Represents a decimal number literal value in the filter grammar.
 /// </summary>
 public class Number : IValue
 {
@@ -15,7 +16,7 @@ public class Number : IValue
     }
 
     /// <summary>
-    /// Gets the decimal value.
+    ///     Gets the decimal value.
     /// </summary>
     public decimal Value { get; }
 
@@ -31,5 +32,5 @@ public class Number : IValue
 
     #endregion
 
-    public override string ToString() { return Value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
+    public override string ToString() { return Value.ToString(CultureInfo.InvariantCulture); }
 }

@@ -7,7 +7,7 @@ using Schemata.Resource.Foundation.Grammars.Operations;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents factors implicitly joined by logical AND (whitespace-separated) in the filter grammar.
+///     Represents factors implicitly joined by logical AND (whitespace-separated) in the filter grammar.
 /// </summary>
 public class Sequence : Logical, IToken
 {
@@ -18,7 +18,7 @@ public class Sequence : Logical, IToken
     }
 
     /// <summary>
-    /// Gets the list of factors that are implicitly combined with logical AND.
+    ///     Gets the list of factors that are implicitly combined with logical AND.
     /// </summary>
     public List<Factor> Factors { get; } = [];
 

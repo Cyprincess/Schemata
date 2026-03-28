@@ -2,32 +2,21 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for resetting a password using a previously issued reset code.
-/// </summary>
 public class ResetRequest
 {
-    /// <summary>
-    ///     Gets or sets the email address associated with the account.
-    /// </summary>
+    /// <summary>Email address of the account to reset; mutually exclusive with PhoneNumber.</summary>
     [EmailAddress]
-    public virtual string? EmailAddress { get; set; }
+    public string? EmailAddress { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the phone number associated with the account.
-    /// </summary>
+    /// <summary>Phone number of the account to reset; mutually exclusive with EmailAddress.</summary>
     [Phone]
-    public virtual string? PhoneNumber { get; set; }
+    public string? PhoneNumber { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the password reset code.
-    /// </summary>
+    /// <summary>Password reset code received via email or SMS.</summary>
     [Required]
-    public virtual string Code { get; set; } = null!;
+    public string Code { get; set; } = null!;
 
-    /// <summary>
-    ///     Gets or sets the new password.
-    /// </summary>
+    /// <summary>New password to set; must satisfy configured password policy.</summary>
     [Required]
-    public virtual string Password { get; set; } = null!;
+    public string Password { get; set; } = null!;
 }

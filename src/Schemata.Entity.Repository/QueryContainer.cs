@@ -4,7 +4,8 @@ using System.Linq;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Wraps a repository and its queryable during the build-query advisor pipeline, allowing advisors to modify the query before execution.
+///     Wraps a repository and its queryable during the build-query advisor pipeline, allowing advisors to modify the query
+///     before execution.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being queried.</typeparam>
 public sealed class QueryContainer<TEntity>

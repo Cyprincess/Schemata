@@ -5,6 +5,7 @@ using LinqToDB;
 using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -27,12 +28,12 @@ public class IntegrationFixture : IAsyncLifetime
 
         var connectionString = $"Data Source={_dbPath}";
 
-        services.AddScoped(_ => {
+        services.TryAddScoped(_ => {
             var options = new DataOptions().UseSQLite(connectionString);
             return new TestDataConnection(options);
         });
 
-        services.AddScoped<IRepository<Student>, LinQ2DbRepository<TestDataConnection, Student>>();
+        services.TryAddScoped<IRepository<Student>, LinQ2DbRepository<TestDataConnection, Student>>();
 
         _root = services.BuildServiceProvider();
 

@@ -7,7 +7,8 @@ using Schemata.Abstractions.Advisors;
 namespace Schemata.Advice;
 
 /// <summary>
-///     Executes all registered advisors of type <typeparamref name="TAdvisor" /> in order, stopping on non-Continue results.
+///     Executes all registered advisors of type <typeparamref name="TAdvisor" /> in order, stopping on non-Continue
+///     results.
 /// </summary>
 /// <typeparam name="TAdvisor">The advisor interface type.</typeparam>
 /// <typeparam name="T1">The type of the first argument.</typeparam>

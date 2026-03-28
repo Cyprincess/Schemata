@@ -42,8 +42,7 @@ public class AdviceUpdateConcurrencyShould
             .ReturnsAsync(stored);
         var entity = new Student { Id = 1, Timestamp = Guid.NewGuid() };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(
-                                                           ctx, mock.Object, entity, CancellationToken.None));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None));
     }
 
     [Fact]
@@ -76,7 +75,7 @@ public class AdviceUpdateConcurrencyShould
     public async Task Advise_Suppressed_DoesNotCheck() {
         var advisor = new AdviceUpdateConcurrency<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressConcurrency());
+        ctx.Set(new ConcurrencySuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { Id = 1, Timestamp = Guid.NewGuid() };
         var original   = entity.Timestamp;

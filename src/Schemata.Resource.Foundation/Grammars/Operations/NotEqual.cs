@@ -5,12 +5,12 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-/// Represents the not-equal operator (<c>!=</c>).
+///     Represents the not-equal operator (<c>!=</c>).
 /// </summary>
 public class NotEqual : IBinary
 {
     /// <summary>
-    /// The string literal representing the not-equal operator.
+    ///     The string literal representing the not-equal operator.
     /// </summary>
     public const string Name = "!=";
 

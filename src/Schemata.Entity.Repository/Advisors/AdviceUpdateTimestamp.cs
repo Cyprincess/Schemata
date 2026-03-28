@@ -1,17 +1,17 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Repository.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceUpdateTimestamp{TEntity}"/>.</summary>
+/// <summary>Order constants for <see cref="AdviceUpdateTimestamp{TEntity}" />.</summary>
 public static class AdviceUpdateTimestamp
 {
     /// <summary>Default execution order.</summary>
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
@@ -20,8 +20,12 @@ public static class AdviceUpdateTimestamp
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <remarks>
 ///     <para>Order: 100,000,000. Runs early in the update pipeline.</para>
-///     <para>Auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only activates for entities implementing <see cref="ITimestamp" />.</para>
-///     <para>Suppressed when <see cref="SuppressTimestamp" /> is present in the advice context.</para>
+///     <para>
+///         Auto-registered by
+///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
+///         activates for entities implementing <see cref="ITimestamp" />.
+///     </para>
+///     <para>Suppressed when <see cref="TimestampSuppressed" /> is present in the advice context.</para>
 /// </remarks>
 public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class
@@ -38,7 +42,7 @@ public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAdvisor<TE
         TEntity              entity,
         CancellationToken    ct
     ) {
-        if (ctx.Has<SuppressTimestamp>()) {
+        if (ctx.Has<TimestampSuppressed>()) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

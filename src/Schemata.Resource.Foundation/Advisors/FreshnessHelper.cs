@@ -10,7 +10,7 @@ internal static class FreshnessHelper
         where TEntity : class, ICanonicalName {
         tag = null;
 
-        if (ctx.Has<SuppressFreshness>()) {
+        if (ctx.Has<FreshnessSuppressed>()) {
             return false;
         }
 

@@ -23,7 +23,7 @@ public class RepositoryQueryShould : IAsyncLifetime
                                           Age      = 18,
                                           Grade    = 1,
                                           Name     = "q-alice",
-            });
+                                      });
             await repository.CommitAsync();
         }
 
@@ -35,7 +35,7 @@ public class RepositoryQueryShould : IAsyncLifetime
                                          Age      = 19,
                                          Grade    = 2,
                                          Name     = "q-bob",
-                });
+                                     });
                 await repo2.CommitAsync();
             }
         }
@@ -48,7 +48,7 @@ public class RepositoryQueryShould : IAsyncLifetime
                                          Age      = 20,
                                          Grade    = 2,
                                          Name     = "q-charlie",
-                });
+                                     });
                 await repo3.CommitAsync();
             }
         }

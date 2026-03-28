@@ -1,16 +1,18 @@
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Cache.Advisors;
 
 public static class AdviceQueryCache
 {
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
@@ -21,20 +23,24 @@ public static class AdviceQueryCache
 /// <typeparam name="T">The scalar or aggregate return type.</typeparam>
 /// <remarks>
 ///     <para>Order: <see cref="SchemataConstants.Orders.Max" /> (2,147,400,000). Runs last among query advisors.</para>
-///     <para>Registered by <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />; not auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.</para>
+///     <para>
+///         Registered by <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />;
+///         not auto-registered by
+///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.
+///     </para>
 ///     <para>Returns <see cref="AdviseResult.Handle" /> when a cache hit occurs, preventing database execution.</para>
-///     <para>Suppressed when <see cref="SuppressQueryCache" /> is present in the advice context.</para>
+///     <para>Suppressed when <see cref="QueryCacheSuppressed" /> is present in the advice context.</para>
 /// </remarks>
 public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvisor<TEntity, TResult, T>
     where TEntity : class
 {
-    private readonly IMemoryCache _cache;
+    private readonly IDistributedCache _cache;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="AdviceQueryCache{TEntity, TResult, T}" /> class.
     /// </summary>
-    /// <param name="cache">The memory cache instance.</param>
-    public AdviceQueryCache(IMemoryCache cache) { _cache = cache; }
+    /// <param name="cache">The distributed cache instance.</param>
+    public AdviceQueryCache(IDistributedCache cache) { _cache = cache; }
 
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
 
@@ -42,31 +48,32 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
     public int Order => AdviceQueryCache.DefaultOrder;
 
     /// <inheritdoc />
-    public Task<AdviseResult> AdviseAsync(
+    public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         QueryContext<TEntity, TResult, T> context,
         CancellationToken                 ct = default
     ) {
-        if (ctx.Has<SuppressQueryCache>()) {
-            return Task.FromResult(AdviseResult.Continue);
+        if (ctx.Has<QueryCacheSuppressed>()) {
+            return AdviseResult.Continue;
         }
 
         var key = context.ToCacheKey();
         if (string.IsNullOrWhiteSpace(key)) {
-            return Task.FromResult(AdviseResult.Continue);
+            return AdviseResult.Continue;
         }
 
-        if (!_cache.TryGetValue(key, out var value)) {
-            return Task.FromResult(AdviseResult.Continue);
+        var bytes = await _cache.GetAsync(key, ct);
+        if (bytes is null) {
+            return AdviseResult.Continue;
         }
 
-        if (value is not T result) {
-            return Task.FromResult(AdviseResult.Continue);
+        if (JsonSerializer.Deserialize<T>(bytes) is not { } result) {
+            return AdviseResult.Continue;
         }
 
         context.Result = result;
 
-        return Task.FromResult(AdviseResult.Handle);
+        return AdviseResult.Handle;
     }
 
     #endregion

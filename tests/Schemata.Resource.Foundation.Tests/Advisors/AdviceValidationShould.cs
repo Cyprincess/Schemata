@@ -14,10 +14,11 @@ public class AdviceValidationShould
     public async Task Create_SuppressValidation_ReturnsContinue() {
         var advisor = new AdviceCreateRequestValidation<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressCreateRequestValidation());
-        var request = new Student { FullName = "Suppressed" };
+        ctx.Set(new CreateRequestValidationSuppressed());
+        var request   = new Student { FullName = "Suppressed" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -26,29 +27,32 @@ public class AdviceValidationShould
     public async Task Create_SuppressValidationAndValidateOnly_ThrowsNoContentException() {
         var advisor = new AdviceCreateRequestValidation<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressCreateRequestValidation());
-        var request = new Student { FullName = "DryRun", ValidateOnly = true };
+        ctx.Set(new CreateRequestValidationSuppressed());
+        var request   = new Student { FullName = "DryRun", ValidateOnly = true };
+        var container = new ResourceRequestContainer<Student>();
 
-        await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(ctx, request, null));
+        await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(ctx, request, container, null));
     }
 
     [Fact]
     public async Task Create_NoValidators_ReturnsContinue() {
-        var advisor = new AdviceCreateRequestValidation<Student, Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new Student { FullName = "Valid" };
+        var advisor   = new AdviceCreateRequestValidation<Student, Student>();
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new Student { FullName = "Valid" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
 
     [Fact]
     public async Task Create_NoValidatorsValidateOnly_ThrowsNoContentException() {
-        var advisor = new AdviceCreateRequestValidation<Student, Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new Student { FullName = "DryRunNoValidators", ValidateOnly = true };
+        var advisor   = new AdviceCreateRequestValidation<Student, Student>();
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new Student { FullName = "DryRunNoValidators", ValidateOnly = true };
+        var container = new ResourceRequestContainer<Student>();
 
-        await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(ctx, request, null));
+        await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(ctx, request, container, null));
     }
 }

@@ -7,23 +7,19 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - Authorization Foundation</Description>
-    <PackageTags>application;authentication;authorization;business;framework;security</PackageTags>
+    <PackageTags>authorization;oauth;oidc;openid-connect;framework</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenIddict.Server.AspNetCore" />
-    <PackageReference Include="OpenIddict.Validation.AspNetCore" />
-    <PackageReference Include="OpenIddict.Validation.ServerIntegration" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
-    <ProjectReference Include="..\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

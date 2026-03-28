@@ -28,7 +28,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
                                               Age      = 18,
                                               Grade    = 1,
                                               Name     = "tx-alice",
-                });
+                                          });
                 var rows = await repository.CommitAsync();
                 Assert.True(rows > 0);
             }

@@ -2,26 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for confirming an email address or phone number with a verification code.
-/// </summary>
 public class ConfirmRequest
 {
-    /// <summary>
-    ///     Gets or sets the email address to confirm.
-    /// </summary>
+    /// <summary>Email address to confirm; mutually exclusive with PhoneNumber.</summary>
     [EmailAddress]
-    public virtual string? EmailAddress { get; set; }
+    public string? EmailAddress { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the phone number to confirm.
-    /// </summary>
+    /// <summary>Phone number to confirm; mutually exclusive with EmailAddress.</summary>
     [Phone]
-    public virtual string? PhoneNumber { get; set; }
+    public string? PhoneNumber { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the verification code.
-    /// </summary>
+    /// <summary>Verification code sent to the email or phone.</summary>
     [Required]
-    public virtual string Code { get; set; } = null!;
+    public string Code { get; set; } = null!;
 }

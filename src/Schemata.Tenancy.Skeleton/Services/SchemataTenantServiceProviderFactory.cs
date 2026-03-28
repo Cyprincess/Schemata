@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton.Services;
@@ -50,7 +51,7 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey> : SchemataTenan
         var id = accessor.Tenant?.TenantId?.ToString();
 
         if (string.IsNullOrWhiteSpace(id)) {
-            throw new InvalidOperationException("Tenant is not initialized successfully.");
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1027));
         }
 
         // TODO: avoid resolving IServiceProvider for non-existing tenant, it may cause memory leak or DoS attack.

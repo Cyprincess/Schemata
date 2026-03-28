@@ -1,63 +1,52 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation;
+using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
-using Schemata.Core.Features;
+using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
-/// <summary>
-///     Extension methods for <see cref="SchemataBuilder" /> to enable authorization.
-/// </summary>
 public static class SchemataBuilderExtensions
 {
-    /// <summary>
-    ///     Adds OpenIddict-based authorization using the default entity types.
-    /// </summary>
-    public static SchemataAuthorizationBuilder UseAuthorization(
-        this SchemataBuilder                       builder,
-        Action<OpenIddictServerBuilder>?           serve     = null,
-        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
-        Action<OpenIddictCoreBuilder>?             store     = null
-    ) {
-        return builder.UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(serve, integrate, store);
+    public static SchemataAuthorizationBuilder<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken> UseAuthorization(this SchemataBuilder builder, Action<SchemataAuthorizationOptions>? configure = null) {
+        return builder.UseAuthorization<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(configure);
     }
 
-    /// <summary>
-    ///     Adds OpenIddict-based authorization using custom entity types.
-    /// </summary>
-    public static SchemataAuthorizationBuilder UseAuthorization<TApplication, TAuthorization, TScope, TToken>(
-        this SchemataBuilder                       builder,
-        Action<OpenIddictServerBuilder>?           serve     = null,
-        Action<OpenIddictServerAspNetCoreBuilder>? integrate = null,
-        Action<OpenIddictCoreBuilder>?             store     = null
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseAuthorization<TApp, TAuth, TScope, TToken>(
+        this SchemataBuilder                  builder,
+        Action<SchemataAuthorizationOptions>? configure = null
     )
-        where TApplication : SchemataApplication
-        where TAuthorization : SchemataAuthorization
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
         where TScope : SchemataScope
-        where TToken : SchemataToken {
-        store ??= _ => { };
-        builder.Configure(store);
+        where TToken : SchemataToken, new() {
+        configure ??= _ => { };
+        builder.Configure(configure);
 
-        serve ??= _ => { };
-        builder.Configure(serve);
+        builder.Configure<WellKnownOptions>(wk => {
+            wk.Map(Endpoints.Discovery, async (
+                       DiscoveryHandler<TScope>               handler,
+                       IOptions<SchemataAuthorizationOptions> options,
+                       HttpContext                            _,
+                       CancellationToken                      ct
+                   ) => {
+                       var issuer = options.Value.Issuer!;
+                       var result = await handler.GetDiscoveryDocumentAsync(issuer, ct);
+                       return Results.Json(result.Data);
+                   });
 
-        integrate ??= _ => { };
-        builder.Configure(integrate);
+            wk.Map(Endpoints.Jwks, (DiscoveryHandler<TScope> handler) => Results.Json(handler.GetJwks().Data));
+        });
 
-        if (!builder.HasFeature<SchemataHttpsFeature>()) {
-            builder.Configure<OpenIddictServerAspNetCoreBuilder>(options => {
-                integrate(options);
+        builder.AddFeature<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
 
-                options.DisableTransportSecurityRequirement();
-            });
-        }
-
-        builder.AddFeature<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
-
-        return new(builder.Options, builder.Configurators);
+        return new(builder.Options, builder.Configurators, builder.Services);
     }
 }

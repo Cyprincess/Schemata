@@ -40,15 +40,13 @@ public sealed class SchemataQuotaFeature : FeatureBase
                     }
                 }
 
-                throw new QuotaExceededException(429, ErrorCodes.ResourceExhausted, SchemataResources.GetResourceString(SchemataResources.ST1011)) {
+                throw new QuotaExceededException(429, ErrorCodes.ResourceExhausted, SchemataResources.GetResourceString(SchemataResources.ST1010)) {
                     Details = [
                         new QuotaFailureDetail {
-                            Violations = [
-                                new() {
-                                    Subject     = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
-                                    Description = SchemataResources.GetResourceString(SchemataResources.ST1011),
-                                },
-                            ],
+                            Violations = [new() {
+                                Subject     = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
+                                Description = SchemataResources.GetResourceString(SchemataResources.ST1010),
+                            }],
                         },
                         new RequestInfoDetail { RequestId = ctx.HttpContext.TraceIdentifier },
                     ],

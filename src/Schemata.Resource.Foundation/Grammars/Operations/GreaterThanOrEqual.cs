@@ -5,12 +5,12 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-/// Represents the greater-than-or-equal operator (<c>&gt;=</c>).
+///     Represents the greater-than-or-equal operator (<c>&gt;=</c>).
 /// </summary>
 public class GreaterThanOrEqual : IBinary
 {
     /// <summary>
-    /// The string literal representing the greater-than-or-equal operator.
+    ///     The string literal representing the greater-than-or-equal operator.
     /// </summary>
     public const string Name = ">=";
 

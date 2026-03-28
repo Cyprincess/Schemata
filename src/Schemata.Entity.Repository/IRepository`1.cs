@@ -154,7 +154,7 @@ public interface IRepository<TEntity>
     /// </summary>
     /// <param name="entity">The entity to add.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddAsync(TEntity                   entity,   CancellationToken ct = default);
+    Task AddAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Adds multiple entities through the advisor pipeline.
@@ -175,7 +175,7 @@ public interface IRepository<TEntity>
     /// </summary>
     /// <param name="entity">The entity to remove.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RemoveAsync(TEntity                   entity,   CancellationToken ct = default);
+    Task RemoveAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Removes multiple entities through the advisor pipeline.

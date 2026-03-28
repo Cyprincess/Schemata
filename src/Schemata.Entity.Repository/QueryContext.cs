@@ -7,7 +7,10 @@ namespace Schemata.Entity.Repository;
 /// </summary>
 /// <typeparam name="TEntity">The root entity type being queried.</typeparam>
 /// <typeparam name="TResult">The projected result type of the query.</typeparam>
-/// <typeparam name="T">The scalar or aggregate return type (e.g., the entity itself, <see cref="bool" />, <see cref="int" />).</typeparam>
+/// <typeparam name="T">
+///     The scalar or aggregate return type (e.g., the entity itself, <see cref="bool" />,
+///     <see cref="int" />).
+/// </typeparam>
 public class QueryContext<TEntity, TResult, T>
     where TEntity : class
 {

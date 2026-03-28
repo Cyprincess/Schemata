@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
-using Schemata.Abstractions;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
@@ -11,7 +11,7 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataForwardedHeadersFeature : FeatureBase
 {
-    public const int DefaultPriority = SchemataConstants.Orders.Base;
+    public const int DefaultPriority = Orders.Base;
 
     public override int Priority => DefaultPriority;
 

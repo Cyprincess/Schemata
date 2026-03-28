@@ -5,17 +5,18 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using Parlot;
+using Schemata.Abstractions;
 using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents a member access expression (e.g. <c>entity.property</c>) in the filter grammar.
+///     Represents a member access expression (e.g. <c>entity.property</c>) in the filter grammar.
 /// </summary>
-public class Member : IComparable
+public class Member : IComparableArg
 {
     /// <summary>
-    /// Initializes a new member with a root value and optional field chain.
+    ///     Initializes a new member with a root value and optional field chain.
     /// </summary>
     /// <param name="position">The position in the source text.</param>
     /// <param name="value">The root value token.</param>
@@ -31,12 +32,12 @@ public class Member : IComparable
     }
 
     /// <summary>
-    /// Gets the root value token of this member access.
+    ///     Gets the root value token of this member access.
     /// </summary>
     public IValue Value { get; }
 
     /// <summary>
-    /// Gets the chain of field accesses following the root value.
+    ///     Gets the chain of field accesses following the root value.
     /// </summary>
     public List<IField> Fields { get; } = [];
 
@@ -59,7 +60,7 @@ public class Member : IComparable
     #endregion
 
     /// <summary>
-    /// Builds the member access expression chain up to (but not including) the last field.
+    ///     Builds the member access expression chain up to (but not including) the last field.
     /// </summary>
     /// <param name="ctx">The expression-building container.</param>
     /// <returns>The intermediate member expression.</returns>
@@ -93,7 +94,7 @@ public class Member : IComparable
         var property = field switch {
             Text text       => text.Value,
             Integer integer => integer.Value.ToString(),
-            var _           => throw new ParseException("Invalid field", field.Position),
+            var _           => throw new ParseException(SchemataResources.GetResourceString(SchemataResources.ST2005), field.Position),
         };
 
         if (typeof(IDictionary).IsAssignableFrom(expression.Type)) {
@@ -120,7 +121,7 @@ public class Member : IComparable
         try {
             return Expression.PropertyOrField(expression, property);
         } catch (ArgumentException) {
-            throw new ParseException($"Invalid field name '{property}'", field.Position);
+            throw new ParseException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST2006), property), field.Position);
         }
     }
 }

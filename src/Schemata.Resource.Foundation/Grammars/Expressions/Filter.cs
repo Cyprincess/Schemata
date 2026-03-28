@@ -7,7 +7,7 @@ using Schemata.Resource.Foundation.Grammars.Operations;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents the top-level filter expression (sequences joined by AND) in the filter grammar.
+///     Represents the top-level filter expression (sequences joined by AND) in the filter grammar.
 /// </summary>
 public class Filter : Logical, IArg, ISimple
 {
@@ -22,7 +22,7 @@ public class Filter : Logical, IArg, ISimple
     }
 
     /// <summary>
-    /// Gets the list of sequences that are combined with logical AND.
+    ///     Gets the list of sequences that are combined with logical AND.
     /// </summary>
     public List<Sequence> Sequences { get; } = [];
 

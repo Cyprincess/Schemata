@@ -9,7 +9,7 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for <see cref="SchemataTenancyBuilder{TTenant, TKey}" /> to register tenant resolvers.
+///     Extension methods for <see cref="SchemataTenancyBuilder{TTenant,TKey}" /> to register tenant resolvers.
 /// </summary>
 public static class SchemataTenancyBuilderExtensions
 {

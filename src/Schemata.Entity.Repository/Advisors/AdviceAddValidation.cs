@@ -11,7 +11,7 @@ using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Entity.Repository.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceAddValidation{TEntity}"/>.</summary>
+/// <summary>Order constants for <see cref="AdviceAddValidation{TEntity}" />.</summary>
 public static class AdviceAddValidation
 {
     /// <summary>Default execution order.</summary>
@@ -24,9 +24,12 @@ public static class AdviceAddValidation
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     <para>Order: <see cref="SchemataConstants.Orders.Max" /> (2,147,400,000). Runs last in the add pipeline.</para>
-///     <para>Auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.</para>
+///     <para>
+///         Auto-registered by
+///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.
+///     </para>
 ///     <para>Throws <see cref="ValidationException" /> when validation fails with <see cref="AdviseResult.Block" />.</para>
-///     <para>Suppressed when <see cref="SuppressAddValidation" /> is present in the advice context.</para>
+///     <para>Suppressed when <see cref="AddValidationSuppressed" /> is present in the advice context.</para>
 /// </remarks>
 public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -43,7 +46,7 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity
         TEntity              entity,
         CancellationToken    ct
     ) {
-        if (ctx.Has<SuppressAddValidation>()) {
+        if (ctx.Has<AddValidationSuppressed>()) {
             return AdviseResult.Continue;
         }
 

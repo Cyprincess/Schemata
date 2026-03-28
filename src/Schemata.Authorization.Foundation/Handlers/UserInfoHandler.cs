@@ -1,0 +1,94 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Advice;
+using Schemata.Authorization.Skeleton;
+using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
+using Schemata.Authorization.Skeleton.Handlers;
+using static Schemata.Abstractions.SchemataConstants;
+
+namespace Schemata.Authorization.Foundation.Handlers;
+
+public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
+{
+    public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
+        var ctx = new AdviceContext(sp);
+
+        var sub    = principal.FindFirstValue(Claims.Subject);
+        var scope  = principal.FindFirstValue(Claims.Scope);
+        var client = principal.FindFirstValue(Claims.ClientId);
+        var scopes = ScopeParser.Parse(scope);
+
+        var info = new UserInfoContext {
+            Principal       = principal,
+            InternalSubject = sub,
+            GrantedScopes   = scopes,
+            IsEndUserToken  = !string.IsNullOrWhiteSpace(sub),
+        };
+
+        switch (await Advisor.For<IUserInfoAdvisor>()
+                             .RunAsync(ctx, info, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
+        }
+
+        var claims = new List<Claim>();
+
+        if (!string.IsNullOrWhiteSpace(sub)) {
+            claims.Add(new(Claims.Subject, sub));
+        }
+
+        if (!string.IsNullOrWhiteSpace(client)) {
+            claims.Add(new(Claims.ClientId, client));
+        }
+
+        switch (await Advisor.For<IClaimsAdvisor>()
+                             .RunAsync(ctx, claims, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
+        }
+
+        for (var i = claims.Count - 1; i >= 0; i--) {
+            var destinations = new HashSet<string>();
+
+            switch (await Advisor.For<IDestinationAdvisor>()
+                                 .RunAsync(ctx, claims[i], destinations, principal, ct)) {
+                case AdviseResult.Continue:
+                case AdviseResult.Handle:
+                    break;
+                case AdviseResult.Block:
+                default:
+                    claims.RemoveAt(i);
+                    continue;
+            }
+
+            if (!destinations.Contains(ClaimDestinations.UserInfo)) {
+                claims.RemoveAt(i);
+            }
+        }
+
+        var dict = claims.GroupBy(c => c.Type)
+                         .ToDictionary(
+                              g => g.Key,
+                              g => g.Count() == 1 ? (object)g.First().Value : g.Select(c => c.Value).ToArray());
+
+        return AuthorizationResult.Content(dict);
+    }
+}

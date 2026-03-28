@@ -24,7 +24,7 @@ public interface IRepository
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>An async enumerable of matching entities as <see cref="object" />.</returns>
-    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>?   predicate, CancellationToken ct = default);
+    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
     ///     Searches entities matching the predicate (full-text or provider-specific search).
@@ -42,7 +42,7 @@ public interface IRepository
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The first matching entity or <see langword="null" />.</returns>
-    ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>?  predicate, CancellationToken ct = default);
+    ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
     ///     Returns the single entity matching the predicate, or <see langword="null" />.
@@ -60,7 +60,7 @@ public interface IRepository
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns><see langword="true" /> if at least one entity matches.</returns>
-    ValueTask<bool>    AnyAsync<T>(Expression<Func<T, bool>>?             predicate, CancellationToken ct = default);
+    ValueTask<bool> AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
     ///     Returns the count of entities matching the predicate.
@@ -69,7 +69,7 @@ public interface IRepository
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The number of matching entities.</returns>
-    ValueTask<int>     CountAsync<T>(Expression<Func<T, bool>>?           predicate, CancellationToken ct = default);
+    ValueTask<int> CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
     ///     Returns the long count of entities matching the predicate.
@@ -78,14 +78,14 @@ public interface IRepository
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The number of matching entities as <see cref="long" />.</returns>
-    ValueTask<long>    LongCountAsync<T>(Expression<Func<T, bool>>?       predicate, CancellationToken ct = default);
+    ValueTask<long> LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
     ///     Adds an entity through the advisor pipeline.
     /// </summary>
     /// <param name="entity">The entity to add.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddAsync(object    entity, CancellationToken ct = default);
+    Task AddAsync(object entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Updates an entity through the advisor pipeline.

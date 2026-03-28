@@ -5,7 +5,7 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-/// Represents an integer literal value in the filter grammar.
+///     Represents an integer literal value in the filter grammar.
 /// </summary>
 public class Integer : IValue
 {
@@ -15,7 +15,7 @@ public class Integer : IValue
     }
 
     /// <summary>
-    /// Gets the integer value.
+    ///     Gets the integer value.
     /// </summary>
     public long Value { get; }
 

@@ -9,12 +9,13 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-/// Represents the has operator (<c>:</c>) supporting presence checks, collection containment, dictionary key lookup, and string contains.
+///     Represents the has operator (<c>:</c>) supporting presence checks, collection containment, dictionary key lookup,
+///     and string contains.
 /// </summary>
 public class Has : IBinary
 {
     /// <summary>
-    /// The character representing the has operator.
+    ///     The character representing the has operator.
     /// </summary>
     public const char Char = ':';
 
@@ -59,12 +60,12 @@ public class Has : IBinary
     private static Expression BuildPresenceExpression(Expression left) {
         if (left.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(left.Type)) {
             var elementType = left.Type.GetElementType()
-                ?? left.Type.GenericTypeArguments.FirstOrDefault()
-                ?? typeof(object);
+                           ?? left.Type.GenericTypeArguments.FirstOrDefault()
+                           ?? typeof(object);
 
             var method = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                .First(m => m.Name == "Any" && m.GetParameters().Length == 1)
-                .MakeGenericMethod(elementType);
+                                           .First(m => m.Name == "Any" && m.GetParameters().Length == 1)
+                                           .MakeGenericMethod(elementType);
 
             var notNull = Expression.NotEqual(left, Expression.Constant(null, left.Type));
             var any     = Expression.Call(method, left);
@@ -99,17 +100,17 @@ public class Has : IBinary
 
     private static Expression BuildCollectionContains(Expression left, Expression right, Container ctx) {
         var elementType = left.Type.GetElementType()
-            ?? left.Type.GenericTypeArguments.FirstOrDefault()
-            ?? typeof(object);
+                       ?? left.Type.GenericTypeArguments.FirstOrDefault()
+                       ?? typeof(object);
 
         if (right.Type != elementType) {
             right = Expression.Convert(right, elementType);
         }
 
         var method = ctx.GetMethod(typeof(Enumerable), "Contains", [elementType],
-            () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
-                .MakeGenericMethod(elementType));
+                                   () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                           .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
+                                                           .MakeGenericMethod(elementType));
 
         return Expression.Call(method!, left, right);
     }

@@ -1,67 +1,70 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-/// <summary>
-///     Represents an OAuth 2.0 / OpenID Connect client application registered with the authorization server.
-/// </summary>
-/// <remarks>
-///     Maps to the OpenIddict application entity. Each record defines a client with its credentials,
-///     redirect URIs, permissions, and consent requirements.
-/// </remarks>
 [DisplayName("Application")]
 [Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
-public class SchemataApplication : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
+public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
-    /// <summary>Gets or sets the application type (e.g. "web", "native").</summary>
-    public virtual string? ApplicationType { get; set; }
+    /// <summary>Alias for <see cref="Name" />.</summary>
+    public virtual string? ClientId
+    {
+        get => Name;
+        set => Name = value;
+    }
 
-    /// <summary>Gets or sets the client identifier issued to the application during registration.</summary>
-    public virtual string? ClientId { get; set; }
-
-    /// <summary>Gets or sets the hashed client secret.</summary>
+    /// <summary>Hashed client secret for confidential clients per RFC 6749 section 2.3.1.</summary>
     public virtual string? ClientSecret { get; set; }
 
-    /// <summary>Gets or sets the client type (e.g. "confidential", "public").</summary>
-    public virtual string? ClientType { get; set; }
+    /// <summary>OAuth 2.0 client type: "confidential" or "public" per RFC 6749 section 2.1.</summary>
+    public virtual string? ClientType { get; set; } = ClientTypes.Confidential;
 
-    /// <summary>Gets or sets the consent type (e.g. "explicit", "implicit", "external", "systematic").</summary>
-    public virtual string? ConsentType { get; set; }
+    /// <summary>Application type: "web" or "native" per OpenID Connect Dynamic Registration.</summary>
+    public virtual string? ApplicationType { get; set; } = ApplicationTypes.Web;
 
-    /// <summary>Gets or sets the JSON-serialized custom properties associated with the application.</summary>
-    public virtual string? Properties { get; set; }
+    /// <summary>Consent model: "explicit", "implicit", or "external" controlling the consent prompt.</summary>
+    public virtual string? ConsentType { get; set; } = ConsentTypes.Explicit;
 
-    /// <summary>Gets or sets the JSON Web Key Set used for token validation.</summary>
-    public virtual string? JsonWebKeySet { get; set; }
+    /// <summary>When null, falls back to global authorization options.</summary>
+    public virtual bool? RequirePkce { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized post-logout redirect URIs allowed for the application.</summary>
-    public virtual string? PostLogoutRedirectUris { get; set; }
+    /// <summary>Registered redirect URIs for authorization code and implicit flows per RFC 6749 section 3.1.2.</summary>
+    public virtual ICollection<string>? RedirectUris { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized redirect URIs allowed for the application.</summary>
-    public virtual string? RedirectUris { get; set; }
+    /// <summary>Granted endpoint and grant-type permissions (e.g. "ept:token", "gt:authorization_code").</summary>
+    public virtual ICollection<string>? Permissions { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized permissions granted to the application.</summary>
-    public virtual string? Permissions { get; set; }
+    /// <summary>Allowed post-logout redirect URIs per OpenID Connect RP-Initiated Logout.</summary>
+    public virtual ICollection<string>? PostLogoutRedirectUris { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized requirements enforced for the application.</summary>
-    public virtual string? Requirements { get; set; }
+    /// <summary>When null, falls back to global configuration.</summary>
+    public virtual string? SubjectType { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized settings for the application.</summary>
-    public virtual string? Settings { get; set; }
+    /// <summary>Used for pairwise subject identifiers.</summary>
+    public virtual string? SectorIdentifierUri { get; set; }
+
+    /// <summary>frontchannel_logout_uri per OpenID Connect Front-Channel Logout §2. Presence implies support.</summary>
+    public virtual string? FrontChannelLogoutUri { get; set; }
+
+    /// <summary>frontchannel_logout_session_required per OpenID Connect Front-Channel Logout §2.</summary>
+    public virtual bool FrontChannelLogoutSessionRequired { get; set; }
+
+    /// <summary>backchannel_logout_uri per OpenID Connect Back-Channel Logout §2.2. Presence implies support.</summary>
+    public virtual string? BackChannelLogoutUri { get; set; }
+
+    /// <summary>backchannel_logout_session_required per OpenID Connect Back-Channel Logout §2.2.</summary>
+    public virtual bool BackChannelLogoutSessionRequired { get; set; }
 
     #region ICanonicalName Members
 
-    /// <summary>Gets or sets the unique name, backed by <see cref="ClientId" />.</summary>
-    public virtual string? Name
-    {
-        get => ClientId;
-        set => ClientId = value;
-    }
+    /// <inheritdoc />
+    public virtual string? Name { get; set; }
 
     /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
@@ -75,20 +78,25 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDisplayName, IC
 
     #endregion
 
-    #region IDisplayName Members
+    #region IDescriptive Members
 
     /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized localized display names.</summary>
-    public virtual string? DisplayNames { get; set; }
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Description { get; set; }
+
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
     public virtual long Id { get; set; }
 
     #endregion

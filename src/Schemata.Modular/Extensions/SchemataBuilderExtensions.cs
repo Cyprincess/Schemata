@@ -6,12 +6,12 @@ using Schemata.Modular.Features;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-/// Extension methods for enabling modular architecture on <see cref="SchemataBuilder"/>.
+///     Extension methods for enabling modular architecture on <see cref="SchemataBuilder" />.
 /// </summary>
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    /// Enables modular architecture using the default runner and provider.
+    ///     Enables modular architecture using the default runner and provider.
     /// </summary>
     /// <param name="builder">The Schemata builder.</param>
     /// <returns>The builder for chaining.</returns>
@@ -20,7 +20,7 @@ public static class SchemataBuilderExtensions
     }
 
     /// <summary>
-    /// Enables modular architecture with a custom runner and the default provider.
+    ///     Enables modular architecture with a custom runner and the default provider.
     /// </summary>
     /// <typeparam name="TRunner">The module runner type.</typeparam>
     /// <param name="builder">The Schemata builder.</param>
@@ -31,7 +31,7 @@ public static class SchemataBuilderExtensions
     }
 
     /// <summary>
-    /// Enables modular architecture with custom runner and provider types.
+    ///     Enables modular architecture with custom runner and provider types.
     /// </summary>
     /// <typeparam name="TRunner">The module runner type.</typeparam>
     /// <typeparam name="TProvider">The module provider type.</typeparam>

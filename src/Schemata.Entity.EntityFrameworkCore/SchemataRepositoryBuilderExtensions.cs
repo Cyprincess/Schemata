@@ -7,14 +7,18 @@ using Schemata.Entity.Repository;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to configure Entity Framework Core as the repository provider.
+///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to configure Entity Framework Core as the repository
+///     provider.
 /// </summary>
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
     ///     Registers an Entity Framework Core <see cref="DbContext" /> as the repository data provider.
     /// </summary>
-    /// <typeparam name="TContext">The <see cref="DbContext" /> type to register (used as both the service and implementation type).</typeparam>
+    /// <typeparam name="TContext">
+    ///     The <see cref="DbContext" /> type to register (used as both the service and implementation
+    ///     type).
+    /// </typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">An optional action to configure the <see cref="DbContextOptionsBuilder" />.</param>
     /// <param name="contextLifetime">The service lifetime for the context (default: <see cref="ServiceLifetime.Scoped" />).</param>
@@ -33,7 +37,8 @@ public static class SchemataRepositoryBuilderExtensions
     }
 
     /// <summary>
-    ///     Registers an Entity Framework Core <see cref="DbContext" /> as the repository data provider with separate service and implementation types.
+    ///     Registers an Entity Framework Core <see cref="DbContext" /> as the repository data provider with separate service
+    ///     and implementation types.
     /// </summary>
     /// <typeparam name="TContextService">The service type for the context.</typeparam>
     /// <typeparam name="TContextImplementation">The implementation type for the context.</typeparam>

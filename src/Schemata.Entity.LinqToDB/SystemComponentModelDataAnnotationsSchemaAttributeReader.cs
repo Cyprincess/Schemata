@@ -25,6 +25,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Schemata.Abstractions;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
@@ -32,7 +33,8 @@ using LinqToDB.Metadata;
 namespace Schemata.Entity.LinqToDB;
 
 /// <summary>
-///     LINQ to DB metadata reader that maps <c>System.ComponentModel.DataAnnotations.Schema</c> attributes to LINQ to DB mapping attributes.
+///     LINQ to DB metadata reader that maps <c>System.ComponentModel.DataAnnotations.Schema</c> attributes to LINQ to DB
+///     mapping attributes.
 /// </summary>
 /// <remarks>
 ///     Translates <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />,
@@ -47,7 +49,8 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     #region IMetadataReader Members
 
     /// <summary>
-    ///     Returns LINQ to DB mapping attributes for the specified type by reading <c>System.ComponentModel.DataAnnotations.Schema.TableAttribute</c>.
+    ///     Returns LINQ to DB mapping attributes for the specified type by reading
+    ///     <c>System.ComponentModel.DataAnnotations.Schema.TableAttribute</c>.
     /// </summary>
     /// <param name="type">The type to inspect.</param>
     /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
@@ -79,14 +82,15 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
                 attr.Schema = names[1];
                 break;
             default:
-                throw new MetadataException($"Invalid table name '{name}' of type '{type.FullName}'");
+                throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1019), name, type.FullName));
         }
 
         return [attr];
     }
 
     /// <summary>
-    ///     Returns LINQ to DB mapping attributes for the specified member by reading <c>System.ComponentModel.DataAnnotations</c> attributes.
+    ///     Returns LINQ to DB mapping attributes for the specified member by reading
+    ///     <c>System.ComponentModel.DataAnnotations</c> attributes.
     /// </summary>
     /// <param name="type">The declaring type.</param>
     /// <param name="member">The member to inspect.</param>
@@ -104,7 +108,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
         var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();
         if (g is {
-            DatabaseGeneratedOption: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity
+            DatabaseGeneratedOption: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity,
         }) {
             attributes.Add(new IdentityAttribute());
         }

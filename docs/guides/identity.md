@@ -2,6 +2,8 @@
 
 This guide adds user management to the Student CRUD app using ASP.NET Core Identity. By the end you will have registration, login, and token refresh endpoints backed by the built-in `SchemataUser` and `SchemataRole` entities.
 
+Schemata provides headless JSON APIs only -- it does not include login or registration pages. You build the frontend yourself using any technology (SPA, mobile app, server-rendered pages). The curl examples below demonstrate the API contract your UI will call.
+
 ## Add the package
 
 ```shell

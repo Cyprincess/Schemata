@@ -45,23 +45,19 @@ public class HandlerFixture
         Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Repository.Object);
 
         Repository
-           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                   It.IsAny<CancellationToken>()))
+           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken ct) => AsyncList(q(Students.AsQueryable()), ct));
 
         Repository
-           .Setup(r => r.SingleOrDefaultAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                                       It.IsAny<CancellationToken>()))
+           .Setup(r => r.SingleOrDefaultAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult(q(Students.AsQueryable()).SingleOrDefault()));
 
         Repository
-           .Setup(r => r.CountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                             It.IsAny<CancellationToken>()))
+           .Setup(r => r.CountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult(q(Students.AsQueryable()).Count()));
 
         Repository
-           .Setup(r => r.LongCountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                                 It.IsAny<CancellationToken>()))
+           .Setup(r => r.LongCountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult((long)q(Students.AsQueryable()).Count()));
 
         Repository.Setup(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
@@ -91,20 +87,22 @@ public class HandlerFixture
 
     public List<Student> Students { get; } = [
         new() {
-            Id        = 1,
-            FullName  = "Alice",
-            Age       = 18,
-            Grade     = 1,
-            Name      = "students/alice-1",
-            Timestamp = Guid.NewGuid(),
+            Id            = 1,
+            FullName      = "Alice",
+            Age           = 18,
+            Grade         = 1,
+            Name          = "alice-1",
+            CanonicalName = "students/alice-1",
+            Timestamp     = Guid.NewGuid(),
         },
         new() {
-            Id        = 2,
-            FullName  = "Bob",
-            Age       = 19,
-            Grade     = 2,
-            Name      = "students/bob-2",
-            Timestamp = Guid.NewGuid(),
+            Id            = 2,
+            FullName      = "Bob",
+            Age           = 19,
+            Grade         = 2,
+            Name          = "bob-2",
+            CanonicalName = "students/bob-2",
+            Timestamp     = Guid.NewGuid(),
         },
     ];
 

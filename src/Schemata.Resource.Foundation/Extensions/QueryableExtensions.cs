@@ -11,12 +11,12 @@ using Schemata.Resource.Foundation.Models;
 namespace System.Linq;
 
 /// <summary>
-/// Extension methods for composing queryable filtering, ordering, and pagination operations.
+///     Extension methods for composing queryable filtering, ordering, and pagination operations.
 /// </summary>
 public static class QueryableExtensions
 {
     /// <summary>
-    /// Composes a filter expression onto an existing query function.
+    ///     Composes a filter expression onto an existing query function.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="query">The existing query function to extend.</param>
@@ -47,7 +47,7 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    /// Composes ordering specifications onto an existing query function.
+    ///     Composes ordering specifications onto an existing query function.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="query">The existing query function to extend.</param>
@@ -81,7 +81,7 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    /// Composes skip/take pagination onto an existing query function.
+    ///     Composes skip/take pagination onto an existing query function.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="query">The existing query function to extend.</param>
@@ -89,8 +89,12 @@ public static class QueryableExtensions
     /// <returns>A new query function that applies pagination.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        PageToken                               token
+        PageToken?                              token
     ) {
+        if (token is null) {
+            return query;
+        }
+
         var build = query;
 
         query = q => build(q).Skip(token.Skip).Take(token.PageSize);
@@ -99,7 +103,12 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    /// Applies an ordering expression, chaining as <see cref="System.Linq.Queryable.ThenBy{TSource,TKey}(IOrderedQueryable{TSource}, System.Linq.Expressions.Expression{Func{TSource,TKey}})">ThenBy</see> when the source is already ordered.
+    ///     Applies an ordering expression, chaining as
+    ///     <see
+    ///         cref="System.Linq.Queryable.ThenBy{TSource,TKey}(IOrderedQueryable{TSource}, System.Linq.Expressions.Expression{Func{TSource,TKey}})">
+    ///         ThenBy
+    ///     </see>
+    ///     when the source is already ordered.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="source">The queryable source.</param>

@@ -1,35 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-/// <summary>
-///     Represents an OAuth 2.0 scope that defines a permission boundary for access tokens.
-/// </summary>
-/// <remarks>
-///     Scopes control the extent of access granted to a client application.
-///     Standard scopes include "openid", "profile", "email"; custom scopes
-///     map to API resources.
-/// </remarks>
 [DisplayName("Scope")]
 [Table("SchemataScopes")]
 [CanonicalName("scopes/{scope}")]
-public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
+public class SchemataScope : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
-    /// <summary>Gets or sets the scope description shown on consent screens.</summary>
-    public virtual string? Description { get; set; }
-
-    /// <summary>Gets or sets the JSON-serialized localized descriptions.</summary>
-    public virtual string? Descriptions { get; set; }
-
-    /// <summary>Gets or sets the JSON-serialized custom properties.</summary>
-    public virtual string? Properties { get; set; }
-
-    /// <summary>Gets or sets the JSON-serialized API resources associated with this scope.</summary>
-    public virtual string? Resources { get; set; }
+    /// <summary>API resources that this scope grants access to.</summary>
+    public virtual ICollection<string>? Resources { get; set; }
 
     #region ICanonicalName Members
 
@@ -48,20 +31,25 @@ public class SchemataScope : IIdentifier, ICanonicalName, IDisplayName, IConcurr
 
     #endregion
 
-    #region IDisplayName Members
+    #region IDescriptive Members
 
     /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized localized display names.</summary>
-    public virtual string? DisplayNames { get; set; }
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Description { get; set; }
+
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
     public virtual long Id { get; set; }
 
     #endregion

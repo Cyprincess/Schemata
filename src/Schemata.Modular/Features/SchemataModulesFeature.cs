@@ -5,14 +5,14 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Modular.Features;
 
 /// <summary>
-/// Feature that bootstraps the modular system by discovering modules and running their lifecycle methods.
+///     Feature that bootstraps the modular system by discovering modules and running their lifecycle methods.
 /// </summary>
 /// <typeparam name="TProvider">The module provider type.</typeparam>
 /// <typeparam name="TRunner">The module runner type.</typeparam>
@@ -20,7 +20,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
 {
-    public const int DefaultPriority = SchemataConstants.Orders.Extension + 80_000_000;
+    public const int DefaultPriority = Orders.Extension + 80_000_000;
 
     /// <inheritdoc />
     public override int Priority => DefaultPriority;

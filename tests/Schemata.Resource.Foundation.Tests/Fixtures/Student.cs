@@ -4,6 +4,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation.Tests.Fixtures;
 
+[CanonicalName("students/{student}")]
 public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IValidation, IUpdateMask
 {
     public string? FullName { get; set; }

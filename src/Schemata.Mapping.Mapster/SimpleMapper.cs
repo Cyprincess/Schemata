@@ -8,14 +8,14 @@ using Schemata.Mapping.Skeleton;
 namespace Schemata.Mapping.Mapster;
 
 /// <summary>
-/// Mapster-backed implementation of <see cref="ISimpleMapper"/>.
+///     Mapster-backed implementation of <see cref="ISimpleMapper" />.
 /// </summary>
 public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly Mapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance wrapping the given Mapster configuration.
+    ///     Initializes a new instance wrapping the given Mapster configuration.
     /// </summary>
     /// <param name="config">The Mapster type adapter configuration.</param>
     public SimpleMapper(TypeAdapterConfig config) { _mapper = new(config); }

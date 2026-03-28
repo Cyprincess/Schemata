@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.Repository;
 using Schemata.Workflow.Foundation.Controllers;
@@ -67,13 +68,11 @@ public class TestFixture
            .Verifiable();
 
         WorkflowRepository
-           .Setup(r => r.SingleOrDefaultAsync(
-                      It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(),
-                      It.IsAny<CancellationToken>()))
+           .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync((
-                             Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate, 
-                             CancellationToken                                                _
-                         ) => predicate(Workflows.AsQueryable()).SingleOrDefault())
+                Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate,
+                CancellationToken                                                _
+            ) => predicate(Workflows.AsQueryable()).SingleOrDefault())
            .Verifiable();
 
         WorkflowRepository.Setup(r => r.AddAsync(It.IsAny<SchemataWorkflow>(), It.IsAny<CancellationToken>()))
@@ -94,10 +93,10 @@ public class TestFixture
 
                                          schema.UseWorkflow().Use<OrderStateMachine, Order>();
 
-                                         schema.Services.AddTransient<IRepository<Order>>(_ => OrderRepository.Object);
-                                         schema.Services.AddTransient<IRepository<SchemataTransition>>(_ => TransitionRepository.Object);
-                                         schema.Services.AddTransient<IRepository<SchemataWorkflow>>(_ => WorkflowRepository.Object);
-                                         schema.Services.AddScoped<WorkflowController>();
+                                         schema.Services.TryAddScoped<IRepository<Order>>(_ => OrderRepository.Object);
+                                         schema.Services.TryAddScoped<IRepository<SchemataTransition>>(_ => TransitionRepository.Object);
+                                         schema.Services.TryAddScoped<IRepository<SchemataWorkflow>>(_ => WorkflowRepository.Object);
+                                         schema.Services.TryAddScoped<WorkflowController>();
                                      });
 
         var app = builder.Build();

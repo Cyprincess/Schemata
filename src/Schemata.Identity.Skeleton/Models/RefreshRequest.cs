@@ -2,14 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for refreshing an authentication token.
-/// </summary>
 public class RefreshRequest
 {
-    /// <summary>
-    ///     Gets or sets the refresh token to exchange for a new access token.
-    /// </summary>
+    /// <summary>Opaque refresh token obtained from a previous authentication.</summary>
     [Required]
-    public virtual string RefreshToken { get; set; } = null!;
+    public string RefreshToken { get; set; } = null!;
 }

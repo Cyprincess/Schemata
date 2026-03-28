@@ -12,14 +12,15 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-/// Generic REST controller that exposes CRUD endpoints for a resource, delegating to <see cref="ResourceOperationHandler{TEntity, TRequest, TDetail, TSummary}"/>.
+///     Generic REST controller that exposes CRUD endpoints for a resource, delegating to
+///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.
 /// </summary>
 /// <typeparam name="TEntity">The persistent entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type for create and update operations.</typeparam>
 /// <typeparam name="TDetail">The detail DTO type returned from get, create, and update operations.</typeparam>
 /// <typeparam name="TSummary">The summary DTO type returned from list operations.</typeparam>
 [ApiController]
-[Route("~/[controller]")]
+[Route("~/Resource")]
 public class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -27,12 +28,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     where TSummary : class, ICanonicalName
 {
     /// <summary>
-    /// The operation handler that orchestrates the advisor pipeline.
+    ///     The operation handler that orchestrates the advisor pipeline.
     /// </summary>
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
-    /// Initializes a new resource controller instance.
+    ///     Initializes a new resource controller instance.
     /// </summary>
     /// <param name="handler">The operation handler.</param>
     /// <param name="json">The JSON serializer options.</param>
@@ -47,17 +48,25 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    /// Gets the configured JSON serializer options with resource-specific naming conventions.
+    ///     Gets the configured JSON serializer options with resource-specific naming conventions.
     /// </summary>
     protected JsonSerializerOptions JsonOptions { get; }
 
     /// <summary>
-    /// Gets the empty result returned when an operation is blocked.
+    ///     Gets the empty result returned when an operation is blocked.
     /// </summary>
     protected virtual EmptyResult EmptyResult { get; } = new();
 
+    private string BuildFullName(string name) {
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        var parent     = descriptor.ResolveParent(HttpContext.Request.RouteValues);
+        return parent is not null
+            ? $"{parent}/{descriptor.Collection}/{name}"
+            : $"{descriptor.Collection}/{name}";
+    }
+
     /// <summary>
-    /// Lists resources with filtering, ordering, and pagination.
+    ///     Lists resources with filtering, ordering, and pagination.
     /// </summary>
     /// <param name="request">The list request parameters from the query string.</param>
     /// <returns>A JSON result containing the paginated list, or an empty result if blocked.</returns>
@@ -65,7 +74,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     public virtual async Task<IActionResult> ListAsync([FromQuery] ListRequest request) {
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
-        var result = await Handler.ListAsync(request, HttpContext, HttpContext.RequestAborted);
+        var result = await Handler.ListAsync(request, HttpContext.User, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
             return EmptyResult;
         }
@@ -74,15 +83,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    /// Gets a single resource by name.
+    ///     Gets a single resource by name.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
     /// <returns>A JSON result containing the detail DTO, or an empty result if blocked.</returns>
     [HttpGet("{name}")]
     public virtual async Task<IActionResult> GetAsync(string name) {
-        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
-
-        var result = await Handler.GetAsync(entity, HttpContext, HttpContext.RequestAborted);
+        var result = await Handler.GetAsync(BuildFullName(name), HttpContext.User, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
             return EmptyResult;
         }
@@ -91,13 +98,15 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    /// Creates a new resource from the request body.
+    ///     Creates a new resource from the request body.
     /// </summary>
     /// <param name="request">The creation request from the body.</param>
     /// <returns>A 201 Created JSON result with the detail DTO, or an empty result if blocked.</returns>
     [HttpPost]
     public virtual async Task<IActionResult> CreateAsync([FromBody] TRequest request) {
-        var result = await Handler.CreateAsync(request, HttpContext, HttpContext.RequestAborted);
+        ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(request, HttpContext.Request.RouteValues);
+
+        var result = await Handler.CreateAsync(request, HttpContext.User, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
             return EmptyResult;
         }
@@ -108,7 +117,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    /// Updates an existing resource by name with a partial or full update from the request body.
+    ///     Updates an existing resource by name with a partial or full update from the request body.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
     /// <param name="request">The update request from the body.</param>
@@ -126,9 +135,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             }
         }
 
-        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
-
-        var result = await Handler.UpdateAsync(request, entity, HttpContext, HttpContext.RequestAborted);
+        var result = await Handler.UpdateAsync(BuildFullName(name), request, HttpContext.User, HttpContext.RequestAborted);
         if (!result.IsAllowed()) {
             return EmptyResult;
         }
@@ -137,7 +144,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    /// Deletes a resource by name with optional ETag concurrency check.
+    ///     Deletes a resource by name with optional ETag concurrency check.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
     /// <param name="etag">Optional ETag for concurrency checking (also read from If-Match header).</param>
@@ -149,14 +156,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         [FromQuery] string? etag  = null,
         [FromQuery] bool?   force = null
     ) {
-        var entity = await Handler.GetByNameAsync(name, HttpContext, HttpContext.RequestAborted);
-
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {
             tag = HttpContext.Request.Headers.IfMatch.ToString();
         }
 
-        var result = await Handler.DeleteAsync(entity, tag, force ?? false, HttpContext, HttpContext.RequestAborted);
+        var result = await Handler.DeleteAsync(BuildFullName(name), tag, force ?? false, HttpContext.User, HttpContext.RequestAborted);
         if (!result) {
             return EmptyResult;
         }

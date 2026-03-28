@@ -1,11 +1,13 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Schemata.Abstractions;
 
 namespace Schemata.Core.Json;
 
 /// <summary>
-///     JSON converter that serializes <see langword="long" /> values as strings to preserve precision in JavaScript clients.
+///     JSON converter that serializes <see langword="long" /> values as strings to preserve precision in JavaScript
+///     clients.
 /// </summary>
 public class JsonStringNumberConverter : JsonConverter<long>
 {
@@ -33,7 +35,7 @@ public class JsonStringNumberConverter : JsonConverter<long>
             }
         }
 
-        throw new JsonException($"Unable to convert \"{reader.GetString()}\" to {typeToConvert}");
+        throw new JsonException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1025), reader.GetString(), typeToConvert));
     }
 
     public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) {

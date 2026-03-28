@@ -3,12 +3,11 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
-using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-/// Distributed-cache-backed implementation of <see cref="IIdempotencyStore"/> for storing idempotent request results.
+///     Distributed-cache-backed implementation of <see cref="IIdempotencyStore" /> for storing idempotent request results.
 /// </summary>
 public sealed class IdempotencyStore : IIdempotencyStore
 {
@@ -17,7 +16,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
     private readonly IDistributedCache _cache;
 
     /// <summary>
-    /// Initializes a new instance backed by the specified distributed cache.
+    ///     Initializes a new instance backed by the specified distributed cache.
     /// </summary>
     /// <param name="cache">The distributed cache implementation.</param>
     public IdempotencyStore(IDistributedCache cache) { _cache = cache; }
@@ -42,9 +41,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
         CancellationToken ct     = default
     ) {
         var bytes   = JsonSerializer.SerializeToUtf8Bytes(value);
-        var options = new DistributedCacheEntryOptions {
-            AbsoluteExpirationRelativeToNow = expiry ?? DefaultExpiry
-        };
+        var options = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = expiry ?? DefaultExpiry };
 
         await _cache.SetAsync(requestId, bytes, options, ct);
     }

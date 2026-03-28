@@ -6,7 +6,8 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Schemata.Tenancy.Skeleton;
 
 /// <summary>
-///     Provides access to the current tenant context using the default <see cref="SchemataTenant{TKey}" /> with <see cref="Guid" /> keys.
+///     Provides access to the current tenant context using the default <see cref="SchemataTenant{TKey}" /> with
+///     <see cref="Guid" /> keys.
 /// </summary>
 public interface ITenantContextAccessor : ITenantContextAccessor<SchemataTenant<Guid>, Guid>;
 
@@ -23,7 +24,7 @@ public interface ITenantContextAccessor<TTenant, TKey>
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    /// <summary>Gets the resolved tenant for the current request, or <see langword="null"/> if not yet initialized.</summary>
+    /// <summary>Gets the resolved tenant for the current request, or <see langword="null" /> if not yet initialized.</summary>
     TTenant? Tenant { get; }
 
     /// <summary>Resolves and initializes the tenant context using the registered <see cref="ITenantResolver{TKey}" />.</summary>

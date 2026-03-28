@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
@@ -24,7 +25,8 @@ public abstract class RepositoryBase
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties = [];
 
     /// <summary>
-    ///     Returns the cached list of key properties for the specified type, discovering them by <see cref="KeyAttribute" /> or by convention (property named "Id").
+    ///     Returns the cached list of key properties for the specified type, discovering them by <see cref="KeyAttribute" />
+    ///     or by convention (property named "Id").
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of key property infos.</returns>
@@ -37,8 +39,7 @@ public abstract class RepositoryBase
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
 
         if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id",
-                                                                     StringComparison.InvariantCultureIgnoreCase));
+            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
             if (id is not null) {
                 keyProperties.Add(id);
             }
@@ -49,7 +50,8 @@ public abstract class RepositoryBase
     }
 
     /// <summary>
-    ///     Returns the cached list of mapped (non-virtual, readable, not <see cref="NotMappedAttribute" />) properties for the specified type.
+    ///     Returns the cached list of mapped (non-virtual, readable, not <see cref="NotMappedAttribute" />) properties for the
+    ///     specified type.
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of mapped property infos.</returns>
@@ -272,14 +274,14 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         var properties = KeyPropertiesCache(type);
         if (properties.Count == 0) {
-            throw new ArgumentException("Entity must have at least one [Key]");
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1020));
         }
 
         var keys = new List<object>();
         foreach (var property in properties) {
             var value = property.GetValue(entity);
             if (value is null) {
-                throw new ArgumentException("Entity key cannot be null");
+                throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1021));
             }
 
             keys.Add(value);
@@ -301,11 +303,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         var properties = KeyPropertiesCache(type);
         if (properties.Count == 0) {
-            throw new ArgumentException("Entity must have at least one [Key]");
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1020));
         }
 
         if (properties.Count != keys.Length) {
-            throw new ArgumentException("Entity key count mismatch");
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1022));
         }
 
         var predicate = Predicate.True<TEntity>();
@@ -393,44 +395,45 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressAddValidation() {
-        AdviceContext.Set<SuppressAddValidation>(null);
+        AdviceContext.Set<AddValidationSuppressed>(null);
         return this;
     }
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressUpdateValidation() {
-        AdviceContext.Set<SuppressUpdateValidation>(null);
+        AdviceContext.Set<UpdateValidationSuppressed>(null);
         return this;
     }
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressConcurrency() {
-        AdviceContext.Set<SuppressConcurrency>(null);
+        AdviceContext.Set<ConcurrencySuppressed>(null);
         return this;
     }
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressQuerySoftDelete() {
-        AdviceContext.Set<SuppressQuerySoftDelete>(null);
+        AdviceContext.Set<QuerySoftDeleteSuppressed>(null);
         return this;
     }
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressSoftDelete() {
-        AdviceContext.Set<SuppressSoftDelete>(null);
+        AdviceContext.Set<SoftDeleteSuppressed>(null);
         return this;
     }
 
     /// <inheritdoc />
     public virtual IRepository<TEntity> SuppressTimestamp() {
-        AdviceContext.Set<SuppressTimestamp>(null);
+        AdviceContext.Set<TimestampSuppressed>(null);
         return this;
     }
 
     #endregion
 
     /// <summary>
-    ///     Creates a <see cref="QueryContainer{TEntity}" /> from the current queryable, for use by the build-query advisor pipeline.
+    ///     Creates a <see cref="QueryContainer{TEntity}" /> from the current queryable, for use by the build-query advisor
+    ///     pipeline.
     /// </summary>
     /// <returns>A new query container wrapping this repository and its queryable.</returns>
     protected virtual QueryContainer<TEntity> AsQueryContainer() {

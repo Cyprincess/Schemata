@@ -1,44 +1,39 @@
 using System;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.BearerToken;
+using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Identity.Foundation.Advisors;
+using Schemata.Identity.Foundation.Controllers;
+using Schemata.Identity.Foundation.Handlers;
+using Schemata.Identity.Foundation.Services;
+using Schemata.Identity.Skeleton.Advisors;
+using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
+using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Features;
 
-/// <summary>
-///     Schemata feature that configures ASP.NET Core Identity with bearer token authentication,
-///     composite authentication handling, and the Schemata user/role stores.
-/// </summary>
-/// <typeparam name="TUser">The user entity type.</typeparam>
-/// <typeparam name="TRole">The role entity type.</typeparam>
-/// <typeparam name="TUserStore">The user store implementation type.</typeparam>
-/// <typeparam name="TRoleStore">The role store implementation type.</typeparam>
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
 public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
-    where TUser : SchemataUser
+    where TUser : SchemataUser, new()
     where TRole : SchemataRole
     where TUserStore : class, IUserStore<TUser>
     where TRoleStore : class, IRoleStore<TRole>
 {
-    public const int DefaultPriority = SchemataConstants.Orders.Extension + 10_000_000;
+    public const int DefaultPriority = Orders.Extension + 10_000_000;
 
     /// <inheritdoc />
     public override int Priority => DefaultPriority;
@@ -53,78 +48,71 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
     ) {
         var configure = configurators.Pop<IdentityOptions>();
         var build     = configurators.Pop<IdentityBuilder>();
-        var bearer    = configurators.Pop<BearerTokenOptions>();
 
         var identify = configurators.Pop<SchemataIdentityOptions>();
+        var opts     = new SchemataIdentityOptions();
+        identify(opts);
         services.Configure(identify);
-
-        services.Configure<JsonSerializerOptions>(options => {
-            options.Converters.Add(ClaimStoreJsonConverter.Instance);
-        });
-
-        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
-            options.SerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
-        });
-
-        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
-            options.JsonSerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
-        });
 
         var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
         services.AddMvcCore()
-                .ConfigureApplicationPartManager(manager => { manager.ApplicationParts.Add(part); });
+                .ConfigureApplicationPartManager(manager => {
+                     manager.ApplicationParts.Add(part);
+                     manager.FeatureProviders.Add(new IdentityControllerFeatureProvider(typeof(AuthenticateController<TUser>)));
+                 });
 
-        services.AddMemoryCache();
+        // Handler
+        services.TryAddScoped<IdentityHandler<TUser>>();
 
-        services.AddAuthentication("Identity.BearerAndApplication")
-                .AddScheme<AuthenticationSchemeOptions, CompositeIdentityHandler>(
-                     "Identity.BearerAndApplication", null, composite => {
-                         composite.ForwardDefault      = IdentityConstants.BearerScheme;
-                         composite.ForwardAuthenticate = "Identity.BearerAndApplication";
-                     })
-                .AddBearerToken(IdentityConstants.BearerScheme, bearer)
-                .AddIdentityCookies();
+        // Advisors
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceIdentityFeatureGate<>)));
 
-        services.TryAddTransient(typeof(IMailSender<>), typeof(NoOpMailSender<>));
-        services.TryAddTransient(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ConfirmRequest>, AdviceConfirmRequestValidation>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangeEmailValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangePhoneValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangePasswordValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceEnrollValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceDowngradeValidation>());
 
+        // Claims and services
+        services.TryAddScoped<IClaimsProvider<TUser>, DefaultClaimsProvider<TUser>>();
+
+        services.TryAddScoped(typeof(IMailSender<>), typeof(NoOpMailSender<>));
+        services.TryAddScoped(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
+
+        // Identity stores and managers
         services.TryAddScoped<IUserStore<TUser>, TUserStore>();
         services.TryAddScoped<IRoleStore<TRole>, TRoleStore>();
 
-        var builder = services.AddIdentityCore<TUser>(configure)
+        services.Configure<IdentityOptions>(o => {
+            o.ClaimsIdentity.UserIdClaimType        = SchemataConstants.Claims.Subject;
+            o.ClaimsIdentity.UserNameClaimType      = SchemataConstants.Claims.PreferredUsername;
+            o.ClaimsIdentity.EmailClaimType         = SchemataConstants.Claims.Email;
+            o.ClaimsIdentity.RoleClaimType          = SchemataConstants.Claims.Role;
+            o.ClaimsIdentity.SecurityStampClaimType = SchemataConstants.Claims.SecurityStamp;
+        });
+
+        var builder = services.AddIdentityApiEndpoints<TUser>(configure)
                               .AddRoles<TRole>()
-                              .AddUserManager<SchemataUserManager<TUser>>()
-                              .AddSignInManager()
-                              .AddDefaultTokenProviders();
+                              .AddUserManager<SchemataUserManager<TUser>>();
 
         build(builder);
     }
 
-    #region Nested type: CompositeIdentityHandler
+    #region Nested type: IdentityControllerFeatureProvider
 
-    private sealed class CompositeIdentityHandler(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory                               logger,
-        UrlEncoder                                   encoder
-    ) : SignInAuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    private sealed class IdentityControllerFeatureProvider(Type controllerType) : IApplicationFeatureProvider<ControllerFeature>
     {
-        protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
-            var result = await Context.AuthenticateAsync(IdentityConstants.BearerScheme);
+        #region IApplicationFeatureProvider<ControllerFeature> Members
 
-            if (!result.None) {
-                return result;
+        public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
+            var typeInfo = controllerType.GetTypeInfo();
+            if (!feature.Controllers.Contains(typeInfo)) {
+                feature.Controllers.Add(typeInfo);
             }
-
-            return await Context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
         }
 
-        protected override Task HandleSignInAsync(ClaimsPrincipal user, AuthenticationProperties? properties) {
-            throw new NotImplementedException();
-        }
-
-        protected override Task HandleSignOutAsync(AuthenticationProperties? properties) {
-            throw new NotImplementedException();
-        }
+        #endregion
     }
 
     #endregion

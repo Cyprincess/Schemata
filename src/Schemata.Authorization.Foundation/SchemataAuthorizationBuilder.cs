@@ -1,23 +1,37 @@
+using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation;
 
-/// <summary>
-///     Fluent builder for configuring authorization features and OAuth 2.0 flows.
-/// </summary>
-public sealed class SchemataAuthorizationBuilder
+public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>
+    where TApp : SchemataApplication
+    where TAuth : SchemataAuthorization
+    where TScope : SchemataScope
+    where TToken : SchemataToken
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataAuthorizationBuilder" /> class.
-    /// </summary>
-    public SchemataAuthorizationBuilder(SchemataOptions schemata, Configurators configurators) {
+    internal SchemataAuthorizationBuilder(
+        SchemataOptions    schemata,
+        Configurators      configurators,
+        IServiceCollection services
+    ) {
         Schemata      = schemata;
         Configurators = configurators;
+        Services      = services;
     }
 
-    /// <summary>Gets the Schemata framework options.</summary>
     public SchemataOptions Schemata { get; }
 
-    /// <summary>Gets the configurator registry for deferred configuration.</summary>
-    public Configurators Configurators { get; }
+    internal Configurators Configurators { get; }
+
+    public IServiceCollection Services { get; }
+
+    public SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> AddFlowFeature<T>()
+        where T : IAuthorizationFlowFeature, new() {
+        Configurators.Set<List<IAuthorizationFlowFeature>>(features => { features.Add(new T()); });
+
+        return this;
+    }
 }

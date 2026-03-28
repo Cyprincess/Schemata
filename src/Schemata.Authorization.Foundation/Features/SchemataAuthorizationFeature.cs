@@ -1,38 +1,41 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
-using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Resolver;
-using Schemata.Authorization.Skeleton.Stores;
 using Schemata.Abstractions;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Binding;
+using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Managers;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton;
+using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Core;
 using Schemata.Core.Features;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-/// <summary>
-///     Configures OpenIddict authorization services, entity stores, and ASP.NET Core integration.
-/// </summary>
-/// <typeparam name="TApplication">The application entity type.</typeparam>
-/// <typeparam name="TAuthorization">The authorization entity type.</typeparam>
-/// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
+[DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
-public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken> : FeatureBase
-    where TApplication : SchemataApplication
-    where TAuthorization : SchemataAuthorization
+[DependsOn<SchemataWellKnownFeature>]
+public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : FeatureBase
+    where TApp : SchemataApplication
+    where TAuth : SchemataAuthorization
     where TScope : SchemataScope
-    where TToken : SchemataToken
+    where TToken : SchemataToken, new()
 {
-    public const int DefaultPriority = SchemataConstants.Orders.Extension + 20_000_000;
+    public const int DefaultPriority = Orders.Extension + 20_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -40,62 +43,85 @@ public sealed class SchemataAuthorizationFeature<TApplication, TAuthorization, T
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var store     = configurators.Pop<OpenIddictCoreBuilder>();
-        var serve     = configurators.Pop<OpenIddictServerBuilder>();
-        var integrate = configurators.Pop<OpenIddictServerAspNetCoreBuilder>();
+        var configure = configurators.PopOrDefault<SchemataAuthorizationOptions>();
+        services.Configure(configure);
 
-        var features = new List<IAuthorizationFeature>();
-        var build    = configurators.Pop<IList<IAuthorizationFeature>>();
-        build(features);
-        features.Sort((a, b) => a.Order.CompareTo(b.Order));
+        services.PostConfigure<SchemataAuthorizationOptions>(o => {
+            if (o.SigningKey is null) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningKey)));
+            }
 
-        var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApplication, TAuthorization, TScope, TToken>>();
-        services.AddMvcCore()
+            if (string.IsNullOrWhiteSpace(o.SigningAlgorithm)) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningAlgorithm)));
+            }
+
+            if (o.EncryptionKey is not null && string.IsNullOrWhiteSpace(o.EncryptionAlgorithm)) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST4020), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
+            }
+
+            if (string.IsNullOrWhiteSpace(o.Issuer)) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.Issuer)));
+            }
+        });
+
+        var flows    = new List<IAuthorizationFlowFeature>();
+        var populate = configurators.PopOrDefault<List<IAuthorizationFlowFeature>>();
+        populate(flows);
+        flows.Sort((a, b) => a.Order.CompareTo(b.Order));
+
+        foreach (var flow in flows) {
+            flow.ConfigureServices(services, schemata, configurators);
+        }
+
+        var options = new SchemataAuthorizationOptions {
+            AllowedClientAuthMethods = { ClientAuthMethods.ClientSecretBasic, ClientAuthMethods.ClientSecretPost },
+            AllowedResponseModes     = { ResponseModes.Fragment, ResponseModes.Query },
+            SupportedClaims          = { Claims.Subject },
+        };
+
+        configure(options);
+
+        var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
+        services.AddMvcCore(mvc => {
+                     mvc.ModelBinderProviders.Insert(0, new OAuthRequestBinderProvider());
+                 })
                 .ConfigureApplicationPartManager(manager => {
                      manager.ApplicationParts.Add(part);
                  });
 
-        services.AddOpenIddict()
-                .AddCore(builder => {
-                     builder.DisableAdditionalFiltering();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
 
-                     builder.SetDefaultApplicationEntity<TApplication>()
-                            .SetDefaultAuthorizationEntity<TAuthorization>()
-                            .SetDefaultScopeEntity<TScope>()
-                            .SetDefaultTokenEntity<TToken>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretBasicAuthentication<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretPostAuthentication<TApp>>());
+        services.TryAddScoped<IClientAuthenticationService<TApp>, ClientAuthenticationService<TApp>>();
 
-                     store(builder);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenEndpointPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenGrantPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenScopeValidation<TApp, TScope>>());
 
-                     builder.ReplaceApplicationStoreResolver<SchemataApplicationStoreResolver>()
-                            .ReplaceAuthorizationStoreResolver<SchemataAuthorizationStoreResolver>()
-                            .ReplaceScopeStoreResolver<SchemataScopeStoreResolver>()
-                            .ReplaceTokenStoreResolver<SchemataTokenStoreResolver>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceAudienceClaims>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdvicePairwiseProjection<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceSubjectClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceProfileClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceEmailClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdvicePhoneClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceAddressClaimDestination>());
 
-                     builder.Services.TryAddScoped(typeof(SchemataApplicationStore<,,>));
-                     builder.Services.TryAddScoped(typeof(SchemataAuthorizationStore<,,>));
-                     builder.Services.TryAddScoped(typeof(SchemataScopeStore<>));
-                     builder.Services.TryAddScoped(typeof(SchemataTokenStore<>));
-                 })
-                .AddServer(builder => {
-                     serve(builder);
+        services.TryAddScoped<DiscoveryHandler<TScope>>();
 
-                     var integration = builder.UseAspNetCore()
-                                              .EnableStatusCodePagesIntegration();
+        services.TryAddScoped<TokenService>();
+        services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
 
-                     if (environment.IsDevelopment()) {
-                         integration.DisableTransportSecurityRequirement();
-                     }
+        services.TryAddScoped<IPasswordHasher<TApp>, PasswordHasher<TApp>>();
+        services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
+        services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();
+        services.TryAddScoped<IAuthorizationManager<TAuth>, SchemataAuthorizationManager<TAuth>>();
+        services.TryAddScoped<ITokenManager<TToken>, SchemataTokenManager<TToken>>();
 
-                     integrate(integration);
+        services.AddAuthentication()
+                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthenticationHandler<TApp, TToken>>(options.BearerScheme, null)
+                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthorizationCodeHandler<TApp, TToken>>(options.CodeScheme, null);
 
-                     foreach (var feature in features) {
-                         feature.ConfigureServer(features, services, builder);
-                         feature.ConfigureServerAspNetCore(features, services, builder, integration);
-                     }
-                 })
-                .AddValidation(builder => {
-                     builder.UseLocalServer();
-                     builder.UseAspNetCore();
-                 });
+        services.AddHostedService<TokenCleanupService<TToken>>();
     }
 }

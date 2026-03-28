@@ -6,9 +6,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-/// <summary>
-///     Represents a claim associated with a <see cref="SchemataUser"/>.
-/// </summary>
 [Table("SchemataUserClaims")]
 public class SchemataUserClaim : IdentityUserClaim<long>, IIdentifier, ITimestamp
 {

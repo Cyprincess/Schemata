@@ -12,7 +12,7 @@ public sealed class ModuleAttribute : Attribute
     ///     Initializes a new instance of the <see cref="ModuleAttribute" /> class.
     /// </summary>
     /// <param name="name">The fully-qualified type name of the module.</param>
-    public ModuleAttribute(string? name) { Name = name ?? string.Empty; }
+    public ModuleAttribute(string name) { Name = name; }
 
     /// <summary>
     ///     Gets the fully-qualified type name of the module.

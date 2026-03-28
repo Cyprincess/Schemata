@@ -2,26 +2,24 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for new user registration.
-/// </summary>
 public class RegisterRequest
 {
-    /// <summary>
-    ///     Gets or sets the email address for the new account.
-    /// </summary>
-    [EmailAddress]
-    public virtual string? EmailAddress { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the phone number for the new account.
-    /// </summary>
-    [Phone]
-    public virtual string? PhoneNumber { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the password for the new account.
-    /// </summary>
+    /// <summary>Desired username for the new account.</summary>
     [Required]
-    public virtual string Password { get; set; } = null!;
+    public string Username { get; set; } = null!;
+
+    /// <summary>Email address for the new account; used for verification and recovery.</summary>
+    [EmailAddress]
+    public string? EmailAddress { get; set; }
+
+    /// <summary>Phone number for the new account; used for verification and recovery.</summary>
+    [Phone]
+    public string? PhoneNumber { get; set; }
+
+    /// <summary>Password for the new account; must satisfy configured password policy.</summary>
+    [Required]
+    public string Password { get; set; } = null!;
+
+    /// <summary>When true, issue a cookie instead of a bearer token after registration.</summary>
+    public bool? UseCookies { get; set; }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -16,7 +17,7 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 [DisplayName("Tenant")]
 [Table("SchemataTenants")]
 [CanonicalName("tenants/{tenant}")]
-public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
+public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
     where TKey : struct, IEquatable<TKey>
 {
     /// <summary>Gets or sets the tenant-specific identifier used for resolution.</summary>
@@ -42,13 +43,19 @@ public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDisplayName, I
 
     #endregion
 
-    #region IDisplayName Members
+    #region IDescriptive Members
 
     /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized localized display names.</summary>
-    public virtual string? DisplayNames { get; set; }
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Description { get; set; }
+
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 

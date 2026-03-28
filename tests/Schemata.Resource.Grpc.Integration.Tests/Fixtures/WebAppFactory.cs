@@ -11,11 +11,6 @@ public class WebAppFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder) {
         builder.UseEnvironment("Testing");
-
-        var contentRoot = FindProjectRoot();
-        if (contentRoot is not null) {
-            builder.UseContentRoot(contentRoot);
-        }
     }
 
     public GrpcChannel CreateGrpcChannel() {
@@ -32,20 +27,5 @@ public class WebAppFactory : WebApplicationFactory<Program>
         var channel = CreateGrpcChannel();
         var binder  = Services.GetRequiredService<BinderConfiguration>();
         return (channel, ClientFactory.Create(binder));
-    }
-
-    private static string? FindProjectRoot() {
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (dir is not null) {
-            if (File.Exists(Path.Combine(dir.FullName, "Schemata.Resource.Grpc.Integration.Tests.csproj"))) {
-                return dir.FullName;
-            }
-
-            dir = dir.Parent;
-        }
-
-        var candidate = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "tests",
-                                                      "Schemata.Resource.Grpc.Integration.Tests"));
-        return Directory.Exists(candidate) ? candidate : null;
     }
 }

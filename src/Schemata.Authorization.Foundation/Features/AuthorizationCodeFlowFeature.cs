@@ -1,49 +1,55 @@
-using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Core;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
-/// <summary>
-///     Enables the OAuth 2.0 Authorization Code flow with PKCE.
-/// </summary>
-/// <remarks>
-///     Use this flow for server-side and single-page applications where the client can securely
-///     exchange an authorization code for tokens. Configures the <c>/Connect/Authorize</c> and
-///     <c>/Connect/Token</c> endpoints.
-/// </remarks>
-public sealed class AuthorizationCodeFlowFeature : IAuthorizationFeature
+public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizationFlowFeature
+    where TApp : SchemataApplication
+    where TAuth : SchemataAuthorization, new()
+    where TScope : SchemataScope
+    where TToken : SchemataToken, new()
 {
-    #region IAuthorizationFeature Members
+    #region IAuthorizationFlowFeature Members
 
-    public const int DefaultOrder = 10_000;
+    public int Order => 10_100;
 
-    /// <inheritdoc />
-    public int Order => DefaultOrder;
+    public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+        var options = configurators.PopOrDefault<CodeFlowOptions>();
+        services.Configure(options);
 
-    /// <inheritdoc />
-    public int Priority => DefaultOrder;
+        services.Configure<SchemataAuthorizationOptions>(o => {
+            o.AllowedResponseTypes.Add(ResponseTypes.Code);
+            o.AllowedResponseModes.Add(ResponseModes.FormPost);
+        });
 
-    /// <inheritdoc />
-    public void ConfigureServer(
-        IReadOnlyList<IAuthorizationFeature> features,
-        IServiceCollection                   services,
-        OpenIddictServerBuilder              builder
-    ) {
-        builder.AllowAuthorizationCodeFlow()
-               .RequireProofKeyForCodeExchange()
-               .SetAuthorizationEndpointUris("/Connect/Authorize")
-               .SetTokenEndpointUris("/Connect/Token");
-    }
+        services.TryAddScoped<AuthorizeEndpoint, AuthorizeHandler<TApp, TToken>>();
 
-    /// <inheritdoc />
-    public void ConfigureServerAspNetCore(
-        IReadOnlyList<IAuthorizationFeature> features,
-        IServiceCollection                   services,
-        OpenIddictServerBuilder              builder,
-        OpenIddictServerAspNetCoreBuilder    integration
-    ) {
-        integration.EnableAuthorizationEndpointPassthrough()
-                   .EnableTokenEndpointPassthrough();
+        services.TryAddKeyedScoped<IGrantHandler, AuthorizationCodeHandler<TApp, TToken>>(GrantTypes.AuthorizationCode);
+        services.TryAddKeyedScoped<IInteractionHandler, AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken>>(TokenTypeUris.Interaction);
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryCodeFlow>());
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeClientAndRedirect<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeEndpointPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeGrantPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeScopeValidation<TApp, TScope>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizePkce<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeNonce<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeResponseMode<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizePrompt<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeConsent<TApp, TAuth>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>>());
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp, TToken>, AdviceCodeExchangeValidation<TApp, TToken>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp, TToken>, AdviceCodeExchangePkce<TApp, TToken>>());
     }
 
     #endregion

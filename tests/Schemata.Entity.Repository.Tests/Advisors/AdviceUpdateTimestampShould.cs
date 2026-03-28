@@ -46,7 +46,7 @@ public class AdviceUpdateTimestampShould
     public async Task Advise_Suppressed_DoesNotUpdateTime() {
         var advisor = new AdviceUpdateTimestamp<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressTimestamp());
+        ctx.Set(new TimestampSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var original   = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var entity     = new Student { CreateTime = original, UpdateTime = original };

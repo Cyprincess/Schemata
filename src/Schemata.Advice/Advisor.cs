@@ -8,7 +8,8 @@ namespace Schemata.Advice;
 public static class Advisor
 {
     /// <summary>
-    ///     Creates an <see cref="AdvicePipeline{TAdvisor}" /> token for the specified advisor type, enabling extension method dispatch.
+    ///     Creates an <see cref="AdvicePipeline{TAdvisor}" /> token for the specified advisor type, enabling extension method
+    ///     dispatch.
     /// </summary>
     /// <typeparam name="TAdvisor">The advisor interface type.</typeparam>
     /// <returns>A pipeline token used to invoke <c>RunAsync</c> extension methods.</returns>

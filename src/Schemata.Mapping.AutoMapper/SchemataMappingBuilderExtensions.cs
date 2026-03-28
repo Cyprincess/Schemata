@@ -13,12 +13,12 @@ using Schemata.Mapping.Skeleton;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-/// Extension methods for selecting AutoMapper as the mapping engine on <see cref="SchemataMappingBuilder"/>.
+///     Extension methods for selecting AutoMapper as the mapping engine on <see cref="SchemataMappingBuilder" />.
 /// </summary>
 public static class SchemataMappingBuilderExtensions
 {
     /// <summary>
-    /// Configures AutoMapper as the mapping engine, registering <see cref="MapperConfiguration"/> as a singleton.
+    ///     Configures AutoMapper as the mapping engine, registering <see cref="MapperConfiguration" /> as a singleton.
     /// </summary>
     /// <param name="builder">The mapping builder.</param>
     /// <returns>The mapping builder for chaining.</returns>

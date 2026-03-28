@@ -5,22 +5,22 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Workflow.Skeleton.Models;
 
 /// <summary>
-/// Response DTO for a workflow, including its current state, state graph, available events, and transition history.
+///     Response DTO for a workflow, including its current state, state graph, available events, and transition history.
 /// </summary>
 public class WorkflowResponse : IIdentifier, IStateful, ITimestamp
 {
     /// <summary>
-    /// The state graph showing all states and transitions.
+    ///     The state graph showing all states and transitions.
     /// </summary>
     public virtual GraphResponse? Graph { get; set; }
 
     /// <summary>
-    /// The names of events available from the current state.
+    ///     The names of events available from the current state.
     /// </summary>
     public virtual List<string>? Events { get; set; }
 
     /// <summary>
-    /// The recorded transition history.
+    ///     The recorded transition history.
     /// </summary>
     public virtual List<TransitionResponse>? Transitions { get; set; }
 

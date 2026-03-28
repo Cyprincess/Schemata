@@ -9,7 +9,7 @@ public class InvalidArgumentException : SchemataException
 {
     /// <inheritdoc />
     public InvalidArgumentException(
-        int     status  = 422,
+        int     status  = 400,
         string? code    = ErrorCodes.InvalidArgument,
         string? message = null
     ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1001)) { }

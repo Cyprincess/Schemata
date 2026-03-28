@@ -1,10 +1,11 @@
 using System;
+using Schemata.Abstractions;
 using Schemata.Common;
 
 namespace Schemata.Workflow.Skeleton;
 
 /// <summary>
-/// Default implementation of <see cref="ITypeResolver"/> that resolves types from the application domain type cache.
+///     Default implementation of <see cref="ITypeResolver" /> that resolves types from the application domain type cache.
 /// </summary>
 public sealed class TypeResolver : ITypeResolver
 {
@@ -16,7 +17,7 @@ public sealed class TypeResolver : ITypeResolver
             return result!;
         }
 
-        throw new TypeAccessException($"Type {name} not found.");
+        throw new TypeAccessException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Type", name));
     }
 
     /// <inheritdoc />

@@ -11,7 +11,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Grpc.Interceptors;
 
 /// <summary>
-/// gRPC interceptor that maps <see cref="SchemataException"/> instances to structured <see cref="RpcException"/> with Google RPC status details.
+///     gRPC interceptor that maps <see cref="SchemataException" /> instances to structured <see cref="RpcException" />
+///     with Google RPC status details.
 /// </summary>
 public class ExceptionMappingInterceptor : Interceptor
 {
@@ -28,7 +29,7 @@ public class ExceptionMappingInterceptor : Interceptor
         } catch (SchemataException ex) {
             throw BuildRpcException(ex, context);
         } catch (Exception) {
-            throw BuildRpcException(new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1018)), context);
+            throw BuildRpcException(new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1012)), context);
         }
     }
 

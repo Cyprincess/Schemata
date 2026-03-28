@@ -5,9 +5,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-/// <summary>
-///     Represents an authentication token associated with a <see cref="SchemataUser"/>.
-/// </summary>
 [Table("SchemataUserTokens")]
 public class SchemataUserToken : IdentityUserToken<long>, ITimestamp
 {

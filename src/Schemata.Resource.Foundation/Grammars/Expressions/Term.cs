@@ -4,7 +4,7 @@ using Parlot;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents an optionally negated simple expression (NOT/- prefix) in the filter grammar.
+///     Represents an optionally negated simple expression (NOT/- prefix) in the filter grammar.
 /// </summary>
 public class Term : IToken
 {
@@ -15,12 +15,12 @@ public class Term : IToken
     }
 
     /// <summary>
-    /// Gets the unary modifier ("NOT" or "-"), or <see langword="null"/> if not negated.
+    ///     Gets the unary modifier ("NOT" or "-"), or <see langword="null" /> if not negated.
     /// </summary>
     public string? Modifier { get; }
 
     /// <summary>
-    /// Gets the inner simple expression.
+    ///     Gets the inner simple expression.
     /// </summary>
     public ISimple Simple { get; }
 
@@ -50,9 +50,7 @@ public class Term : IToken
             };
         }
 
-        return expression.Type == typeof(bool)
-            ? Expression.Not(expression)
-            : Expression.Negate(expression);
+        return expression.Type == typeof(bool) ? Expression.Not(expression) : Expression.Negate(expression);
     }
 
     #endregion

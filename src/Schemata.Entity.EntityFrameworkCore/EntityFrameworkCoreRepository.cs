@@ -153,7 +153,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return false;
             case AdviseResult.Handle:
                 return context.Result;
             case AdviseResult.Continue:
@@ -166,7 +166,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, bool>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return false;
             case AdviseResult.Handle:
             case AdviseResult.Continue:
             default:
@@ -188,7 +188,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return 0;
             case AdviseResult.Handle:
                 return context.Result;
             case AdviseResult.Continue:
@@ -201,7 +201,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, int>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return 0;
             case AdviseResult.Handle:
             case AdviseResult.Continue:
             default:
@@ -223,7 +223,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return 0;
             case AdviseResult.Handle:
                 return context.Result;
             case AdviseResult.Continue:
@@ -236,7 +236,7 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, long>>()
                              .RunAsync(AdviceContext, context, ct)) {
             case AdviseResult.Block:
-                return default;
+                return 0;
             case AdviseResult.Handle:
             case AdviseResult.Continue:
             default:

@@ -13,7 +13,7 @@ using Schemata.Resource.Foundation.Features;
 namespace Schemata.Resource.Http.Features;
 
 /// <summary>
-/// Feature that sets up the MVC infrastructure for dynamically generated resource HTTP controllers.
+///     Feature that sets up the MVC infrastructure for dynamically generated resource HTTP controllers.
 /// </summary>
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataResourceFeature>]
@@ -37,8 +37,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
         services.AddOptions<MvcOptions>()
-                .Configure(mvc => {
-                     mvc.Conventions.Add(new ResourceControllerConvention());
+                .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
+                     mvc.Conventions.Add(new ResourceControllerConvention(opts.Value.AuthenticationScheme));
                  });
 
         services.AddMvcCore()

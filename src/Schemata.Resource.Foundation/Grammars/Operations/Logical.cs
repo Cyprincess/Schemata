@@ -8,17 +8,17 @@ using Schemata.Resource.Foundation.Grammars.Values;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-/// Base class for logical combinators (AND/OR) that fold multiple child tokens into a single boolean expression.
+///     Base class for logical combinators (AND/OR) that fold multiple child tokens into a single boolean expression.
 /// </summary>
 public abstract class Logical : IToken
 {
     /// <summary>
-    /// Gets the child tokens to combine.
+    ///     Gets the child tokens to combine.
     /// </summary>
     public abstract IEnumerable<IToken> Tokens { get; }
 
     /// <summary>
-    /// Gets the LINQ expression type for combining children (AndAlso or OrElse).
+    ///     Gets the LINQ expression type for combining children (AndAlso or OrElse).
     /// </summary>
     public abstract ExpressionType Operator { get; }
 

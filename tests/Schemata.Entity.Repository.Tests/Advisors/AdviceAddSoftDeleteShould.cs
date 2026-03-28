@@ -41,7 +41,7 @@ public class AdviceAddSoftDeleteShould
     public async Task Advise_Suppressed_DoesNotClearDeleteTime() {
         var advisor = new AdviceAddSoftDelete<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressSoftDelete());
+        ctx.Set(new SoftDeleteSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var existing   = DateTime.UtcNow;
         var entity     = new Student { DeleteTime = existing };

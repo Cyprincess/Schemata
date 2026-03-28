@@ -2,30 +2,22 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for username/password authentication, with optional two-factor verification.
-/// </summary>
 public class LoginRequest
 {
-    /// <summary>
-    ///     Gets or sets the username or email address.
-    /// </summary>
+    /// <summary>Account username used for authentication.</summary>
     [Required]
-    public virtual string Username { get; set; } = null!;
+    public string Username { get; set; } = null!;
 
-    /// <summary>
-    ///     Gets or sets the password.
-    /// </summary>
+    /// <summary>Account password.</summary>
     [Required]
-    public virtual string Password { get; set; } = null!;
+    public string Password { get; set; } = null!;
 
-    /// <summary>
-    ///     Gets or sets the TOTP code for two-factor authentication.
-    /// </summary>
-    public virtual string? TwoFactorCode { get; set; }
+    /// <summary>TOTP code from an authenticator app for two-factor verification.</summary>
+    public string? TwoFactorCode { get; set; }
 
-    /// <summary>
-    ///     Gets or sets a recovery code for two-factor fallback.
-    /// </summary>
-    public virtual string? TwoFactorRecoveryCode { get; set; }
+    /// <summary>One-time recovery code used when the authenticator app is unavailable.</summary>
+    public string? TwoFactorRecoveryCode { get; set; }
+
+    /// <summary>When true, issue a cookie instead of a bearer token.</summary>
+    public bool? UseCookies { get; set; }
 }

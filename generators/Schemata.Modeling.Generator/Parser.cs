@@ -276,7 +276,7 @@ internal static class Parser
                              .And(ZeroOrOne(fieldBody))
                              .Then(parts => {
                                   var type     = parts.Item1;
-                                  var nullable = parts.Item2 != default;
+                                  var nullable = parts.Item2 != 0;
                                   var name     = parts.Item3.ToString();
                                   var options  = parts.Item4;
                                   var body     = parts.Item5;
@@ -398,7 +398,7 @@ internal static class Parser
         // the scanner is NOT at another identifier character. This prevents
         // "id name" (two fields) from being consumed as one typed field.
         var bodyTyped = QualifiedName.And(Identifier)
-                                     .When((ctx, pair) => {
+                                     .When((ctx, _) => {
                                           // After consuming qualifiedName + identifier, peek at the scanner.
                                           // If the next non-whitespace char starts an identifier (letter/underscore),
                                           // then the second "identifier" is actually the start of the next field,

@@ -4,22 +4,22 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Workflow.Skeleton.Models;
 
 /// <summary>
-/// Response DTO for a single workflow transition record.
+///     Response DTO for a single workflow transition record.
 /// </summary>
 public class TransitionResponse : IIdentifier, IEvent, ITimestamp
 {
     /// <summary>
-    /// The identifier of the parent workflow.
+    ///     The identifier of the parent workflow.
     /// </summary>
     public virtual long WorkflowId { get; set; }
 
     /// <summary>
-    /// The state before this transition.
+    ///     The state before this transition.
     /// </summary>
     public virtual string? Previous { get; set; }
 
     /// <summary>
-    /// The state after this transition.
+    ///     The state after this transition.
     /// </summary>
     public virtual string? Posterior { get; set; }
 

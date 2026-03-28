@@ -7,7 +7,8 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Workflow.Skeleton.Entities;
 
 /// <summary>
-/// Records a single state transition within a workflow, capturing the event, previous and posterior states, and audit metadata.
+///     Records a single state transition within a workflow, capturing the event, previous and posterior states, and audit
+///     metadata.
 /// </summary>
 [DisplayName("Transition")]
 [Table("SchemataTransitions")]
@@ -15,22 +16,22 @@ namespace Schemata.Workflow.Skeleton.Entities;
 public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestamp
 {
     /// <summary>
-    /// The identifier of the parent workflow this transition belongs to.
+    ///     The identifier of the parent workflow this transition belongs to.
     /// </summary>
     public virtual long WorkflowId { get; set; }
 
     /// <summary>
-    /// The display name of the parent workflow.
+    ///     The display name of the parent workflow.
     /// </summary>
     public virtual string? WorkflowName { get; set; }
 
     /// <summary>
-    /// The state before this transition occurred.
+    ///     The state before this transition occurred.
     /// </summary>
     public virtual string? Previous { get; set; }
 
     /// <summary>
-    /// The state after this transition occurred.
+    ///     The state after this transition occurred.
     /// </summary>
     public virtual string? Posterior { get; set; }
 

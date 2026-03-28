@@ -5,20 +5,15 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-/// <summary>
-///     User store using the default Schemata entity types.
-/// </summary>
 public class SchemataUserStore : SchemataUserStore<SchemataUser>
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataUserStore"/> class.
-    /// </summary>
     public SchemataUserStore(
         IRepository<SchemataUser>      users,
         IRepository<SchemataRole>      roles,
@@ -30,16 +25,9 @@ public class SchemataUserStore : SchemataUserStore<SchemataUser>
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
-/// <summary>
-///     User store with a custom user type and default supporting entity types.
-/// </summary>
-/// <typeparam name="TUser">The user entity type.</typeparam>
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     where TUser : SchemataUser
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataUserStore{TUser}"/> class.
-    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<SchemataRole>      roles,
@@ -51,19 +39,11 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
-/// <summary>
-///     User store with custom user and role types and default supporting entity types.
-/// </summary>
-/// <typeparam name="TUser">The user entity type.</typeparam>
-/// <typeparam name="TRole">The role entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
     SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
     where TUser : SchemataUser
     where TRole : SchemataRole
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataUserStore{TUser, TRole}"/> class.
-    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<TRole>             roles,
@@ -75,21 +55,9 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
-/// <summary>
-///     Full repository-backed implementation of the ASP.NET Core Identity user store, implementing
-///     <see cref="IUserDisplayNameStore{TUser}"/>, <see cref="IUserPhoneStore{TUser}"/>,
-///     <see cref="IUserPrincipalNameStore{TUser}"/>, and <see cref="IProtectedUserStore{TUser}"/>.
-/// </summary>
-/// <typeparam name="TUser">The user entity type.</typeparam>
-/// <typeparam name="TRole">The role entity type.</typeparam>
-/// <typeparam name="TUserClaim">The user claim entity type.</typeparam>
-/// <typeparam name="TUserRole">The user-role join entity type.</typeparam>
-/// <typeparam name="TUserLogin">The user login entity type.</typeparam>
-/// <typeparam name="TUserToken">The user token entity type.</typeparam>
-/// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
-    IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
+    IUserCanonicalNameStore<TUser>, IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>, IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserClaim : SchemataUserClaim, new()
@@ -98,39 +66,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     where TUserToken : SchemataUserToken, new()
     where TRoleClaim : SchemataRoleClaim, new()
 {
-    /// <summary>
-    ///     The repository for role entities.
-    /// </summary>
     protected readonly IRepository<TRole> RolesRepository;
 
-    /// <summary>
-    ///     The repository for user claim entities.
-    /// </summary>
     protected readonly IRepository<TUserClaim> UserClaimsRepository;
 
-    /// <summary>
-    ///     The repository for user login entities.
-    /// </summary>
     protected readonly IRepository<TUserLogin> UserLoginsRepository;
 
-    /// <summary>
-    ///     The repository for user-role join entities.
-    /// </summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
-    /// <summary>
-    ///     The repository for user entities.
-    /// </summary>
     protected readonly IRepository<TUser> UsersRepository;
 
-    /// <summary>
-    ///     The repository for user token entities.
-    /// </summary>
     protected readonly IRepository<TUserToken> UserTokensRepository;
 
-    /// <summary>
-    ///     Initializes a new instance of the user store with the specified repositories.
-    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>      users,
         IRepository<TRole>      roles,
@@ -148,13 +95,23 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         UserTokensRepository = userTokens;
     }
 
-    /// <summary>
-    ///     Gets or sets a value indicating whether changes are automatically committed after each operation.
-    /// </summary>
+    /// <summary>Whether mutations are automatically committed to the repository. Default: true.</summary>
     public virtual bool AutoSaveChanges { get; set; } = true;
 
     /// <inheritdoc />
     public override IQueryable<TUser> Users => UsersRepository.AsQueryable();
+
+    #region IUserCanonicalNameStore<TUser> Members
+
+    /// <inheritdoc />
+    public virtual async Task<TUser?> FindByCanonicalNameAsync(string canonicalName, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.CanonicalName == canonicalName), ct);
+    }
+
+    #endregion
 
     #region IUserDisplayNameStore<TUser> Members
 
@@ -242,10 +199,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #endregion
 
-    /// <summary>
-    ///     Commits pending changes to the user repository if <see cref="AutoSaveChanges"/> is enabled.
-    /// </summary>
-    /// <param name="ct">A token to cancel the operation.</param>
     protected virtual async Task SaveChanges(CancellationToken ct) {
         if (!AutoSaveChanges) {
             return;
@@ -268,7 +221,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
         if (roleEntity is null) {
-            throw new InvalidOperationException($"Role {normalizedRoleName} does not exist.");
+            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Role", normalizedRoleName));
         }
 
         await UserRoleRepository.AddAsync(CreateUserRole(user, roleEntity), ct);
@@ -398,10 +351,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var matchedClaims = await UserClaimsRepository
-                                 .ListAsync(
-                                      q => q.Where(uc => uc.UserId.Equals(user.Id)
-                                                      && uc.ClaimValue == claim.Value
-                                                      && uc.ClaimType == claim.Type), ct)
+                                 .ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Id)
+                                                            && uc.ClaimValue == claim.Value
+                                                            && uc.ClaimType == claim.Type), ct)
                                  .ToListAsync(ct);
         foreach (var matchedClaim in matchedClaims) {
             matchedClaim.ClaimValue = newClaim.Value;
@@ -500,9 +452,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var users = await UserClaimsRepository
-                         .ListAsync(
-                              q => q.Where(uc => uc.ClaimValue == claim.Value && uc.ClaimType == claim.Type)
-                                    .Select(uc => uc.UserId), ct)
+                         .ListAsync(q => q.Where(uc => uc.ClaimValue == claim.Value && uc.ClaimType == claim.Type).Select(uc => uc.UserId), ct)
                          .ToListAsync(ct);
 
         return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Id)), ct).ToListAsync(ct);
@@ -570,14 +520,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName),
-                                                          ct);
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
 
     /// <inheritdoc />
     protected override async Task<TRole> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName),
-                                                          ct);
+        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
     }
 
     /// <inheritdoc />
@@ -597,10 +545,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string            providerKey,
         CancellationToken ct
     ) {
-        return await UserLoginsRepository.SingleOrDefaultAsync(
-            q => q.Where(l => l.UserId.Equals(userId)
-                           && l.LoginProvider == loginProvider
-                           && l.ProviderKey == providerKey), ct);
+        return await UserLoginsRepository.SingleOrDefaultAsync(q => q.Where(l => l.UserId.Equals(userId)
+                                                                              && l.LoginProvider == loginProvider
+                                                                              && l.ProviderKey == providerKey), ct);
     }
 
     /// <inheritdoc />
@@ -609,8 +556,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string            providerKey,
         CancellationToken ct
     ) {
-        return await UserLoginsRepository.SingleOrDefaultAsync(
-            q => q.Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey), ct);
+        return await UserLoginsRepository.SingleOrDefaultAsync(q => q.Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey), ct);
     }
 
     /// <inheritdoc />

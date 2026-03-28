@@ -2,30 +2,19 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Request model for updating user profile fields such as email, phone, or password.
-/// </summary>
 public class ProfileRequest
 {
-    /// <summary>
-    ///     Gets or sets the new email address.
-    /// </summary>
+    /// <summary>New email address to change to; requires confirmation.</summary>
     [EmailAddress]
-    public virtual string? EmailAddress { get; set; }
+    public string? EmailAddress { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the new phone number.
-    /// </summary>
+    /// <summary>New phone number to change to; requires confirmation.</summary>
     [Phone]
-    public virtual string? PhoneNumber { get; set; }
+    public string? PhoneNumber { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the current password, required for password change.
-    /// </summary>
-    public virtual string? OldPassword { get; set; }
+    /// <summary>Current password, required when changing password.</summary>
+    public string? OldPassword { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the new password.
-    /// </summary>
-    public virtual string? NewPassword { get; set; }
+    /// <summary>Desired new password; must satisfy configured password policy.</summary>
+    public string? NewPassword { get; set; }
 }

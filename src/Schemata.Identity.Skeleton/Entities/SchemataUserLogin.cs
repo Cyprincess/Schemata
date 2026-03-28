@@ -5,9 +5,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-/// <summary>
-///     Represents an external login associated with a <see cref="SchemataUser"/>.
-/// </summary>
 [Table("SchemataUserLogins")]
 public class SchemataUserLogin : IdentityUserLogin<long>, ITimestamp
 {

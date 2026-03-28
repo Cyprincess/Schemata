@@ -4,7 +4,8 @@ using System.Linq.Expressions;
 namespace Schemata.Mapping.Skeleton.Configurations;
 
 /// <summary>
-/// Concrete implementation of <see cref="IMapping"/> that stores typed expressions for a single field mapping or converter.
+///     Concrete implementation of <see cref="IMapping" /> that stores typed expressions for a single field mapping or
+///     converter.
 /// </summary>
 /// <typeparam name="TSource">The source type.</typeparam>
 /// <typeparam name="TDestination">The destination type.</typeparam>

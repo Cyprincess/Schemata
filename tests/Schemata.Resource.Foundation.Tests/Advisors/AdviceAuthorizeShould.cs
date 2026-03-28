@@ -1,10 +1,12 @@
+using System;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation.Advisors;
@@ -14,63 +16,102 @@ using Xunit;
 
 namespace Schemata.Resource.Foundation.Tests.Advisors;
 
-[Anonymous(Operations.Create)]
-public class AnonStudent : Student
-{ }
-
 public class AdviceAuthorizeShould
 {
     [Fact]
-    public async Task Create_AuthorizedUser_ReturnsContinue() {
-        var access = new Mock<IAccessProvider<Student, ResourceRequestContext<Student>>>();
-        access.Setup(a => a.HasAccessAsync(
-                         It.IsAny<Student?>(),
-                         It.IsAny<ResourceRequestContext<Student>?>(),
-                         It.IsAny<ClaimsPrincipal?>(),
-                         It.IsAny<CancellationToken>()
-                         )).ReturnsAsync(true);
-
+    public async Task Create_WithAnonymousGranted_SkipsAccessCheck() {
+        var access  = new Mock<IAccessProvider<Student, Student>>(MockBehavior.Strict);
         var advisor = new AdviceCreateRequestAuthorize<Student, Student>(access.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new Student { FullName = "Authorized" };
+        ctx.Set(new AnonymousGranted());
+        var request   = new Student { FullName = "Anonymous" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
 
     [Fact]
-    public async Task Create_UnauthorizedUser_ThrowsAuthorizationException() {
-        var access = new Mock<IAccessProvider<Student, ResourceRequestContext<Student>>>();
-        access.Setup(a => a.HasAccessAsync(
-                         It.IsAny<Student?>(),
-                         It.IsAny<ResourceRequestContext<Student>?>(),
-                         It.IsAny<ClaimsPrincipal?>(),
-                         It.IsAny<CancellationToken>()
-                         )).ReturnsAsync(false);
+    public async Task Create_WithoutAnonymousGranted_ChecksAccess() {
+        var access = new Mock<IAccessProvider<Student, Student>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<Student>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(false);
 
-        var advisor = new AdviceCreateRequestAuthorize<Student, Student>(access.Object);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new Student { FullName = "Unauthorized" };
+        var advisor   = new AdviceCreateRequestAuthorize<Student, Student>(access.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new Student { FullName = "Unauthorized" };
+        var container = new ResourceRequestContainer<Student>();
 
-        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, request, null));
+        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, request, container, null));
+
+        access.Verify(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<Student>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Create_AnonymousEntity_ContinuesWithoutCallingAccessProvider() {
-        var access  = new Mock<IAccessProvider<AnonStudent, ResourceRequestContext<Student>>>();
-        var advisor = new AdviceCreateRequestAuthorize<AnonStudent, Student>(access.Object);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new Student { FullName = "Public" };
+    public async Task Get_AuthorizedUser_AppliesEntitlementToContainer() {
+        var access = new Mock<IAccessProvider<Student, GetRequest>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(true);
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        Expression<Func<Student, bool>> filter      = s => s.FullName != null;
+        var                             entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();
+
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<GetRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(filter);
+
+        var advisor   = new AdviceGetRequestAuthorize<Student>(access.Object, entitlement.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var container = new ResourceRequestContainer<Student>();
+        var request   = new GetRequest { Name = "students/1" };
+
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
-        access.Verify(a => a.HasAccessAsync(
-                          It.IsAny<AnonStudent?>(),
-                          It.IsAny<ResourceRequestContext<Student>?>(),
-                          It.IsAny<ClaimsPrincipal?>(),
-                          It.IsAny<CancellationToken>()
-                          ), Times.Never);
+
+        var students = new[] { new Student { FullName = "Alice" }, new Student { FullName = null } };
+        var filtered = container.Query(students.AsQueryable()).ToList();
+        Assert.Single(filtered);
+        Assert.Equal("Alice", filtered[0].FullName);
+    }
+
+    [Fact]
+    public async Task Get_AuthorizedUser_NullEntitlement_LeavesContainerUnmodified() {
+        var access = new Mock<IAccessProvider<Student, GetRequest>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(true);
+
+        var entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<GetRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync((Expression<Func<Student, bool>>?)null);
+
+        var advisor   = new AdviceGetRequestAuthorize<Student>(access.Object, entitlement.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var container = new ResourceRequestContainer<Student>();
+        var request   = new GetRequest { Name = "students/1" };
+
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+
+        var students = new[] { new Student { FullName = "Alice" } };
+        var filtered = container.Query(students.AsQueryable()).ToList();
+        Assert.Single(filtered);
+    }
+
+    [Fact]
+    public async Task Get_UnauthorizedUser_ThrowsAuthorizationException() {
+        var access = new Mock<IAccessProvider<Student, GetRequest>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(false);
+
+        var entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();
+
+        var advisor   = new AdviceGetRequestAuthorize<Student>(access.Object, entitlement.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var container = new ResourceRequestContainer<Student>();
+        var request   = new GetRequest { Name = "students/1" };
+
+        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, request, container, null));
     }
 }

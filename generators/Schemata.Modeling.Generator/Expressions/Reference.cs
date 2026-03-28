@@ -1,5 +1,3 @@
-using System;
-
 namespace Schemata.Modeling.Generator.Expressions;
 
 internal sealed record Reference(string QualifiedName) : IExpression

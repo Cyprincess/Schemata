@@ -1,6 +1,6 @@
 # Identity
 
-Schemata wraps ASP.NET Core Identity with its own entity types, user manager extensions, and a controller that exposes registration, login, token refresh, profile management, password reset, account confirmation, and two-factor authentication as API endpoints.
+Schemata wraps ASP.NET Core Identity with its own entity types, user manager extensions, and a controller that exposes registration, login, token refresh, profile management, password reset, account confirmation, and two-factor authentication as JSON API endpoints. Schemata does not provide login or registration UI -- these are implemented by the application. All endpoints are headless APIs suitable for any frontend (SPA, mobile app, server-rendered pages).
 
 ## Packages
 

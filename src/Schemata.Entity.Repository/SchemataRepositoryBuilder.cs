@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Builder for configuring repository services, returned by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" /> to enable fluent chaining of provider and advisor registrations.
+///     Builder for configuring repository services, returned by
+///     <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" /> to enable fluent
+///     chaining of provider and advisor registrations.
 /// </summary>
 public sealed class SchemataRepositoryBuilder
 {

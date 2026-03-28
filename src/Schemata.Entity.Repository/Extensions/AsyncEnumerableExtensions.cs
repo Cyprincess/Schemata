@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 namespace System.Linq;
 
 /// <summary>
-///     Extension methods for <see cref="IAsyncEnumerable{T}" /> providing mapping, list materialization, and dictionary conversion.
+///     Extension methods for <see cref="IAsyncEnumerable{T}" /> providing mapping, list materialization, and dictionary
+///     conversion.
 /// </summary>
 public static class AsyncEnumerableExtensions
 {

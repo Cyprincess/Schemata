@@ -1,7 +1,6 @@
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -11,29 +10,16 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 public static class AdviceCreateRequestAuthorize
 {
-    public const int DefaultOrder = AdviceCreateRequestIdempotency.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceCreateRequestAnonymous.DefaultOrder + 10_000_000;
 }
 
-/// <summary>
-/// Authorizes create requests by checking role-based access for the current user.
-/// </summary>
-/// <typeparam name="TEntity">The entity type being created.</typeparam>
-/// <typeparam name="TRequest">The request DTO type carrying creation data.</typeparam>
-/// <remarks>
-/// Order: 100,000,000. Registered by <see cref="SchemataResourceBuilder.WithAuthorization"/>;
-/// not auto-registered by <see cref="Features.SchemataResourceFeature"/>.
-/// Skips authorization when the entity is decorated with <see cref="Schemata.Abstractions.Resource.AnonymousAttribute"/> for the Create operation.
-/// Throws <see cref="Schemata.Abstractions.Exceptions.AuthorizationException"/> if access is denied.
-/// </remarks>
 public sealed class AdviceCreateRequestAuthorize<TEntity, TRequest> : IResourceCreateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
 {
-    private readonly IAccessProvider<TEntity, ResourceRequestContext<TRequest>> _access;
+    private readonly IAccessProvider<TEntity, TRequest> _access;
 
-    public AdviceCreateRequestAuthorize(IAccessProvider<TEntity, ResourceRequestContext<TRequest>> access) {
-        _access = access;
-    }
+    public AdviceCreateRequestAuthorize(IAccessProvider<TEntity, TRequest> access) { _access = access; }
 
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
@@ -42,17 +28,19 @@ public sealed class AdviceCreateRequestAuthorize<TEntity, TRequest> : IResourceC
 
     /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TRequest          request,
-        HttpContext?      http,
-        CancellationToken ct = default
+        AdviceContext                     ctx,
+        TRequest                          request,
+        ResourceRequestContainer<TEntity> container,
+        ClaimsPrincipal?                  principal,
+        CancellationToken                 ct = default
     ) {
-        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.Create)) {
+        if (ctx.Has<AnonymousGranted>()) {
             return AdviseResult.Continue;
         }
 
-        var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Create, Request = request }, http?.User, ct);
+        var context = new AccessContext<TRequest> { Operation = nameof(Operations.Create), Request = request };
 
+        var result = await _access.HasAccessAsync(null, context, principal, ct);
         if (!result) {
             throw new AuthorizationException();
         }

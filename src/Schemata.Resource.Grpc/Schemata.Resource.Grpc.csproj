@@ -13,9 +13,9 @@
   <ItemGroup>
     <PackageReference Include="Google.Api.CommonProtos" />
     <PackageReference Include="Grpc.AspNetCore.Server" />
+    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" />
+    <PackageReference Include="protobuf-net" />
     <PackageReference Include="protobuf-net.Grpc" />
-    <PackageReference Include="protobuf-net.Grpc.Reflection" />
-    <PackageReference Include="protobuf-net.Reflection" Aliases="ProtoBufReflection" />
   </ItemGroup>
 
   <ItemGroup>

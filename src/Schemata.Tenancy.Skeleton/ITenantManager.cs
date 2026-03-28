@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -40,11 +40,7 @@ public interface ITenantManager<TTenant, TKey>
     ValueTask SetDisplayNameAsync(TTenant tenant, string? name, CancellationToken ct);
 
     /// <summary>Sets the localized display names.</summary>
-    ValueTask SetDisplayNamesAsync(
-        TTenant                                  tenant,
-        ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct
-    );
+    ValueTask SetDisplayNamesAsync(TTenant tenant, Dictionary<string, string> names, CancellationToken ct);
 
     /// <summary>Sets the host names associated with the tenant.</summary>
     ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct);
