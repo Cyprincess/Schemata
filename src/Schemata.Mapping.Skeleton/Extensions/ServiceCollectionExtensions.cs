@@ -6,12 +6,12 @@ using Schemata.Mapping.Skeleton.Configurations;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Extension methods for registering mapping configurations on <see cref="IServiceCollection"/>.
+///     Extension methods for registering mapping configurations on <see cref="IServiceCollection" />.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers a mapping configuration between the specified source and destination types.
+    ///     Registers a mapping configuration between the specified source and destination types.
     /// </summary>
     /// <typeparam name="TSource">The source type.</typeparam>
     /// <typeparam name="TDestination">The destination type.</typeparam>

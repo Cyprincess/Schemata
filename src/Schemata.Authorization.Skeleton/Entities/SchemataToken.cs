@@ -1,60 +1,44 @@
 using System;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-/// <summary>
-///     Represents an OAuth 2.0 / OpenID Connect token (access token, refresh token, authorization code, or device code).
-/// </summary>
-/// <remarks>
-///     Tokens are bound to an application and optionally an authorization.
-///     They carry a payload, have an expiration, and can be revoked or redeemed.
-/// </remarks>
 [DisplayName("Token")]
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
-public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
-    /// <summary>Gets or sets the foreign key to the associated <see cref="SchemataApplication" />.</summary>
-    public virtual long? ApplicationId { get; set; }
+    public virtual string? ApplicationName { get; set; }
 
-    /// <summary>Gets or sets the foreign key to the associated <see cref="SchemataAuthorization" />.</summary>
-    public virtual long? AuthorizationId { get; set; }
+    public virtual string? AuthorizationName { get; set; }
 
-    /// <summary>Gets or sets the subject (user identifier) the token was issued to.</summary>
+    /// <summary>Identifier of the resource owner this token represents.</summary>
     public virtual string? Subject { get; set; }
 
-    /// <summary>Gets or sets the token type (e.g. "access_token", "refresh_token", "authorization_code").</summary>
+    /// <summary>OP session identifier (sid) linking this token to a login session for session-aware logout.</summary>
+    public virtual string? SessionId { get; set; }
+
+    /// <summary>Token type, e.g. "access_token", "refresh_token", "authorization_code", or "device_code".</summary>
     public virtual string? Type { get; set; }
 
-    /// <summary>Gets or sets the reference identifier used for token lookup when reference tokens are enabled.</summary>
-    public virtual string? ReferenceId { get; set; }
-
-    /// <summary>Gets or sets the current status (e.g. "valid", "revoked", "redeemed").</summary>
+    /// <summary>Current lifecycle status, e.g. "valid", "redeemed", or "revoked".</summary>
     public virtual string? Status { get; set; }
 
-    /// <summary>Gets or sets the serialized token payload.</summary>
+    /// <summary>Serialization format used when the token was issued: "reference", "jwt", or "jwe".</summary>
+    public virtual string? Format { get; set; }
+
+    /// <summary>Opaque reference used for token lookup instead of the raw value.</summary>
+    public virtual string? ReferenceId { get; set; }
+
+    /// <summary>Serialized token content (JWT, JSON claims, or encrypted blob depending on format).</summary>
     public virtual string? Payload { get; set; }
-
-    /// <summary>Gets or sets the JSON-serialized custom properties.</summary>
-    public virtual string? Properties { get; set; }
-
-    /// <summary>Gets or sets the UTC expiration time.</summary>
-    public virtual DateTime? ExpireTime { get; set; }
-
-    /// <summary>Gets or sets the UTC time when the token was redeemed.</summary>
-    public virtual DateTime? RedeemTime { get; set; }
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
-    public virtual string? Name { get; set; }
-
-    /// <inheritdoc />
-    public virtual string? CanonicalName { get; set; }
+    public string? Name          { get; set; }
+    public string? CanonicalName { get; set; }
 
     #endregion
 
@@ -65,10 +49,16 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #endregion
 
+    #region IExpiration Members
+
+    /// <inheritdoc />
+    public virtual DateTime? ExpireTime { get; set; }
+
+    #endregion
+
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
     public virtual long Id { get; set; }
 
     #endregion

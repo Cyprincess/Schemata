@@ -51,7 +51,7 @@ public class AdviceBuildQuerySoftDeleteShould
     public async Task Advise_Suppressed_DoesNotFilter() {
         var advisor = new AdviceBuildQuerySoftDelete<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressQuerySoftDelete());
+        ctx.Set(new QuerySoftDeleteSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
             new() { Id = 1, DeleteTime = null }, new() { Id = 2, DeleteTime = DateTime.UtcNow },

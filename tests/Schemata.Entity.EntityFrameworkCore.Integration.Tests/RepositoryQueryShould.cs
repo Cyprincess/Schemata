@@ -23,19 +23,19 @@ public class RepositoryQueryShould : IAsyncLifetime
                                           Age      = 18,
                                           Grade    = 1,
                                           Name     = "alice",
-            });
+                                      });
             await repository.AddAsync(new() {
                                           FullName = "Bob",
                                           Age      = 19,
                                           Grade    = 2,
                                           Name     = "bob",
-            });
+                                      });
             await repository.AddAsync(new() {
                                           FullName = "Charlie",
                                           Age      = 20,
                                           Grade    = 2,
                                           Name     = "charlie",
-            });
+                                      });
             await repository.CommitAsync();
         }
     }

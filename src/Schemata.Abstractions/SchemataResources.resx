@@ -60,30 +60,150 @@
         <value>One or more validation errors occurred.</value>
     </data>
   <data name="ST1010" xml:space="preserve">
-        <value>Resource name is required.</value>
-    </data>
-  <data name="ST1011" xml:space="preserve">
         <value>Rate limit exceeded.</value>
     </data>
+  <data name="ST1011" xml:space="preserve">
+        <value>{0} '{1}' not found.</value>
+    </data>
   <data name="ST1012" xml:space="preserve">
-        <value>Invalid request payload.</value>
+        <value>An error occurred.</value>
     </data>
   <data name="ST1013" xml:space="preserve">
-        <value>Cross-parent reading is not supported for this resource.</value>
+        <value>'{0}' must not be empty.</value>
     </data>
   <data name="ST1014" xml:space="preserve">
-        <value>Resource '{0}' not found.</value>
+        <value>Unsupported algorithm: {0}.</value>
     </data>
   <data name="ST1015" xml:space="preserve">
-        <value>The page token is invalid or has expired.</value>
+        <value>'{0}' is not supported.</value>
     </data>
   <data name="ST1016" xml:space="preserve">
-        <value>The filter expression is malformed.</value>
+        <value>'{0}' is not configured.</value>
     </data>
   <data name="ST1017" xml:space="preserve">
-        <value>The order_by expression is malformed.</value>
+        <value>Application has no sector identifier URI and no redirect URIs.</value>
     </data>
   <data name="ST1018" xml:space="preserve">
-        <value>An error occurred.</value>
+        <value>Cannot resolve a resource name without a pattern.</value>
+    </data>
+  <data name="ST1019" xml:space="preserve">
+        <value>Invalid table name '{0}' of type '{1}'.</value>
+    </data>
+  <data name="ST1020" xml:space="preserve">
+        <value>Entity must have at least one [Key].</value>
+    </data>
+  <data name="ST1021" xml:space="preserve">
+        <value>Entity key cannot be null.</value>
+    </data>
+  <data name="ST1022" xml:space="preserve">
+        <value>Entity key count mismatch.</value>
+    </data>
+  <data name="ST1023" xml:space="preserve">
+        <value>Cannot resolve parameter '{0}' of type '{1}'.</value>
+    </data>
+  <data name="ST1024" xml:space="preserve">
+        <value>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</value>
+    </data>
+  <data name="ST1025" xml:space="preserve">
+        <value>Unable to convert '{0}' to {1}.</value>
+    </data>
+  <data name="ST1026" xml:space="preserve">
+        <value>Mapping for field {0} is missing a source field.</value>
+    </data>
+  <data name="ST1027" xml:space="preserve">
+        <value>Tenant is not initialized successfully.</value>
+    </data>
+  <data name="ST1028" xml:space="preserve">
+        <value>Entry assembly is null.</value>
+    </data>
+  <data name="ST1029" xml:space="preserve">
+        <value>The type {0} does not implement {1}.</value>
+    </data>
+  <data name="ST2001" xml:space="preserve">
+        <value>Invalid request payload.</value>
+    </data>
+  <data name="ST2002" xml:space="preserve">
+        <value>Cross-parent reading is not supported for this resource.</value>
+    </data>
+  <data name="ST2003" xml:space="preserve">
+        <value>The page token is invalid or has expired.</value>
+    </data>
+  <data name="ST2004" xml:space="preserve">
+        <value>The {0} expression is malformed.</value>
+    </data>
+  <data name="ST2005" xml:space="preserve">
+        <value>Invalid field.</value>
+    </data>
+  <data name="ST2006" xml:space="preserve">
+        <value>Invalid field name '{0}'.</value>
+    </data>
+  <data name="ST2007" xml:space="preserve">
+        <value>Function '{0}' not registered.</value>
+    </data>
+  <data name="ST3001" xml:space="preserve">
+        <value>The user manager must produce an authenticator key after reset.</value>
+    </data>
+  <data name="ST4001" xml:space="preserve">
+        <value>The client credentials are missing or invalid.</value>
+    </data>
+  <data name="ST4002" xml:space="preserve">
+        <value>Client secret is required for confidential clients.</value>
+    </data>
+  <data name="ST4003" xml:space="preserve">
+        <value>The request uses more than one client authentication method.</value>
+    </data>
+  <data name="ST4004" xml:space="preserve">
+        <value>The provided grant is invalid, expired, or revoked.</value>
+    </data>
+  <data name="ST4005" xml:space="preserve">
+        <value>The code_verifier does not match the code_challenge.</value>
+    </data>
+  <data name="ST4006" xml:space="preserve">
+        <value>The requested scope is not allowed for this client.</value>
+    </data>
+  <data name="ST4007" xml:space="preserve">
+        <value>The client is not authorized to use this grant type.</value>
+    </data>
+  <data name="ST4008" xml:space="preserve">
+        <value>The resource owner or authorization server denied the request.</value>
+    </data>
+  <data name="ST4009" xml:space="preserve">
+        <value>The redirect_uri does not match any registered URI.</value>
+    </data>
+  <data name="ST4010" xml:space="preserve">
+        <value>User consent is required.</value>
+    </data>
+  <data name="ST4011" xml:space="preserve">
+        <value>User authentication is required.</value>
+    </data>
+  <data name="ST4012" xml:space="preserve">
+        <value>The authorization request is still pending.</value>
+    </data>
+  <data name="ST4013" xml:space="preserve">
+        <value>The polling interval is too short. Increase the interval and retry.</value>
+    </data>
+  <data name="ST4014" xml:space="preserve">
+        <value>An internal server error occurred.</value>
+    </data>
+  <data name="ST4015" xml:space="preserve">
+        <value>The '{0}' prompt value cannot be combined with other values.</value>
+    </data>
+  <data name="ST4016" xml:space="preserve">
+        <value>The '{0}' prompt value is not supported for this client.</value>
+    </data>
+  <data name="ST4017" xml:space="preserve">
+        <value>A valid user identity is required for this request.</value>
+    </data>
+  <data name="ST4018" xml:space="preserve">
+        <value>{0} is enabled but {1} is not set.</value>
+    </data>
+  <data name="ST4019" xml:space="preserve">
+        <value>{0} must be an absolute URI.</value>
+    </data>
+  <data name="ST4020" xml:space="preserve">
+        <value>{0} is set but {1} is not set.</value>
+    </data>
+  <data name="ST5001" xml:space="preserve">
+        <value>Unable to resolve {0}.</value>
     </data>
 </root>

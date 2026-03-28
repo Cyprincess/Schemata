@@ -6,7 +6,7 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Repository.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceAddConcurrency{TEntity}"/>.</summary>
+/// <summary>Order constants for <see cref="AdviceAddConcurrency{TEntity}" />.</summary>
 public static class AdviceAddConcurrency
 {
     /// <summary>Default execution order.</summary>
@@ -19,8 +19,12 @@ public static class AdviceAddConcurrency
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     <para>Order: 200,000,000.</para>
-///     <para>Auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only activates for entities implementing <see cref="IConcurrency" />.</para>
-///     <para>Suppressed when <see cref="SuppressConcurrency" /> is present in the advice context.</para>
+///     <para>
+///         Auto-registered by
+///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
+///         activates for entities implementing <see cref="IConcurrency" />.
+///     </para>
+///     <para>Suppressed when <see cref="ConcurrencySuppressed" /> is present in the advice context.</para>
 /// </remarks>
 public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -37,7 +41,7 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntit
         TEntity              entity,
         CancellationToken    ct
     ) {
-        if (ctx.Has<SuppressConcurrency>()) {
+        if (ctx.Has<ConcurrencySuppressed>()) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

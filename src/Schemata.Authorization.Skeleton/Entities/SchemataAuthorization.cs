@@ -1,49 +1,48 @@
 using System;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
-/// <summary>
-///     Represents an OAuth 2.0 / OpenID Connect authorization grant.
-/// </summary>
-/// <remarks>
-///     An authorization binds a subject (user) to a client application with a set of scopes.
-///     Permanent authorizations persist across token requests so that returning users are not
-///     prompted for consent again.
-/// </remarks>
 [DisplayName("Authorization")]
 [Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
 public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    /// <summary>Gets or sets the foreign key to the associated <see cref="SchemataApplication" />.</summary>
-    public virtual long? ApplicationId { get; set; }
+    public virtual string? ApplicationName { get; set; }
 
-    /// <summary>Gets or sets the subject (user identifier) the authorization was granted to.</summary>
+    /// <summary>Identifier of the resource owner who granted this authorization.</summary>
     public virtual string? Subject { get; set; }
 
-    /// <summary>Gets or sets the authorization type (e.g. "permanent", "ad-hoc").</summary>
+    /// <summary>
+    ///     Authorization type — see <c>SchemataConstants.AuthorizationTypes</c>. Distinguishes
+    ///     consent-reusable records from single-grant anchors:
+    ///     <para>
+    ///         <c>"ad-hoc"</c> — authorization-code flow consent. The consent advisor may match it
+    ///         on subsequent /authorize calls with the same subject + client + ⊇ scope, allowing silent consent.
+    ///     </para>
+    ///     <para>
+    ///         <c>"device"</c> — device flow approval. The consent advisor explicitly skips records of this
+    ///         type so a device approval cannot silently authorize a subsequent browser /authorize on the
+    ///         same client (the verifying user agent is not the requesting device).
+    ///     </para>
+    ///     <para>
+    ///         <c>"permanent"</c> — explicitly-stored persistent consent record reusable across sessions.
+    ///     </para>
+    /// </summary>
     public virtual string? Type { get; set; }
 
-    /// <summary>Gets or sets the current status (e.g. "valid", "revoked").</summary>
+    /// <summary>Current status, e.g. "valid" or "revoked".</summary>
     public virtual string? Status { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized custom properties.</summary>
-    public virtual string? Properties { get; set; }
-
-    /// <summary>Gets or sets the JSON-serialized scopes associated with this authorization.</summary>
+    /// <summary>Space-delimited scopes granted in this authorization.</summary>
     public virtual string? Scopes { get; set; }
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
-    public virtual string? Name { get; set; }
-
-    /// <inheritdoc />
-    public virtual string? CanonicalName { get; set; }
+    public string? Name          { get; set; }
+    public string? CanonicalName { get; set; }
 
     #endregion
 
@@ -57,7 +56,6 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
     public virtual long Id { get; set; }
 
     #endregion

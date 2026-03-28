@@ -25,5 +25,3 @@ template = "docs/CHANGELOG.tera"
 authors = []
 
 [bump_profiles]
-
-[packages]

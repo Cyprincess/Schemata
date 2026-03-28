@@ -5,12 +5,13 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-/// Represents the equality operator (<c>=</c>) with wildcard pattern support (<c>*</c> for prefix, suffix, and contains matching).
+///     Represents the equality operator (<c>=</c>) with wildcard pattern support (<c>*</c> for prefix, suffix, and
+///     contains matching).
 /// </summary>
 public class Equal : IBinary
 {
     /// <summary>
-    /// The character representing the equality operator.
+    ///     The character representing the equality operator.
     /// </summary>
     public const char Char = '=';
 
@@ -45,8 +46,8 @@ public class Equal : IBinary
             return Expression.NotEqual(left, Expression.Constant(null, left.Type));
         }
 
-        var leading = pattern.StartsWith('*');
-        var trailing   = pattern.EndsWith('*');
+        var leading  = pattern.StartsWith('*');
+        var trailing = pattern.EndsWith('*');
 
         if (leading && trailing && pattern.Length > 2) {
             var sub    = pattern[1..^1];

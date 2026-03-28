@@ -7,12 +7,12 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Modular;
 
 /// <summary>
-/// Orchestrates module lifecycle phases: service registration, application configuration, and endpoint configuration.
+///     Orchestrates module lifecycle phases: service registration, application configuration, and endpoint configuration.
 /// </summary>
 public interface IModulesRunner
 {
     /// <summary>
-    /// Invokes <c>ConfigureServices</c> on each discovered module, registering their services.
+    ///     Invokes <c>ConfigureServices</c> on each discovered module, registering their services.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
@@ -20,7 +20,7 @@ public interface IModulesRunner
     void ConfigureServices(IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment);
 
     /// <summary>
-    /// Invokes <c>ConfigureApplication</c> on each discovered module, configuring the middleware pipeline.
+    ///     Invokes <c>ConfigureApplication</c> on each discovered module, configuring the middleware pipeline.
     /// </summary>
     /// <param name="app">The application builder.</param>
     /// <param name="configuration">The application configuration.</param>
@@ -28,7 +28,7 @@ public interface IModulesRunner
     void ConfigureApplication(IApplicationBuilder app, IConfiguration configuration, IWebHostEnvironment environment);
 
     /// <summary>
-    /// Invokes <c>ConfigureEndpoints</c> on each discovered module, registering route endpoints.
+    ///     Invokes <c>ConfigureEndpoints</c> on each discovered module, registering route endpoints.
     /// </summary>
     /// <param name="app">The application builder.</param>
     /// <param name="endpoints">The endpoint route builder.</param>

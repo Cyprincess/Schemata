@@ -7,7 +7,7 @@ using Schemata.Abstractions.Resource;
 namespace Schemata.Resource.Grpc;
 
 /// <summary>
-/// gRPC service contract for CRUD operations on a resource, used by protobuf-net code-first gRPC.
+///     gRPC service contract for CRUD operations on a resource, used by protobuf-net code-first gRPC.
 /// </summary>
 /// <typeparam name="TEntity">The persistent entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type for create and update operations.</typeparam>
@@ -21,7 +21,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     where TSummary : class, ICanonicalName
 {
     /// <summary>
-    /// Lists resources with filtering, ordering, and pagination.
+    ///     Lists resources with filtering, ordering, and pagination.
     /// </summary>
     /// <param name="request">The list request parameters.</param>
     /// <param name="context">The gRPC call context.</param>
@@ -30,7 +30,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default);
 
     /// <summary>
-    /// Gets a single resource by canonical name.
+    ///     Gets a single resource by canonical name.
     /// </summary>
     /// <param name="request">The get request containing the canonical name.</param>
     /// <param name="context">The gRPC call context.</param>
@@ -39,7 +39,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default);
 
     /// <summary>
-    /// Creates a new resource.
+    ///     Creates a new resource.
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="context">The gRPC call context.</param>
@@ -48,7 +48,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default);
 
     /// <summary>
-    /// Updates an existing resource by canonical name.
+    ///     Updates an existing resource by canonical name.
     /// </summary>
     /// <param name="request">The update request DTO.</param>
     /// <param name="context">The gRPC call context.</param>
@@ -57,7 +57,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default);
 
     /// <summary>
-    /// Deletes a resource by canonical name.
+    ///     Deletes a resource by canonical name.
     /// </summary>
     /// <param name="request">The delete request containing the canonical name, ETag, and force flag.</param>
     /// <param name="context">The gRPC call context.</param>

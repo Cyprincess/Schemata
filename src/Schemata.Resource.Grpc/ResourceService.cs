@@ -9,7 +9,8 @@ using Schemata.Resource.Foundation;
 namespace Schemata.Resource.Grpc;
 
 /// <summary>
-/// Default gRPC service implementation that delegates to <see cref="ResourceOperationHandler{TEntity, TRequest, TDetail, TSummary}"/>.
+///     Default gRPC service implementation that delegates to
+///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.
 /// </summary>
 /// <typeparam name="TEntity">The persistent entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -22,17 +23,17 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     where TSummary : class, ICanonicalName
 {
     /// <summary>
-    /// The HTTP context accessor for retrieving the current request context.
+    ///     The HTTP context accessor for retrieving the current request context.
     /// </summary>
-    protected readonly IHttpContextAccessor                                           Accessor;
+    protected readonly IHttpContextAccessor Accessor;
 
     /// <summary>
-    /// The operation handler that orchestrates the advisor pipeline.
+    ///     The operation handler that orchestrates the advisor pipeline.
     /// </summary>
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
-    /// Initializes a new resource service instance.
+    ///     Initializes a new resource service instance.
     /// </summary>
     /// <param name="handler">The operation handler.</param>
     /// <param name="accessor">The HTTP context accessor.</param>
@@ -45,7 +46,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     }
 
     /// <summary>
-    /// Gets the current HTTP context, if available.
+    ///     Gets the current HTTP context, if available.
     /// </summary>
     protected HttpContext? Http => Accessor.HttpContext;
 
@@ -53,7 +54,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
 
     /// <inheritdoc />
     public virtual async ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
-        var result = await Handler.ListAsync(request, Http, Http?.RequestAborted);
+        var result = await Handler.ListAsync(request, Http?.User, Http?.RequestAborted);
         if (!result.IsAllowed()) {
             return new();
         }
@@ -63,9 +64,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
 
     /// <inheritdoc />
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, Http?.RequestAborted);
-
-        var result = await Handler.GetAsync(entity, Http, Http?.RequestAborted);
+        var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, Http?.RequestAborted);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -77,7 +76,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
-        var result = await Handler.CreateAsync(request, Http, ct);
+        var result = await Handler.CreateAsync(request, Http?.User, ct);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -89,9 +88,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
-        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, ct);
-
-        var result = await Handler.UpdateAsync(request, entity, Http, ct);
+        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, ct);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -103,9 +100,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     public virtual async ValueTask DeleteAsync(DeleteRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
-        var entity = await Handler.GetByCanonicalNameAsync(request.CanonicalName, ct);
-
-        await Handler.DeleteAsync(entity, request.Etag, request.Force, Http, ct);
+        await Handler.DeleteAsync(request.CanonicalName!, request.Etag, request.Force, Http?.User, ct);
     }
 
     #endregion

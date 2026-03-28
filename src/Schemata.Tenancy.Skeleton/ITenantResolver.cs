@@ -16,6 +16,6 @@ namespace Schemata.Tenancy.Skeleton;
 public interface ITenantResolver<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    /// <summary>Resolves the tenant identifier from the current request, or <see langword="null"/> if absent.</summary>
+    /// <summary>Resolves the tenant identifier from the current request, or <see langword="null" /> if absent.</summary>
     Task<TKey?> ResolveAsync(CancellationToken ct);
 }

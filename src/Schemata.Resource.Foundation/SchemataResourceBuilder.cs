@@ -12,12 +12,13 @@ using Schemata.Resource.Foundation.Features;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-/// Fluent builder for configuring resource services including authorization, validation, freshness, and resource registration.
+///     Fluent builder for configuring resource services including authorization, validation, freshness, and resource
+///     registration.
 /// </summary>
 public sealed class SchemataResourceBuilder
 {
     /// <summary>
-    /// Initializes a new instance with the Schemata options and service collection.
+    ///     Initializes a new instance with the Schemata options and service collection.
     /// </summary>
     /// <param name="schemata">The Schemata framework options.</param>
     /// <param name="services">The DI service collection.</param>
@@ -31,7 +32,7 @@ public sealed class SchemataResourceBuilder
     private IServiceCollection Services { get; }
 
     /// <summary>
-    /// Adds a framework feature to the Schemata configuration.
+    ///     Adds a framework feature to the Schemata configuration.
     /// </summary>
     /// <typeparam name="T">The feature type to add.</typeparam>
     public void AddFeature<T>()
@@ -40,10 +41,26 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    /// Registers the built-in authorization advisors for all CRUD operations.
+    ///     Registers the built-in authorization advisors for all CRUD operations.
     /// </summary>
+    /// <param name="scheme">
+    ///     Optional ASP.NET Core authentication scheme name. When provided, resource endpoints
+    ///     authenticate using this scheme (populating <c>HttpContext.User</c>) before advisors run.
+    /// </param>
     /// <returns>This builder for chaining.</returns>
-    public SchemataResourceBuilder WithAuthorization() {
+    public SchemataResourceBuilder WithAuthorization(string? scheme = null) {
+        if (!string.IsNullOrWhiteSpace(scheme)) {
+            Services.Configure<SchemataResourceOptions>(o => o.AuthenticationScheme = scheme);
+        }
+
+        // Anonymous advisors run first and set AnonymousGranted in the context when applicable
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAnonymous<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAnonymous<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAnonymous<,>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAnonymous<,>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAnonymous<>)));
+
+        // Authorization advisors check AnonymousGranted flag before enforcing access control
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAuthorize<,>)));
@@ -54,7 +71,7 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    /// Globally suppresses create-request validation for all resources.
+    ///     Globally suppresses create-request validation for all resources.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutCreateValidation() {
@@ -63,7 +80,7 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    /// Globally suppresses update-request validation for all resources.
+    ///     Globally suppresses update-request validation for all resources.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutUpdateValidation() {
@@ -72,7 +89,7 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    /// Globally suppresses freshness (ETag) checks and generation for all resources.
+    ///     Globally suppresses freshness (ETag) checks and generation for all resources.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutFreshness() {
@@ -81,7 +98,7 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    /// Registers a resource with explicit entity, request, detail, and summary types.
+    ///     Registers a resource with explicit entity, request, detail, and summary types.
     /// </summary>
     /// <typeparam name="TEntity">The persistent entity type.</typeparam>
     /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -102,7 +119,13 @@ public sealed class SchemataResourceBuilder
         var resource = entity.GetCustomAttribute<ResourceAttribute>() ?? new(entity, request, detail, summary);
 
         if (endpoints is null) {
+            resource.Endpoints = null;
+        } else if (resource.Endpoints is null) {
             resource.Endpoints = endpoints;
+        } else {
+            foreach (var endpoint in endpoints) {
+                resource.Endpoints.Add(endpoint);
+            }
         }
 
         SchemataResourceFeature.RegisterResource(Services, resource);

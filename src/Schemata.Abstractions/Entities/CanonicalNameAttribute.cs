@@ -3,7 +3,8 @@ using System;
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Specifies the AIP-122 canonical resource name pattern for an entity type (e.g., "publishers/{publisher}/books/{book}").
+///     Specifies the AIP-122 canonical resource name pattern for an entity type (e.g.,
+///     "publishers/{publisher}/books/{book}").
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class CanonicalNameAttribute : Attribute

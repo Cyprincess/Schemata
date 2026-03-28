@@ -14,7 +14,7 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
-///     Looks up the tenant via <see cref="ITenantManager{TTenant, TKey}.FindByHost" />.
+///     Looks up the tenant via <see cref="ITenantManager{TTenant,TKey}.FindByHost" />.
 ///     Throws <see cref="TenantResolveException" /> when no matching tenant is found.
 /// </remarks>
 public class RequestHostResolver<TTenant, TKey> : ITenantResolver<TKey>

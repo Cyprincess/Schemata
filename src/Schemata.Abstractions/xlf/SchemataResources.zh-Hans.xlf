@@ -1,110 +1,298 @@
 <?xml version="1.0" encoding="utf-8"?>
-<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
-  <file datatype="xml" source-language="en" target-language="zh-Hans" original="../SchemataResources.resx">
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2"
+  xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
+  <file datatype="xml" source-language="en" target-language="zh-Hans"
+    original="../SchemataResources.resx">
     <body>
       <trans-unit id="ST0001">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="new">{0} depends on {1}, it will be added automatically.</target>
+        <target state="translated">{0} 依赖 {1}，将会自动添加。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0002">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="new">{0} requires {1}, you should add it manually.</target>
+        <target state="translated">{0} 需要 {1}，请手动添加。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0003">
         <source>{0} suggests adding {1}.</source>
-        <target state="new">{0} suggests adding {1}.</target>
+        <target state="translated">{0} 建议添加 {1}。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1001">
         <source>The request contains an invalid argument.</source>
-        <target state="new">The request contains an invalid argument.</target>
+        <target state="translated">请求包含无效的参数。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1002">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="new">Unable to resolve tenant for the current request.</target>
+        <target state="translated">无法解析当前请求的租户。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1003">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="new">The request cannot be executed in the current system state.</target>
+        <target state="translated">请求无法在当前系统状态下执行。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1004">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="new">The request does not have valid authentication credentials.</target>
+        <target state="translated">请求没有有效的身份验证凭据。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1005">
         <source>You do not have permission to perform this action.</source>
-        <target state="new">You do not have permission to perform this action.</target>
+        <target state="translated">您没有权限执行此操作。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1006">
         <source>The requested resource was not found.</source>
-        <target state="new">The requested resource was not found.</target>
+        <target state="translated">未找到请求的资源。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1007">
         <source>The resource already exists.</source>
-        <target state="new">The resource already exists.</target>
+        <target state="translated">该资源已存在。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1008">
         <source>A concurrency conflict occurred while saving to the database.</source>
-        <target state="new">A concurrency conflict occurred while saving to the database.</target>
+        <target state="translated">保存到数据库时发生并发冲突。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1009">
         <source>One or more validation errors occurred.</source>
-        <target state="new">One or more validation errors occurred.</target>
+        <target state="translated">发生了一个或多个验证错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1010">
-        <source>Resource name is required.</source>
-        <target state="new">Resource name is required.</target>
+        <source>Rate limit exceeded.</source>
+        <target state="translated">超出速率限制。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1011">
-        <source>Rate limit exceeded.</source>
-        <target state="new">Rate limit exceeded.</target>
+        <source>Invalid request payload.</source>
+        <target state="translated">无效的请求载荷。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1012">
-        <source>Invalid request payload.</source>
-        <target state="new">Invalid request payload.</target>
+        <source>Cross-parent reading is not supported for this resource.</source>
+        <target state="translated">此资源不支持跨父级读取。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1013">
-        <source>Cross-parent reading is not supported for this resource.</source>
-        <target state="new">Cross-parent reading is not supported for this resource.</target>
+        <source>{0} '{1}' not found.</source>
+        <target state="translated">{0}"{1}"未找到。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1014">
-        <source>Resource '{0}' not found.</source>
-        <target state="new">Resource '{0}' not found.</target>
+        <source>The page token is invalid or has expired.</source>
+        <target state="translated">页面令牌无效或已过期。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1015">
-        <source>The page token is invalid or has expired.</source>
-        <target state="new">The page token is invalid or has expired.</target>
+        <source>The {0} expression is malformed.</source>
+        <target state="translated">{0} 表达式格式不正确。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1016">
-        <source>The filter expression is malformed.</source>
-        <target state="new">The filter expression is malformed.</target>
+        <source>An error occurred.</source>
+        <target state="translated">发生了一个错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1017">
-        <source>The order_by expression is malformed.</source>
-        <target state="new">The order_by expression is malformed.</target>
+        <source>'{0}' must not be empty.</source>
+        <target state="translated">'{0}' 不能为空。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1018">
-        <source>An error occurred.</source>
-        <target state="new">An error occurred.</target>
+        <source>Unsupported algorithm: {0}.</source>
+        <target state="translated">不支持的算法：{0}。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1019">
+        <source>'{0}' is not supported.</source>
+        <target state="translated">不支持"{0}"。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1020">
+        <source>'{0}' is not configured.</source>
+        <target state="translated">"{0}"未配置。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1021">
+        <source>Application has no sector identifier URI and no redirect URIs.</source>
+        <target state="translated">应用程序没有扇区标识符 URI 和重定向 URI。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1022">
+        <source>Cannot resolve a resource name without a pattern.</source>
+        <target state="translated">没有模式无法解析资源名称。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1023">
+        <source>Invalid field.</source>
+        <target state="translated">无效的字段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1024">
+        <source>Invalid field name '{0}'.</source>
+        <target state="translated">无效的字段名称"{0}"。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1025">
+        <source>Function '{0}' not registered.</source>
+        <target state="translated">函数"{0}"未注册。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1026">
+        <source>Invalid table name '{0}' of type '{1}'.</source>
+        <target state="translated">类型"{1}"的表名"{0}"无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1027">
+        <source>Entity must have at least one [Key].</source>
+        <target state="translated">实体必须至少有一个 [Key]。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1028">
+        <source>Entity key cannot be null.</source>
+        <target state="translated">实体键不能为 null。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1029">
+        <source>Entity key count mismatch.</source>
+        <target state="translated">实体键数量不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1030">
+        <source>Unable to resolve {0}.</source>
+        <target state="translated">无法解析{0}。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1031">
+        <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
+        <target state="translated">无法解析类型"{1}"的参数"{0}"。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1032">
+        <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
+        <target state="translated">无法解析类型"{2}"上方法"{1}"的参数"{0}"。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1033">
+        <source>Unable to convert '{0}' to {1}.</source>
+        <target state="translated">无法将"{0}"转换为 {1}。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1034">
+        <source>Mapping for field {0} is missing a source field.</source>
+        <target state="translated">字段 {0} 的映射缺少源字段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1035">
+        <source>Tenant is not initialized successfully.</source>
+        <target state="translated">租户未成功初始化。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1036">
+        <source>Entry assembly is null.</source>
+        <target state="translated">入口程序集为 null。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1037">
+        <source>The user manager must produce an authenticator key after reset.</source>
+        <target state="translated">用户管理器必须在重置后生成验证器密钥。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1038">
+        <source>The type {0} does not implement {1}.</source>
+        <target state="translated">类型 {0} 未实现 {1}。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2001">
+        <source>The client credentials are missing or invalid.</source>
+        <target state="new">The client credentials are missing or invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2002">
+        <source>Client secret is required for confidential clients.</source>
+        <target state="new">Client secret is required for confidential clients.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2003">
+        <source>The request uses more than one client authentication method.</source>
+        <target state="new">The request uses more than one client authentication method.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2004">
+        <source>The provided grant is invalid, expired, or revoked.</source>
+        <target state="new">The provided grant is invalid, expired, or revoked.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2005">
+        <source>The code_verifier does not match the code_challenge.</source>
+        <target state="new">The code_verifier does not match the code_challenge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2006">
+        <source>The requested scope is not allowed for this client.</source>
+        <target state="new">The requested scope is not allowed for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2007">
+        <source>The client is not authorized to use this grant type.</source>
+        <target state="new">The client is not authorized to use this grant type.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2008">
+        <source>The resource owner or authorization server denied the request.</source>
+        <target state="new">The resource owner or authorization server denied the request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2009">
+        <source>The redirect_uri does not match any registered URI.</source>
+        <target state="new">The redirect_uri does not match any registered URI.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2010">
+        <source>User consent is required.</source>
+        <target state="new">User consent is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2011">
+        <source>User authentication is required.</source>
+        <target state="new">User authentication is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2012">
+        <source>The authorization request is still pending.</source>
+        <target state="new">The authorization request is still pending.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2013">
+        <source>The polling interval is too short. Increase the interval and retry.</source>
+        <target state="new">The polling interval is too short. Increase the interval and retry.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2014">
+        <source>An internal server error occurred.</source>
+        <target state="new">An internal server error occurred.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2015">
+        <source>The '{0}' prompt value cannot be combined with other values.</source>
+        <target state="new">The '{0}' prompt value cannot be combined with other values.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2016">
+        <source>The '{0}' prompt value is not supported for this client.</source>
+        <target state="new">The '{0}' prompt value is not supported for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2017">
+        <source>A valid user identity is required for this request.</source>
+        <target state="new">A valid user identity is required for this request.</target>
         <note />
       </trans-unit>
     </body>

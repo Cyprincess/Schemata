@@ -1,110 +1,300 @@
 <?xml version="1.0" encoding="utf-8"?>
-<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
-  <file datatype="xml" source-language="en" target-language="tr" original="../SchemataResources.resx">
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2"
+  xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
+  <file datatype="xml" source-language="en" target-language="tr"
+    original="../SchemataResources.resx">
     <body>
       <trans-unit id="ST0001">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="new">{0} depends on {1}, it will be added automatically.</target>
+        <target state="translated">{0}, {1} bağımlılığına sahiptir ve otomatik olarak eklenecektir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0002">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="new">{0} requires {1}, you should add it manually.</target>
+        <target state="translated">{0}, {1} gerektirir, manuel olarak eklemelisiniz.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0003">
         <source>{0} suggests adding {1}.</source>
-        <target state="new">{0} suggests adding {1}.</target>
+        <target state="translated">{0}, {1} eklenmesini öneriyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1001">
         <source>The request contains an invalid argument.</source>
-        <target state="new">The request contains an invalid argument.</target>
+        <target state="translated">İstek geçersiz bir argüman içeriyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1002">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="new">Unable to resolve tenant for the current request.</target>
+        <target state="translated">Geçerli istek için kiracı çözümlenemedi.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1003">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="new">The request cannot be executed in the current system state.</target>
+        <target state="translated">İstek mevcut sistem durumunda yürütülemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1004">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="new">The request does not have valid authentication credentials.</target>
+        <target state="translated">İstek geçerli kimlik doğrulama bilgilerine sahip değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1005">
         <source>You do not have permission to perform this action.</source>
-        <target state="new">You do not have permission to perform this action.</target>
+        <target state="translated">Bu işlemi gerçekleştirme izniniz yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1006">
         <source>The requested resource was not found.</source>
-        <target state="new">The requested resource was not found.</target>
+        <target state="translated">İstenen kaynak bulunamadı.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1007">
         <source>The resource already exists.</source>
-        <target state="new">The resource already exists.</target>
+        <target state="translated">Kaynak zaten mevcut.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1008">
         <source>A concurrency conflict occurred while saving to the database.</source>
-        <target state="new">A concurrency conflict occurred while saving to the database.</target>
+        <target state="translated">Veritabanına kaydetme sırasında eşzamanlılık çakışması oluştu.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1009">
         <source>One or more validation errors occurred.</source>
-        <target state="new">One or more validation errors occurred.</target>
+        <target state="translated">Bir veya daha fazla doğrulama hatası oluştu.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1010">
-        <source>Resource name is required.</source>
-        <target state="new">Resource name is required.</target>
+        <source>Rate limit exceeded.</source>
+        <target state="translated">Hız sınırı aşıldı.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1011">
-        <source>Rate limit exceeded.</source>
-        <target state="new">Rate limit exceeded.</target>
+        <source>{0} '{1}' not found.</source>
+        <target state="translated">{0} '{1}' bulunamadı.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1012">
-        <source>Invalid request payload.</source>
-        <target state="new">Invalid request payload.</target>
+        <source>An error occurred.</source>
+        <target state="translated">Bir hata oluştu.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1013">
-        <source>Cross-parent reading is not supported for this resource.</source>
-        <target state="new">Cross-parent reading is not supported for this resource.</target>
+        <source>'{0}' must not be empty.</source>
+        <target state="translated">'{0}' boş olmamalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1014">
-        <source>Resource '{0}' not found.</source>
-        <target state="new">Resource '{0}' not found.</target>
+        <source>Unsupported algorithm: {0}.</source>
+        <target state="translated">Desteklenmeyen algoritma: {0}.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1015">
-        <source>The page token is invalid or has expired.</source>
-        <target state="new">The page token is invalid or has expired.</target>
+        <source>'{0}' is not supported.</source>
+        <target state="translated">'{0}' desteklenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1016">
-        <source>The filter expression is malformed.</source>
-        <target state="new">The filter expression is malformed.</target>
+        <source>'{0}' is not configured.</source>
+        <target state="translated">'{0}' yapılandırılmamış.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1017">
-        <source>The order_by expression is malformed.</source>
-        <target state="new">The order_by expression is malformed.</target>
+        <source>Application has no sector identifier URI and no redirect URIs.</source>
+        <target state="translated">Uygulamanın sektör tanımlayıcı URI'si ve yönlendirme URI'leri
+          yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1018">
-        <source>An error occurred.</source>
-        <target state="new">An error occurred.</target>
+        <source>Cannot resolve a resource name without a pattern.</source>
+        <target state="translated">Bir desen olmadan kaynak adı çözümlenemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1019">
+        <source>Invalid table name '{0}' of type '{1}'.</source>
+        <target state="translated">'{1}' türünde geçersiz tablo adı '{0}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1020">
+        <source>Entity must have at least one [Key].</source>
+        <target state="translated">Varlık en az bir [Key] içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1021">
+        <source>Entity key cannot be null.</source>
+        <target state="translated">Varlık anahtarı null olamaz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1022">
+        <source>Entity key count mismatch.</source>
+        <target state="translated">Varlık anahtar sayısı uyuşmuyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1023">
+        <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
+        <target state="translated">'{1}' türünde '{0}' parametresi çözümlenemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1024">
+        <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
+        <target state="translated">'{2}' türünde '{1}' yönteminin '{0}' parametresi çözümlenemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1025">
+        <source>Unable to convert '{0}' to {1}.</source>
+        <target state="translated">'{0}', {1} türüne dönüştürülemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1026">
+        <source>Mapping for field {0} is missing a source field.</source>
+        <target state="translated">{0} alanı için eşlemede kaynak alan eksik.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1027">
+        <source>Tenant is not initialized successfully.</source>
+        <target state="translated">Kiracı başarıyla başlatılamadı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1028">
+        <source>Entry assembly is null.</source>
+        <target state="translated">Giriş derlemesi null.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1029">
+        <source>The type {0} does not implement {1}.</source>
+        <target state="translated">{0} türü {1} arabirimini uygulamıyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2001">
+        <source>Invalid request payload.</source>
+        <target state="translated">Geçersiz istek yükü.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2002">
+        <source>Cross-parent reading is not supported for this resource.</source>
+        <target state="translated">Bu kaynak için çapraz üst okuma desteklenmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2003">
+        <source>The page token is invalid or has expired.</source>
+        <target state="translated">Sayfa belirteci geçersiz veya süresi dolmuş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2004">
+        <source>The {0} expression is malformed.</source>
+        <target state="translated">{0} ifadesi hatalı biçimlendirilmiş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2005">
+        <source>Invalid field.</source>
+        <target state="translated">Geçersiz alan.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2006">
+        <source>Invalid field name '{0}'.</source>
+        <target state="translated">Geçersiz alan adı '{0}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2007">
+        <source>Function '{0}' not registered.</source>
+        <target state="translated">'{0}' işlevi kayıtlı değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST3001">
+        <source>The user manager must produce an authenticator key after reset.</source>
+        <target state="translated">Kullanıcı yöneticisi sıfırlamadan sonra bir doğrulayıcı anahtarı
+          üretmelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4001">
+        <source>The client credentials are missing or invalid.</source>
+        <target state="new">The client credentials are missing or invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4002">
+        <source>Client secret is required for confidential clients.</source>
+        <target state="new">Client secret is required for confidential clients.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4003">
+        <source>The request uses more than one client authentication method.</source>
+        <target state="new">The request uses more than one client authentication method.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4004">
+        <source>The provided grant is invalid, expired, or revoked.</source>
+        <target state="new">The provided grant is invalid, expired, or revoked.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4005">
+        <source>The code_verifier does not match the code_challenge.</source>
+        <target state="new">The code_verifier does not match the code_challenge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4006">
+        <source>The requested scope is not allowed for this client.</source>
+        <target state="new">The requested scope is not allowed for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4007">
+        <source>The client is not authorized to use this grant type.</source>
+        <target state="new">The client is not authorized to use this grant type.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4008">
+        <source>The resource owner or authorization server denied the request.</source>
+        <target state="new">The resource owner or authorization server denied the request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4009">
+        <source>The redirect_uri does not match any registered URI.</source>
+        <target state="new">The redirect_uri does not match any registered URI.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4010">
+        <source>User consent is required.</source>
+        <target state="new">User consent is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4011">
+        <source>User authentication is required.</source>
+        <target state="new">User authentication is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4012">
+        <source>The authorization request is still pending.</source>
+        <target state="new">The authorization request is still pending.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4013">
+        <source>The polling interval is too short. Increase the interval and retry.</source>
+        <target state="new">The polling interval is too short. Increase the interval and retry.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4014">
+        <source>An internal server error occurred.</source>
+        <target state="new">An internal server error occurred.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4015">
+        <source>The '{0}' prompt value cannot be combined with other values.</source>
+        <target state="new">The '{0}' prompt value cannot be combined with other values.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4016">
+        <source>The '{0}' prompt value is not supported for this client.</source>
+        <target state="new">The '{0}' prompt value is not supported for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4017">
+        <source>A valid user identity is required for this request.</source>
+        <target state="new">A valid user identity is required for this request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST5001">
+        <source>Unable to resolve {0}.</source>
+        <target state="translated">{0} çözümlenemiyor.</target>
         <note />
       </trans-unit>
     </body>

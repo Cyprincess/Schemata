@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 namespace Schemata.Mapping.Skeleton.Configurations;
 
 /// <summary>
-/// Fluent builder for configuring an individual field mapping within a <see cref="Map{TSource,TDestination}"/>.
+///     Fluent builder for configuring an individual field mapping within a <see cref="Map{TSource,TDestination}" />.
 /// </summary>
 /// <typeparam name="TSource">The source type.</typeparam>
 /// <typeparam name="TDestination">The destination type.</typeparam>
@@ -16,7 +16,7 @@ public sealed class FieldSelection<TSource, TDestination>
     internal FieldSelection(Mapping<TSource, TDestination> mapping) { _mapping = mapping; }
 
     /// <summary>
-    /// Specifies the source field expression for this mapping.
+    ///     Specifies the source field expression for this mapping.
     /// </summary>
     /// <param name="sourceField">An expression selecting the source property.</param>
     /// <returns>This field selection for chaining.</returns>
@@ -26,9 +26,9 @@ public sealed class FieldSelection<TSource, TDestination>
     }
 
     /// <summary>
-    /// Marks this destination field as ignored, optionally based on a condition.
+    ///     Marks this destination field as ignored, optionally based on a condition.
     /// </summary>
-    /// <param name="condition">An optional predicate; when it returns <see langword="true"/>, the field is ignored.</param>
+    /// <param name="condition">An optional predicate; when it returns <see langword="true" />, the field is ignored.</param>
     /// <returns>This field selection for chaining.</returns>
     public FieldSelection<TSource, TDestination> Ignore(
         Expression<Func<TSource, TDestination, bool>>? condition = null
@@ -43,7 +43,7 @@ public sealed class FieldSelection<TSource, TDestination>
     }
 
     /// <summary>
-    /// Begins configuring a new destination field mapping.
+    ///     Begins configuring a new destination field mapping.
     /// </summary>
     /// <param name="destinationField">An expression selecting the destination property.</param>
     /// <returns>A new field selection for the specified destination field.</returns>

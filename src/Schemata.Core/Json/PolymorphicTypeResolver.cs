@@ -11,7 +11,8 @@ using Schemata.Common;
 namespace Schemata.Core.Json;
 
 /// <summary>
-///     JSON type info resolver that auto-discovers <see cref="PolymorphicAttribute" /> types and wires polymorphic serialization.
+///     JSON type info resolver that auto-discovers <see cref="PolymorphicAttribute" /> types and wires polymorphic
+///     serialization.
 /// </summary>
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {

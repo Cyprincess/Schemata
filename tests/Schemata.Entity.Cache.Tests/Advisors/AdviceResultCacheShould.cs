@@ -1,8 +1,11 @@
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Cache.Advisors;
@@ -16,7 +19,7 @@ public class AdviceResultCacheShould
 {
     [Fact]
     public async Task Advise_WithResult_StoresInCache() {
-        var cache      = new MemoryCache(new MemoryCacheOptions());
+        var cache      = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
         var advisor    = new AdviceResultCache<Student, Student, Student>(cache);
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
@@ -31,15 +34,16 @@ public class AdviceResultCacheShould
 
         var key = context.ToCacheKey();
         Assert.NotNull(key);
-        Assert.True(cache.TryGetValue(key, out var stored));
-        Assert.NotNull(stored);
-        var student = Assert.IsType<Student>(stored);
+        var bytes = await cache.GetAsync(key);
+        Assert.NotNull(bytes);
+        var student = JsonSerializer.Deserialize<Student>(bytes);
+        Assert.NotNull(student);
         Assert.Equal("Alice", student.FullName);
     }
 
     [Fact]
     public async Task Advise_NullResult_DoesNotStore() {
-        var cache      = new MemoryCache(new MemoryCacheOptions());
+        var cache      = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
         var advisor    = new AdviceResultCache<Student, Student, Student>(cache);
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
@@ -52,16 +56,16 @@ public class AdviceResultCacheShould
 
         var key = context.ToCacheKey();
         if (key != null) {
-            Assert.False(cache.TryGetValue(key, out var _));
+            Assert.Null(await cache.GetAsync(key));
         }
     }
 
     [Fact]
     public async Task Advise_Suppressed_DoesNotStore() {
-        var cache   = new MemoryCache(new MemoryCacheOptions());
+        var cache   = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
         var advisor = new AdviceResultCache<Student, Student, Student>(cache);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressQueryCache());
+        ctx.Set(new QueryCacheSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var data       = new[] { new Student { Id = 1, FullName = "Alice" } }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repository, data) {
@@ -74,7 +78,7 @@ public class AdviceResultCacheShould
 
         var key = context.ToCacheKey();
         if (key != null) {
-            Assert.False(cache.TryGetValue(key, out var _));
+            Assert.Null(await cache.GetAsync(key));
         }
     }
 }

@@ -27,7 +27,7 @@ public class AdviceAddValidationShould
     public async Task Advise_Suppressed_Continues() {
         var advisor = new AdviceAddValidation<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressAddValidation());
+        ctx.Set(new AddValidationSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student();
 

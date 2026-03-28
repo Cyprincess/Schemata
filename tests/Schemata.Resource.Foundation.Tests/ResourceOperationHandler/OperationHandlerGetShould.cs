@@ -13,28 +13,9 @@ public class OperationHandlerGetShould
         var handler = _fixture.CreateHandler();
         var entity  = _fixture.Students[0];
 
-        var result = await handler.GetAsync(entity, null, null);
+        var result = await handler.GetAsync(entity.CanonicalName!, null, null);
 
         Assert.NotNull(result);
         Assert.True(result.IsAllowed());
-    }
-
-    [Fact]
-    public async Task FindByName_ExistingName_ReturnsEntity() {
-        var handler = _fixture.CreateHandler();
-
-        var entity = await handler.FindByNameAsync("students/alice-1", null);
-
-        Assert.NotNull(entity);
-        Assert.Equal("Alice", entity.FullName);
-    }
-
-    [Fact]
-    public async Task FindByName_NonExistentName_ReturnsNull() {
-        var handler = _fixture.CreateHandler();
-
-        var entity = await handler.FindByNameAsync("students/nobody-999", null);
-
-        Assert.Null(entity);
     }
 }

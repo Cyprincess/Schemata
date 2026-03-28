@@ -10,17 +10,31 @@ namespace Schemata.Abstractions.Resource;
 public sealed class AnonymousAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="AnonymousAttribute" /> class.
+    ///     Initializes a new instance allowing anonymous access for the specified CRUD operations.
+    ///     If none are specified, all operations are anonymous.
     /// </summary>
-    /// <param name="operations">
-    ///     The operations that allow anonymous access. If none are specified, all operations are anonymous.
-    /// </param>
+    /// <param name="operations">The CRUD operations that allow anonymous access.</param>
     public AnonymousAttribute(params Operations[] operations) {
-        Operations = operations.Length > 0 ? operations : null;
+        Operations = operations.Length > 0
+            ? Array.ConvertAll(operations, op => op.ToString())
+            : null;
     }
 
     /// <summary>
-    ///     Null = all operations anonymous. Otherwise, only specified operations.
+    ///     Initializes a new instance allowing anonymous access for the specified named operations.
+    ///     Intended for state machine event names and other non-CRUD operation identifiers.
     /// </summary>
-    public Operations[]? Operations { get; }
+    /// <param name="first">The first operation name.</param>
+    /// <param name="rest">Additional operation names.</param>
+    public AnonymousAttribute(string first, params string[] rest) {
+        var ops = new string[1 + rest.Length];
+        ops[0] = first;
+        rest.CopyTo(ops, 1);
+        Operations = ops;
+    }
+
+    /// <summary>
+    ///     Null = all operations anonymous. Otherwise, only the specified operation names are anonymous.
+    /// </summary>
+    public string[]? Operations { get; }
 }

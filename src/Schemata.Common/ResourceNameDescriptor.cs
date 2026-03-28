@@ -16,7 +16,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Common;
 
 /// <summary>
-///     Parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building canonical names.
+///     Parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building canonical
+///     names.
 /// </summary>
 public sealed class ResourceNameDescriptor
 {
@@ -156,7 +157,7 @@ public sealed class ResourceNameDescriptor
     /// </summary>
     public string Resolve(object entity) {
         if (_segments.Length == 0) {
-            throw new InvalidOperationException("Cannot resolve a resource name without a pattern.");
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1018));
         }
 
         var type       = entity.GetType();
@@ -175,13 +176,11 @@ public sealed class ResourceNameDescriptor
 
             var value = property.GetValue(entity)?.ToString();
             if (string.IsNullOrWhiteSpace(value)) {
-                throw new ValidationException([
-                    new() {
-                        Field       = seg.Property!,
-                        Reason      = FieldReasons.Required,
-                        Description = SchemataResources.GetResourceString(SchemataResources.ST1010),
-                    },
-                ]);
+                throw new ValidationException([new() {
+                    Field       = seg.Property!.Underscore(),
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), seg.Property!.Humanize(LetterCasing.Title)),
+                    Reason      = FieldReasons.NotEmpty,
+                }]);
             }
 
             parts[i] = value!;

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - Comprehensive Business Project Targets</Description>
-    <PackageTags>application;business;database;datasourcedsl;;framework;generator;repository</PackageTags>
+    <PackageTags>application;business;database;datasourcedsl;framework;generator;repository</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>

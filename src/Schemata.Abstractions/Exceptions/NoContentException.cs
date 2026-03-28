@@ -1,10 +1,10 @@
+using System.Collections.Generic;
+using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Abstractions.Exceptions;
 
-/// <summary>
-///     Thrown to signal a successful operation with no response body (HTTP 204).
-/// </summary>
+/// <summary>Thrown to signal a successful operation with no response body (HTTP 204).</summary>
 public class NoContentException : SchemataException
 {
     /// <inheritdoc />
@@ -13,4 +13,7 @@ public class NoContentException : SchemataException
         string? code    = ErrorCodes.Ok,
         string? message = null
     ) : base(status, code, message) { }
+
+    /// <inheritdoc />
+    public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) { return null; }
 }

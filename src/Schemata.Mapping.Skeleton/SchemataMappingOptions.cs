@@ -5,17 +5,17 @@ using Schemata.Mapping.Skeleton.Configurations;
 namespace Schemata.Mapping.Skeleton;
 
 /// <summary>
-/// Accumulates mapping configurations that are applied when the mapping engine is initialized.
+///     Accumulates mapping configurations that are applied when the mapping engine is initialized.
 /// </summary>
 public sealed class SchemataMappingOptions
 {
     /// <summary>
-    /// The collection of compiled mapping definitions.
+    ///     The collection of compiled mapping definitions.
     /// </summary>
     public List<IMapping> Mappings { get; } = [];
 
     /// <summary>
-    /// Adds a mapping configuration for the specified source and destination types.
+    ///     Adds a mapping configuration for the specified source and destination types.
     /// </summary>
     /// <typeparam name="TSource">The source type.</typeparam>
     /// <typeparam name="TDestination">The destination type.</typeparam>

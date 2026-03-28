@@ -4,9 +4,9 @@ using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -58,7 +58,7 @@ public static class ApplicationBuilderExtensions
 
         var schemata = sp.GetRequiredService<SchemataOptions>();
 
-        schemata.Pop<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(SchemataConstants.Options.Features);
+        schemata.Pop<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Keys.Features);
 
         return app;
     }

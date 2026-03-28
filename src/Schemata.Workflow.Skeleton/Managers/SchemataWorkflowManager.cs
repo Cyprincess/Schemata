@@ -17,14 +17,15 @@ using Schemata.Workflow.Skeleton.Models;
 namespace Schemata.Workflow.Skeleton.Managers;
 
 /// <summary>
-/// Default implementation of <see cref="IWorkflowManager{TWorkflow,TTransition,TResponse}"/> and <see cref="IWorkflowManager"/>.
+///     Default implementation of <see cref="IWorkflowManager{TWorkflow,TTransition,TResponse}" /> and
+///     <see cref="IWorkflowManager" />.
 /// </summary>
 /// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
 /// <typeparam name="TTransition">The transition entity type.</typeparam>
 /// <typeparam name="TResponse">The response DTO type.</typeparam>
 /// <remarks>
-/// Coordinates repositories, state machines, and mappers to manage the full workflow lifecycle
-/// including creation, event raising, transition recording, and response mapping.
+///     Coordinates repositories, state machines, and mappers to manage the full workflow lifecycle
+///     including creation, event raising, transition recording, and response mapping.
 /// </remarks>
 public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkflowManager<TWorkflow, TTransition, TResponse>,
                                                                           IWorkflowManager
@@ -39,7 +40,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     private readonly IRepository<TWorkflow>   _workflows;
 
     /// <summary>
-    /// Initializes a new instance of the workflow manager.
+    ///     Initializes a new instance of the workflow manager.
     /// </summary>
     /// <param name="sp">The service provider for resolving repositories and state machines.</param>
     /// <param name="mapper">The mapper for converting workflow details to response objects.</param>
@@ -286,10 +287,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     #endregion
 
     /// <summary>
-    /// Resolves the entity type and its repository for the given workflow.
+    ///     Resolves the entity type and its repository for the given workflow.
     /// </summary>
     /// <param name="workflow">The workflow whose instance type to resolve.</param>
-    /// <returns>A tuple of the resolved type and repository, either of which may be <see langword="null"/>.</returns>
+    /// <returns>A tuple of the resolved type and repository, either of which may be <see langword="null" />.</returns>
     protected virtual async Task<(Type?, IRepository?)> ResolveRepositoryAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
         if (it is null) {
@@ -300,10 +301,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     /// <summary>
-    /// Resolves the repository for the given entity type from the service provider.
+    ///     Resolves the repository for the given entity type from the service provider.
     /// </summary>
     /// <param name="type">The entity type.</param>
-    /// <returns>The repository, or <see langword="null"/> if it cannot be cast.</returns>
+    /// <returns>The repository, or <see langword="null" /> if it cannot be cast.</returns>
     protected virtual IRepository? ResolveRepository(Type type) {
         var rt      = typeof(IRepository<>).MakeGenericType(type);
         var service = _sp.GetRequiredService(rt);
@@ -312,10 +313,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     /// <summary>
-    /// Resolves the entity type and its state machine for the given workflow.
+    ///     Resolves the entity type and its state machine for the given workflow.
     /// </summary>
     /// <param name="workflow">The workflow whose state machine to resolve.</param>
-    /// <returns>A tuple of the resolved type and state machine, either of which may be <see langword="null"/>.</returns>
+    /// <returns>A tuple of the resolved type and state machine, either of which may be <see langword="null" />.</returns>
     protected virtual async Task<(Type?, StateMachine?)> ResolveStateMachineAsync(TWorkflow workflow) {
         var it = await GetInstanceTypeAsync(workflow.InstanceType);
         if (it is null) {
@@ -326,7 +327,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     /// <summary>
-    /// Resolves the state machine for the given entity type from the service provider.
+    ///     Resolves the state machine for the given entity type from the service provider.
     /// </summary>
     /// <param name="type">The entity type.</param>
     /// <returns>The state machine instance.</returns>

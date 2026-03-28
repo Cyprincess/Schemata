@@ -142,6 +142,22 @@ public static class SchemataBuilderExtensions
 
     #endregion
 
+    #region Well-Known Feature
+
+    public static SchemataBuilder UseWellKnown(
+        this SchemataBuilder      builder,
+        Action<WellKnownOptions>? configure = null
+    ) {
+        configure ??= _ => { };
+        builder.Configure(configure);
+
+        builder.AddFeature<SchemataWellKnownFeature>();
+
+        return builder;
+    }
+
+    #endregion
+
     #region Quota Feature
 
     public static SchemataBuilder UseQuota(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {

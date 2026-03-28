@@ -46,7 +46,7 @@ public class AdviceRemoveSoftDeleteShould
     public async Task Advise_Suppressed_ContinuesWithoutSoftDelete() {
         var advisor = new AdviceRemoveSoftDelete<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressSoftDelete());
+        ctx.Set(new SoftDeleteSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { DeleteTime = null };
 

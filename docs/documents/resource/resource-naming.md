@@ -128,7 +128,7 @@ When `"-"` is used for a parent segment, `BuildParentPredicate` skips that segme
 2. If `IIdentifier` is implemented, `request.Id` is reset to 0.
 3. The request is mapped to an entity.
 4. Parent properties are populated from HTTP route values via `SetParentFromRouteValues`.
-5. The canonical name is computed after persistence by the entity repository's `AdviceAddCanonicalName` advisor using `ResourceNameDescriptor.Resolve`.
+5. The canonical name is computed after persistence by `AdviceAddCanonicalName` (an `IRepositoryAddAdvisor<TEntity>` implementation) using `ResourceNameDescriptor.Resolve`.
 
 ### Update
 

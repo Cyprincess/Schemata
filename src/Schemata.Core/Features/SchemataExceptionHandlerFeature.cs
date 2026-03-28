@@ -15,7 +15,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures global exception handling, converting <see cref="SchemataException" /> to structured JSON error responses.
+///     Configures global exception handling, converting <see cref="SchemataException" /> to structured JSON error
+///     responses.
 /// </summary>
 [DependsOn<SchemataJsonSerializerFeature>]
 public sealed class SchemataExceptionHandlerFeature : FeatureBase
@@ -43,12 +44,10 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
                     await context.Response.WriteAsJsonAsync(new ErrorResponse {
                         Error = new() {
                             Code    = ErrorCodes.Internal,
-                            Message = SchemataResources.GetResourceString(SchemataResources.ST1018),
-                            Details = [
-                                new RequestInfoDetail {
-                                    RequestId = context.TraceIdentifier,
-                                },
-                            ],
+                            Message = SchemataResources.GetResourceString(SchemataResources.ST1012),
+                            Details = [new RequestInfoDetail {
+                                RequestId = context.TraceIdentifier,
+                            }],
                         },
                     }, options.Value, context.RequestAborted);
 
@@ -57,26 +56,14 @@ public sealed class SchemataExceptionHandlerFeature : FeatureBase
 
                 context.Response.StatusCode = http.Status;
 
-                var body = new ErrorBody {
-                    Code    = http.Code,
-                    Message = http.Message,
-                };
-
-                if (http.Details is { Count: > 0 }) {
-                    body.Details = http.Details;
+                var response = http.CreateErrorResponse();
+                if (response is null) {
+                    return;
                 }
 
-                body.Details ??= [];
-                body.Details.Add(new RequestInfoDetail { RequestId = context.TraceIdentifier });
+                context.Response.ContentType = MediaTypeNames.Application.Json;
 
-                if (body.Message is not null
-                 || body.Code is not null
-                 || body.Details is not null) {
-                    context.Response.ContentType = MediaTypeNames.Application.Json;
-                    await context.Response.WriteAsJsonAsync(new ErrorResponse {
-                        Error = body,
-                    }, options.Value, context.RequestAborted);
-                }
+                await context.Response.WriteAsJsonAsync(response, options.Value, context.RequestAborted);
             });
         });
     }

@@ -5,12 +5,12 @@ using Schemata.Resource.Foundation;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-/// Convenience overloads for registering resources with fewer type parameters.
+///     Convenience overloads for registering resources with fewer type parameters.
 /// </summary>
 public static class SchemataResourceBuilderExtensions
 {
     /// <summary>
-    /// Registers a resource using the entity type for all four type parameters.
+    ///     Registers a resource using the entity type for all four type parameters.
     /// </summary>
     /// <typeparam name="TEntity">The entity type used as entity, request, detail, and summary.</typeparam>
     /// <param name="builder">The resource builder.</param>
@@ -21,7 +21,7 @@ public static class SchemataResourceBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a resource using the request type for detail and summary.
+    ///     Registers a resource using the request type for detail and summary.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type, also used as detail and summary.</typeparam>
@@ -34,7 +34,7 @@ public static class SchemataResourceBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a resource using the detail type as the summary type.
+    ///     Registers a resource using the detail type as the summary type.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>

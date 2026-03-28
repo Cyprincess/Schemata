@@ -1,7 +1,6 @@
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -12,26 +11,21 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 public static class AdviceGetRequestAuthorize
 {
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = AdviceGetRequestAnonymous.DefaultOrder + 10_000_000;
 }
 
-/// <summary>
-/// Authorizes get requests by checking role-based access for the current user.
-/// </summary>
-/// <typeparam name="TEntity">The entity type being retrieved.</typeparam>
-/// <remarks>
-/// Order: 100,000,000. Registered by <see cref="SchemataResourceBuilder.WithAuthorization"/>;
-/// not auto-registered by <see cref="Features.SchemataResourceFeature"/>.
-/// Skips authorization when the entity is decorated with <see cref="Schemata.Abstractions.Resource.AnonymousAttribute"/> for the Get operation.
-/// Throws <see cref="Schemata.Abstractions.Exceptions.AuthorizationException"/> if access is denied.
-/// </remarks>
 public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
-    private readonly IAccessProvider<TEntity, ResourceRequestContext<GetRequest>> _access;
+    private readonly IAccessProvider<TEntity, GetRequest>      _access;
+    private readonly IEntitlementProvider<TEntity, GetRequest> _entitlement;
 
-    public AdviceGetRequestAuthorize(IAccessProvider<TEntity, ResourceRequestContext<GetRequest>> access) {
-        _access = access;
+    public AdviceGetRequestAuthorize(
+        IAccessProvider<TEntity, GetRequest>      access,
+        IEntitlementProvider<TEntity, GetRequest> entitlement
+    ) {
+        _access      = access;
+        _entitlement = entitlement;
     }
 
     #region IResourceGetRequestAdvisor<TEntity> Members
@@ -41,17 +35,22 @@ public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvi
 
     /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        GetRequest        request,
-        HttpContext?      http,
-        CancellationToken ct = default
+        AdviceContext                     ctx,
+        GetRequest                        request,
+        ResourceRequestContainer<TEntity> container,
+        ClaimsPrincipal?                  principal,
+        CancellationToken                 ct = default
     ) {
-        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.Get)) {
+        var context = new AccessContext<GetRequest> { Operation = nameof(Operations.Get), Request = request };
+
+        var expression = await _entitlement.GenerateEntitlementExpressionAsync(context, principal, ct);
+        container.ApplyModification(expression);
+
+        if (ctx.Has<AnonymousGranted>()) {
             return AdviseResult.Continue;
         }
 
-        var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Get, Request = request }, http?.User, ct);
-
+        var result = await _access.HasAccessAsync(null, context, principal, ct);
         if (!result) {
             throw new AuthorizationException();
         }

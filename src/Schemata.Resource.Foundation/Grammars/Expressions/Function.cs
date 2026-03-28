@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Parlot;
+using Schemata.Abstractions;
 using Schemata.Resource.Foundation.Grammars.Values;
 
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents a function call expression (e.g. <c>contains(field, value)</c>) in the filter grammar.
+///     Represents a function call expression (e.g. <c>contains(field, value)</c>) in the filter grammar.
 /// </summary>
-public class Function : IComparable
+public class Function : IComparableArg
 {
     public Function(TextPosition position, Member member, IReadOnlyCollection<IArg>? args) {
         Position = position;
@@ -22,12 +23,12 @@ public class Function : IComparable
     }
 
     /// <summary>
-    /// Gets the member path that forms the function name.
+    ///     Gets the member path that forms the function name.
     /// </summary>
     public Member Member { get; }
 
     /// <summary>
-    /// Gets the list of arguments passed to the function.
+    ///     Gets the list of arguments passed to the function.
     /// </summary>
     public List<IArg> Args { get; } = [];
 
@@ -66,15 +67,13 @@ public class Function : IComparable
         if (segments.Count > 1) {
             var method = segments[^1];
             if (ctx.Functions.TryGetValue(method, out function)) {
-                var instance = Member.ToMemberExpression(ctx);
-                var expressions = new[] { instance }
-                    .Concat(Args.Select(a => a.ToExpression(ctx)!))
-                    .ToArray();
+                var instance    = Member.ToMemberExpression(ctx);
+                var expressions = new[] { instance }.Concat(Args.Select(a => a.ToExpression(ctx)!)).ToArray();
                 return function.Factory(expressions, ctx);
             }
         }
 
-        throw new ParseException($"Function '{name}' not registered", Position);
+        throw new ParseException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST2007), name), Position);
     }
 
     #endregion

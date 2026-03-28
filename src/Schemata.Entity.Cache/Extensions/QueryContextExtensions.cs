@@ -10,7 +10,8 @@ namespace Schemata.Entity.Repository;
 public static class QueryContextExtensions
 {
     /// <summary>
-    ///     Generates a cache key from the query expression and return type, or <see langword="null" /> if the expression cannot be stringized.
+    ///     Generates a cache key from the query expression and return type, or <see langword="null" /> if the expression
+    ///     cannot be stringized.
     /// </summary>
     /// <typeparam name="TEntity">The root entity type being queried.</typeparam>
     /// <typeparam name="TResult">The projected result type of the query.</typeparam>

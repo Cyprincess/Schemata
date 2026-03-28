@@ -1,30 +1,30 @@
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 public static class AdviceUpdateFreshness
 {
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-/// Enforces optimistic concurrency for update operations by comparing the request ETag with the entity timestamp.
+///     Enforces optimistic concurrency for update operations by comparing the request ETag with the entity timestamp.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <typeparam name="TRequest">The request DTO type carrying the ETag.</typeparam>
 /// <remarks>
-/// Order: 300,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature"/>.
-/// Reads the ETag from the request if it implements <see cref="Schemata.Abstractions.Resource.IFreshness"/>,
-/// and compares it with the entity's concurrency timestamp.
-/// Throws <see cref="Schemata.Abstractions.Exceptions.ConcurrencyException"/> when the ETag does not match.
-/// Suppressed when <see cref="SuppressFreshness"/> is present in the advice context.
+///     Order: 300,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature" />.
+///     Reads the ETag from the request if it implements <see cref="Schemata.Abstractions.Resource.IFreshness" />,
+///     and compares it with the entity's concurrency timestamp.
+///     Throws <see cref="Schemata.Abstractions.Exceptions.ConcurrencyException" /> when the ETag does not match.
+///     Suppressed when <see cref="FreshnessSuppressed" /> is present in the advice context.
 /// </remarks>
 public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
@@ -40,7 +40,7 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
         AdviceContext     ctx,
         TRequest          request,
         TEntity           entity,
-        HttpContext?      http,
+        ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
         if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {

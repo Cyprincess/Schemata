@@ -7,14 +7,14 @@ using Schemata.Mapping.Skeleton;
 namespace Schemata.Mapping.AutoMapper;
 
 /// <summary>
-/// AutoMapper-backed implementation of <see cref="ISimpleMapper"/>.
+///     AutoMapper-backed implementation of <see cref="ISimpleMapper" />.
 /// </summary>
 public sealed class SimpleMapper : ISimpleMapper
 {
     private readonly IMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance wrapping the given AutoMapper configuration.
+    ///     Initializes a new instance wrapping the given AutoMapper configuration.
     /// </summary>
     /// <param name="config">The AutoMapper configuration.</param>
     public SimpleMapper(MapperConfiguration config) { _mapper = new Mapper(config); }

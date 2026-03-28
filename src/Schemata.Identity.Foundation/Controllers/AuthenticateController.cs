@@ -1,77 +1,14 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Schemata.Identity.Foundation.Handlers;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Managers;
-using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
-/// <summary>
-///     API controller providing identity endpoints for registration, login, token refresh,
-///     profile management, password reset, account confirmation, and two-factor authentication.
-/// </summary>
 [ApiController]
-[Route("~/[controller]")]
-public sealed partial class AuthenticateController : ControllerBase
-{
-    private readonly IOptionsMonitor<BearerTokenOptions>      _bearerToken;
-    private readonly IMailSender<SchemataUser>                _mailSender;
-    private readonly IMessageSender<SchemataUser>             _messageSender;
-    private readonly IOptionsMonitor<SchemataIdentityOptions> _options;
-
-    private readonly IServiceProvider                  _sp;
-    private readonly SchemataUserManager<SchemataUser> _userManager;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="AuthenticateController"/> class.
-    /// </summary>
-    public AuthenticateController(
-        SchemataUserManager<SchemataUser>        userManager,
-        IMailSender<SchemataUser>                mailSender,
-        IMessageSender<SchemataUser>             messageSender,
-        IOptionsMonitor<BearerTokenOptions>      bearerToken,
-        IOptionsMonitor<SchemataIdentityOptions> options,
-        IServiceProvider                         sp
-    ) {
-        _userManager   = userManager;
-        _mailSender    = mailSender;
-        _messageSender = messageSender;
-        _bearerToken   = bearerToken;
-        _options       = options;
-        _sp            = sp;
-    }
-
-    private EmptyResult EmptyResult { get; } = new();
-
-    private async Task<SchemataUser?> GetUserAsync(string? email, string? phone) {
-        return true switch {
-            var _ when !string.IsNullOrWhiteSpace(email) => await _userManager.FindByEmailAsync(email),
-            var _ when !string.IsNullOrWhiteSpace(phone) => await _userManager.FindByPhoneAsync(phone),
-            var _                                        => null,
-        };
-    }
-
-    private async Task SendConfirmationCodeAsync(SchemataUser user, string? email, string? phone) {
-        if (!_options.CurrentValue.AllowAccountConfirmation) {
-            return;
-        }
-
-        switch (user) {
-            case var _ when !string.IsNullOrWhiteSpace(email):
-            {
-                var code = await _userManager.GenerateChangeEmailTokenAsync(user, email);
-                await _mailSender.SendConfirmationCodeAsync(user, email, code);
-                break;
-            }
-            case var _ when !string.IsNullOrWhiteSpace(phone):
-            {
-                var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, phone);
-                await _messageSender.SendConfirmationCodeAsync(user, phone, code);
-                break;
-            }
-        }
-    }
-}
+[Route("~/Authenticate")]
+public sealed partial class AuthenticateController<TUser>(
+    IdentityHandler<TUser>              handler,
+    IOptionsMonitor<BearerTokenOptions> bearer
+) : ControllerBase where TUser : SchemataUser, new();

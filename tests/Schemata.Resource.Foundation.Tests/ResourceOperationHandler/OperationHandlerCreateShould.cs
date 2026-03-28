@@ -1,5 +1,6 @@
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Resource.Foundation.Advisors;
@@ -31,13 +32,13 @@ public class OperationHandlerCreateShould
 
         await handler.CreateAsync(request, null, null);
 
-        _fixture.Repository.Verify(r => r.CommitAsync(default), Times.AtLeastOnce);
+        _fixture.Repository.Verify(r => r.CommitAsync(CancellationToken.None), Times.AtLeastOnce);
     }
 
     [Fact]
     public async Task Create_ValidateOnly_ThrowsNoContent() {
         var handler = _fixture.CreateHandler(services => {
-            services.AddSingleton<IResourceCreateRequestAdvisor<Student, Student>,
+            services.TryAddScoped<IResourceCreateRequestAdvisor<Student, Student>,
                 AdviceCreateRequestValidation<Student, Student>>();
         });
         var request = new Student {

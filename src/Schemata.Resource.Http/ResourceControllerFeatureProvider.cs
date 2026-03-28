@@ -13,8 +13,8 @@ using Schemata.Common;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-/// Dynamically adds generic <see cref="ResourceController{TEntity, TRequest, TDetail, TSummary}"/> instances
-/// for registered resources and notifies MVC when the controller set changes.
+///     Dynamically adds generic <see cref="ResourceController{TEntity, TRequest, TDetail, TSummary}" /> instances
+///     for registered resources and notifies MVC when the controller set changes.
 /// </summary>
 public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>,
                                                         IActionDescriptorChangeProvider
@@ -22,7 +22,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     private CancellationTokenSource _cts = new();
 
     /// <summary>
-    /// Gets or sets the registered resources that should produce HTTP controllers.
+    ///     Gets or sets the registered resources that should produce HTTP controllers.
     /// </summary>
     public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
 
@@ -59,7 +59,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     #endregion
 
     /// <summary>
-    /// Signals MVC that the controller set has changed and action descriptors should be refreshed.
+    ///     Signals MVC that the controller set has changed and action descriptors should be refreshed.
     /// </summary>
     public void Commit() {
         var old = _cts;

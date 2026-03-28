@@ -4,7 +4,8 @@ using Schemata.Entity.Cache.Advisors;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Extension methods for <see cref="IRepository" /> and <see cref="IRepository{TEntity}" /> providing cache suppression.
+///     Extension methods for <see cref="IRepository" /> and <see cref="IRepository{TEntity}" /> providing cache
+///     suppression.
 /// </summary>
 public static class RepositoryExtensions
 {
@@ -14,7 +15,7 @@ public static class RepositoryExtensions
     /// <param name="repository">The repository instance.</param>
     /// <returns>The same repository instance for chaining.</returns>
     public static IRepository SuppressQueryCache(this IRepository repository) {
-        repository.AdviceContext.Set<SuppressQueryCache>(null);
+        repository.AdviceContext.Set<QueryCacheSuppressed>(null);
         return repository;
     }
 
@@ -26,7 +27,7 @@ public static class RepositoryExtensions
     /// <returns>The same repository instance for chaining.</returns>
     public static IRepository<TEntity> SuppressQueryCache<TEntity>(this IRepository<TEntity> repository)
         where TEntity : class {
-        repository.AdviceContext.Set<SuppressQueryCache>(null);
+        repository.AdviceContext.Set<QueryCacheSuppressed>(null);
         return repository;
     }
 }

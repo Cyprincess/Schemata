@@ -1,110 +1,301 @@
 <?xml version="1.0" encoding="utf-8"?>
-<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
-  <file datatype="xml" source-language="en" target-language="pt-BR" original="../SchemataResources.resx">
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2"
+  xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
+  <file datatype="xml" source-language="en" target-language="pt-BR"
+    original="../SchemataResources.resx">
     <body>
       <trans-unit id="ST0001">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="new">{0} depends on {1}, it will be added automatically.</target>
+        <target state="translated">{0} depende de {1}, será adicionado automaticamente.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0002">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="new">{0} requires {1}, you should add it manually.</target>
+        <target state="translated">{0} requer {1}, você deve adicioná-lo manualmente.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST0003">
         <source>{0} suggests adding {1}.</source>
-        <target state="new">{0} suggests adding {1}.</target>
+        <target state="translated">{0} sugere adicionar {1}.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1001">
         <source>The request contains an invalid argument.</source>
-        <target state="new">The request contains an invalid argument.</target>
+        <target state="translated">A solicitação contém um argumento inválido.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1002">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="new">Unable to resolve tenant for the current request.</target>
+        <target state="translated">Não foi possível resolver o locatário para a solicitação atual.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1003">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="new">The request cannot be executed in the current system state.</target>
+        <target state="translated">A solicitação não pode ser executada no estado atual do sistema.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1004">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="new">The request does not have valid authentication credentials.</target>
+        <target state="translated">A solicitação não possui credenciais de autenticação válidas.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1005">
         <source>You do not have permission to perform this action.</source>
-        <target state="new">You do not have permission to perform this action.</target>
+        <target state="translated">Você não tem permissão para realizar esta ação.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1006">
         <source>The requested resource was not found.</source>
-        <target state="new">The requested resource was not found.</target>
+        <target state="translated">O recurso solicitado não foi encontrado.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1007">
         <source>The resource already exists.</source>
-        <target state="new">The resource already exists.</target>
+        <target state="translated">O recurso já existe.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1008">
         <source>A concurrency conflict occurred while saving to the database.</source>
-        <target state="new">A concurrency conflict occurred while saving to the database.</target>
+        <target state="translated">Ocorreu um conflito de concorrência ao salvar no banco de dados.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1009">
         <source>One or more validation errors occurred.</source>
-        <target state="new">One or more validation errors occurred.</target>
+        <target state="translated">Ocorreram um ou mais erros de validação.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1010">
-        <source>Resource name is required.</source>
-        <target state="new">Resource name is required.</target>
+        <source>Rate limit exceeded.</source>
+        <target state="translated">Limite de taxa excedido.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1011">
-        <source>Rate limit exceeded.</source>
-        <target state="new">Rate limit exceeded.</target>
+        <source>{0} '{1}' not found.</source>
+        <target state="translated">{0} '{1}' não encontrado.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1012">
-        <source>Invalid request payload.</source>
-        <target state="new">Invalid request payload.</target>
+        <source>An error occurred.</source>
+        <target state="translated">Ocorreu um erro.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1013">
-        <source>Cross-parent reading is not supported for this resource.</source>
-        <target state="new">Cross-parent reading is not supported for this resource.</target>
+        <source>'{0}' must not be empty.</source>
+        <target state="translated">'{0}' não deve estar vazio.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1014">
-        <source>Resource '{0}' not found.</source>
-        <target state="new">Resource '{0}' not found.</target>
+        <source>Unsupported algorithm: {0}.</source>
+        <target state="translated">Algoritmo não suportado: {0}.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1015">
-        <source>The page token is invalid or has expired.</source>
-        <target state="new">The page token is invalid or has expired.</target>
+        <source>'{0}' is not supported.</source>
+        <target state="translated">'{0}' não é suportado.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1016">
-        <source>The filter expression is malformed.</source>
-        <target state="new">The filter expression is malformed.</target>
+        <source>'{0}' is not configured.</source>
+        <target state="translated">'{0}' não está configurado.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1017">
-        <source>The order_by expression is malformed.</source>
-        <target state="new">The order_by expression is malformed.</target>
+        <source>Application has no sector identifier URI and no redirect URIs.</source>
+        <target state="translated">A aplicação não possui URI de identificador de setor nem URIs de
+          redirecionamento.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1018">
-        <source>An error occurred.</source>
-        <target state="new">An error occurred.</target>
+        <source>Cannot resolve a resource name without a pattern.</source>
+        <target state="translated">Não é possível resolver um nome de recurso sem um padrão.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1019">
+        <source>Invalid table name '{0}' of type '{1}'.</source>
+        <target state="translated">Nome de tabela inválido '{0}' do tipo '{1}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1020">
+        <source>Entity must have at least one [Key].</source>
+        <target state="translated">A entidade deve ter pelo menos um [Key].</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1021">
+        <source>Entity key cannot be null.</source>
+        <target state="translated">A chave da entidade não pode ser nula.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1022">
+        <source>Entity key count mismatch.</source>
+        <target state="translated">A quantidade de chaves da entidade não corresponde.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1023">
+        <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
+        <target state="translated">Não é possível resolver o parâmetro '{0}' do tipo '{1}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1024">
+        <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
+        <target state="translated">Não é possível resolver o parâmetro '{0}' do método '{1}' no tipo
+          '{2}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1025">
+        <source>Unable to convert '{0}' to {1}.</source>
+        <target state="translated">Não é possível converter '{0}' para {1}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1026">
+        <source>Mapping for field {0} is missing a source field.</source>
+        <target state="translated">O campo {0} está sem um campo de origem no mapeamento.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1027">
+        <source>Tenant is not initialized successfully.</source>
+        <target state="translated">O locatário não foi inicializado com sucesso.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1028">
+        <source>Entry assembly is null.</source>
+        <target state="translated">O assembly de entrada é nulo.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST1029">
+        <source>The type {0} does not implement {1}.</source>
+        <target state="translated">O tipo {0} não implementa {1}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2001">
+        <source>Invalid request payload.</source>
+        <target state="translated">Carga da solicitação inválida.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2002">
+        <source>Cross-parent reading is not supported for this resource.</source>
+        <target state="translated">A leitura entre pais não é compatível com este recurso.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2003">
+        <source>The page token is invalid or has expired.</source>
+        <target state="translated">O token de página é inválido ou expirou.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2004">
+        <source>The {0} expression is malformed.</source>
+        <target state="translated">A expressão {0} está malformada.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2005">
+        <source>Invalid field.</source>
+        <target state="translated">Campo inválido.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2006">
+        <source>Invalid field name '{0}'.</source>
+        <target state="translated">Nome de campo inválido '{0}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2007">
+        <source>Function '{0}' not registered.</source>
+        <target state="translated">A função '{0}' não está registrada.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST3001">
+        <source>The user manager must produce an authenticator key after reset.</source>
+        <target state="translated">O gerenciador de usuários deve produzir uma chave de autenticador
+          após a redefinição.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4001">
+        <source>The client credentials are missing or invalid.</source>
+        <target state="new">The client credentials are missing or invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4002">
+        <source>Client secret is required for confidential clients.</source>
+        <target state="new">Client secret is required for confidential clients.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4003">
+        <source>The request uses more than one client authentication method.</source>
+        <target state="new">The request uses more than one client authentication method.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4004">
+        <source>The provided grant is invalid, expired, or revoked.</source>
+        <target state="new">The provided grant is invalid, expired, or revoked.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4005">
+        <source>The code_verifier does not match the code_challenge.</source>
+        <target state="new">The code_verifier does not match the code_challenge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4006">
+        <source>The requested scope is not allowed for this client.</source>
+        <target state="new">The requested scope is not allowed for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4007">
+        <source>The client is not authorized to use this grant type.</source>
+        <target state="new">The client is not authorized to use this grant type.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4008">
+        <source>The resource owner or authorization server denied the request.</source>
+        <target state="new">The resource owner or authorization server denied the request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4009">
+        <source>The redirect_uri does not match any registered URI.</source>
+        <target state="new">The redirect_uri does not match any registered URI.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4010">
+        <source>User consent is required.</source>
+        <target state="new">User consent is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4011">
+        <source>User authentication is required.</source>
+        <target state="new">User authentication is required.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4012">
+        <source>The authorization request is still pending.</source>
+        <target state="new">The authorization request is still pending.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4013">
+        <source>The polling interval is too short. Increase the interval and retry.</source>
+        <target state="new">The polling interval is too short. Increase the interval and retry.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4014">
+        <source>An internal server error occurred.</source>
+        <target state="new">An internal server error occurred.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4015">
+        <source>The '{0}' prompt value cannot be combined with other values.</source>
+        <target state="new">The '{0}' prompt value cannot be combined with other values.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4016">
+        <source>The '{0}' prompt value is not supported for this client.</source>
+        <target state="new">The '{0}' prompt value is not supported for this client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4017">
+        <source>A valid user identity is required for this request.</source>
+        <target state="new">A valid user identity is required for this request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST5001">
+        <source>Unable to resolve {0}.</source>
+        <target state="translated">Não foi possível resolver {0}.</target>
         <note />
       </trans-unit>
     </body>

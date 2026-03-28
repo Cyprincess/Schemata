@@ -1,32 +1,19 @@
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>
-///     Response model containing the current state of a user's two-factor authenticator.
-/// </summary>
 public class AuthenticatorResponse
 {
-    /// <summary>
-    ///     Gets or sets a value indicating whether two-factor authentication is enabled.
-    /// </summary>
-    public virtual bool IsTwoFactorEnabled { get; set; }
+    /// <summary>Whether two-factor authentication is currently enabled for the user.</summary>
+    public bool IsTwoFactorEnabled { get; set; }
 
-    /// <summary>
-    ///     Gets or sets a value indicating whether this machine is remembered for two-factor bypass.
-    /// </summary>
-    public virtual bool IsMachineRemembered { get; set; }
+    /// <summary>Whether this device has been remembered and can bypass 2FA prompts.</summary>
+    public bool IsMachineRemembered { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the number of unused recovery codes remaining.
-    /// </summary>
-    public virtual int RecoveryCodesLeft { get; set; }
+    /// <summary>Number of unused recovery codes remaining.</summary>
+    public int RecoveryCodesLeft { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the shared key for TOTP authenticator setup, provided during initial enrollment.
-    /// </summary>
-    public virtual string? SharedKey { get; set; }
+    /// <summary>Provided during initial enrollment only.</summary>
+    public string? SharedKey { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the generated recovery codes, provided during initial enrollment.
-    /// </summary>
-    public virtual string[]? RecoveryCodes { get; set; }
+    /// <summary>Provided during initial enrollment only.</summary>
+    public string[]? RecoveryCodes { get; set; }
 }

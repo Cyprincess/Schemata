@@ -5,13 +5,13 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Tenancy.Foundation.Middlewares;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
 using Schemata.Tenancy.Skeleton.Services;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Tenancy.Foundation.Features;
 
@@ -27,7 +27,7 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
     where TKey : struct, IEquatable<TKey>
 {
     public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 10_000_000;
-    public const int DefaultOrder    = SchemataConstants.Orders.Max;
+    public const int DefaultOrder    = Orders.Max;
 
     /// <inheritdoc />
     public override int Order => DefaultOrder;

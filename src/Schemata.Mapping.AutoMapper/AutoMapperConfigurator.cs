@@ -10,12 +10,12 @@ using Schemata.Mapping.Skeleton.Configurations;
 namespace Schemata.Mapping.AutoMapper;
 
 /// <summary>
-/// Translates Schemata mapping configurations into AutoMapper profile rules.
+///     Translates Schemata mapping configurations into AutoMapper profile rules.
 /// </summary>
 public static class AutoMapperConfigurator
 {
     /// <summary>
-    /// Applies all <see cref="SchemataMappingOptions"/> mappings to the given AutoMapper configuration.
+    ///     Applies all <see cref="SchemataMappingOptions" /> mappings to the given AutoMapper configuration.
     /// </summary>
     /// <param name="config">The AutoMapper configuration expression.</param>
     /// <param name="options">The Schemata mapping options containing compiled mapping definitions.</param>
@@ -40,7 +40,7 @@ public static class AutoMapperConfigurator
     ) {
         var setter = config.CreateMap<TSource, TDestination>();
 
-        setter.ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+        setter.ForAllMembers(opts => opts.Condition((_, _, srcMember) => srcMember != null));
         setter.PreserveReferences();
 
         foreach (var mapping in mappings) {

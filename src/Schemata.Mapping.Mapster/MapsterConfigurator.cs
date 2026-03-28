@@ -10,12 +10,12 @@ using Schemata.Mapping.Skeleton.Configurations;
 namespace Schemata.Mapping.Mapster;
 
 /// <summary>
-/// Translates Schemata mapping configurations into Mapster type adapter rules.
+///     Translates Schemata mapping configurations into Mapster type adapter rules.
 /// </summary>
 public static class MapsterConfigurator
 {
     /// <summary>
-    /// Applies all <see cref="SchemataMappingOptions"/> mappings to the given Mapster configuration.
+    ///     Applies all <see cref="SchemataMappingOptions" /> mappings to the given Mapster configuration.
     /// </summary>
     /// <param name="config">The Mapster type adapter configuration.</param>
     /// <param name="options">The Schemata mapping options containing compiled mapping definitions.</param>
