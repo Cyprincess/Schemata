@@ -1,69 +1,149 @@
-using System.Collections.Generic;
+using System;
 using Schemata.Authorization.Foundation;
+using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
-/// <summary>
-///     Extension methods for <see cref="SchemataAuthorizationBuilder" /> to enable authorization features.
-/// </summary>
 public static class SchemataAuthorizationBuilderExtensions
 {
-    /// <summary>Enables the OAuth 2.0 Authorization Code flow with PKCE.</summary>
-    public static SchemataAuthorizationBuilder UseCodeFlow(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationCodeFlowFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseCodeFlow<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder,
+        Action<CodeFlowOptions>?                                       configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<InteractionFeature>();
+        builder.AddFlowFeature<AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken>>();
         return builder;
     }
 
-    /// <summary>Enables the OAuth 2.0 Refresh Token flow.</summary>
-    public static SchemataAuthorizationBuilder UseRefreshTokenFlow(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationRefreshTokenFlowFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseClientCredentialsFlow<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<ClientCredentialsFlowFeature<TApp>>();
         return builder;
     }
 
-    /// <summary>Enables the OAuth 2.0 Client Credentials flow.</summary>
-    public static SchemataAuthorizationBuilder UseClientCredentialsFlow(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationClientCredentialsFlowFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseRefreshTokenFlow<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder,
+        Action<RefreshTokenFlowOptions>?                               configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<RefreshTokenFlowFeature<TApp, TToken>>();
         return builder;
     }
 
-    /// <summary>Enables the OAuth 2.0 Device Authorization flow.</summary>
-    public static SchemataAuthorizationBuilder UseDeviceFlow(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationDeviceFlowFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseDeviceFlow<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<InteractionFeature>();
+        builder.AddFlowFeature<DeviceFlowFeature<TApp, TAuth, TScope, TToken>>();
         return builder;
     }
 
-    /// <summary>Enables the OAuth 2.0 Token Introspection endpoint.</summary>
-    public static SchemataAuthorizationBuilder UseIntrospection(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationIntrospectionFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseTokenExchange<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<TokenExchangeFeature<TApp>>();
         return builder;
     }
 
-    /// <summary>Enables the OpenID Connect End Session (logout) endpoint.</summary>
-    public static SchemataAuthorizationBuilder UseEndSession(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationEndSessionFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseIntrospection<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<IntrospectionFeature<TApp, TToken>>();
         return builder;
     }
 
-    /// <summary>Enables the OAuth 2.0 Token Revocation endpoint.</summary>
-    public static SchemataAuthorizationBuilder UseRevocation(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationRevocationFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseRevocation<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<RevocationFeature<TApp, TToken>>();
         return builder;
     }
 
-    /// <summary>Enables request caching for authorization and end-session endpoints.</summary>
-    public static SchemataAuthorizationBuilder UseCaching(this SchemataAuthorizationBuilder builder) {
-        builder.AddFeature<AuthorizationCachingFeature>();
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseUserInfo<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<UserInfoFeature>();
         return builder;
     }
 
-    /// <summary>Registers a custom <see cref="IAuthorizationFeature" /> implementation.</summary>
-    /// <typeparam name="T">The feature type to add.</typeparam>
-    public static SchemataAuthorizationBuilder AddFeature<T>(this SchemataAuthorizationBuilder builder)
-        where T : IAuthorizationFeature, new() {
-        builder.Configurators.Set<IList<IAuthorizationFeature>>(configure => { configure.Add(new T()); });
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseFrontChannelLogout<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<FrontChannelLogoutFeature<TApp, TToken>>();
+        return builder;
+    }
 
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseBackChannelLogout<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<BackChannelLogoutFeature<TApp, TToken>>();
+        return builder;
+    }
+
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseEndSession<TApp, TAuth, TScope, TToken>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope
+        where TToken : SchemataToken, new() {
+        builder.AddFlowFeature<EndSessionFeature<TApp>>();
         return builder;
     }
 }

@@ -5,9 +5,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-/// <summary>
-///     Represents the many-to-many relationship between a <see cref="SchemataUser"/> and a <see cref="SchemataRole"/>.
-/// </summary>
 [Table("SchemataUserRole")]
 public class SchemataUserRole : IdentityUserRole<long>, ITimestamp
 {

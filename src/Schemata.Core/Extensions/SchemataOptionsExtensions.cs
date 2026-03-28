@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Common;
 using Schemata.Core.Features;
+using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Core;
@@ -19,7 +20,7 @@ public static class SchemataOptionsExtensions
     /// <param name="schemata">The Schemata options.</param>
     /// <returns>The features dictionary, or <see langword="null" /> if none are registered.</returns>
     public static Dictionary<RuntimeTypeHandle, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
-        return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(SchemataConstants.Options.Features);
+        return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Keys.Features);
     }
 
     /// <summary>
@@ -29,7 +30,7 @@ public static class SchemataOptionsExtensions
         this SchemataOptions                           schemata,
         Dictionary<RuntimeTypeHandle, ISimpleFeature>? value
     ) {
-        schemata.Set(SchemataConstants.Options.Features, value);
+        schemata.Set(Keys.Features, value);
     }
 
     /// <summary>

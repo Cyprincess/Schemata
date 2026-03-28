@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -7,22 +8,12 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
-/// <summary>
-///     Represents a role in the Schemata identity system.
-/// </summary>
-/// <remarks>
-///     Extends ASP.NET Core <see cref="IdentityRole{TKey}"/> with Schemata entity interfaces
-///     for canonical naming, display names, optimistic concurrency, and audit timestamps.
-///     Stored in the <c>SchemataRoles</c> table with a <see langword="long"/> primary key.
-/// </remarks>
 [DisplayName("Role")]
 [Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
-public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
+public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
-    /// <summary>
-    ///     Gets or sets the concurrency stamp, backed by the <see cref="Timestamp"/> GUID.
-    /// </summary>
+    /// <summary>Bridges Identity's string-based ConcurrencyStamp to the Guid-based Timestamp.</summary>
     [NotMapped]
     public override string? ConcurrencyStamp
     {
@@ -44,13 +35,19 @@ public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDi
 
     #endregion
 
-    #region IDisplayName Members
+    #region IDescriptive Members
 
     /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
     /// <inheritdoc />
-    public virtual string? DisplayNames { get; set; }
+    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Description { get; set; }
+
+    /// <inheritdoc />
+    public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 

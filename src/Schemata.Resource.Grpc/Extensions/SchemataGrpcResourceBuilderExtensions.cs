@@ -6,12 +6,12 @@ using Schemata.Resource.Grpc;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-/// Convenience overloads for registering gRPC-only resources with fewer type parameters.
+///     Convenience overloads for registering gRPC-only resources with fewer type parameters.
 /// </summary>
 public static class SchemataGrpcResourceBuilderExtensions
 {
     /// <summary>
-    /// Registers a gRPC-only resource using the entity type for all four type parameters.
+    ///     Registers a gRPC-only resource using the entity type for all four type parameters.
     /// </summary>
     /// <typeparam name="TEntity">The entity type used as entity, request, detail, and summary.</typeparam>
     /// <param name="builder">The gRPC resource builder.</param>
@@ -22,7 +22,7 @@ public static class SchemataGrpcResourceBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a gRPC-only resource using the request type for detail and summary.
+    ///     Registers a gRPC-only resource using the request type for detail and summary.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type, also used as detail and summary.</typeparam>
@@ -35,7 +35,7 @@ public static class SchemataGrpcResourceBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a gRPC-only resource using the detail type as the summary type.
+    ///     Registers a gRPC-only resource using the detail type as the summary type.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>
@@ -50,7 +50,7 @@ public static class SchemataGrpcResourceBuilderExtensions
     }
 
     /// <summary>
-    /// Registers a gRPC-only resource with explicit entity, request, detail, and summary types.
+    ///     Registers a gRPC-only resource with explicit entity, request, detail, and summary types.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>

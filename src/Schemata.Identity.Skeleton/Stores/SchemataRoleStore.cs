@@ -11,16 +11,9 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
-/// <summary>
-///     Role store using the default Schemata entity types.
-/// </summary>
-/// <typeparam name="TRole">The role entity type.</typeparam>
 public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>
     where TRole : SchemataRole
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataRoleStore{TRole}"/> class.
-    /// </summary>
     public SchemataRoleStore(
         IRepository<TRole>             roles,
         IRepository<SchemataRoleClaim> roleClaims,
@@ -29,38 +22,19 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
     ) : base(roles, roleClaims, userRole, describer) { }
 }
 
-/// <summary>
-///     Repository-backed implementation of <see cref="IQueryableRoleStore{TRole}"/> and
-///     <see cref="IRoleClaimStore{TRole}"/> for ASP.NET Core Identity.
-/// </summary>
-/// <typeparam name="TRole">The role entity type.</typeparam>
-/// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
-/// <typeparam name="TUserRole">The user-role join entity type.</typeparam>
 public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
     where TRole : SchemataRole
     where TRoleClaim : SchemataRoleClaim, new()
     where TUserRole : SchemataUserRole, new()
 {
-    /// <summary>
-    ///     The repository for role claim entities.
-    /// </summary>
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
 
-    /// <summary>
-    ///     The repository for role entities.
-    /// </summary>
     protected readonly IRepository<TRole> RolesRepository;
 
-    /// <summary>
-    ///     The repository for user-role join entities.
-    /// </summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
     private bool _disposed;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataRoleStore{TRole, TRoleClaim, TUserRole}"/> class.
-    /// </summary>
     public SchemataRoleStore(
         IRepository<TRole>      roles,
         IRepository<TRoleClaim> roleClaims,
@@ -73,9 +47,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
     }
 
-    /// <summary>
-    ///     Gets or sets the error describer used to produce identity error messages.
-    /// </summary>
+    /// <summary>Provides localized error messages for identity operations.</summary>
     public IdentityErrorDescriber ErrorDescriber { get; set; }
 
     #region IQueryableRoleStore<TRole> Members
@@ -256,9 +228,6 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
 
     #endregion
 
-    /// <summary>
-    ///     Throws an <see cref="ObjectDisposedException"/> if the store has been disposed.
-    /// </summary>
     protected virtual void ThrowIfDisposed() {
         if (!_disposed) {
             return;

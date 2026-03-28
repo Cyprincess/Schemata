@@ -7,7 +7,7 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Workflow.Skeleton.Entities;
 
 /// <summary>
-/// Represents a workflow instance, linking to the underlying stateful entity by identifier and type.
+///     Represents a workflow instance, linking to the underlying stateful entity by identifier and type.
 /// </summary>
 [DisplayName("Workflow")]
 [Table("SchemataWorkflows")]
@@ -15,12 +15,12 @@ namespace Schemata.Workflow.Skeleton.Entities;
 public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
 {
     /// <summary>
-    /// The identifier of the stateful entity instance that this workflow tracks.
+    ///     The identifier of the stateful entity instance that this workflow tracks.
     /// </summary>
     public virtual long InstanceId { get; set; }
 
     /// <summary>
-    /// The fully qualified CLR type name of the stateful entity instance.
+    ///     The fully qualified CLR type name of the stateful entity instance.
     /// </summary>
     public virtual string InstanceType { get; set; } = null!;
 

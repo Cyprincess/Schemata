@@ -13,13 +13,12 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
-    ///     Registers in-memory query caching advisors (<see cref="AdviceQueryCache{TEntity,TResult,T}" /> and <see cref="AdviceResultCache{TEntity,TResult,T}" />).
+    ///     Registers in-memory query caching advisors (<see cref="AdviceQueryCache{TEntity,TResult,T}" /> and
+    ///     <see cref="AdviceResultCache{TEntity,TResult,T}" />).
     /// </summary>
     /// <param name="builder">The repository builder.</param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseQueryCache(this SchemataRepositoryBuilder builder) {
-        builder.Services.AddMemoryCache();
-
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAdvisor<,,>), typeof(AdviceQueryCache<,,>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryResultAdvisor<,,>), typeof(AdviceResultCache<,,>)));
 

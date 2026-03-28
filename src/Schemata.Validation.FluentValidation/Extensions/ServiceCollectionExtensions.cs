@@ -9,12 +9,13 @@ using Schemata.Validation.Skeleton.Advisors;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Extension methods for registering FluentValidation validators and their corresponding validation advisors.
+///     Extension methods for registering FluentValidation validators and their corresponding validation advisors.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers a FluentValidation validator and auto-registers <see cref="AdviceValidation{T}"/> and <see cref="AdviceValidationErrors{T}"/>.
+    ///     Registers a FluentValidation validator and auto-registers <see cref="AdviceValidation{T}" /> and
+    ///     <see cref="AdviceValidationErrors{T}" />.
     /// </summary>
     /// <typeparam name="TValidator">The validator implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -27,8 +28,7 @@ public static class ServiceCollectionExtensions
         where TValidator : class, IValidator {
         var implementationType = typeof(TValidator);
         var validatorType = implementationType.GetInterfaces()
-                                              .FirstOrDefault(t => t.IsGenericType
-                                                                && t.GetGenericTypeDefinition() == typeof(IValidator<>));
+                                              .FirstOrDefault(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IValidator<>));
 
         if (validatorType is null) {
             throw new AggregateException(implementationType.Name + "is not implement with IValidator<>.");
@@ -41,7 +41,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers a FluentValidation validator for a specific entity type and auto-registers the validation advisors.
+    ///     Registers a FluentValidation validator for a specific entity type and auto-registers the validation advisors.
     /// </summary>
     /// <typeparam name="T">The entity type being validated.</typeparam>
     /// <typeparam name="TValidator">The validator implementation type.</typeparam>

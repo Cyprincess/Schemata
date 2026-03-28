@@ -12,5 +12,5 @@ public class QuotaExceededException : SchemataException
         int     status  = 429,
         string? code    = ErrorCodes.ResourceExhausted,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1011)) { }
+    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1010)) { }
 }

@@ -12,7 +12,7 @@ public class ConfiguratorsShould
         var configurators = new Configurators();
         var called        = false;
 
-        configurators.Set<string>(s => called = true);
+        configurators.Set<string>(_ => called = true);
         var action = configurators.Get<string>();
         action("test");
 
@@ -100,7 +100,7 @@ public class ConfiguratorsShould
         var configurators = new Configurators();
         var called        = false;
 
-        configurators.Set<TestOptions>(opts => {
+        configurators.Set<TestKeys>(opts => {
             opts.Value = "configured";
             called     = true;
         });
@@ -109,15 +109,15 @@ public class ConfiguratorsShould
         configurators.Invoke(services);
 
         var provider = services.BuildServiceProvider();
-        var options  = provider.GetRequiredService<IOptions<TestOptions>>();
+        var options  = provider.GetRequiredService<IOptions<TestKeys>>();
 
         Assert.Equal("configured", options.Value.Value);
         Assert.True(called);
     }
 
-    #region Nested type: TestOptions
+    #region Nested type: TestKeys
 
-    private sealed class TestOptions
+    private sealed class TestKeys
     {
         public string? Value { get; set; }
     }

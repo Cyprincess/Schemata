@@ -7,11 +7,10 @@
   <PropertyGroup>
     <Authors>Chino Chang</Authors>
     <Description>Schemata Application Framework - Authorization Skeleton</Description>
-    <PackageTags>application;authentication;authorization;business;framework;security</PackageTags>
+    <PackageTags>authorization;oauth;oidc;openid-connect;framework</PackageTags>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="OpenIddict.Core" />
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'">
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 

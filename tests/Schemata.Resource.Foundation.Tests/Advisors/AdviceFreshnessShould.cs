@@ -53,7 +53,7 @@ public class AdviceFreshnessShould
     public async Task UpdateFreshness_SuppressFreshness_Continues() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressFreshness());
+        ctx.Set(new FreshnessSuppressed());
         var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = "W/\"wrong\"" };
 

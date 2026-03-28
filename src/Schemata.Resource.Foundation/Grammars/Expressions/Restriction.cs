@@ -4,11 +4,11 @@ using Parlot;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-/// Represents a comparison restriction (e.g. <c>field = value</c>) in the filter grammar.
+///     Represents a comparison restriction (e.g. <c>field = value</c>) in the filter grammar.
 /// </summary>
 public class Restriction : ISimple
 {
-    public Restriction(TextPosition position, IComparable comparable, (IBinary, IArg)? comparator) {
+    public Restriction(TextPosition position, IComparableArg comparable, (IBinary, IArg)? comparator) {
         Position = position;
 
         Comparable = comparable;
@@ -20,17 +20,17 @@ public class Restriction : ISimple
     }
 
     /// <summary>
-    /// Gets the left-hand comparable expression.
+    ///     Gets the left-hand comparable expression.
     /// </summary>
-    public IComparable Comparable { get; }
+    public IComparableArg Comparable { get; }
 
     /// <summary>
-    /// Gets the binary comparator operator, or <see langword="null"/> for a bare expression.
+    ///     Gets the binary comparator operator, or <see langword="null" /> for a bare expression.
     /// </summary>
     public IBinary? Comparator { get; }
 
     /// <summary>
-    /// Gets the right-hand argument, or <see langword="null"/> for a bare expression.
+    ///     Gets the right-hand argument, or <see langword="null" /> for a bare expression.
     /// </summary>
     public IArg? Arg { get; }
 

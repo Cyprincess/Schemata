@@ -1,0 +1,82 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Authorization.Skeleton.Services;
+using static Schemata.Abstractions.SchemataConstants;
+
+namespace Schemata.Authorization.Foundation.Services;
+
+public sealed class ClientSecretBasicAuthentication<TApp>(
+    IApplicationManager<TApp>              manager,
+    IOptions<SchemataAuthorizationOptions> options
+) : IClientAuthentication<TApp>
+    where TApp : SchemataApplication
+{
+    #region IClientAuthentication<TApp> Members
+
+    public async Task<TApp?> AuthenticateAsync(
+        Dictionary<string, List<string?>>? query,
+        Dictionary<string, List<string?>>? form,
+        Dictionary<string, List<string?>>? headers,
+        CancellationToken                 ct
+    ) {
+        if (!options.Value.AllowedClientAuthMethods.Contains(ClientAuthMethods.ClientSecretBasic)) {
+            return null;
+        }
+
+        if (headers is null || !headers.TryGetValue(nameof(Authorization), out var values) || values.Count == 0) {
+            return null;
+        }
+
+        var header = values.FirstOrDefault(v => v?.StartsWith(Schemes.Basic + " ", StringComparison.OrdinalIgnoreCase) == true);
+        if (header is null) {
+            return null;
+        }
+
+        string decoded;
+        try {
+            decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header[(Schemes.Basic + " ").Length..].Trim()));
+        } catch (FormatException) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+        }
+
+        var colon = decoded.IndexOf(':');
+        if (colon < 0) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+        }
+
+        var id     = WebUtility.UrlDecode(decoded[..colon]);
+        var secret = WebUtility.UrlDecode(decoded[(colon + 1)..]);
+
+        if (string.IsNullOrWhiteSpace(id)) {
+            throw new OAuthException(OAuthErrors.InvalidClient, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId));
+        }
+
+        var app = await manager.FindByCanonicalNameAsync(id, ct);
+        if (app == null) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+        }
+
+        if (!string.IsNullOrWhiteSpace(secret)) {
+            if (!await manager.ValidateClientSecretAsync(app, secret, ct)) {
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+            }
+        } else if (app.ClientType == ClientTypes.Confidential) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4002));
+        }
+
+        return app;
+    }
+
+    #endregion
+}

@@ -13,7 +13,7 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// </summary>
 /// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
-///     Returns <see langword="null"/> when the header is absent. Throws <see cref="TenantResolveException" />
+///     Returns <see langword="null" /> when the header is absent. Throws <see cref="TenantResolveException" />
 ///     when the header is present but the value cannot be parsed.
 /// </remarks>
 public class RequestHeaderResolver<TKey> : ITenantResolver<TKey>

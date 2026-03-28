@@ -46,8 +46,14 @@ public static class SchemataRepositoryBuilderExtensions
     /// </summary>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
-    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="contextLifetime">
+    ///     The service lifetime for the data connection (default:
+    ///     <see cref="ServiceLifetime.Scoped" />).
+    /// </param>
+    /// <param name="optionsLifetime">
+    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
+    ///     ).
+    /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb(
         this SchemataRepositoryBuilder                   builder,
@@ -64,8 +70,14 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContext">The <see cref="DataConnection" /> type (used as both service and implementation type).</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
-    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="contextLifetime">
+    ///     The service lifetime for the data connection (default:
+    ///     <see cref="ServiceLifetime.Scoped" />).
+    /// </param>
+    /// <param name="optionsLifetime">
+    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
+    ///     ).
+    /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
         this SchemataRepositoryBuilder                   builder,
@@ -84,10 +96,19 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContextImplementation">The implementation type for the data connection.</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">The service lifetime for the data connection (default: <see cref="ServiceLifetime.Scoped" />).</param>
-    /// <param name="optionsLifetime">The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />).</param>
+    /// <param name="contextLifetime">
+    ///     The service lifetime for the data connection (default:
+    ///     <see cref="ServiceLifetime.Scoped" />).
+    /// </param>
+    /// <param name="optionsLifetime">
+    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
+    ///     ).
+    /// </param>
     /// <returns>The same builder for chaining.</returns>
-    /// <exception cref="ArgumentException">Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor accepting <see cref="DataOptions" />.</exception>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor
+    ///     accepting <see cref="DataOptions" />.
+    /// </exception>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
         Func<IServiceProvider, DataOptions, DataOptions> configure,

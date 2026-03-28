@@ -5,7 +5,8 @@ using System.Text;
 namespace Schemata.Entity.Cache;
 
 /// <summary>
-///     Expression visitor that serializes a LINQ expression tree into a deterministic string representation suitable for use as a cache key.
+///     Expression visitor that serializes a LINQ expression tree into a deterministic string representation suitable for
+///     use as a cache key.
 /// </summary>
 internal class Stringizing : ExpressionVisitor
 {

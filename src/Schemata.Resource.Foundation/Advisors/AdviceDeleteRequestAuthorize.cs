@@ -1,7 +1,6 @@
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -12,26 +11,21 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 public static class AdviceDeleteRequestAuthorize
 {
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = AdviceDeleteRequestAnonymous.DefaultOrder + 10_000_000;
 }
 
-/// <summary>
-/// Authorizes delete requests by checking role-based access for the current user.
-/// </summary>
-/// <typeparam name="TEntity">The entity type being deleted.</typeparam>
-/// <remarks>
-/// Order: 100,000,000. Registered by <see cref="SchemataResourceBuilder.WithAuthorization"/>;
-/// not auto-registered by <see cref="Features.SchemataResourceFeature"/>.
-/// Skips authorization when the entity is decorated with <see cref="Schemata.Abstractions.Resource.AnonymousAttribute"/> for the Delete operation.
-/// Throws <see cref="Schemata.Abstractions.Exceptions.AuthorizationException"/> if access is denied.
-/// </remarks>
 public sealed class AdviceDeleteRequestAuthorize<TEntity> : IResourceDeleteRequestAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
-    private readonly IAccessProvider<TEntity, ResourceRequestContext<DeleteRequest>> _access;
+    private readonly IAccessProvider<TEntity, DeleteRequest>      _access;
+    private readonly IEntitlementProvider<TEntity, DeleteRequest> _entitlement;
 
-    public AdviceDeleteRequestAuthorize(IAccessProvider<TEntity, ResourceRequestContext<DeleteRequest>> access) {
-        _access = access;
+    public AdviceDeleteRequestAuthorize(
+        IAccessProvider<TEntity, DeleteRequest>      access,
+        IEntitlementProvider<TEntity, DeleteRequest> entitlement
+    ) {
+        _access      = access;
+        _entitlement = entitlement;
     }
 
     #region IResourceDeleteRequestAdvisor<TEntity> Members
@@ -41,17 +35,22 @@ public sealed class AdviceDeleteRequestAuthorize<TEntity> : IResourceDeleteReque
 
     /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        DeleteRequest     request,
-        HttpContext?      http,
-        CancellationToken ct = default
+        AdviceContext                     ctx,
+        DeleteRequest                     request,
+        ResourceRequestContainer<TEntity> container,
+        ClaimsPrincipal?                  principal,
+        CancellationToken                 ct = default
     ) {
-        if (AnonymousAccessHelper.IsAnonymous<TEntity>(Operations.Delete)) {
+        var context = new AccessContext<DeleteRequest> { Operation = nameof(Operations.Delete), Request = request };
+
+        var expression = await _entitlement.GenerateEntitlementExpressionAsync(context, principal, ct);
+        container.ApplyModification(expression);
+
+        if (ctx.Has<AnonymousGranted>()) {
             return AdviseResult.Continue;
         }
 
-        var result = await _access.HasAccessAsync(null, new() { Operation = Operations.Delete, Request = request }, http?.User, ct);
-
+        var result = await _access.HasAccessAsync(null, context, principal, ct);
         if (!result) {
             throw new AuthorizationException();
         }

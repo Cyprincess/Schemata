@@ -1,9 +1,10 @@
 using Automatonymous.Graphing;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
+using Microsoft.Extensions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Mapping.Foundation.Features;
@@ -16,7 +17,7 @@ using Schemata.Workflow.Skeleton.Models;
 namespace Schemata.Workflow.Foundation.Features;
 
 /// <summary>
-/// Feature that registers the workflow manager, type resolver, and mapping configuration.
+///     Feature that registers the workflow manager, type resolver, and mapping configuration.
 /// </summary>
 /// <typeparam name="TWorkflow">The workflow entity type.</typeparam>
 /// <typeparam name="TTransition">The transition entity type.</typeparam>
@@ -43,17 +44,21 @@ public sealed class SchemataWorkflowFeature<TWorkflow, TTransition, TResponse> :
     ) {
         var mapping = configurators.Pop<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>();
 
-        var part = new SchemataExtensionPart<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
-        services.AddMvcCore()
-                .ConfigureApplicationPartManager(manager => {
-                     manager.ApplicationParts.Add(part);
+        services.AddOptions<MvcOptions>()
+                .Configure<IOptions<SchemataWorkflowOptions>>((mvc, opts) => {
+                     mvc.Conventions.Add(new WorkflowControllerConvention(opts.Value.AuthenticationScheme));
                  });
+
+        var part = new SchemataExtensionPart<SchemataWorkflowFeature<TWorkflow, TTransition, TResponse>>();
+        services.AddMvcCore().ConfigureApplicationPartManager(manager => {
+            manager.ApplicationParts.Add(part);
+        });
 
         services.TryAddSingleton<ITypeResolver, TypeResolver>();
 
         services.TryAddScoped<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>();
-        services.TryAddTransient<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
-        services.TryAddTransient<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
+        services.TryAddScoped<IWorkflowManager<TWorkflow, TTransition, TResponse>>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
+        services.TryAddScoped<IWorkflowManager>(sp => sp.GetRequiredService<SchemataWorkflowManager<TWorkflow, TTransition, TResponse>>());
 
         services.Map<Vertex, string>(map => { map.With(s => s.Title); });
 

@@ -1,27 +1,32 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Repository.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceBuildQuerySoftDelete{TEntity}"/>.</summary>
+/// <summary>Order constants for <see cref="AdviceBuildQuerySoftDelete{TEntity}" />.</summary>
 public static class AdviceBuildQuerySoftDelete
 {
     /// <summary>Default execution order.</summary>
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-///     Applies a global query filter that excludes soft-deleted entities (where <see cref="ISoftDelete.DeleteTime" /> is non-null).
+///     Applies a global query filter that excludes soft-deleted entities (where <see cref="ISoftDelete.DeleteTime" /> is
+///     non-null).
 /// </summary>
 /// <typeparam name="TEntity">The entity type being queried.</typeparam>
 /// <remarks>
 ///     <para>Order: 100,000,000.</para>
-///     <para>Auto-registered by <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only activates when <typeparamref name="TEntity" /> implements <see cref="ISoftDelete" />.</para>
-///     <para>Suppressed when <see cref="SuppressQuerySoftDelete" /> is present in the advice context.</para>
+///     <para>
+///         Auto-registered by
+///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
+///         activates when <typeparamref name="TEntity" /> implements <see cref="ISoftDelete" />.
+///     </para>
+///     <para>Suppressed when <see cref="QuerySoftDeleteSuppressed" /> is present in the advice context.</para>
 /// </remarks>
 public sealed class AdviceBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryAdvisor<TEntity>
     where TEntity : class
@@ -37,7 +42,7 @@ public sealed class AdviceBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryA
         QueryContainer<TEntity> container,
         CancellationToken       ct = default
     ) {
-        if (ctx.Has<SuppressQuerySoftDelete>()) {
+        if (ctx.Has<QuerySoftDeleteSuppressed>()) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

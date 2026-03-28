@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 namespace Schemata.Mapping.Skeleton;
 
 /// <summary>
-/// Extension methods for mapping collections using <see cref="ISimpleMapper"/>.
+///     Extension methods for mapping collections using <see cref="ISimpleMapper" />.
 /// </summary>
 public static class MapperExtensions
 {
     /// <summary>
-    /// Maps each element in the source collection to type <typeparamref name="T"/>, skipping null results.
+    ///     Maps each element in the source collection to type <typeparamref name="T" />, skipping null results.
     /// </summary>
     /// <typeparam name="T">The destination type.</typeparam>
     /// <param name="mapper">The mapper.</param>
@@ -37,7 +37,8 @@ public static class MapperExtensions
     }
 
     /// <summary>
-    /// Maps each element in the strongly-typed source collection to <typeparamref name="TDestination"/>, skipping null results.
+    ///     Maps each element in the strongly-typed source collection to <typeparamref name="TDestination" />, skipping null
+    ///     results.
     /// </summary>
     /// <typeparam name="TSource">The source element type.</typeparam>
     /// <typeparam name="TDestination">The destination element type.</typeparam>
@@ -63,7 +64,7 @@ public static class MapperExtensions
     }
 
     /// <summary>
-    /// Asynchronously maps each element in the source to type <typeparamref name="T"/>, skipping null results.
+    ///     Asynchronously maps each element in the source to type <typeparamref name="T" />, skipping null results.
     /// </summary>
     /// <typeparam name="T">The destination type.</typeparam>
     /// <param name="mapper">The mapper.</param>
@@ -87,7 +88,8 @@ public static class MapperExtensions
     }
 
     /// <summary>
-    /// Asynchronously maps each element in the strongly-typed source to <typeparamref name="TDestination"/>, skipping null results.
+    ///     Asynchronously maps each element in the strongly-typed source to <typeparamref name="TDestination" />, skipping
+    ///     null results.
     /// </summary>
     /// <typeparam name="TSource">The source element type.</typeparam>
     /// <typeparam name="TDestination">The destination element type.</typeparam>

@@ -5,34 +5,34 @@ using System.Threading.Tasks;
 using FluentValidation;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Validation.Skeleton.Advisors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Validation.FluentValidation.Advisors;
 
 public static class AdviceValidation
 {
-    public const int DefaultOrder = SchemataConstants.Orders.Base;
+    public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-/// Validation advisor that integrates FluentValidation into the Schemata validation pipeline.
+///     Validation advisor that integrates FluentValidation into the Schemata validation pipeline.
 /// </summary>
 /// <typeparam name="T">The type being validated.</typeparam>
 /// <remarks>
-/// Resolves <see cref="IValidator{T}"/> from the service provider and runs validation,
-/// translating FluentValidation failures into <see cref="ErrorFieldViolation"/> entries.
-/// Auto-registered when <see cref="ServiceCollectionExtensions.AddValidator{TValidator}"/> is called.
+///     Resolves <see cref="IValidator{T}" /> from the service provider and runs validation,
+///     translating FluentValidation failures into <see cref="ErrorFieldViolation" /> entries.
+///     Auto-registered when <see cref="ServiceCollectionExtensions.AddValidator{TValidator}" /> is called.
 /// </remarks>
 public sealed class AdviceValidation<T> : IValidationAdvisor<T>
 {
     private readonly IServiceProvider _sp;
 
     /// <summary>
-    /// Initializes a new instance with the specified service provider.
+    ///     Initializes a new instance with the specified service provider.
     /// </summary>
     /// <param name="sp">The service provider for resolving validators.</param>
     public AdviceValidation(IServiceProvider sp) { _sp = sp; }
@@ -70,7 +70,7 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
             var field = error.PropertyName.Underscore();
 
             var code = error.ErrorCode.EndsWith("Validator")
-                ? error.ErrorCode.Substring(0, error.ErrorCode.Length - 9).Underscore()
+                ? error.ErrorCode[..^9].Underscore()
                 : error.ErrorCode.Underscore();
             var values = error.FormattedMessagePlaceholderValues;
             if (values.TryGetValue("ComparisonValue", out var c)) {

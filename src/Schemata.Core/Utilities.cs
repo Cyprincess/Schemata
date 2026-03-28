@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 
 namespace Schemata.Core;
 
@@ -60,11 +61,7 @@ public static class Utilities
             }
 
             if (sp is null) {
-                throw new InvalidOperationException($"Cannot resolve parameter '{
-                    parameter.Name
-                }' of type '{
-                    type.FullName
-                }'.");
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1023), parameter.Name, type.FullName));
             }
 
             arguments[i] = sp.GetRequiredService(parameter.ParameterType);
@@ -129,13 +126,7 @@ public static class Utilities
             }
 
             if (sp is null) {
-                throw new InvalidOperationException($"Cannot resolve parameter '{
-                    parameter.Name
-                }' of method '{
-                    method
-                }' on type '{
-                    instance.GetType().FullName
-                }'.");
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1024), parameter.Name, method, instance.GetType().FullName));
             }
 
             arguments[i] = sp.GetRequiredService(parameter.ParameterType);

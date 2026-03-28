@@ -13,11 +13,14 @@ using Schemata.Core;
 namespace Schemata.Modular;
 
 /// <summary>
-/// Default module runner that invokes lifecycle methods on discovered <see cref="IModule"/> instances.
+///     Default module runner that invokes lifecycle methods on discovered <see cref="IModule" /> instances.
 /// </summary>
 /// <remarks>
-/// Modules are instantiated once during <see cref="IModulesRunner.ConfigureServices"/>, sorted by <see cref="Schemata.Abstractions.Modular.ModuleBase.Order"/>,
-/// then reused during <see cref="IModulesRunner.ConfigureApplication"/> and <see cref="IModulesRunner.ConfigureEndpoints"/> sorted by <see cref="Schemata.Abstractions.Modular.ModuleBase.Priority"/>.
+///     Modules are instantiated once during <see cref="IModulesRunner.ConfigureServices" />, sorted by
+///     <see cref="Schemata.Abstractions.Modular.ModuleBase.Order" />,
+///     then reused during <see cref="IModulesRunner.ConfigureApplication" /> and
+///     <see cref="IModulesRunner.ConfigureEndpoints" /> sorted by
+///     <see cref="Schemata.Abstractions.Modular.ModuleBase.Priority" />.
 /// </remarks>
 public sealed class DefaultModulesRunner : IModulesRunner
 {
@@ -25,7 +28,7 @@ public sealed class DefaultModulesRunner : IModulesRunner
     private readonly SchemataOptions               _schemata;
 
     /// <summary>
-    /// Initializes a new instance of the module runner.
+    ///     Initializes a new instance of the module runner.
     /// </summary>
     /// <param name="schemata">The Schemata options containing discovered module descriptors.</param>
     /// <param name="logger">The logger.</param>

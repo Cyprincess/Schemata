@@ -11,10 +11,7 @@ namespace Schemata.Resource.Grpc.Proto;
 internal static class RpcStatusBuilder
 {
     public static Google.Rpc.Status Build(SchemataException ex, string? requestId) {
-        var status = new Google.Rpc.Status {
-            Code    = MapFromCode(ex.Code),
-            Message = ex.Message,
-        };
+        var status = new Google.Rpc.Status { Code = MapFromCode(ex.Code), Message = ex.Message };
 
         if (ex.Details is { Count: > 0 }) {
             foreach (var detail in ex.Details) {
@@ -37,15 +34,12 @@ internal static class RpcStatusBuilder
             BadRequestDetail d => Any.Pack(new BadRequest {
                 FieldViolations = {
                     (d.FieldViolations ?? []).Select(fv => new BadRequest.Types.FieldViolation {
-                        Field       = fv.Field ?? "",
-                        Description = fv.Description ?? "",
+                        Field = fv.Field ?? "", Description = fv.Description ?? "",
                     }),
                 },
             }),
             ErrorInfoDetail d => Any.Pack(new ErrorInfo {
-                Reason   = d.Reason ?? "",
-                Domain   = d.Domain ?? "",
-                Metadata = { d.Metadata ?? [] },
+                Reason = d.Reason ?? "", Domain = d.Domain ?? "", Metadata = { d.Metadata ?? [] },
             }),
             ResourceInfoDetail d => Any.Pack(new ResourceInfo {
                 ResourceType = d.ResourceType ?? "",
@@ -56,23 +50,19 @@ internal static class RpcStatusBuilder
             PreconditionFailureDetail d => Any.Pack(new PreconditionFailure {
                 Violations = {
                     (d.Violations ?? []).Select(v => new PreconditionFailure.Types.Violation {
-                        Type        = v.Type ?? "",
-                        Subject     = v.Subject ?? "",
-                        Description = v.Description ?? "",
+                        Type = v.Type ?? "", Subject = v.Subject ?? "", Description = v.Description ?? "",
                     }),
                 },
             }),
             QuotaFailureDetail d => Any.Pack(new QuotaFailure {
                 Violations = {
                     (d.Violations ?? []).Select(v => new QuotaFailure.Types.Violation {
-                        Subject     = v.Subject ?? "",
-                        Description = v.Description ?? "",
+                        Subject = v.Subject ?? "", Description = v.Description ?? "",
                     }),
                 },
             }),
             RequestInfoDetail d => Any.Pack(new RequestInfo {
-                RequestId   = d.RequestId ?? "",
-                ServingData = d.ServingData ?? "",
+                RequestId = d.RequestId ?? "", ServingData = d.ServingData ?? "",
             }),
             var _ => null,
         };

@@ -8,12 +8,12 @@ using Schemata.Mapping.Skeleton.Configurations;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-/// Extension methods for registering mappings on <see cref="SchemataMappingBuilder"/>.
+///     Extension methods for registering mappings on <see cref="SchemataMappingBuilder" />.
 /// </summary>
 public static class SchemataMappingBuilderExtensions
 {
     /// <summary>
-    /// Registers a mapping configuration between the specified source and destination types.
+    ///     Registers a mapping configuration between the specified source and destination types.
     /// </summary>
     /// <typeparam name="TSource">The source type.</typeparam>
     /// <typeparam name="TDestination">The destination type.</typeparam>

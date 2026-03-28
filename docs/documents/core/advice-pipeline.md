@@ -303,6 +303,80 @@ Defined in `Schemata.Validation.Skeleton`:
 | ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `IValidationAdvisor<T>` | `IAdvisor<Operations, T, IList<ErrorFieldViolation>>` | During validation. Receives the CRUD operation kind, the object being validated, and a mutable error list. |
 
+### Authorization advisors
+
+Authorization advisors are defined in `Schemata.Authorization.Skeleton.Advisors`. Built-in implementations are registered automatically by `UseAuthorization()` and individual flow features (`UseCodeFlow()`, `UseDeviceFlow()`, etc.). For architectural details, see [Authorization](../authorization.md).
+
+**Token endpoint** -- runs once for all grant types before the grant-specific handler:
+
+| Interface              | Base                                                       | When it runs                                                |
+| ---------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| `ITokenRequestAdvisor` | `IAdvisor<TokenRequest, Dictionary<string, List<string>>?>` | Client authentication, grant permission, scope validation. |
+
+**Authorization Code flow** -- enabled by `UseCodeFlow()`:
+
+| Interface                    | Base                                                        | When it runs                                            |
+| ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------- |
+| `IAuthorizeEndpointAdvisor`  | `IAdvisor<AuthorizationRequestContext>`                     | Authorization endpoint: client lookup, redirect URI, PKCE, scope, prompt, consent, and auto-approval. |
+| `ICodeExchangeAdvisor`       | `IAdvisor<SchemataApplication, TokenRequest, AuthorizeRequest, SchemataToken>` | Token endpoint: PKCE verification and custom hooks during authorization code exchange. |
+
+**Device Authorization flow** -- enabled by `UseDeviceFlow()`:
+
+| Interface                         | Base                                                                  | When it runs                                             |
+| --------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| `IDeviceAuthorizeAdvisor`         | `IAdvisor<SchemataApplication, DeviceAuthorizeRequest>`               | After client auth, before device/user code generation.   |
+| `IDeviceCodeExchangeAdvisor`      | `IAdvisor<SchemataApplication?, SchemataToken>`                       | Token endpoint: device code validation and status check. |
+
+**Refresh Token flow** -- enabled by `UseRefreshTokenFlow()`:
+
+| Interface              | Base                                            | When it runs                                                           |
+| ---------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `IRefreshTokenAdvisor` | `IAdvisor<SchemataApplication?, SchemataToken>` | Token endpoint: refresh token validation, expiry, client ownership.    |
+| `IRefreshScopeAdvisor` | `IAdvisor<RefreshScopeContext>`                 | Ensures requested scope is a subset of the original grant (RFC 6749 §6). |
+
+**Token Exchange** -- automatically enabled by `UseCodeFlow()` and `UseDeviceFlow()`:
+
+| Interface               | Base                                            | When it runs                                |
+| ----------------------- | ----------------------------------------------- | ------------------------------------------- |
+| `ITokenExchangeAdvisor` | `IAdvisor<SchemataApplication, SchemataToken>`  | Validates token status and grant permission. |
+
+**Token Introspection (RFC 7662)** -- enabled by `UseIntrospection()`:
+
+| Interface                      | Base                                                          | When it runs                           |
+| ------------------------------ | ------------------------------------------------------------- | -------------------------------------- |
+| `IIntrospectionRequestAdvisor` | `IAdvisor<IntrospectRequest, Dictionary<string, List<string>>?>` | Client authentication.              |
+| `IIntrospectionAdvisor`        | `IAdvisor<IntrospectionResponse>`                             | Customizes the introspection response. |
+
+**Token Revocation (RFC 7009)** -- enabled by `UseRevocation()`:
+
+| Interface                  | Base                                                      | When it runs                                      |
+| -------------------------- | --------------------------------------------------------- | ------------------------------------------------- |
+| `IRevocationRequestAdvisor` | `IAdvisor<RevokeRequest, Dictionary<string, List<string>>?>` | Client authentication.                         |
+| `IRevocationAdvisor`       | `IAdvisor<SchemataApplication?, SchemataToken>`           | Per-token hook before revocation is committed.    |
+
+**End Session (RP-Initiated Logout)** -- enabled by `UseEndSession()`:
+
+| Interface                  | Base                                             | When it runs                                              |
+| -------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| `IEndSessionRequestAdvisor` | `IAdvisor<EndSessionRequest>`                   | Validates id_token_hint, resolves client, checks redirect URI. |
+| `IEndSessionAdvisor`       | `IAdvisor<SchemataApplication?, ClaimsPrincipal>` | After validation, before sign-out.                        |
+
+**Claims and token issuance** -- registered by `UseAuthorization()`:
+
+| Interface             | Base                                                    | When it runs                                          |
+| --------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
+| `IClaimsAdvisor`      | `IAdvisor<List<Claim>>`                                 | Claims enrichment before token issuance.              |
+| `IDestinationAdvisor` | `IAdvisor<Claim, HashSet<string>, ClaimsPrincipal>`     | Determines which tokens (access/identity) receive each claim. |
+| `ITokenAdvisor`       | `IAdvisor<SchemataApplication?, ClaimsPrincipal>`       | Final adjustments before token issuance.              |
+
+**Discovery and UserInfo** -- registered by `UseAuthorization()`:
+
+| Interface                  | Base                                   | When it runs                                    |
+| -------------------------- | -------------------------------------- | ----------------------------------------------- |
+| `IDiscoveryAdvisor`        | `IAdvisor<DiscoveryDocument>`          | Populates the OIDC discovery document. Each flow feature adds its own entries. |
+| `IUserInfoRequestAdvisor`  | `IAdvisor<ClaimsPrincipal>`            | Validates the access token at the UserInfo endpoint. |
+| `IUserInfoResponseAdvisor` | `IAdvisor<Dictionary<string, object>>` | Customizes the UserInfo response body.          |
+
 ## Registering custom advisors
 
 Advisors are registered in the DI container using `TryAddEnumerable` with a

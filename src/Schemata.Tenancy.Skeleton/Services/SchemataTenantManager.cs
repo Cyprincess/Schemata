@@ -1,11 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton.Entities;
 
@@ -17,7 +17,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 public class SchemataTenantManager : SchemataTenantManager<SchemataTenant<Guid>, Guid>, ITenantManager
 {
     /// <inheritdoc />
-    public SchemataTenantManager(IMemoryCache cache, IRepository<SchemataTenant<Guid>> tenants) :
+    public SchemataTenantManager(IDistributedCache cache, IRepository<SchemataTenant<Guid>> tenants) :
         base(cache, tenants) { }
 }
 
@@ -30,13 +30,13 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    private readonly IMemoryCache         _cache;
+    private readonly IDistributedCache    _cache;
     private readonly IRepository<TTenant> _tenants;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SchemataTenantManager{TTenant, TKey}" /> class.
     /// </summary>
-    public SchemataTenantManager(IMemoryCache cache, IRepository<TTenant> tenants) {
+    public SchemataTenantManager(IDistributedCache cache, IRepository<TTenant> tenants) {
         _cache   = cache;
         _tenants = tenants;
     }
@@ -60,21 +60,23 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     }
 
     /// <inheritdoc />
-    public virtual ValueTask<ImmutableArray<string>> GetHostsAsync(TTenant tenant, CancellationToken ct) {
+    public virtual async ValueTask<ImmutableArray<string>> GetHostsAsync(TTenant tenant, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(tenant.Hosts)) {
-            return new(ImmutableArray<string>.Empty);
+            return ImmutableArray<string>.Empty;
         }
 
-        var key = tenant.Hosts!.ToCacheKey();
-        var hosts = _cache.GetOrCreate(key, entry => {
-            entry.SetPriority(CacheItemPriority.High).SetSlidingExpiration(TimeSpan.FromMinutes(1));
+        var key   = tenant.Hosts!.ToCacheKey();
+        var bytes = await _cache.GetAsync(key, ct);
+        if (bytes is not null) {
+            return JsonSerializer.Deserialize<ImmutableArray<string>>(bytes);
+        }
 
-            var result = JsonSerializer.Deserialize<ImmutableArray<string>?>(tenant.Hosts!);
+        var hosts = JsonSerializer.Deserialize<ImmutableArray<string>?>(tenant.Hosts!) ?? ImmutableArray<string>.Empty;
+        await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(hosts), new() {
+            SlidingExpiration = TimeSpan.FromMinutes(1),
+        }, ct);
 
-            return result ?? ImmutableArray<string>.Empty;
-        })!;
-
-        return new(hosts);
+        return hosts;
     }
 
     /// <inheritdoc />
@@ -91,17 +93,16 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
 
     /// <inheritdoc />
     public virtual ValueTask SetDisplayNamesAsync(
-        TTenant                                  tenant,
-        ImmutableDictionary<CultureInfo, string> names,
-        CancellationToken                        ct
+        TTenant                    tenant,
+        Dictionary<string, string> names,
+        CancellationToken          ct
     ) {
         if (names is not { Count: > 0 }) {
             tenant.DisplayNames = null;
             return default;
         }
 
-        var dictionary = names.ToDictionary(kv => kv.Key.Name, kv => kv.Value);
-        tenant.DisplayNames = JsonSerializer.Serialize(dictionary);
+        tenant.DisplayNames = names;
 
         return default;
     }

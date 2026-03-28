@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Advice;
@@ -19,16 +19,15 @@ using Schemata.Workflow.Skeleton.Models;
 namespace Schemata.Workflow.Foundation.Controllers;
 
 /// <summary>
-/// API controller that exposes workflow operations: Get, Submit, and Raise.
+///     API controller that exposes workflow operations: Get, Submit, and Raise.
 /// </summary>
 /// <remarks>
-/// Each action runs its corresponding advisor pipeline (<see cref="IWorkflowGetAdvisor"/>,
-/// <see cref="IWorkflowSubmitAdvisor"/>, <see cref="IWorkflowRaiseAdvisor"/>) before
-/// delegating to the <see cref="IWorkflowManager"/>.
+///     Each action runs its corresponding advisor pipeline (<see cref="IStatusAdvisor" />,
+///     <see cref="ISubmitAdvisor" />, <see cref="IRaiseAdvisor" />) before
+///     delegating to the <see cref="IWorkflowManager" />.
 /// </remarks>
-[Authorize]
 [ApiController]
-[Route("~/[controller]")]
+[Route("~/Workflow")]
 public sealed class WorkflowController : ControllerBase
 {
     private readonly ILogger<WorkflowController>              _logger;
@@ -38,7 +37,7 @@ public sealed class WorkflowController : ControllerBase
     private readonly IServiceProvider _sp;
 
     /// <summary>
-    /// Initializes a new instance of the workflow controller.
+    ///     Initializes a new instance of the workflow controller.
     /// </summary>
     /// <param name="sp">The service provider.</param>
     /// <param name="mapper">The object mapper.</param>
@@ -59,19 +58,19 @@ public sealed class WorkflowController : ControllerBase
     private EmptyResult EmptyResult { get; } = new();
 
     /// <summary>
-    /// Retrieves a workflow by identifier, running the Get advisor pipeline.
+    ///     Retrieves a workflow by identifier, running the Get advisor pipeline.
     /// </summary>
     /// <param name="id">The workflow identifier.</param>
     /// <returns>The workflow response, or 404 if not found.</returns>
     [HttpGet("{id:long}")]
-    public async Task<IActionResult> Get(long id) {
+    public async Task<IActionResult> Status(long id) {
         var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
                                                                 _options.CurrentValue.TransitionType,
                                                                 _options.CurrentValue.WorkflowResponseType);
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException("Unable to resolve workflow manager.");
+            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
         }
 
         var workflow = await manager.FindAsync(id);
@@ -81,13 +80,15 @@ public sealed class WorkflowController : ControllerBase
 
         var ctx = new AdviceContext(_sp);
 
-        switch (await Advisor.For<IWorkflowGetAdvisor>()
-                             .RunAsync(ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return EmptyResult;
+        switch (await Advisor.For<IStatusAdvisor>()
+                             .RunAsync(ctx, workflow, HttpContext.User, HttpContext.RequestAborted)) {
             case AdviseResult.Continue:
                 break;
+            case AdviseResult.Handle when ctx.TryGet<IActionResult>(out var handled):
+                return handled!;
+            case AdviseResult.Block:
+            default:
+                return EmptyResult;
         }
 
         var response = await manager.MapAsync(workflow, _options.CurrentValue, User);
@@ -99,7 +100,7 @@ public sealed class WorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Submits a new workflow, running the Submit advisor pipeline.
+    ///     Submits a new workflow, running the Submit advisor pipeline.
     /// </summary>
     /// <param name="request">The workflow creation request containing the entity type and instance data.</param>
     /// <returns>The created workflow response, or 400 on validation failure.</returns>
@@ -107,13 +108,15 @@ public sealed class WorkflowController : ControllerBase
     public async Task<IActionResult> Submit(WorkflowRequest<IStateful> request) {
         var ctx = new AdviceContext(_sp);
 
-        switch (await Advisor.For<IWorkflowSubmitAdvisor>()
-                             .RunAsync(ctx, request, HttpContext, HttpContext.RequestAborted)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return EmptyResult;
+        switch (await Advisor.For<ISubmitAdvisor>()
+                             .RunAsync(ctx, request, HttpContext.User, HttpContext.RequestAborted)) {
             case AdviseResult.Continue:
                 break;
+            case AdviseResult.Handle when ctx.TryGet<IActionResult>(out var handled):
+                return handled!;
+            case AdviseResult.Block:
+            default:
+                return EmptyResult;
         }
 
         if (request.Instance is null || string.IsNullOrWhiteSpace(request.Type)) {
@@ -137,7 +140,7 @@ public sealed class WorkflowController : ControllerBase
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException("Unable to resolve workflow manager.");
+            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
         }
 
         var workflow = await manager.CreateAsync(instance, User);
@@ -154,7 +157,7 @@ public sealed class WorkflowController : ControllerBase
     }
 
     /// <summary>
-    /// Raises an event on an existing workflow, running the Get and Raise advisor pipelines.
+    ///     Raises an event on an existing workflow, running the Get and Raise advisor pipelines.
     /// </summary>
     /// <param name="id">The workflow identifier.</param>
     /// <param name="request">The event data to raise.</param>
@@ -167,7 +170,7 @@ public sealed class WorkflowController : ControllerBase
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException("Unable to resolve workflow manager.");
+            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
         }
 
         var workflow = await manager.FindAsync(id);
@@ -177,22 +180,15 @@ public sealed class WorkflowController : ControllerBase
 
         var ctx = new AdviceContext(_sp);
 
-        switch (await Advisor.For<IWorkflowGetAdvisor>()
-                             .RunAsync(ctx, workflow, HttpContext, HttpContext.RequestAborted)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return EmptyResult;
+        switch (await Advisor.For<IRaiseAdvisor>()
+                             .RunAsync(ctx, workflow, request, HttpContext.User, HttpContext.RequestAborted)) {
             case AdviseResult.Continue:
                 break;
-        }
-
-        switch (await Advisor.For<IWorkflowRaiseAdvisor>()
-                             .RunAsync(ctx, workflow, request, HttpContext, HttpContext.RequestAborted)) {
+            case AdviseResult.Handle when ctx.TryGet<IActionResult>(out var handled):
+                return handled!;
             case AdviseResult.Block:
-            case AdviseResult.Handle:
+            default:
                 return EmptyResult;
-            case AdviseResult.Continue:
-                break;
         }
 
         try {

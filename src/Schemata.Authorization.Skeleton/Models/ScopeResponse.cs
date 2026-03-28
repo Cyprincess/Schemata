@@ -1,16 +1,26 @@
+using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
-/// <summary>
-///     Response model describing a single OAuth 2.0 scope for consent screens.
-/// </summary>
-public class ScopeResponse
+public class ScopeResponse : IDescriptive
 {
-    /// <summary>Gets or sets the scope identifier.</summary>
-    public virtual string? Name { get; set; }
+    /// <summary>Machine-readable scope identifier, e.g. "openid" or "profile".</summary>
+    public string? Name { get; set; }
 
-    /// <summary>Gets or sets the localized display name.</summary>
-    public virtual string? DisplayName { get; set; }
+    #region IDescriptive Members
 
-    /// <summary>Gets or sets the localized description.</summary>
-    public virtual string? Description { get; set; }
+    /// <inheritdoc />
+    public string? DisplayName { get; set; }
+
+    /// <inheritdoc />
+    public Dictionary<string, string>? DisplayNames { get; set; }
+
+    /// <inheritdoc />
+    public string? Description { get; set; }
+
+    /// <inheritdoc />
+    public Dictionary<string, string>? Descriptions { get; set; }
+
+    #endregion
 }

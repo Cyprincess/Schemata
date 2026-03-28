@@ -3,19 +3,21 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Modular;
 
 namespace Schemata.Modular;
 
 /// <summary>
-/// Default module provider that discovers modules from <see cref="ModuleAttribute"/> annotations on the entry assembly.
+///     Default module provider that discovers modules from <see cref="ModuleAttribute" /> annotations on the entry
+///     assembly.
 /// </summary>
 public sealed class DefaultModulesProvider : IModulesProvider
 {
     private static readonly ConcurrentBag<ModuleDescriptor> Modules = [];
 
     /// <summary>
-    /// Initializes the provider, scanning the entry assembly for <see cref="ModuleAttribute"/> instances.
+    ///     Initializes the provider, scanning the entry assembly for <see cref="ModuleAttribute" /> instances.
     /// </summary>
     public DefaultModulesProvider() {
         if (!Modules.IsEmpty) {
@@ -24,7 +26,7 @@ public sealed class DefaultModulesProvider : IModulesProvider
 
         var entry = Assembly.GetEntryAssembly();
         if (entry is null) {
-            throw new InvalidOperationException("Entry assembly is null.");
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1028));
         }
 
         var modules = entry.GetCustomAttributes<ModuleAttribute>();

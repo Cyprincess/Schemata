@@ -33,7 +33,7 @@ public class ViewParserShould
 
     [Fact]
     public void Parse_ViewWithNestedChildren() {
-        var input       = "Object response {\n  Category.response category [omit all] {\n    id = category_id\n  }\n  status\n  title\n  body\n}";
+        var input = "Object response {\n  Category.response category [omit all] {\n    id = category_id\n  }\n  status\n  title\n  body\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);
         Assert.Equal(4, result.Fields.Length);

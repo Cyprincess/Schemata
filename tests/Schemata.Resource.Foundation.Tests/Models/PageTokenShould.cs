@@ -80,7 +80,7 @@ public class PageTokenShould
         var encoded = await token.ToStringAsync();
 
         // Truncate to create invalid base64
-        var tampered = encoded.Substring(0, encoded.Length - 5);
+        var tampered = encoded[..^5];
 
         var result = await PageToken.FromStringAsync(tampered);
         Assert.Null(result);

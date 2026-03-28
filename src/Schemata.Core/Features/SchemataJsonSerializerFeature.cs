@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using Schemata.Core.Json;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
@@ -67,7 +67,7 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
                     Name: nameof(IErrorDetail.Type),
                 });
 
-                property?.Name = SchemataConstants.Parameters.Type;
+                property?.Name = Parameters.Type;
             });
 
             configure(options);

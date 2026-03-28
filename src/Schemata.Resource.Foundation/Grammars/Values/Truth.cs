@@ -5,7 +5,7 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-/// Represents a boolean literal value (TRUE/FALSE) in the filter grammar.
+///     Represents a boolean literal value (TRUE/FALSE) in the filter grammar.
 /// </summary>
 public class Truth : IValue
 {
@@ -15,7 +15,7 @@ public class Truth : IValue
     }
 
     /// <summary>
-    /// Gets the boolean value.
+    ///     Gets the boolean value.
     /// </summary>
     public bool Value { get; }
 

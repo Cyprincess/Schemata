@@ -10,25 +10,17 @@ using Xunit;
 
 namespace Schemata.Resource.Foundation.Tests.Advisors;
 
-public class StudentRequest : Student, IRequestIdentification
-{
-    #region IRequestIdentification Members
-
-    public string? RequestId { get; set; }
-
-    #endregion
-}
-
 public class AdviceIdempotencyShould
 {
     [Fact]
     public async Task Create_NoRequestId_Continues() {
-        var store   = new Mock<IIdempotencyStore>();
-        var advisor = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new StudentRequest();
+        var store     = new Mock<IIdempotencyStore>();
+        var advisor   = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new StudentRequest();
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
         store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -40,11 +32,12 @@ public class AdviceIdempotencyShould
         store.Setup(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
              .ReturnsAsync((CreateResult<Student>?)null);
 
-        var advisor = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new StudentRequest { RequestId = "req-123" };
+        var advisor   = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new StudentRequest { RequestId = "req-123" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
         store.Verify(s => s.GetAsync<CreateResult<Student>>("req-123", It.IsAny<CancellationToken>()), Times.Once);
@@ -57,11 +50,12 @@ public class AdviceIdempotencyShould
         store.Setup(s => s.GetAsync<CreateResult<Student>>("req-123", It.IsAny<CancellationToken>()))
              .ReturnsAsync(cached);
 
-        var advisor = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var request = new StudentRequest { RequestId = "req-123" };
+        var advisor   = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var request   = new StudentRequest { RequestId = "req-123" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Handle, result);
         Assert.Equal(cached, ctx.Get<CreateResult<Student>>());
@@ -72,10 +66,11 @@ public class AdviceIdempotencyShould
         var store   = new Mock<IIdempotencyStore>();
         var advisor = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(store.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SuppressCreateIdempotency());
-        var request = new StudentRequest { RequestId = "req-456" };
+        ctx.Set(new CreateIdempotencySuppressed());
+        var request   = new StudentRequest { RequestId = "req-456" };
+        var container = new ResourceRequestContainer<Student>();
 
-        var result = await advisor.AdviseAsync(ctx, request, null);
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
         store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
