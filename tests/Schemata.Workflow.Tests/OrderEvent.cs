@@ -2,9 +2,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Tests;
 
-public class OrderEvent : IEvent
+public class OrderEvent : ITransition
 {
-    #region IEvent Members
+    #region ITransition Members
 
     public string Event { get; set; } = null!;
 

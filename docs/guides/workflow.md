@@ -1,6 +1,6 @@
 # Workflow
 
-This guide adds an enrollment state machine to the Student entity. After completing it, students will transition through Draft, Enrolled, and Graduated states, with every transition recorded as an auditable `SchemataTransition` row.
+This guide adds an enrollment state machine to the Student entity. After completing it, students will transition through Draft, Enrolled, and Graduated states, with every transition recorded as an auditable `SchemataFlowTransition` row.
 
 ## Add the workflow package
 
@@ -35,7 +35,7 @@ schema.UseWorkflow()
       .Use<EnrollmentStateMachine, Student>();
 ```
 
-`UseWorkflow()` registers the default `SchemataWorkflow` and `SchemataTransition` entity types, the `SchemataWorkflowManager`, the workflow controller, and the response mapping. The `.Use<TStateMachine, TI>()` call registers the state machine as `StateMachineBase<Student>` in DI.
+`UseWorkflow()` registers the default `SchemataWorkflow` and `SchemataFlowTransition` entity types, the `SchemataWorkflowManager`, the workflow controller, and the response mapping. The `.Use<TStateMachine, TI>()` call registers the state machine as `StateMachineBase<Student>` in DI.
 
 ## Add workflow tables to the DbContext
 
@@ -48,7 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Student>            Students    => Set<Student>();
     public DbSet<SchemataWorkflow>   Workflows   => Set<SchemataWorkflow>();
-    public DbSet<SchemataTransition> Transitions => Set<SchemataTransition>();
+    public DbSet<SchemataFlowTransition> Transitions => Set<SchemataFlowTransition>();
 }
 ```
 
@@ -115,7 +115,7 @@ schema.UseWorkflow()
 
 ## Trigger transitions
 
-Submit a workflow for a student, then raise events to drive state changes. Every transition is recorded as a `SchemataTransition` row with `Previous`, `Posterior`, `Event`, and audit metadata.
+Submit a workflow for a student, then raise events to drive state changes. Every transition is recorded as a `SchemataFlowTransition` row with `Previous`, `Posterior`, `Event`, and audit metadata.
 
 ```shell
 # Submit a workflow for student with ID 1

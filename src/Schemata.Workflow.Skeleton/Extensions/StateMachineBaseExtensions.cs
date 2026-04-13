@@ -20,7 +20,7 @@ public static class StateMachineBaseExtensions
     ///     Raises a named event on the state machine for the given entity instance.
     /// </summary>
     /// <typeparam name="TI">The stateful entity type.</typeparam>
-    /// <typeparam name="TEvent">The event data type, which must implement <see cref="IEvent" />.</typeparam>
+    /// <typeparam name="TEvent">The event data type, which must implement <see cref="ITransition" />.</typeparam>
     /// <param name="machine">The state machine.</param>
     /// <param name="instance">The entity to transition.</param>
     /// <param name="event">The event data containing the event name and metadata.</param>
@@ -32,7 +32,7 @@ public static class StateMachineBaseExtensions
         CancellationToken         ct
     )
         where TI : class, IStatefulEntity
-        where TEvent : class, IEvent {
+        where TEvent : class, ITransition {
         ct.ThrowIfCancellationRequested();
         return machine.RaiseEvent(instance, _ => machine.GetEvent<TEvent>(@event.Event), @event, ct);
     }

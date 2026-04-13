@@ -55,7 +55,7 @@ public interface IWorkflowManager
     /// <param name="id">The workflow identifier.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>An async enumerable of transitions.</returns>
-    IAsyncEnumerable<SchemataTransition> ListTransitionsAsync(long id, CancellationToken ct = default);
+    IAsyncEnumerable<SchemataFlowTransition> ListTransitionsAsync(long id, CancellationToken ct = default);
 
     /// <summary>
     ///     Creates a new workflow for the given stateful entity instance.
@@ -93,7 +93,7 @@ public interface IWorkflowManager
         ClaimsPrincipal?  principal = null,
         CancellationToken ct        = default
     )
-        where TEvent : class, IEvent;
+        where TEvent : class, ITransition;
 
     /// <summary>
     ///     Raises an event on a workflow identified by its identifier.
@@ -103,7 +103,7 @@ public interface IWorkflowManager
     /// <param name="event">The event data.</param>
     /// <param name="ct">A cancellation token.</param>
     Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
-        where TEvent : class, IEvent;
+        where TEvent : class, ITransition;
 
     /// <summary>
     ///     Maps a workflow and its state machine graph into a response object.

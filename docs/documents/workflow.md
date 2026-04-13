@@ -18,7 +18,7 @@ Represents a workflow instance. Table: `SchemataWorkflows`. Canonical name: `wor
 - `InstanceId` -- the primary key of the stateful entity this workflow tracks
 - `InstanceType` -- the fully qualified CLR type name of the stateful entity
 
-### SchemataTransition
+### SchemataFlowTransition
 
 Records a single state transition within a workflow. Table: `SchemataTransitions`. Canonical name: `workflows/{workflow}/transitions/{transition}`.
 
@@ -26,8 +26,8 @@ Records a single state transition within a workflow. Table: `SchemataTransitions
 - `WorkflowName` -- display name of the parent workflow
 - `Previous` -- the state before the transition
 - `Posterior` -- the state after the transition
-- `Event` -- the event name that triggered the transition (from `IEvent`)
-- `Note` -- optional note (from `IEvent`)
+- `Event` -- the event name that triggered the transition (from `ITransition`)
+- `Note` -- optional note (from `ITransition`)
 - `UpdatedById`, `UpdatedBy` -- audit fields identifying who triggered the transition
 
 ### IStatefulEntity
@@ -71,7 +71,7 @@ The non-generic workflow manager interface provides type-erased access:
 - `FindAsync(id, ct)` -- finds a workflow by ID
 - `FindInstanceAsync(id, ct)` -- finds the stateful entity for a workflow
 - `GetInstanceAsync(workflow, ct)` -- gets the entity linked to a workflow
-- `ListTransitionsAsync(id, ct)` -- lists all transitions as `IAsyncEnumerable<SchemataTransition>`
+- `ListTransitionsAsync(id, ct)` -- lists all transitions as `IAsyncEnumerable<SchemataFlowTransition>`
 - `CreateAsync(instance, principal, ct)` -- creates a new workflow for an entity
 - `CreateAsync(instance, id, ct)` -- creates a workflow record for an existing entity by type and ID
 - `RaiseAsync<TEvent>(workflow, event, principal, ct)` -- raises an event causing a state transition
@@ -99,7 +99,7 @@ The `MapAsync` method retrieves the state machine graph, available next events, 
 Configuration specifying the concrete types:
 
 - `WorkflowType` -- the `SchemataWorkflow` subclass
-- `TransitionType` -- the `SchemataTransition` subclass
+- `TransitionType` -- the `SchemataFlowTransition` subclass
 - `WorkflowResponseType` -- the response DTO type
 - `TransitionResponseType` -- defaults to `TransitionResponse`
 - `Package` -- optional scoping identifier
@@ -115,7 +115,7 @@ builder.UseWorkflow(
 
 ### Overloads
 
-- `UseWorkflow()` -- uses `SchemataWorkflow`, `SchemataTransition`, `WorkflowResponse`
+- `UseWorkflow()` -- uses `SchemataWorkflow`, `SchemataFlowTransition`, `WorkflowResponse`
 - `UseWorkflow<TWorkflow, TTransition>()` -- custom workflow/transition, default response
 - `UseWorkflow<TWorkflow, TTransition, TResponse>()` -- fully custom types
 

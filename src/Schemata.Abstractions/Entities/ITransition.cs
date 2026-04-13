@@ -5,7 +5,7 @@ namespace Schemata.Abstractions.Entities;
 ///     performed what action.
 ///     Combine with <see cref="ITimestamp" /> for a complete audit record.
 /// </summary>
-public interface IEvent
+public interface ITransition
 {
     /// <summary>
     ///     The event type identifier

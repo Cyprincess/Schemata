@@ -13,7 +13,7 @@ namespace Schemata.Workflow.Skeleton.Entities;
 [DisplayName("Transition")]
 [Table("SchemataTransitions")]
 [CanonicalName("workflows/{workflow}/transitions/{transition}")]
-public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestamp
+public class SchemataFlowTransition : IIdentifier, ICanonicalName, ITransition, ITimestamp
 {
     /// <summary>
     ///     The identifier of the parent workflow this transition belongs to.
@@ -45,22 +45,6 @@ public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestam
 
     #endregion
 
-    #region IEvent Members
-
-    /// <inheritdoc />
-    public virtual string Event { get; set; } = null!;
-
-    /// <inheritdoc />
-    public virtual string? Note { get; set; }
-
-    /// <inheritdoc />
-    public virtual long? UpdatedById { get; set; }
-
-    /// <inheritdoc />
-    public virtual string? UpdatedBy { get; set; }
-
-    #endregion
-
     #region IIdentifier Members
 
     /// <inheritdoc />
@@ -76,6 +60,22 @@ public class SchemataTransition : IIdentifier, ICanonicalName, IEvent, ITimestam
 
     /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
+
+    #endregion
+
+    #region ITransition Members
+
+    /// <inheritdoc />
+    public virtual string Event { get; set; } = null!;
+
+    /// <inheritdoc />
+    public virtual string? Note { get; set; }
+
+    /// <inheritdoc />
+    public virtual long? UpdatedById { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? UpdatedBy { get; set; }
 
     #endregion
 }

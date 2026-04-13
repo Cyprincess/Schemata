@@ -22,7 +22,7 @@ public sealed class AdviceRaiseAnonymous : IRaiseAdvisor
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         SchemataWorkflow  workflow,
-        IEvent            request,
+        ITransition       request,
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {

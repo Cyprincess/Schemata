@@ -22,12 +22,12 @@ public sealed class AdviceRaiseAuthorize : IRaiseAdvisor
 {
     public const int DefaultOrder = AdviceRaiseAnonymous.DefaultOrder + 10_000_000;
 
-    private readonly IAccessProvider<SchemataWorkflow, IEvent>      _access;
-    private readonly IEntitlementProvider<SchemataWorkflow, IEvent> _entitlement;
+    private readonly IAccessProvider<SchemataWorkflow, ITransition>      _access;
+    private readonly IEntitlementProvider<SchemataWorkflow, ITransition> _entitlement;
 
     public AdviceRaiseAuthorize(
-        IAccessProvider<SchemataWorkflow, IEvent>      access,
-        IEntitlementProvider<SchemataWorkflow, IEvent> entitlement
+        IAccessProvider<SchemataWorkflow, ITransition>      access,
+        IEntitlementProvider<SchemataWorkflow, ITransition> entitlement
     ) {
         _access      = access;
         _entitlement = entitlement;
@@ -42,11 +42,11 @@ public sealed class AdviceRaiseAuthorize : IRaiseAdvisor
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         SchemataWorkflow  workflow,
-        IEvent            request,
+        ITransition       request,
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {
-        var context = new AccessContext<IEvent> { Operation = request.Event, Request = request };
+        var context = new AccessContext<ITransition> { Operation = request.Event, Request = request };
 
         var expression = await _entitlement.GenerateEntitlementExpressionAsync(context, principal, ct);
         if (expression is not null && !expression.Compile()(workflow)) {

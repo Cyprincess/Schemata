@@ -6,7 +6,7 @@ namespace Schemata.Workflow.Skeleton.Models;
 /// <summary>
 ///     Response DTO for a single workflow transition record.
 /// </summary>
-public class TransitionResponse : IIdentifier, IEvent, ITimestamp
+public class TransitionResponse : IIdentifier, ITransition, ITimestamp
 {
     /// <summary>
     ///     The identifier of the parent workflow.
@@ -23,22 +23,6 @@ public class TransitionResponse : IIdentifier, IEvent, ITimestamp
     /// </summary>
     public virtual string? Posterior { get; set; }
 
-    #region IEvent Members
-
-    /// <inheritdoc />
-    public virtual string Event { get; set; } = null!;
-
-    /// <inheritdoc />
-    public virtual string? Note { get; set; }
-
-    /// <inheritdoc />
-    public virtual long? UpdatedById { get; set; }
-
-    /// <inheritdoc />
-    public virtual string? UpdatedBy { get; set; }
-
-    #endregion
-
     #region IIdentifier Members
 
     /// <inheritdoc />
@@ -53,6 +37,22 @@ public class TransitionResponse : IIdentifier, IEvent, ITimestamp
 
     /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
+
+    #endregion
+
+    #region ITransition Members
+
+    /// <inheritdoc />
+    public virtual string Event { get; set; } = null!;
+
+    /// <inheritdoc />
+    public virtual string? Note { get; set; }
+
+    /// <inheritdoc />
+    public virtual long? UpdatedById { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? UpdatedBy { get; set; }
 
     #endregion
 }

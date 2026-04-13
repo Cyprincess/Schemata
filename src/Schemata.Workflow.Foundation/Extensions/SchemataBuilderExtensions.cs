@@ -16,7 +16,8 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    ///     Enables the workflow subsystem using default <see cref="SchemataWorkflow" /> and <see cref="SchemataTransition" />
+    ///     Enables the workflow subsystem using default <see cref="SchemataWorkflow" /> and
+    ///     <see cref="SchemataFlowTransition" />
     ///     types.
     /// </summary>
     /// <param name="builder">The Schemata builder.</param>
@@ -24,11 +25,11 @@ public static class SchemataBuilderExtensions
     /// <param name="mapping">Optional mapping configuration for the workflow response.</param>
     /// <returns>A <see cref="SchemataWorkflowBuilder" /> for further configuration.</returns>
     public static SchemataWorkflowBuilder UseWorkflow(
-        this SchemataBuilder                                                                  builder,
-        Action<SchemataWorkflowOptions>?                                                      configure = null,
-        Action<Map<WorkflowDetails<SchemataWorkflow, SchemataTransition>, WorkflowResponse>>? mapping   = null
+        this SchemataBuilder                                                                      builder,
+        Action<SchemataWorkflowOptions>?                                                          configure = null,
+        Action<Map<WorkflowDetails<SchemataWorkflow, SchemataFlowTransition>, WorkflowResponse>>? mapping   = null
     ) {
-        return builder.UseWorkflow<SchemataWorkflow, SchemataTransition>(configure, mapping);
+        return builder.UseWorkflow<SchemataWorkflow, SchemataFlowTransition>(configure, mapping);
     }
 
     /// <summary>
@@ -47,7 +48,7 @@ public static class SchemataBuilderExtensions
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, WorkflowResponse>>? mapping   = null
     )
         where TWorkflow : SchemataWorkflow, new()
-        where TTransition : SchemataTransition, new() {
+        where TTransition : SchemataFlowTransition, new() {
         return builder.UseWorkflow<TWorkflow, TTransition, WorkflowResponse>(configure, mapping);
     }
 
@@ -67,7 +68,7 @@ public static class SchemataBuilderExtensions
         Action<Map<WorkflowDetails<TWorkflow, TTransition>, TResponse>>? mapping   = null
     )
         where TWorkflow : SchemataWorkflow, new()
-        where TTransition : SchemataTransition, new()
+        where TTransition : SchemataFlowTransition, new()
         where TResponse : WorkflowResponse {
         builder.Configure<SchemataWorkflowOptions>(options => {
             configure?.Invoke(options);

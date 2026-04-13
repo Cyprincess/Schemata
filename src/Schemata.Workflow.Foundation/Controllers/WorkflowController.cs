@@ -64,13 +64,17 @@ public sealed class WorkflowController : ControllerBase
     /// <returns>The workflow response, or 404 if not found.</returns>
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Status(long id) {
-        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
-                                                                _options.CurrentValue.TransitionType,
-                                                                _options.CurrentValue.WorkflowResponseType);
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(
+            _options.CurrentValue.WorkflowType,
+            _options.CurrentValue.TransitionType,
+            _options.CurrentValue.WorkflowResponseType
+        );
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager")
+            );
         }
 
         var workflow = await manager.FindAsync(id);
@@ -134,13 +138,17 @@ public sealed class WorkflowController : ControllerBase
             return BadRequest();
         }
 
-        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
-                                                                _options.CurrentValue.TransitionType,
-                                                                _options.CurrentValue.WorkflowResponseType);
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(
+            _options.CurrentValue.WorkflowType,
+            _options.CurrentValue.TransitionType,
+            _options.CurrentValue.WorkflowResponseType
+        );
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager")
+            );
         }
 
         var workflow = await manager.CreateAsync(instance, User);
@@ -163,14 +171,18 @@ public sealed class WorkflowController : ControllerBase
     /// <param name="request">The event data to raise.</param>
     /// <returns>The updated workflow response, or 404/400 on failure.</returns>
     [HttpPost("{id:long}")]
-    public async Task<IActionResult> Raise(long id, IEvent request) {
-        var type = typeof(IWorkflowManager<,,>).MakeGenericType(_options.CurrentValue.WorkflowType,
-                                                                _options.CurrentValue.TransitionType,
-                                                                _options.CurrentValue.WorkflowResponseType);
+    public async Task<IActionResult> Raise(long id, ITransition request) {
+        var type = typeof(IWorkflowManager<,,>).MakeGenericType(
+            _options.CurrentValue.WorkflowType,
+            _options.CurrentValue.TransitionType,
+            _options.CurrentValue.WorkflowResponseType
+        );
 
         var service = _sp.GetRequiredService(type);
         if (service is not IWorkflowManager manager) {
-            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager"));
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST5001), "workflow manager")
+            );
         }
 
         var workflow = await manager.FindAsync(id);

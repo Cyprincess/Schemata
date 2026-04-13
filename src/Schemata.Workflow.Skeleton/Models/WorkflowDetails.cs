@@ -15,7 +15,7 @@ namespace Schemata.Workflow.Skeleton.Models;
 /// </remarks>
 public sealed class WorkflowDetails<TWorkflow, TTransition>
     where TWorkflow : SchemataWorkflow
-    where TTransition : SchemataTransition
+    where TTransition : SchemataFlowTransition
 {
     /// <summary>
     ///     The workflow entity.

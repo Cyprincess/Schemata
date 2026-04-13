@@ -68,13 +68,13 @@ public class TestFixture
 
         TransitionRepository
            .Setup(r => r.ListAsync(
-                      It.IsAny<Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>>>(),
+                      It.IsAny<Func<IQueryable<SchemataFlowTransition>, IQueryable<SchemataFlowTransition>>>(),
                       It.IsAny<CancellationToken>()
                   )
             )
            .Returns((
-                        Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>> predicate,
-                        CancellationToken                                                    ct
+                        Func<IQueryable<SchemataFlowTransition>, IQueryable<SchemataFlowTransition>> predicate,
+                        CancellationToken                                                            ct
                     ) => List(Transitions.AsQueryable(), predicate, ct)
             )
            .Verifiable();
@@ -116,8 +116,8 @@ public class TestFixture
                                              );
                                              schema.Services
                                                    .TryAddScoped<
-                                                        IRepository<SchemataTransition>>(_ => TransitionRepository
-                                                                                            .Object
+                                                        IRepository<SchemataFlowTransition>>(_ => TransitionRepository
+                                                                                                .Object
                                                     );
                                              schema.Services
                                                    .TryAddScoped<IRepository<SchemataWorkflow>>(_ => WorkflowRepository
@@ -139,13 +139,13 @@ public class TestFixture
     public Mock<IRepository<Order>> OrderRepository { get; }
         = new Mock<IRepository>(MockBehavior.Strict).As<IRepository<Order>>();
 
-    public Mock<IRepository<SchemataTransition>> TransitionRepository { get; } = new(MockBehavior.Strict);
+    public Mock<IRepository<SchemataFlowTransition>> TransitionRepository { get; } = new(MockBehavior.Strict);
 
     public Mock<IRepository<SchemataWorkflow>> WorkflowRepository { get; } = new(MockBehavior.Strict);
 
     public List<Order> Orders { get; }
 
-    public List<SchemataTransition> Transitions { get; }
+    public List<SchemataFlowTransition> Transitions { get; }
 
     public List<SchemataWorkflow> Workflows { get; }
 

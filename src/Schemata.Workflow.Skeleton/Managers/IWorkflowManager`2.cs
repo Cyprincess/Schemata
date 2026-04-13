@@ -17,7 +17,7 @@ namespace Schemata.Workflow.Skeleton.Managers;
 /// <typeparam name="TResponse">The response DTO type.</typeparam>
 public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     where TWorkflow : SchemataWorkflow
-    where TTransition : SchemataTransition
+    where TTransition : SchemataFlowTransition
     where TResponse : WorkflowResponse
 {
     /// <summary>
@@ -96,7 +96,7 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
         ClaimsPrincipal?  principal = null,
         CancellationToken ct        = default
     )
-        where TEvent : class, IEvent;
+        where TEvent : class, ITransition;
 
     /// <summary>
     ///     Raises an event on a workflow identified by its identifier.
@@ -106,7 +106,7 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     /// <param name="event">The event data.</param>
     /// <param name="ct">A cancellation token.</param>
     Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
-        where TEvent : class, IEvent;
+        where TEvent : class, ITransition;
 
     /// <summary>
     ///     Maps a workflow and its state machine graph into a strongly-typed response.
