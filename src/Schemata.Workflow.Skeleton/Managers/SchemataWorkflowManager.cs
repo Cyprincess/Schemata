@@ -30,7 +30,7 @@ namespace Schemata.Workflow.Skeleton.Managers;
 public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkflowManager<TWorkflow, TTransition, TResponse>,
                                                                           IWorkflowManager
     where TWorkflow : SchemataWorkflow, new()
-    where TTransition : SchemataTransition, new()
+    where TTransition : SchemataFlowTransition, new()
     where TResponse : WorkflowResponse
 {
     private readonly ISimpleMapper            _mapper;
@@ -79,7 +79,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return GetInstanceAsync((TWorkflow)workflow, ct);
     }
 
-    IAsyncEnumerable<SchemataTransition> IWorkflowManager.ListTransitionsAsync(long id, CancellationToken ct) {
+    IAsyncEnumerable<SchemataFlowTransition> IWorkflowManager.ListTransitionsAsync(long id, CancellationToken ct) {
         return ListTransitionsAsync(id, ct);
     }
 
@@ -201,7 +201,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
 
     /// <inheritdoc />
     public virtual async Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
-        where TEvent : class, IEvent {
+        where TEvent : class, ITransition {
         var workflow = await FindAsync(id, ct);
 
         await RaiseAsync(workflow, @event, null, ct);
@@ -214,7 +214,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         ClaimsPrincipal?  principal = null,
         CancellationToken ct        = default
     )
-        where TEvent : class, IEvent {
+        where TEvent : class, ITransition {
         if (workflow is null) {
             throw new ArgumentNullException(nameof(workflow));
         }
@@ -232,8 +232,10 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return;
         }
 
-        var method = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.RaiseEventAsync),
-                                                                  BindingFlags.Static | BindingFlags.Public);
+        var method = typeof(StateMachineBaseExtensions).GetMethod(
+            nameof(StateMachineBaseExtensions.RaiseEventAsync),
+            BindingFlags.Static | BindingFlags.Public
+        );
         var invoke = method!.MakeGenericMethod(type, @event.GetType());
 
         await (Task)invoke.Invoke(null, [machine, instance, @event, ct])!;
@@ -262,12 +264,16 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return null;
         }
 
-        var visit = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetGraphAsync),
-                                                                 BindingFlags.Static | BindingFlags.Public);
+        var visit = typeof(StateMachineBaseExtensions).GetMethod(
+            nameof(StateMachineBaseExtensions.GetGraphAsync),
+            BindingFlags.Static | BindingFlags.Public
+        );
         var graph = await (Task<StateMachineGraph>)visit!.MakeGenericMethod(type).Invoke(null, [machine, ct])!;
 
-        var next = typeof(StateMachineBaseExtensions).GetMethod(nameof(StateMachineBaseExtensions.GetNextEventsAsync),
-                                                                BindingFlags.Static | BindingFlags.Public);
+        var next = typeof(StateMachineBaseExtensions).GetMethod(
+            nameof(StateMachineBaseExtensions.GetNextEventsAsync),
+            BindingFlags.Static | BindingFlags.Public
+        );
         var events = await (Task<IEnumerable<string>>)next!.MakeGenericMethod(type)
                                                            .Invoke(null, [machine, instance, ct])!;
 

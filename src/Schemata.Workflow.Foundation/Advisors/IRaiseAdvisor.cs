@@ -8,4 +8,4 @@ namespace Schemata.Workflow.Foundation.Advisors;
 /// <summary>
 ///     Advisor interface for the workflow Raise pipeline.
 /// </summary>
-public interface IRaiseAdvisor : IAdvisor<SchemataWorkflow, IEvent, ClaimsPrincipal>;
+public interface IRaiseAdvisor : IAdvisor<SchemataWorkflow, ITransition, ClaimsPrincipal>;
