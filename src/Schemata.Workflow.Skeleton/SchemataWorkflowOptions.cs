@@ -19,7 +19,8 @@ public sealed class SchemataWorkflowOptions
     public Type WorkflowResponseType { get; set; } = null!;
 
     /// <summary>
-    ///     The concrete <see cref="Schemata.Workflow.Skeleton.Entities.SchemataTransition" /> type used by the application.
+    ///     The concrete <see cref="Schemata.Workflow.Skeleton.Entities.SchemataFlowTransition" /> type used by the
+    ///     application.
     /// </summary>
     public Type TransitionType { get; set; } = null!;
 

@@ -239,10 +239,10 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task RaiseAuthorize_WithAnonymousGranted_SkipsAccessCheck() {
-        var access      = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>(MockBehavior.Strict);
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
+        var access      = new Mock<IAccessProvider<SchemataWorkflow, ITransition>>(MockBehavior.Strict);
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, ITransition>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<IEvent>>(),
+                              It.IsAny<AccessContext<ITransition>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -262,19 +262,19 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task RaiseAuthorize_Unauthorized_ThrowsAuthorizationException() {
-        var access = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>();
+        var access = new Mock<IAccessProvider<SchemataWorkflow, ITransition>>();
         access.Setup(a => a.HasAccessAsync(
                          It.IsAny<SchemataWorkflow?>(),
-                         It.IsAny<AccessContext<IEvent>>(),
+                         It.IsAny<AccessContext<ITransition>>(),
                          It.IsAny<ClaimsPrincipal?>(),
                          It.IsAny<CancellationToken>()
                      )
                )
               .ReturnsAsync(false);
 
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, ITransition>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<IEvent>>(),
+                              It.IsAny<AccessContext<ITransition>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -292,19 +292,19 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task RaiseAuthorize_Authorized_ReturnsContinue() {
-        var access = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>();
+        var access = new Mock<IAccessProvider<SchemataWorkflow, ITransition>>();
         access.Setup(a => a.HasAccessAsync(
                          It.IsAny<SchemataWorkflow?>(),
-                         It.IsAny<AccessContext<IEvent>>(),
+                         It.IsAny<AccessContext<ITransition>>(),
                          It.IsAny<ClaimsPrincipal?>(),
                          It.IsAny<CancellationToken>()
                      )
                )
               .ReturnsAsync(true);
 
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, ITransition>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<IEvent>>(),
+                              It.IsAny<AccessContext<ITransition>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -323,10 +323,10 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task RaiseAuthorize_EntitlementDenied_ThrowsAuthorizationException() {
-        var access      = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>(MockBehavior.Strict);
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
+        var access      = new Mock<IAccessProvider<SchemataWorkflow, ITransition>>(MockBehavior.Strict);
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, ITransition>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<IEvent>>(),
+                              It.IsAny<AccessContext<ITransition>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
