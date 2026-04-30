@@ -14,7 +14,7 @@ Schemata provides a multi-tenant architecture with pluggable tenant resolution, 
 The base tenant entity, parameterized by key type (typically `Guid` or `long`):
 
 ```csharp
-public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDisplayName, IConcurrency, ITimestamp
+public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
     where TKey : struct, IEquatable<TKey>
 ```
 

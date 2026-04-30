@@ -24,7 +24,7 @@ public class DeviceInteractionHandlerShould
 
         var app  = new SchemataApplication { Id = 1, ClientId = "device-client" };
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
-        apps.Setup(a => a.FindByCanonicalNameAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
+        apps.Setup(a => a.FindByClientIdAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
 
         var devicePayload = JsonSerializer.Serialize(
             new DeviceCodePayload { Scope = "openid profile", ClientId = "device-client" },
@@ -60,7 +60,7 @@ public class DeviceInteractionHandlerShould
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("user-ref", It.IsAny<CancellationToken>())).ReturnsAsync(userCode);
-        tokens.Setup(t => t.FindByCanonicalNameAsync(device.Name!, It.IsAny<CancellationToken>())).ReturnsAsync(device);
+        tokens.Setup(t => t.FindByNameAsync(device.Name!, It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
         var scopes   = new Mock<IScopeManager<SchemataScope>>();
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
@@ -103,7 +103,7 @@ public class DeviceInteractionHandlerShould
 
         var createInvocation = Assert.Single(
             f.AuthzMgr.Invocations,
-            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+            i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync)
         );
         var created = Assert.IsType<SchemataAuthorization>(createInvocation.Arguments[0]);
         Assert.Equal("device-client", created.ApplicationName);
@@ -132,7 +132,7 @@ public class DeviceInteractionHandlerShould
 
         Assert.DoesNotContain(
             f.AuthzMgr.Invocations,
-            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+            i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync)
         );
     }
 

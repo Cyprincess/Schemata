@@ -54,7 +54,7 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(gotName);
 
         var name     = nameProp.GetString()!;
-        var response = await client.DeleteAsync($"/students/{Uri.EscapeDataString(name)}");
+        var response = await client.DeleteAsync($"/{name}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 }

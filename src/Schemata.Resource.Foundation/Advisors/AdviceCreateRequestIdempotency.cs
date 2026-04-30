@@ -17,10 +17,9 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceCreateRequestIdempotency
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" /> — runs early so cached responses
-    ///     short-circuit before authorization and validation.
+    ///     Default order: runs after <see cref="AdviceCreateRequestSanitize{TEntity,TRequest}" />.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceCreateRequestSanitize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

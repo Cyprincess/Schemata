@@ -21,12 +21,14 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [CanonicalName("applications/{application}")]
 public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
-    /// <summary>Public client identifier, used as the <c>client_id</c> parameter in OAuth requests.</summary>
-    public virtual string? ClientId
-    {
-        get => Name;
-        set => Name = value;
-    }
+    /// <summary>
+    ///     OAuth 2.0 client identifier.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.2">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.2: Client Identifier
+    ///     </seealso>
+    /// </summary>
+    public virtual string? ClientId { get; set; }
 
     /// <summary>
     ///     Hashed client secret for confidential clients.
@@ -94,7 +96,11 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
 
     #region ICanonicalName Members
 
-    public virtual string? Name { get; set; }
+    public virtual string? Name
+    {
+        get => ClientId;
+        set => ClientId = value;
+    }
 
     public virtual string? CanonicalName { get; set; }
 

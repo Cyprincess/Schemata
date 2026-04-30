@@ -28,7 +28,7 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     client secret.  Public clients may omit the secret.
 /// </summary>
 public sealed class ClientSecretBasicAuthentication<TApp>(
-    IApplicationManager<TApp>              manager,
+    IApplicationManager<TApp>              apps,
     IOptions<SchemataAuthorizationOptions> options
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
@@ -88,7 +88,7 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
             );
         }
 
-        var app = await manager.FindByCanonicalNameAsync(id, ct);
+        var app = await apps.FindByClientIdAsync(id, ct);
         if (app == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
@@ -99,7 +99,7 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
         // Confidential clients MUST present a valid secret (RFC 6749 §2.3.1);
         // public clients may authenticate without one.
         if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await manager.ValidateClientSecretAsync(app, secret, ct)) {
+            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
                     SchemataResources.GetResourceString(SchemataResources.ST4001)

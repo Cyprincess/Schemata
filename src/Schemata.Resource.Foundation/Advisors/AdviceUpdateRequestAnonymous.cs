@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Security.Skeleton;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -14,9 +13,9 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceUpdateRequestAnonymous
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" />.
+    ///     Default order: runs after <see cref="AdviceUpdateRequestSanitize{TEntity,TRequest}" />.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceUpdateRequestSanitize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

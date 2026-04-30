@@ -69,13 +69,13 @@ public sealed class EndSessionHandler<TApp>(
 
             var client = hint?.FindFirstValue(Claims.ClientId) ?? hint?.FindFirstValue(Claims.Audience);
             if (!string.IsNullOrWhiteSpace(client)) {
-                application = await apps.FindByCanonicalNameAsync(client, ct);
+                application = await apps.FindByClientIdAsync(client, ct);
             }
 
             // When client_id is provided alongside the hint, verify consistency
             // to prevent cross-RP logout injection.
             if (!string.IsNullOrWhiteSpace(request.ClientId) && application is not null) {
-                var requested = await apps.FindByCanonicalNameAsync(request.ClientId, ct);
+                var requested = await apps.FindByClientIdAsync(request.ClientId, ct);
                 if (requested?.Id != application.Id) {
                     application = null;
                 }
@@ -90,7 +90,7 @@ public sealed class EndSessionHandler<TApp>(
         // Fallback: no hint but client_id provided — resolve the application
         // solely for post_logout_redirect_uri validation.
         if (application is null && !string.IsNullOrWhiteSpace(request.ClientId)) {
-            application = await apps.FindByCanonicalNameAsync(request.ClientId, ct);
+            application = await apps.FindByClientIdAsync(request.ClientId, ct);
         }
 
         string? redirect = null;

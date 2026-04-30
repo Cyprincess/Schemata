@@ -6,8 +6,8 @@ The delete operation is handled by `ResourceOperationHandler.DeleteAsync`. It ta
 
 ```csharp
 public async Task<bool> DeleteAsync(
-    TEntity entity, string? etag, bool force,
-    HttpContext? http, CancellationToken? ct)
+    string name, string? etag, bool force,
+    ClaimsPrincipal? principal, CancellationToken? ct)
 ```
 
 The return value is `true` when the entity is deleted (or the operation is handled by an advisor), and `false` when the operation is blocked.
@@ -111,7 +111,7 @@ public class ProtectActiveOrders<TEntity> : IResourceDeleteAdvisor<TEntity>
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext ctx, TEntity entity, DeleteRequest request,
-        HttpContext? http, CancellationToken ct = default)
+        ClaimsPrincipal? principal, CancellationToken ct = default)
     {
         // Custom business logic to prevent deletion
         if (entity is Order { Status: "active" })

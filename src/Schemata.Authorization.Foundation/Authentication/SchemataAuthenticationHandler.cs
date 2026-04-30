@@ -276,7 +276,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
-            ? (await apps.FindByCanonicalNameAsync(client, ct))?.Name
+            ? (await apps.FindByClientIdAsync(client, ct))?.Name
             : null;
         var @internal = principal.FindFirstValue(Claims.Subject);
 
