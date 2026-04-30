@@ -82,7 +82,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
-            ? (await apps.FindByCanonicalNameAsync(client, ct))?.Name
+            ? (await apps.FindByClientIdAsync(client, ct))?.Name
             : null;
         var subject = principal.FindFirstValue(Claims.Subject);
 

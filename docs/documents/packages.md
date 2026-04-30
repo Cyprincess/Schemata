@@ -106,28 +106,28 @@ The comprehensive module target. Includes everything in the base target plus:
 
 ## Target comparison matrix
 
-| Package | App | App.P | App.M | App.C | Biz | Biz.P | Biz.C | Mod | Mod.P | Mod.C |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Schemata.Core | x | x | x | x | | | | | | |
-| Schemata.Abstractions | | | | | x | x | x | x | x | x |
-| Schemata.Advice.Generator | x | x | x | x | x | x | x | x | x | x |
-| Schemata.Entity.Repository | | x | | x | | x | x | | x | x |
-| Schemata.Modular | | | x | x | | | | | | |
-| Schemata.Tenancy.Foundation | | | | x | | | | | | |
-| Schemata.Authorization.Foundation | | | | x | | | | | | |
-| Schemata.Authorization.Skeleton | | | | | | | x | | | x |
-| Schemata.Identity.Foundation | | | | x | | | | | | |
-| Schemata.Identity.Skeleton | | | | | | | x | | | x |
-| Schemata.Mapping.Mapster | | | | x | | | | | | |
-| Schemata.Mapping.Skeleton | | | | | | | x | | | x |
-| Schemata.Resource.Foundation | | | | x | | | | | | |
-| Schemata.Resource.Grpc | | | | x | | | | | | |
-| Schemata.Resource.Http | | | | x | | | | | | |
-| Schemata.Security.Foundation | | | | x | | | | | | |
-| Schemata.Security.Skeleton | | | | | | | x | | | x |
-| Schemata.Validation.FluentValidation | | | | x | | | | | | x |
-| Schemata.Workflow.Foundation | | | | x | | | | | | |
-| Schemata.Workflow.Skeleton | | | | | | | x | | | x |
-| Schemata.Modeling.Generator | | | | x | | | x | | | x |
+| Package                              | App | App.P | App.M | App.C | Biz | Biz.P | Biz.C | Mod | Mod.P | Mod.C |
+| ------------------------------------ | --- | ----- | ----- | ----- | --- | ----- | ----- | --- | ----- | ----- |
+| Schemata.Core                        | x   | x     | x     | x     |     |       |       |     |       |       |
+| Schemata.Abstractions                |     |       |       |       | x   | x     | x     | x   | x     | x     |
+| Schemata.Advice.Generator            | x   | x     | x     | x     | x   | x     | x     | x   | x     | x     |
+| Schemata.Entity.Repository           |     | x     |       | x     |     | x     | x     |     | x     | x     |
+| Schemata.Modular                     |     |       | x     | x     |     |       |       |     |       |       |
+| Schemata.Tenancy.Foundation          |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Authorization.Foundation    |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Authorization.Skeleton      |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Identity.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Identity.Skeleton           |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Mapping.Mapster             |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Mapping.Skeleton            |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Resource.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Resource.Grpc               |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Resource.Http               |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Security.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Security.Skeleton           |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Validation.FluentValidation |     |       |       | x     |     |       |       |     |       | x     |
+| Schemata.Workflow.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Workflow.Skeleton           |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Modeling.Generator          |     |       |       | x     |     |       | x     |     |       | x     |
 
 **Legend:** App = Application, Biz = Business, Mod = Module, P = Persisting, M = Modular, C = Complex

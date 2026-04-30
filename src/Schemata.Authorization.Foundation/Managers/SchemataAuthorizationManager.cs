@@ -55,17 +55,6 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
     }
 
     /// <inheritdoc />
-    public async Task<TAuthorization?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(name)) {
-            return null;
-        }
-
-        return await _authorizations.SingleOrDefaultAsync(q => q.Where(a => a.Name == name), ct);
-    }
-
-    /// <inheritdoc />
     public async Task<TAuthorization?> CreateAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

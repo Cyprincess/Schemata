@@ -27,7 +27,7 @@ public class AdviceAuthorizeConsentShould
         var advisor = new AdviceAuthorizeConsent<SchemataApplication, SchemataAuthorization>(authzMgr.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { Name  = "test-app", ConsentType = ConsentTypes.Explicit },
+            Application = new() { ClientId  = "test-app", ConsentType = ConsentTypes.Explicit },
             Request     = new() { Scope = "openid profile" },
             Principal   = CreatePrincipal("user-1"),
         };
@@ -45,8 +45,8 @@ public class AdviceAuthorizeConsentShould
         var advisor = new AdviceAuthorizeConsent<SchemataApplication, SchemataAuthorization>(authzMgr.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { Name  = "test-app", ConsentType = ConsentTypes.Explicit },
-            Request     = new() { Scope = "openid profile email" },
+            Application = new() { ClientId = "test-app", ConsentType = ConsentTypes.Explicit },
+            Request     = new() { Scope    = "openid profile email" },
             Principal   = CreatePrincipal("user-1"),
         };
 

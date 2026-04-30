@@ -288,14 +288,15 @@ All error code constants are defined in `SchemataConstants.ErrorCodes`:
 
 `SchemataConstants.FieldReasons` defines well-known reason codes used in `ErrorFieldViolation.Reason` for framework-produced validation errors:
 
-| Constant                 | Value                      | Description                                |
-| ------------------------ | -------------------------- | ------------------------------------------ |
-| `Required`               | `REQUIRED`                 | The field is required but was not provided |
-| `InvalidPayload`         | `INVALID_PAYLOAD`          | The request payload is invalid             |
-| `InvalidFilter`          | `INVALID_FILTER`           | The filter expression is malformed         |
-| `InvalidOrderBy`         | `INVALID_ORDER_BY`         | The order_by expression is malformed       |
-| `InvalidPageToken`       | `INVALID_PAGE_TOKEN`       | The page token is invalid or expired       |
-| `CrossParentUnsupported` | `CROSS_PARENT_UNSUPPORTED` | Cross-parent operations are not supported  |
+| Constant                 | Value                      | Description                               |
+| ------------------------ | -------------------------- | ----------------------------------------- |
+| `NotEmpty`               | `not_empty`                | The field must not be empty               |
+| `InvalidPayload`         | `invalid_payload`          | The request payload is invalid            |
+| `InvalidFilter`          | `invalid_filter`           | The filter expression is malformed        |
+| `InvalidName`            | `invalid_name`             | The resource name is invalid              |
+| `InvalidOrderBy`         | `invalid_order_by`         | The order_by expression is malformed      |
+| `InvalidPageToken`       | `invalid_page_token`       | The page token is invalid or expired      |
+| `CrossParentUnsupported` | `cross_parent_unsupported` | Cross-parent operations are not supported |
 
 These are distinct from the FluentValidation-derived reason codes described in the `ErrorFieldViolation` section above. FluentValidation reasons use `snake_case` (e.g. `not_empty`), while framework-produced reasons use `UPPER_SNAKE_CASE`.
 

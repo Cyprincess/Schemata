@@ -42,7 +42,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
     }
 
     /// <inheritdoc />
-    public async Task<TToken?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
+    public async Task<TToken?> FindByNameAsync(string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
         if (string.IsNullOrWhiteSpace(name)) {

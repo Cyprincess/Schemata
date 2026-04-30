@@ -101,7 +101,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             );
         }
 
-        var application = await _apps.FindByCanonicalNameAsync(authorize.ClientId, ct);
+        var application = await _apps.FindByClientIdAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -178,7 +178,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             );
         }
 
-        var application = await _apps.FindByCanonicalNameAsync(authorize.ClientId, ct);
+        var application = await _apps.FindByClientIdAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

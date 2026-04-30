@@ -47,13 +47,13 @@ schema.UseIdentity(
 
 `SchemataUser` extends `IdentityUser<long>` and implements several Schemata trait interfaces:
 
-| Trait            | Purpose                                    |
-| ---------------- | ------------------------------------------ |
-| `IIdentifier`    | `long` primary key                         |
-| `ICanonicalName` | Resource name (`users/{user}`)             |
-| `IDisplayName`   | Human-readable display name                |
-| `IConcurrency`   | Optimistic concurrency via `Timestamp`     |
-| `ITimestamp`     | `CreateTime` and `UpdateTime` audit fields |
+| Trait            | Purpose                                     |
+| ---------------- | ------------------------------------------- |
+| `IIdentifier`    | `long` primary key                          |
+| `ICanonicalName` | Resource name (`users/{user}`)              |
+| `IDescriptive`   | Human-readable display name and description |
+| `IConcurrency`   | Optimistic concurrency via `Timestamp`      |
+| `ITimestamp`     | `CreateTime` and `UpdateTime` audit fields  |
 
 User records are stored in the `SchemataUsers` table. `SchemataRole` follows the same pattern, stored in `SchemataRoles`.
 

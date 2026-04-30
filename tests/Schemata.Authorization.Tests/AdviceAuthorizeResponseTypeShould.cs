@@ -29,7 +29,7 @@ public class AdviceAuthorizeResponseTypeShould
         var app = new SchemataApplication { ClientId = "test" };
 
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
-        manager.Setup(m => m.FindByCanonicalNameAsync("test", It.IsAny<CancellationToken>())).ReturnsAsync(app);
+        manager.Setup(m => m.FindByClientIdAsync("test", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateRedirectUriAsync(app, "https://example.com/cb", It.IsAny<CancellationToken>()))
                .ReturnsAsync(true);
 

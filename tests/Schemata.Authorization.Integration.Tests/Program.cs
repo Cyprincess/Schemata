@@ -22,7 +22,7 @@ var testApp = new SchemataApplication {
 };
 
 var appMock = new Mock<IApplicationManager<SchemataApplication>>();
-appMock.Setup(m => m.FindByCanonicalNameAsync("test-client", It.IsAny<CancellationToken>())).ReturnsAsync(testApp);
+appMock.Setup(m => m.FindByClientIdAsync("test-client", It.IsAny<CancellationToken>())).ReturnsAsync(testApp);
 appMock.Setup(m => m.ValidateClientSecretAsync(testApp, "test-secret", It.IsAny<CancellationToken>()))
        .ReturnsAsync(true);
 appMock.Setup(m => m.ValidateClientSecretAsync(

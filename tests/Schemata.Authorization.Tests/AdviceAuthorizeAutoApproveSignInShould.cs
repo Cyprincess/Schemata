@@ -65,7 +65,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
 
         var invocation = Assert.Single(
             authzMgr.Invocations,
-            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+            i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync)
         );
         var captured = Assert.IsType<SchemataAuthorization>(invocation.Arguments[0]);
         Assert.Equal("app-1", captured.ApplicationName);

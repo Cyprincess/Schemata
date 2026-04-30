@@ -41,7 +41,7 @@ public class RevocationHandlerShould
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app        = new SchemataApplication { Id = 1, Name = "test-app", ClientId = "test-app" };
+        var app        = new SchemataApplication { Id = 1, ClientId = "test-app" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(
                              It.IsAny<Dictionary<string, List<string?>>?>(),

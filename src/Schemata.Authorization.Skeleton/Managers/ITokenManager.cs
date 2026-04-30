@@ -19,8 +19,8 @@ public interface ITokenManager<TToken>
     /// </summary>
     Task<TToken?> FindByReferenceIdAsync(string? reference, CancellationToken ct = default);
 
-    /// <summary>Finds a token by its canonical name.</summary>
-    Task<TToken?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default);
+    /// <summary>Finds a token by its name.</summary>
+    Task<TToken?> FindByNameAsync(string? name, CancellationToken ct = default);
 
     /// <summary>Lists tokens associated with a login session.</summary>
     IAsyncEnumerable<TToken> ListBySessionAsync(string? session, CancellationToken ct = default);

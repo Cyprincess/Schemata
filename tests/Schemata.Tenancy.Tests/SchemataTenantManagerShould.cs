@@ -208,6 +208,10 @@ public class SchemataTenantManagerShould
 
         public IRepository<T> SuppressTimestamp() { return this; }
 
+        public IRepository<T> SuppressOwner() { return this; }
+
+        public IRepository<T> SuppressQueryOwner() { return this; }
+
         #endregion
 
         private static async IAsyncEnumerable<TResult> ToAsync<TResult>(IEnumerable<TResult> source) {

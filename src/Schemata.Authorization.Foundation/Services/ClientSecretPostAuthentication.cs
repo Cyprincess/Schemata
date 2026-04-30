@@ -24,7 +24,7 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     looks up the application, and validates the client secret.
 /// </summary>
 public sealed class ClientSecretPostAuthentication<TApp>(
-    IApplicationManager<TApp>              manager,
+    IApplicationManager<TApp>              apps,
     IOptions<SchemataAuthorizationOptions> options
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
@@ -64,7 +64,7 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         form.TryGetValue(Parameters.ClientSecret, out var secrets);
         var secret = secrets?.FirstOrDefault();
 
-        var app = await manager.FindByCanonicalNameAsync(id, ct);
+        var app = await apps.FindByClientIdAsync(id, ct);
         if (app == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
@@ -73,7 +73,7 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         }
 
         if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await manager.ValidateClientSecretAsync(app, secret, ct)) {
+            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
                     SchemataResources.GetResourceString(SchemataResources.ST4001)
