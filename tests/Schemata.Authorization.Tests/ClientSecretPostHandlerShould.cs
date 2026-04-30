@@ -30,7 +30,7 @@ public class ClientSecretPostHandlerShould
 
     private static Mock<IApplicationManager<SchemataApplication>> MockManager() {
         var mock = new Mock<IApplicationManager<SchemataApplication>>();
-        mock.Setup(m => m.FindByCanonicalNameAsync("my-client", It.IsAny<CancellationToken>())).ReturnsAsync(TestApp);
+        mock.Setup(m => m.FindByClientIdAsync("my-client", It.IsAny<CancellationToken>())).ReturnsAsync(TestApp);
         mock.Setup(m => m.ValidateClientSecretAsync(TestApp, "my-secret", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         return mock;

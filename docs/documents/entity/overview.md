@@ -18,7 +18,7 @@ No explicit wiring is needed. Adding a trait interface to an entity activates th
 Traits are grouped by package:
 
 **Entity traits** (`Schemata.Abstractions.Entities`) — implemented on the persistent entity class:
-`IIdentifier`, `ITimestamp`, `ISoftDelete`, `IConcurrency`, `ICanonicalName`, `IStateful`, `IDisplayName`, `IExpiration`, `IEvent`
+`IIdentifier`, `ITimestamp`, `ISoftDelete`, `IConcurrency`, `ICanonicalName`, `IStateful`, `IDescriptive`, `IExpiration`, `IEvent`, `IOwnable`
 
 **Resource traits** (`Schemata.Abstractions.Resource`) — implemented on request/response DTO types:
 `IFreshness`, `IUpdateMask`, `IValidation`, `IRequestIdentification`

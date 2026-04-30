@@ -4,9 +4,9 @@ Schemata provides an OAuth 2.0 / OpenID Connect authorization server with a comp
 
 ## Packages
 
-| Package | Role |
-|---|---|
-| `Schemata.Authorization.Skeleton` | Entity types, stores, store resolvers, advisor interfaces, request/response models, manager interfaces |
+| Package                             | Role                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Schemata.Authorization.Skeleton`   | Entity types, stores, store resolvers, advisor interfaces, request/response models, manager interfaces      |
 | `Schemata.Authorization.Foundation` | Feature, controller, handlers, advisor implementations, model binding, token service, client authentication |
 
 ## Entity types
@@ -85,21 +85,21 @@ Flows that require user interaction use a common pattern:
 
 Token type URIs for `code_type` and `subject_token_type`:
 
-| Flow | Token type URI |
-|---|---|
+| Flow                  | Token type URI                                      |
+| --------------------- | --------------------------------------------------- |
 | Authorization consent | `urn:schemata:authorization:token-type:interaction` |
-| Device verification | `urn:schemata:authorization:token-type:user-code` |
-| Logout | `urn:schemata:authorization:token-type:logout` |
+| Device verification   | `urn:schemata:authorization:token-type:user-code`   |
+| Logout                | `urn:schemata:authorization:token-type:logout`      |
 
 `InteractionHandler` dispatches to `IInteractionHandler` implementations by code type. The `GET` endpoint returns an `InteractionResponse` containing application details, requested scopes, and (for authorization) the original request. The `DELETE` endpoint revokes the interaction token.
 
 Configuration in `SchemataAuthorizationOptions`:
 
-| Property | Purpose |
-|---|---|
-| `InteractionUri` | Consent/verification page (e.g. `https://auth.example.com/interact`) |
-| `DeviceVerificationUri` | Device code entry page (e.g. `https://auth.example.com/device`) |
-| `LogoutUri` | Logout page for front/back-channel notifications |
+| Property                | Purpose                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| `InteractionUri`        | Consent/verification page (e.g. `https://auth.example.com/interact`) |
+| `DeviceVerificationUri` | Device code entry page (e.g. `https://auth.example.com/device`)      |
+| `LogoutUri`             | Logout page for front/back-channel notifications                     |
 
 ### Token endpoint (shared pipeline)
 
@@ -120,11 +120,11 @@ public interface IGrantHandler
 
 `ITokenRequestAdvisor` runs for every grant type before the grant-specific handler. Registered by `UseAuthorization()`:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceTokenClientAuth` | Authenticates the client via `IClientAuthHandler` chain |
+| Advisor                      | Responsibility                                                  |
+| ---------------------------- | --------------------------------------------------------------- |
+| `AdviceTokenClientAuth`      | Authenticates the client via `IClientAuthHandler` chain         |
 | `AdviceTokenGrantPermission` | Verifies the client has permission for the requested grant type |
-| `AdviceTokenScopeValidation` | Validates requested scopes against client permissions |
+| `AdviceTokenScopeValidation` | Validates requested scopes against client permissions           |
 
 Each grant handler then runs the flow's own advisor pipeline, followed by `IClaimsAdvisor` for claims enrichment.
 
@@ -140,17 +140,17 @@ Endpoints: `GET|POST /Connect/Authorize`, `POST /Connect/Token`.
 
 Runs `IAuthorizeEndpointAdvisor`:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceAuthorizeClientAndRedirect` | Resolves application by `client_id` and validates `redirect_uri` |
-| `AdviceAuthorizeResponseMode` | Validates response mode safety |
-| `AdviceAuthorizeGrantPermission` | Verifies `authorization_code` grant permission |
-| `AdviceAuthorizeScopeValidation` | Validates requested scopes |
-| `AdviceAuthorizePkce` | Enforces PKCE requirement per client or global setting |
-| `AdviceAuthorizeNonce` | Enforces nonce for `id_token` response types |
-| `AdviceAuthorizePrompt` | Handles `prompt` parameter (none, login, consent) |
-| `AdviceAuthorizeConsent` | Evaluates consent based on application consent type and existing authorizations |
-| `AdviceAuthorizeAutoApproveSignIn` | Auto-approves and issues sign-in result when consent is already granted |
+| Advisor                            | Responsibility                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------- |
+| `AdviceAuthorizeClientAndRedirect` | Resolves application by `client_id` and validates `redirect_uri`                |
+| `AdviceAuthorizeResponseMode`      | Validates response mode safety                                                  |
+| `AdviceAuthorizeGrantPermission`   | Verifies `authorization_code` grant permission                                  |
+| `AdviceAuthorizeScopeValidation`   | Validates requested scopes                                                      |
+| `AdviceAuthorizePkce`              | Enforces PKCE requirement per client or global setting                          |
+| `AdviceAuthorizeNonce`             | Enforces nonce for `id_token` response types                                    |
+| `AdviceAuthorizePrompt`            | Handles `prompt` parameter (none, login, consent)                               |
+| `AdviceAuthorizeConsent`           | Evaluates consent based on application consent type and existing authorizations |
+| `AdviceAuthorizeAutoApproveSignIn` | Auto-approves and issues sign-in result when consent is already granted         |
 
 If auto-approved (`Handle`), issues a sign-in result directly. Otherwise, creates an interaction token and redirects to the consent UI.
 
@@ -162,8 +162,8 @@ If auto-approved (`Handle`), issues a sign-in result directly. Otherwise, create
 2. Deserializes the stored `AuthorizeRequest` and matches `client_id` / `redirect_uri`
 3. Runs `ICodeExchangeAdvisor` (receives the application, current `TokenRequest`, original `AuthorizeRequest`, and code token):
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                  | Responsibility                                             |
+| ------------------------ | ---------------------------------------------------------- |
 | `AdviceCodeExchangePkce` | Verifies `code_verifier` against the stored code challenge |
 
 4. Revokes the code (one-time use per RFC 9700 §2.1.2)
@@ -191,14 +191,14 @@ Endpoint: `POST /Connect/Token`.
 
 `IRefreshTokenAdvisor` -- refresh token validation:
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                        | Responsibility                                             |
+| ------------------------------ | ---------------------------------------------------------- |
 | `AdviceRefreshTokenValidation` | Validates token type, status, expiry, and client ownership |
 
 `IRefreshScopeAdvisor` (registered by `UseAuthorization()`) -- scope narrowing per RFC 6749 §6:
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                        | Responsibility                                            |
+| ------------------------------ | --------------------------------------------------------- |
 | `AdviceRefreshScopeValidation` | Ensures requested scope is a subset of the original grant |
 
 The consumed refresh token is revoked (rotation per RFC 9700 §2.2.2).
@@ -213,18 +213,18 @@ Endpoints: `POST /Connect/Device`, `POST /Connect/Token`.
 
 **Device authorization** -- `DeviceAuthorizeHandler` generates device and user codes. Runs `IDeviceAuthorizeAdvisor`:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceDeviceEndpointPermission` | Validates endpoint permission (RFC 8628 §3.1) |
-| `AdviceDeviceAuthorizeGrantPermission` | Validates device_code grant type permission |
-| `AdviceDeviceAuthorizeScopeValidation` | Validates requested scopes |
+| Advisor                                | Responsibility                                |
+| -------------------------------------- | --------------------------------------------- |
+| `AdviceDeviceEndpointPermission`       | Validates endpoint permission (RFC 8628 §3.1) |
+| `AdviceDeviceAuthorizeGrantPermission` | Validates device_code grant type permission   |
+| `AdviceDeviceAuthorizeScopeValidation` | Validates requested scopes                    |
 
 **Device verification** -- `DeviceInteractionHandler` (`IInteractionHandler`, code type: user_code) retrieves device code details for the verification UI and handles user denial.
 
 **Token exchange** -- `DeviceCodeHandler` (`IGrantHandler`, grant type: `urn:ietf:params:oauth:grant-type:device_code`). `UseDeviceFlow()` also adds `AdviceDeviceCodePolling` to the `ITokenRequestAdvisor` pipeline to throttle polling per RFC 8628 §3.5. After the shared pipeline, runs `IDeviceCodeExchangeAdvisor`:
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                              | Responsibility                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------- |
 | `AdviceDeviceCodeExchangeValidation` | Validates device code type, ownership, expiry, and authorization status |
 
 ### Token Exchange
@@ -252,9 +252,9 @@ Built-in sub-handler: `InteractionTokenExchangeHandler` (subject token type: `ur
 
 `ITokenExchangeAdvisor` -- token exchange validation:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceTokenExchangeValidation` | Validates token status and expiry |
+| Advisor                              | Responsibility                                        |
+| ------------------------------------ | ----------------------------------------------------- |
+| `AdviceTokenExchangeValidation`      | Validates token status and expiry                     |
 | `AdviceTokenExchangeGrantPermission` | Verifies client has `token-exchange` grant permission |
 
 ### Token Introspection (RFC 7662)
@@ -269,8 +269,8 @@ Endpoint: `POST /Connect/Introspect`.
 
 `IIntrospectionRequestAdvisor` -- client authentication:
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                         | Responsibility           |
+| ------------------------------- | ------------------------ |
 | `AdviceIntrospectionClientAuth` | Authenticates the client |
 
 `IIntrospectionAdvisor` allows customization of the introspection response. Per RFC 7662 §2.1, invalid or unauthorized requests return `active=false` (not an error).
@@ -287,8 +287,8 @@ Endpoint: `POST /Connect/Revoke`.
 
 `IRevocationRequestAdvisor` -- client authentication:
 
-| Advisor | Responsibility |
-|---|---|
+| Advisor                      | Responsibility           |
+| ---------------------------- | ------------------------ |
 | `AdviceRevocationClientAuth` | Authenticates the client |
 
 `IRevocationAdvisor` provides a per-token hook before revocation is committed.
@@ -305,10 +305,10 @@ Endpoint: `GET|POST /Connect/EndSession`.
 
 `IEndSessionRequestAdvisor` -- request validation:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceEndSessionClientLookup` | Validates `id_token_hint`, resolves client application |
-| `AdviceEndSessionRedirectUri` | Validates `post_logout_redirect_uri` against registered URIs |
+| Advisor                        | Responsibility                                               |
+| ------------------------------ | ------------------------------------------------------------ |
+| `AdviceEndSessionClientLookup` | Validates `id_token_hint`, resolves client application       |
+| `AdviceEndSessionRedirectUri`  | Validates `post_logout_redirect_uri` against registered URIs |
 
 `IEndSessionAdvisor` runs after validation, before sign-out.
 
@@ -320,19 +320,19 @@ Registered by `UseAuthorization()`. Run by all grant handlers after flow-specifi
 
 `IClaimsAdvisor` -- claims enrichment before token issuance:
 
-| Advisor | Responsibility |
-|---|---|
-| `AdviceAudienceClaims` | Adds `client_id` as an audience claim per OIDC Core §2 |
-| `AdviceSubjectClaims` | Enriches claims from `ISubjectProvider` (conditional on Identity being enabled) |
+| Advisor                | Responsibility                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `AdviceAudienceClaims` | Adds `client_id` as an audience claim per OIDC Core §2                          |
+| `AdviceSubjectClaims`  | Enriches claims from `ISubjectProvider` (conditional on Identity being enabled) |
 
 `IDestinationAdvisor` -- determines which tokens (access/identity) receive each claim:
 
-| Advisor | Condition |
-|---|---|
-| `AdviceSubjectClaimDestination` | Always |
+| Advisor                         | Condition                 |
+| ------------------------------- | ------------------------- |
+| `AdviceSubjectClaimDestination` | Always                    |
 | `AdviceProfileClaimDestination` | `profile` scope permitted |
-| `AdviceEmailClaimDestination` | `email` scope permitted |
-| `AdvicePhoneClaimDestination` | `phone` scope permitted |
+| `AdviceEmailClaimDestination`   | `email` scope permitted   |
+| `AdvicePhoneClaimDestination`   | `phone` scope permitted   |
 | `AdviceAddressClaimDestination` | `address` scope permitted |
 
 `ITokenAdvisor` runs as a final hook before token issuance.
@@ -357,11 +357,11 @@ Registered by `UseAuthorization()`. Run by all grant handlers after flow-specifi
 
 `InteractionHandler` dispatches to `IInteractionHandler` implementations by code type URI. Each flow that requires user-facing interaction registers its own handler:
 
-| Code type | Handler | Registered by |
-|---|---|---|
-| interaction | `AuthorizeInteractionHandler` | `UseCodeFlow()` |
-| user_code | `DeviceInteractionHandler` | `UseDeviceFlow()` |
-| logout | `LogoutInteractionHandler` | `UseEndSession()` |
+| Code type   | Handler                       | Registered by     |
+| ----------- | ----------------------------- | ----------------- |
+| interaction | `AuthorizeInteractionHandler` | `UseCodeFlow()`   |
+| user_code   | `DeviceInteractionHandler`    | `UseDeviceFlow()` |
+| logout      | `LogoutInteractionHandler`    | `UseEndSession()` |
 
 `IInteractionHandler` provides two operations: `GetDetailsAsync` (retrieve interaction details for the UI) and `DenyAsync` (user-initiated denial).
 
@@ -402,9 +402,9 @@ Handlers are tried in registration order. HTTP headers are collected by the cont
 
 Schemata provides its own manager interfaces in `Schemata.Authorization.Skeleton.Managers`:
 
-| Interface | Purpose |
-|---|---|
-| `IApplicationManager<T>` | Client application CRUD, permission checks, secret validation |
-| `IAuthorizationManager<T>` | Authorization grant CRUD |
-| `IScopeManager<T>` | Scope CRUD and resource resolution |
-| `ITokenManager<T>` | Token CRUD, revocation, reference ID lookup |
+| Interface                  | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
+| `IApplicationManager<T>`   | Client application CRUD, permission checks, secret validation |
+| `IAuthorizationManager<T>` | Authorization grant CRUD                                      |
+| `IScopeManager<T>`         | Scope CRUD and resource resolution                            |
+| `ITokenManager<T>`         | Token CRUD, revocation, reference ID lookup                   |

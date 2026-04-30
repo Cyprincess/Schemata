@@ -120,7 +120,7 @@ public class SetCreateTimestamp<TEntity, TRequest> : IResourceCreateAdvisor<TEnt
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext ctx, TRequest request, TEntity entity,
-        HttpContext? http, CancellationToken ct = default)
+        ClaimsPrincipal? principal, CancellationToken ct = default)
     {
         entity.CreateTime = DateTime.UtcNow;
         return Task.FromResult(AdviseResult.Continue);

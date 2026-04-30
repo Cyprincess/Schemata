@@ -68,7 +68,7 @@ You can restrict which transports a resource is exposed on by setting the `Endpo
 
 Every operation follows the same general advisor flow:
 
-1. `IResourceRequestAdvisor<TEntity>` -- a general gate that runs before any operation-specific logic, receiving the `HttpContext` and the `Operations` enum value.
+1. `IResourceRequestAdvisor<TEntity>` -- a general gate that runs before any operation-specific logic, receiving the `ClaimsPrincipal` and the `Operations` enum value.
 2. Operation-specific request advisor (e.g., `IResourceCreateRequestAdvisor<TEntity, TRequest>`).
 3. Operation-specific entity advisor (e.g., `IResourceCreateAdvisor<TEntity, TRequest>`), which has access to both the request and the entity.
 4. Persistence via `IRepository<TEntity>`.

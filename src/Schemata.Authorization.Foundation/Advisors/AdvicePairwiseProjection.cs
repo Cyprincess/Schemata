@@ -54,7 +54,7 @@ public sealed class AdvicePairwiseProjection<TApp>(
             return AdviseResult.Continue;
         }
 
-        var app = await apps.FindByCanonicalNameAsync(client, ct);
+        var app = await apps.FindByClientIdAsync(client, ct);
         if (app is null) {
             return AdviseResult.Continue;
         }

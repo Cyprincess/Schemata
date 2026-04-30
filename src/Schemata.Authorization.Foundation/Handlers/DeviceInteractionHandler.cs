@@ -76,7 +76,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var device = await tokens.FindByCanonicalNameAsync(uc.DeviceCodeName, ct);
+        var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Status != TokenStatuses.Valid
          || device.Type != TokenTypes.DeviceCode
          || (device.ExpireTime.HasValue && device.ExpireTime.Value <= DateTime.UtcNow)
@@ -95,7 +95,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var application = await apps.FindByCanonicalNameAsync(payload.ClientId, ct);
+        var application = await apps.FindByClientIdAsync(payload.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -168,7 +168,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var device = await tokens.FindByCanonicalNameAsync(uc.DeviceCodeName, ct);
+        var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Status != TokenStatuses.Valid
          || device.Type != TokenTypes.DeviceCode
          || (device.ExpireTime.HasValue && device.ExpireTime.Value <= DateTime.UtcNow)
@@ -187,7 +187,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var application = await apps.FindByCanonicalNameAsync(payload.ClientId, ct);
+        var application = await apps.FindByClientIdAsync(payload.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -240,7 +240,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var device = await tokens.FindByCanonicalNameAsync(uc.DeviceCodeName, ct);
+        var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Type != TokenTypes.DeviceCode) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

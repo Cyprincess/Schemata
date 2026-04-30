@@ -25,6 +25,7 @@
     <Project Path="src/Schemata.Entity.Cache/Schemata.Entity.Cache.csproj" />
     <Project Path="src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
     <Project Path="src/Schemata.Entity.LinqToDB/Schemata.Entity.LinqToDB.csproj" />
+    <Project Path="src/Schemata.Entity.Owner/Schemata.Entity.Owner.csproj" />
     <Project Path="src/Schemata.Entity.Repository/Schemata.Entity.Repository.csproj" />
     <Project Path="src/Schemata.Identity.Foundation/Schemata.Identity.Foundation.csproj" />
     <Project Path="src/Schemata.Identity.Skeleton/Schemata.Identity.Skeleton.csproj" />

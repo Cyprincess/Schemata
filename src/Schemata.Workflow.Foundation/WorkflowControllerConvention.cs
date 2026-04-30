@@ -5,7 +5,7 @@ using Schemata.Workflow.Foundation.Controllers;
 
 namespace Schemata.Workflow.Foundation;
 
-internal sealed class WorkflowControllerConvention(string? scheme = null) : IControllerModelConvention
+public sealed class WorkflowControllerConvention(string? scheme = null) : IControllerModelConvention
 {
     #region IControllerModelConvention Members
 

@@ -39,22 +39,24 @@ internal static class ResourceJsonOptions
         }
 
         json.TypeInfoResolver = json.TypeInfoResolver?.WithAddedModifier(info => {
-            // Remove CanonicalName from serialization — it is a fully-qualified
-            // resource path (AIP-122) reconstructed from the hierarchical JSON
-            // structure, not a stored property.
             if (typeof(ICanonicalName).IsAssignableFrom(info.Type)) {
-                var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
+                // Remove ICanonicalName.Name from serialization — it is the full resource name pattern and
+                // not a proto field that should be serialized independently.
+                var np = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
+                    Name: nameof(ICanonicalName.Name),
+                });
+                if (np is not null) {
+                    info.Properties.Remove(np);
+                }
+
+                // Map CanonicalName to "name" for AIP-122 wire compatibility.
+                var cp = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(ICanonicalName.CanonicalName),
                 });
-
-                if (property is not null) {
-                    info.Properties.Remove(property);
-                }
+                cp?.Name = Parameters.Name;
             }
 
-            // Rename Entities to the pluralized entity name per AIP-132,
-            // which requires the repeated field in a List response to use
-            // the resource's plural name (e.g. "books" instead of "entities").
+            // Rename "entities" to the pluralized resource name per AIP-132.
             if (info.Type is { IsGenericType: true } && info.Type.GetGenericTypeDefinition() == typeof(ListResult<>)) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(ListResult<>.Entities),
@@ -72,8 +74,7 @@ internal static class ResourceJsonOptions
                 }
             }
 
-            // Rename EntityTag to "etag" per AIP-154 convention,
-            // matching the query parameter name used for concurrency control.
+            // Map EntityTag to "etag" per AIP-154 concurrency token naming.
             if (typeof(IFreshness).IsAssignableFrom(info.Type)) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(IFreshness.EntityTag),

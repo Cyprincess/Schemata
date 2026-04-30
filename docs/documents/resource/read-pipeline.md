@@ -34,7 +34,7 @@ The first gate. Returns `Continue`, `Handle` (with `ListResult<TSummary>` in con
 IResourceListRequestAdvisor<TEntity>
 ```
 
-Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the `HttpContext`. Advisors can inspect the request and add query modifications to the container.
+Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the `ClaimsPrincipal`. Advisors can inspect the request and add query modifications to the container.
 
 When `WithAuthorization()` is enabled, `AdviceListRequestAuthorize` runs at order 100,000,000:
 
@@ -100,15 +100,7 @@ A `ListResult<TSummary>` is returned with:
 
 ## Get Operation
 
-`ResourceOperationHandler.GetAsync` accepts a `TEntity` (already resolved) and returns a `GetResult<TDetail>`.
-
-The handler provides several entity-resolution methods:
-
-| Method                                   | Lookup Strategy                                                                                                                      |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `GetByNameAsync(name, http, ct)`         | Finds by `Name` property, extracting parent values from HTTP route values.                                                           |
-| `GetByNameAsync(name, parentValues, ct)` | Finds by `Name` with explicit parent values dictionary.                                                                              |
-| `GetByCanonicalNameAsync(name, ct)`      | Parses a full canonical name (e.g., `publishers/acme/books/les-miserables`), extracts the leaf name and parent values, then queries. |
+`ResourceOperationHandler.GetAsync` accepts a resource name and a `ClaimsPrincipal`, resolves the entity, and returns a `GetResult<TDetail>`.
 
 All of these call `FindByNameAsync` internally, which queries with `SuppressQuerySoftDelete()` so that soft-deleted entities can be found (useful for undelete scenarios). If no entity matches, a `NotFoundException` is thrown with the resource type and name in the error details.
 

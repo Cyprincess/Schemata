@@ -147,7 +147,7 @@ public class AuditUpdate<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TR
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext ctx, TRequest request, TEntity entity,
-        HttpContext? http, CancellationToken ct = default)
+        ClaimsPrincipal? principal, CancellationToken ct = default)
     {
         entity.UpdateTime = DateTime.UtcNow;
         return Task.FromResult(AdviseResult.Continue);

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
@@ -16,7 +17,11 @@ public class DefaultClaimsProvider<TUser>(SchemataUserManager<TUser> manager) : 
 
     /// <inheritdoc />
     public async Task<IList<Claim>> GetClaimsAsync(TUser user, CancellationToken ct = default) {
-        var subject = user.CanonicalName ?? await manager.GetUserIdAsync(user);
+        var subject = user.CanonicalName;
+        if (string.IsNullOrWhiteSpace(subject)) {
+            throw new AuthorizationException();
+        }
+
         var claims  = new List<Claim> { new(Claims.Subject, subject) };
 
         var username = await manager.GetUserPrincipalNameAsync(user);

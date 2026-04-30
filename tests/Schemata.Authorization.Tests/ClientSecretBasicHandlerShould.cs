@@ -33,7 +33,7 @@ public class ClientSecretBasicHandlerShould
     private static Mock<IApplicationManager<SchemataApplication>> MockManager(SchemataApplication? app = null) {
         var mock = new Mock<IApplicationManager<SchemataApplication>>();
         if (app is not null) {
-            mock.Setup(m => m.FindByCanonicalNameAsync(app.ClientId!, It.IsAny<CancellationToken>())).ReturnsAsync(app);
+            mock.Setup(m => m.FindByClientIdAsync(app.ClientId!, It.IsAny<CancellationToken>())).ReturnsAsync(app);
             mock.Setup(m => m.ValidateClientSecretAsync(app, "my-secret", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
         }
@@ -63,7 +63,7 @@ public class ClientSecretBasicHandlerShould
     public async Task Authenticates_WithUrlEncodedValues() {
         var app     = new SchemataApplication { Id = 1, ClientId = "my client", ClientType = "confidential" };
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
-        manager.Setup(m => m.FindByCanonicalNameAsync("my client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
+        manager.Setup(m => m.FindByClientIdAsync("my client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateClientSecretAsync(app, "my:secret", It.IsAny<CancellationToken>()))
                .ReturnsAsync(true);
 

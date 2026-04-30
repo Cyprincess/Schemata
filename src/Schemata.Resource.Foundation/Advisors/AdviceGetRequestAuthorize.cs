@@ -71,10 +71,7 @@ public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvi
             return AdviseResult.Continue;
         }
 
-        var result = await _access.HasAccessAsync(null, context, principal, ct);
-        if (!result) {
-            throw new AuthorizationException();
-        }
+        await AuthorizeHelper.EnsureAsync(_access, context, request.Name ?? string.Empty, principal, ct);
 
         return AdviseResult.Continue;
     }

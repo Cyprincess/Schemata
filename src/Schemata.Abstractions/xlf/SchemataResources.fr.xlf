@@ -214,87 +214,102 @@
       </trans-unit>
       <trans-unit id="ST4001">
         <source>The client credentials are missing or invalid.</source>
-        <target state="new">The client credentials are missing or invalid.</target>
+        <target state="translated">Les informations d'identification du client sont manquantes ou invalides.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4002">
         <source>Client secret is required for confidential clients.</source>
-        <target state="new">Client secret is required for confidential clients.</target>
+        <target state="translated">Le secret client est requis pour les clients confidentiels.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4003">
         <source>The request uses more than one client authentication method.</source>
-        <target state="new">The request uses more than one client authentication method.</target>
+        <target state="translated">La requête utilise plus d'une méthode d'authentification client.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4004">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="new">The provided grant is invalid, expired, or revoked.</target>
+        <target state="translated">L'autorisation fournie est invalide, expirée ou révoquée.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4005">
         <source>The code_verifier does not match the code_challenge.</source>
-        <target state="new">The code_verifier does not match the code_challenge.</target>
+        <target state="translated">Le code_verifier ne correspond pas au code_challenge.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4006">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="new">The requested scope is not allowed for this client.</target>
+        <target state="translated">L'étendue demandée n'est pas autorisée pour ce client.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4007">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="new">The client is not authorized to use this grant type.</target>
+        <target state="translated">Le client n'est pas autorisé à utiliser ce type d'autorisation.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4008">
         <source>The resource owner or authorization server denied the request.</source>
-        <target state="new">The resource owner or authorization server denied the request.</target>
+        <target state="translated">Le propriétaire de la ressource ou le serveur d'autorisation a refusé la requête.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4009">
         <source>The redirect_uri does not match any registered URI.</source>
-        <target state="new">The redirect_uri does not match any registered URI.</target>
+        <target state="translated">L'URI de redirection ne correspond à aucune URI enregistrée.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4010">
         <source>User consent is required.</source>
-        <target state="new">User consent is required.</target>
+        <target state="translated">Le consentement de l'utilisateur est requis.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4011">
         <source>User authentication is required.</source>
-        <target state="new">User authentication is required.</target>
+        <target state="translated">L'authentification de l'utilisateur est requise.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4012">
         <source>The authorization request is still pending.</source>
-        <target state="new">The authorization request is still pending.</target>
+        <target state="translated">La demande d'autorisation est toujours en attente.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4013">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="new">The polling interval is too short. Increase the interval and retry.</target>
+        <target state="translated">L'intervalle d'interrogation est trop court. Augmentez l'intervalle et réessayez.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4014">
         <source>An internal server error occurred.</source>
-        <target state="new">An internal server error occurred.</target>
+        <target state="translated">Une erreur interne du serveur s'est produite.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4015">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
-        <target state="new">The '{0}' prompt value cannot be combined with other values.</target>
+        <target state="translated">La valeur d'invite '{0}' ne peut pas être combinée avec d'autres valeurs.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4016">
         <source>The '{0}' prompt value is not supported for this client.</source>
-        <target state="new">The '{0}' prompt value is not supported for this client.</target>
+        <target state="translated">La valeur d'invite '{0}' n'est pas prise en charge pour ce client.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4017">
         <source>A valid user identity is required for this request.</source>
-        <target state="new">A valid user identity is required for this request.</target>
+        <target state="translated">Une identité utilisateur valide est requise pour cette requête.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4018">
+        <source>{0} is enabled but {1} is not set.</source>
+        <target state="translated">{0} est activé mais {1} n'est pas défini.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4019">
+        <source>{0} must be an absolute URI.</source>
+        <target state="translated">{0} doit être une URI absolue.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4020">
+        <source>{0} is set but {1} is not set.</source>
+        <target state="translated">{0} est défini mais {1} n'est pas défini.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST5001">

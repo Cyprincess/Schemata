@@ -4,18 +4,19 @@ Schemata wraps ASP.NET Core Identity with its own entity types, user manager ext
 
 ## Packages
 
-| Package | Role |
-|---|---|
-| `Schemata.Identity.Skeleton` | Entity types, stores, managers, request/response models, services |
-| `Schemata.Identity.Foundation` | Feature, controller, builder extensions, advisor interfaces |
+| Package                        | Role                                                              |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `Schemata.Identity.Skeleton`   | Entity types, stores, managers, request/response models, services |
+| `Schemata.Identity.Foundation` | Feature, controller, builder extensions, advisor interfaces       |
 
 ## Entity types
 
 ### SchemataUser
 
-Extends `IdentityUser<long>` with Schemata interfaces (`IIdentifier`, `ICanonicalName`, `IDisplayName`, `IConcurrency`, `ITimestamp`). Stored in the `SchemataUsers` table. Uses a `long` primary key.
+Extends `IdentityUser<long>` with Schemata interfaces (`IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, `ITimestamp`). Stored in the `SchemataUsers` table. Uses a `long` primary key.
 
 Key properties beyond standard Identity fields:
+
 - `Name`, `CanonicalName` -- canonical name support (`users/{user}`)
 - `DisplayName`, `DisplayNames` -- display name with localization
 - `Timestamp` -- `Guid` used for optimistic concurrency (mapped to `ConcurrencyStamp`)
@@ -67,15 +68,15 @@ builder.UseIdentity(
 
 Controls which identity endpoints are enabled:
 
-| Property | Default | Description |
-|---|---|---|
-| `AllowRegistration` | `true` | Enable the Register endpoint |
-| `AllowAccountConfirmation` | `true` | Enable email/phone confirmation |
-| `AllowPasswordReset` | `true` | Enable forgot/reset password flow |
-| `AllowPasswordChange` | `true` | Enable authenticated password change |
-| `AllowEmailChange` | `true` | Enable email address change |
-| `AllowPhoneNumberChange` | `true` | Enable phone number change |
-| `AllowTwoFactorAuthentication` | `true` | Enable 2FA management endpoints |
+| Property                       | Default | Description                          |
+| ------------------------------ | ------- | ------------------------------------ |
+| `AllowRegistration`            | `true`  | Enable the Register endpoint         |
+| `AllowAccountConfirmation`     | `true`  | Enable email/phone confirmation      |
+| `AllowPasswordReset`           | `true`  | Enable forgot/reset password flow    |
+| `AllowPasswordChange`          | `true`  | Enable authenticated password change |
+| `AllowEmailChange`             | `true`  | Enable email address change          |
+| `AllowPhoneNumberChange`       | `true`  | Enable phone number change           |
+| `AllowTwoFactorAuthentication` | `true`  | Enable 2FA management endpoints      |
 
 ## AuthenticateController
 

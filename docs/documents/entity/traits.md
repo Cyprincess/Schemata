@@ -7,10 +7,10 @@ runtime and apply the corresponding logic automatically within the
 
 Traits live in two packages depending on where they are applied:
 
-| Package                          | Applied to            | Traits                                                                                                           |
-| -------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Abstractions.Entities` | Entity classes        | IIdentifier, ITimestamp, ISoftDelete, IConcurrency, ICanonicalName, IStateful, IDisplayName, IExpiration, IEvent |
-| `Schemata.Abstractions.Resource` | Request/response DTOs | IFreshness, IUpdateMask, IValidation, IRequestIdentification                                                     |
+| Package                          | Applied to            | Traits                                                                                                                                |
+| -------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Abstractions.Entities` | Entity classes        | IIdentifier, ITimestamp, ISoftDelete, IConcurrency, ICanonicalName, IStateful, IDescriptive, IExpiration, IEvent, IOwnable, IOrdering |
+| `Schemata.Abstractions.Resource` | Request/response DTOs | IFreshness, IUpdateMask, IValidation, IRequestIdentification                                                                          |
 
 ---
 
@@ -148,6 +148,29 @@ public class Book : ICanonicalName { ... }
 
 ---
 
+### IOwnable
+
+Records the principal that owns the entity, enabling owner-scoped query filtering and
+authorization.
+
+```csharp
+public interface IOwnable
+{
+    string? Owner { get; set; }
+}
+```
+
+**Applies to:** Entity
+
+**Built-in advisors:** None in the core repository package. The `IRepository` exposes
+`SuppressOwner()` and `SuppressQueryOwner()` that place `OwnerSuppressed` and
+`QueryOwnerSuppressed` markers in the advice context. Application-level advisors
+can implement `IRepositoryAddAdvisor<TEntity>` and
+`IRepositoryBuildQueryAdvisor<TEntity>` to auto-assign owners and scope queries by
+reading the current principal from `AdviceContext.ServiceProvider`.
+
+---
+
 ### IStateful
 
 Indicates that an entity has a discrete state representing a workflow or lifecycle stage.
@@ -166,23 +189,26 @@ public interface IStateful
 
 ---
 
-### IDisplayName
+### IDescriptive
 
-Provides user-facing display names, including an optional field for alternative or
-localized names (typically serialized as JSON).
+Provides user-facing display names and descriptions with optional localization,
+corresponding to AIP-148 `display_name` and `description`.
 
 ```csharp
-public interface IDisplayName
+public interface IDescriptive
 {
-    string? DisplayName  { get; set; }
-    string? DisplayNames { get; set; }
+    string?                     DisplayName  { get; set; }
+    Dictionary<string, string>? DisplayNames { get; set; }
+    string?                     Description  { get; set; }
+    Dictionary<string, string>? Descriptions { get; set; }
 }
 ```
 
 **Applies to:** Entity
 
-**Built-in advisors:** None. Display names are set by application code during create
-and update operations.
+**Built-in advisors:** None. Display names and descriptions are set by application code
+during create and update operations. `DisplayNames` and `Descriptions` are
+dictionaries keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`).
 
 ---
 

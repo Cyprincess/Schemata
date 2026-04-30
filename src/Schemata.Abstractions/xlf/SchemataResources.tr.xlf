@@ -209,87 +209,102 @@
       </trans-unit>
       <trans-unit id="ST4001">
         <source>The client credentials are missing or invalid.</source>
-        <target state="new">The client credentials are missing or invalid.</target>
+        <target state="translated">İstemci kimlik bilgileri eksik veya geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4002">
         <source>Client secret is required for confidential clients.</source>
-        <target state="new">Client secret is required for confidential clients.</target>
+        <target state="translated">Gizli istemciler için istemci parolası gereklidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4003">
         <source>The request uses more than one client authentication method.</source>
-        <target state="new">The request uses more than one client authentication method.</target>
+        <target state="translated">İstek birden fazla istemci kimlik doğrulama yöntemi kullanıyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4004">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="new">The provided grant is invalid, expired, or revoked.</target>
+        <target state="translated">Sağlanan yetki geçersiz, süresi dolmuş veya iptal edilmiş.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4005">
         <source>The code_verifier does not match the code_challenge.</source>
-        <target state="new">The code_verifier does not match the code_challenge.</target>
+        <target state="translated">code_verifier, code_challenge ile eşleşmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4006">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="new">The requested scope is not allowed for this client.</target>
+        <target state="translated">İstenen kapsam bu istemci için izin verilmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4007">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="new">The client is not authorized to use this grant type.</target>
+        <target state="translated">İstemci bu yetki türünü kullanmaya yetkili değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4008">
         <source>The resource owner or authorization server denied the request.</source>
-        <target state="new">The resource owner or authorization server denied the request.</target>
+        <target state="translated">Kaynak sahibi veya yetkilendirme sunucusu isteği reddetti.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4009">
         <source>The redirect_uri does not match any registered URI.</source>
-        <target state="new">The redirect_uri does not match any registered URI.</target>
+        <target state="translated">redirect_uri herhangi bir kayıtlı URI ile eşleşmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4010">
         <source>User consent is required.</source>
-        <target state="new">User consent is required.</target>
+        <target state="translated">Kullanıcı onayı gereklidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4011">
         <source>User authentication is required.</source>
-        <target state="new">User authentication is required.</target>
+        <target state="translated">Kullanıcı kimlik doğrulaması gereklidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4012">
         <source>The authorization request is still pending.</source>
-        <target state="new">The authorization request is still pending.</target>
+        <target state="translated">Yetkilendirme isteği hala beklemede.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4013">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="new">The polling interval is too short. Increase the interval and retry.</target>
+        <target state="translated">Yoklama aralığı çok kısa. Aralığı artırın ve tekrar deneyin.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4014">
         <source>An internal server error occurred.</source>
-        <target state="new">An internal server error occurred.</target>
+        <target state="translated">Bir iç sunucu hatası oluştu.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4015">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
-        <target state="new">The '{0}' prompt value cannot be combined with other values.</target>
+        <target state="translated">'{0}' istem değeri diğer değerlerle birleştirilemez.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4016">
         <source>The '{0}' prompt value is not supported for this client.</source>
-        <target state="new">The '{0}' prompt value is not supported for this client.</target>
+        <target state="translated">'{0}' istem değeri bu istemci için desteklenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST4017">
         <source>A valid user identity is required for this request.</source>
-        <target state="new">A valid user identity is required for this request.</target>
+        <target state="translated">Bu istek için geçerli bir kullanıcı kimliği gereklidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4018">
+        <source>{0} is enabled but {1} is not set.</source>
+        <target state="translated">{0} etkinleştirildi ancak {1} ayarlanmadı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4019">
+        <source>{0} must be an absolute URI.</source>
+        <target state="translated">{0} mutlak bir URI olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST4020">
+        <source>{0} is set but {1} is not set.</source>
+        <target state="translated">{0} ayarlandı ancak {1} ayarlanmadı.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST5001">

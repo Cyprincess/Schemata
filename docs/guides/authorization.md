@@ -21,15 +21,15 @@ schema.UseAuthorization()
 
 `UseAuthorization()` sets up the authorization server with the Schemata entity stores (`SchemataApplication`, `SchemataAuthorization`, `SchemataScope`, `SchemataToken`). It returns a `SchemataAuthorizationBuilder` that provides fluent methods for enabling individual OAuth 2.0 flows:
 
-| Method                       | Flow                         | Endpoint                                              |
-| ---------------------------- | ---------------------------- | ----------------------------------------------------- |
-| `UseCodeFlow()`              | Authorization Code with PKCE | `/Connect/Authorize` + `/Connect/Token`               |
-| `UseClientCredentialsFlow()` | Client Credentials           | `/Connect/Token`                                      |
-| `UseRefreshTokenFlow()`      | Refresh Token                | `/Connect/Token`                                      |
-| `UseDeviceFlow()`            | Device Authorization         | `/Connect/Device` + `/Connect/Token`                  |
-| `UseIntrospection()`         | Token Introspection          | `/Connect/Introspect`                                 |
-| `UseRevocation()`            | Token Revocation             | `/Connect/Revoke`                                     |
-| `UseEndSession()`            | OpenID Connect Logout        | `/Connect/EndSession`                                 |
+| Method                       | Flow                         | Endpoint                                |
+| ---------------------------- | ---------------------------- | --------------------------------------- |
+| `UseCodeFlow()`              | Authorization Code with PKCE | `/Connect/Authorize` + `/Connect/Token` |
+| `UseClientCredentialsFlow()` | Client Credentials           | `/Connect/Token`                        |
+| `UseRefreshTokenFlow()`      | Refresh Token                | `/Connect/Token`                        |
+| `UseDeviceFlow()`            | Device Authorization         | `/Connect/Device` + `/Connect/Token`    |
+| `UseIntrospection()`         | Token Introspection          | `/Connect/Introspect`                   |
+| `UseRevocation()`            | Token Revocation             | `/Connect/Revoke`                       |
+| `UseEndSession()`            | OpenID Connect Logout        | `/Connect/EndSession`                   |
 
 `UseAuthorization()` also accepts an optional `Action<SchemataAuthorizationOptions>` for advanced configuration:
 

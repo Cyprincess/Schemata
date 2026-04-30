@@ -251,49 +251,49 @@ For more detail on how these advisors compose within a mutation, see
 ### Resource advisors
 
 Resource advisors run during HTTP/gRPC resource operations. They are defined in
-`Schemata.Resource.Foundation` and typically receive an `HttpContext?` as their last
+`Schemata.Resource.Foundation` and typically receive a `ClaimsPrincipal?` as their last
 argument.
 
 **General (cross-operation) advisors:**
 
-| Interface                                    | Base                                         | When it runs                                                           |
-| -------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------- |
-| `IResourceRequestAdvisor<TEntity>`           | `IAdvisor<HttpContext?, Operations>`         | First in every resource operation (List, Get, Create, Update, Delete). |
-| `IResourceResponseAdvisor<TEntity, TDetail>` | `IAdvisor<TEntity?, TDetail?, HttpContext?>` | After an entity is mapped to a detail DTO (Get, Create, Update).       |
+| Interface                                    | Base                                             | When it runs                                                           |
+| -------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------- |
+| `IResourceRequestAdvisor<TEntity>`           | `IAdvisor<ClaimsPrincipal?, Operations>`         | First in every resource operation (List, Get, Create, Update, Delete). |
+| `IResourceResponseAdvisor<TEntity, TDetail>` | `IAdvisor<TEntity?, TDetail?, ClaimsPrincipal?>` | After an entity is mapped to a detail DTO (Get, Create, Update).       |
 
 **List-specific advisors:**
 
-| Interface                                | Base                                                                     | When it runs                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
-| `IResourceListRequestAdvisor<TEntity>`   | `IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, HttpContext?>` | After the general request advisor, during List. |
-| `IResourceListResponseAdvisor<TSummary>` | `IAdvisor<ImmutableArray<TSummary>?, HttpContext?>`                      | After query execution and mapping to summaries. |
+| Interface                                | Base                                                                         | When it runs                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `IResourceListRequestAdvisor<TEntity>`   | `IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>` | After the general request advisor, during List. |
+| `IResourceListResponseAdvisor<TSummary>` | `IAdvisor<ImmutableArray<TSummary>?, ClaimsPrincipal?>`                      | After query execution and mapping to summaries. |
 
 **Get-specific advisors:**
 
-| Interface                             | Base                                 | When it runs                                   |
-| ------------------------------------- | ------------------------------------ | ---------------------------------------------- |
-| `IResourceGetRequestAdvisor<TEntity>` | `IAdvisor<GetRequest, HttpContext?>` | After the general request advisor, during Get. |
+| Interface                             | Base                                                                        | When it runs                                   |
+| ------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| `IResourceGetRequestAdvisor<TEntity>` | `IAdvisor<GetRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>` | After the general request advisor, during Get. |
 
 **Create-specific advisors:**
 
-| Interface                                          | Base                                        | When it runs                               |
-| -------------------------------------------------- | ------------------------------------------- | ------------------------------------------ |
-| `IResourceCreateRequestAdvisor<TEntity, TRequest>` | `IAdvisor<TRequest, HttpContext?>`          | Before the request is mapped to an entity. |
-| `IResourceCreateAdvisor<TEntity, TRequest>`        | `IAdvisor<TRequest, TEntity, HttpContext?>` | After mapping, before persistence.         |
+| Interface                                          | Base                                                                      | When it runs                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| `IResourceCreateRequestAdvisor<TEntity, TRequest>` | `IAdvisor<TRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>` | Before the request is mapped to an entity. |
+| `IResourceCreateAdvisor<TEntity, TRequest>`        | `IAdvisor<TRequest, TEntity, ClaimsPrincipal?>`                           | After mapping, before persistence.         |
 
 **Update-specific advisors:**
 
-| Interface                                          | Base                                        | When it runs                                               |
-| -------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
-| `IResourceUpdateRequestAdvisor<TEntity, TRequest>` | `IAdvisor<TRequest, HttpContext?>`          | Before the entity is modified.                             |
-| `IResourceUpdateAdvisor<TEntity, TRequest>`        | `IAdvisor<TRequest, TEntity, HttpContext?>` | After the request advisor, before mapping onto the entity. |
+| Interface                                          | Base                                                                      | When it runs                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `IResourceUpdateRequestAdvisor<TEntity, TRequest>` | `IAdvisor<TRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>` | Before the entity is modified.                             |
+| `IResourceUpdateAdvisor<TEntity, TRequest>`        | `IAdvisor<TRequest, TEntity, ClaimsPrincipal?>`                           | After the request advisor, before mapping onto the entity. |
 
 **Delete-specific advisors:**
 
-| Interface                                | Base                                             | When it runs                                                   |
-| ---------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
-| `IResourceDeleteRequestAdvisor<TEntity>` | `IAdvisor<DeleteRequest, HttpContext?>`          | Before the entity is deleted.                                  |
-| `IResourceDeleteAdvisor<TEntity>`        | `IAdvisor<TEntity, DeleteRequest, HttpContext?>` | After the request advisor, before removal from the repository. |
+| Interface                                | Base                                                                           | When it runs                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `IResourceDeleteRequestAdvisor<TEntity>` | `IAdvisor<DeleteRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>` | Before the entity is deleted.                                  |
+| `IResourceDeleteAdvisor<TEntity>`        | `IAdvisor<TEntity, DeleteRequest, ClaimsPrincipal?>`                           | After the request advisor, before removal from the repository. |
 
 ### Validation advisors
 
@@ -309,73 +309,73 @@ Authorization advisors are defined in `Schemata.Authorization.Skeleton.Advisors`
 
 **Token endpoint** -- runs once for all grant types before the grant-specific handler:
 
-| Interface              | Base                                                       | When it runs                                                |
-| ---------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| Interface              | Base                                                        | When it runs                                               |
+| ---------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
 | `ITokenRequestAdvisor` | `IAdvisor<TokenRequest, Dictionary<string, List<string>>?>` | Client authentication, grant permission, scope validation. |
 
 **Authorization Code flow** -- enabled by `UseCodeFlow()`:
 
-| Interface                    | Base                                                        | When it runs                                            |
-| ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------- |
-| `IAuthorizeEndpointAdvisor`  | `IAdvisor<AuthorizationRequestContext>`                     | Authorization endpoint: client lookup, redirect URI, PKCE, scope, prompt, consent, and auto-approval. |
-| `ICodeExchangeAdvisor`       | `IAdvisor<SchemataApplication, TokenRequest, AuthorizeRequest, SchemataToken>` | Token endpoint: PKCE verification and custom hooks during authorization code exchange. |
+| Interface                   | Base                                                                           | When it runs                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `IAuthorizeEndpointAdvisor` | `IAdvisor<AuthorizationRequestContext>`                                        | Authorization endpoint: client lookup, redirect URI, PKCE, scope, prompt, consent, and auto-approval. |
+| `ICodeExchangeAdvisor`      | `IAdvisor<SchemataApplication, TokenRequest, AuthorizeRequest, SchemataToken>` | Token endpoint: PKCE verification and custom hooks during authorization code exchange.                |
 
 **Device Authorization flow** -- enabled by `UseDeviceFlow()`:
 
-| Interface                         | Base                                                                  | When it runs                                             |
-| --------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
-| `IDeviceAuthorizeAdvisor`         | `IAdvisor<SchemataApplication, DeviceAuthorizeRequest>`               | After client auth, before device/user code generation.   |
-| `IDeviceCodeExchangeAdvisor`      | `IAdvisor<SchemataApplication?, SchemataToken>`                       | Token endpoint: device code validation and status check. |
+| Interface                    | Base                                                    | When it runs                                             |
+| ---------------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `IDeviceAuthorizeAdvisor`    | `IAdvisor<SchemataApplication, DeviceAuthorizeRequest>` | After client auth, before device/user code generation.   |
+| `IDeviceCodeExchangeAdvisor` | `IAdvisor<SchemataApplication?, SchemataToken>`         | Token endpoint: device code validation and status check. |
 
 **Refresh Token flow** -- enabled by `UseRefreshTokenFlow()`:
 
-| Interface              | Base                                            | When it runs                                                           |
-| ---------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
-| `IRefreshTokenAdvisor` | `IAdvisor<SchemataApplication?, SchemataToken>` | Token endpoint: refresh token validation, expiry, client ownership.    |
+| Interface              | Base                                            | When it runs                                                             |
+| ---------------------- | ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `IRefreshTokenAdvisor` | `IAdvisor<SchemataApplication?, SchemataToken>` | Token endpoint: refresh token validation, expiry, client ownership.      |
 | `IRefreshScopeAdvisor` | `IAdvisor<RefreshScopeContext>`                 | Ensures requested scope is a subset of the original grant (RFC 6749 §6). |
 
 **Token Exchange** -- automatically enabled by `UseCodeFlow()` and `UseDeviceFlow()`:
 
-| Interface               | Base                                            | When it runs                                |
-| ----------------------- | ----------------------------------------------- | ------------------------------------------- |
-| `ITokenExchangeAdvisor` | `IAdvisor<SchemataApplication, SchemataToken>`  | Validates token status and grant permission. |
+| Interface               | Base                                           | When it runs                                 |
+| ----------------------- | ---------------------------------------------- | -------------------------------------------- |
+| `ITokenExchangeAdvisor` | `IAdvisor<SchemataApplication, SchemataToken>` | Validates token status and grant permission. |
 
 **Token Introspection (RFC 7662)** -- enabled by `UseIntrospection()`:
 
-| Interface                      | Base                                                          | When it runs                           |
-| ------------------------------ | ------------------------------------------------------------- | -------------------------------------- |
-| `IIntrospectionRequestAdvisor` | `IAdvisor<IntrospectRequest, Dictionary<string, List<string>>?>` | Client authentication.              |
-| `IIntrospectionAdvisor`        | `IAdvisor<IntrospectionResponse>`                             | Customizes the introspection response. |
+| Interface                      | Base                                                             | When it runs                           |
+| ------------------------------ | ---------------------------------------------------------------- | -------------------------------------- |
+| `IIntrospectionRequestAdvisor` | `IAdvisor<IntrospectRequest, Dictionary<string, List<string>>?>` | Client authentication.                 |
+| `IIntrospectionAdvisor`        | `IAdvisor<IntrospectionResponse>`                                | Customizes the introspection response. |
 
 **Token Revocation (RFC 7009)** -- enabled by `UseRevocation()`:
 
-| Interface                  | Base                                                      | When it runs                                      |
-| -------------------------- | --------------------------------------------------------- | ------------------------------------------------- |
+| Interface                   | Base                                                         | When it runs                                   |
+| --------------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
 | `IRevocationRequestAdvisor` | `IAdvisor<RevokeRequest, Dictionary<string, List<string>>?>` | Client authentication.                         |
-| `IRevocationAdvisor`       | `IAdvisor<SchemataApplication?, SchemataToken>`           | Per-token hook before revocation is committed.    |
+| `IRevocationAdvisor`        | `IAdvisor<SchemataApplication?, SchemataToken>`              | Per-token hook before revocation is committed. |
 
 **End Session (RP-Initiated Logout)** -- enabled by `UseEndSession()`:
 
-| Interface                  | Base                                             | When it runs                                              |
-| -------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `IEndSessionRequestAdvisor` | `IAdvisor<EndSessionRequest>`                   | Validates id_token_hint, resolves client, checks redirect URI. |
-| `IEndSessionAdvisor`       | `IAdvisor<SchemataApplication?, ClaimsPrincipal>` | After validation, before sign-out.                        |
+| Interface                   | Base                                              | When it runs                                                   |
+| --------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| `IEndSessionRequestAdvisor` | `IAdvisor<EndSessionRequest>`                     | Validates id_token_hint, resolves client, checks redirect URI. |
+| `IEndSessionAdvisor`        | `IAdvisor<SchemataApplication?, ClaimsPrincipal>` | After validation, before sign-out.                             |
 
 **Claims and token issuance** -- registered by `UseAuthorization()`:
 
-| Interface             | Base                                                    | When it runs                                          |
-| --------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
-| `IClaimsAdvisor`      | `IAdvisor<List<Claim>>`                                 | Claims enrichment before token issuance.              |
-| `IDestinationAdvisor` | `IAdvisor<Claim, HashSet<string>, ClaimsPrincipal>`     | Determines which tokens (access/identity) receive each claim. |
-| `ITokenAdvisor`       | `IAdvisor<SchemataApplication?, ClaimsPrincipal>`       | Final adjustments before token issuance.              |
+| Interface             | Base                                                | When it runs                                                  |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| `IClaimsAdvisor`      | `IAdvisor<List<Claim>>`                             | Claims enrichment before token issuance.                      |
+| `IDestinationAdvisor` | `IAdvisor<Claim, HashSet<string>, ClaimsPrincipal>` | Determines which tokens (access/identity) receive each claim. |
+| `ITokenAdvisor`       | `IAdvisor<SchemataApplication?, ClaimsPrincipal>`   | Final adjustments before token issuance.                      |
 
 **Discovery and UserInfo** -- registered by `UseAuthorization()`:
 
-| Interface                  | Base                                   | When it runs                                    |
-| -------------------------- | -------------------------------------- | ----------------------------------------------- |
+| Interface                  | Base                                   | When it runs                                                                   |
+| -------------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
 | `IDiscoveryAdvisor`        | `IAdvisor<DiscoveryDocument>`          | Populates the OIDC discovery document. Each flow feature adds its own entries. |
-| `IUserInfoRequestAdvisor`  | `IAdvisor<ClaimsPrincipal>`            | Validates the access token at the UserInfo endpoint. |
-| `IUserInfoResponseAdvisor` | `IAdvisor<Dictionary<string, object>>` | Customizes the UserInfo response body.          |
+| `IUserInfoRequestAdvisor`  | `IAdvisor<ClaimsPrincipal>`            | Validates the access token at the UserInfo endpoint.                           |
+| `IUserInfoResponseAdvisor` | `IAdvisor<Dictionary<string, object>>` | Customizes the UserInfo response body.                                         |
 
 ## Registering custom advisors
 

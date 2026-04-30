@@ -815,6 +815,9 @@ public static class SchemataConstants
         /// <summary>The entity tag parameter name.</summary>
         public const string EntityTag = "etag";
 
+        /// <summary>The resource name parameter name.</summary>
+        public const string Name = "name";
+
         /// <summary>The type discriminator parameter name for polymorphic serialization.</summary>
         public const string Type = "@type";
 

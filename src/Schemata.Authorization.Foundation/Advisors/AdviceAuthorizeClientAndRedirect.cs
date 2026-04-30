@@ -48,7 +48,7 @@ public static class AdviceAuthorizeClientAndRedirect
 /// </remarks>
 /// <seealso cref="AdviceAuthorizeEndpointPermission{TApp}" />
 public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
-    IApplicationManager<TApp>              manager,
+    IApplicationManager<TApp>              apps,
     IOptions<SchemataAuthorizationOptions> options
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
@@ -71,7 +71,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
             );
         }
 
-        var application = await manager.FindByCanonicalNameAsync(authz.Request.ClientId, ct);
+        var application = await apps.FindByClientIdAsync(authz.Request.ClientId, ct);
         if (application is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
@@ -81,7 +81,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
 
         authz.Application = application;
 
-        if (!await manager.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
+        if (!await apps.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRedirectUri,
                 SchemataResources.GetResourceString(SchemataResources.ST4009)

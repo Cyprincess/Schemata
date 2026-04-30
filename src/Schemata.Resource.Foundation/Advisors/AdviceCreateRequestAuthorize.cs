@@ -60,10 +60,7 @@ public sealed class AdviceCreateRequestAuthorize<TEntity, TRequest> : IResourceC
 
         var context = new AccessContext<TRequest> { Operation = nameof(Operations.Create), Request = request };
 
-        var result = await _access.HasAccessAsync(null, context, principal, ct);
-        if (!result) {
-            throw new AuthorizationException();
-        }
+        await AuthorizeHelper.EnsureAsync(_access, context, request.Name ?? string.Empty, principal, ct);
 
         return AdviseResult.Continue;
     }

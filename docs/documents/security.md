@@ -4,12 +4,12 @@ Schemata provides a pluggable security model with two provider interfaces: one f
 
 ## Packages
 
-| Package | Role |
-|---|---|
-| `Schemata.Security.Skeleton` | Core interfaces, defaults, and registration extensions |
-| `Schemata.Security.Foundation` | Feature registration via `UseSecurity()` |
-| `Schemata.Resource.Foundation` | `ResourceAccessProvider` for resource CRUD |
-| `Schemata.Workflow.Skeleton` | `WorkflowAccessProvider` for workflow operations |
+| Package                        | Role                                                   |
+| ------------------------------ | ------------------------------------------------------ |
+| `Schemata.Security.Skeleton`   | Core interfaces, defaults, and registration extensions |
+| `Schemata.Security.Foundation` | Feature registration via `UseSecurity()`               |
+| `Schemata.Resource.Foundation` | `ResourceAccessProvider` for resource CRUD             |
+| `Schemata.Workflow.Skeleton`   | `WorkflowAccessProvider` for workflow operations       |
 
 ## IAccessProvider\<T, TContext\>
 
@@ -69,10 +69,12 @@ resource-{operation}-{entity}
 ```
 
 Where:
+
 - `{operation}` is the CRUD operation, kebab-cased via Humanizer (e.g. `create`, `update`, `delete`, `list`)
 - `{entity}` is the entity type name, kebab-cased (e.g. `product`, `order-item`)
 
 Supports wildcards:
+
 - `resource-*-product` -- grants all operations on `Product`
 - `resource-create-*` -- grants create on all entity types
 
@@ -91,6 +93,7 @@ workflow-{operation}-{entity}
 Where `{operation}` corresponds to workflow operations (e.g. `get`, `submit`, `raise`), kebab-cased.
 
 Supports the same wildcard patterns:
+
 - `workflow-*-approval` -- grants all operations on `Approval` workflows
 - `workflow-get-*` -- grants read access to all workflow types
 

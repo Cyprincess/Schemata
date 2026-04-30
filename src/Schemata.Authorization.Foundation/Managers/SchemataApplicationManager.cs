@@ -43,14 +43,14 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
     }
 
     /// <inheritdoc />
-    public async Task<TApplication?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
+    public async Task<TApplication?> FindByClientIdAsync(string? clientId, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(name)) {
+        if (string.IsNullOrWhiteSpace(clientId)) {
             return null;
         }
 
-        return await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Name == name), ct);
+        return await _applications.SingleOrDefaultAsync(q => q.Where(a => a.ClientId == clientId), ct);
     }
 
     /// <inheritdoc />

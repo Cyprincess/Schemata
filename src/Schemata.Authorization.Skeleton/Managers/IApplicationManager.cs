@@ -20,8 +20,8 @@ public interface IApplicationManager<TApplication>
         CancellationToken                                         ct = default
     );
 
-    /// <summary>Finds an application by its canonical name (client_id).</summary>
-    Task<TApplication?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default);
+    /// <summary>Finds an application by its client_id.</summary>
+    Task<TApplication?> FindByClientIdAsync(string? clientId, CancellationToken ct = default);
 
     /// <summary>
     ///     Validates a client secret against the stored hash.
