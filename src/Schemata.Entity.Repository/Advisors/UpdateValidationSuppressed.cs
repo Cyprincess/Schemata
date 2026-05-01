@@ -9,4 +9,4 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
 ///     <see cref="AdviceUpdateValidation{TEntity}" /> skips its validation logic.
 /// </remarks>
-internal sealed class UpdateValidationSuppressed;
+public sealed class UpdateValidationSuppressed;

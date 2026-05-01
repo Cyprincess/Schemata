@@ -8,4 +8,4 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
 ///     <see cref="AdviceAddTimestamp{TEntity}" /> and <see cref="AdviceUpdateTimestamp{TEntity}" /> skip their logic.
 /// </remarks>
-internal sealed class TimestampSuppressed;
+public sealed class TimestampSuppressed;

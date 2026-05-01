@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal sealed record Entity(
+public sealed record Entity(
     string                      Name,
     EquatableArray<string>      Bases,
     EquatableArray<Note>        Notes,

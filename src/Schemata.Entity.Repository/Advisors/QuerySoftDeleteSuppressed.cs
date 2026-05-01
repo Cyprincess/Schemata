@@ -11,4 +11,4 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     allowing queries to return entities where <see cref="Schemata.Abstractions.Entities.ISoftDelete.DeleteTime" /> is
 ///     non-null.
 /// </remarks>
-internal sealed class QuerySoftDeleteSuppressed;
+public sealed class QuerySoftDeleteSuppressed;

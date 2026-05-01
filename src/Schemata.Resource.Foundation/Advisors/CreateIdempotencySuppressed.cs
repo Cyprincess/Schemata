@@ -7,4 +7,4 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
 ///     <see cref="AdviceCreateRequestIdempotency{TEntity, TRequest, TDetail}" /> skips the cached-response lookup.
 /// </remarks>
-internal sealed class CreateIdempotencySuppressed;
+public sealed class CreateIdempotencySuppressed;

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,43 +6,47 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
-using Schemata.Resource.Grpc.Integration.Tests;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 
-// When the content root cannot be resolved from the current directory
-// (as happens when running under WebApplicationFactory from the test output folder),
-// fall back to a well-known path so WebApplication.CreateBuilder does not throw.
-var options = new WebApplicationOptions { Args = args };
+namespace Schemata.Resource.Grpc.Integration.Tests;
 
-var builder = WebApplication.CreateBuilder(options);
+public class Program
+{
+    public static void Main(string[] args) {
+        
+        var options = new WebApplicationOptions { Args = args };
 
-builder.UseSchemata(schema => {
-    schema.UseMapster().Map<Student, Student>();
+        var builder = WebApplication.CreateBuilder(options);
 
-    var resource = schema.UseResource();
-    resource.MapGrpc().Use<Student, Student, Student, Student>();
+        builder.UseSchemata(schema => {
+            schema.UseMapster().Map<Student, Student>();
 
-    // Suppress validation noise; keep freshness enabled for ETag tests
-    resource.WithoutCreateValidation().WithoutUpdateValidation();
+            var resource = schema.UseResource();
+            resource.MapGrpc().Use<Student, Student, Student, Student>();
 
-    schema.Services.AddDistributedMemoryCache();
+            // Suppress validation noise; keep freshness enabled for ETag tests
+            resource.WithoutCreateValidation().WithoutUpdateValidation();
 
-    var dbName = "grpc-integration-" + Guid.NewGuid();
-    schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
+            schema.Services.AddDistributedMemoryCache();
 
-    schema.Services.TryAddScoped<IRepository<Student>, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+            var dbName = "grpc-integration-" + Guid.NewGuid();
+            schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
 
-    // Register repository advisors that normally come with AddRepository()
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQuerySoftDelete<>)));
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddConcurrency<>)));
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddSoftDelete<>)));
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddCanonicalName<>)));
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateTimestamp<>)));
+            schema.Services.TryAddScoped<IRepository<Student>, EntityFrameworkCoreRepository<TestDbContext, Student>>();
 
-    // Auto-assign a unique slug to every new Student (runs before AdviceAddCanonicalName).
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
-});
+            // Register repository advisors that normally come with AddRepository()
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQuerySoftDelete<>)));
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddConcurrency<>)));
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddSoftDelete<>)));
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddCanonicalName<>)));
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateTimestamp<>)));
 
-var app = builder.Build();
+            // Auto-assign a unique slug to every new Student (runs before AdviceAddCanonicalName).
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+        });
 
-app.Run();
+        var app = builder.Build();
+
+        app.Run();
+    }
+}

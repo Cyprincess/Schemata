@@ -5,7 +5,7 @@ using Schemata.Modeling.Generator.Expressions;
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-internal static class TraitGenerator
+public static class TraitGenerator
 {
     public static void Generate(SourceProductionContext spc, Trait trait, Document doc) {
         var name = $"I{trait.Name}";

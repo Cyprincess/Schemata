@@ -53,11 +53,11 @@ public class HandlerFixture
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult(q(Students.AsQueryable()).SingleOrDefault()));
 
         Repository
-           .Setup(r => r.CountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
+           .Setup(r => r.CountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult(q(Students.AsQueryable()).Count()));
 
         Repository
-           .Setup(r => r.LongCountAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
+           .Setup(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()))
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _) => ValueTask.FromResult((long)q(Students.AsQueryable()).Count()));
 
         Repository.Setup(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))

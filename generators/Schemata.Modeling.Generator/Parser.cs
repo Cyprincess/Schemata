@@ -8,57 +8,57 @@ using static Parlot.Fluent.Parsers;
 
 namespace Schemata.Modeling.Generator;
 
-internal static class Parser
+public static class Parser
 {
     // ── Shared sub-parsers (reused by later tasks) ──────────────────────
 
-    internal static readonly Parser<TextSpan> Identifier;
+    public static readonly Parser<TextSpan> Identifier;
 
-    internal static readonly Parser<string> QualifiedName;
+    public static readonly Parser<string> QualifiedName;
 
     // ── Entry-point parsers ─────────────────────────────────────────────
 
-    internal static readonly Parser<IExpression> Literal;
+    public static readonly Parser<IExpression> Literal;
 
-    internal static readonly Parser<IExpression> Expression;
+    public static readonly Parser<IExpression> Expression;
 
     // ── Annotation & composition parsers ──────────────────────────────
 
-    internal static readonly Parser<Note> Note;
+    public static readonly Parser<Note> Note;
 
-    internal static readonly Parser<Property> Property;
+    public static readonly Parser<Property> Property;
 
-    internal static readonly Parser<EquatableArray<FieldOption>> FieldOptions;
+    public static readonly Parser<EquatableArray<FieldOption>> FieldOptions;
 
-    internal static readonly Parser<EquatableArray<ViewOption>> ViewOptions;
+    public static readonly Parser<EquatableArray<ViewOption>> ViewOptions;
 
-    internal static readonly Parser<EquatableArray<PointerOption>> PointerOptions;
+    public static readonly Parser<EquatableArray<PointerOption>> PointerOptions;
 
-    internal static readonly Parser<Use> Use;
+    public static readonly Parser<Use> Use;
 
     // ── Member parsers ──────────────────────────────────────────────────
 
-    internal static readonly Parser<Field> Field;
+    public static readonly Parser<Field> Field;
 
-    internal static readonly Parser<Pointer> Pointer;
+    public static readonly Parser<Pointer> Pointer;
 
-    internal static readonly Parser<ViewField> ViewField;
+    public static readonly Parser<ViewField> ViewField;
 
-    internal static readonly Parser<View> View;
+    public static readonly Parser<View> View;
 
     // ── Declaration parsers ───────────────────────────────────────────
 
-    internal static readonly Parser<EnumValue> EnumValue;
+    public static readonly Parser<EnumValue> EnumValue;
 
-    internal static readonly Parser<Enumeration> Enumeration;
+    public static readonly Parser<Enumeration> Enumeration;
 
-    internal static readonly Parser<string> Namespace;
+    public static readonly Parser<string> Namespace;
 
-    internal static readonly Parser<Entity> Entity;
+    public static readonly Parser<Entity> Entity;
 
-    internal static readonly Parser<Trait> Trait;
+    public static readonly Parser<Trait> Trait;
 
-    internal static readonly Parser<Document> Document;
+    public static readonly Parser<Document> Document;
 
     // ── Construction ────────────────────────────────────────────────────
 

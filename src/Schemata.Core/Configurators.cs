@@ -175,7 +175,7 @@ public sealed class Configurators
         return action!;
     }
 
-    internal IServiceCollection Invoke(IServiceCollection services) {
+    public IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);

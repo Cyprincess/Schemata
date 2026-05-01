@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal sealed record NumberLiteral(string Raw) : IExpression
+public sealed record NumberLiteral(string Raw) : IExpression
 {
     #region IExpression Members
 

@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal sealed record BooleanLiteral(bool Value) : IExpression
+public sealed record BooleanLiteral(bool Value) : IExpression
 {
     #region IExpression Members
 
