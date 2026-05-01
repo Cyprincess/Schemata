@@ -13,4 +13,4 @@ namespace Schemata.Entity.Cache.Advisors;
 ///     <see cref="AdviceQueryCache{TEntity,TResult,T}" /> will not return cached results and
 ///     <see cref="AdviceResultCache{TEntity,TResult,T}" /> will not store results in the cache.
 /// </remarks>
-internal sealed class QueryCacheSuppressed;
+public sealed class QueryCacheSuppressed;

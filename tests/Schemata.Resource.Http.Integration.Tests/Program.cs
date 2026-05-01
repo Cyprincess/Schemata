@@ -6,34 +6,37 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
-using Schemata.Resource.Http.Integration.Tests;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 
-// When the content root cannot be resolved from the current directory
-// (as happens when running under WebApplicationFactory from the test output folder),
-// fall back to a well-known path so WebApplication.CreateBuilder does not throw.
-var options = new WebApplicationOptions { Args = args };
+namespace Schemata.Resource.Http.Integration.Tests;
 
-var builder = WebApplication.CreateBuilder(options);
+public class Program
+{
+    public static void Main(string[] args) {
+        var options = new WebApplicationOptions { Args = args };
 
-builder.UseSchemata(schema => {
-    schema.UseMapster().Map<Student, Student>();
+        var builder = WebApplication.CreateBuilder(options);
 
-    var resource = schema.UseResource();
-    resource.MapHttp().Use<Student, Student, Student, Student>();
-    resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
+        builder.UseSchemata(schema => {
+            schema.UseMapster().Map<Student, Student>();
 
-    schema.Services.AddDistributedMemoryCache();
+            var resource = schema.UseResource();
+            resource.MapHttp().Use<Student, Student, Student, Student>();
+            resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
 
-    var dbName = "integration-" + Guid.NewGuid();
-    schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
+            schema.Services.AddDistributedMemoryCache();
 
-    schema.Services.TryAddScoped<IRepository<Student>, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+            var dbName = "integration-" + Guid.NewGuid();
+            schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
 
-    // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
-});
+            schema.Services.TryAddScoped<IRepository<Student>, EntityFrameworkCoreRepository<TestDbContext, Student>>();
 
-var app = builder.Build();
+            // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
+            schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+        });
 
-app.Run();
+        var app = builder.Build();
+
+        app.Run();
+    }
+}

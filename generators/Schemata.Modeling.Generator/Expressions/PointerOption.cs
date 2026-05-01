@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal enum PointerOption
+public enum PointerOption
 {
     Unique,
     BTree,

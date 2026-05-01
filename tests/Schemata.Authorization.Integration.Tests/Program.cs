@@ -36,16 +36,16 @@ scopeMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<Cance
 
 var authzMock = new Mock<IAuthorizationManager<SchemataAuthorization>>();
 authzMock.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
-         .Returns((SchemataAuthorization a, CancellationToken _) => Task.FromResult(a));
+         .Returns((SchemataAuthorization? a, CancellationToken _) => Task.FromResult(a));
 
 var tokenMock = new Mock<ITokenManager<SchemataToken>>();
 tokenMock.Setup(m => m.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
-         .Returns((SchemataToken t, CancellationToken _) => Task.FromResult(t));
+         .Returns((SchemataToken? t, CancellationToken _) => Task.FromResult(t));
 
 builder.Services.AddSingleton(appMock.Object);
 builder.Services.AddSingleton(scopeMock.Object);
-builder.Services.AddSingleton<IAuthorizationManager<SchemataAuthorization>>(authzMock.Object);
-builder.Services.AddSingleton<ITokenManager<SchemataToken>>(tokenMock.Object);
+builder.Services.AddSingleton(authzMock.Object);
+builder.Services.AddSingleton(tokenMock.Object);
 
 builder.UseSchemata(schema => {
     schema.UseWellKnown();

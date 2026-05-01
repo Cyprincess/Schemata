@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnumerable<T>
+public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnumerable<T>
 {
     private readonly ImmutableArray<T> _array;
 

@@ -10,4 +10,4 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     <see cref="Schemata.Abstractions.Entities.ISoftDelete.DeleteTime" /> on insert and
 ///     <see cref="AdviceRemoveSoftDelete{TEntity}" /> will not convert deletes into soft-deletes.
 /// </remarks>
-internal sealed class SoftDeleteSuppressed;
+public sealed class SoftDeleteSuppressed;

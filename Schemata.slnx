@@ -66,7 +66,6 @@
     <Project Path="tests/Schemata.Mapping.AutoMapper.Integration.Tests/Schemata.Mapping.AutoMapper.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.Mapster.Integration.Tests/Schemata.Mapping.Mapster.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Modeling.Generator.Tests/Schemata.Modeling.Generator.Tests.csproj" />
-    <Project Path="tests/Schemata.Resource.Foundation.Integration.Tests/Schemata.Resource.Foundation.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Foundation.Tests/Schemata.Resource.Foundation.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Grpc.Integration.Tests/Schemata.Resource.Grpc.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Http.Integration.Tests/Schemata.Resource.Http.Integration.Tests.csproj" />

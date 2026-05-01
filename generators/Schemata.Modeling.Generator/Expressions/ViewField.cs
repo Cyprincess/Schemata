@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-internal sealed record ViewField(
+public sealed record ViewField(
     string?                    Type,
     bool                       Nullable,
     string                     Name,

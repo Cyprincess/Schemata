@@ -8,7 +8,7 @@ namespace Schemata.Entity.Cache;
 ///     Expression visitor that serializes a LINQ expression tree into a deterministic string representation suitable for
 ///     use as a cache key.
 /// </summary>
-internal class Stringizing : ExpressionVisitor
+public class Stringizing : ExpressionVisitor
 {
     private readonly StringBuilder _builder = new();
 

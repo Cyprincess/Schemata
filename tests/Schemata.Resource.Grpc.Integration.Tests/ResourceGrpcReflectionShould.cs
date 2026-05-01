@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf.Reflection;
+using Grpc.Reflection.V1Alpha;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 using Xunit;
 

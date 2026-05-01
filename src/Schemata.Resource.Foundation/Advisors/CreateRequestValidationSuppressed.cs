@@ -8,4 +8,4 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     <see cref="AdviceCreateRequestValidation{TEntity, TRequest}" /> skips validation.
 ///     Automatically set when <see cref="SchemataResourceOptions.SuppressCreateValidation" /> is <see langword="true" />.
 /// </remarks>
-internal sealed class CreateRequestValidationSuppressed;
+public sealed class CreateRequestValidationSuppressed;

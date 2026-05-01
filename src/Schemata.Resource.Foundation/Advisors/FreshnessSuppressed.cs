@@ -9,4 +9,4 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     and <see cref="AdviceResponseFreshness{TEntity, TDetail}" /> all skip their logic.
 ///     Automatically set when <see cref="SchemataResourceOptions.SuppressFreshness" /> is <see langword="true" />.
 /// </remarks>
-internal sealed class FreshnessSuppressed;
+public sealed class FreshnessSuppressed;
