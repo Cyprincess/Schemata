@@ -8,4 +8,4 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
 ///     <see cref="AdviceAddConcurrency{TEntity}" /> and <see cref="AdviceUpdateConcurrency{TEntity}" /> skip their logic.
 /// </remarks>
-internal sealed class ConcurrencySuppressed;
+public sealed class ConcurrencySuppressed;
