@@ -148,7 +148,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             }
         }
 
-        var result = await Handler.UpdateAsync(BuildFullName(name), request, HttpContext.User, HttpContext.RequestAborted);
+        var result = await Handler.UpdateAsync(
+            BuildFullName(name),
+            request,
+            HttpContext.User,
+            HttpContext.RequestAborted
+        );
         if (!result.IsAllowed()) {
             return EmptyResult;
         }
@@ -177,7 +182,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             tag = HttpContext.Request.Headers.IfMatch.ToString();
         }
 
-        var result = await Handler.DeleteAsync(BuildFullName(name), tag, force ?? false, HttpContext.User, HttpContext.RequestAborted);
+        var result = await Handler.DeleteAsync(
+            BuildFullName(name),
+            tag,
+            force ?? false,
+            HttpContext.User,
+            HttpContext.RequestAborted
+        );
         if (!result) {
             return EmptyResult;
         }

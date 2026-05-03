@@ -17,6 +17,9 @@
     <Project Path="src/Schemata.Authorization.Foundation/Schemata.Authorization.Foundation.csproj" />
     <Project Path="src/Schemata.Authorization.Identity/Schemata.Authorization.Identity.csproj" />
     <Project Path="src/Schemata.Authorization.Skeleton/Schemata.Authorization.Skeleton.csproj" />
+    <Project Path="src/Schemata.Caching.Distributed/Schemata.Caching.Distributed.csproj" />
+    <Project Path="src/Schemata.Caching.Redis/Schemata.Caching.Redis.csproj" />
+    <Project Path="src/Schemata.Caching.Skeleton/Schemata.Caching.Skeleton.csproj" />
     <Project Path="src/Schemata.Common/Schemata.Common.csproj" />
     <Project Path="src/Schemata.Core/Schemata.Core.csproj" />
     <Project Path="src/Schemata.Entity.Cache/Schemata.Entity.Cache.csproj" />

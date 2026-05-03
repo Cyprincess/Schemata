@@ -122,7 +122,8 @@ public static class AppDomainTypeCache
                               BindingFlags.GetProperty
                             | BindingFlags.IgnoreCase
                             | BindingFlags.Public
-                            | BindingFlags.Instance)
+                            | BindingFlags.Instance
+                          )
                          .ToDictionary(m => m.Name, m => m);
         Properties[type.TypeHandle] = properties;
 
@@ -135,10 +136,10 @@ public static class AppDomainTypeCache
     /// <param name="type">The type to inspect.</param>
     /// <returns>An array of readable and writable properties.</returns>
     public static PropertyInfo[] GetWritableProperties(Type type) {
-        return WritableProperties.GetOrAdd(type.TypeHandle,
-                                           _ => GetProperties(type)
-                                               .Values.Where(p => p is { CanRead: true, CanWrite: true })
-                                               .ToArray());
+        return WritableProperties.GetOrAdd(
+            type.TypeHandle,
+            _ => GetProperties(type).Values.Where(p => p is { CanRead: true, CanWrite: true }).ToArray()
+        );
     }
 
     /// <summary>

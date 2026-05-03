@@ -96,8 +96,12 @@ public static class SchemataOptionsExtensions
                     continue;
                 }
 
-                schemata.Logger.Log(LogLevel.Debug, SchemataResources.GetResourceString(SchemataResources.ST0001),
-                                    type.Name, dependency.Name);
+                schemata.Logger.Log(
+                    LogLevel.Debug,
+                    SchemataResources.GetResourceString(SchemataResources.ST0001),
+                    type.Name,
+                    dependency.Name
+                );
                 schemata.AddFeature(dependency);
                 continue;
             }

@@ -290,8 +290,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 return;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied,
-                                         SchemataResources.GetResourceString(SchemataResources.ST4008));
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                );
         }
 
         // Filter claims to their registered destinations and annotate each

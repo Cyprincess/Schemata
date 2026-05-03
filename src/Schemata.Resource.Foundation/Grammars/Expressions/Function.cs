@@ -83,7 +83,10 @@ public class Function : IComparableArg
             }
         }
 
-        throw new ParseException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST2007), name), Position);
+        throw new ParseException(
+            string.Format(SchemataResources.GetResourceString(SchemataResources.ST2007), name),
+            Position
+        );
     }
 
     #endregion

@@ -12,17 +12,17 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-/// <summary>
-///     Registers the specified repository implementation as <see cref="IRepository{TEntity}" />
-///     and adds all built-in advisors: timestamp per
-///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>, concurrency per
-///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>,
-///     query soft-delete filter per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>
-///     and <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>,
-///     soft-delete on add/remove per AIP-164 and
-///     <seealso href="https://google.aip.dev/214">AIP-214: Resource expiration</seealso>,
-///     validation, and canonical name resolution.
-/// </summary>
+    /// <summary>
+    ///     Registers the specified repository implementation as <see cref="IRepository{TEntity}" />
+    ///     and adds all built-in advisors: timestamp per
+    ///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>, concurrency per
+    ///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>,
+    ///     query soft-delete filter per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>
+    ///     and <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>,
+    ///     soft-delete on add/remove per AIP-164 and
+    ///     <seealso href="https://google.aip.dev/214">AIP-214: Resource expiration</seealso>,
+    ///     validation, and canonical name resolution.
+    /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="implementationType">
     ///     A type that implements both <see cref="IRepository" /> and
@@ -39,7 +39,13 @@ public static class ServiceCollectionExtensions
         var nonGenericInterface     = implementationType.GetInterface(nameof(IRepository));
         var implementationInterface = implementationType.GetInterface(serviceType.Name);
         if (nonGenericInterface is null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
-            throw new ArgumentException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1029), implementationType, serviceType));
+            throw new ArgumentException(
+                string.Format(
+                    SchemataResources.GetResourceString(SchemataResources.ST1029),
+                    implementationType,
+                    serviceType
+                )
+            );
         }
 
         services.TryAddScoped(serviceType, implementationType);

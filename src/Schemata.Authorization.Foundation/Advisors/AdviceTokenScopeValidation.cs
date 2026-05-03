@@ -62,11 +62,17 @@ public sealed class AdviceTokenScopeValidation<TApp, TScope>(
             var scope = await scopes.FindByNameAsync(s, ct);
 
             if (string.IsNullOrWhiteSpace(scope?.Name)) {
-                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+                throw new OAuthException(
+                    OAuthErrors.InvalidScope,
+                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                );
             }
 
             if (!await apps.HasPermissionAsync(application, PermissionPrefixes.Scope + s, ct)) {
-                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+                throw new OAuthException(
+                    OAuthErrors.InvalidScope,
+                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                );
             }
         }
 

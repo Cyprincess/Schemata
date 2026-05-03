@@ -40,9 +40,9 @@ public class ResourceGrpcReflectionShould
 
         using var call = client.ServerReflectionInfo();
 
-        await call.RequestStream.WriteAsync(new() {
-            FileContainingSymbol = "Schemata.Resource.Grpc.Integration.Tests.Fixtures.StudentService",
-        });
+        await call.RequestStream.WriteAsync(
+            new() { FileContainingSymbol = "Schemata.Resource.Grpc.Integration.Tests.Fixtures.StudentService" }
+        );
         await call.RequestStream.CompleteAsync();
 
         Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));

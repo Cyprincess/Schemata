@@ -50,8 +50,12 @@ public class ClientSecretPostHandlerShould
         var manager = MockManager();
         var handler = CreateHandler(manager);
 
-        var result = await handler.AuthenticateAsync(null, Form("my-client", "my-secret"), null,
-                                                     CancellationToken.None);
+        var result = await handler.AuthenticateAsync(
+            null,
+            Form("my-client", "my-secret"),
+            null,
+            CancellationToken.None
+        );
 
         Assert.NotNull(result);
         Assert.Equal("my-client", result!.ClientId);
@@ -63,7 +67,12 @@ public class ClientSecretPostHandlerShould
         var handler = CreateHandler(manager);
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
-                                                     null, Form("my-client", ""), null, CancellationToken.None));
+                                                     null,
+                                                     Form("my-client", ""),
+                                                     null,
+                                                     CancellationToken.None
+                                                 )
+        );
     }
 
     [Fact]
@@ -72,7 +81,12 @@ public class ClientSecretPostHandlerShould
         var handler = CreateHandler(manager);
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
-                                                     null, Form("my-client", null), null, CancellationToken.None));
+                                                     null,
+                                                     Form("my-client", null),
+                                                     null,
+                                                     CancellationToken.None
+                                                 )
+        );
     }
 
     [Fact]
@@ -80,6 +94,11 @@ public class ClientSecretPostHandlerShould
         var handler = CreateHandler();
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
-                                                     null, Form("", ""), null, CancellationToken.None));
+                                                     null,
+                                                     Form("", ""),
+                                                     null,
+                                                     CancellationToken.None
+                                                 )
+        );
     }
 }

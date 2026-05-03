@@ -44,12 +44,19 @@ public class OperationHandlerUpdateShould
     [Fact]
     public async Task Update_ETagMismatch_ThrowsConcurrencyException() {
         var handler = _fixture.CreateHandler(services => {
-            services.TryAddScoped<IResourceUpdateAdvisor<Student, Student>, AdviceUpdateFreshness<Student, Student>>();
-        });
+                services
+                   .TryAddScoped<IResourceUpdateAdvisor<Student, Student>, AdviceUpdateFreshness<Student, Student>>();
+            }
+        );
         var entity  = _fixture.Students[0];
         var request = new Student { EntityTag = "W/\"wrongtag\"" };
 
         await Assert.ThrowsAsync<ConcurrencyException>(() => handler.UpdateAsync(
-                                                           entity.CanonicalName!, request, null, null));
+                                                           entity.CanonicalName!,
+                                                           request,
+                                                           null,
+                                                           null
+                                                       )
+        );
     }
 }

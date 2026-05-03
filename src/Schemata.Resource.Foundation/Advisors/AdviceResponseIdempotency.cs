@@ -1,9 +1,11 @@
+using System;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
+using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -20,7 +22,7 @@ public static class AdviceResponseIdempotency
 }
 
 /// <summary>
-///     On successful create, caches the response in the <see cref="IIdempotencyStore" />
+///     On successful create, caches the response in the <see cref="ICacheProvider" />
 ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso> when a
 ///     <see cref="PendingIdempotencyKey" /> is present in the context.
 ///     Works in tandem with <see cref="AdviceCreateRequestIdempotency{TEntity,TRequest,TDetail}" />.
@@ -31,13 +33,13 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName
 {
-    private readonly IIdempotencyStore _store;
+    private readonly ICacheProvider _cache;
 
     /// <summary>
     ///     Initializes a new instance with the idempotency store.
     /// </summary>
-    /// <param name="store">The <see cref="IIdempotencyStore" />.</param>
-    public AdviceResponseIdempotency(IIdempotencyStore store) { _store = store; }
+    /// <param name="cache">The <see cref="ICacheProvider" />.</param>
+    public AdviceResponseIdempotency(ICacheProvider cache) { _cache = cache; }
 
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
@@ -60,7 +62,13 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
             return AdviseResult.Continue;
         }
 
-        await _store.SetAsync(pending.RequestId, new CreateResult<TDetail> { Detail = detail }, ct: ct);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(detail);
+
+        var key = $"idempotency\x1e{pending.RequestId}".ToCacheKey(Keys.Resource);
+        await _cache.SetAsync(key, bytes, new() {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24),
+        }, ct);
+
         return AdviseResult.Continue;
     }
 

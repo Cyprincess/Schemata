@@ -44,7 +44,10 @@ public sealed class AdviceDeviceAuthorizeGrantPermission<TApp>(IApplicationManag
         CancellationToken      ct = default
     ) {
         if (!await apps.HasPermissionAsync(application, PermissionPrefixes.GrantType + GrantTypes.DeviceCode, ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007));
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007)
+            );
         }
 
         return AdviseResult.Continue;

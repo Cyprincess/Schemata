@@ -25,7 +25,9 @@ public static class BackChannelLogoutService
 }
 
 /// <summary>
-///     Performs OIDC Back-Channel Logout per <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>.
+///     Performs OIDC Back-Channel Logout per
+///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>
+///     .
 ///     Discovers session clients from stored tokens, resolves per-RP subject
 ///     identifiers (including pairwise), builds a logout token JWT, and enqueues
 ///     an out-of-band HTTP POST to each RP's <c>backchannel_logout_uri</c>.

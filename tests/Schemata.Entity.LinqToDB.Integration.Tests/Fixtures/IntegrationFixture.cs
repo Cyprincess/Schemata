@@ -29,9 +29,10 @@ public class IntegrationFixture : IAsyncLifetime
         var connectionString = $"Data Source={_dbPath}";
 
         services.TryAddScoped(_ => {
-            var options = new DataOptions().UseSQLite(connectionString);
-            return new TestDataConnection(options);
-        });
+                var options = new DataOptions().UseSQLite(connectionString);
+                return new TestDataConnection(options);
+            }
+        );
 
         services.TryAddScoped<IRepository<Student>, LinQ2DbRepository<TestDataConnection, Student>>();
 

@@ -26,9 +26,10 @@ public class DeviceInteractionHandlerShould
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByCanonicalNameAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
 
-        var devicePayload
-            = JsonSerializer.Serialize(new DeviceCodePayload { Scope = "openid profile", ClientId = "device-client" },
-                                       jsonOpts.Value);
+        var devicePayload = JsonSerializer.Serialize(
+            new DeviceCodePayload { Scope = "openid profile", ClientId = "device-client" },
+            jsonOpts.Value
+        );
 
         var device = new SchemataToken {
             Id          = 2,
@@ -43,7 +44,9 @@ public class DeviceInteractionHandlerShould
         var userCodePayload = JsonSerializer.Serialize(
             new UserCodePayload {
                 DeviceCodeName = device.Name, Scope = "openid profile", ClientId = "device-client",
-            }, jsonOpts.Value);
+            },
+            jsonOpts.Value
+        );
 
         var userCode = new SchemataToken {
             Id          = 1,
@@ -63,13 +66,20 @@ public class DeviceInteractionHandlerShould
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
-                     a.Name = "auth-generated";
-                     return a;
-                 });
+                         a.Name = "auth-generated";
+                         return a;
+                     }
+                 );
 
         var handler
             = new DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(
-                apps.Object, tokens.Object, scopes.Object, authzMgr.Object, authOpts, jsonOpts);
+                apps.Object,
+                tokens.Object,
+                scopes.Object,
+                authzMgr.Object,
+                authOpts,
+                jsonOpts
+            );
 
         return new(handler, tokens, authzMgr, device, userCode);
     }
@@ -84,12 +94,17 @@ public class DeviceInteractionHandlerShould
         var principal = CreatePrincipal(sid: "sess-xyz");
 
         await Assert.ThrowsAsync<NoContentException>(() => f.Handler.ApproveAsync(
-                                                         new() { Code = "user-ref" }, principal, "https://auth",
-                                                         CancellationToken.None));
+                                                         new() { Code = "user-ref" },
+                                                         principal,
+                                                         "https://auth",
+                                                         CancellationToken.None
+                                                     )
+        );
 
-        var createInvocation = Assert.Single(f.AuthzMgr.Invocations,
-                                             i => i.Method.Name
-                                               == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync));
+        var createInvocation = Assert.Single(
+            f.AuthzMgr.Invocations,
+            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+        );
         var created = Assert.IsType<SchemataAuthorization>(createInvocation.Arguments[0]);
         Assert.Equal("device-client", created.ApplicationName);
         Assert.Equal("user-42", created.Subject);
@@ -108,11 +123,17 @@ public class DeviceInteractionHandlerShould
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
         await Assert.ThrowsAsync<OAuthException>(() => f.Handler.ApproveAsync(
-                                                     new() { Code = "user-ref" }, principal, "https://auth",
-                                                     CancellationToken.None));
+                                                     new() { Code = "user-ref" },
+                                                     principal,
+                                                     "https://auth",
+                                                     CancellationToken.None
+                                                 )
+        );
 
-        Assert.DoesNotContain(f.AuthzMgr.Invocations,
-                              i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync));
+        Assert.DoesNotContain(
+            f.AuthzMgr.Invocations,
+            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+        );
     }
 
     #region Nested type: Fixture

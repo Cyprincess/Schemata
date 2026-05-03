@@ -39,7 +39,10 @@ public sealed class AdviceAuthorizeGrantPermission<TApp>(IApplicationManager<TAp
         CancellationToken      ct = default
     ) {
         if (!await manager.HasPermissionAsync(authz.Application, PermissionPrefixes.GrantType + GrantTypes.AuthorizationCode, ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007)) {
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007)
+            ) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
                 ResponseMode = authz.ResponseMode,

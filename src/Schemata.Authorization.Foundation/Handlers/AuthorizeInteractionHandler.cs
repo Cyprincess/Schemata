@@ -87,17 +87,26 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
          || interaction.Type != TokenTypes.Interaction
          || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= DateTime.UtcNow)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var application = await _apps.FindByCanonicalNameAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var requested = ScopeParser.Parse(authorize.Scope);
@@ -155,17 +164,26 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
          || interaction.Type != TokenTypes.Interaction
          || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= DateTime.UtcNow)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var application = await _apps.FindByCanonicalNameAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var claims = new List<Claim> {

@@ -8,11 +8,19 @@ public class OrderStateMachine : StateMachineBase<Order>
     public OrderStateMachine() {
         InstanceState(x => x.State);
 
-        Initially(When(Pay).TransitionTo(Progressing), When(Void).TransitionTo(Voided),
-                  When(Cancel).TransitionTo(Expired));
+        Initially(
+            When(Pay).TransitionTo(Progressing),
+            When(Void).TransitionTo(Voided),
+            When(Cancel).TransitionTo(Expired)
+        );
 
-        During(Progressing, When(Accept).TransitionTo(Final), When(Deny).TransitionTo(Denied),
-               When(Void).TransitionTo(Voided), When(Cancel).TransitionTo(Expired));
+        During(
+            Progressing,
+            When(Accept).TransitionTo(Final),
+            When(Deny).TransitionTo(Denied),
+            When(Void).TransitionTo(Voided),
+            When(Cancel).TransitionTo(Expired)
+        );
     }
 
     public State Progressing { get; } = null!;
