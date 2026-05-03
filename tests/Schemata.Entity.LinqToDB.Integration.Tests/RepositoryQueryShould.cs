@@ -18,24 +18,28 @@ public class RepositoryQueryShould : IAsyncLifetime
 
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
-            await repository.AddAsync(new() {
-                                          FullName = "Alice",
-                                          Age      = 18,
-                                          Grade    = 1,
-                                          Name     = "q-alice",
-                                      });
+            await repository.AddAsync(
+                new() {
+                    FullName = "Alice",
+                    Age      = 18,
+                    Grade    = 1,
+                    Name     = "q-alice",
+                }
+            );
             await repository.CommitAsync();
         }
 
         {
             var (repo2, scope2) = _fixture.CreateScopeWithRepository();
             using (scope2) {
-                await repo2.AddAsync(new() {
-                                         FullName = "Bob",
-                                         Age      = 19,
-                                         Grade    = 2,
-                                         Name     = "q-bob",
-                                     });
+                await repo2.AddAsync(
+                    new() {
+                        FullName = "Bob",
+                        Age      = 19,
+                        Grade    = 2,
+                        Name     = "q-bob",
+                    }
+                );
                 await repo2.CommitAsync();
             }
         }
@@ -43,12 +47,14 @@ public class RepositoryQueryShould : IAsyncLifetime
         {
             var (repo3, scope3) = _fixture.CreateScopeWithRepository();
             using (scope3) {
-                await repo3.AddAsync(new() {
-                                         FullName = "Charlie",
-                                         Age      = 20,
-                                         Grade    = 2,
-                                         Name     = "q-charlie",
-                                     });
+                await repo3.AddAsync(
+                    new() {
+                        FullName = "Charlie",
+                        Age      = 20,
+                        Grade    = 2,
+                        Name     = "q-charlie",
+                    }
+                );
                 await repo3.CommitAsync();
             }
         }

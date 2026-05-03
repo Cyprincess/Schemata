@@ -48,11 +48,19 @@ public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicat
         CancellationToken                  ct = default
     ) {
         if (introspection.Application?.ClientType == ClientTypes.Public) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4002), 401);
+            throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4002),
+                401
+            );
         }
 
         if (!await manager.HasPermissionAsync(introspection.Application, PermissionPrefixes.Endpoint + "introspection", ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007), 403);
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007),
+                403
+            );
         }
 
         return AdviseResult.Continue;

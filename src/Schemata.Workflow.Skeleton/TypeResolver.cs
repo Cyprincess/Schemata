@@ -17,7 +17,9 @@ public sealed class TypeResolver : ITypeResolver
             return result!;
         }
 
-        throw new TypeAccessException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Type", name));
+        throw new TypeAccessException(
+            string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Type", name)
+        );
     }
 
     /// <inheritdoc />

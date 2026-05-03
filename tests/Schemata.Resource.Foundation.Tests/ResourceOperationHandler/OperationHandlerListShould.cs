@@ -37,13 +37,15 @@ public class OperationHandlerListShould
     [Fact]
     public async Task List_WithPageSize_LimitsResults() {
         for (var i = 3; i <= 5; i++) {
-            _fixture.Students.Add(new() {
-                                      Id       = i,
-                                      FullName = $"Student{i}",
-                                      Age      = 20 + i,
-                                      Grade    = i,
-                                      Name     = $"students/student-{i}",
-                                  });
+            _fixture.Students.Add(
+                new() {
+                    Id       = i,
+                    FullName = $"Student{i}",
+                    Age      = 20 + i,
+                    Grade    = i,
+                    Name     = $"students/student-{i}",
+                }
+            );
         }
 
         var handler = _fixture.CreateHandler();

@@ -32,29 +32,40 @@ public class IntrospectionHandlerShould
     private static readonly RsaSecurityKey SigningKey = new(Rsa);
 
     private static Fixture CreateFixture(string callerAppName = "test-app") {
-        var opts = Options.Create(new SchemataAuthorizationOptions {
-            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
-        });
+        var opts = Options.Create(
+            new SchemataAuthorizationOptions {
+                Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
+            }
+        );
 
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
         var app        = new SchemataApplication { Id = 1, ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<CancellationToken>()
+                         )
+                   )
                   .ReturnsAsync(app);
 
         var services = new ServiceCollection();
-        services.TryAddEnumerable(ServiceDescriptor
-                                     .Scoped<IIntrospectionAdvisor<SchemataApplication, SchemataToken>,
-                                          AdviceIntrospectionTokenValidation<SchemataApplication, SchemataToken>>());
+        services.TryAddEnumerable(
+            ServiceDescriptor
+               .Scoped<IIntrospectionAdvisor<SchemataApplication, SchemataToken>,
+                    AdviceIntrospectionTokenValidation<SchemataApplication, SchemataToken>>()
+        );
         var sp = services.BuildServiceProvider();
 
         var handler = new IntrospectionHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokenService, tokensMock.Object, sp);
+            clientAuth.Object,
+            tokenService,
+            tokensMock.Object,
+            sp
+        );
         return new(handler, tokensMock, tokenService);
     }
 
@@ -94,7 +105,11 @@ public class IntrospectionHandlerShould
         var request = new IntrospectRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -105,7 +120,11 @@ public class IntrospectionHandlerShould
         var request = new IntrospectRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }

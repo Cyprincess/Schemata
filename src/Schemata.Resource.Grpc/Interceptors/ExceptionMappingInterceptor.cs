@@ -34,7 +34,10 @@ public class ExceptionMappingInterceptor : Interceptor
             throw BuildRpcException(ex, context);
         } catch (Exception) {
             // AIP-193: unhandled server errors map to Internal with a non-disclosing message.
-            throw BuildRpcException(new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1012)), context);
+            throw BuildRpcException(
+                new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1012)),
+                context
+            );
         }
     }
 

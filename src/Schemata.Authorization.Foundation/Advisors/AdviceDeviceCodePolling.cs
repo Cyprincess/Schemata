@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -10,6 +9,7 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
@@ -35,15 +35,7 @@ public static class AdviceDeviceCodePolling
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <remarks>
-///     Uses a distributed cache keyed on the device code to enforce a minimum interval between poll
-///     requests. Returns <c>slow_down</c> if the client is polling too fast. The interval is controlled
-///     by <see cref="SchemataAuthorizationOptions.DeviceCodeInterval" />.
-/// </remarks>
-public sealed class AdviceDeviceCodePolling<TApp>(
-    IDistributedCache                      cache,
-    IOptions<SchemataAuthorizationOptions> options
-) : ITokenRequestAdvisor<TApp>
+public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions<SchemataAuthorizationOptions> options) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
     #region ITokenRequestAdvisor<TApp> Members
@@ -67,12 +59,15 @@ public sealed class AdviceDeviceCodePolling<TApp>(
             return AdviseResult.Continue;
         }
 
-        var key = $"{Keys.DevicePoll}:{device}";
+        var key = $"polling\x1e{device}".ToCacheKey(Keys.Authorization);
         if (await cache.GetAsync(key, ct) is not null) {
-            throw new OAuthException(OAuthErrors.SlowDown, SchemataResources.GetResourceString(SchemataResources.ST4013));
+            throw new OAuthException(
+                OAuthErrors.SlowDown,
+                SchemataResources.GetResourceString(SchemataResources.ST4013)
+            );
         }
 
-        await cache.SetAsync(key, [1], new() {
+        await cache.SetAsync(key, [], new() {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.Value.DeviceCodeInterval),
         }, ct);
 

@@ -51,15 +51,23 @@ public class RefreshTokenHandlerShould
 
         var app        = new SchemataApplication { Id = 1, ClientId = "test" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<Dictionary<string, List<string?>>?>(),
+                             It.IsAny<CancellationToken>()
+                         )
+                   )
                   .ReturnsAsync(app);
 
         var sp = new ServiceCollection().BuildServiceProvider();
         var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
+            clientAuth.Object,
+            tokens.Object,
+            tokenService,
+            refreshOpts,
+            sp
+        );
 
         return new(handler, tokens, refreshToken);
     }
@@ -81,8 +89,11 @@ public class RefreshTokenHandlerShould
         var f = CreateFixture();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              CreateRequest(refresh: refreshToken), null,
-                                                              CancellationToken.None));
+                                                              CreateRequest(refresh: refreshToken),
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }

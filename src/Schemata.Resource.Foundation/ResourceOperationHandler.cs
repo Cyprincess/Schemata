@@ -92,9 +92,9 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-///     Lists resources with filtering
-///     per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>, ordering, and pagination
-///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso> through the full advisor pipeline.
+    ///     Lists resources with filtering
+    ///     per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>, ordering, and pagination
+    ///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso> through the full advisor pipeline.
     /// </summary>
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
@@ -251,10 +251,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-///     Gets a resource by name
-///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso> through the advisor pipeline.
-///     Authorization is checked before the entity is loaded
-///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
+    ///     Gets a resource by name
+    ///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso> through the advisor
+    ///     pipeline.
+    ///     Authorization is checked before the entity is loaded
+    ///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
     /// </summary>
     /// <param name="name">The resource name.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
@@ -312,9 +313,9 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-///     Creates a resource
-///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso> through the full advisor
-///     pipeline.
+    ///     Creates a resource
+    ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso> through the full advisor
+    ///     pipeline.
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
@@ -400,13 +401,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-///     Updates a resource
-///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> through the full advisor
-///     pipeline.
-///     Authorization is checked before the entity is loaded
-///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
-///     Uses field masks
-///     per <seealso href="https://google.aip.dev/161">AIP-161: Field masks</seealso> when the request implements
+    ///     Updates a resource
+    ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> through the full advisor
+    ///     pipeline.
+    ///     Authorization is checked before the entity is loaded
+    ///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
+    ///     Uses field masks
+    ///     per <seealso href="https://google.aip.dev/161">AIP-161: Field masks</seealso> when the request implements
     ///     <see cref="IUpdateMask" />.
     /// </summary>
     /// <param name="name">The resource name.</param>
@@ -502,16 +503,16 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-///     Deletes a resource
-///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> through the full advisor
-///     pipeline.
-///     Authorization is checked before the entity is loaded
-///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
+    ///     Deletes a resource
+    ///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> through the full advisor
+    ///     pipeline.
+    ///     Authorization is checked before the entity is loaded
+    ///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
     /// </summary>
     /// <param name="name">The resource name.</param>
     /// <param name="etag">
-///     The optional ETag for optimistic concurrency
-///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
+    ///     The optional ETag for optimistic concurrency
+    ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </param>
     /// <param name="force">When <see langword="true" />, bypasses the freshness check.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>

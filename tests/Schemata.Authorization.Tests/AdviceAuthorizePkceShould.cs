@@ -64,7 +64,7 @@ public class AdviceAuthorizePkceShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenPlainMethodUsed_AndS256Required() {
         var (advisor, ctx, authz) = Create();
-        authz.Request = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
+        authz.Request             = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
@@ -73,7 +73,7 @@ public class AdviceAuthorizePkceShould
     [Fact]
     public async Task Continues_WhenPlainMethodUsed_AndS256NotRequired() {
         var (advisor, ctx, authz) = Create(true, false);
-        authz.Request = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
+        authz.Request             = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
 
         var result = await advisor.AdviseAsync(ctx, authz);
 

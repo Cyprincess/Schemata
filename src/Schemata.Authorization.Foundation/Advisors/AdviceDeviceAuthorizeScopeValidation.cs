@@ -61,18 +61,27 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp, TScope>(
         }
 
         if (requested.Contains(Scopes.OpenId)) {
-            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+            throw new OAuthException(
+                OAuthErrors.InvalidScope,
+                SchemataResources.GetResourceString(SchemataResources.ST4006)
+            );
         }
 
         foreach (var s in requested) {
             var scope = await scopes.FindByNameAsync(s, ct);
 
             if (string.IsNullOrWhiteSpace(scope?.Name)) {
-                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+                throw new OAuthException(
+                    OAuthErrors.InvalidScope,
+                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                );
             }
 
             if (!await apps.HasPermissionAsync(application, PermissionPrefixes.Scope + s, ct)) {
-                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+                throw new OAuthException(
+                    OAuthErrors.InvalidScope,
+                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                );
             }
         }
 

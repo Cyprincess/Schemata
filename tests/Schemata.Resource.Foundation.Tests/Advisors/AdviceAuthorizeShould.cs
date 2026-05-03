@@ -35,8 +35,13 @@ public class AdviceAuthorizeShould
     [Fact]
     public async Task Create_WithoutAnonymousGranted_ChecksAccess() {
         var access = new Mock<IAccessProvider<Student, Student>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<Student>>(),
-                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(
+                         It.IsAny<Student?>(),
+                         It.IsAny<AccessContext<Student>>(),
+                         It.IsAny<ClaimsPrincipal?>(),
+                         It.IsAny<CancellationToken>()
+                     )
+               )
               .ReturnsAsync(false);
 
         var advisor   = new AdviceCreateRequestAuthorize<Student, Student>(access.Object);
@@ -47,23 +52,37 @@ public class AdviceAuthorizeShould
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, request, container, null));
 
         access.Verify(
-            a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<Student>>(),
-                                  It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Once);
+            a => a.HasAccessAsync(
+                It.IsAny<Student?>(),
+                It.IsAny<AccessContext<Student>>(),
+                It.IsAny<ClaimsPrincipal?>(),
+                It.IsAny<CancellationToken>()
+            ),
+            Times.Once
+        );
     }
 
     [Fact]
     public async Task Get_AuthorizedUser_AppliesEntitlementToContainer() {
         var access = new Mock<IAccessProvider<Student, GetRequest>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(),
-                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(
+                         It.IsAny<Student?>(),
+                         It.IsAny<AccessContext<GetRequest>>(),
+                         It.IsAny<ClaimsPrincipal?>(),
+                         It.IsAny<CancellationToken>()
+                     )
+               )
               .ReturnsAsync(true);
 
         Expression<Func<Student, bool>> filter      = s => s.FullName != null;
         var                             entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();
 
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<GetRequest>>(),
-                                                                    It.IsAny<ClaimsPrincipal?>(),
-                                                                    It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
+                              It.IsAny<AccessContext<GetRequest>>(),
+                              It.IsAny<ClaimsPrincipal?>(),
+                              It.IsAny<CancellationToken>()
+                          )
+                    )
                    .ReturnsAsync(filter);
 
         var advisor   = new AdviceGetRequestAuthorize<Student>(access.Object, entitlement.Object);
@@ -84,14 +103,22 @@ public class AdviceAuthorizeShould
     [Fact]
     public async Task Get_AuthorizedUser_NullEntitlement_LeavesContainerUnmodified() {
         var access = new Mock<IAccessProvider<Student, GetRequest>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(),
-                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(
+                         It.IsAny<Student?>(),
+                         It.IsAny<AccessContext<GetRequest>>(),
+                         It.IsAny<ClaimsPrincipal?>(),
+                         It.IsAny<CancellationToken>()
+                     )
+               )
               .ReturnsAsync(true);
 
         var entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<GetRequest>>(),
-                                                                    It.IsAny<ClaimsPrincipal?>(),
-                                                                    It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
+                              It.IsAny<AccessContext<GetRequest>>(),
+                              It.IsAny<ClaimsPrincipal?>(),
+                              It.IsAny<CancellationToken>()
+                          )
+                    )
                    .ReturnsAsync((Expression<Func<Student, bool>>?)null);
 
         var advisor   = new AdviceGetRequestAuthorize<Student>(access.Object, entitlement.Object);
@@ -111,8 +138,13 @@ public class AdviceAuthorizeShould
     [Fact]
     public async Task Get_UnauthorizedUser_ThrowsAuthorizationException() {
         var access = new Mock<IAccessProvider<Student, GetRequest>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<GetRequest>>(),
-                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(
+                         It.IsAny<Student?>(),
+                         It.IsAny<AccessContext<GetRequest>>(),
+                         It.IsAny<ClaimsPrincipal?>(),
+                         It.IsAny<CancellationToken>()
+                     )
+               )
               .ReturnsAsync(false);
 
         var entitlement = new Mock<IEntitlementProvider<Student, GetRequest>>();

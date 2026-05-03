@@ -42,7 +42,12 @@ public class AdviceDowngradeValidationShould
         var request = new AuthenticatorRequest();
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Downgrade, Anonymous));
+                                                          ctx,
+                                                          request,
+                                                          IdentityOperation.Downgrade,
+                                                          Anonymous
+                                                      )
+        );
     }
 
     [Fact]

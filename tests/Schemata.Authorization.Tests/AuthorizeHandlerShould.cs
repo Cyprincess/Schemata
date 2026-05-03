@@ -49,7 +49,11 @@ public class AuthorizeHandlerShould
         var request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.AuthorizeAsync(
-                                                              request, AuthenticatedUser(), CancellationToken.None));
+                                                              request,
+                                                              AuthenticatedUser(),
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }

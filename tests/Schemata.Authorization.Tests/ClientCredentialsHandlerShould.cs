@@ -54,16 +54,22 @@ public class ClientCredentialsHandlerShould
         var manager    = new Mock<IApplicationManager<SchemataApplication>>(MockBehavior.Strict);
 
         if (authFails) {
-            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<CancellationToken>()))
+            clientAuth.Setup(c => c.AuthenticateAsync(
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<CancellationToken>()
+                             )
+                       )
                       .ThrowsAsync(new OAuthException(errorCode, "auth failed"));
         } else if (application is not null) {
-            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<CancellationToken>()))
+            clientAuth.Setup(c => c.AuthenticateAsync(
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<CancellationToken>()
+                             )
+                       )
                       .ReturnsAsync(application);
 
             foreach (var perm in application.Permissions!) {
@@ -74,9 +80,10 @@ public class ClientCredentialsHandlerShould
 
         var services = new ServiceCollection();
         services.AddSingleton(manager.Object);
-        services.TryAddEnumerable(ServiceDescriptor
-                                     .Scoped<ITokenRequestAdvisor<SchemataApplication>,
-                                          AdviceTokenGrantPermission<SchemataApplication>>());
+        services.TryAddEnumerable(
+            ServiceDescriptor
+               .Scoped<ITokenRequestAdvisor<SchemataApplication>, AdviceTokenGrantPermission<SchemataApplication>>()
+        );
         var sp = services.BuildServiceProvider();
 
         var handler = new ClientCredentialsHandler<SchemataApplication>(clientAuth.Object, sp);
@@ -109,7 +116,11 @@ public class ClientCredentialsHandlerShould
         var request = CreateRequest("unknown");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
@@ -119,7 +130,11 @@ public class ClientCredentialsHandlerShould
         var request = CreateRequest(secret: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
@@ -141,7 +156,11 @@ public class ClientCredentialsHandlerShould
         var request = CreateRequest(secret: "wrong-secret");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
@@ -156,7 +175,11 @@ public class ClientCredentialsHandlerShould
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
         Assert.Equal(OAuthErrors.UnauthorizedClient, ex.Code);
     }
 }

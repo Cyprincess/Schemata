@@ -69,8 +69,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-///     Globally suppresses create-request validation
-///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
+    ///     Globally suppresses create-request validation
+    ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutCreateValidation() {
@@ -79,8 +79,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-///     Globally suppresses update-request validation
-///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
+    ///     Globally suppresses update-request validation
+    ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutUpdateValidation() {
@@ -89,8 +89,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-///     Globally suppresses freshness (ETag) checks and generation
-///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
+    ///     Globally suppresses freshness (ETag) checks and generation
+    ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutFreshness() {
@@ -99,8 +99,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-///     Registers a resource with explicit entity, request, detail, and summary types
-///     per <seealso href="https://google.aip.dev/121">AIP-121: Resource-oriented design</seealso>.
+    ///     Registers a resource with explicit entity, request, detail, and summary types
+    ///     per <seealso href="https://google.aip.dev/121">AIP-121: Resource-oriented design</seealso>.
     /// </summary>
     /// <typeparam name="TEntity">The persistent entity type.</typeparam>
     /// <typeparam name="TRequest">The request DTO type.</typeparam>

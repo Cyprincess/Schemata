@@ -117,10 +117,13 @@ public class FilterContainerShould
         var filter = Parser.Filter.Parse("(msg.endsWith('world') AND retries < 10)");
         Assert.NotNull(filter);
         var expr = Container.Build(filter)
-                            .RegisterFunction("endsWith", (args, ctx) => {
-                                 var method = ctx.GetMethod(typeof(string), "EndsWith", [typeof(string)]);
-                                 return Expression.Call(args[0], method!, args[1]);
-                             })
+                            .RegisterFunction(
+                                 "endsWith",
+                                 (args, ctx) => {
+                                     var method = ctx.GetMethod(typeof(string), "EndsWith", [typeof(string)]);
+                                     return Expression.Call(args[0], method!, args[1]);
+                                 }
+                             )
                             .Bind("msg", typeof(string))
                             .Bind("retries", typeof(int))
                             .Build();
@@ -134,10 +137,13 @@ public class FilterContainerShould
         var filter = Parser.Filter.Parse("startsWith(name, 'hel')");
         Assert.NotNull(filter);
         var expr = Container.Build(filter)
-                            .RegisterFunction("startsWith", (args, ctx) => {
-                                 var method = ctx.GetMethod(typeof(string), "StartsWith", [typeof(string)]);
-                                 return Expression.Call(args[0], method!, args[1]);
-                             })
+                            .RegisterFunction(
+                                 "startsWith",
+                                 (args, ctx) => {
+                                     var method = ctx.GetMethod(typeof(string), "StartsWith", [typeof(string)]);
+                                     return Expression.Call(args[0], method!, args[1]);
+                                 }
+                             )
                             .Bind("name", typeof(string))
                             .Build();
         var func = (Func<string, bool>)expr!.Compile();

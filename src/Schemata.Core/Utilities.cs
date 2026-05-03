@@ -62,7 +62,13 @@ public static class Utilities
             }
 
             if (sp is null) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1023), parameter.Name, type.FullName));
+                throw new InvalidOperationException(
+                    string.Format(
+                        SchemataResources.GetResourceString(SchemataResources.ST1023),
+                        parameter.Name,
+                        type.FullName
+                    )
+                );
             }
 
             arguments[i] = sp.GetRequiredService(parameter.ParameterType);
@@ -120,7 +126,14 @@ public static class Utilities
             }
 
             if (sp is null) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1024), parameter.Name, method, instance.GetType().FullName));
+                throw new InvalidOperationException(
+                    string.Format(
+                        SchemataResources.GetResourceString(SchemataResources.ST1024),
+                        parameter.Name,
+                        method,
+                        instance.GetType().FullName
+                    )
+                );
             }
 
             arguments[i] = sp.GetRequiredService(parameter.ParameterType);

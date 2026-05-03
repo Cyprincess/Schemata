@@ -101,9 +101,10 @@ public class ConfiguratorsShould
         var called        = false;
 
         configurators.Set<TestKeys>(opts => {
-            opts.Value = "configured";
-            called     = true;
-        });
+                opts.Value = "configured";
+                called     = true;
+            }
+        );
 
         var services = new ServiceCollection();
         configurators.Invoke(services);

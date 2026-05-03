@@ -31,7 +31,9 @@ public partial class ConnectController
         var result = await handler.HandleAsync(request, HttpContext.User, ct);
 
         return result.Status switch {
-            AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(result.RedirectUri),
+            AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(
+                result.RedirectUri
+            ),
             AuthorizationStatus.Content when result.Data is string html => new ContentResult {
                 Content     = html,
                 ContentType = MediaTypeNames.Text.Html,

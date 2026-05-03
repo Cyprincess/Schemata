@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Schemata.Caching.Skeleton\Schemata.Caching.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
     <ProjectReference Include="..\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />

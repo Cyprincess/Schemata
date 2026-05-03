@@ -85,7 +85,10 @@ public class AdviceAuthorizeResponseTypeShould
         var (advisor, ctx) = Create("code");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(
-                                                              ctx, Authz(Req("code", "form_post"))));
+                                                              ctx,
+                                                              Authz(Req("code", "form_post"))
+                                                          )
+        );
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
 

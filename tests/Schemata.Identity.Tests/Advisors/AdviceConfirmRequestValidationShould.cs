@@ -45,7 +45,12 @@ public class AdviceConfirmRequestValidationShould
         var request = new ConfirmRequest { EmailAddress = "a@b.c", Code = code! };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
+                                                          ctx,
+                                                          request,
+                                                          IdentityOperation.Confirm,
+                                                          Anonymous
+                                                      )
+        );
     }
 
     [Fact]
@@ -55,7 +60,12 @@ public class AdviceConfirmRequestValidationShould
         var request = new ConfirmRequest { Code = "123456" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
+                                                          ctx,
+                                                          request,
+                                                          IdentityOperation.Confirm,
+                                                          Anonymous
+                                                      )
+        );
     }
 
     [Fact]

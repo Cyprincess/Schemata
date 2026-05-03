@@ -73,7 +73,10 @@ public sealed class AuthorizeHandler<TApp, TToken>(
                 return endpoint!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008)) {
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                ) {
                     RedirectUri  = authz.Request.RedirectUri,
                     State        = authz.Request.State,
                     ResponseMode = authz.ResponseMode,
@@ -81,10 +84,11 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         }
 
         if (authz.Application is null) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001)) {
-                RedirectUri  = authz.Request.RedirectUri,
-                State        = authz.Request.State,
-                ResponseMode = authz.ResponseMode,
+            throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4001)
+            ) {
+                RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
             };
         }
 
@@ -93,10 +97,11 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         }
 
         if (string.IsNullOrWhiteSpace(options.Value.InteractionUri)) {
-            throw new OAuthException(OAuthErrors.ServerError, SchemataResources.GetResourceString(SchemataResources.ST4008)) {
-                RedirectUri  = authz.Request.RedirectUri,
-                State        = authz.Request.State,
-                ResponseMode = authz.ResponseMode,
+            throw new OAuthException(
+                OAuthErrors.ServerError,
+                SchemataResources.GetResourceString(SchemataResources.ST4008)
+            ) {
+                RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
             };
         }
 

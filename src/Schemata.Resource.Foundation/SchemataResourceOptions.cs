@@ -26,8 +26,8 @@ public sealed class SchemataResourceOptions
     public bool SuppressUpdateValidation { get; set; }
 
     /// <summary>
-///     Gets or sets whether freshness (ETag) checks and generation are globally suppressed
-///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
+    ///     Gets or sets whether freshness (ETag) checks and generation are globally suppressed
+    ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </summary>
     public bool SuppressFreshness { get; set; }
 

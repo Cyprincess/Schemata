@@ -1,5 +1,7 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Entity.Cache;
 using Schemata.Entity.Cache.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
@@ -8,19 +10,31 @@ using Schemata.Entity.Repository.Advisors;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to enable in-memory query caching.
+///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to enable query caching
+///     together with immediate eviction on update and remove.
 /// </summary>
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
-    ///     Registers in-memory query caching advisors (<see cref="AdviceQueryCache{TEntity,TResult,T}" /> and
-    ///     <see cref="AdviceResultCache{TEntity,TResult,T}" />).
+    ///     Registers the query, result, update-evict, and remove-evict cache advisors together with
+    ///     <see cref="SchemataQueryCacheOptions" />.
     /// </summary>
     /// <param name="builder">The repository builder.</param>
+    /// <param name="configure">Optional callback to customize <see cref="SchemataQueryCacheOptions" />.</param>
     /// <returns>The same builder for chaining.</returns>
-    public static SchemataRepositoryBuilder UseQueryCache(this SchemataRepositoryBuilder builder) {
+    public static SchemataRepositoryBuilder UseQueryCache(
+        this SchemataRepositoryBuilder     builder,
+        Action<SchemataQueryCacheOptions>? configure = null
+    ) {
+        var options = builder.Services.AddOptions<SchemataQueryCacheOptions>();
+        if (configure is not null) {
+            options.Configure(configure);
+        }
+
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAdvisor<,,>), typeof(AdviceQueryCache<,,>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryResultAdvisor<,,>), typeof(AdviceResultCache<,,>)));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateEvictCache<>)));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAdvisor<>), typeof(AdviceRemoveEvictCache<>)));
 
         return builder;
     }
