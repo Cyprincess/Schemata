@@ -4,10 +4,18 @@ using Parlot;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents a comparison restriction (e.g. <c>field = value</c>) in the filter grammar.
+///     A comparison restriction (e.g., <c>field = value</c>).
+///     When no comparator is present, the bare comparable expression is returned as-is,
+///     which callers interpret as an existence/presence check.
 /// </summary>
 public class Restriction : ISimple
 {
+    /// <summary>
+    ///     Initializes a new restriction.
+    /// </summary>
+    /// <param name="position">The position in the source text.</param>
+    /// <param name="comparable">The left-hand comparable expression.</param>
+    /// <param name="comparator">The optional comparator and right-hand argument.</param>
     public Restriction(TextPosition position, IComparableArg comparable, (IBinary, IArg)? comparator) {
         Position = position;
 
@@ -25,21 +33,24 @@ public class Restriction : ISimple
     public IComparableArg Comparable { get; }
 
     /// <summary>
-    ///     Gets the binary comparator operator, or <see langword="null" /> for a bare expression.
+    ///     Gets the comparator operator, or <see langword="null" /> for bare expressions.
     /// </summary>
     public IBinary? Comparator { get; }
 
     /// <summary>
-    ///     Gets the right-hand argument, or <see langword="null" /> for a bare expression.
+    ///     Gets the right-hand argument, or <see langword="null" /> for bare expressions.
     /// </summary>
     public IArg? Arg { get; }
 
     #region ISimple Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => Comparable.IsConstant && Comparator is null;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         var left = Comparable.ToExpression(ctx);
         if (left is null) {
@@ -68,6 +79,7 @@ public class Restriction : ISimple
 
     #endregion
 
+    /// <inheritdoc />
     public override string? ToString() {
         return Comparator is not null ? $"[{Comparator} {Comparable} {Arg}]" : Comparable.ToString();
     }

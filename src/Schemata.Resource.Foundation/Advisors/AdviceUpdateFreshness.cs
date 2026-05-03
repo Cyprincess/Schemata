@@ -9,23 +9,28 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceUpdateFreshness{TEntity,TRequest}" />.
+/// </summary>
 public static class AdviceUpdateFreshness
 {
+    /// <summary>
+    ///     Default order at <see cref="Orders.Base" />.
+    /// </summary>
     public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-///     Enforces optimistic concurrency for update operations by comparing the request ETag with the entity timestamp.
+///     Enforces optimistic concurrency for update operations
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso> by comparing the
+///     request
+///     ETag with the entity's concurrency timestamp.
+///     The request must implement <see cref="IFreshness" /> and the ETag must start with
+///     <c>W/</c>; if it doesn't match, throws <see cref="ConcurrencyException" />.
+///     Suppressed when <see cref="FreshnessSuppressed" /> is present.
 /// </summary>
-/// <typeparam name="TEntity">The entity type being updated.</typeparam>
-/// <typeparam name="TRequest">The request DTO type carrying the ETag.</typeparam>
-/// <remarks>
-///     Order: 300,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature" />.
-///     Reads the ETag from the request if it implements <see cref="Schemata.Abstractions.Resource.IFreshness" />,
-///     and compares it with the entity's concurrency timestamp.
-///     Throws <see cref="Schemata.Abstractions.Exceptions.ConcurrencyException" /> when the ETag does not match.
-///     Suppressed when <see cref="FreshnessSuppressed" /> is present in the advice context.
-/// </remarks>
+/// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TRequest">The request DTO type.</typeparam>
 public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

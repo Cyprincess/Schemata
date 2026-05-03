@@ -16,8 +16,29 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     OIDC UserInfo endpoint per
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#UserInfo">
+///         OpenID Connect Core 1.0 §5.3:
+///         UserInfo Endpoint
+///     </seealso>
+///     .
+///     Returns claims about the authenticated end-user.  Runs the
+///     <see cref="IUserInfoAdvisor" /> pipeline to fill the user-info context,
+///     then the <see cref="IClaimsAdvisor" /> pipeline to resolve claims,
+///     and finally filters claims by <see cref="IDestinationAdvisor" /> to
+///     only include those allowed for the <c>userinfo</c> destination.
+/// </summary>
 public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
 {
+    /// <summary>
+    ///     Returns user claims scoped to the userinfo destination.
+    ///     Filters by OIDC scope, runs advisor pipelines for claim resolution
+    ///     and destination filtering, and returns claims as a JSON object.
+    ///     Multiple values for the same claim type are returned as an array.
+    /// </summary>
+    /// <param name="principal">The authenticated principal extracted from the access token.</param>
+    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
         var ctx = new AdviceContext(sp);
 
@@ -65,6 +86,7 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
                 throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
         }
 
+        // Filter claims: only include those whose destination set contains "userinfo".
         for (var i = claims.Count - 1; i >= 0; i--) {
             var destinations = new HashSet<string>();
 
@@ -84,6 +106,7 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
             }
         }
 
+        // Flatten duplicate claim types: single value → string, multiple → array.
         var dict = claims.GroupBy(c => c.Type)
                          .ToDictionary(
                               g => g.Key,

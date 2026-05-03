@@ -3,13 +3,16 @@ using System.Linq.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents a binary comparator operator (=, !=, &lt;, &gt;, &lt;=, &gt;=, :) in the filter grammar.
+///     A binary comparator operator (<c>=</c>, <c>!=</c>, <c>&lt;</c>, <c>&gt;</c>,
+///     <c>&lt;=</c>, <c>&gt;=</c>, <c>:</c>) in the filter grammar.
+///     When <see cref="Type" /> is <see langword="null" /> (for <c>=</c> and <c>:</c>),
+///     <see cref="ToExpression(Expression,Expression,Container)" /> provides custom logic.
 /// </summary>
 public interface IBinary : IToken
 {
     /// <summary>
-    ///     Gets the LINQ expression type for simple comparisons, or <see langword="null" /> for custom operators like <c>=</c>
-    ///     and <c>:</c>.
+    ///     Gets the LINQ expression type for simple comparisons, or <see langword="null" />
+    ///     for custom operators like <c>=</c> and <c>:</c>.
     /// </summary>
     ExpressionType? Type { get; }
 

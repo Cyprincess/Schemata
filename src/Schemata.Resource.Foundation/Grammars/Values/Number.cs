@@ -6,10 +6,13 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-///     Represents a decimal number literal value in the filter grammar.
+///     A decimal number literal.
 /// </summary>
 public class Number : IValue
 {
+    /// <summary>
+    ///     Initializes a new number literal.
+    /// </summary>
     public Number(TextPosition position, decimal value) {
         Value    = value;
         Position = position;
@@ -24,13 +27,17 @@ public class Number : IValue
 
     object IValue.Value => Value;
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => true;
 
+    /// <inheritdoc />
     public Expression ToExpression(Container ctx) { return Expression.Constant(Value); }
 
     #endregion
 
+    /// <inheritdoc />
     public override string ToString() { return Value.ToString(CultureInfo.InvariantCulture); }
 }

@@ -16,8 +16,10 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Common;
 
 /// <summary>
-///     Parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building canonical
-///     names.
+///     Parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building
+///     canonical names.
+///     See <seealso href="https://google.aip.dev/122">AIP-122: Resource names</seealso>
+///     and <seealso href="https://google.aip.dev/159">AIP-159: Reading across collections</seealso>.
 /// </summary>
 public sealed class ResourceNameDescriptor
 {
@@ -94,46 +96,48 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     The full AIP-122 pattern, e.g., "publishers/{publisher}/books/{book}".
-    ///     Null when no <see cref="CanonicalNameAttribute" /> is present.
+    ///     The full <seealso href="https://google.aip.dev/122">AIP-122: Resource names</seealso> pattern, e.g.,
+    ///     <c>"publishers/{publisher}/books/{book}"</c>.
+    ///     <see langword="null" /> when no <see cref="CanonicalNameAttribute" /> is present.
     /// </summary>
     public string? Pattern { get; }
 
     /// <summary>
-    ///     PascalCase singular, e.g., "Book" (from DisplayName/Table/TypeName).
+    ///     PascalCase singular form derived from <see cref="DisplayNameAttribute" />, <see cref="TableAttribute" />, or
+    ///     the type name.
     /// </summary>
     public string Singular { get; }
 
     /// <summary>
-    ///     PascalCase plural, e.g., "Books".
+    ///     PascalCase plural form.
     /// </summary>
     public string Plural { get; }
 
     /// <summary>
-    ///     Collection identifier (last collection segment from pattern), e.g., "books".
+    ///     Last collection segment from the pattern, e.g., <c>"books"</c>.
     /// </summary>
     public string Collection { get; }
 
     /// <summary>
-    ///     For HTTP routing: everything up to and including the last collection segment,
-    ///     e.g., "publishers/{publisher}/books".
+    ///     Everything up to and including the last collection segment, e.g.,
+    ///     <c>"publishers/{publisher}/books"</c> — used for HTTP routing.
     /// </summary>
     public string CollectionPath { get; }
 
     /// <summary>
-    ///     API package/prefix. Read from <see cref="ResourcePackageAttribute" /> on the type.
-    ///     Used by HTTP as route prefix and by gRPC as service name prefix.
-    ///     Null when no attribute is present.
+    ///     API package/prefix from <see cref="ResourcePackageAttribute" />, used as route prefix and gRPC service name
+    ///     prefix. <see langword="null" /> when no attribute is present.
     /// </summary>
     public string? Package { get; }
 
     /// <summary>
-    ///     True when the resource has parent segments in its pattern.
+    ///     <see langword="true" /> when the resource has parent segments in its pattern.
     /// </summary>
     public bool HasParent => _parentSegments.Length > 0;
 
     /// <summary>
-    ///     True when the entity type has <see cref="ReadAcrossAttribute" /> (AIP-159 opt-in).
+    ///     <see langword="true" /> when the entity type has <see cref="ReadAcrossAttribute" /> (
+    ///     <seealso href="https://google.aip.dev/159">AIP-159: Reading across collections</seealso> opt-in).
     /// </summary>
     public bool SupportsReadAcross { get; }
 
@@ -152,9 +156,14 @@ public sealed class ResourceNameDescriptor
     public static ResourceNameDescriptor ForType<T>() { return ForType(typeof(T)); }
 
     /// <summary>
-    ///     Resolves placeholder values from an entity instance.
-    ///     e.g., "publishers/{publisher}/books/{book}" + entity → "publishers/acme/books/les-miserables"
+    ///     Resolves placeholder values from an entity instance against the pattern.
+    ///     e.g., <c>"publishers/{publisher}/books/{book}"</c> + entity => <c>"publishers/acme/books/les-miserables"</c>.
     /// </summary>
+    /// <param name="entity">The entity instance.</param>
+    /// <returns>The resolved resource name.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when no pattern is defined.</exception>
+    /// <exception cref="MissingFieldException">Thrown when a required property is not found on the entity.</exception>
+    /// <exception cref="ValidationException">Thrown when a required placeholder value is missing or empty.</exception>
     public string Resolve(object entity) {
         if (_segments.Length == 0) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1018));
@@ -204,9 +213,12 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Parse a parent string using the parent portion of CollectionPath.
-    ///     e.g., "publishers/acme" with CollectionPath "publishers/{publisher}/books" → { "publisher": "acme" }
+    ///     Parses a parent string using the parent portion of <see cref="CollectionPath" />.
+    ///     e.g., <c>"publishers/acme"</c> with CollectionPath <c>"publishers/{publisher}/books"</c>
+    ///     produces <c>{ "publisher": "acme" }</c>.
     /// </summary>
+    /// <param name="parent">The parent path to parse.</param>
+    /// <returns>A dictionary of placeholder names to values, or <see langword="null" /> if parsing fails.</returns>
     public Dictionary<string, string>? ParseParent(string? parent) {
         if (_parentSegments.Length == 0 || string.IsNullOrWhiteSpace(parent)) {
             return null;
@@ -216,9 +228,12 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Parse full canonical name using Pattern.
-    ///     e.g., "publishers/acme/books/les-miserables" → ({"publisher": "acme"}, "les-miserables")
+    ///     Parses a full canonical name against <see cref="Pattern" /> and returns parent values plus the leaf name.
+    ///     e.g., <c>"publishers/acme/books/les-miserables"</c> =>
+    ///     <c>({"publisher": "acme"}, "les-miserables")</c>.
     /// </summary>
+    /// <param name="canonicalName">The full canonical resource name.</param>
+    /// <returns>A tuple of parent values and leaf name, or <see langword="null" /> if parsing fails.</returns>
     public (Dictionary<string, string> ParentValues, string LeafName)? ParseCanonicalName(string canonicalName) {
         if (_segments.Length == 0 || _leafSegment is not { IsPlaceholder: true } leaf) {
             return null;
@@ -235,9 +250,11 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Build parent string from ASP.NET route values.
-    ///     e.g., routeValues { publisher: "acme" } → "publishers/acme"
+    ///     Builds a parent path string from ASP.NET route values.
+    ///     e.g., routeValues <c>{ publisher: "acme" }</c> => <c>"publishers/acme"</c>.
     /// </summary>
+    /// <param name="routeValues">The route value dictionary.</param>
+    /// <returns>The parent path, or <see langword="null" /> if no parent segments exist.</returns>
     public string? ResolveParent(IDictionary<string, object?> routeValues) {
         if (_parentSegments.Length == 0) return null;
         var parts = new string[_parentSegments.Length];
@@ -254,8 +271,10 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Extract parent placeholder values from route values.
+    ///     Extracts parent placeholder values from route values.
     /// </summary>
+    /// <param name="routeValues">The route value dictionary.</param>
+    /// <returns>A dictionary of placeholder names to values, or <see langword="null" /> if none found.</returns>
     public Dictionary<string, string>? ExtractParentValues(IDictionary<string, object?> routeValues) {
         if (_parentSegments.Length == 0) return null;
         var values = new Dictionary<string, string>();
@@ -269,8 +288,10 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Set parent properties on target from route values.
+    ///     Sets parent properties on the target object from route values.
     /// </summary>
+    /// <param name="target">The target object.</param>
+    /// <param name="routeValues">The route value dictionary.</param>
     public void SetParentFromRouteValues(object target, IDictionary<string, object?> routeValues) {
         if (_parentSegments.Length == 0) return;
         var properties = AppDomainTypeCache.GetProperties(target.GetType());
@@ -285,9 +306,13 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Build WHERE predicate from parent values.
-    ///     Skips predicates where value is "-" (AIP-159 wildcard).
+    ///     Builds a WHERE predicate expression from parent values.
+    ///     Skips predicates where the value is <c>"-"</c> (
+    ///     <seealso href="https://google.aip.dev/159">AIP-159: Reading across collections</seealso> wildcard).
     /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="parentValues">The parent values dictionary.</param>
+    /// <returns>A predicate expression, or <see langword="null" /> if no conditions can be built.</returns>
     public Expression<Func<T, bool>>? BuildParentPredicate<T>(Dictionary<string, string> parentValues) {
         var parameter  = Expression.Parameter(typeof(T), "e");
         var properties = AppDomainTypeCache.GetProperties(typeof(T));
@@ -301,7 +326,7 @@ public sealed class ResourceNameDescriptor
                 continue;
             }
 
-            // AIP-159: skip wildcard parent
+            // AIP-159: Reading across collections — skip wildcard parent
             if (value == "-") {
                 continue;
             }
@@ -325,8 +350,9 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Clear parent properties on object (set to null).
+    ///     Clears parent properties on the target object (sets them to <see langword="null" />).
     /// </summary>
+    /// <param name="target">The target object.</param>
     public void ClearParentProperties(object target) {
         var properties = AppDomainTypeCache.GetProperties(target.GetType());
 

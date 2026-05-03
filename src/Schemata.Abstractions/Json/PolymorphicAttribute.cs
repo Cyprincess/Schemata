@@ -3,24 +3,29 @@ using System;
 namespace Schemata.Abstractions.Json;
 
 /// <summary>
-///     Registers a class as a polymorphic derived type for JSON serialization under the specified base type.
+///     Registers a class as a derived type of <see cref="BaseType" /> for
+///     polymorphic JSON serialization. The serializer emits a discriminator
+///     (defaults to <c>"@type"</c>) so the deserializer can select the correct
+///     concrete type.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class PolymorphicAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="PolymorphicAttribute" /> class.
+    ///     Registers the annotated class as a derived type of <paramref name="type" />
+    ///     for polymorphic serialization.
     /// </summary>
-    /// <param name="type">The base type this class is a derived type of for polymorphic serialization.</param>
+    /// <param name="type">The base type this class inherits from.</param>
     public PolymorphicAttribute(Type type) { BaseType = type; }
 
     /// <summary>
-    ///     Gets the base type used for polymorphic serialization.
+    ///     The base type under which this derived type is registered.
     /// </summary>
     public Type BaseType { get; }
 
     /// <summary>
-    ///     Gets or sets the type discriminator name used during serialization.
+    ///     The discriminator value emitted for this derived type. When
+    ///     <see langword="null" />, the type's CLR name is used.
     /// </summary>
     public string? Name { get; set; }
 }

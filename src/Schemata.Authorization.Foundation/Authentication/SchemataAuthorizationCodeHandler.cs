@@ -24,6 +24,14 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
+/// <summary>
+///     ASP.NET Core authentication handler for the Schemata authorization-code scheme.
+///     Unlike the Bearer handler which writes JSON, this handler creates an authorization
+///     code token and returns the callback (redirect or form_post) via
+///     <see cref="ResponseModeService" />.
+///     Called from the authorization endpoint after the resource owner approves
+///     the authorization request.
+/// </summary>
 public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     IOptionsMonitor<SchemataAuthenticationHandlerOptions> options,
     IOptions<SchemataAuthorizationOptions>                config,
@@ -37,12 +45,27 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    /// <inheritdoc />
+    /// <exception cref="NotImplementedException">
+    ///     The authorization-code scheme is write-only; validation is not supported.
+    /// </exception>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() { throw new NotImplementedException(); }
 
+    /// <inheritdoc />
+    /// <exception cref="NotImplementedException">
+    ///     The authorization-code scheme is write-only; sign-out is not supported.
+    /// </exception>
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    ///     Creates an authorization code and returns the response via the
+    ///     appropriate callback mode (query, fragment, or form_post).
+    ///     For hybrid flows, may also include access tokens and ID tokens
+    ///     directly in the callback when the response_type includes
+    ///     <c>token</c> or <c>id_token</c>.
+    /// </summary>
     protected override async Task HandleSignInAsync(ClaimsPrincipal principal, AuthenticationProperties? properties) {
         var ct    = Context.RequestAborted;
         var items = properties?.Items ?? new Dictionary<string, string?>();
@@ -145,6 +168,13 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         await actionResult.ExecuteResultAsync(new(Context, routeData, new()));
     }
 
+    /// <summary>
+    ///     Creates a short-lived authorization code token.  The code is a
+    ///     random reference that points to a stored entity containing the
+    ///     serialized <see cref="AuthorizeRequest" /> payload, which includes
+    ///     PKCE challenge, redirect URI, nonce, and other auth-time parameters
+    ///     needed by the token endpoint's code exchange.
+    /// </summary>
     private async Task<string> CreateAuthorizationCodeAsync(
         string?                      client,
         string?                      scope,

@@ -17,11 +17,21 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
+/// <summary>Shared constants for back-channel logout operations.</summary>
 public static class BackChannelLogoutService
 {
+    /// <summary>HTTP timeout for individual back-channel logout requests.</summary>
     internal static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 }
 
+/// <summary>
+///     Performs OIDC Back-Channel Logout per <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>.
+///     Discovers session clients from stored tokens, resolves per-RP subject
+///     identifiers (including pairwise), builds a logout token JWT, and enqueues
+///     an out-of-band HTTP POST to each RP's <c>backchannel_logout_uri</c>.
+///     All heavy work (DB queries, JWT signing) runs in the request scope;
+///     only the HTTP call is deferred to the background queue.
+/// </summary>
 public sealed class BackChannelLogoutService<TApp, TToken>(
     IApplicationManager<TApp>              apps,
     ITokenManager<TToken>                  tokens,
@@ -35,11 +45,18 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 {
     #region ILogoutNotifier Members
 
+    /// <inheritdoc />
     public Task<List<string>>
         GetFrontChannelUrisAsync(string? subject, string? session, CancellationToken ct = default) {
         return Task.FromResult<List<string>>([]);
     }
 
+    /// <summary>
+    ///     Enqueues back-channel logout requests for all RPs that have active
+    ///     sessions for the given subject or session.
+    ///     Each RP receives a signed logout token containing the subject (or
+    ///     pairwise identifier), session ID, and the logout event type.
+    /// </summary>
     public async Task EnqueueBackChannelAsync(string? subject, string? session, CancellationToken ct = default) {
         if (string.IsNullOrWhiteSpace(subject) && string.IsNullOrWhiteSpace(session)) {
             return;

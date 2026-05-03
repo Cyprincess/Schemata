@@ -1,12 +1,15 @@
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Indicates that an entity has a discrete state, typically representing a workflow or lifecycle stage.
+///     Declares a discrete state field representing a workflow or lifecycle
+///     stage, corresponding to
+///     <seealso href="https://google.aip.dev/216">AIP-216: States</seealso>
+///     <c>state</c>.
 /// </summary>
 public interface IStateful
 {
     /// <summary>
-    ///     Gets or sets the current state of the entity.
+    ///     The current state of the entity.
     /// </summary>
     string? State { get; set; }
 }

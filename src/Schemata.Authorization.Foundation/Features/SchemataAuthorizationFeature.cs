@@ -23,6 +23,21 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Configures the core Schemata Authorization server: options validation, token services,
+///     managers, authentication schemes, claim advisors, the discovery handler, the OAuth
+///     model binder, the well-known endpoint mappings, and delegates to all registered
+///     <see cref="IAuthorizationFlowFeature" /> implementations.
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TAuth">The authorization entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
+/// <remarks>
+///     Installed via <c>UseAuthorization()</c> on <see cref="SchemataBuilder" />.
+///     Depends on <see cref="SchemataAuthenticationFeature" />, <see cref="SchemataControllersFeature" />,
+///     and <see cref="SchemataWellKnownFeature" />.
+/// </remarks>
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataWellKnownFeature>]
@@ -34,8 +49,10 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 {
     public const int DefaultPriority = Orders.Extension + 20_000_000;
 
+    /// <inheritdoc cref="FeatureBase.Priority" />
     public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

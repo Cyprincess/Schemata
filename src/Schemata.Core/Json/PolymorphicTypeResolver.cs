@@ -11,8 +11,10 @@ using Schemata.Common;
 namespace Schemata.Core.Json;
 
 /// <summary>
-///     JSON type info resolver that auto-discovers <see cref="PolymorphicAttribute" /> types and wires polymorphic
-///     serialization.
+///     JSON type info resolver that scans the application domain for types
+///     decorated with <see cref="PolymorphicAttribute" /> and configures
+///     <see cref="JsonPolymorphismOptions" /> on base types with discriminator
+///     property <c>"@type"</c>. Unknown discriminators fail serialization.
 /// </summary>
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
@@ -33,7 +35,8 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
     }
 
     /// <summary>
-    ///     Gets the singleton instance.
+    ///     Singleton instance registered by
+    ///     <see cref="Features.SchemataJsonSerializerFeature" />.
     /// </summary>
     public static PolymorphicTypeResolver Instance { get; } = new();
 
@@ -46,7 +49,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
         }
 
         info.PolymorphismOptions = new() {
-            TypeDiscriminatorPropertyName        = "$type",
+            TypeDiscriminatorPropertyName        = "@type",
             IgnoreUnrecognizedTypeDiscriminators = true,
             UnknownDerivedTypeHandling           = JsonUnknownDerivedTypeHandling.FailSerialization,
         };

@@ -4,7 +4,9 @@ using System.Collections.Generic;
 namespace Schemata.Abstractions.Advisors;
 
 /// <summary>
-///     A typed property bag that flows through the advisor pipeline, providing shared state and access to services.
+///     Typed property bag flowing through the advisor pipeline.
+///     Advisors share state via <see cref="Set{T}" />, <see cref="TryGet{T}" />,
+///     and <see cref="Has{T}" />.
 /// </summary>
 public class AdviceContext
 {
@@ -13,27 +15,33 @@ public class AdviceContext
     /// <summary>
     ///     Initializes a new instance of the <see cref="AdviceContext" /> class.
     /// </summary>
-    /// <param name="sp">The service provider used to resolve services within advisors.</param>
+    /// <param name="sp">The <see cref="IServiceProvider" /> available to advisors during pipeline execution.</param>
     public AdviceContext(IServiceProvider sp) { ServiceProvider = sp; }
 
     /// <summary>
-    ///     Gets the service provider for resolving dependencies during pipeline execution.
+    ///     The <see cref="IServiceProvider" /> for resolving services within advisors.
     /// </summary>
     public IServiceProvider ServiceProvider { get; }
 
     /// <summary>
-    ///     Stores a value in the context, keyed by its type.
+    ///     Stores a value keyed by its runtime type.
     /// </summary>
     /// <typeparam name="T">The type used as the key.</typeparam>
-    /// <param name="value">The value to store.</param>
+    /// <param name="value">The value to store; may be <see langword="null" />.</param>
     public void Set<T>(T? value) { _options[typeof(T).TypeHandle] = value; }
 
     /// <summary>
-    ///     Attempts to retrieve a value from the context by its type.
+    ///     Attempts to retrieve a value keyed by type.
     /// </summary>
-    /// <typeparam name="T">The type used as the key.</typeparam>
-    /// <param name="value">When this method returns, contains the value if found; otherwise, the default value.</param>
-    /// <returns><see langword="true" /> if a non-null value was found; otherwise, <see langword="false" />.</returns>
+    /// <typeparam name="T">The key type.</typeparam>
+    /// <param name="value">
+    ///     When this method returns <see langword="true" />, contains the stored value;
+    ///     otherwise <see langword="null" />.
+    /// </param>
+    /// <returns>
+    ///     <see langword="true" /> if a non-null value was found for type
+    ///     <typeparamref name="T" />; otherwise <see langword="false" />.
+    /// </returns>
     public bool TryGet<T>(out T? value) {
         if (!_options.TryGetValue(typeof(T).TypeHandle, out var @object)) {
             value = default;
@@ -45,11 +53,13 @@ public class AdviceContext
     }
 
     /// <summary>
-    ///     Retrieves a value from the context by its type, or throws if not found.
+    ///     Retrieves a value keyed by type, throwing if none exists.
     /// </summary>
-    /// <typeparam name="T">The type used as the key.</typeparam>
+    /// <typeparam name="T">The key type.</typeparam>
     /// <returns>The stored value.</returns>
-    /// <exception cref="KeyNotFoundException">Thrown when no value of the specified type exists in the context.</exception>
+    /// <exception cref="KeyNotFoundException">
+    ///     No value of type <typeparamref name="T" /> has been set in this context.
+    /// </exception>
     public T? Get<T>() {
         if (TryGet<T>(out var value)) {
             return value;
@@ -59,9 +69,12 @@ public class AdviceContext
     }
 
     /// <summary>
-    ///     Determines whether the context contains a value of the specified type.
+    ///     Determines whether a value of type <typeparamref name="T" /> exists in the
+    ///     context, regardless of whether the stored value is <see langword="null" />.
     /// </summary>
-    /// <typeparam name="T">The type to check for.</typeparam>
-    /// <returns><see langword="true" /> if the context contains a value of type <typeparamref name="T" />.</returns>
+    /// <typeparam name="T">The key type.</typeparam>
+    /// <returns>
+    ///     <see langword="true" /> if a key for type <typeparamref name="T" /> exists.
+    /// </returns>
     public bool Has<T>() { return _options.ContainsKey(typeof(T).TypeHandle); }
 }

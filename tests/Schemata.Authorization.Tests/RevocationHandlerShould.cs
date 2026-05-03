@@ -33,24 +33,28 @@ public class RevocationHandlerShould
 
     private static Fixture CreateFixture() {
         var opts = Options.Create(new SchemataAuthorizationOptions {
-            Issuer           = Issuer,
-            SigningKey       = SigningKey,
-            SigningAlgorithm = SigningAlgorithms.RsaSha256,
+            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
         });
 
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app = new SchemataApplication { Id = 1, Name = "test-app", ClientId = "test-app" };
+        var app        = new SchemataApplication { Id = 1, Name = "test-app", ClientId = "test-app" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
         var services = new ServiceCollection();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRevocationAdvisor<SchemataApplication, SchemataToken>, AdviceRevocationTokenValidation<SchemataApplication, SchemataToken>>());
+        services.TryAddEnumerable(ServiceDescriptor
+                                     .Scoped<IRevocationAdvisor<SchemataApplication, SchemataToken>,
+                                          AdviceRevocationTokenValidation<SchemataApplication, SchemataToken>>());
         var sp = services.BuildServiceProvider();
 
-        var handler = new RevocationHandler<SchemataApplication, SchemataToken>(clientAuth.Object, tokensMock.Object, sp);
+        var handler
+            = new RevocationHandler<SchemataApplication, SchemataToken>(clientAuth.Object, tokensMock.Object, sp);
         return new(handler, tokensMock, tokenService);
     }
 
@@ -79,7 +83,8 @@ public class RevocationHandlerShould
         var f       = CreateFixture();
         var request = new RevokeRequest { Token = "" };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -89,7 +94,8 @@ public class RevocationHandlerShould
         var f       = CreateFixture();
         var request = new RevokeRequest { Token = "   " };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -113,9 +119,7 @@ public class RevocationHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()),
-            new(Claims.Subject, "user-42"),
-            new(Claims.Audience, "api"),
+            new(Claims.JwtId, Guid.NewGuid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
@@ -150,9 +154,7 @@ public class RevocationHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()),
-            new(Claims.Subject, "user-42"),
-            new(Claims.Audience, "api"),
+            new(Claims.JwtId, Guid.NewGuid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
@@ -171,8 +173,8 @@ public class RevocationHandlerShould
 
     private record Fixture(
         RevocationHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>> Tokens,
-        TokenService                       TokenService
+        Mock<ITokenManager<SchemataToken>>                    Tokens,
+        TokenService                                          TokenService
     );
 
     #endregion

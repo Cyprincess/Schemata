@@ -49,8 +49,7 @@ public class ResourceGrpcReflectionShould
         var response = call.ResponseStream.Current;
         Assert.NotNull(response.FileDescriptorResponse);
 
-        var files = response.FileDescriptorResponse.FileDescriptorProto
-                            .Select(FileDescriptorProto.Parser.ParseFrom)
+        var files = response.FileDescriptorResponse.FileDescriptorProto.Select(FileDescriptorProto.Parser.ParseFrom)
                             .ToList();
 
         var allFields = files.Where(f => !f.Name.StartsWith("google/"))

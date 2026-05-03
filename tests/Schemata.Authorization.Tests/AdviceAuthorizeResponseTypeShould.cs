@@ -18,7 +18,9 @@ namespace Schemata.Authorization.Tests;
 
 public class AdviceAuthorizeResponseTypeShould
 {
-    private static (AdviceAuthorizeClientAndRedirect<SchemataApplication> advisor, AdviceContext ctx) Create(params string[] allowedTypes) {
+    private static (AdviceAuthorizeClientAndRedirect<SchemataApplication> advisor, AdviceContext ctx) Create(
+        params string[] allowedTypes
+    ) {
         var opts = new SchemataAuthorizationOptions();
         foreach (var t in allowedTypes) opts.AllowedResponseTypes.Add(t);
         opts.AllowedResponseModes.Add(ResponseModes.Query);
@@ -27,8 +29,7 @@ public class AdviceAuthorizeResponseTypeShould
         var app = new SchemataApplication { ClientId = "test" };
 
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
-        manager.Setup(m => m.FindByCanonicalNameAsync("test", It.IsAny<CancellationToken>()))
-               .ReturnsAsync(app);
+        manager.Setup(m => m.FindByCanonicalNameAsync("test", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateRedirectUriAsync(app, "https://example.com/cb", It.IsAny<CancellationToken>()))
                .ReturnsAsync(true);
 
@@ -39,7 +40,7 @@ public class AdviceAuthorizeResponseTypeShould
     }
 
     private static AuthorizeRequest Req(string responseType, string? responseMode = null) {
-        return new AuthorizeRequest {
+        return new() {
             ClientId     = "test",
             RedirectUri  = "https://example.com/cb",
             ResponseType = responseType,
@@ -49,7 +50,7 @@ public class AdviceAuthorizeResponseTypeShould
     }
 
     private static AuthorizeContext<SchemataApplication> Authz(AuthorizeRequest request) {
-        return new AuthorizeContext<SchemataApplication> { Request = request };
+        return new() { Request = request };
     }
 
     [Fact]
@@ -83,7 +84,8 @@ public class AdviceAuthorizeResponseTypeShould
     public async Task RejectUnsupportedResponseMode() {
         var (advisor, ctx) = Create("code");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, Authz(Req("code", "form_post"))));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(
+                                                              ctx, Authz(Req("code", "form_post"))));
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
 

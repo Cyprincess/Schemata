@@ -22,17 +22,16 @@ public class DeviceCodeHandlerShould
     private static Fixture CreateFixture(string? approvedScope = "openid profile email") {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
 
-        var app = new SchemataApplication { Id = 1, Name = "test-app", ClientId = "test-client" };
+        var app        = new SchemataApplication { Id = 1, Name = "test-app", ClientId = "test-client" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(
-                              It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                              It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
-        var payload = JsonSerializer.Serialize(new DeviceCodePayload {
-            Scope    = approvedScope,
-            ClientId = app.ClientId,
-        }, jsonOpts.Value);
+        var payload = JsonSerializer.Serialize(
+            new DeviceCodePayload { Scope = approvedScope, ClientId = app.ClientId }, jsonOpts.Value);
 
         var device = new SchemataToken {
             Id                = 1,
@@ -49,21 +48,21 @@ public class DeviceCodeHandlerShould
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();
-        tokens.Setup(t => t.FindByReferenceIdAsync("dev-ref", It.IsAny<CancellationToken>()))
-              .ReturnsAsync(device);
+        tokens.Setup(t => t.FindByReferenceIdAsync("dev-ref", It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
-        var sp      = new ServiceCollection().BuildServiceProvider();
-        var handler = new DeviceCodeHandler<SchemataApplication, SchemataToken>(clientAuth.Object, tokens.Object, sp, jsonOpts);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var handler = new DeviceCodeHandler<SchemataApplication, SchemataToken>(
+            clientAuth.Object, tokens.Object, sp, jsonOpts);
 
         return new(handler, tokens, device, app);
     }
 
     private static TokenRequest CreateRequest(string? scope = null, string deviceCode = "dev-ref") {
         return new() {
-            GrantType    = GrantTypes.DeviceCode,
-            ClientId     = "test-client",
-            DeviceCode   = deviceCode,
-            Scope        = scope,
+            GrantType  = GrantTypes.DeviceCode,
+            ClientId   = "test-client",
+            DeviceCode = deviceCode,
+            Scope      = scope,
         };
     }
 
@@ -72,7 +71,8 @@ public class DeviceCodeHandlerShould
         var f       = CreateFixture();
         var request = CreateRequest(deviceCode: string.Empty);
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
@@ -82,15 +82,16 @@ public class DeviceCodeHandlerShould
         var f       = CreateFixture();
         var request = CreateRequest(deviceCode: "missing");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
 
     [Fact]
     public async Task UsesApprovedScope_WhenRequestScopeOmitted() {
-        var f       = CreateFixture("openid profile email");
-        var request = CreateRequest(scope: null);
+        var f       = CreateFixture();
+        var request = CreateRequest();
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -100,8 +101,8 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task UsesRequestScope_WhenNarrowerThanApproved() {
-        var f       = CreateFixture("openid profile email");
-        var request = CreateRequest(scope: "profile");
+        var f       = CreateFixture();
+        var request = CreateRequest("profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -111,7 +112,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task UsesRequestScope_WhenEqualToApproved() {
         var f       = CreateFixture("openid profile");
-        var request = CreateRequest(scope: "openid profile");
+        var request = CreateRequest("openid profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -121,19 +122,21 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidScope_WhenRequestScopeIntroducesNewScope() {
         var f       = CreateFixture("openid profile");
-        var request = CreateRequest(scope: "openid profile email");
+        var request = CreateRequest("openid profile email");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
     }
 
     [Fact]
     public async Task ThrowsInvalidScope_WhenNoScopeApprovedButClientRequestsOne() {
-        var f       = CreateFixture(approvedScope: null);
-        var request = CreateRequest(scope: "openid");
+        var f       = CreateFixture(null);
+        var request = CreateRequest("openid");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
     }
@@ -145,10 +148,8 @@ public class DeviceCodeHandlerShould
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
-        Assert.Equal("auth-approved",
-                     result.Properties![Properties.AuthorizationName]);
-        Assert.Equal("sess-approved",
-                     result.Properties![Properties.SessionId]);
+        Assert.Equal("auth-approved", result.Properties![Properties.AuthorizationName]);
+        Assert.Equal("sess-approved", result.Properties![Properties.SessionId]);
     }
 
     [Fact]
@@ -156,7 +157,8 @@ public class DeviceCodeHandlerShould
         var f = CreateFixture();
         f.Device.Payload = null;
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              CreateRequest(), null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
@@ -165,9 +167,9 @@ public class DeviceCodeHandlerShould
 
     private record Fixture(
         DeviceCodeHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>> Tokens,
-        SchemataToken                      Device,
-        SchemataApplication                App
+        Mock<ITokenManager<SchemataToken>>                    Tokens,
+        SchemataToken                                         Device,
+        SchemataApplication                                   App
     );
 
     #endregion

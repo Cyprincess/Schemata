@@ -33,7 +33,8 @@ public class OperationHandlerDeleteShould
         });
         var entity = _fixture.Students[0]; // already has Timestamp set
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => handler.DeleteAsync(entity.CanonicalName!, "W/\"wrongtag\"", false, null, null));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => handler.DeleteAsync(
+                                                           entity.CanonicalName!, "W/\"wrongtag\"", false, null, null));
     }
 
     [Fact]

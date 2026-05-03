@@ -10,23 +10,19 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceAddTimestamp{TEntity}" />.</summary>
 public static class AdviceAddTimestamp
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>Default execution order: 100,000,000.</summary>
     public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-///     Sets <see cref="ITimestamp.CreateTime" /> and <see cref="ITimestamp.UpdateTime" /> to
-///     <see cref="DateTime.UtcNow" /> when an entity is added.
+///     Sets <see cref="ITimestamp.CreateTime" /> and <see cref="ITimestamp.UpdateTime" />
+///     to <see cref="DateTime.UtcNow" /> when an entity is added, per
+///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
-///     <para>Order: 100,000,000. Runs early in the add pipeline.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
-///         activates for entities implementing <see cref="ITimestamp" />.
-///     </para>
-///     <para>Suppressed when <see cref="TimestampSuppressed" /> is present in the advice context.</para>
+///     Runs first in the add pipeline. Only activates for entities implementing
+///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
 /// </remarks>
 public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class

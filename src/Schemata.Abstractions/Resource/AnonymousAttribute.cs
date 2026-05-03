@@ -4,16 +4,18 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Marks a resource as allowing anonymous (unauthenticated) access for all or specific operations.
+///     Marks a resource as allowing unauthenticated access on the specified
+///     operations. When <see cref="Operations" /> is <see langword="null" />,
+///     all operations on the resource are anonymous.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class AnonymousAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance allowing anonymous access for the specified CRUD operations.
-    ///     If none are specified, all operations are anonymous.
+    ///     Allows anonymous access on the given <see cref="Entities.Operations" /> values.
+    ///     An empty set means all operations are anonymous.
     /// </summary>
-    /// <param name="operations">The CRUD operations that allow anonymous access.</param>
+    /// <param name="operations">The CRUD operations to allow anonymously.</param>
     public AnonymousAttribute(params Operations[] operations) {
         Operations = operations.Length > 0
             ? Array.ConvertAll(operations, op => op.ToString())
@@ -21,8 +23,8 @@ public sealed class AnonymousAttribute : Attribute
     }
 
     /// <summary>
-    ///     Initializes a new instance allowing anonymous access for the specified named operations.
-    ///     Intended for state machine event names and other non-CRUD operation identifiers.
+    ///     Allows anonymous access for named operation identifiers (e.g. state-machine
+    ///     event names) that are not part of the standard <see cref="Entities.Operations" /> enum.
     /// </summary>
     /// <param name="first">The first operation name.</param>
     /// <param name="rest">Additional operation names.</param>
@@ -34,7 +36,8 @@ public sealed class AnonymousAttribute : Attribute
     }
 
     /// <summary>
-    ///     Null = all operations anonymous. Otherwise, only the specified operation names are anonymous.
+    ///     <see langword="null" /> means all operations are anonymous.
+    ///     Otherwise, only the listed operation names bypass authentication.
     /// </summary>
     public string[]? Operations { get; }
 }

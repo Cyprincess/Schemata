@@ -11,19 +11,43 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceDeviceCodeExchangeValidation{TApp, TToken}" />.</summary>
 public static class AdviceDeviceCodeExchangeValidation
 {
     public const int DefaultOrder = Orders.Base;
 }
 
+/// <summary>
+///     Validates a device code token at the token endpoint before exchange,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.4: Device Access Token Request
+///     </seealso>
+///     and
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.5: Device Access Token Response
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
+/// <remarks>
+///     Returns <c>authorization_pending</c> if the user has not yet authorised the device,
+///     <c>access_denied</c> if the user denied, and <c>expired_token</c> if the device code
+///     has expired. The token must be in <c>Authorized</c> status with a subject to proceed.
+/// </remarks>
 public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken> : IDeviceCodeExchangeAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
     #region IDeviceCodeExchangeAdvisor<TApp,TToken> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodeExchangeValidation.DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                           ctx,
         DeviceCodeExchangeContext<TApp, TToken> exchange,

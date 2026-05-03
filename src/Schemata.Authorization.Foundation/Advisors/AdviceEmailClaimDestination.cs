@@ -9,14 +9,29 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>
+///     Claim destination advisor for the <c>email</c> and <c>email_verified</c> claims, per
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages">
+///         OpenID Connect Core 1.0 §5.5.2:
+///         Languages and Scripts for Individual Claims
+///     </seealso>
+///     .
+/// </summary>
+/// <remarks>
+///     Always includes the claim in access tokens. If the <c>email</c> scope was granted,
+///     also includes it in identity tokens and UserInfo responses.
+/// </remarks>
+/// <seealso cref="AdviceProfileClaimDestination" />
 public sealed class AdviceEmailClaimDestination : IDestinationAdvisor
 {
     public const int DefaultOrder = AdviceProfileClaimDestination.DefaultOrder + 10_000_000;
 
     #region IDestinationAdvisor Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,

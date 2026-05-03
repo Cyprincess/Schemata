@@ -22,6 +22,8 @@ internal static class RpcStatusBuilder
             }
         }
 
+        // Attach request identifier as RequestInfo so callers can trace errors
+        // back to a specific server-side request — AIP-193.
         if (!string.IsNullOrWhiteSpace(requestId)) {
             status.Details.Add(ToAny(new RequestInfoDetail { RequestId = requestId })!);
         }

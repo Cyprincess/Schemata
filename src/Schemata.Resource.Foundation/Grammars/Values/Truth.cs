@@ -5,10 +5,13 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-///     Represents a boolean literal value (TRUE/FALSE) in the filter grammar.
+///     A boolean literal (<c>TRUE</c> / <c>FALSE</c>).
 /// </summary>
 public class Truth : IValue
 {
+    /// <summary>
+    ///     Initializes a new boolean literal.
+    /// </summary>
     public Truth(TextPosition position, bool value) {
         Value    = value;
         Position = position;
@@ -23,13 +26,17 @@ public class Truth : IValue
 
     object IValue.Value => Value;
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => true;
 
+    /// <inheritdoc />
     public Expression ToExpression(Container ctx) { return Expression.Constant(Value); }
 
     #endregion
 
+    /// <inheritdoc />
     public override string ToString() { return Value ? "\u2611" : "\u2612"; }
 }

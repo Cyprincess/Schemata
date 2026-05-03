@@ -20,6 +20,11 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     Handles the consent/login interaction flow for the OAuth 2.0 authorization endpoint.
+///     An SPA calls GET to render the consent screen and POST to approve or deny.
+///     Implements <see cref="IInteractionHandler" /> for <see cref="TokenTypeUris.Interaction" />.
+/// </summary>
 public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -28,11 +33,20 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
 {
     private readonly IApplicationManager<TApp>              _apps;
     private readonly IAuthorizationManager<TAuth>           _auths;
+    private readonly IOptions<JsonSerializerOptions>        _json;
+    private readonly IOptions<SchemataAuthorizationOptions> _options;
     private readonly IScopeManager<TScope>                  _scopes;
     private readonly ITokenManager<TToken>                  _tokens;
-    private readonly IOptions<SchemataAuthorizationOptions> _options;
-    private readonly IOptions<JsonSerializerOptions>        _json;
 
+    /// <summary>
+    ///     Initializes the handler with the required managers and configuration.
+    /// </summary>
+    /// <param name="apps">Application registry.</param>
+    /// <param name="auths">Authorization storage for consent records.</param>
+    /// <param name="scopes">Scope resolver.</param>
+    /// <param name="tokens">Token storage.</param>
+    /// <param name="json">JSON serialization options.</param>
+    /// <param name="options">Server-level authorization configuration.</param>
     public AuthorizeInteractionHandler(
         IApplicationManager<TApp>              apps,
         IAuthorizationManager<TAuth>           auths,
@@ -51,9 +65,18 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
 
     #region IInteractionHandler Members
 
-    /// <inheritdoc />
+    /// <summary>
+    ///     The token type URI this handler processes — always <see cref="TokenTypeUris.Interaction" />.
+    /// </summary>
     public string CodeType => TokenTypeUris.Interaction;
 
+    /// <summary>
+    ///     Returns details the consent SPA needs to render: the original
+    ///     <see cref="AuthorizeRequest" />, resolved scope metadata, and the client application info.
+    /// </summary>
+    /// <param name="request">Interaction request containing the reference token code.</param>
+    /// <param name="issuer">Token issuer URI.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> GetDetailsAsync(
         InteractRequest   request,
         string            issuer,
@@ -88,6 +111,8 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
                                        Descriptions = s.Descriptions,
                                    }, ct).ToListAsync(ct);
 
+        // Re-resolve response_mode from response_type when it was not explicitly
+        // provided, so the SPA can display the correct callback method.
         if (!string.IsNullOrWhiteSpace(authorize.ResponseType)) {
             authorize.ResponseMode = ResponseModeService.ResolveMode(authorize.ResponseMode, authorize.ResponseType);
         }
@@ -104,6 +129,16 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         });
     }
 
+    /// <summary>
+    ///     Approves the authorization request: revokes the interaction token,
+    ///     creates a consent record (<typeparamref name="TAuth" />), and returns
+    ///     a <see cref="AuthorizationResult.SignIn" /> carrying all auth properties
+    ///     needed by <see cref="SchemataAuthorizationCodeHandler{TApp, TToken}" />.
+    /// </summary>
+    /// <param name="request">Interaction request containing the reference token code.</param>
+    /// <param name="principal">The authenticated resource owner.</param>
+    /// <param name="issuer">Token issuer URI.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> ApproveAsync(
         InteractRequest   request,
         ClaimsPrincipal   principal,
@@ -161,6 +196,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
 
         await _tokens.RevokeAsync(interaction, ct);
 
+        // Record consent so future requests for the same client/scope can skip interaction.
         var authorization = new TAuth {
             ApplicationName = application.Name,
             Subject         = subject,
@@ -176,6 +212,12 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         return AuthorizationResult.SignIn(response, properties);
     }
 
+    /// <summary>
+    ///     Denies the authorization request by revoking the interaction token.
+    ///     No consent record is created.
+    /// </summary>
+    /// <param name="request">Interaction request containing the reference token code.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);
         if (interaction is null) {

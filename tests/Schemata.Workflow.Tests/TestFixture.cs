@@ -41,8 +41,10 @@ public class TestFixture
         ];
 
         OrderRepository.As<IRepository>()
-                       .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Expression<Func<IStatefulEntity, bool>>>(), It.IsAny<CancellationToken>()))
-                       .ReturnsAsync((Expression<Func<IStatefulEntity, bool>> predicate, CancellationToken _) => Orders.AsQueryable().SingleOrDefault(predicate))
+                       .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Expression<Func<IStatefulEntity, bool>>>(),
+                                                          It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((Expression<Func<IStatefulEntity, bool>> predicate, CancellationToken _)
+                                         => Orders.AsQueryable().SingleOrDefault(predicate))
                        .Verifiable();
 
         OrderRepository.As<IRepository>()
@@ -60,7 +62,8 @@ public class TestFixture
                        .Verifiable();
 
         TransitionRepository
-           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>>>(), It.IsAny<CancellationToken>()))
+           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>>>(),
+                                   It.IsAny<CancellationToken>()))
            .Returns((
                         Func<IQueryable<SchemataTransition>, IQueryable<SchemataTransition>> predicate,
                         CancellationToken                                                    ct
@@ -68,11 +71,13 @@ public class TestFixture
            .Verifiable();
 
         WorkflowRepository
-           .Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(), It.IsAny<CancellationToken>()))
+           .Setup(r => r.SingleOrDefaultAsync(
+                      It.IsAny<Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>>>(),
+                      It.IsAny<CancellationToken>()))
            .ReturnsAsync((
-                Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate,
-                CancellationToken                                                _
-            ) => predicate(Workflows.AsQueryable()).SingleOrDefault())
+                             Func<IQueryable<SchemataWorkflow>, IQueryable<SchemataWorkflow>> predicate,
+                             CancellationToken                                                _
+                         ) => predicate(Workflows.AsQueryable()).SingleOrDefault())
            .Verifiable();
 
         WorkflowRepository.Setup(r => r.AddAsync(It.IsAny<SchemataWorkflow>(), It.IsAny<CancellationToken>()))
@@ -94,8 +99,12 @@ public class TestFixture
                                          schema.UseWorkflow().Use<OrderStateMachine, Order>();
 
                                          schema.Services.TryAddScoped<IRepository<Order>>(_ => OrderRepository.Object);
-                                         schema.Services.TryAddScoped<IRepository<SchemataTransition>>(_ => TransitionRepository.Object);
-                                         schema.Services.TryAddScoped<IRepository<SchemataWorkflow>>(_ => WorkflowRepository.Object);
+                                         schema.Services
+                                               .TryAddScoped<IRepository<SchemataTransition>>(_ => TransitionRepository
+                                                                                                 .Object);
+                                         schema.Services
+                                               .TryAddScoped<IRepository<SchemataWorkflow>>(_ => WorkflowRepository
+                                                                                               .Object);
                                          schema.Services.TryAddScoped<WorkflowController>();
                                      });
 
@@ -108,7 +117,8 @@ public class TestFixture
 
     public IServiceProvider ServiceProvider { get; }
 
-    public Mock<IRepository<Order>> OrderRepository { get; } = new Mock<IRepository>(MockBehavior.Strict).As<IRepository<Order>>();
+    public Mock<IRepository<Order>> OrderRepository { get; }
+        = new Mock<IRepository>(MockBehavior.Strict).As<IRepository<Order>>();
 
     public Mock<IRepository<SchemataTransition>> TransitionRepository { get; } = new(MockBehavior.Strict);
 

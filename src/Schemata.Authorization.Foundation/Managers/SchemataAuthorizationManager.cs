@@ -10,6 +10,17 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
+/// <summary>
+///     Default implementation of <see cref="IAuthorizationManager{TAuthorization}" /> backed by an
+///     <see cref="IRepository{TEntity}" />.
+/// </summary>
+/// <typeparam name="TAuthorization">The authorization entity type, must derive from <see cref="SchemataAuthorization" />.</typeparam>
+/// <remarks>
+///     Authorizations represent a user's consent to a specific application for a set of scopes. They are
+///     keyed by subject + application name. Revocation sets the status to <see cref="TokenStatuses.Revoked" />
+///     without physically deleting the record.
+/// </remarks>
+/// <seealso cref="SchemataTokenManager{TToken}" />
 public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManager<TAuthorization>
     where TAuthorization : SchemataAuthorization
 {
@@ -21,6 +32,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
 
     #region IAuthorizationManager<TAuthorization> Members
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<TAuthorization> ListAsync(
         string?                                    subject,
         string?                                    client,
@@ -42,6 +54,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         }
     }
 
+    /// <inheritdoc />
     public async Task<TAuthorization?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -52,6 +65,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         return await _authorizations.SingleOrDefaultAsync(q => q.Where(a => a.Name == name), ct);
     }
 
+    /// <inheritdoc />
     public async Task<TAuthorization?> CreateAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -65,6 +79,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         return authorization;
     }
 
+    /// <inheritdoc />
     public async Task RevokeAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -78,6 +93,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         await _authorizations.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -89,6 +105,7 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         await _authorizations.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

@@ -8,17 +8,20 @@ using System.Threading.Tasks;
 namespace Schemata.Resource.Foundation.Models;
 
 /// <summary>
-///     Represents a pagination cursor that encodes query parameters into a Brotli-compressed Base64 URL-safe token.
+///     Encodes list query parameters (filter, order-by, parent, show-deleted, page size, skip)
+///     into a Brotli-compressed Base64 URL-safe token
+///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso>. Deserialization failures
+///     return <see langword="null" /> silently — the caller treats a null token as a fresh request.
 /// </summary>
 public class PageToken
 {
     /// <summary>
-    ///     Gets or sets the filter expression carried across pages.
+    ///     Gets or sets the filter expression.
     /// </summary>
     public virtual string? Filter { get; set; }
 
     /// <summary>
-    ///     Gets or sets the order-by clause carried across pages.
+    ///     Gets or sets the order-by clause.
     /// </summary>
     public virtual string? OrderBy { get; set; }
 
@@ -28,24 +31,24 @@ public class PageToken
     public virtual string? Parent { get; set; }
 
     /// <summary>
-    ///     Gets or sets whether soft-deleted entities should be included.
+    ///     Gets or sets whether soft-deleted entities are included.
     /// </summary>
     public virtual bool? ShowDeleted { get; set; }
 
     /// <summary>
-    ///     Gets or sets the number of items per page (clamped to 1-100, default 25).
+    ///     Gets or sets the number of items per page (clamped to 1–100, default 25).
     /// </summary>
     public virtual int PageSize { get; set; }
 
     /// <summary>
-    ///     Gets or sets the number of items to skip for the current page.
+    ///     Gets or sets the skip offset for the current page.
     /// </summary>
     public virtual int Skip { get; set; }
 
     /// <summary>
     ///     Serializes this token to a Brotli-compressed Base64 URL-safe string.
     /// </summary>
-    /// <returns>The encoded page token string.</returns>
+    /// <returns>The encoded page token.</returns>
     public async Task<string> ToStringAsync() {
         var json  = JsonSerializer.Serialize(this);
         var bytes = Encoding.UTF8.GetBytes(json);
@@ -59,10 +62,11 @@ public class PageToken
     }
 
     /// <summary>
-    ///     Deserializes a page token from its Brotli-compressed Base64 URL-safe string representation.
+    ///     Deserializes a page token from its Brotli-compressed Base64 URL-safe representation.
+    ///     Returns <see langword="null" /> if the input is null, empty, or invalid.
     /// </summary>
     /// <param name="token">The encoded token string, or <see langword="null" />.</param>
-    /// <returns>The deserialized page token, or <see langword="null" /> if the input is null/empty or invalid.</returns>
+    /// <returns>The deserialized token, or <see langword="null" />.</returns>
     public static async Task<PageToken?> FromStringAsync(string? token) {
         if (string.IsNullOrWhiteSpace(token)) {
             return null;

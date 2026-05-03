@@ -15,7 +15,9 @@ namespace Schemata.Authorization.Tests;
 
 public class ClientSecretPostHandlerShould
 {
-    private static readonly SchemataApplication TestApp = new() { Id = 1, ClientId = "my-client", ClientType = "confidential" };
+    private static readonly SchemataApplication TestApp = new() {
+        Id = 1, ClientId = "my-client", ClientType = "confidential",
+    };
 
     private static ClientSecretPostAuthentication<SchemataApplication> CreateHandler(
         Mock<IApplicationManager<SchemataApplication>>? managerMock = null
@@ -28,8 +30,7 @@ public class ClientSecretPostHandlerShould
 
     private static Mock<IApplicationManager<SchemataApplication>> MockManager() {
         var mock = new Mock<IApplicationManager<SchemataApplication>>();
-        mock.Setup(m => m.FindByCanonicalNameAsync("my-client", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TestApp);
+        mock.Setup(m => m.FindByCanonicalNameAsync("my-client", It.IsAny<CancellationToken>())).ReturnsAsync(TestApp);
         mock.Setup(m => m.ValidateClientSecretAsync(TestApp, "my-secret", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         return mock;
@@ -40,6 +41,7 @@ public class ClientSecretPostHandlerShould
         if (secret is not null) {
             form[Parameters.ClientSecret] = [secret];
         }
+
         return form;
     }
 
@@ -48,7 +50,8 @@ public class ClientSecretPostHandlerShould
         var manager = MockManager();
         var handler = CreateHandler(manager);
 
-        var result = await handler.AuthenticateAsync(null, Form("my-client", "my-secret"), null, CancellationToken.None);
+        var result = await handler.AuthenticateAsync(null, Form("my-client", "my-secret"), null,
+                                                     CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("my-client", result!.ClientId);
@@ -59,7 +62,8 @@ public class ClientSecretPostHandlerShould
         var manager = MockManager();
         var handler = CreateHandler(manager);
 
-        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(null, Form("my-client", ""), null, CancellationToken.None));
+        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
+                                                     null, Form("my-client", ""), null, CancellationToken.None));
     }
 
     [Fact]
@@ -67,13 +71,15 @@ public class ClientSecretPostHandlerShould
         var manager = MockManager();
         var handler = CreateHandler(manager);
 
-        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(null, Form("my-client", null), null, CancellationToken.None));
+        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
+                                                     null, Form("my-client", null), null, CancellationToken.None));
     }
 
     [Fact]
     public async Task Throws_WhenBothEmpty() {
         var handler = CreateHandler();
 
-        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(null, Form("", ""), null, CancellationToken.None));
+        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
+                                                     null, Form("", ""), null, CancellationToken.None));
     }
 }

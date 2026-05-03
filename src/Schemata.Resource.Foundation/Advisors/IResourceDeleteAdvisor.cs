@@ -6,16 +6,12 @@ using Schemata.Abstractions.Resource;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Advises on a Delete operation with access to both the entity and the delete request.
+///     Advises on a delete operation
+///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> with access to both the
+///     entity
+///     and the <see cref="DeleteRequest" />. Used for freshness checks
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
 /// </summary>
-/// <typeparam name="TEntity">The entity type being deleted.</typeparam>
-/// <remarks>
-///     Invoked during
-///     <see cref="ResourceOperationHandler{TEntity, TRequest, TDetail, TSummary}.DeleteAsync">DeleteAsync</see> after
-///     <see cref="IResourceDeleteRequestAdvisor{TEntity}" />
-///     and before the entity is removed from the repository. Used for freshness checks (ETag validation).
-///     Return <see cref="AdviseResult.Continue" /> to proceed, <see cref="AdviseResult.Handle" /> to indicate
-///     success without deleting, or <see cref="AdviseResult.Block" /> to deny the operation.
-/// </remarks>
+/// <typeparam name="TEntity">The entity type.</typeparam>
 public interface IResourceDeleteAdvisor<TEntity> : IAdvisor<TEntity, DeleteRequest, ClaimsPrincipal?>
     where TEntity : class, ICanonicalName;

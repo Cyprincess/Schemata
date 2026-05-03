@@ -1,16 +1,31 @@
 namespace Schemata.Authorization.Skeleton.Models;
 
+/// <summary>
+///     Token revocation request,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.1">
+///         RFC 7009: OAuth 2.0 Token Revocation
+///         §2.1: Revocation Request
+///     </seealso>
+///     .
+/// </summary>
 public class RevokeRequest
 {
-    /// <summary>Token value to revoke per RFC 7009 section 2.1.</summary>
+    /// <summary>Token value to revoke.</summary>
     public string? Token { get; set; }
 
-    /// <summary>Hint about the type of token, e.g. "access_token" or "refresh_token" per RFC 7009 section 2.1.</summary>
+    /// <summary>Hint about the type of token, e.g. <c>"access_token"</c> or <c>"refresh_token"</c>.</summary>
     public string? TokenTypeHint { get; set; }
 
-    /// <summary>Client identifier for authentication when using the request body per RFC 6749 section 2.3.1.</summary>
+    /// <summary>
+    ///     Client identifier for authentication when using the request body.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.3.1: Client Password
+    ///     </seealso>
+    /// </summary>
     public string? ClientId { get; set; }
 
-    /// <summary>Client secret for authentication when using the request body per RFC 6749 section 2.3.1.</summary>
+    /// <summary>Client secret for authentication when using the request body.</summary>
     public string? ClientSecret { get; set; }
 }

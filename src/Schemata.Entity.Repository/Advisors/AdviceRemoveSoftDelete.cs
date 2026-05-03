@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using static Schemata.Abstractions.SchemataConstants;
@@ -11,24 +10,21 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceRemoveSoftDelete{TEntity}" />.</summary>
 public static class AdviceRemoveSoftDelete
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>Default execution order: 2,147,483,647.</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
 /// <summary>
-///     Converts a physical delete into a soft-delete by setting <see cref="ISoftDelete.DeleteTime" /> and updating the
-///     entity instead.
+///     Converts a physical delete into a soft-delete by setting
+///     <see cref="ISoftDelete.DeleteTime" /> and updating the entity instead of removing it,
+///     per <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso> and
+///     <seealso href="https://google.aip.dev/214">AIP-214: Resource expiration</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being removed.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" />. Runs last in the remove pipeline.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
-///         activates for entities implementing <see cref="ISoftDelete" />.
-///     </para>
-///     <para>Returns <see cref="AdviseResult.Handle" /> to prevent the physical delete from occurring.</para>
-///     <para>Suppressed when <see cref="SoftDeleteSuppressed" /> is present in the advice context.</para>
+///     Runs last in the remove pipeline. Returns <see cref="AdviseResult.Handle" /> to prevent
+///     the physical delete. Only activates for entities implementing <see cref="ISoftDelete" />.
+///     Suppressed by <see cref="SoftDeleteSuppressed" />.
 /// </remarks>
 public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAdvisor<TEntity>
     where TEntity : class
@@ -55,8 +51,11 @@ public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAdvisor<T
 
         trash.DeleteTime = DateTime.UtcNow;
 
+        // Persist as an update rather than a delete so the row is retained.
         await repository.UpdateAsync(entity, ct);
 
+        // Handle signals the pipeline that the remove has been handled;
+        // the entity will not be physically deleted.
         return AdviseResult.Handle;
     }
 

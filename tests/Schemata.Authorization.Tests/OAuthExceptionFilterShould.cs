@@ -1,7 +1,7 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
@@ -18,10 +18,8 @@ public class OAuthExceptionFilterShould
     private static ExceptionContext CreateContext(OAuthException exception) {
         var httpContext  = new DefaultHttpContext();
         var routeData    = new RouteData();
-        var actionCtx    = new ActionContext(httpContext, routeData, new ActionDescriptor());
-        var exceptionCtx = new ExceptionContext(actionCtx, new List<IFilterMetadata>()) {
-            Exception = exception,
-        };
+        var actionCtx    = new ActionContext(httpContext, routeData, new());
+        var exceptionCtx = new ExceptionContext(actionCtx, new List<IFilterMetadata>()) { Exception = exception };
         return exceptionCtx;
     }
 
@@ -32,11 +30,9 @@ public class OAuthExceptionFilterShould
 
     [Fact]
     public void AddsIssToQueryRedirect_WhenIssuerConfigured() {
-        var filter    = CreateFilter("https://auth.example.com");
+        var filter = CreateFilter("https://auth.example.com");
         var exception = new OAuthException(OAuthErrors.InvalidScope, "scope denied") {
-            RedirectUri  = "https://client.example.com/callback",
-            State        = "xyz",
-            ResponseMode = ResponseModes.Query,
+            RedirectUri = "https://client.example.com/callback", State = "xyz", ResponseMode = ResponseModes.Query,
         };
         var ctx = CreateContext(exception);
 
@@ -51,10 +47,9 @@ public class OAuthExceptionFilterShould
 
     [Fact]
     public void AddsIssToFragmentRedirect_WhenIssuerConfigured() {
-        var filter    = CreateFilter("https://auth.example.com");
+        var filter = CreateFilter("https://auth.example.com");
         var exception = new OAuthException(OAuthErrors.AccessDenied, "denied") {
-            RedirectUri  = "https://client.example.com/callback",
-            ResponseMode = ResponseModes.Fragment,
+            RedirectUri = "https://client.example.com/callback", ResponseMode = ResponseModes.Fragment,
         };
         var ctx = CreateContext(exception);
 
@@ -67,10 +62,9 @@ public class OAuthExceptionFilterShould
 
     [Fact]
     public void OmitsIss_WhenIssuerNotConfigured() {
-        var filter    = CreateFilter(null);
+        var filter = CreateFilter(null);
         var exception = new OAuthException(OAuthErrors.InvalidScope, "scope denied") {
-            RedirectUri  = "https://client.example.com/callback",
-            ResponseMode = ResponseModes.Query,
+            RedirectUri = "https://client.example.com/callback", ResponseMode = ResponseModes.Query,
         };
         var ctx = CreateContext(exception);
 
@@ -94,9 +88,9 @@ public class OAuthExceptionFilterShould
 
     [Fact]
     public void IgnoresNonOAuthException() {
-        var filter    = CreateFilter("https://auth.example.com");
-        var ctx       = CreateContext(null!);
-        ctx.Exception = new System.InvalidOperationException("boom");
+        var filter = CreateFilter("https://auth.example.com");
+        var ctx    = CreateContext(null!);
+        ctx.Exception = new InvalidOperationException("boom");
 
         filter.OnException(ctx);
 

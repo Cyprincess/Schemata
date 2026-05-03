@@ -22,6 +22,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     Handles the <c>urn:ietf:params:oauth:grant-type:device_code</c> grant type.
+///     Validates the device code token, runs the
+///     <see cref="IDeviceCodeExchangeAdvisor{TApp,TToken}" /> pipeline, enforces
+///     scope constraints, and revokes the device code on success,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.4: Device Access Token Request
+///     </seealso>
+///     .
+/// </summary>
 public sealed class DeviceCodeHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
     ITokenManager<TToken>              tokens,
@@ -33,9 +45,23 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.DeviceCode;
 
+    /// <summary>
+    ///     Polls for device authorization completion and, when the device code
+    ///     is in the <see cref="TokenStatuses.Authorized" /> state, issues tokens
+    ///     and revokes the device code to prevent replay,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
+    ///         RFC 8628: OAuth 2.0 Device Authorization
+    ///         Grant §3.4: Device Access Token Request
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <param name="request">Token request containing the device code.</param>
+    /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,
@@ -106,6 +132,8 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             scope = request.Scope;
         }
 
+        // device codes are single-use; revoke on successful exchange.
+        // See RFC 8628 §3.4.
         await tokens.RevokeAsync(token, ct);
 
         var claims = new List<Claim> {

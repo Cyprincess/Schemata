@@ -13,6 +13,12 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
+/// <summary>
+///     Core token creation and validation service.
+///     Creates signed JWTs, encrypted JWEs, opaque reference tokens, and OIDC
+///     ID tokens.  Validates tokens against the configured signing key and issuer.
+///     All token claims include <c>iss</c>, <c>iat</c>, <c>exp</c>, and <c>jti</c>.
+/// </summary>
 public class TokenService
 {
     private readonly string                       _algorithm;
@@ -22,6 +28,12 @@ public class TokenService
     private readonly SigningCredentials           _signing;
     private readonly TokenValidationParameters    _validation;
 
+    /// <summary>
+    ///     Initializes the token service from <see cref="SchemataAuthorizationOptions" />.
+    ///     Configures signing credentials, optional encryption credentials, and
+    ///     validation parameters.
+    /// </summary>
+    /// <param name="options">Server authorization options.</param>
     public TokenService(IOptions<SchemataAuthorizationOptions> options) {
         _options   = options.Value;
         _algorithm = _options.SigningAlgorithm!;
@@ -41,6 +53,13 @@ public class TokenService
         };
     }
 
+    /// <summary>
+    ///     Creates a signed JWT (or encrypted JWE when <paramref name="encrypt" /> is <c>true</c>).
+    ///     Sets <c>iss</c>, <c>iat</c>, <c>exp</c> automatically.
+    /// </summary>
+    /// <param name="claims">Claims to embed in the token.</param>
+    /// <param name="lifetime">Token validity duration.</param>
+    /// <param name="encrypt">When <c>true</c>, wraps the JWT as a JWE.</param>
     public string CreateToken(IEnumerable<Claim> claims, TimeSpan lifetime, bool encrypt = false) {
         if (encrypt && _encrypting is null) {
             throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Encryption key"));
@@ -58,8 +77,29 @@ public class TokenService
         return _handler.CreateToken(descriptor);
     }
 
+    /// <summary>Generates a cryptographically random opaque reference string (Base64URL-encoded).</summary>
     public string CreateReference() { return Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32)); }
 
+    /// <summary>
+    ///     Creates an OIDC ID token with <c>token_use: id_token</c>, optional
+    ///     <c>at_hash</c> and <c>c_hash</c> computed per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation">
+    ///         OpenID Connect Core 1.0
+    ///         §3.1.3.8: Access Token Validation
+    ///     </seealso>
+    ///     ,
+    ///     and <c>nonce</c> per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation">
+    ///         OpenID Connect Core 1.0
+    ///         §3.1.3.7: ID Token Validation
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <param name="claims">ID token claims.</param>
+    /// <param name="lifetime">Token validity duration.</param>
+    /// <param name="at">Access token value for <c>at_hash</c>.</param>
+    /// <param name="code">Authorization code for <c>c_hash</c>.</param>
+    /// <param name="nonce">Opaque nonce from the authorization request.</param>
     public string CreateIdToken(
         List<Claim> claims,
         TimeSpan    lifetime,
@@ -84,6 +124,14 @@ public class TokenService
         return CreateToken(claims, lifetime);
     }
 
+    /// <summary>
+    ///     Validates a JWT or JWE token string against the configured issuer
+    ///     and signing key. When <paramref name="audience" /> is provided,
+    ///     audience validation is enforced.
+    /// </summary>
+    /// <param name="token">The JWT/JWE token string, or stored payload for reference tokens.</param>
+    /// <param name="audience">Expected audience (client ID); null disables audience validation.</param>
+    /// <param name="lifetime">When <c>false</c>, expired tokens are still accepted (used for refresh token inspection).</param>
     public async Task<ClaimsPrincipal?> Validate(string? token, string? audience = null, bool lifetime = true) {
         if (string.IsNullOrWhiteSpace(token)) {
             return null;
@@ -106,6 +154,9 @@ public class TokenService
         return new(result.ClaimsIdentity);
     }
 
+    // at_hash and c_hash use the leftmost 128 bits
+    // (half) of the SHA-2 hash of the ASCII-encoded value.
+    // See OpenID Connect Core 1.0 §3.1.3.8.
     private static string ComputeHash(string value, string algorithm) {
         var       bytes  = Encoding.ASCII.GetBytes(value);
         using var hash   = CryptoProviderFactory.Default.CreateHashAlgorithm(algorithm);

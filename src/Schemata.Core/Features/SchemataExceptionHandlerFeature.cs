@@ -15,16 +15,24 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures global exception handling, converting <see cref="SchemataException" /> to structured JSON error
-///     responses.
+///     Wires ASP.NET Core exception handling middleware.
+///     <see cref="SchemataException" /> instances produce structured JSON error
+///     responses per <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>. Unhandled exceptions produce a
+///     generic 500 response
+///     with an internal-error code and a request trace identifier.
 /// </summary>
 [DependsOn<SchemataJsonSerializerFeature>]
 public sealed class SchemataExceptionHandlerFeature : FeatureBase
 {
+    /// <summary>
+    ///     Priority for ordering the middleware registration in the application pipeline.
+    /// </summary>
     public const int DefaultPriority = SchemataDeveloperExceptionPageFeature.DefaultPriority + 10_000_000;
 
+    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

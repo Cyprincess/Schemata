@@ -11,7 +11,8 @@ public class ResourceControllerConventionSchemeShould
     [Fact]
     public void Apply_WithScheme_AddsAuthorizeFilter() {
         var convention = new ResourceControllerConvention("TestScheme");
-        var model = new ControllerModel(typeof(ResourceController<Student, Student, Student, Student>).GetTypeInfo(), []);
+        var model = new ControllerModel(typeof(ResourceController<Student, Student, Student, Student>).GetTypeInfo(),
+                                        []);
 
         convention.Apply(model);
 
@@ -21,7 +22,8 @@ public class ResourceControllerConventionSchemeShould
     [Fact]
     public void Apply_WithoutScheme_NoAuthorizeFilter() {
         var convention = new ResourceControllerConvention();
-        var model = new ControllerModel(typeof(ResourceController<Student, Student, Student, Student>).GetTypeInfo(), []);
+        var model = new ControllerModel(typeof(ResourceController<Student, Student, Student, Student>).GetTypeInfo(),
+                                        []);
 
         convention.Apply(model);
 

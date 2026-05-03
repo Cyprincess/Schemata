@@ -3,14 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Builder for configuring repository services, returned by
-///     <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" /> to enable fluent
-///     chaining of provider and advisor registrations.
+///     Fluent builder for configuring repository services. Returned by
+///     <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />
+///     to enable provider and advisor registrations.
 /// </summary>
 public sealed class SchemataRepositoryBuilder
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataRepositoryBuilder" /> class.
+    ///     Initializes a new instance of <see cref="SchemataRepositoryBuilder" />.
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     public SchemataRepositoryBuilder(IServiceCollection services) { Services = services; }

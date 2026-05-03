@@ -9,8 +9,9 @@ using Schemata.Resource.Foundation;
 namespace Schemata.Resource.Grpc;
 
 /// <summary>
-///     Default gRPC service implementation that delegates to
-///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.
+///     Default gRPC service implementation that delegates every operation to
+///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />,
+///     passing the current <see cref="HttpContext.User" /> and cancellation token.
 /// </summary>
 /// <typeparam name="TEntity">The persistent entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -22,21 +23,14 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     where TDetail : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
-    /// <summary>
-    ///     The HTTP context accessor for retrieving the current request context.
-    /// </summary>
-    protected readonly IHttpContextAccessor Accessor;
-
-    /// <summary>
-    ///     The operation handler that orchestrates the advisor pipeline.
-    /// </summary>
+    protected readonly IHttpContextAccessor                                           Accessor;
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
-    ///     Initializes a new resource service instance.
+    ///     Initializes a new instance with the operation handler and HTTP context accessor.
     /// </summary>
-    /// <param name="handler">The operation handler.</param>
-    /// <param name="accessor">The HTTP context accessor.</param>
+    /// <param name="handler">The <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.</param>
+    /// <param name="accessor">The HTTP context accessor for retrieving the current user and cancellation token.</param>
     public ResourceService(
         ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> handler,
         IHttpContextAccessor                                           accessor
@@ -45,16 +39,14 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         Accessor = accessor;
     }
 
-    /// <summary>
-    ///     Gets the current HTTP context, if available.
-    /// </summary>
     protected HttpContext? Http => Accessor.HttpContext;
 
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.ListAsync" />
     public virtual async ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
         var result = await Handler.ListAsync(request, Http?.User, Http?.RequestAborted);
+        // Return empty list on denied rather than throwing — AIP-132 lists may legitimately be empty.
         if (!result.IsAllowed()) {
             return new();
         }
@@ -62,9 +54,10 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.GetAsync" />
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
         var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, Http?.RequestAborted);
+        // Throw NoContentException on denied to avoid confirming resource existence — AIP-193.
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -72,7 +65,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.CreateAsync" />
     public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
@@ -84,7 +77,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.UpdateAsync" />
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 
@@ -96,7 +89,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.DeleteAsync" />
     public virtual async ValueTask DeleteAsync(DeleteRequest request, CallContext context = default) {
         var ct = Http?.RequestAborted;
 

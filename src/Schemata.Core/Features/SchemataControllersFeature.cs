@@ -11,16 +11,25 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures MVC controllers and endpoint routing.
+///     Registers MVC controllers with endpoint routing, applies deferred
+///     <see cref="MvcOptions" /> and <see cref="IMvcBuilder" /> configurators, and
+///     strips <c>Schemata.*</c> assemblies from the
+///     <see cref="ApplicationPartManager" /> to prevent duplicate controller
+///     discovery.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
 [DependsOn<SchemataExceptionHandlerFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
 {
+    /// <summary>
+    ///     Priority for ordering the middleware registration in the application pipeline.
+    /// </summary>
     public const int DefaultPriority = SchemataSessionFeature<ISessionStore>.DefaultPriority + 10_000_000;
 
+    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -46,6 +55,7 @@ public sealed class SchemataControllersFeature : FeatureBase
         build(builder);
     }
 
+    /// <inheritdoc />
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

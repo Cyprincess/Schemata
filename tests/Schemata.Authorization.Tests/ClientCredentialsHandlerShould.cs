@@ -30,7 +30,10 @@ public class ClientCredentialsHandlerShould
         long   id       = 42
     ) {
         var app = new SchemataApplication {
-            Id = id, ClientId = clientId, ClientType = type, Permissions = new List<string>(),
+            Id          = id,
+            ClientId    = clientId,
+            ClientType  = type,
+            Permissions = new List<string>(),
         };
 
         if (hasGrant) {
@@ -40,19 +43,27 @@ public class ClientCredentialsHandlerShould
         return app;
     }
 
-    private static (ClientCredentialsHandler<SchemataApplication> handler, Mock<IClientAuthenticationService<SchemataApplication>> clientAuth, Mock<IApplicationManager<SchemataApplication>> manager) CreateHandler(
-        SchemataApplication? application = null,
-        bool                 authFails   = false,
-        string               errorCode   = OAuthErrors.InvalidClient
-    ) {
+    private static (ClientCredentialsHandler<SchemataApplication> handler,
+        Mock<IClientAuthenticationService<SchemataApplication>> clientAuth,
+        Mock<IApplicationManager<SchemataApplication>> manager) CreateHandler(
+            SchemataApplication? application = null,
+            bool                 authFails   = false,
+            string               errorCode   = OAuthErrors.InvalidClient
+        ) {
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>(MockBehavior.Strict);
         var manager    = new Mock<IApplicationManager<SchemataApplication>>(MockBehavior.Strict);
 
         if (authFails) {
-            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<CancellationToken>()))
                       .ThrowsAsync(new OAuthException(errorCode, "auth failed"));
         } else if (application is not null) {
-            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<CancellationToken>()))
                       .ReturnsAsync(application);
 
             foreach (var perm in application.Permissions!) {
@@ -63,7 +74,9 @@ public class ClientCredentialsHandlerShould
 
         var services = new ServiceCollection();
         services.AddSingleton(manager.Object);
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<SchemataApplication>, AdviceTokenGrantPermission<SchemataApplication>>());
+        services.TryAddEnumerable(ServiceDescriptor
+                                     .Scoped<ITokenRequestAdvisor<SchemataApplication>,
+                                          AdviceTokenGrantPermission<SchemataApplication>>());
         var sp = services.BuildServiceProvider();
 
         var handler = new ClientCredentialsHandler<SchemataApplication>(clientAuth.Object, sp);
@@ -80,9 +93,9 @@ public class ClientCredentialsHandlerShould
 
     [Fact]
     public async Task AcceptValidConfidentialClient() {
-        var application             = CreateApplication();
+        var application = CreateApplication();
         var (handler, _, _) = CreateHandler(application);
-        var request                 = CreateRequest();
+        var request = CreateRequest();
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -93,9 +106,10 @@ public class ClientCredentialsHandlerShould
     [Fact]
     public async Task RejectUnknownClient() {
         var (handler, _, _) = CreateHandler(authFails: true);
-        var request = CreateRequest(clientId: "unknown");
+        var request = CreateRequest("unknown");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
@@ -104,15 +118,16 @@ public class ClientCredentialsHandlerShould
         var (handler, _, _) = CreateHandler(authFails: true);
         var request = CreateRequest(secret: string.Empty);
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
     [Fact]
     public async Task AcceptPublicClientWithoutSecret() {
-        var application             = CreateApplication(ClientTypes.Public);
+        var application = CreateApplication(ClientTypes.Public);
         var (handler, _, _) = CreateHandler(application);
-        var request                 = CreateRequest(secret: string.Empty);
+        var request = CreateRequest(secret: string.Empty);
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -125,13 +140,14 @@ public class ClientCredentialsHandlerShould
         var (handler, _, _) = CreateHandler(authFails: true);
         var request = CreateRequest(secret: "wrong-secret");
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }
 
     [Fact]
     public async Task RejectClientWithoutGrantPermission() {
-        var application             = CreateApplication(hasGrant: false);
+        var application = CreateApplication(hasGrant: false);
         var (handler, _, manager) = CreateHandler(application);
 
         manager.Setup(m => m.HasPermissionAsync(application, "g:client_credentials", It.IsAny<CancellationToken>()))
@@ -139,7 +155,8 @@ public class ClientCredentialsHandlerShould
 
         var request = CreateRequest();
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
         Assert.Equal(OAuthErrors.UnauthorizedClient, ex.Code);
     }
 }

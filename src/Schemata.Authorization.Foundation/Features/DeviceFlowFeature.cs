@@ -13,6 +13,21 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Registers the OAuth 2.0 Device Authorization Grant infrastructure per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+///     :
+///     device authorize endpoint, device token exchange, polling, and discovery metadata.
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TAuth">The authorization entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
+/// <remarks>
+///     Installed via <c>UseDeviceFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Requires <see cref="SchemataAuthorizationOptions.DeviceVerificationUri" /> to be set.
+/// </remarks>
+/// <seealso cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope, TToken}" />
 public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -21,8 +36,10 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
 {
     #region IAuthorizationFlowFeature Members
 
+    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_400;
 
+    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (string.IsNullOrWhiteSpace(o.DeviceVerificationUri)) {

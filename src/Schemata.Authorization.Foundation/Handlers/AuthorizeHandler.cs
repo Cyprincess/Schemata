@@ -23,6 +23,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     OAuth 2.0 Authorization Endpoint.
+///     Runs the <see cref="IAuthorizeAdvisor{TApp}" /> pipeline,
+///     then redirects unauthenticated users to the interaction URI with a short-lived
+///     interaction token that encodes the original <see cref="AuthorizeRequest" />,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2">
+///         RFC 9700: The OAuth 2.0 Authorization
+///         Framework: Best Current Practice §2.1.2
+///     </seealso>
+///     .
+/// </summary>
 public sealed class AuthorizeHandler<TApp, TToken>(
     ITokenManager<TToken>                  tokens,
     TokenService                           issuer,
@@ -33,6 +45,14 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    /// <summary>
+    ///     Processes an authorization request by running the advisor pipeline and,
+    ///     when interaction is required, creating a reference-based interaction token
+    ///     that carries the serialized <see cref="AuthorizeRequest" /> to the consent/login SPA.
+    /// </summary>
+    /// <param name="request">The validated OAuth 2.0 authorization request.</param>
+    /// <param name="principal">The current authenticated principal, or empty if anonymous.</param>
+    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> AuthorizeAsync(
         AuthorizeRequest  request,
         ClaimsPrincipal   principal,

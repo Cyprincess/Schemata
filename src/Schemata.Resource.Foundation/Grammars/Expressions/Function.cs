@@ -8,10 +8,19 @@ using Schemata.Resource.Foundation.Grammars.Values;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents a function call expression (e.g. <c>contains(field, value)</c>) in the filter grammar.
+///     A function call expression (e.g., <c>contains(field, value)</c>) in the filter grammar.
+///     Supports fully qualified two-part names (e.g., <c>time.now</c>) and instance-method
+///     style calls (e.g., <c>msg.endsWith(value)</c>) where the first segment becomes
+///     the instance expression.
 /// </summary>
 public class Function : IComparableArg
 {
+    /// <summary>
+    ///     Initializes a new function call.
+    /// </summary>
+    /// <param name="position">The position in the source text.</param>
+    /// <param name="member">The member path forming the function name.</param>
+    /// <param name="args">Optional argument tokens.</param>
     public Function(TextPosition position, Member member, IReadOnlyCollection<IArg>? args) {
         Position = position;
 
@@ -23,30 +32,33 @@ public class Function : IComparableArg
     }
 
     /// <summary>
-    ///     Gets the member path that forms the function name.
+    ///     Gets the member path forming the function name.
     /// </summary>
     public Member Member { get; }
 
     /// <summary>
-    ///     Gets the list of arguments passed to the function.
+    ///     Gets the argument tokens.
     /// </summary>
     public List<IArg> Args { get; } = [];
 
-    #region IComparable Members
+    #region IComparableArg Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => false;
 
+    /// <inheritdoc />
     public Expression ToExpression(Container ctx) {
         var segments = new List<string>();
 
-        if (Member.Value is Text { Value: string first }) {
+        if (Member.Value is Text { Value: { } first }) {
             segments.Add(first);
         }
 
         foreach (var field in Member.Fields) {
-            if (field is Text { Value: string s }) {
+            if (field is Text { Value: { } s }) {
                 segments.Add(s);
             }
         }
@@ -57,13 +69,11 @@ public class Function : IComparableArg
 
         var name = string.Join(".", segments);
 
-        // Try full name lookup (e.g., "time.now", "math.mem", "regex")
         if (ctx.Functions.TryGetValue(name, out var function)) {
             var expressions = Args.Select(a => a.ToExpression(ctx)!).ToArray();
             return function.Factory(expressions, ctx);
         }
 
-        // Try last segment as function name (instance-style, e.g., "msg.endsWith")
         if (segments.Count > 1) {
             var method = segments[^1];
             if (ctx.Functions.TryGetValue(method, out function)) {
@@ -78,5 +88,6 @@ public class Function : IComparableArg
 
     #endregion
 
+    /// <inheritdoc />
     public override string ToString() { return $"{Member}({string.Join(',', Args)})"; }
 }

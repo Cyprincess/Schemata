@@ -9,14 +9,31 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>
+///     Adds the authorization code flow metadata to the discovery document: <c>authorization_endpoint</c>,
+///     <c>authorization_code</c> grant, and PKCE methods,
+///     per
+///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig">
+///         OpenID Connect Discovery 1.0
+///         §4: Obtaining OpenID Provider Configuration Information
+///     </seealso>
+///     .
+/// </summary>
+/// <remarks>
+///     Advertises PKCE methods (<c>S256</c> always, <c>plain</c> only when not forbidden by
+///     <see cref="CodeFlowOptions.RequirePkceS256" />).
+/// </remarks>
+/// <seealso cref="CodeFlowOptions" />
 public sealed class AdviceDiscoveryCodeFlow(IOptions<CodeFlowOptions> codeOptions) : IDiscoveryAdvisor
 {
     public const int DefaultOrder = AdviceDiscoveryUserInfo.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         DiscoveryContext  discovery,

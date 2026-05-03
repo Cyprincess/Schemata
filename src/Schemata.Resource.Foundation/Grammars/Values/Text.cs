@@ -5,14 +5,17 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-///     Represents a text (string) literal or identifier value in the filter grammar.
+///     A text/string literal or identifier. During expression building,
+///     the text value is first resolved against bound parameters and expressions
+///     in the <see cref="Container" /> before falling back to a constant.
 /// </summary>
-/// <remarks>
-///     During expression building, text values are first resolved against bound parameters and expressions
-///     in the container before falling back to a constant string.
-/// </remarks>
 public class Text : IValue
 {
+    /// <summary>
+    ///     Initializes a new text literal.
+    /// </summary>
+    /// <param name="position">The position in the source text.</param>
+    /// <param name="value">The text value.</param>
     public Text(TextPosition position, string value) {
         Value    = value;
         Position = position;
@@ -27,10 +30,13 @@ public class Text : IValue
 
     object IValue.Value => Value;
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => true;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         if (ctx.TryGetParameter(Value, out var value)) {
             return value;
@@ -45,5 +51,6 @@ public class Text : IValue
 
     #endregion
 
+    /// <inheritdoc />
     public override string ToString() { return $"\"{Value}\""; }
 }

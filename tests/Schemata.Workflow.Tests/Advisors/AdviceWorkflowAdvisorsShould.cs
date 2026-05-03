@@ -81,7 +81,9 @@ public class AdviceWorkflowAdvisorsShould
     public async Task StatusAuthorize_WithAnonymousGranted_SkipsAccessCheck() {
         var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor = new AdviceStatusAuthorize(access.Object, entitlement.Object);
@@ -97,11 +99,14 @@ public class AdviceWorkflowAdvisorsShould
     [Fact]
     public async Task StatusAuthorize_Unauthorized_ThrowsAuthorizationException() {
         var access = new Mock<IAccessProvider<SchemataWorkflow, long>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<long>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(false);
 
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
@@ -114,11 +119,14 @@ public class AdviceWorkflowAdvisorsShould
     [Fact]
     public async Task StatusAuthorize_Authorized_ReturnsContinue() {
         var access = new Mock<IAccessProvider<SchemataWorkflow, long>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<long>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(true);
 
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
@@ -134,7 +142,9 @@ public class AdviceWorkflowAdvisorsShould
     public async Task StatusAuthorize_EntitlementDenied_ThrowsAuthorizationException() {
         var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync(w => w.Id == 999);
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
@@ -148,7 +158,9 @@ public class AdviceWorkflowAdvisorsShould
     public async Task StatusAuthorize_EntitlementDenied_Anonymous_StillThrows() {
         var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<long>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync(w => w.Id == 999);
 
         var advisor = new AdviceStatusAuthorize(access.Object, entitlement.Object);
@@ -180,7 +192,9 @@ public class AdviceWorkflowAdvisorsShould
     [Fact]
     public async Task SubmitAuthorize_Unauthorized_ThrowsAuthorizationException() {
         var access = new Mock<IAccessProvider<SchemataWorkflow, WorkflowRequest<IStateful>>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<WorkflowRequest<IStateful>>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(),
+                                           It.IsAny<AccessContext<WorkflowRequest<IStateful>>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(false);
 
         var advisor = new AdviceSubmitAuthorize(access.Object);
@@ -198,7 +212,9 @@ public class AdviceWorkflowAdvisorsShould
     public async Task RaiseAuthorize_WithAnonymousGranted_SkipsAccessCheck() {
         var access      = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>(MockBehavior.Strict);
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
@@ -215,11 +231,14 @@ public class AdviceWorkflowAdvisorsShould
     [Fact]
     public async Task RaiseAuthorize_Unauthorized_ThrowsAuthorizationException() {
         var access = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<IEvent>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(false);
 
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
@@ -227,17 +246,21 @@ public class AdviceWorkflowAdvisorsShould
         var workflow = CreateWorkflow();
         var request  = new OrderEvent { Event = "Approve" };
 
-        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, request, CreateUser()));
+        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
+                                                             ctx, workflow, request, CreateUser()));
     }
 
     [Fact]
     public async Task RaiseAuthorize_Authorized_ReturnsContinue() {
         var access = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>();
-        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        access.Setup(a => a.HasAccessAsync(It.IsAny<SchemataWorkflow?>(), It.IsAny<AccessContext<IEvent>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(true);
 
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync((Expression<Func<SchemataWorkflow, bool>>?)null);
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
@@ -254,7 +277,9 @@ public class AdviceWorkflowAdvisorsShould
     public async Task RaiseAuthorize_EntitlementDenied_ThrowsAuthorizationException() {
         var access      = new Mock<IAccessProvider<SchemataWorkflow, IEvent>>(MockBehavior.Strict);
         var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, IEvent>>();
-        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(It.IsAny<AccessContext<IEvent>>(),
+                                                                    It.IsAny<ClaimsPrincipal?>(),
+                                                                    It.IsAny<CancellationToken>()))
                    .ReturnsAsync(w => w.Id == 999);
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
@@ -262,7 +287,8 @@ public class AdviceWorkflowAdvisorsShould
         var workflow = CreateWorkflow();
         var request  = new OrderEvent { Event = "Approve" };
 
-        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, request, CreateUser()));
+        await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
+                                                             ctx, workflow, request, CreateUser()));
     }
 
     #endregion

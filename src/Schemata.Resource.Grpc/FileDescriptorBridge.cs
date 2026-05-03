@@ -10,10 +10,6 @@ using WellKnownReflection = Google.Protobuf.WellKnownTypes;
 
 namespace Schemata.Resource.Grpc;
 
-/// <summary>
-///     Builds <see cref="ServiceDescriptor" /> objects for grpc-dotnet's <c>ReflectionServiceImpl</c>
-///     by reading field metadata directly from <see cref="RuntimeTypeModel" />.
-/// </summary>
 internal static class FileDescriptorBridge
 {
     public static IReadOnlyList<ServiceDescriptor> BuildServiceDescriptors(
@@ -55,7 +51,8 @@ internal static class FileDescriptorBridge
 
         proto.Dependency.Add("google/protobuf/empty.proto");
 
-        // Collect message types (deduplicate by CLR type)
+        // Deduplicate message types by CLR type — the same type may appear in multiple
+        // roles (e.g. detail == summary).
         var messages = new Dictionary<Type, string> {
             [typeof(ListRequest)]   = nameof(ListRequest),
             [typeof(GetRequest)]    = nameof(GetRequest),
@@ -66,14 +63,12 @@ internal static class FileDescriptorBridge
         messages.TryAdd(summaryType, summaryType.Name);
         messages[listResultType] = $"List{descriptor.Plural}Response";
 
-        // Build and add message descriptors
-        // Only scalar and well-known types are supported; nested message types
-        // would require recursive descriptor building — add when needed.
+        // Only scalar and well-known proto types are supported for reflection display.
+        // Nested message descriptors would require recursive building — deferred until needed.
         foreach (var (type, name) in messages) {
             proto.MessageType.Add(BuildMessage(model, type, name));
         }
 
-        // Build service descriptor
         var fqPrefix    = package is not null ? $".{package}." : ".";
         var serviceName = $"{descriptor.Singular}Service";
         var service     = new ServiceDescriptorProto { Name = serviceName };
@@ -105,7 +100,6 @@ internal static class FileDescriptorBridge
         });
         proto.Service.Add(service);
 
-        // Serialize and build FileDescriptor with well-known dependencies
         var deps = new[] { WellKnownReflection.EmptyReflection.Descriptor };
 
         return FileDescriptor.BuildFromByteStrings(deps.Select(d => d.SerializedData).Append(proto.ToByteString()))
@@ -155,10 +149,11 @@ internal static class FileDescriptorBridge
         if (clr == typeof(byte[])) return FieldDescriptorProto.Types.Type.Bytes;
         if (clr == typeof(Guid)) return FieldDescriptorProto.Types.Type.String;
 
-        // Enums use int32 wire encoding in proto3; avoids needing EnumDescriptorProto.
+        // Proto3 encodes enums as int32 on the wire — avoids building EnumDescriptorProto.
         if (clr.IsEnum) return FieldDescriptorProto.Types.Type.Int32;
 
-        // Unknown complex types: string is a safe fallback for reflection display.
+        // Fall back to string for complex types so reflection display still produces
+        // something readably useful rather than failing.
         return FieldDescriptorProto.Types.Type.String;
     }
 

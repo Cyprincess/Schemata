@@ -23,6 +23,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     OAuth 2.0 Device Authorization Endpoint per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.1">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.1: Device Authorization Request
+///     </seealso>
+///     .
+///     Creates a device code and a user code pair, returning them to the
+///     client along with the verification URI and polling interval.
+///     User codes use an 8-character human-readable alphabet with a dash separator
+///     (formatted as XXXX-XXXX) excluding visually ambiguous characters.
+/// </summary>
 public sealed class DeviceAuthorizeHandler<TApp, TToken>(
     IClientAuthenticationService<TApp>     client,
     ITokenManager<TToken>                  tokens,
@@ -35,6 +47,15 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
 {
     private const string UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+    /// <summary>
+    ///     Processes a device authorization request: authenticates the client,
+    ///     runs the <see cref="IDeviceAuthorizeAdvisor{TApp}" /> pipeline,
+    ///     creates both a device code and a user code token,
+    ///     and returns the <see cref="DeviceAuthorizationResponse" />.
+    /// </summary>
+    /// <param name="request">Device authorization request from the client.</param>
+    /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> DeviceAuthorizeAsync(
         DeviceAuthorizeRequest             request,
         Dictionary<string, List<string?>>? headers,

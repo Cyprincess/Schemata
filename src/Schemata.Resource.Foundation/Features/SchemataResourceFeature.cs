@@ -14,45 +14,18 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Features;
 
 /// <summary>
-///     Core feature that registers the resource advisor pipeline, idempotency store, and auto-discovered resources.
+///     Core feature that registers the resource advisor pipeline, the
+///     <see cref="IIdempotencyStore" /> implementation, and auto-discovers resources
+///     decorated with <see cref="ResourceAttribute" />.
 /// </summary>
-/// <remarks>
-///     <para>Auto-registers the following advisors for all resources:</para>
-///     <list type="bullet">
-///         <item>
-///             <see cref="AdviceCreateRequestValidation{TEntity,TRequest}" /> (order
-///             <see cref="AdviceCreateRequestValidation.DefaultOrder" />)
-///         </item>
-///         <item>
-///             <see cref="AdviceUpdateRequestValidation{TEntity, TRequest}" /> (order
-///             <see cref="AdviceUpdateRequestValidation.DefaultOrder" />)
-///         </item>
-///         <item>
-///             <see cref="AdviceUpdateFreshness{TEntity, TRequest}" /> (order
-///             <see cref="AdviceUpdateFreshness.DefaultOrder" />)
-///         </item>
-///         <item>
-///             <see cref="AdviceDeleteFreshness{TEntity}" /> (order <see cref="AdviceDeleteFreshness.DefaultOrder" />)
-///         </item>
-///         <item>
-///             <see cref="AdviceResponseFreshness{TEntity, TDetail}" /> (order
-///             <see cref="AdviceResponseFreshness.DefaultOrder" />)
-///         </item>
-///         <item>
-///             <see cref="AdviceResponseIdempotency{TEntity, TDetail}" /> (order
-///             <see cref="AdviceResponseIdempotency.DefaultOrder" />)
-///         </item>
-///     </list>
-///     <para>
-///         Per-resource registration via <see cref="RegisterResource" /> also adds
-///         <see cref="AdviceCreateRequestIdempotency{TEntity, TRequest, TDetail}" /> (order 50,000,000).
-///     </para>
-/// </remarks>
 [DependsOn<SchemataRoutingFeature>]
 [DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
 [DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
+    /// <summary>
+    ///     The default priority for this feature.
+    /// </summary>
     public const int DefaultPriority = Orders.Extension + 50_000_000;
 
     /// <inheritdoc />
@@ -98,10 +71,12 @@ public sealed class SchemataResourceFeature : FeatureBase
     }
 
     /// <summary>
-    ///     Registers a single resource type, configuring its idempotency advisor and options.
+///     Registers a single resource: resolves endpoints, adds the idempotency advisor
+///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>, and stores the
+    ///     <see cref="ResourceAttribute" /> in <see cref="SchemataResourceOptions" />.
     /// </summary>
-    /// <param name="services">The DI service collection.</param>
-    /// <param name="resource">The resource attribute describing entity/request/detail/summary types.</param>
+    /// <param name="services">The <see cref="IServiceCollection" />.</param>
+    /// <param name="resource">The <see cref="ResourceAttribute" /> describing the resource.</param>
     public static void RegisterResource(IServiceCollection services, ResourceAttribute resource) {
         resource.Endpoints ??= resource.Entity.GetCustomAttributes<ResourceEndpointAttributeBase>()
                                        .Select(a => a.Endpoint)

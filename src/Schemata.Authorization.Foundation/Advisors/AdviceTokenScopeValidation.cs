@@ -12,11 +12,24 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceTokenScopeValidation{TApp, TScope}" />.</summary>
 public static class AdviceTokenScopeValidation
 {
     public const int DefaultOrder = AdviceDeviceCodePolling.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Validates that all scopes in a token request exist and are permitted for the application,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §4.1.3: Access Token Request
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <seealso cref="AdviceAuthorizeScopeValidation{TApp, TScope}" />
 public sealed class AdviceTokenScopeValidation<TApp, TScope>(
     IApplicationManager<TApp> apps,
     IScopeManager<TScope>     scopes
@@ -26,8 +39,10 @@ public sealed class AdviceTokenScopeValidation<TApp, TScope>(
 {
     #region ITokenRequestAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenScopeValidation.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

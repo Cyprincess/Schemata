@@ -23,7 +23,8 @@ public class AdviceIdempotencyShould
         var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
-        store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                     Times.Never);
     }
 
     [Fact]
@@ -73,6 +74,7 @@ public class AdviceIdempotencyShould
         var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
-        store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        store.Verify(s => s.GetAsync<CreateResult<Student>>(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                     Times.Never);
     }
 }

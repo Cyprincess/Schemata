@@ -14,19 +14,40 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceAuthorizeConsent{TApp, TAuth}" />.</summary>
 public static class AdviceAuthorizeConsent
 {
     public const int DefaultOrder = AdviceAuthorizePrompt.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Makes the consent decision based on the application's consent type (<see cref="ConsentTypes" />), the prompt
+///     parameter, and any prior authorization, per
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+///         OpenID Connect Core 1.0
+///         §3.1.2.1: Authentication Request
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TAuth">The authorization entity type.</typeparam>
+/// <remarks>
+///     For <see cref="ConsentTypes.Explicit" />, an existing authorization is itself sufficient — unlike implicit,
+///     which always grants. The <c>prompt=none</c> value triggers <c>consent_required</c> when no prior
+///     consent exists.
+/// </remarks>
+/// <seealso cref="AdviceAuthorizePrompt" />
+/// <seealso cref="AdviceAuthorizeAutoApproveSignIn{TApp, TAuth}" />
 public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TAuth> authorizations) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization
 {
     #region IAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeConsent.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

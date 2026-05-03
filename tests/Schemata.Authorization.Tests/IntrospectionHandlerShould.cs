@@ -33,24 +33,28 @@ public class IntrospectionHandlerShould
 
     private static Fixture CreateFixture(string callerAppName = "test-app") {
         var opts = Options.Create(new SchemataAuthorizationOptions {
-            Issuer           = Issuer,
-            SigningKey       = SigningKey,
-            SigningAlgorithm = SigningAlgorithms.RsaSha256,
+            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
         });
 
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app = new SchemataApplication { Id = 1, ClientId = callerAppName };
+        var app        = new SchemataApplication { Id = 1, ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
         var services = new ServiceCollection();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIntrospectionAdvisor<SchemataApplication, SchemataToken>, AdviceIntrospectionTokenValidation<SchemataApplication, SchemataToken>>());
+        services.TryAddEnumerable(ServiceDescriptor
+                                     .Scoped<IIntrospectionAdvisor<SchemataApplication, SchemataToken>,
+                                          AdviceIntrospectionTokenValidation<SchemataApplication, SchemataToken>>());
         var sp = services.BuildServiceProvider();
 
-        var handler = new IntrospectionHandler<SchemataApplication, SchemataToken>(clientAuth.Object, tokenService, tokensMock.Object, sp);
+        var handler = new IntrospectionHandler<SchemataApplication, SchemataToken>(
+            clientAuth.Object, tokenService, tokensMock.Object, sp);
         return new(handler, tokensMock, tokenService);
     }
 
@@ -89,7 +93,8 @@ public class IntrospectionHandlerShould
         var f       = CreateFixture();
         var request = new IntrospectRequest { Token = "" };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -99,7 +104,8 @@ public class IntrospectionHandlerShould
         var f       = CreateFixture();
         var request = new IntrospectRequest { Token = "   " };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -137,7 +143,7 @@ public class IntrospectionHandlerShould
         // RFC 7662: introspection callers are protected resources, not necessarily
         // the client that issued the token. Access is gated upstream via the
         // ep:introspection permission (AdviceIntrospectionProtectedResource).
-        var f = CreateFixture(callerAppName: "resource-server");
+        var f = CreateFixture("resource-server");
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -152,7 +158,7 @@ public class IntrospectionHandlerShould
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
 
-        var response = await f.Handler.HandleAsync(new IntrospectRequest { Token = jwt }, null, CancellationToken.None);
+        var response = await f.Handler.HandleAsync(new() { Token = jwt }, null, CancellationToken.None);
 
         Assert.True(response.Active);
         Assert.Equal("other-client", response.ClientId);
@@ -163,9 +169,7 @@ public class IntrospectionHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()),
-            new(Claims.Subject, "user-42"),
-            new(Claims.Audience, "api"),
+            new(Claims.JwtId, Guid.NewGuid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
@@ -183,8 +187,8 @@ public class IntrospectionHandlerShould
 
     private record Fixture(
         IntrospectionHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>> Tokens,
-        TokenService                       TokenService
+        Mock<ITokenManager<SchemataToken>>                       Tokens,
+        TokenService                                             TokenService
     );
 
     #endregion

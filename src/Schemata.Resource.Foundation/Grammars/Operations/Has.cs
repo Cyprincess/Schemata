@@ -9,28 +9,48 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-///     Represents the has operator (<c>:</c>) supporting presence checks, collection containment, dictionary key lookup,
-///     and string contains.
+///     The has operator (<c>:</c>). Dispatches based on the left operand type:
+///     <list type="bullet">
+///         <item>Wildcard <c>"*"</c>: presence check (non-null for non-collections; <c>Any()</c> for collections)</item>
+///         <item><see cref="IDictionary" />: key lookup via <c>ContainsKey</c></item>
+///         <item>
+///             <see cref="IEnumerable" />: element containment via
+///             <c>Enumerable.Contains&lt;TSource&gt;</c>
+///         </item>
+///         <item>
+///             <see cref="string" />: substring match via
+///             <see cref="string.Contains(string)" />
+///         </item>
+///         <item>Other types: falls back to equality via <see cref="ExpressionType.Equal" /></item>
+///     </list>
 /// </summary>
 public class Has : IBinary
 {
     /// <summary>
-    ///     The character representing the has operator.
+    ///     The operator character.
     /// </summary>
     public const char Char = ':';
 
+    /// <summary>
+    ///     Initializes a new has operator.
+    /// </summary>
     public Has(TextPosition position) { Position = position; }
 
     #region IBinary Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => false;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) { return null; }
 
+    /// <inheritdoc />
     public ExpressionType? Type => null;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Expression left, Expression right, Container ctx) {
         if (right is ConstantExpression { Value: "*" }) {
             return BuildPresenceExpression(left);
@@ -124,5 +144,6 @@ public class Has : IBinary
         return Expression.Call(left, method!, right);
     }
 
+    /// <inheritdoc />
     public override string ToString() { return $"{Char}"; }
 }

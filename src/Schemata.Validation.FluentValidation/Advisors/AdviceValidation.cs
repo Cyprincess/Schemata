@@ -13,8 +13,14 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Validation.FluentValidation.Advisors;
 
+/// <summary>
+///     Order constants for <see cref="AdviceValidation{T}" />.
+/// </summary>
 public static class AdviceValidation
 {
+    /// <summary>
+    ///     The default execution order for this advisor.
+    /// </summary>
     public const int DefaultOrder = Orders.Base;
 }
 

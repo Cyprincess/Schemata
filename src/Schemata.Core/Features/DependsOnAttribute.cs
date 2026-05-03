@@ -1,26 +1,29 @@
 using System;
+using Schemata.Common;
 
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Declares that a feature depends on another feature identified by name.
+///     Declares a string-based feature dependency resolved at registration time via
+///     <see cref="AppDomainTypeCache" />. Set <see cref="Optional" /> to
+///     <see langword="true" /> to suppress the error-level log when the dependency is
+///     absent.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DependsOnAttribute : Attribute
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="DependsOnAttribute" /> class.
-    /// </summary>
-    /// <param name="name">The fully-qualified type name of the dependency.</param>
+    /// <param name="name">Assembly-qualified type name of the dependency.</param>
     public DependsOnAttribute(string name) { Name = name; }
 
     /// <summary>
-    ///     Gets the fully-qualified type name of the dependency.
+    ///     Assembly-qualified type name of the dependent feature.
     /// </summary>
     public string Name { get; }
 
     /// <summary>
-    ///     Gets or sets whether this dependency is optional.
+    ///     When <see langword="true" />, a missing dependency logs at
+    ///     <see cref="Microsoft.Extensions.Logging.LogLevel.Information" /> instead of
+    ///     <see cref="Microsoft.Extensions.Logging.LogLevel.Error" />.
     /// </summary>
     public bool Optional { get; init; }
 }

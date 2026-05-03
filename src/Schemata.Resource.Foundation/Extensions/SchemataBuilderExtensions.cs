@@ -6,15 +6,16 @@ using Schemata.Resource.Foundation.Features;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for configuring resource services on <see cref="SchemataBuilder" />.
+///     Extension methods for enabling the resource system on a <see cref="SchemataBuilder" />.
 /// </summary>
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    ///     Enables the resource system and returns a builder for further configuration.
+    ///     Enables the resource system and returns a <see cref="SchemataResourceBuilder" />
+    ///     for further configuration.
     /// </summary>
-    /// <param name="builder">The Schemata builder.</param>
-    /// <returns>A resource builder for configuring resources, authorization, and options.</returns>
+    /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
+    /// <returns>A <see cref="SchemataResourceBuilder" /> for chaining resource configuration.</returns>
     public static SchemataResourceBuilder UseResource(this SchemataBuilder builder) {
         builder.AddFeature<SchemataResourceFeature>();
 

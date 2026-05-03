@@ -12,16 +12,16 @@ using Schemata.Resource.Foundation.Features;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Fluent builder for configuring resource services including authorization, validation, freshness, and resource
-///     registration.
+///     Fluent builder for configuring the resource system: authorization, validation suppression,
+///     freshness suppression, and per-resource registration.
 /// </summary>
 public sealed class SchemataResourceBuilder
 {
     /// <summary>
     ///     Initializes a new instance with the Schemata options and service collection.
     /// </summary>
-    /// <param name="schemata">The Schemata framework options.</param>
-    /// <param name="services">The DI service collection.</param>
+    /// <param name="schemata">The <see cref="SchemataOptions" />.</param>
+    /// <param name="services">The <see cref="IServiceCollection" />.</param>
     public SchemataResourceBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
@@ -32,20 +32,20 @@ public sealed class SchemataResourceBuilder
     private IServiceCollection Services { get; }
 
     /// <summary>
-    ///     Adds a framework feature to the Schemata configuration.
+    ///     Adds a feature to the Schemata configuration.
     /// </summary>
-    /// <typeparam name="T">The feature type to add.</typeparam>
+    /// <typeparam name="T">The <see cref="ISimpleFeature" /> type.</typeparam>
     public void AddFeature<T>()
         where T : ISimpleFeature {
         Schemata.AddFeature(typeof(T));
     }
 
     /// <summary>
-    ///     Registers the built-in authorization advisors for all CRUD operations.
+    ///     Registers the built-in authorization and anonymous-access advisors for all CRUD operations.
     /// </summary>
     /// <param name="scheme">
-    ///     Optional ASP.NET Core authentication scheme name. When provided, resource endpoints
-    ///     authenticate using this scheme (populating <c>HttpContext.User</c>) before advisors run.
+    ///     An optional ASP.NET Core authentication scheme name. When set, resource endpoints
+    ///     authenticate using this scheme before advisors run.
     /// </param>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithAuthorization(string? scheme = null) {
@@ -53,14 +53,12 @@ public sealed class SchemataResourceBuilder
             Services.Configure<SchemataResourceOptions>(o => o.AuthenticationScheme = scheme);
         }
 
-        // Anonymous advisors run first and set AnonymousGranted in the context when applicable
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAnonymous<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAnonymous<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAnonymous<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAnonymous<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAnonymous<>)));
 
-        // Authorization advisors check AnonymousGranted flag before enforcing access control
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAuthorize<,>)));
@@ -71,7 +69,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    ///     Globally suppresses create-request validation for all resources.
+///     Globally suppresses create-request validation
+///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutCreateValidation() {
@@ -80,7 +79,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    ///     Globally suppresses update-request validation for all resources.
+///     Globally suppresses update-request validation
+///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutUpdateValidation() {
@@ -89,7 +89,8 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    ///     Globally suppresses freshness (ETag) checks and generation for all resources.
+///     Globally suppresses freshness (ETag) checks and generation
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutFreshness() {
@@ -98,13 +99,14 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
-    ///     Registers a resource with explicit entity, request, detail, and summary types.
+///     Registers a resource with explicit entity, request, detail, and summary types
+///     per <seealso href="https://google.aip.dev/121">AIP-121: Resource-oriented design</seealso>.
     /// </summary>
     /// <typeparam name="TEntity">The persistent entity type.</typeparam>
     /// <typeparam name="TRequest">The request DTO type.</typeparam>
     /// <typeparam name="TDetail">The detail DTO type.</typeparam>
     /// <typeparam name="TSummary">The summary DTO type.</typeparam>
-    /// <param name="endpoints">Optional endpoint names to restrict registration (e.g. HTTP only, gRPC only).</param>
+    /// <param name="endpoints">Optional endpoint names to restrict registration.</param>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(IList<string>? endpoints = null)
         where TEntity : class, ICanonicalName

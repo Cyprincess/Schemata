@@ -6,6 +6,11 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 internal static class FreshnessHelper
 {
+    /// <summary>
+    ///     Builds a weak ETag (<c>W/"..."</c>) from the entity's <see cref="IConcurrency.Timestamp" />.
+    ///     Returns <see langword="false" /> when freshness is suppressed, the entity is not
+    ///     <see cref="IConcurrency" />, or the timestamp is null/empty.
+    /// </summary>
     public static bool TryGetEntityTag<TEntity>(AdviceContext ctx, TEntity? entity, out string? tag)
         where TEntity : class, ICanonicalName {
         tag = null;

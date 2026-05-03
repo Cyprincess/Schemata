@@ -7,7 +7,9 @@ using Microsoft.Extensions.Configuration;
 namespace Schemata.Core;
 
 /// <summary>
-///     Startup filter that wires the Schemata middleware pipeline and endpoint configuration.
+///     An <see cref="IStartupFilter" /> that injects the Schemata middleware
+///     pipeline and endpoint configuration into the ASP.NET Core request pipeline
+///     before the next filter in the chain.
 /// </summary>
 public sealed class SchemataStartup : IStartupFilter
 {
@@ -39,7 +41,8 @@ public sealed class SchemataStartup : IStartupFilter
     #endregion
 
     /// <summary>
-    ///     Creates a new instance of <see cref="SchemataStartup" />.
+    ///     Factory method that creates the filter. The constructor is private to
+    ///     ensure instantiation only through this path during service registration.
     /// </summary>
     /// <param name="configuration">The application configuration.</param>
     /// <param name="environment">The web host environment.</param>

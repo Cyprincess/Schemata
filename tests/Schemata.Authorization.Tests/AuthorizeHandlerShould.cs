@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,11 +35,11 @@ public class AuthorizeHandlerShould
         var services = new ServiceCollection();
         var sp       = services.BuildServiceProvider();
 
-        return new AuthorizeHandler<SchemataApplication, SchemataToken>(tokens.Object, tokenService, Options.Create(opts), sp, jsonOpts);
+        return new(tokens.Object, tokenService, Options.Create(opts), sp, jsonOpts);
     }
 
-    private static System.Security.Claims.ClaimsPrincipal AuthenticatedUser(string subject = "user-1") {
-        return new(new System.Security.Claims.ClaimsIdentity([new(Claims.Subject, subject)], "test"));
+    private static ClaimsPrincipal AuthenticatedUser(string subject = "user-1") {
+        return new(new ClaimsIdentity([new(Claims.Subject, subject)], "test"));
     }
 
     [Fact]
@@ -47,7 +48,8 @@ public class AuthorizeHandlerShould
         var handler = CreateHandler();
         var request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.AuthorizeAsync(request, AuthenticatedUser(), CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.AuthorizeAsync(
+                                                              request, AuthenticatedUser(), CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
     }

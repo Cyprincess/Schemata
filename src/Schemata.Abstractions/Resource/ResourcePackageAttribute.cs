@@ -3,19 +3,20 @@ using System;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Specifies the API package prefix for a resource, used as route prefix for HTTP and service name for gRPC.
+///     Sets the API package prefix for a resource. Used as the route prefix in
+///     HTTP (e.g. <c>/api/v1/</c>) and the gRPC service namespace.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ResourcePackageAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="ResourcePackageAttribute" /> class.
+    ///     Sets the package prefix for the annotated resource.
     /// </summary>
-    /// <param name="package">The package prefix (e.g., "api/v1").</param>
+    /// <param name="package">The prefix string (e.g., "api/v1").</param>
     public ResourcePackageAttribute(string package) { Package = package; }
 
     /// <summary>
-    ///     Gets the package prefix.
+    ///     The package prefix applied to generated routes and service names.
     /// </summary>
     public string Package { get; }
 }

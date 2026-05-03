@@ -1,12 +1,14 @@
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Indicates that a request or response supports HTTP ETag-based freshness validation.
+///     Supports HTTP ETag / If-Match / If-None-Match freshness validation for
+///     optimistic concurrency control, per
+///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
 /// </summary>
 public interface IFreshness
 {
     /// <summary>
-    ///     Gets or sets the entity tag used for conditional requests (If-Match / If-None-Match).
+    ///     The entity tag for conditional request matching.
     /// </summary>
     public string? EntityTag { get; set; }
 }

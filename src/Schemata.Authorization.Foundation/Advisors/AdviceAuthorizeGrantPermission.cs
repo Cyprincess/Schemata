@@ -11,18 +11,28 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceAuthorizeGrantPermission{TApp}" />.</summary>
 public static class AdviceAuthorizeGrantPermission
 {
     public const int DefaultOrder = AdviceAuthorizeResponseMode.DefaultOrder + 10_000_000;
 }
 
+/// <summary>Checks that the application has the <c>grant_type:authorization_code</c> permission at the authorize endpoint.</summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <remarks>
+///     Even though the grant permission is also checked at the token endpoint, this advisor validates it at
+///     the authorize endpoint so that misconfigured clients are rejected early.
+/// </remarks>
+/// <seealso cref="AdviceTokenGrantPermission{TApp}" />
 public sealed class AdviceAuthorizeGrantPermission<TApp>(IApplicationManager<TApp> manager) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
     #region IAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeGrantPermission.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

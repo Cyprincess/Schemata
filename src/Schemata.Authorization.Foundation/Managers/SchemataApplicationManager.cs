@@ -10,6 +10,17 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
+/// <summary>
+///     Default implementation of <see cref="IApplicationManager{TApplication}" /> backed by an
+///     <see cref="IRepository{TEntity}" /> and an <see cref="IPasswordHasher{TUser}" /> for client secret hashing.
+/// </summary>
+/// <typeparam name="TApplication">The application entity type, must derive from <see cref="SchemataApplication" />.</typeparam>
+/// <remarks>
+///     Client secrets are hashed using <see cref="IPasswordHasher{TApplication}" /> before storage. Redirect URI
+///     and permission checks use exact-match comparison against the application's configured lists.
+/// </remarks>
+/// <seealso cref="SchemataScopeManager{TScope}" />
+/// <seealso cref="SchemataTokenManager{TToken}" />
 public class SchemataApplicationManager<TApplication> : IApplicationManager<TApplication>
     where TApplication : SchemataApplication
 {
@@ -23,6 +34,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
 
     #region IApplicationManager<TApplication> Members
 
+    /// <inheritdoc />
     public IAsyncEnumerable<TApplication> ListAsync(
         Func<IQueryable<TApplication>, IQueryable<TApplication>>? predicate,
         CancellationToken                                         ct = default
@@ -30,6 +42,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return _applications.ListAsync(predicate, ct);
     }
 
+    /// <inheritdoc />
     public async Task<TApplication?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -40,6 +53,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return await _applications.SingleOrDefaultAsync(q => q.Where(a => a.Name == name), ct);
     }
 
+    /// <inheritdoc />
     public Task<bool> ValidateClientSecretAsync(
         TApplication?     application,
         string?           secret,
@@ -61,6 +75,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
                                       or PasswordVerificationResult.SuccessRehashNeeded);
     }
 
+    /// <inheritdoc />
     public Task<bool> ValidateRedirectUriAsync(TApplication? application, string? uri, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -77,6 +92,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.FromResult(found == true);
     }
 
+    /// <inheritdoc />
     public Task<bool> ValidatePostLogoutRedirectUriAsync(
         TApplication?     application,
         string?           uri,
@@ -97,6 +113,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.FromResult(found == true);
     }
 
+    /// <inheritdoc />
     public Task<bool> HasPermissionAsync(
         TApplication?     application,
         string?           permission,
@@ -117,6 +134,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.FromResult(found == true);
     }
 
+    /// <inheritdoc />
     public Task SetClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -127,6 +145,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDisplayNameAsync(TApplication? application, string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -135,6 +154,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDisplayNamesAsync(
         TApplication?               application,
         Dictionary<string, string>? names,
@@ -147,6 +167,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDescriptionAsync(TApplication? application, string? description, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -155,6 +176,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDescriptionsAsync(
         TApplication?               application,
         Dictionary<string, string>? descriptions,
@@ -167,6 +189,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetRedirectUrisAsync(
         TApplication?        application,
         ICollection<string>? uris,
@@ -179,6 +202,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetPostLogoutRedirectUrisAsync(
         TApplication?        application,
         ICollection<string>? uris,
@@ -191,6 +215,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetPermissionsAsync(
         TApplication?        application,
         ICollection<string>? permissions,
@@ -203,6 +228,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetClientTypeAsync(TApplication? application, string? type, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -211,6 +237,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetApplicationTypeAsync(TApplication? application, string? type, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -219,6 +246,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetConsentTypeAsync(TApplication? application, string? type, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -227,6 +255,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetRequirePkceAsync(TApplication? application, bool? require, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -235,6 +264,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetSubjectTypeAsync(TApplication? application, string? type, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -243,6 +273,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetSectorIdentifierUriAsync(TApplication? application, string? uri, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -251,6 +282,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetFrontChannelLogoutAsync(
         TApplication?     application,
         string?           uri,
@@ -269,6 +301,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetBackChannelLogoutAsync(
         TApplication?     application,
         string?           uri,
@@ -287,6 +320,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public async Task<TApplication?> CreateAsync(TApplication? application, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -300,6 +334,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return application;
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(TApplication? application, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -311,6 +346,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         await _applications.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(TApplication? application, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

@@ -7,106 +7,127 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+/// <summary>
+///     Represents an OAuth 2.0 client or OpenID Connect Relying Party registered with the authorization server,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §2: Client Registration
+///     </seealso>
+///     .
+/// </summary>
 [DisplayName("Application")]
 [Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
 public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
-    /// <summary>Alias for <see cref="Name" />.</summary>
+    /// <summary>Public client identifier, used as the <c>client_id</c> parameter in OAuth requests.</summary>
     public virtual string? ClientId
     {
         get => Name;
         set => Name = value;
     }
 
-    /// <summary>Hashed client secret for confidential clients per RFC 6749 section 2.3.1.</summary>
+    /// <summary>
+    ///     Hashed client secret for confidential clients.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.3.1: Client Password
+    ///     </seealso>
+    /// </summary>
     public virtual string? ClientSecret { get; set; }
 
-    /// <summary>OAuth 2.0 client type: "confidential" or "public" per RFC 6749 section 2.1.</summary>
+    /// <summary>
+    ///     OAuth 2.0 client type: <c>"confidential"</c> or <c>"public"</c>.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.1: Client Types
+    ///     </seealso>
+    /// </summary>
     public virtual string? ClientType { get; set; } = ClientTypes.Confidential;
 
-    /// <summary>Application type: "web" or "native" per OpenID Connect Dynamic Registration.</summary>
+    /// <summary>Application type: <c>"web"</c> or <c>"native"</c>.</summary>
     public virtual string? ApplicationType { get; set; } = ApplicationTypes.Web;
 
-    /// <summary>Consent model: "explicit", "implicit", or "external" controlling the consent prompt.</summary>
+    /// <summary>Consent model: <c>"explicit"</c>, <c>"implicit"</c>, or <c>"external"</c>.</summary>
     public virtual string? ConsentType { get; set; } = ConsentTypes.Explicit;
 
-    /// <summary>When null, falls back to global authorization options.</summary>
+    /// <summary>When non-null, overrides the global PKCE requirement for this application.</summary>
     public virtual bool? RequirePkce { get; set; }
 
-    /// <summary>Registered redirect URIs for authorization code and implicit flows per RFC 6749 section 3.1.2.</summary>
+    /// <summary>
+    ///     Registered redirect URIs.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.1.2">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §3.1.2: Redirection Endpoint
+    ///     </seealso>
+    /// </summary>
     public virtual ICollection<string>? RedirectUris { get; set; }
 
-    /// <summary>Granted endpoint and grant-type permissions (e.g. "ept:token", "gt:authorization_code").</summary>
+    /// <summary>Granted permissions, e.g. <c>"ept:token"</c>, <c>"gt:authorization_code"</c>.</summary>
     public virtual ICollection<string>? Permissions { get; set; }
 
-    /// <summary>Allowed post-logout redirect URIs per OpenID Connect RP-Initiated Logout.</summary>
+    /// <summary>Allowed post-logout redirect URIs for RP-Initiated Logout.</summary>
     public virtual ICollection<string>? PostLogoutRedirectUris { get; set; }
 
-    /// <summary>When null, falls back to global configuration.</summary>
+    /// <summary>When non-null, overrides the global subject type for this application.</summary>
     public virtual string? SubjectType { get; set; }
 
-    /// <summary>Used for pairwise subject identifiers.</summary>
+    /// <summary>Required for pairwise subject identifiers to scope the hash.</summary>
     public virtual string? SectorIdentifierUri { get; set; }
 
-    /// <summary>frontchannel_logout_uri per OpenID Connect Front-Channel Logout §2. Presence implies support.</summary>
+    /// <summary>
+    ///     <c>frontchannel_logout_uri</c>. Presence implies support for front-channel logout.
+    /// </summary>
     public virtual string? FrontChannelLogoutUri { get; set; }
 
-    /// <summary>frontchannel_logout_session_required per OpenID Connect Front-Channel Logout §2.</summary>
+    /// <summary><c>frontchannel_logout_session_required</c>.</summary>
     public virtual bool FrontChannelLogoutSessionRequired { get; set; }
 
-    /// <summary>backchannel_logout_uri per OpenID Connect Back-Channel Logout §2.2. Presence implies support.</summary>
+    /// <summary>
+    ///     <c>backchannel_logout_uri</c>. Presence implies support for back-channel logout.
+    /// </summary>
     public virtual string? BackChannelLogoutUri { get; set; }
 
-    /// <summary>backchannel_logout_session_required per OpenID Connect Back-Channel Logout §2.2.</summary>
+    /// <summary><c>backchannel_logout_session_required</c>.</summary>
     public virtual bool BackChannelLogoutSessionRequired { get; set; }
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
     public virtual string? Name { get; set; }
 
-    /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IConcurrency Members
 
-    /// <inheritdoc />
     public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IDescriptive Members
 
-    /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Description { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    /// <inheritdoc />
     public virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

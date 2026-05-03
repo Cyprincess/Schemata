@@ -18,15 +18,16 @@ using Schemata.Entity.Repository.Advisors;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Non-generic base class providing shared key-property caching logic for repository implementations.
+///     Non-generic base class providing shared key-property caching logic for repository
+///     implementations.
 /// </summary>
 public abstract class RepositoryBase
 {
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties = [];
 
     /// <summary>
-    ///     Returns the cached list of key properties for the specified type, discovering them by <see cref="KeyAttribute" />
-    ///     or by convention (property named "Id").
+    ///     Returns the cached list of key properties for the specified type, discovering
+    ///     them by <see cref="KeyAttribute" /> or by convention (property named "Id").
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of key property infos.</returns>
@@ -50,8 +51,8 @@ public abstract class RepositoryBase
     }
 
     /// <summary>
-    ///     Returns the cached list of mapped (non-virtual, readable, not <see cref="NotMappedAttribute" />) properties for the
-    ///     specified type.
+    ///     Returns the cached list of mapped (non-virtual, readable, not
+    ///     <see cref="NotMappedAttribute" />) properties for the specified type.
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of mapped property infos.</returns>
@@ -75,23 +76,30 @@ public abstract class RepositoryBase
 }
 
 /// <summary>
-///     Abstract base class for repository implementations providing advisor pipeline integration and common CRUD logic.
+///     Abstract base class for repository implementations providing advisor pipeline
+///     integration and common CRUD logic. All query methods pass through
+///     <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />; mutate methods delegate
+///     to abstract/virtual methods that concrete providers must implement.
 /// </summary>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
 public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
     where TEntity : class
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="RepositoryBase{TEntity}" /> class.
+    ///     Initializes a new instance of <see cref="RepositoryBase{TEntity}" />.
     /// </summary>
-    /// <param name="sp">The service provider for resolving advisors and creating new instances.</param>
+    /// <param name="sp">
+    ///     The service provider for resolving advisors and creating new instances via
+    ///     <see cref="Once" />.
+    /// </param>
     protected RepositoryBase(IServiceProvider sp) {
         ServiceProvider = sp;
         AdviceContext   = new(sp);
     }
 
     /// <summary>
-    ///     Gets the service provider used to resolve advisors and create new repository instances.
+    ///     Gets the service provider used to resolve advisors and create new repository
+    ///     instances.
     /// </summary>
     protected virtual IServiceProvider ServiceProvider { get; }
 
@@ -381,7 +389,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return Task.WhenAll(tasks);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IRepository{TEntity}.CommitAsync" />
     public abstract ValueTask<int> CommitAsync(CancellationToken ct = default);
 
     /// <inheritdoc />
@@ -432,8 +440,9 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     #endregion
 
     /// <summary>
-    ///     Creates a <see cref="QueryContainer{TEntity}" /> from the current queryable, for use by the build-query advisor
-    ///     pipeline.
+    ///     Creates a <see cref="QueryContainer{TEntity}" /> from the current queryable
+    ///     for use by the build-query advisor pipeline
+    ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />).
     /// </summary>
     /// <returns>A new query container wrapping this repository and its queryable.</returns>
     protected virtual QueryContainer<TEntity> AsQueryContainer() {
@@ -445,7 +454,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     }
 
     /// <summary>
-    ///     Applies the user-supplied predicate to the query, or falls back to <see cref="Queryable.OfType{TResult}" />.
+    ///     Applies the user-supplied predicate to the advisor-processed query, or falls
+    ///     back to <see cref="Queryable.OfType{TResult}" /> when no predicate is provided.
     /// </summary>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="query">The base queryable after build-query advisors have run.</param>

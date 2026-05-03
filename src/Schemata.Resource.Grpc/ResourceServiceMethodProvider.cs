@@ -10,12 +10,6 @@ using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
 namespace Schemata.Resource.Grpc;
 
-/// <summary>
-///     Discovers and registers gRPC methods for <see cref="ResourceService{TEntity,TRequest,TDetail,TSummary}" />
-///     using standard grpc-dotnet APIs with protobuf-net serialization.
-///     Registered as an open generic <c>IServiceMethodProvider&lt;&gt;</c>; silently skips any
-///     <typeparamref name="TService" /> that is not a closed <c>ResourceService&lt;,,,&gt;</c>.
-/// </summary>
 internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodProvider<TService>
     where TService : class
 {
@@ -31,7 +25,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
             return;
         }
 
-        var args = t.GetGenericArguments();
+        var args   = t.GetGenericArguments();
         var method = typeof(ResourceServiceMethodProvider<TService>).GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(args[0], args[1], args[2], args[3]);
 
         Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>), method);
@@ -47,8 +41,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
     #endregion
 
-    // Called via reflection from the static constructor to cross the generic boundary.
-    // ReSharper disable once UnusedMember.Local
     private static void RegisterAll<TEntity, TRequest, TDetail, TSummary>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config
@@ -62,9 +54,11 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var package = descriptor.Package ?? typeof(TEntity).Namespace;
         var service = package is not null ? $"{package}.{descriptor.Singular}Service" : $"{descriptor.Singular}Service";
 
+        // Empty metadata array — grpc-dotnet does not inject authorization metadata at
+        // the method provider level; that is handled by the endpoint builder in
+        // SchemataGrpcResourceFeature.
         var metadata = Array.Empty<object>();
 
-        // List
         context.AddUnaryMethod(
             new Method<ListRequest, ListResult<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResult<TSummary>>(model)), metadata,
             async (svc, req, _) => {
@@ -72,7 +66,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
                 return await rs.ListAsync(req);
             });
 
-        // Get
         context.AddUnaryMethod(
             new Method<GetRequest, TDetail>(MethodType.Unary, service, $"Get{descriptor.Singular}", CreateMarshaller<GetRequest>(model), CreateMarshaller<TDetail>(model)),
             metadata, async (svc, req, _) => {
@@ -80,7 +73,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
                 return await rs.GetAsync(req);
             });
 
-        // Create
         context.AddUnaryMethod(
             new Method<TRequest, TDetail>(MethodType.Unary, service, $"Create{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
             metadata, async (svc, req, _) => {
@@ -88,7 +80,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
                 return await rs.CreateAsync(req);
             });
 
-        // Update
         context.AddUnaryMethod(
             new Method<TRequest, TDetail>(MethodType.Unary, service, $"Update{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
             metadata, async (svc, req, _) => {
@@ -96,7 +87,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
                 return await rs.UpdateAsync(req);
             });
 
-        // Delete
         context.AddUnaryMethod(
             new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
             async (svc, req, _) => {

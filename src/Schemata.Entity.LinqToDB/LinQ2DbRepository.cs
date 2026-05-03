@@ -51,17 +51,17 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     protected virtual ITable<TEntity> Table => field ??= Context.GetTable<TEntity>().TableName(TableName);
 
     /// <summary>
-    ///     Gets or sets the current transaction, if any.
+    ///     The current transaction, if one is active.
     /// </summary>
     protected virtual DataConnectionTransaction? Transaction { get; set; }
 
     /// <summary>
-    ///     Gets or sets the cumulative number of rows affected by operations in the current transaction.
+    ///     Cumulative number of rows affected by operations in the current transaction.
     /// </summary>
     protected virtual int RowsAffected { get; set; }
 
     /// <summary>
-    ///     Gets the table name used for CRUD operations, derived from <see cref="TableAttribute" /> or pluralized entity name.
+    ///     The table name used for CRUD operations, derived from <see cref="TableAttribute" /> or the pluralized entity name.
     /// </summary>
     public virtual string TableName { get; }
 

@@ -3,13 +3,12 @@
 namespace System;
 
 /// <summary>
-///     Extension methods for Base64 URL-safe encoding and decoding.
+///     Base64 URL-safe encoding and decoding (no padding; <c>-</c>/<c>_</c> in place of <c>+</c>/<c>/</c>).
 /// </summary>
 public static class Base64Extensions
 {
     /// <summary>
-    ///     Converts a byte array to a Base64 URL-safe string (no padding, <c>-</c> and <c>_</c> instead of <c>+</c> and
-    ///     <c>/</c>).
+    ///     Encodes a byte array to a Base64 URL-safe string.
     /// </summary>
     /// <param name="bytes">The bytes to encode.</param>
     /// <returns>The Base64 URL-safe string.</returns>
@@ -18,9 +17,9 @@ public static class Base64Extensions
     }
 
     /// <summary>
-    ///     Decodes a Base64 URL-safe string back to a byte array.
+    ///     Decodes a Base64 URL-safe string to a byte array.
     /// </summary>
-    /// <param name="string">The Base64 URL-safe string to decode.</param>
+    /// <param name="string">The Base64 URL-safe string.</param>
     /// <returns>The decoded bytes.</returns>
     public static byte[] FromBase64UrlString(this string @string) {
         var base64 = @string.Replace('_', '/').Replace('-', '+');

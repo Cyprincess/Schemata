@@ -14,14 +14,23 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures JSON serialization with snake_case naming, polymorphic type resolution, and AIP conventions.
+///     Configures <see cref="JsonSerializerOptions" /> with snake_case naming,
+///     string-number coercion, kebab-case enums, and polymorphic type resolution.
+///     Also wires <see cref="JsonOptions" /> and
+///     <see cref="Microsoft.AspNetCore.Mvc.JsonOptions" /> when controllers are
+///     present.
 /// </summary>
 public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
+    /// <summary>
+    ///     Priority for ordering the middleware registration in the application pipeline.
+    /// </summary>
     public const int DefaultPriority = SchemataControllersFeature.DefaultPriority + 10_000_000;
 
+    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -58,7 +67,6 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
 
             options.TypeInfoResolver = PolymorphicTypeResolver.Instance.WithAddedModifier(info => {
                 // Rename details type to "@type" per AIP conventions
-
                 if (!typeof(IErrorDetail).IsAssignableFrom(info.Type)) {
                     return;
                 }

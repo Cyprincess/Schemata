@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 namespace System.Linq;
 
 /// <summary>
-///     Extension methods for <see cref="IAsyncEnumerable{T}" /> providing mapping, list materialization, and dictionary
-///     conversion.
+///     Extension methods for <see cref="IAsyncEnumerable{T}" /> providing projection,
+///     materialization, and dictionary conversion.
 /// </summary>
 public static class AsyncEnumerableExtensions
 {
@@ -40,7 +40,9 @@ public static class AsyncEnumerableExtensions
 
 #if !NET10_0_OR_GREATER
     /// <summary>
-    ///     Materializes an async enumerable into a <see cref="List{T}" />.
+    ///     Materializes an async enumerable into a <see cref="List{T}"/>.
+    ///     Conditional on <c>!NET10_0_OR_GREATER</c> because .NET 10 ships
+    ///     a built-in <c>ToListAsync</c>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source async enumerable.</param>
@@ -77,7 +79,8 @@ public static class AsyncEnumerableExtensions
     }
 
     /// <summary>
-    ///     Creates a dictionary from an async enumerable using the specified key selector and comparer.
+    ///     Creates a dictionary from an async enumerable using the specified key selector and
+    ///     comparer.
     /// </summary>
     /// <typeparam name="TSource">The source element type.</typeparam>
     /// <typeparam name="TKey">The key type.</typeparam>
@@ -97,7 +100,8 @@ public static class AsyncEnumerableExtensions
     }
 
     /// <summary>
-    ///     Creates a dictionary from an async enumerable using the specified key and element selectors.
+    ///     Creates a dictionary from an async enumerable using the specified key and element
+    ///     selectors.
     /// </summary>
     /// <typeparam name="TSource">The source element type.</typeparam>
     /// <typeparam name="TKey">The key type.</typeparam>
@@ -118,7 +122,8 @@ public static class AsyncEnumerableExtensions
     }
 
     /// <summary>
-    ///     Creates a dictionary from an async enumerable using the specified key selector, element selector, and comparer.
+    ///     Creates a dictionary from an async enumerable using the specified key selector,
+    ///     element selector, and comparer.
     /// </summary>
     /// <typeparam name="TSource">The source element type.</typeparam>
     /// <typeparam name="TKey">The key type.</typeparam>

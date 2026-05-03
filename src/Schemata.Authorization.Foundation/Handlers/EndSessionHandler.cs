@@ -18,6 +18,20 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     OIDC RP-Initiated Logout endpoint.
+///     Validates the optional <c>id_token_hint</c>, resolves the OP session to
+///     discover relying parties, and performs front-channel and back-channel logout
+///     via registered <see cref="ILogoutNotifier" /> services,
+///     per
+///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#ImplementationConsiderations">
+///         OpenID Connect Session
+///         Management 1.0 §5: Implementation Considerations
+///     </seealso>
+///     and
+///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>
+///     .
+/// </summary>
 public sealed class EndSessionHandler<TApp>(
     IApplicationManager<TApp>              apps,
     TokenService                           issuer,
@@ -26,6 +40,17 @@ public sealed class EndSessionHandler<TApp>(
 ) : EndSessionEndpoint
     where TApp : SchemataApplication
 {
+    /// <summary>
+    ///     Processes an RP-initiated logout request.
+    ///     When front-channel logout URIs are discovered, returns an HTML page
+    ///     with hidden <c>iframe</c> elements that trigger each RP's logout endpoint;
+    ///     the page meta-refreshes to the <c>post_logout_redirect_uri</c> after
+    ///     all iframes load (or after a 5-second timeout).
+    ///     Otherwise performs a direct redirect or returns an empty response.
+    /// </summary>
+    /// <param name="request">The logout request.</param>
+    /// <param name="principal">The authenticated user principal.</param>
+    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> HandleAsync(
         EndSessionRequest request,
         ClaimsPrincipal   principal,
@@ -37,7 +62,9 @@ public sealed class EndSessionHandler<TApp>(
         TApp? application = null;
 
         if (!string.IsNullOrWhiteSpace(request.IdTokenHint)) {
-            // Validate hint with client_id as audience when provided (tightens acceptance).
+            // Validate the id_token_hint. When a client_id is also provided,
+            // verify the audience matches for consistency (tightens acceptance
+            // against misdirected hints).
             var hint = await issuer.Validate(request.IdTokenHint, request.ClientId, false);
 
             var client = hint?.FindFirstValue(Claims.ClientId) ?? hint?.FindFirstValue(Claims.Audience);
@@ -45,7 +72,8 @@ public sealed class EndSessionHandler<TApp>(
                 application = await apps.FindByCanonicalNameAsync(client, ct);
             }
 
-            // When client_id is also in the request, verify consistency.
+            // When client_id is provided alongside the hint, verify consistency
+            // to prevent cross-RP logout injection.
             if (!string.IsNullOrWhiteSpace(request.ClientId) && application is not null) {
                 var requested = await apps.FindByCanonicalNameAsync(request.ClientId, ct);
                 if (requested?.Id != application.Id) {
@@ -53,12 +81,14 @@ public sealed class EndSessionHandler<TApp>(
                 }
             }
 
-            // Subject from hint may be pairwise; fan-out prefers session when available.
+            // Pairwise subjects in the hint may differ from the session principal;
+            // prefer the session-level subject when available.
             subject ??= hint?.FindFirstValue(Claims.Subject);
             session ??= hint?.FindFirstValue(Claims.SessionId);
         }
 
-        // Fallback: no hint but client_id provided.
+        // Fallback: no hint but client_id provided — resolve the application
+        // solely for post_logout_redirect_uri validation.
         if (application is null && !string.IsNullOrWhiteSpace(request.ClientId)) {
             application = await apps.FindByCanonicalNameAsync(request.ClientId, ct);
         }
@@ -104,6 +134,12 @@ public sealed class EndSessionHandler<TApp>(
         return $"{uri}{separator}{Parameters.State}={Uri.EscapeDataString(state)}";
     }
 
+    /// <summary>
+    ///     Builds an HTML page for front-channel logout.  Each RP URI is rendered
+    ///     as a hidden iframe.  The page automatically redirects to the
+    ///     <paramref name="redirect" /> URI after all iframes finish loading or
+    ///     a 5-second timeout elapses.
+    /// </summary>
     public static string BuildLogoutPage(List<string> uris, string? redirect) {
         var sb = new StringBuilder();
 

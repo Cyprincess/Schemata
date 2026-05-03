@@ -25,8 +25,8 @@ public sealed class AdviceSubjectClaims(ISubjectProvider subjects) : IClaimsAdvi
             return AdviseResult.Continue;
         }
 
-        var baseline      = new HashSet<string>(claims.Select(c => c.Type));
-        var subject = await subjects.GetClaimsAsync(sub, ct);
+        var baseline = new HashSet<string>(claims.Select(c => c.Type));
+        var subject  = await subjects.GetClaimsAsync(sub, ct);
 
         foreach (var claim in subject) {
             if (baseline.Contains(claim.Type)) {

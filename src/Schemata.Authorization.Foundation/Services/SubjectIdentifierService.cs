@@ -12,13 +12,35 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
-// OIDC Core 1.0 §8: public returns userId as-is; pairwise returns deterministic SHA-256 hash.
+/// <summary>
+///     OIDC Subject Identifier Service per
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes">
+///         OpenID Connect Core 1.0 §8: Subject
+///         Identifier Types
+///     </seealso>
+///     .
+///     When the subject type is <c>public</c>, returns the internal user ID
+///     unchanged.  When <c>pairwise</c>, computes a deterministic SHA-256 hash
+///     over <c>{sector_host} + {userId} + {pairwise_salt}</c> and returns the
+///     Base64URL-encoded result.  The sector identifier is derived from the
+///     application's <c>sector_identifier_uri</c>, falling back to the host
+///     of the first registered redirect URI.
+/// </summary>
 public class SubjectIdentifierService(IOptions<SchemataAuthorizationOptions> options) : ISubjectIdentifierService
 {
     private readonly SchemataAuthorizationOptions _options = options.Value;
 
     #region ISubjectIdentifierService Members
 
+    /// <summary>
+    ///     Resolves the subject identifier for the given user and application.
+    /// </summary>
+    /// <param name="userId">The internal (OP-local) user identifier.</param>
+    /// <param name="application">The relying party application.</param>
+    /// <returns>
+    ///     The public or pairwise subject identifier suitable for use in
+    ///     ID tokens and UserInfo responses.
+    /// </returns>
     public string Resolve(string userId, SchemataApplication application) {
         var type = application.SubjectType ?? _options.SubjectType;
 
@@ -35,6 +57,16 @@ public class SubjectIdentifierService(IOptions<SchemataAuthorizationOptions> opt
 
     #endregion
 
+    /// <summary>
+    ///     Derives the sector identifier host per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#PairwiseAlg">
+    ///         OpenID Connect Core 1.0 §8.1:
+    ///         Pairwise Identifier Algorithm
+    ///     </seealso>
+    ///     :
+    ///     uses <c>sector_identifier_uri</c> when configured, otherwise falls
+    ///     back to the host of the first registered redirect URI.
+    /// </summary>
     private static string GetSector(SchemataApplication application) {
         if (!string.IsNullOrWhiteSpace(application.SectorIdentifierUri)) {
             return new Uri(application.SectorIdentifierUri).Host;

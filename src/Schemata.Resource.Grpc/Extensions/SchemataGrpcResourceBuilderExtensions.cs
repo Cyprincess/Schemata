@@ -6,28 +6,31 @@ using Schemata.Resource.Grpc;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Convenience overloads for registering gRPC-only resources with fewer type parameters.
+///     Convenience overloads for registering gRPC-only resources with fewer explicit
+///     type parameters.
 /// </summary>
 public static class SchemataGrpcResourceBuilderExtensions
 {
     /// <summary>
-    ///     Registers a gRPC-only resource using the entity type for all four type parameters.
+    ///     Registers a gRPC-only resource using the entity type for all four type
+    ///     parameters (entity = request = detail = summary).
     /// </summary>
-    /// <typeparam name="TEntity">The entity type used as entity, request, detail, and summary.</typeparam>
-    /// <param name="builder">The gRPC resource builder.</param>
-    /// <returns>The gRPC resource builder for chaining.</returns>
+    /// <typeparam name="TEntity">The entity type, also used as request, detail, and summary.</typeparam>
+    /// <param name="builder">The <see cref="SchemataGrpcResourceBuilder" />.</param>
+    /// <returns>The <see cref="SchemataGrpcResourceBuilder" /> for chaining.</returns>
     public static SchemataGrpcResourceBuilder Use<TEntity>(this SchemataGrpcResourceBuilder builder)
         where TEntity : class, ICanonicalName {
         return builder.Use<TEntity, TEntity, TEntity, TEntity>();
     }
 
     /// <summary>
-    ///     Registers a gRPC-only resource using the request type for detail and summary.
+    ///     Registers a gRPC-only resource using the request type for detail and summary
+    ///     (entity and request specified; detail = summary = request).
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type, also used as detail and summary.</typeparam>
-    /// <param name="builder">The gRPC resource builder.</param>
-    /// <returns>The gRPC resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataGrpcResourceBuilder" />.</param>
+    /// <returns>The <see cref="SchemataGrpcResourceBuilder" /> for chaining.</returns>
     public static SchemataGrpcResourceBuilder Use<TEntity, TRequest>(this SchemataGrpcResourceBuilder builder)
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName {
@@ -35,13 +38,14 @@ public static class SchemataGrpcResourceBuilderExtensions
     }
 
     /// <summary>
-    ///     Registers a gRPC-only resource using the detail type as the summary type.
+    ///     Registers a gRPC-only resource using the detail type as the summary type
+    ///     (entity, request, and detail specified; summary = detail).
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>
     /// <typeparam name="TDetail">The detail type, also used as summary.</typeparam>
-    /// <param name="builder">The gRPC resource builder.</param>
-    /// <returns>The gRPC resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataGrpcResourceBuilder" />.</param>
+    /// <returns>The <see cref="SchemataGrpcResourceBuilder" /> for chaining.</returns>
     public static SchemataGrpcResourceBuilder Use<TEntity, TRequest, TDetail>(this SchemataGrpcResourceBuilder builder)
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
@@ -50,14 +54,15 @@ public static class SchemataGrpcResourceBuilderExtensions
     }
 
     /// <summary>
-    ///     Registers a gRPC-only resource with explicit entity, request, detail, and summary types.
+    ///     Registers a gRPC-only resource with explicit entity, request, detail, and
+    ///     summary types, tagged with <see cref="GrpcResourceAttribute.Name" />.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>
     /// <typeparam name="TDetail">The detail type.</typeparam>
     /// <typeparam name="TSummary">The summary type.</typeparam>
-    /// <param name="builder">The gRPC resource builder.</param>
-    /// <returns>The gRPC resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataGrpcResourceBuilder" />.</param>
+    /// <returns>The <see cref="SchemataGrpcResourceBuilder" /> for chaining.</returns>
     public static SchemataGrpcResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
         this SchemataGrpcResourceBuilder builder
     )

@@ -13,6 +13,12 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 internal static class ValidationHelper
 {
+    /// <summary>
+    ///     Runs all registered <see cref="IValidationAdvisor{TRequest}" /> implementations against the request.
+    ///     Supports <c>ValidateOnly</c> dry-runs and per-operation suppression via the
+    ///     <paramref name="suppressed" /> flag. On validation failure, throws
+    ///     <see cref="ValidationException" /> with the collected errors.
+    /// </summary>
     public static async Task<AdviseResult> ValidateAsync<TRequest>(
         AdviceContext     ctx,
         TRequest          request,

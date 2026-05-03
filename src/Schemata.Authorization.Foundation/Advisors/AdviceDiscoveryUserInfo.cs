@@ -7,14 +7,26 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>
+///     Adds the <c>userinfo_endpoint</c> to the discovery document,
+///     per
+///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig">
+///         OpenID Connect Discovery 1.0
+///         §4: Obtaining OpenID Provider Configuration Information
+///     </seealso>
+///     .
+/// </summary>
+/// <seealso cref="AdviceDiscoveryBase" />
 public sealed class AdviceDiscoveryUserInfo : IDiscoveryAdvisor
 {
     public const int DefaultOrder = AdviceDiscoveryBase.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         DiscoveryContext  discovery,

@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Foundation.Advisors;
@@ -61,10 +60,7 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
                      manager.FeatureProviders.Add(new IdentityControllerFeatureProvider(typeof(AuthenticateController<TUser>)));
                  });
 
-        // Handler
         services.TryAddScoped<IdentityHandler<TUser>>();
-
-        // Advisors
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceIdentityFeatureGate<>)));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ConfirmRequest>, AdviceConfirmRequestValidation>());
@@ -74,22 +70,20 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceEnrollValidation<TUser>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceDowngradeValidation>());
 
-        // Claims and services
         services.TryAddScoped<IClaimsProvider<TUser>, DefaultClaimsProvider<TUser>>();
 
         services.TryAddScoped(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddScoped(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));
 
-        // Identity stores and managers
         services.TryAddScoped<IUserStore<TUser>, TUserStore>();
         services.TryAddScoped<IRoleStore<TRole>, TRoleStore>();
 
         services.Configure<IdentityOptions>(o => {
-            o.ClaimsIdentity.UserIdClaimType        = SchemataConstants.Claims.Subject;
-            o.ClaimsIdentity.UserNameClaimType      = SchemataConstants.Claims.PreferredUsername;
-            o.ClaimsIdentity.EmailClaimType         = SchemataConstants.Claims.Email;
-            o.ClaimsIdentity.RoleClaimType          = SchemataConstants.Claims.Role;
-            o.ClaimsIdentity.SecurityStampClaimType = SchemataConstants.Claims.SecurityStamp;
+            o.ClaimsIdentity.UserIdClaimType        = Claims.Subject;
+            o.ClaimsIdentity.UserNameClaimType      = Claims.PreferredUsername;
+            o.ClaimsIdentity.EmailClaimType         = Claims.Email;
+            o.ClaimsIdentity.RoleClaimType          = Claims.Role;
+            o.ClaimsIdentity.SecurityStampClaimType = Claims.SecurityStamp;
         });
 
         var builder = services.AddIdentityApiEndpoints<TUser>(configure)

@@ -49,6 +49,7 @@ public class OperationHandlerUpdateShould
         var entity  = _fixture.Students[0];
         var request = new Student { EntityTag = "W/\"wrongtag\"" };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => handler.UpdateAsync(entity.CanonicalName!, request, null, null));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => handler.UpdateAsync(
+                                                           entity.CanonicalName!, request, null, null));
     }
 }

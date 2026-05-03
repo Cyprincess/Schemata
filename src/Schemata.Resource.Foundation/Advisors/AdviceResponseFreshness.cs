@@ -8,22 +8,26 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceResponseFreshness{TEntity,TDetail}" />.
+/// </summary>
 public static class AdviceResponseFreshness
 {
+    /// <summary>
+    ///     Default order at <see cref="Orders.Base" />.
+    /// </summary>
     public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-///     Sets the ETag on response detail DTOs that implement <see cref="Schemata.Abstractions.Resource.IFreshness" />.
+///     Sets the ETag on response DTOs that implement <see cref="IFreshness" />
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>. Computes a weak ETag
+///     from
+///     the entity's <see cref="IConcurrency.Timestamp" />.
+///     Suppressed when <see cref="FreshnessSuppressed" /> is present.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-/// <typeparam name="TDetail">The detail DTO type returned to the caller.</typeparam>
-/// <remarks>
-///     Order: 100,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature" />.
-///     Computes a weak ETag from the entity's <see cref="Schemata.Abstractions.Entities.IConcurrency.Timestamp" />
-///     and assigns it to the detail's <see cref="Schemata.Abstractions.Resource.IFreshness.EntityTag" /> property.
-///     Suppressed when <see cref="FreshnessSuppressed" /> is present in the advice context.
-/// </remarks>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdvisor<TEntity, TDetail>
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName

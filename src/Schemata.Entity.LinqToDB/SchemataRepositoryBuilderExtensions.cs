@@ -1,26 +1,7 @@
-// Some code is borrowed from linq2db
+// Portions adapted from linq2db
 // https://github.com/linq2db/linq2db/blob/4120b637104810a1b0c4d338794257579fa1604d/Source/LinqToDB.AspNet/ServiceConfigurationExtensions.cs
-// The borrowed code is licensed under the MIT License:
-//
+// Licensed under the MIT License.
 // Copyright (c) 2024 Igor Tkachev, Ilya Chudin, Svyatoslav Danyliv, Dmitry Lukashenko
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
 
 using System;
 using System.Linq;
@@ -47,12 +28,12 @@ public static class SchemataRepositoryBuilderExtensions
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
     /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (default:
+    ///     The service lifetime for the data connection (defaults to
     ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
-    ///     ).
+    ///     The service lifetime for the data options (defaults to
+    ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb(
@@ -71,12 +52,12 @@ public static class SchemataRepositoryBuilderExtensions
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
     /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (default:
+    ///     The service lifetime for the data connection (defaults to
     ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
-    ///     ).
+    ///     The service lifetime for the data options (defaults to
+    ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
@@ -97,17 +78,17 @@ public static class SchemataRepositoryBuilderExtensions
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
     /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (default:
+    ///     The service lifetime for the data connection (defaults to
     ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (default: <see cref="ServiceLifetime.Scoped" />
-    ///     ).
+    ///     The service lifetime for the data options (defaults to
+    ///     <see cref="ServiceLifetime.Scoped" />).
     /// </param>
     /// <returns>The same builder for chaining.</returns>
     /// <exception cref="ArgumentException">
     ///     Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor
-    ///     accepting <see cref="DataOptions" />.
+    ///     accepting <see cref="DataOptions" /> or a typed variant.
     /// </exception>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
@@ -117,8 +98,8 @@ public static class SchemataRepositoryBuilderExtensions
     )
         where TContextImplementation : TContext
         where TContext : DataConnection {
-        // Register default metadata reader for System.ComponentModel.DataAnnotations.Schema attributes
-        // This is required for LINQ to DB to work with entities that have TableAttribute, ColumnAttribute, etc.
+        // Register the default metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
+        // to LINQ to DB mapping attributes so that [Table], [Column], etc. are recognized.
         MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();

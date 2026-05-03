@@ -9,22 +9,22 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceAddCanonicalName{TEntity}" />.</summary>
 public static class AdviceAddCanonicalName
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>
+    ///     Default execution order: after <see cref="AdviceAddConcurrency{TEntity}" />
+    ///     (210,000,000 + 10,000,000 = 220,000,000).
+    /// </summary>
     public const int DefaultOrder = AdviceAddConcurrency.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Resolves and sets <see cref="ICanonicalName.CanonicalName" /> from the entity's resource-name pattern when an
-///     entity is added.
+///     Resolves and sets <see cref="ICanonicalName.CanonicalName" /> from the entity's
+///     <see cref="ResourceNameDescriptor" /> pattern when an entity is added.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
-///     <para>Order: 300,000,000.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
-///         activates for entities implementing <see cref="ICanonicalName" />.
-///     </para>
+///     Only activates for entities implementing <see cref="ICanonicalName" /> whose type
+///     has a registered resource-name pattern. Has no suppress flag — always runs if the
+///     entity type matches.
 /// </remarks>
 public sealed class AdviceAddCanonicalName<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class

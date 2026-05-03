@@ -50,6 +50,7 @@ internal static class RuntimeTypeModelConfigurator
             return;
         }
 
+        // Open generics cannot be serialized; skip to avoid Add throwing.
         if (type is { IsGenericType: true, IsConstructedGenericType: false }) {
             return;
         }
@@ -63,13 +64,17 @@ internal static class RuntimeTypeModelConfigurator
             var name = property.Name;
 
             switch (name) {
+                // Skip ICanonicalName.Name — it is the full resource name pattern and
+                // not a proto field that should be serialized independently.
                 case nameof(ICanonicalName.Name) when typeof(ICanonicalName).IsAssignableFrom(type):
                     continue;
 
+                // Map CanonicalName to "name" for AIP-122 wire compatibility.
                 case nameof(ICanonicalName.CanonicalName) when typeof(ICanonicalName).IsAssignableFrom(type):
                     name = nameof(ICanonicalName.Name);
                     break;
 
+                // Map EntityTag to "etag" per AIP-154 concurrency token naming.
                 case nameof(IFreshness.EntityTag) when typeof(IFreshness).IsAssignableFrom(type):
                     name = Parameters.EntityTag;
                     break;
@@ -80,6 +85,7 @@ internal static class RuntimeTypeModelConfigurator
             }
 
             var field = meta.AddField(number++, property.Name);
+            // Underscore field names for proto convention (snake_case over PascalCase).
             field.Name = name.Underscore();
 
             var underlying = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
@@ -106,6 +112,7 @@ internal static class RuntimeTypeModelConfigurator
 
         var meta  = model[response];
         var field = meta.GetFields().FirstOrDefault(f => f.Name == "entities");
-        field?.Name = ResourceNameDescriptor.ForType(entity).Plural.Underscore();
+        // Rename "entities" to the pluralized resource name per AIP-132.
+        field!.Name = ResourceNameDescriptor.ForType(entity).Plural.Underscore();
     }
 }
