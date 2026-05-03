@@ -5,6 +5,17 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Binding;
 
+/// <summary>
+///     Provides <see cref="OAuthFormBinder{T}" /> or <see cref="OAuthQueryBinder{T}" /> for known OAuth request
+///     models based on the binding source.
+/// </summary>
+/// <remarks>
+///     Registered as the first model binder provider in the MVC pipeline by
+///     <see cref="Features.SchemataAuthorizationFeature{TApp, TAuth, TScope, TToken}" />.
+///     Non-OAuth models fall through to the default model binder.
+/// </remarks>
+/// <seealso cref="OAuthFormBinder{T}" />
+/// <seealso cref="OAuthQueryBinder{T}" />
 public sealed class OAuthRequestBinderProvider : IModelBinderProvider
 {
     private static readonly HashSet<Type> Supported = [
@@ -19,6 +30,7 @@ public sealed class OAuthRequestBinderProvider : IModelBinderProvider
 
     #region IModelBinderProvider Members
 
+    /// <inheritdoc />
     public IModelBinder? GetBinder(ModelBinderProviderContext context) {
         if (!Supported.Contains(context.Metadata.ModelType)) return null;
 

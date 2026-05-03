@@ -14,11 +14,32 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceDeviceCodePolling{TApp}" />.</summary>
 public static class AdviceDeviceCodePolling
 {
     public const int DefaultOrder = AdviceTokenGrantPermission.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Rate-limits device token polling at the token endpoint,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.4: Device Access Token Request
+///     </seealso>
+///     and
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.5: Device Access Token Response
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <remarks>
+///     Uses a distributed cache keyed on the device code to enforce a minimum interval between poll
+///     requests. Returns <c>slow_down</c> if the client is polling too fast. The interval is controlled
+///     by <see cref="SchemataAuthorizationOptions.DeviceCodeInterval" />.
+/// </remarks>
 public sealed class AdviceDeviceCodePolling<TApp>(
     IDistributedCache                      cache,
     IOptions<SchemataAuthorizationOptions> options
@@ -27,8 +48,10 @@ public sealed class AdviceDeviceCodePolling<TApp>(
 {
     #region ITokenRequestAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodePolling.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

@@ -9,8 +9,14 @@ using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Validation.FluentValidation.Advisors;
 
+/// <summary>
+///     Order constants for <see cref="AdviceValidationErrors{T}" />.
+/// </summary>
 public static class AdviceValidationErrors
 {
+    /// <summary>
+    ///     The default execution order for this advisor, running after <see cref="AdviceValidation.DefaultOrder" />.
+    /// </summary>
     public const int DefaultOrder = AdviceValidation.DefaultOrder + 10_000_000;
 }
 

@@ -13,12 +13,18 @@ using Schemata.Resource.Foundation.Features;
 namespace Schemata.Resource.Http.Features;
 
 /// <summary>
-///     Feature that sets up the MVC infrastructure for dynamically generated resource HTTP controllers.
+///     Feature that sets up the MVC infrastructure for dynamically generated
+///     <see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" /> instances
+///     per <seealso href="https://google.aip.dev/127">AIP-127: HTTP and gRPC Transcoding</seealso>.
 /// </summary>
 [DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataResourceFeature>]
 public sealed class SchemataHttpResourceFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default priority for this feature, offset from <see cref="SchemataResourceFeature.DefaultPriority" />
+    ///     to ensure resource definitions are registered before HTTP infrastructure is built.
+    /// </summary>
     public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 10_000_000;
 
     /// <inheritdoc />
@@ -59,6 +65,8 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         var options  = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
         provider.Resources = options.Value.Resources;
+        // Notify MVC that controllers have been added so action descriptors
+        // are refreshed before the first request is served.
         provider.Commit();
     }
 }

@@ -5,26 +5,36 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-///     Represents the equality operator (<c>=</c>) with wildcard pattern support (<c>*</c> for prefix, suffix, and
-///     contains matching).
+///     The equality operator (<c>=</c>) with
+///     <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso> wildcard pattern support:
+///     <c>*</c> for prefix, suffix, and contains matching via
+///     <see cref="string.StartsWith(string)" />, <see cref="string.EndsWith(string)" />, and
+///     <see cref="string.Contains(string)" />.
 /// </summary>
 public class Equal : IBinary
 {
     /// <summary>
-    ///     The character representing the equality operator.
+    ///     The operator character.
     /// </summary>
     public const char Char = '=';
 
+    /// <summary>
+    ///     Initializes a new equality operator.
+    /// </summary>
     public Equal(TextPosition position) { Position = position; }
 
     #region IBinary Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => false;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) { return null; }
 
+    /// <inheritdoc />
     public Expression? ToExpression(Expression left, Expression right, Container ctx) {
         if (right is ConstantExpression { Value: string pattern } && pattern.Contains('*')) {
             return BuildWildcardExpression(left, pattern, ctx);
@@ -37,6 +47,7 @@ public class Equal : IBinary
         return Expression.MakeBinary(ExpressionType.Equal, left, right);
     }
 
+    /// <inheritdoc />
     public ExpressionType? Type => null;
 
     #endregion
@@ -70,5 +81,6 @@ public class Equal : IBinary
         return Expression.MakeBinary(ExpressionType.Equal, left, Expression.Constant(pattern));
     }
 
+    /// <inheritdoc />
     public override string ToString() { return $"{Char}"; }
 }

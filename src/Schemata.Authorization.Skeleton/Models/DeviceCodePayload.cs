@@ -1,5 +1,6 @@
 namespace Schemata.Authorization.Skeleton.Models;
 
+/// <summary>Payload serialized inside a device code token.</summary>
 public sealed class DeviceCodePayload
 {
     /// <summary>Space-delimited scopes associated with this device code.</summary>

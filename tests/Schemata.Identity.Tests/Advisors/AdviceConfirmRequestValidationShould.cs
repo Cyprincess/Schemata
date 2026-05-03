@@ -44,7 +44,8 @@ public class AdviceConfirmRequestValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest { EmailAddress = "a@b.c", Code = code! };
 
-        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, request, IdentityOperation.Confirm, Anonymous));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
+                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
     }
 
     [Fact]
@@ -53,7 +54,8 @@ public class AdviceConfirmRequestValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest { Code = "123456" };
 
-        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, request, IdentityOperation.Confirm, Anonymous));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
+                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
     }
 
     [Fact]

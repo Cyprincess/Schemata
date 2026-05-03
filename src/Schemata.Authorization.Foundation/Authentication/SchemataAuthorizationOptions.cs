@@ -8,9 +8,24 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
+/// <summary>
+///     Configuration for the Schemata authorization server, including key material,
+///     token lifetimes, allowed response types/modes, and endpoint URIs.
+///     Provides fluent helpers to add ephemeral signing and encryption keys.
+/// </summary>
 public class SchemataAuthorizationOptions
 {
-    /// <summary>OIDC subject identifier type: "public" or "pairwise" (OIDC Core §8).</summary>
+    /// <summary>
+    ///     OIDC subject identifier type:
+    ///     <see cref="SubjectTypes.Public">"public"</see> or
+    ///     <see cref="SubjectTypes.Pairwise">"pairwise"</see>,
+    ///     per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes">
+    ///         OpenID Connect Core 1.0 §8: Subject
+    ///         Identifier Types
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public string SubjectType { get; set; } = SubjectTypes.Public;
 
     /// <summary>Salt used to compute pairwise subject identifiers; ignored when SubjectType is "public".</summary>
@@ -28,7 +43,7 @@ public class SchemataAuthorizationOptions
     /// <summary>Validity duration of access tokens issued by the token endpoint.</summary>
     public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
-    /// <summary>Validity duration of ID tokens (OIDC Core §2).</summary>
+    /// <summary>Validity duration of ID tokens.</summary>
     public TimeSpan IdTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>Validity duration of refresh tokens before they must be rotated.</summary>
@@ -37,16 +52,48 @@ public class SchemataAuthorizationOptions
     /// <summary>Validity duration of interaction tokens used during consent/login flows.</summary>
     public TimeSpan InteractionTokenLifetime { get; set; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>Validity duration of device codes before they expire (RFC 8628 §3.2).</summary>
+    /// <summary>
+    ///     Validity duration of device codes before they expire,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.2">
+    ///         RFC 8628: OAuth 2.0 Device Authorization
+    ///         Grant §3.2: Device Authorization Response
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public TimeSpan DeviceCodeLifetime { get; set; } = TimeSpan.FromMinutes(15);
 
-    /// <summary>Validity duration of authorization codes (RFC 9700 §2.1.2).</summary>
+    /// <summary>
+    ///     Validity duration of authorization codes,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2">
+    ///         RFC 9700: The OAuth 2.0 Authorization
+    ///         Framework: Best Current Practice §2.1.2
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>Minimum polling interval in seconds for the device code grant (RFC 8628 §3.5).</summary>
+    /// <summary>
+    ///     Minimum polling interval in seconds for the device code grant,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+    ///         RFC 8628: OAuth 2.0 Device Authorization
+    ///         Grant §3.5: Device Access Token Response
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public int DeviceCodeInterval { get; set; } = 5;
 
-    /// <summary>Token issuer identifier included in the "iss" claim (RFC 9068 §2.2).</summary>
+    /// <summary>
+    ///     Token issuer identifier included in the "iss" claim,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9068.html#section-2.2">
+    ///         RFC 9068: JSON Web Token (JWT) Profile
+    ///         for OAuth 2.0 Access Tokens §2.2: Data Structure
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public string? Issuer { get; set; }
 
     /// <summary>Asymmetric or symmetric key used to sign JWTs.</summary>
@@ -67,7 +114,15 @@ public class SchemataAuthorizationOptions
     /// <summary>Absolute URI of the consent/login SPA that handles authorization interactions.</summary>
     public string? InteractionUri { get; set; }
 
-    /// <summary>Absolute URI where users enter device codes (RFC 8628 §3.3.1 verification_uri).</summary>
+    /// <summary>
+    ///     Absolute URI where users enter device codes,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.3.1">
+    ///         RFC 8628: OAuth 2.0 Device
+    ///         Authorization Grant §3.3.1: Non-Textual Verification URI Optimization
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public string? DeviceVerificationUri { get; set; }
 
     /// <summary>Authentication scheme name used to register the bearer token handler.</summary>
@@ -78,8 +133,14 @@ public class SchemataAuthorizationOptions
 
     /// <summary>
     ///     Claim type used to read the OP session identifier from the authenticated user principal.
-    ///     Defaults to "sid" per OIDC Back-Channel Logout §2.1. Framework users who use a different
-    ///     claim type for their authentication session can override this.
+    ///     Defaults to "sid". Framework users who use a different claim type for their authentication
+    ///     session can override this,
+    ///     per
+    ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html#BCSupport">
+    ///         OpenID Connect
+    ///         Back-Channel Logout 1.0 §2.1: Indicating OP Support for Back-Channel Logout
+    ///     </seealso>
+    ///     .
     /// </summary>
     public string SessionIdClaimType { get; set; } = "sid";
 
@@ -98,23 +159,32 @@ public class SchemataAuthorizationOptions
     /// <summary>Scope values the server is willing to grant; scopes not in this set are rejected.</summary>
     public HashSet<string> AllowedScopes { get; } = [];
 
+    /// <summary>Permits a single response_type value (e.g., "code").</summary>
     public SchemataAuthorizationOptions PermitResponseType(string type) {
         AllowedResponseTypes.Add(type);
         return this;
     }
 
+    /// <summary>Permits a two-value response_type combination (e.g., "code id_token").</summary>
     public SchemataAuthorizationOptions PermitResponseType((string first, string second) types) {
         var normalized = string.Join(' ', new[] { types.first, types.second }.OrderBy(x => x));
         AllowedResponseTypes.Add(normalized);
         return this;
     }
 
+    /// <summary>Permits a three-value response_type combination (e.g., "code id_token token").</summary>
     public SchemataAuthorizationOptions PermitResponseType((string first, string second, string third) types) {
         var normalized = string.Join(' ', new[] { types.first, types.second, types.third }.OrderBy(x => x));
         AllowedResponseTypes.Add(normalized);
         return this;
     }
 
+    /// <summary>
+    ///     Generates an ephemeral key pair and sets <see cref="SigningKey" />
+    ///     and <see cref="SigningAlgorithm" />.  Key type is derived from the
+    ///     algorithm identifier.
+    /// </summary>
+    /// <param name="algorithm">JWS algorithm (default: <see cref="SigningAlgorithms.RsaSha256" />).</param>
     public SchemataAuthorizationOptions AddEphemeralSigningKey(string algorithm = SigningAlgorithms.RsaSha256) {
         SigningKey = algorithm switch {
             SigningAlgorithms.RsaSha256 or SigningAlgorithms.RsaSha384 or SigningAlgorithms.RsaSha512 => new RsaSecurityKey(RSA.Create(2048)),
@@ -131,6 +201,11 @@ public class SchemataAuthorizationOptions
         return this;
     }
 
+    /// <summary>
+    ///     Generates an ephemeral key and sets <see cref="EncryptionKey" />
+    ///     and <see cref="EncryptionAlgorithm" />.
+    /// </summary>
+    /// <param name="algorithm">JWE algorithm (default: <see cref="EncryptionAlgorithms.RsaOaep" />).</param>
     public SchemataAuthorizationOptions AddEphemeralEncryptionKey(string algorithm = EncryptionAlgorithms.RsaOaep) {
         EncryptionKey = algorithm switch {
             EncryptionAlgorithms.RsaOaep or EncryptionAlgorithms.RsaOaep256 => new RsaSecurityKey(RSA.Create(2048)),

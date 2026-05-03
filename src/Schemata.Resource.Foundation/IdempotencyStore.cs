@@ -7,7 +7,9 @@ using Microsoft.Extensions.Caching.Distributed;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Distributed-cache-backed implementation of <see cref="IIdempotencyStore" /> for storing idempotent request results.
+///     <see cref="IDistributedCache" />-backed implementation of <see cref="IIdempotencyStore" />
+///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>.
+///     Stores results as JSON with a default 24-hour TTL.
 /// </summary>
 public sealed class IdempotencyStore : IIdempotencyStore
 {
@@ -18,7 +20,7 @@ public sealed class IdempotencyStore : IIdempotencyStore
     /// <summary>
     ///     Initializes a new instance backed by the specified distributed cache.
     /// </summary>
-    /// <param name="cache">The distributed cache implementation.</param>
+    /// <param name="cache">The <see cref="IDistributedCache" /> implementation.</param>
     public IdempotencyStore(IDistributedCache cache) { _cache = cache; }
 
     #region IIdempotencyStore Members

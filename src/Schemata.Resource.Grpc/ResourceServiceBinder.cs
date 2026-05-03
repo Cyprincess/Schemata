@@ -18,6 +18,7 @@ internal sealed class ResourceServiceBinder : ServiceBinder
         var descriptor = ResourceNameDescriptor.ForType(entityType);
         var package    = descriptor.Package ?? entityType.Namespace;
 
+        // protobuf-net.Grpc service name = "{package}.{Singular}Service".
         name = package is not null ? $"{package}.{descriptor.Singular}Service" : $"{descriptor.Singular}Service";
         return true;
     }
@@ -29,6 +30,7 @@ internal sealed class ResourceServiceBinder : ServiceBinder
             return base.IsOperationContract(method, out name);
         }
 
+        // Let protobuf-net decide whether the method is an operation (checks [Operation] etc.).
         if (!base.IsOperationContract(method, out var _)) {
             name = null;
             return false;
@@ -36,7 +38,9 @@ internal sealed class ResourceServiceBinder : ServiceBinder
 
         var entityType = declaringType.GetGenericArguments()[0];
         var descriptor = ResourceNameDescriptor.ForType(entityType);
-        var baseName   = method.Name.EndsWith("Async") ? method.Name[..^5] : method.Name;
+        // protobuf-net automatically strips "Async", but we rebuild the name manually,
+        // so we must strip it ourselves.
+        var baseName = method.Name.EndsWith("Async") ? method.Name[..^5] : method.Name;
 
         name = baseName switch {
             "List" => $"List{descriptor.Plural}",

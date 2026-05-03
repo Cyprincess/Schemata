@@ -11,18 +11,20 @@ using Schemata.Resource.Foundation.Models;
 namespace System.Linq;
 
 /// <summary>
-///     Extension methods for composing queryable filtering, ordering, and pagination operations.
+///     Extension methods that compose filtering
+///     per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>, ordering, and pagination
+///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso> onto query functions.
 /// </summary>
 public static class QueryableExtensions
 {
     /// <summary>
-    ///     Composes a filter expression onto an existing query function.
+    ///     Composes a parsed filter expression onto the query pipeline.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
-    /// <param name="query">The existing query function to extend.</param>
-    /// <param name="filter">The parsed filter expression.</param>
+    /// <param name="query">The query function to extend.</param>
+    /// <param name="filter">The parsed filter, or <see langword="null" />.</param>
     /// <param name="configure">Optional callback to customize the filter container.</param>
-    /// <returns>A new query function that applies the filter.</returns>
+    /// <returns>The composed query function.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithFiltering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Filter?                                 filter,
@@ -47,12 +49,12 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    ///     Composes ordering specifications onto an existing query function.
+    ///     Composes ordering specifications onto the query pipeline.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
-    /// <param name="query">The existing query function to extend.</param>
-    /// <param name="order">The member-to-ordering mapping.</param>
-    /// <returns>A new query function that applies the ordering.</returns>
+    /// <param name="query">The query function to extend.</param>
+    /// <param name="order">The member-to-ordering mapping, or <see langword="null" />.</param>
+    /// <returns>The composed query function.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithOrdering<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         Dictionary<Member, Ordering>?           order
@@ -81,12 +83,12 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    ///     Composes skip/take pagination onto an existing query function.
+    ///     Composes skip/take pagination onto the query pipeline.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
-    /// <param name="query">The existing query function to extend.</param>
-    /// <param name="token">The page token containing skip and page size.</param>
-    /// <returns>A new query function that applies pagination.</returns>
+    /// <param name="query">The query function to extend.</param>
+    /// <param name="token">The page token, or <see langword="null" />.</param>
+    /// <returns>The composed query function.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
         PageToken?                              token
@@ -103,17 +105,14 @@ public static class QueryableExtensions
     }
 
     /// <summary>
-    ///     Applies an ordering expression, chaining as
-    ///     <see
-    ///         cref="System.Linq.Queryable.ThenBy{TSource,TKey}(IOrderedQueryable{TSource}, System.Linq.Expressions.Expression{Func{TSource,TKey}})">
-    ///         ThenBy
-    ///     </see>
-    ///     when the source is already ordered.
+    ///     Applies an ordering expression. When the source is already ordered, chains
+    ///     via <c>ThenBy</c>/<c>ThenByDescending</c>; otherwise uses
+    ///     <c>OrderBy</c>/<c>OrderByDescending</c>.
     /// </summary>
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="source">The queryable source.</param>
     /// <param name="select">The property selector expression.</param>
-    /// <param name="ordering">The sort direction.</param>
+    /// <param name="ordering">The sort direction; defaults to <see cref="Ordering.Ascending" />.</param>
     /// <returns>An ordered queryable.</returns>
     public static IOrderedQueryable<T> WithOrdering<T>(
         this IQueryable<T>          source,

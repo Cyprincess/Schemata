@@ -26,29 +26,21 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Orchestrates CRUD operations for a resource, running the advisor pipeline around each step.
+///     Orchestrates standard CRUD operations including
+///     <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso>,
+///     <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>,
+///     <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>,
+///     <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>, and
+///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> by running an advisor
+///     pipeline around each
+///     step: general request check → operation-specific request advisor → entity advisor → persistence → response advisor.
 /// </summary>
-/// <typeparam name="TEntity">The persistent entity type.</typeparam>
-/// <typeparam name="TRequest">The request DTO type for create and update operations.</typeparam>
-/// <typeparam name="TDetail">The detail DTO type returned from get, create, and update operations.</typeparam>
-/// <typeparam name="TSummary">The summary DTO type returned from list operations.</typeparam>
-/// <remarks>
-///     <para>The handler follows a consistent advisor pipeline for each operation:</para>
-///     <list type="number">
-///         <item><see cref="Advisors.IResourceRequestAdvisor{TEntity}" /> -- general request-level check</item>
-///         <item>
-///             Operation-specific request advisor (e.g.
-///             <see cref="Advisors.IResourceCreateRequestAdvisor{TEntity, TRequest}" />)
-///         </item>
-///         <item>
-///             Operation-specific entity advisor (e.g. <see cref="Advisors.IResourceCreateAdvisor{TEntity, TRequest}" />
-///             )
-///         </item>
-///         <item>Persistence (add/update/remove + commit)</item>
-///         <item><see cref="Advisors.IResourceResponseAdvisor{TEntity, TDetail}" /> -- response post-processing</item>
-///     </list>
-///     <para>Registered as a scoped service by <see cref="Features.SchemataResourceFeature" />.</para>
-/// </remarks>
+/// <typeparam name="TEntity">
+///     The persistent entity type implementing <see cref="ICanonicalName" />.
+/// </typeparam>
+/// <typeparam name="TRequest">The request DTO for create/update operations.</typeparam>
+/// <typeparam name="TDetail">The detail DTO returned from get, create, and update.</typeparam>
+/// <typeparam name="TSummary">The summary DTO returned from list operations.</typeparam>
 public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -60,11 +52,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     private readonly IServiceProvider     _sp;
 
     /// <summary>
-    ///     Initializes a new instance of the handler with its required dependencies.
+    ///     Initializes a new instance with its required dependencies.
     /// </summary>
-    /// <param name="sp">The service provider for resolving advisors and options.</param>
+    /// <param name="sp">The <see cref="IServiceProvider" /> for resolving advisors and options.</param>
     /// <param name="repository">The entity repository.</param>
-    /// <param name="mapper">The mapper for converting between entity and DTO types.</param>
+    /// <param name="mapper">The mapper for entity–DTO conversion.</param>
     public ResourceOperationHandler(IServiceProvider sp, IRepository<TEntity> repository, ISimpleMapper mapper) {
         _sp         = sp;
         _repository = repository;
@@ -100,12 +92,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-    ///     Lists entities with filtering, ordering, pagination, and the full advisor pipeline.
+///     Lists resources with filtering
+///     per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>, ordering, and pagination
+///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso> through the full advisor pipeline.
     /// </summary>
-    /// <param name="request">The list request containing filter, order, paging, and parent parameters.</param>
-    /// <param name="principal">The optional claims principal.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>A paginated list result with summaries and an optional next page token.</returns>
+    /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <returns>A <see cref="ListResult{TSummary}" /> with summaries and an optional next page token.</returns>
     public async Task<ListResult<TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
@@ -257,13 +251,15 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-    ///     Gets a single entity detail through the advisor pipeline.
-    ///     Authorization is checked before the entity is loaded (AIP-211).
+///     Gets a resource by name
+///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso> through the advisor pipeline.
+///     Authorization is checked before the entity is loaded
+///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
     /// </summary>
-    /// <param name="name">The resource name to retrieve.</param>
-    /// <param name="principal">The optional claims principal.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The get result containing the detail DTO.</returns>
+    /// <param name="name">The resource name.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <returns>A <see cref="GetResult{TDetail}" /> containing the detail DTO.</returns>
     public async Task<GetResult<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
@@ -316,12 +312,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-    ///     Creates a new entity from the request through the full advisor pipeline.
+///     Creates a resource
+///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso> through the full advisor
+///     pipeline.
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
-    /// <param name="principal">The optional claims principal.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The create result containing the new entity's detail DTO.</returns>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <returns>A <see cref="CreateResult{TDetail}" /> containing the new resource's detail DTO.</returns>
     public async Task<CreateResult<TDetail>> CreateAsync(
         TRequest           request,
         ClaimsPrincipal?   principal,
@@ -402,14 +400,20 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-    ///     Updates an existing entity from the request through the full advisor pipeline.
-    ///     Authorization is checked before the entity is loaded (AIP-211).
+///     Updates a resource
+///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> through the full advisor
+///     pipeline.
+///     Authorization is checked before the entity is loaded
+///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
+///     Uses field masks
+///     per <seealso href="https://google.aip.dev/161">AIP-161: Field masks</seealso> when the request implements
+    ///     <see cref="IUpdateMask" />.
     /// </summary>
-    /// <param name="name">The resource name of the entity to update.</param>
+    /// <param name="name">The resource name.</param>
     /// <param name="request">The update request DTO.</param>
-    /// <param name="principal">The optional claims principal.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The update result containing the updated detail DTO.</returns>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <returns>An <see cref="UpdateResult{TDetail}" /> containing the updated detail DTO.</returns>
     public async Task<UpdateResult<TDetail>> UpdateAsync(
         string             name,
         TRequest           request,
@@ -498,17 +502,22 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     }
 
     /// <summary>
-    ///     Deletes an entity through the full advisor pipeline.
-    ///     Authorization is checked before the entity is loaded (AIP-211).
+///     Deletes a resource
+///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> through the full advisor
+///     pipeline.
+///     Authorization is checked before the entity is loaded
+///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso>.
     /// </summary>
-    /// <param name="name">The resource name of the entity to delete.</param>
-    /// <param name="etag">The optional ETag for concurrency checking.</param>
-    /// <param name="force">Whether to bypass the freshness check.</param>
-    /// <param name="principal">The optional claims principal.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="name">The resource name.</param>
+    /// <param name="etag">
+///     The optional ETag for optimistic concurrency
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
+    /// </param>
+    /// <param name="force">When <see langword="true" />, bypasses the freshness check.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
     /// <returns>
-    ///     <see langword="true" /> if the entity was deleted or the operation was handled; <see langword="false" /> if
-    ///     blocked.
+    ///     <see langword="true" /> if deleted or handled; <see langword="false" /> if blocked.
     /// </returns>
     public async Task<bool> DeleteAsync(
         string             name,

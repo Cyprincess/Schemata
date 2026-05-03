@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -12,23 +11,21 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceUpdateConcurrency{TEntity}" />.</summary>
 public static class AdviceUpdateConcurrency
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>Default execution order: 2,147,483,647.</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
 /// <summary>
-///     Verifies the concurrency stamp matches the stored value and generates a new stamp on update.
+///     Verifies the concurrency stamp matches the stored value and generates a new stamp on
+///     update, per
+///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" />. Runs last in the update pipeline.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
-///         activates for entities implementing <see cref="IConcurrency" />.
-///     </para>
-///     <para>Throws <see cref="ConcurrencyException" /> when the stored stamp does not match the entity's stamp.</para>
-///     <para>Suppressed when <see cref="ConcurrencySuppressed" /> is present in the advice context.</para>
+///     Runs last in the update pipeline. Fetches the stored entity, compares
+///     <see cref="IConcurrency.Timestamp" /> values, and throws
+///     <see cref="ConcurrencyException" /> on mismatch. Suppressed by
+///     <see cref="ConcurrencySuppressed" />.
 /// </remarks>
 public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class

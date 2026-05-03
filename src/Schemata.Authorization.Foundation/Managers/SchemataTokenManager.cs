@@ -11,6 +11,16 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
+/// <summary>
+///     Default implementation of <see cref="ITokenManager{TToken}" /> backed by an
+///     <see cref="IRepository{TEntity}" />.
+/// </summary>
+/// <typeparam name="TToken">The token entity type, must derive from <see cref="SchemataToken" />.</typeparam>
+/// <remarks>
+///     <see cref="RevokeByAuthorizationAsync" /> cascades revocation to all tokens linked to a given
+///     authorization. <see cref="PruneAsync" /> removes expired and revoked tokens for storage cleanup.
+/// </remarks>
+/// <seealso cref="SchemataAuthorizationManager{TAuth}" />
 public class SchemataTokenManager<TToken> : ITokenManager<TToken>
     where TToken : SchemataToken
 {
@@ -20,6 +30,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
 
     #region ITokenManager<TToken> Members
 
+    /// <inheritdoc />
     public async Task<TToken?> FindByReferenceIdAsync(string? reference, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -30,6 +41,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         return await _tokens.SingleOrDefaultAsync(q => q.Where(t => t.ReferenceId == reference), ct);
     }
 
+    /// <inheritdoc />
     public async Task<TToken?> FindByCanonicalNameAsync(string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -40,6 +52,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         return await _tokens.SingleOrDefaultAsync(q => q.Where(t => t.Name == name), ct);
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<TToken> ListBySessionAsync(
         string?                                    session,
         [EnumeratorCancellation] CancellationToken ct = default
@@ -54,6 +67,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         }
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<TToken> ListBySubjectAsync(
         string?                                    subject,
         [EnumeratorCancellation] CancellationToken ct = default
@@ -68,6 +82,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         }
     }
 
+    /// <inheritdoc />
     public async Task<TToken?> CreateAsync(TToken? token, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -81,6 +96,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         return token;
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(TToken? token, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -92,6 +108,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         await _tokens.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task RevokeAsync(TToken? token, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -105,6 +122,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         await _tokens.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task<long> RevokeByAuthorizationAsync(string? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -127,6 +145,7 @@ public class SchemataTokenManager<TToken> : ITokenManager<TToken>
         return count;
     }
 
+    /// <inheritdoc />
     public async Task<long> PruneAsync(DateTime? threshold, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

@@ -1,11 +1,8 @@
 namespace Schemata.Entity.Repository.Advisors;
 
 /// <summary>
-///     Context flag that suppresses automatic timestamp assignment on add and update operations.
+///     Context flag that suppresses automatic <see cref="Schemata.Abstractions.Entities.ITimestamp.CreateTime" />
+///     and <see cref="Schemata.Abstractions.Entities.ITimestamp.UpdateTime" /> assignment, per
+///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>.
 /// </summary>
-/// <remarks>
-///     Set via <see cref="IRepository.SuppressTimestamp" /> or <see cref="IRepository{TEntity}.SuppressTimestamp" />.
-///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
-///     <see cref="AdviceAddTimestamp{TEntity}" /> and <see cref="AdviceUpdateTimestamp{TEntity}" /> skip their logic.
-/// </remarks>
 public sealed class TimestampSuppressed;

@@ -3,8 +3,12 @@ using Schemata.Abstractions.Advisors;
 namespace Schemata.Advice;
 
 /// <summary>
-///     A zero-size struct used as a type token for dispatch of source-generated <c>RunAsync</c> extension methods.
+///     Zero-size struct serving as a pure type marker for the advisor pipeline
+///     system. Its sole purpose is to carry the generic parameter
+///     <typeparamref name="TAdvisor" /> so that source-generated <c>RunAsync</c>
+///     extension methods dispatch to the correct
+///     <see cref="AdviceRunner{TAdvisor, T1}" /> overload without any heap allocation.
 /// </summary>
-/// <typeparam name="TAdvisor">The advisor interface type this pipeline runs.</typeparam>
+/// <typeparam name="TAdvisor">The advisor interface type this pipeline token targets.</typeparam>
 public readonly struct AdvicePipeline<TAdvisor>
     where TAdvisor : IAdvisor;

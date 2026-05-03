@@ -20,6 +20,33 @@ public static class AdviceAuthorizeClientAndRedirect
     public const int DefaultOrder = Orders.Base;
 }
 
+/// <summary>
+///     Validates the client_id, resolves the application, validates the redirect_uri, and validates the response_type
+///     and response_mode,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §4.1.2.1: Error Response
+///     </seealso>
+///     ,
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+///         OpenID Connect Core 1.0
+///         §3.1.2.1: Authentication Request
+///     </seealso>
+///     ,
+///     and
+///     <seealso href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">
+///         OAuth 2.0 Multiple Response Type
+///         Encoding Practices 1.0
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <remarks>
+///     Response types are sorted alphabetically so that <c>"id_token token"</c> and <c>"token id_token"</c>
+///     are treated identically.
+/// </remarks>
+/// <seealso cref="AdviceAuthorizeEndpointPermission{TApp}" />
 public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
     IApplicationManager<TApp>              manager,
     IOptions<SchemataAuthorizationOptions> options
@@ -28,8 +55,10 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
 {
     #region IAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeClientAndRedirect.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

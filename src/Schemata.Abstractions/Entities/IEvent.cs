@@ -1,27 +1,30 @@
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Indicates that an entity represents an audit event or state change log entry.
+///     Records an audit event or state-change log entry capturing who
+///     performed what action.
+///     Combine with <see cref="ITimestamp" /> for a complete audit record.
 /// </summary>
 public interface IEvent
 {
     /// <summary>
-    ///     Gets or sets the event type identifier.
+    ///     The event type identifier
+    ///     (e.g., <c>"created"</c>, <c>"updated"</c>, <c>"deleted"</c>).
     /// </summary>
     string Event { get; set; }
 
     /// <summary>
-    ///     Gets or sets an optional note or description for the event.
+    ///     An optional human-readable note describing the event.
     /// </summary>
     string? Note { get; set; }
 
     /// <summary>
-    ///     Gets or sets the numeric identifier of the user who triggered the event.
+    ///     The numeric identifier of the principal who triggered the event.
     /// </summary>
     long? UpdatedById { get; set; }
 
     /// <summary>
-    ///     Gets or sets the display name of the user who triggered the event.
+    ///     The display name of the principal who triggered the event.
     /// </summary>
     string? UpdatedBy { get; set; }
 }

@@ -27,7 +27,7 @@ public class DiscoveryHandlerShould
 {
     private const string Issuer = "https://auth.example.com";
 
-    private static readonly RSA            Rsa       = RSA.Create(2048);
+    private static readonly RSA            Rsa        = RSA.Create(2048);
     private static readonly RsaSecurityKey SigningKey = new(Rsa);
 
     private static DiscoveryHandler<SchemataScope> CreateHandler(
@@ -35,9 +35,7 @@ public class DiscoveryHandlerShould
         Action<IServiceCollection>? configure = null
     ) {
         var options = Options.Create(new SchemataAuthorizationOptions {
-            Issuer           = Issuer,
-            SigningKey       = SigningKey,
-            SigningAlgorithm = SigningAlgorithms.RsaSha256,
+            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
         });
 
         var services = new ServiceCollection();
@@ -55,7 +53,7 @@ public class DiscoveryHandlerShould
         scopesMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>?>(), It.IsAny<CancellationToken>()))
                   .Returns(EmptyAsyncEnumerable<SchemataScope>());
 
-        return new DiscoveryHandler<SchemataScope>(options, scopesMock.Object, sp);
+        return new(options, scopesMock.Object, sp);
     }
 
     private static DiscoveryDocument ExtractDocument(AuthorizationResult result) {
@@ -63,7 +61,9 @@ public class DiscoveryHandlerShould
         return Assert.IsType<DiscoveryDocument>(result.Data);
     }
 
-    private static async IAsyncEnumerable<T> EmptyAsyncEnumerable<T>([EnumeratorCancellation] CancellationToken ct = default) {
+    private static async IAsyncEnumerable<T> EmptyAsyncEnumerable<T>(
+        [EnumeratorCancellation] CancellationToken ct = default
+    ) {
         await Task.CompletedTask;
         yield break;
     }
@@ -89,7 +89,7 @@ public class DiscoveryHandlerShould
 
     [Fact]
     public void GetJwks_ReturnsPublicSigningKey() {
-        var handler = CreateHandler(out _);
+        var handler = CreateHandler(out var _);
         var result  = handler.GetJwks();
 
         Assert.Equal(AuthorizationStatus.Content, result.Status);

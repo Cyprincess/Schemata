@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Schemata.Advice.Generator;
 
-internal sealed class AdvisorInterfaceInfo : IEquatable<AdvisorInterfaceInfo>
+public sealed class AdvisorInterfaceInfo : IEquatable<AdvisorInterfaceInfo>
 {
     public AdvisorInterfaceInfo(
         string interfaceFullyQualifiedName,

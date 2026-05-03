@@ -3,12 +3,12 @@ using System.Collections.Generic;
 namespace Schemata.Abstractions;
 
 /// <summary>
-///     Well-known constants used throughout the Schemata framework.
+///     Well-known constant values used across the Schemata framework.
 /// </summary>
 public static class SchemataConstants
 {
     /// <summary>
-    ///     The Schemata framework identifier GUID.
+    ///     Schemata framework identifier as a GUID string.
     /// </summary>
     public const string Schemata = "9049a32e-c96b-4e0e-ae34-c370c574f00d";
 
@@ -19,7 +19,7 @@ public static class SchemataConstants
     /// </summary>
     public static class ApplicationTypes
     {
-        /// <summary>A native application.</summary>
+        /// <summary>A native (desktop/mobile) application.</summary>
         public const string Native = "native";
 
         /// <summary>A web-based application.</summary>
@@ -31,7 +31,7 @@ public static class SchemataConstants
     #region Nested type: AuthorizationTypes
 
     /// <summary>
-    ///     SchemataAuthorization.Type values. Distinguishes consent-reusable records from
+    ///     Distinguishes consent-reusable records from
     ///     single-grant anchors so the consent advisor only matches the former.
     /// </summary>
     public static class AuthorizationTypes
@@ -80,8 +80,8 @@ public static class SchemataConstants
     #region Nested type: Claims
 
     /// <summary>
-    ///     Claim names including registered JWT claims.
-    ///     See: https://www.iana.org/assignments/jwt/jwt.xhtml
+    ///     Claim names including registered JWT claims, as registered in the
+    ///     <seealso href="https://www.iana.org/assignments/jwt/jwt.xhtml">IANA JSON Web Token Claims</seealso> registry.
     /// </summary>
     public static class Claims
     {
@@ -129,14 +129,33 @@ public static class SchemataConstants
     #region Nested type: ClientAuthMethods
 
     /// <summary>
-    ///     OAuth 2.0 client authentication method identifiers (RFC 6749 §2.3).
+    ///     OAuth 2.0 client authentication method identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.3: Client Authentication
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class ClientAuthMethods
     {
-        /// <summary>Client authenticates via HTTP Basic authentication (RFC 6749 §2.3.1).</summary>
+        /// <summary>
+        ///     Client authenticates via HTTP Basic authentication, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §2.3.1: Client Password
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ClientSecretBasic = "client_secret_basic";
 
-        /// <summary>Client authenticates by including credentials in the request body (RFC 6749 §2.3.1).</summary>
+        /// <summary>
+        ///     Client authenticates by including credentials in the request body, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §2.3.1: Client Password
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ClientSecretPost = "client_secret_post";
     }
 
@@ -180,26 +199,72 @@ public static class SchemataConstants
     #region Nested type: ContentEncryptionAlgorithms
 
     /// <summary>
-    ///     JWE content encryption algorithm identifiers (RFC 7518 §5.1).
+    ///     JWE content encryption algorithm identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.1">
+    ///         RFC 7518: JSON Web Algorithms (JWA) §5.1: "enc" (Encryption Algorithm) Header Parameter Values for JWE
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class ContentEncryptionAlgorithms
     {
-        /// <summary>AES_128_CBC_HMAC_SHA_256 authenticated encryption (RFC 7518 §5.2.3).</summary>
+        /// <summary>
+        ///     AES_128_CBC_HMAC_SHA_256 authenticated encryption, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.2.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA)
+        ///         §5.2.3: AES_128_CBC_HMAC_SHA_256
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes128CbcHmacSha256 = "A128CBC-HS256";
 
-        /// <summary>AES_192_CBC_HMAC_SHA_384 authenticated encryption (RFC 7518 §5.2.4).</summary>
+        /// <summary>
+        ///     AES_192_CBC_HMAC_SHA_384 authenticated encryption, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.2.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA)
+        ///         §5.2.4: AES_192_CBC_HMAC_SHA_384
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes192CbcHmacSha384 = "A192CBC-HS384";
 
-        /// <summary>AES_256_CBC_HMAC_SHA_512 authenticated encryption (RFC 7518 §5.2.5).</summary>
+        /// <summary>
+        ///     AES_256_CBC_HMAC_SHA_512 authenticated encryption, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.2.5">
+        ///         RFC 7518: JSON Web Algorithms (JWA)
+        ///         §5.2.5: AES_256_CBC_HMAC_SHA_512
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes256CbcHmacSha512 = "A256CBC-HS512";
 
-        /// <summary>AES-GCM with 128-bit key (RFC 7518 §5.3).</summary>
+        /// <summary>
+        ///     AES-GCM with 128-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §5.3:
+        ///         Content Encryption with AES GCM
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes128Gcm = "A128GCM";
 
-        /// <summary>AES-GCM with 192-bit key (RFC 7518 §5.3).</summary>
+        /// <summary>
+        ///     AES-GCM with 192-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §5.3:
+        ///         Content Encryption with AES GCM
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes192Gcm = "A192GCM";
 
-        /// <summary>AES-GCM with 256-bit key (RFC 7518 §5.3).</summary>
+        /// <summary>
+        ///     AES-GCM with 256-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-5.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §5.3:
+        ///         Content Encryption with AES GCM
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Aes256Gcm = "A256GCM";
     }
 
@@ -208,35 +273,102 @@ public static class SchemataConstants
     #region Nested type: EncryptionAlgorithms
 
     /// <summary>
-    ///     JWE key management algorithm identifiers (RFC 7518 §4.1).
+    ///     JWE key management algorithm identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.1">
+    ///         RFC 7518: JSON Web Algorithms (JWA) §4.1: "alg" (Algorithm) Header Parameter Values for JWE
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class EncryptionAlgorithms
     {
-        /// <summary>RSAES OAEP using default parameters (RFC 7518 §4.3).</summary>
+        /// <summary>
+        ///     RSAES OAEP using default parameters, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.3:
+        ///         Key Encryption with RSAES OAEP
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaOaep = "RSA-OAEP";
 
-        /// <summary>RSAES OAEP using SHA-256 and MGF1 with SHA-256 (RFC 7518 §4.3).</summary>
+        /// <summary>
+        ///     RSAES OAEP using SHA-256 and MGF1 with SHA-256, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.3:
+        ///         Key Encryption with RSAES OAEP
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaOaep256 = "RSA-OAEP-256";
 
-        /// <summary>Elliptic Curve Diffie-Hellman Ephemeral Static key agreement (RFC 7518 §4.6).</summary>
+        /// <summary>
+        ///     Elliptic Curve Diffie-Hellman Ephemeral Static key agreement, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.6">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.6:
+        ///         Key Agreement with ECDH-ES
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdhEs = "ECDH-ES";
 
-        /// <summary>ECDH-ES using Concat KDF and CEK wrapped with "A128KW" (RFC 7518 §4.6).</summary>
+        /// <summary>
+        ///     ECDH-ES using Concat KDF and CEK wrapped with "A128KW", per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.6">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.6:
+        ///         Key Agreement with ECDH-ES
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdhEsA128Kw = "ECDH-ES+A128KW";
 
-        /// <summary>ECDH-ES using Concat KDF and CEK wrapped with "A192KW" (RFC 7518 §4.6).</summary>
+        /// <summary>
+        ///     ECDH-ES using Concat KDF and CEK wrapped with "A192KW", per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.6">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.6:
+        ///         Key Agreement with ECDH-ES
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdhEsA192Kw = "ECDH-ES+A192KW";
 
-        /// <summary>ECDH-ES using Concat KDF and CEK wrapped with "A256KW" (RFC 7518 §4.6).</summary>
+        /// <summary>
+        ///     ECDH-ES using Concat KDF and CEK wrapped with "A256KW", per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.6">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.6:
+        ///         Key Agreement with ECDH-ES
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdhEsA256Kw = "ECDH-ES+A256KW";
 
-        /// <summary>AES Key Wrap with 128-bit key (RFC 7518 §4.4).</summary>
+        /// <summary>
+        ///     AES Key Wrap with 128-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.4:
+        ///         Key Wrapping with AES Key Wrap
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string A128Kw = "A128KW";
 
-        /// <summary>AES Key Wrap with 192-bit key (RFC 7518 §4.4).</summary>
+        /// <summary>
+        ///     AES Key Wrap with 192-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.4:
+        ///         Key Wrapping with AES Key Wrap
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string A192Kw = "A192KW";
 
-        /// <summary>AES Key Wrap with 256-bit key (RFC 7518 §4.4).</summary>
+        /// <summary>
+        ///     AES Key Wrap with 256-bit key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-4.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §4.4:
+        ///         Key Wrapping with AES Key Wrap
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string A256Kw = "A256KW";
     }
 
@@ -258,19 +390,30 @@ public static class SchemataConstants
         /// <summary>Authorization endpoint path.</summary>
         public const string Authorize = "/Connect/Authorize";
 
-        /// <summary>Device authorization endpoint path (RFC 8628).</summary>
+        /// <summary>
+        ///     Device authorization endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+        ///     .
+        /// </summary>
         public const string Device = "/Connect/Device";
 
-        /// <summary>Token introspection endpoint path (RFC 7662).</summary>
+        /// <summary>
+        ///     Token introspection endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7662.html">RFC 7662: OAuth 2.0 Token Introspection</seealso>.
+        /// </summary>
         public const string Introspect = "/Connect/Introspect";
 
-        /// <summary>Token revocation endpoint path (RFC 7009).</summary>
+        /// <summary>
+        ///     Token revocation endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html">RFC 7009: OAuth 2.0 Token Revocation</seealso>.
+        /// </summary>
         public const string Revoke = "/Connect/Revoke";
 
-        /// <summary>Interaction endpoint path for consent and device verification UIs.</summary>
-        public const string Interact = "/Connect/Interact";
-
-        /// <summary>RP-Initiated Logout endpoint path (OIDC RP-Initiated Logout 1.0).</summary>
+        /// <summary>
+        ///     RP-Initiated Logout endpoint path, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>
+        ///     .
+        /// </summary>
         public const string EndSession = "/Connect/EndSession";
 
         /// <summary>OpenID Connect Discovery document endpoint path.</summary>
@@ -342,7 +485,14 @@ public static class SchemataConstants
     /// </summary>
     public static class EventTypes
     {
-        /// <summary>Back-Channel Logout event URI (OpenID Connect Back-Channel Logout 1.0 §2.4).</summary>
+        /// <summary>
+        ///     Back-Channel Logout event URI, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken">
+        ///         OpenID Connect Back-Channel Logout 1.0
+        ///         §2.4
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string LogoutEvent = "http://schemas.openid.net/event/backchannel-logout";
     }
 
@@ -382,23 +532,53 @@ public static class SchemataConstants
     #region Nested type: GrantTypes
 
     /// <summary>
-    ///     OAuth 2.0 grant type identifiers (RFC 6749 and extensions).
+    ///     OAuth 2.0 grant type identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
+    ///     and extensions.
     /// </summary>
     public static class GrantTypes
     {
-        /// <summary>Authorization code grant (RFC 6749 §4.1).</summary>
+        /// <summary>
+        ///     Authorization code grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1: Authorization Code Grant
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string AuthorizationCode = "authorization_code";
 
-        /// <summary>Client credentials grant (RFC 6749 §4.4).</summary>
+        /// <summary>
+        ///     Client credentials grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.4">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.4: Client Credentials Grant
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ClientCredentials = "client_credentials";
 
-        /// <summary>Refresh token grant (RFC 6749 §6).</summary>
+        /// <summary>
+        ///     Refresh token grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-6">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §6: Refreshing an Access Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RefreshToken = "refresh_token";
 
-        /// <summary>Device authorization grant (RFC 8628).</summary>
+        /// <summary>
+        ///     Device authorization grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+        ///     .
+        /// </summary>
         public const string DeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
 
-        /// <summary>Token exchange grant (RFC 8693).</summary>
+        /// <summary>
+        ///     Token exchange grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html">RFC 8693: OAuth 2.0 Token Exchange</seealso>.
+        /// </summary>
         public const string TokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
     }
 
@@ -433,7 +613,7 @@ public static class SchemataConstants
         /// <summary>Key for the modular modules list in configuration.</summary>
         public const string ModularModules = "Modular:Modules";
 
-        /// <summary>Key prefix for Device Poll</summary>
+        /// <summary>Key prefix for Device Poll cache.</summary>
         public const string DevicePoll = "device_poll";
     }
 
@@ -442,56 +622,156 @@ public static class SchemataConstants
     #region Nested type: OAuthErrors
 
     /// <summary>
-    ///     OAuth 2.0 error codes (RFC 6749 §5.2 and extensions).
+    ///     OAuth 2.0 error codes, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §5.2: Error Response
+    ///     </seealso>
+    ///     and extensions.
     /// </summary>
     public static class OAuthErrors
     {
         /// <summary>
-        ///     The provided authorization grant or refresh token is invalid, expired, revoked, or does not match (RFC 6749
-        ///     §5.2).
+        ///     The provided authorization grant or refresh token is invalid, expired, revoked, or does not match, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
         /// </summary>
         public const string InvalidGrant = "invalid_grant";
 
-        /// <summary>Client authentication failed (RFC 6749 §5.2).</summary>
+        /// <summary>
+        ///     Client authentication failed, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string InvalidClient = "invalid_client";
 
-        /// <summary>The client is not authorized to request an authorization code using this method (RFC 6749 §4.1.2.1).</summary>
+        /// <summary>
+        ///     The client is not authorized to request an authorization code using this method, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string UnauthorizedClient = "unauthorized_client";
 
-        /// <summary>The requested scope is invalid, unknown, or malformed (RFC 6749 §5.2).</summary>
+        /// <summary>
+        ///     The requested scope is invalid, unknown, or malformed, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string InvalidScope = "invalid_scope";
 
-        /// <summary>The request is missing a required parameter or is otherwise malformed (RFC 6749 §4.1.2.1).</summary>
+        /// <summary>
+        ///     The request is missing a required parameter or is otherwise malformed, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string InvalidRequest = "invalid_request";
 
-        /// <summary>The resource owner or authorization server denied the request (RFC 6749 §4.1.2.1).</summary>
+        /// <summary>
+        ///     The resource owner or authorization server denied the request, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string AccessDenied = "access_denied";
 
-        /// <summary>The authorization server does not support the requested grant type (RFC 6749 §5.2).</summary>
+        /// <summary>
+        ///     The authorization server does not support the requested grant type, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string UnsupportedGrantType = "unsupported_grant_type";
 
-        /// <summary>The authorization server does not support the requested response type (RFC 6749 §4.1.2.1).</summary>
+        /// <summary>
+        ///     The authorization server does not support the requested response type, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string UnsupportedResponseType = "unsupported_response_type";
 
         /// <summary>The redirect URI is invalid or does not match a registered URI.</summary>
         public const string InvalidRedirectUri = "invalid_redirect_uri";
 
-        /// <summary>The token presented has expired (RFC 8628 §3.5).</summary>
+        /// <summary>
+        ///     The token presented has expired, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+        ///         RFC 8628: OAuth 2.0 Device Authorization
+        ///         Grant §3.5: Authorization Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ExpiredToken = "expired_token";
 
-        /// <summary>The authorization request is still pending (RFC 8628 §3.5).</summary>
+        /// <summary>
+        ///     The authorization request is still pending, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+        ///         RFC 8628: OAuth 2.0 Device Authorization
+        ///         Grant §3.5: Authorization Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string AuthorizationPending = "authorization_pending";
 
-        /// <summary>The polling interval must be increased (RFC 8628 §3.5).</summary>
+        /// <summary>
+        ///     The polling interval must be increased, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.5">
+        ///         RFC 8628: OAuth 2.0 Device Authorization
+        ///         Grant §3.5: Authorization Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string SlowDown = "slow_down";
 
-        /// <summary>The authorization server encountered an unexpected condition (RFC 6749 §4.1.2.1).</summary>
+        /// <summary>
+        ///     The authorization server encountered an unexpected condition, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ServerError = "server_error";
 
-        /// <summary>The authorization server requires end-user authentication (OpenID Connect Core §3.1.2.6).</summary>
+        /// <summary>
+        ///     The authorization server requires end-user authentication, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string LoginRequired = "login_required";
 
-        /// <summary>The authorization server requires end-user consent (OpenID Connect Core §3.1.2.6).</summary>
+        /// <summary>
+        ///     The authorization server requires end-user consent, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ConsentRequired = "consent_required";
     }
 
@@ -500,7 +780,7 @@ public static class SchemataConstants
     #region Nested type: Orders
 
     /// <summary>
-    ///     Well-known ordering constants.
+    ///     Well-known ordering constants for feature and advisor pipeline sequencing.
     /// </summary>
     public static class Orders
     {
@@ -529,79 +809,246 @@ public static class SchemataConstants
         /// <summary>The type discriminator parameter name for polymorphic serialization.</summary>
         public const string Type = "@type";
 
-        /// <summary>OAuth access_token response parameter (RFC 6749 §4.1.4).</summary>
+        /// <summary>
+        ///     OAuth access_token response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.4">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.4: Access Token Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string AccessToken = "access_token";
 
-        /// <summary>OAuth grant_type parameter (RFC 6749 §4.1.3).</summary>
+        /// <summary>
+        ///     OAuth grant_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.3: Access Token Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string GrantType = "grant_type";
 
-        /// <summary>OAuth client_id parameter (RFC 6749 §2.2).</summary>
+        /// <summary>
+        ///     OAuth client_id parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §2.2: Client Identifier
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ClientId = "client_id";
 
-        /// <summary>OAuth client_secret parameter (RFC 6749 §2.3.1).</summary>
+        /// <summary>
+        ///     OAuth client_secret parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §2.3.1: Client Password
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ClientSecret = "client_secret";
 
-        /// <summary>OAuth authorization code parameter (RFC 6749 §4.1.3).</summary>
+        /// <summary>
+        ///     OAuth authorization code parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.3: Access Token Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Code = "code";
 
         /// <summary>Schemata interaction code_type parameter identifying the token type URI of the code.</summary>
         public const string CodeType = "code_type";
 
-        /// <summary>OAuth error response parameter (RFC 6749 §5.2).</summary>
+        /// <summary>
+        ///     OAuth error response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Error = "error";
 
-        /// <summary>OAuth error_description response parameter (RFC 6749 §5.2).</summary>
+        /// <summary>
+        ///     OAuth error_description response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ErrorDescription = "error_description";
 
-        /// <summary>OAuth expires_in response parameter (RFC 6749 §4.1.4).</summary>
+        /// <summary>
+        ///     OAuth expires_in response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.4">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.4: Access Token Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ExpiresIn = "expires_in";
 
-        /// <summary>OAuth id_token response parameter (OpenID Connect Core §3.1.3.3).</summary>
+        /// <summary>
+        ///     OAuth id_token response parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse">
+        ///         OpenID Connect Core 1.0
+        ///         §3.1.3.3: Token Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string IdToken = "id_token";
 
-        /// <summary>OAuth logout_token parameter (OpenID Connect Back-Channel Logout 1.0 §2.4).</summary>
+        /// <summary>
+        ///     OAuth logout_token parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken">
+        ///         OpenID Connect Back-Channel Logout 1.0
+        ///         §2.4
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string LogoutToken = "logout_token";
 
-        /// <summary>OAuth response_type parameter (RFC 6749 §3.1.1).</summary>
+        /// <summary>
+        ///     OAuth response_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.1.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §3.1.1: Response Type
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ResponseType = "response_type";
 
-        /// <summary>OpenID Connect nonce parameter (OpenID Connect Core §3.1.2.1).</summary>
+        /// <summary>
+        ///     OpenID Connect nonce parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+        ///         OpenID Connect Core 1.0 §3.1.2.1:
+        ///         Authentication Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Nonce = "nonce";
 
-        /// <summary>Device code parameter (RFC 8628 §3.4).</summary>
+        /// <summary>
+        ///     Device code parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
+        ///         RFC 8628: OAuth 2.0 Device Authorization
+        ///         Grant §3.4: Device Access Token Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string DeviceCode = "device_code";
 
-        /// <summary>Device user code parameter (RFC 8628 §3.2).</summary>
+        /// <summary>
+        ///     Device user code parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.2">
+        ///         RFC 8628: OAuth 2.0 Device Authorization
+        ///         Grant §3.2: Device Authorization Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string UserCode = "user_code";
 
-        /// <summary>Token parameter used in introspection and revocation (RFC 7662 §2.1).</summary>
+        /// <summary>
+        ///     Token parameter used in introspection and revocation, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7662.html#section-2.1">
+        ///         RFC 7662: OAuth 2.0 Token Introspection
+        ///         §2.1: Introspection Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Token = "token";
 
-        /// <summary>Refresh token parameter (RFC 6749 §6).</summary>
+        /// <summary>
+        ///     Refresh token parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-6">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §6: Refreshing an Access Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RefreshToken = "refresh_token";
 
-        /// <summary>OAuth state parameter (RFC 6749 §4.1.1).</summary>
+        /// <summary>
+        ///     OAuth state parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.1">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.1: Authorization Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string State = "state";
 
-        /// <summary>Token exchange subject_token parameter (RFC 8693 §2.1).</summary>
+        /// <summary>
+        ///     Token exchange subject_token parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string SubjectToken = "subject_token";
 
-        /// <summary>Token exchange subject_token_type parameter (RFC 8693 §2.1).</summary>
+        /// <summary>
+        ///     Token exchange subject_token_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string SubjectTokenType = "subject_token_type";
 
-        /// <summary>PKCE code_challenge parameter (RFC 7636 §4.3).</summary>
+        /// <summary>
+        ///     PKCE code_challenge parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7636.html#section-4.3">
+        ///         RFC 7636: Proof Key for Code Exchange by OAuth Public Clients (PKCE) §4.3: Authorization Server Stores the Code
+        ///         Challenge
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string CodeChallenge = "code_challenge";
 
-        /// <summary>PKCE code_challenge_method parameter (RFC 7636 §4.3).</summary>
+        /// <summary>
+        ///     PKCE code_challenge_method parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7636.html#section-4.3">
+        ///         RFC 7636: Proof Key for Code Exchange by OAuth Public Clients (PKCE) §4.3: Authorization Server Stores the Code
+        ///         Challenge
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string CodeChallengeMethod = "code_challenge_method";
 
-        /// <summary>OAuth response_mode parameter (OAuth 2.0 Multiple Response Types §2.1).</summary>
+        /// <summary>
+        ///     OAuth response_mode parameter, per
+        ///     <seealso href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">
+        ///         OAuth 2.0 Multiple Response Type Encoding Practices §2.1
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string ResponseMode = "response_mode";
 
-        /// <summary>OAuth token_type response parameter (RFC 6749 §4.1.4).</summary>
+        /// <summary>
+        ///     OAuth token_type response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.4">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.1.4: Access Token Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string TokenType = "token_type";
 
-        /// <summary>OpenID Connect max_age parameter (OpenID Connect Core §3.1.2.1).</summary>
+        /// <summary>
+        ///     OpenID Connect max_age parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+        ///         OpenID Connect Core 1.0 §3.1.2.1:
+        ///         Authentication Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string MaxAge = "max_age";
     }
 
@@ -629,7 +1076,12 @@ public static class SchemataConstants
     #region Nested type: PkceMethods
 
     /// <summary>
-    ///     PKCE (Proof Key for Code Exchange) code challenge method identifiers (RFC 7636).
+    ///     PKCE (Proof Key for Code Exchange) code challenge method identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7636.html">
+    ///         RFC 7636: Proof Key for Code Exchange by OAuth Public
+    ///         Clients
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class PkceMethods
     {
@@ -671,7 +1123,12 @@ public static class SchemataConstants
     #region Nested type: PromptValues
 
     /// <summary>
-    ///     OpenID Connect prompt parameter values (OpenID Connect Core §3.1.2.1).
+    ///     OpenID Connect prompt parameter values, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+    ///         OpenID Connect Core 1.0 §3.1.2.1:
+    ///         Authentication Request
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class PromptValues
     {
@@ -692,6 +1149,9 @@ public static class SchemataConstants
 
     #region Nested type: Properties
 
+    /// <summary>
+    ///     Serialization property names used for authorization and token metadata.
+    /// </summary>
     public static class Properties
     {
         public const string GrantType           = ".grant_type";
@@ -715,7 +1175,15 @@ public static class SchemataConstants
     #region Nested type: ResponseModes
 
     /// <summary>
-    ///     OAuth 2.0 response mode values (OAuth 2.0 Multiple Response Types §2.1, OAuth 2.0 Form Post Response Mode).
+    ///     OAuth 2.0 response mode values, per
+    ///     <seealso href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">
+    ///         OAuth 2.0 Multiple Response Type Encoding Practices §2.1
+    ///     </seealso>
+    ///     and
+    ///     <seealso href="https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html">
+    ///         OAuth 2.0 Form Post Response Mode
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class ResponseModes
     {
@@ -734,7 +1202,12 @@ public static class SchemataConstants
     #region Nested type: ResponseTypes
 
     /// <summary>
-    ///     OAuth 2.0 response type values (RFC 6749 §3.1.1).
+    ///     OAuth 2.0 response type values, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.1.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §3.1.1: Response Type
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class ResponseTypes
     {
@@ -753,14 +1226,26 @@ public static class SchemataConstants
     #region Nested type: Schemes
 
     /// <summary>
-    ///     OAuth 2.0 access token type identifiers (RFC 6749 Section 7.1).
+    ///     OAuth 2.0 access token type identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-7.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §7.1: Access Token Types
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class Schemes
     {
-        /// <summary>Bearer token type (RFC 6750).</summary>
+        /// <summary>
+        ///     Bearer token type, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6750.html">
+        ///         RFC 6750: The OAuth 2.0 Authorization Framework:
+        ///         Bearer Token Usage
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Bearer = "Bearer";
 
-        /// <summary>Basic scheme type</summary>
+        /// <summary>Basic scheme type.</summary>
         public const string Basic = "Basic";
     }
 
@@ -773,7 +1258,14 @@ public static class SchemataConstants
     /// </summary>
     public static class Scopes
     {
-        /// <summary>OpenID Connect scope; requests an ID token (OpenID Connect Core §3.1.2.1).</summary>
+        /// <summary>
+        ///     OpenID Connect scope; requests an ID token, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest">
+        ///         OpenID Connect Core 1.0 §3.1.2.1:
+        ///         Authentication Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string OpenId = "openid";
 
         /// <summary>Requests access to the end-user's default profile claims.</summary>
@@ -788,7 +1280,14 @@ public static class SchemataConstants
         /// <summary>Requests access to the end-user's physical mailing address.</summary>
         public const string Address = "address";
 
-        /// <summary>Requests a refresh token for offline access (RFC 6749 §3.3).</summary>
+        /// <summary>
+        ///     Requests a refresh token for offline access, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.3">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §3.3: Access Token Scope
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string OfflineAccess = "offline_access";
     }
 
@@ -797,44 +1296,132 @@ public static class SchemataConstants
     #region Nested type: SigningAlgorithms
 
     /// <summary>
-    ///     JWS signing algorithm identifiers (RFC 7518 §3.1).
+    ///     JWS signing algorithm identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.1">
+    ///         RFC 7518: JSON Web Algorithms (JWA) §3.1: "alg" (Algorithm) Header Parameter Values for JWS
+    ///     </seealso>
+    ///     .
     /// </summary>
     public static class SigningAlgorithms
     {
-        /// <summary>RSASSA-PKCS1-v1_5 using SHA-256 (RFC 7518 §3.3).</summary>
+        /// <summary>
+        ///     RSASSA-PKCS1-v1_5 using SHA-256, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.3:
+        ///         Digital Signature with RSASSA-PKCS1-v1_5
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaSha256 = "RS256";
 
-        /// <summary>RSASSA-PKCS1-v1_5 using SHA-384 (RFC 7518 §3.3).</summary>
+        /// <summary>
+        ///     RSASSA-PKCS1-v1_5 using SHA-384, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.3:
+        ///         Digital Signature with RSASSA-PKCS1-v1_5
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaSha384 = "RS384";
 
-        /// <summary>RSASSA-PKCS1-v1_5 using SHA-512 (RFC 7518 §3.3).</summary>
+        /// <summary>
+        ///     RSASSA-PKCS1-v1_5 using SHA-512, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.3">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.3:
+        ///         Digital Signature with RSASSA-PKCS1-v1_5
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaSha512 = "RS512";
 
-        /// <summary>ECDSA using P-256 and SHA-256 (RFC 7518 §3.4).</summary>
+        /// <summary>
+        ///     ECDSA using P-256 and SHA-256, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.4:
+        ///         Digital Signature with ECDSA
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdsaSha256 = "ES256";
 
-        /// <summary>ECDSA using P-384 and SHA-384 (RFC 7518 §3.4).</summary>
+        /// <summary>
+        ///     ECDSA using P-384 and SHA-384, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.4:
+        ///         Digital Signature with ECDSA
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdsaSha384 = "ES384";
 
-        /// <summary>ECDSA using P-521 and SHA-512 (RFC 7518 §3.4).</summary>
+        /// <summary>
+        ///     ECDSA using P-521 and SHA-512, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.4">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.4:
+        ///         Digital Signature with ECDSA
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string EcdsaSha512 = "ES512";
 
-        /// <summary>RSASSA-PSS using SHA-256 and MGF1 with SHA-256 (RFC 7518 §3.5).</summary>
+        /// <summary>
+        ///     RSASSA-PSS using SHA-256 and MGF1 with SHA-256, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.5">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.5:
+        ///         Digital Signature with RSASSA-PSS
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaPssSha256 = "PS256";
 
-        /// <summary>RSASSA-PSS using SHA-384 and MGF1 with SHA-384 (RFC 7518 §3.5).</summary>
+        /// <summary>
+        ///     RSASSA-PSS using SHA-384 and MGF1 with SHA-384, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.5">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.5:
+        ///         Digital Signature with RSASSA-PSS
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaPssSha384 = "PS384";
 
-        /// <summary>RSASSA-PSS using SHA-512 and MGF1 with SHA-512 (RFC 7518 §3.5).</summary>
+        /// <summary>
+        ///     RSASSA-PSS using SHA-512 and MGF1 with SHA-512, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.5">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.5:
+        ///         Digital Signature with RSASSA-PSS
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string RsaPssSha512 = "PS512";
 
-        /// <summary>HMAC using SHA-256 (RFC 7518 §3.2).</summary>
+        /// <summary>
+        ///     HMAC using SHA-256, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.2">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.2:
+        ///         HMAC with SHA-2 Functions
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string HmacSha256 = "HS256";
 
-        /// <summary>HMAC using SHA-384 (RFC 7518 §3.2).</summary>
+        /// <summary>
+        ///     HMAC using SHA-384, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.2">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.2:
+        ///         HMAC with SHA-2 Functions
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string HmacSha384 = "HS384";
 
-        /// <summary>HMAC using SHA-512 (RFC 7518 §3.2).</summary>
+        /// <summary>
+        ///     HMAC using SHA-512, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7518.html#section-3.2">
+        ///         RFC 7518: JSON Web Algorithms (JWA) §3.2:
+        ///         HMAC with SHA-2 Functions
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string HmacSha512 = "HS512";
     }
 
@@ -843,8 +1430,9 @@ public static class SchemataConstants
     #region Nested type: StandardScopes
 
     /// <summary>
-    ///     OIDC scope-to-claims mapping per OpenID Connect Core 1.0 Section 5.4.
-    ///     See: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+    ///     OIDC scope-to-claims mapping, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims">OpenID Connect Core 1.0 §5.4</seealso>
+    ///     .
     /// </summary>
     public static class StandardScopes
     {
@@ -880,12 +1468,24 @@ public static class SchemataConstants
 
     #region Nested type: TokenFormats
 
+    /// <summary>
+    ///     Token serialization format identifiers.
+    /// </summary>
     public static class TokenFormats
     {
+        /// <summary>
+        ///     JSON Web Token, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7519.html">RFC 7519: JSON Web Token (JWT)</seealso>.
+        /// </summary>
         public const string Jwt = "jwt";
 
+        /// <summary>
+        ///     JSON Web Encryption, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7516.html">RFC 7516: JSON Web Encryption (JWE)</seealso>.
+        /// </summary>
         public const string Jwe = "jwe";
 
+        /// <summary>Opaque reference that must be introspected.</summary>
         public const string Reference = "reference";
     }
 
@@ -935,13 +1535,21 @@ public static class SchemataConstants
         /// <summary>An OpenID Connect ID token.</summary>
         public const string IdToken = "id_token";
 
-        /// <summary>A device code (RFC 8628).</summary>
+        /// <summary>
+        ///     A device code, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+        ///     .
+        /// </summary>
         public const string DeviceCode = TokenTypeUris.DeviceCode;
 
         /// <summary>An interaction token used during authorization UI flows.</summary>
         public const string Interaction = TokenTypeUris.Interaction;
 
-        /// <summary>A user code for device authorization (RFC 8628).</summary>
+        /// <summary>
+        ///     A user code for device authorization, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+        ///     .
+        /// </summary>
         public const string UserCode = TokenTypeUris.UserCode;
 
         /// <summary>A logout token used during RP-initiated logout with front-channel notifications.</summary>
@@ -957,10 +1565,24 @@ public static class SchemataConstants
     /// </summary>
     public static class TokenTypeUris
     {
-        /// <summary>JWT token type URI (RFC 8693 §3).</summary>
+        /// <summary>
+        ///     JWT token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string Jwt = "urn:ietf:params:oauth:token-type:jwt";
 
-        /// <summary>Access token type URI (RFC 8693 §3).</summary>
+        /// <summary>
+        ///     Access token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
         public const string AccessToken = "urn:ietf:params:oauth:token-type:access_token";
 
         /// <summary>Schemata-internal token type URI for an interaction token reference.</summary>

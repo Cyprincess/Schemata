@@ -11,17 +11,21 @@ using Schemata.Resource.Foundation.Grammars.Values;
 namespace Schemata.Resource.Foundation.Grammars;
 
 /// <summary>
-///     Provides compiled Parlot parsers for the AIP-160 filter and order-by grammars.
+///     Compiled <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso> filter and
+///     order-by parsers built on <see href="https://github.com/sebastienros/parlot">Parlot</see>.
+///     The filter grammar handles sequences (AND), factors (OR), terms (NOT/-),
+///     restrictions (comparisons), functions (<c>fn(args)</c>), and member access (<c>a.b.c</c>).
 /// </summary>
 public class Parser
 {
     /// <summary>
-    ///     Gets the compiled parser for AIP-160 filter expressions.
+    ///     The compiled AIP-160 filter expression parser.
     /// </summary>
     public static readonly Parser<Filter> Filter;
 
     /// <summary>
-    ///     Gets the compiled parser for order-by clauses (comma-separated member/direction pairs).
+    ///     The compiled order-by parser producing a mapping of
+    ///     <see cref="Member" /> → <see cref="Ordering" />.
     /// </summary>
     public static readonly Parser<Dictionary<Member, Ordering>> Order;
 
@@ -81,10 +85,6 @@ public class Parser
         var eq  = Parsers.Terms.Char(Equal.Char).Then((c,       _) => new Equal(c.Scanner.Cursor.Position));
         var has = Parsers.Terms.Char(Has.Char).Then((c,         _) => new Has(c.Scanner.Cursor.Position));
 
-        // value
-        // : TEXT
-        // | STRING
-        // ;
         var value = integer.Then<IValue>(v => v)
                            .Or(number.Then<IValue>(v => v))
                            .Or(truth.Then<IValue>(v => v))
@@ -92,20 +92,8 @@ public class Parser
                            .Or(unquoted.Then<IValue>(v => v))
                            .Or(quoted.Then<IValue>(v => v));
 
-        // composite
-        // : LPAREN expression RPAREN
-        // ;
         var composite = Parsers.Between(lparen, filter, rparen);
 
-        // comparator
-        // : LESS_EQUALS      # <=
-        // | LESS_THAN        # <
-        // | GREATER_EQUALS   # >=
-        // | GREATER_THAN     # >
-        // | NOT_EQUALS       # !=
-        // | EQUALS           # =
-        // | HAS              # :
-        // ;
         var comparator = le.Then<IBinary>(b => b)
                            .Or(lt.Then<IBinary>(b => b))
                            .Or(ge.Then<IBinary>(b => b))
@@ -114,11 +102,6 @@ public class Parser
                            .Or(eq.Then<IBinary>(b => b))
                            .Or(has.Then<IBinary>(b => b));
 
-        // keyword
-        // : NOT
-        // | AND
-        // | OR
-        // ;
         var keyword = Parsers.Terms.Pattern(c => Character.IsIdentifierPart(c) || !char.IsAscii(c))
                              .When((_, span) => {
                                   var s = span.Span.ToString();
@@ -128,95 +111,46 @@ public class Parser
                               })
                              .Then((c, k) => new Text(c.Scanner.Cursor.Position, k.Span.ToString()));
 
-        // field
-        // : value
-        // | keyword
-        // ;
         var field = value.Or(keyword.Then<IValue>(v => v));
 
-        // member
-        // : value {DOT field}
-        // ;
         var member = value.And(Parsers.ZeroOrMany(accessor.SkipAnd(field)))
                           .Then((c, m) => new Member(c.Scanner.Cursor.Position, m.Item1, m.Item2));
 
-        // name: text or keyword (identifier-like tokens only, per EBNF)
         var name = unquoted.Then<IValue>(v => v).Or(keyword.Then<IValue>(v => v));
 
-        // path: name { "." name } — restricted member for function paths
         var path = name.And(Parsers.ZeroOrMany(accessor.SkipAnd(name)))
                        .Then((c, m) => new Member(c.Scanner.Cursor.Position, m.Item1, m.Item2));
 
         var comparable = Parsers.Deferred<IComparableArg>();
 
-        // arg
-        // : comparable
-        // | composite
-        // ;
         var arg = comparable.Then<IArg>(a => a).Or(composite.Then<IArg>(a => a));
 
-        // argList
-        // : arg { COMMA arg}
-        // ;
         var args = arg.And(Parsers.ZeroOrMany(comma.SkipAnd(arg)))
-                      .Then(a => a.Item2?.Prepend(a.Item1).ToArray() ?? [a.Item1]);
+                      .Then(a => a.Item2.Prepend(a.Item1).ToArray());
 
-        // function
-        // : name {DOT name} LPAREN [argList] RPAREN
-        // ;
         var function = path.And(Parsers.Between(lparen, Parsers.ZeroOrOne(args), rparen))
                            .Then((c, f) => new Function(c.Scanner.Cursor.Position, f.Item1, f.Item2));
 
-        // comparable
-        // : member
-        // | function
-        // ;
         comparable.Parser = function.Then<IComparableArg>(c => c).Or(member.Then<IComparableArg>(c => c));
 
-        // restriction
-        // : comparable [comparator arg]
-        // ;
         var restriction = comparable.And(Parsers.ZeroOrOne(comparator.And(arg)))
                                     .Then((c, r) => new Restriction(c.Scanner.Cursor.Position, r.Item1, r.Item2));
 
-        // simple
-        // : restriction
-        // | composite
-        // ;
         var simple = restriction.Then<ISimple>(s => s).Or(composite.Then<ISimple>(s => s));
 
-        // term
-        // : [(NOT WS | MINUS)] simple
-        // ;
         var term = Parsers.ZeroOrOne(not.Or(minus.Then<string>(_ => "-")))
                           .And(simple)
                           .Then((c, t) => new Term(c.Scanner.Cursor.Position, t.Item1, t.Item2));
 
-        // factor
-        // : term {WS OR WS term}
-        // ;
         var factor = term.And(Parsers.ZeroOrMany(or.SkipAnd(term)))
                          .Then((c, f) => new Factor(c.Scanner.Cursor.Position, f.Item1, f.Item2));
 
-        // sequence
-        // : factor {WS factor}
-        // ;
         var sequence = Parsers.OneOrMany(factor).Then((c, s) => new Sequence(c.Scanner.Cursor.Position, s));
 
-        // expression
-        // : sequence {WS AND WS sequence}
-        // ;
         filter.Parser = sequence.And(Parsers.ZeroOrMany(and.SkipAnd(sequence)))
                                 .Then((c, f) => new Filter(c.Scanner.Cursor.Position, f.Item1, f.Item2));
 
-        // filter
-        // : [expression]
-        // ;
         Filter = filter.Compile();
-
-        // order
-        // : { member [ASC | DESC] }
-        // ;
 
         var asc  = WithWordBoundary(Parsers.Terms.Text("ASC", true)).Then(_ => Ordering.Ascending);
         var desc = WithWordBoundary(Parsers.Terms.Text("DESC", true)).Then(_ => Ordering.Descending);

@@ -42,7 +42,8 @@ public class AdviceUpdateConcurrencyShould
             .ReturnsAsync(stored);
         var entity = new Student { Id = 1, Timestamp = Guid.NewGuid() };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(
+                                                           ctx, mock.Object, entity, CancellationToken.None));
     }
 
     [Fact]

@@ -20,6 +20,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     OIDC Discovery endpoint per
+///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig">
+///         OpenID Connect Discovery 1.0
+///         §4: Obtaining OpenID Provider Configuration Information
+///     </seealso>
+///     .
+///     Builds the OP's discovery document from <see cref="SchemataAuthorizationOptions" />
+///     and publishes the JSON Web Key Set for signature verification per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html">RFC 7517: JSON Web Key (JWK)</seealso>.
+///     Symmetric keys are excluded from the public JWKS.
+/// </summary>
 public sealed class DiscoveryHandler<TScope>(
     IOptions<SchemataAuthorizationOptions> options,
     IScopeManager<TScope>                  scopes,
@@ -27,6 +39,14 @@ public sealed class DiscoveryHandler<TScope>(
 )
     where TScope : SchemataScope
 {
+    /// <summary>
+    ///     Returns the OIDC discovery document containing server metadata:
+    ///     supported response types, response modes, grant types, subject types,
+    ///     signing algorithms, claims, and the JWKS endpoint URI.
+    ///     Runs the <see cref="IDiscoveryAdvisor" /> pipeline for extensibility.
+    /// </summary>
+    /// <param name="issuer">The issuer URI for this OP instance.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> GetDiscoveryDocumentAsync(string issuer, CancellationToken ct) {
         var config = options.Value;
 
@@ -67,12 +87,21 @@ public sealed class DiscoveryHandler<TScope>(
         return AuthorizationResult.Content(document);
     }
 
+    /// <summary>
+    ///     Returns a JSON Web Key Set containing the public key
+    ///     material needed to verify tokens issued by this OP.
+    ///     Private key components are stripped before publication.
+    ///     Symmetric keys result in an empty <c>keys</c> array because they
+    ///     cannot be disclosed publicly,
+    ///     per <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html#section-4.2">RFC 7517: JSON Web Key (JWK) §4.2: "use" (Public Key Use) Parameter</seealso>.
+    /// </summary>
     public AuthorizationResult GetJwks() {
         if (options.Value.SigningKey == null) {
             throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Signing key"));
         }
 
-        // Symmetric keys must not appear in a public JWKS (RFC 7517 §4.2).
+        // symmetric keys MUST NOT appear in a public JWKS.
+        // See RFC 7517 §4.2.
         if (options.Value.SigningKey is SymmetricSecurityKey) {
             return AuthorizationResult.Content(new Dictionary<string, object> {
                 ["keys"] = Array.Empty<object>(),

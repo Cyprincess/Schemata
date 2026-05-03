@@ -11,8 +11,10 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Grpc.Interceptors;
 
 /// <summary>
-///     gRPC interceptor that maps <see cref="SchemataException" /> instances to structured <see cref="RpcException" />
-///     with Google RPC status details.
+///     gRPC interceptor that maps <see cref="SchemataException" /> instances to
+///     <see cref="RpcException" /> with Google RPC status details
+///     per <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
+///     Unhandled exceptions produce an INTERNAL status with a generic message.
 /// </summary>
 public class ExceptionMappingInterceptor : Interceptor
 {
@@ -25,10 +27,13 @@ public class ExceptionMappingInterceptor : Interceptor
         try {
             return await continuation(request, context);
         } catch (RpcException) {
+            // Intended RpcExceptions propagate as-is — only SchemataExceptions
+            // and unhandled errors need mapping.
             throw;
         } catch (SchemataException ex) {
             throw BuildRpcException(ex, context);
         } catch (Exception) {
+            // AIP-193: unhandled server errors map to Internal with a non-disclosing message.
             throw BuildRpcException(new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1012)), context);
         }
     }
@@ -37,6 +42,8 @@ public class ExceptionMappingInterceptor : Interceptor
         var httpContext = context.GetHttpContext();
         var requestId   = httpContext.TraceIdentifier;
 
+        // Build structured google.rpc.Status including error details and request
+        // identifier, then attach as grpc-status-details-bin metadata.
         var rpcStatus = RpcStatusBuilder.Build(ex, requestId);
 
         var metadata = new Metadata { { "grpc-status-details-bin", rpcStatus.ToByteArray() } };

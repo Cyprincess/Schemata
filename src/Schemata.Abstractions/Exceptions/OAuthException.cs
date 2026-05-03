@@ -4,13 +4,22 @@ using Schemata.Abstractions.Errors;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     Thrown for OAuth 2.0 protocol errors. Produces RFC 6749 Section 5.2 error responses.
+///     Thrown for OAuth 2.0 protocol errors.
 /// </summary>
+/// <remarks>
+///     Produces an <see cref="OAuthErrorResponse" /> per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
+///     instead of the default <see cref="ErrorResponse" />.
+/// </remarks>
 public class OAuthException : SchemataException
 {
     /// <summary>
-    ///     Thrown for OAuth 2.0 protocol errors. Produces RFC 6749 Section 5.2 error responses.
+    ///     Initializes a new <see cref="OAuthException" /> with an OAuth error code and
+    ///     description.
     /// </summary>
+    /// <param name="error">OAuth 2.0 error code (e.g. <c>"invalid_grant"</c>).</param>
+    /// <param name="description">Human-readable explanation of the error.</param>
+    /// <param name="status">HTTP response status code.</param>
     public OAuthException(
         string  error,
         string  description,
@@ -18,18 +27,45 @@ public class OAuthException : SchemataException
     ) : base(status, error, description) { }
 
     /// <summary>
-    ///     When set, the error is delivered via redirect. Used by interactive endpoints
-    ///     (authorize) after redirect_uri validation.
+    ///     When non-<see langword="null" />, the error is delivered via a redirect to this
+    ///     URI rather than a direct JSON response.
     /// </summary>
+    /// <remarks>
+    ///     Used by the interactive authorization endpoint after <c>redirect_uri</c>
+    ///     validation succeeds, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §4.1.2.1: Error Response
+    ///     </seealso>
+    ///     .
+    /// </remarks>
     public string? RedirectUri { get; set; }
 
-    /// <summary>OAuth 2.0 state parameter echoed back to the client during redirect-based error delivery.</summary>
+    /// <summary>
+    ///     Opaque <c>state</c> parameter echoed back to the client during redirect-based
+    ///     error delivery, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §4.1.2.1: Error Response
+    ///     </seealso>
+    ///     .
+    /// </summary>
     public string? State { get; set; }
 
-    /// <summary>Response mode for error delivery (e.g. "query", "fragment", "form_post").</summary>
+    /// <summary>
+    ///     OAuth 2.0 <c>response_mode</c> value controlling how the error is transported
+    ///     to the client (e.g. <c>"query"</c>, <c>"fragment"</c>, <c>"form_post"</c>).
+    /// </summary>
     public string? ResponseMode { get; set; }
 
-    /// <inheritdoc />
+    /// <summary>
+    ///     Returns an <see cref="OAuthErrorResponse" /> instead of the default
+    ///     <see cref="ErrorResponse" />.
+    /// </summary>
+    /// <param name="details">
+    ///     Additional detail entries appended after the exception's own
+    ///     <see cref="SchemataException.Details" />.
+    /// </param>
     public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) {
         var response = new OAuthErrorResponse { Error = Code, ErrorDescription = Message };
 

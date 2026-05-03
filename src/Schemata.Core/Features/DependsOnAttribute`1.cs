@@ -3,9 +3,10 @@ using System;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Declares that a feature depends on another feature identified by type. The dependency is automatically registered.
+///     Declares a typed feature dependency. The dependency is automatically registered
+///     before the declaring feature during <see cref="SchemataOptionsExtensions.AddFeature{T}" />.
 /// </summary>
-/// <typeparam name="T">The feature type that this feature depends on.</typeparam>
+/// <typeparam name="T">The <see cref="ISimpleFeature" /> type this feature depends on.</typeparam>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DependsOnAttribute<T> : Attribute
     where T : class, ISimpleFeature;

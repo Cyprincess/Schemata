@@ -1,6 +1,5 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using static Schemata.Abstractions.SchemataConstants;
@@ -10,23 +9,20 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceAddSoftDelete{TEntity}" />.</summary>
 public static class AdviceAddSoftDelete
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>Default execution order: 2,147,483,647.</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
 /// <summary>
-///     Clears <see cref="ISoftDelete.DeleteTime" /> to <see langword="null" /> when a soft-deletable entity is added,
-///     ensuring it is not marked as deleted.
+///     Clears <see cref="ISoftDelete.DeleteTime" /> to <see langword="null" /> when a
+///     soft-deletable entity is added, ensuring it is not marked as deleted, per
+///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" />. Runs last in the add pipeline (after validation).</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />. Only
-///         activates for entities implementing <see cref="ISoftDelete" />.
-///     </para>
-///     <para>Suppressed when <see cref="SoftDeleteSuppressed" /> is present in the advice context.</para>
+///     Runs last in the add pipeline (after validation). Only activates for entities
+///     implementing <see cref="ISoftDelete" />. Suppressed by
+///     <see cref="SoftDeleteSuppressed" />.
 /// </remarks>
 public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class

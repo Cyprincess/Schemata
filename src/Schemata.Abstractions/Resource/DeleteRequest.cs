@@ -3,17 +3,21 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Standard request parameters for deleting a resource.
+///     Standard request for deleting a resource per
+///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>,
+///     supporting optimistic concurrency via <see cref="Etag" /> and hard-delete
+///     via <see cref="Force" />.
 /// </summary>
 public class DeleteRequest : ICanonicalName
 {
     /// <summary>
-    ///     Gets or sets the entity tag for conditional deletion (optimistic concurrency).
+    ///     Entity tag for conditional deletion (If-Match). <see langword="null" />
+    ///     means no concurrency check.
     /// </summary>
     public string? Etag { get; set; }
 
     /// <summary>
-    ///     Gets or sets whether to force-delete the resource, bypassing soft-delete.
+    ///     When <see langword="true" />, bypasses soft-delete and removes permanently.
     /// </summary>
     public bool Force { get; set; }
 

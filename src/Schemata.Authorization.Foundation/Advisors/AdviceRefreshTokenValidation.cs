@@ -11,19 +11,34 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceRefreshTokenValidation{TApp, TToken}" />.</summary>
 public static class AdviceRefreshTokenValidation
 {
     public const int DefaultOrder = Orders.Base;
 }
 
+/// <summary>
+///     Validates a refresh token at token exchange: checks type, application, expiry, status, and subject,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-6">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §6: Refreshing an Access Token
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
+/// <seealso cref="AdviceCodeExchangeValidation{TApp, TToken}" />
 public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
     #region IRefreshTokenAdvisor<TApp,TToken> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRefreshTokenValidation.DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         RefreshTokenContext<TApp, TToken> exchange,

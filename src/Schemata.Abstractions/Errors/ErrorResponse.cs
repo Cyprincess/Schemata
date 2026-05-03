@@ -1,12 +1,15 @@
 namespace Schemata.Abstractions.Errors;
 
 /// <summary>
-///     Top-level error response envelope wrapping an <see cref="ErrorBody" />.
+///     Top-level error-response envelope per
+///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>
+///     that wraps an <see cref="ErrorBody" /> for JSON serialization.
 /// </summary>
 public class ErrorResponse
 {
     /// <summary>
-    ///     Gets or sets the error body containing the error details.
+    ///     The nested error body; <see langword="null" /> when the response represents a success
+    ///     or has no serialized error content.
     /// </summary>
     public virtual ErrorBody? Error { get; set; }
 }

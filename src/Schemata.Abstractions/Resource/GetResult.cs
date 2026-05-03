@@ -1,13 +1,16 @@
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Result of a Get operation containing the retrieved resource detail.
+///     Result of a get operation per
+///     <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso>,
+///     carrying the full detail of a single resource. The result is valid only when
+///     <see cref="Detail" /> is non-<see langword="null" />.
 /// </summary>
-/// <typeparam name="TDetail">The type of the resource detail.</typeparam>
+/// <typeparam name="TDetail">The resource detail type.</typeparam>
 public class GetResult<TDetail> : OperationResult<GetResult<TDetail>>
 {
     /// <summary>
-    ///     Gets or sets the detail of the retrieved resource.
+    ///     The retrieved resource detail, or <see langword="null" /> if not found.
     /// </summary>
     public virtual TDetail? Detail { get; set; }
 

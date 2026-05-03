@@ -24,6 +24,26 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
+/// <summary>
+///     ASP.NET Core authentication handler for the Schemata Bearer token scheme.
+///     Handles three concerns:
+///     <list type="number">
+///         <item>
+///             <description>
+///                 Bearer token validation: extracts the token from the
+///                 <c>Authorization: Bearer</c> header, looks up the stored entity,
+///                 validates the JWT/JWE/opaque payload, and returns the claims principal.
+///             </description>
+///         </item>
+///         <item>
+///             <description>
+///                 Token issuance (<c>SignIn</c>): runs claim resolution and destination
+///                 advisor pipelines, issues access tokens, refresh tokens, and ID tokens,
+///                 and writes a JSON <see cref="TokenResponse" /> to the HTTP response.
+///             </description>
+///         </item>
+///     </list>
+/// </summary>
 public class SchemataAuthenticationHandler<TApp, TToken>(
     IOptionsMonitor<SchemataAuthenticationHandlerOptions> options,
     IOptions<SchemataAuthorizationOptions>                config,
@@ -37,11 +57,22 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    /// <summary>
+    ///     Returns <c>true</c> when the grant type indicates a user-present flow
+    ///     (authorization_code, refresh_token, or token exchange).
+    ///     Used to decide whether an ID token should be issued.
+    /// </summary>
     public static bool IsUserGrant(IDictionary<string, string?> items) {
         items.TryGetValue(Properties.GrantType, out var grant);
         return grant is GrantTypes.AuthorizationCode or GrantTypes.RefreshToken or GrantTypes.TokenExchange;
     }
 
+    /// <summary>
+    ///     Determines whether a refresh token should be issued.
+    ///     Always <c>true</c> for the <c>refresh_token</c> grant (rotation),
+    ///     never for <c>client_credentials</c>, and for all other grants
+    ///     depends on the presence of the <c>offline_access</c> scope.
+    /// </summary>
     public static bool ShouldIssueRefreshToken(IDictionary<string, string?> items) {
         if (!items.TryGetValue(Properties.GrantType, out var grant) || string.IsNullOrWhiteSpace(grant)) {
             return false;
@@ -58,6 +89,18 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         }
     }
 
+    /// <summary>
+    ///     Creates a signed OIDC ID token (JWT) with optional <c>at_hash</c>,
+    ///     <c>c_hash</c>, and <c>nonce</c> claims.  When <c>max_age</c> and
+    ///     <c>auth_time</c> are present, the <c>auth_time</c> claim is included
+    ///     in the token.
+    /// </summary>
+    /// <param name="token">The <see cref="TokenService" /> used for signing.</param>
+    /// <param name="items">Authentication properties dictionary.</param>
+    /// <param name="claims">Claims to include in the ID token.</param>
+    /// <param name="lifetime">ID token validity duration.</param>
+    /// <param name="at">Access token value for <c>at_hash</c> computation.</param>
+    /// <param name="code">Authorization code value for <c>c_hash</c> computation.</param>
     public static string CreateIdToken(
         TokenService                 token,
         IDictionary<string, string?> items,
@@ -81,6 +124,24 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return token.CreateIdToken(claims, lifetime, at, code, nonce);
     }
 
+    /// <summary>
+    ///     Creates and persists a token entity (access, refresh, or ID).
+    ///     For JWT/JWE formats, the reference IS the encoded token value;
+    ///     for opaque reference tokens, a separate random reference is generated
+    ///     and the JWT is stored as the payload for later introspection.
+    ///     Returns the value that should be emitted to the client.
+    /// </summary>
+    /// <param name="tokens">Token storage manager.</param>
+    /// <param name="token">Token service for JWT/JWE creation.</param>
+    /// <param name="claims">Claims to embed.</param>
+    /// <param name="format">Token serialization format (JWT, JWE, or Reference).</param>
+    /// <param name="lifetime">Token validity duration.</param>
+    /// <param name="type">Token type (e.g., <see cref="TokenTypes.AccessToken" />).</param>
+    /// <param name="subject">Resource owner subject.</param>
+    /// <param name="application">Issuing client application name.</param>
+    /// <param name="authorization">Linked authorization/consent record name.</param>
+    /// <param name="session">OP session identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
     public static async Task<string> CreateTokenAsync(
         ITokenManager<TToken> tokens,
         TokenService          token,
@@ -118,6 +179,8 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 break;
         }
 
+        // For reference tokens, store the full JWT as the payload so it can be
+        // introspected later without requiring live JWT validation on every call.
         var payload = format == TokenFormats.Reference ? token.CreateToken(claims, lifetime) : value;
 
         var now = DateTime.UtcNow;
@@ -139,6 +202,13 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return value;
     }
 
+    /// <summary>
+    ///     Validates a Bearer token from the <c>Authorization</c> header.
+    ///     Looks up the token entity by reference, verifies its type is
+    ///     <see cref="TokenTypes.AccessToken" /> and status is
+    ///     <see cref="TokenStatuses.Valid" />, then validates the JWT/JWE
+    ///     payload and returns the claims principal.
+    /// </summary>
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
         var ct = Context.RequestAborted;
 
@@ -169,6 +239,8 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             return AuthenticateResult.NoResult();
         }
 
+        // Replace the subject claim with the one from the token entity to support
+        // pairwise subject identifiers stored at issuance time.
         var id = principal.Identity as ClaimsIdentity;
         var claims = id!.Claims.Where(c => c.Type != Claims.Subject)
                         .Append(new(Claims.Subject, entity.Subject ?? string.Empty))
@@ -178,8 +250,16 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
 
+    /// <inheritdoc />
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) { return Task.CompletedTask; }
 
+    /// <summary>
+    ///     Issues tokens in response to a successful authentication.
+    ///     Runs claim resolution via <see cref="IClaimsAdvisor" />, filters
+    ///     claims by destination via <see cref="IDestinationAdvisor" />,
+    ///     creates the access token, optionally a refresh token and an ID token,
+    ///     and writes the JSON <see cref="TokenResponse" /> to the HTTP response body.
+    /// </summary>
     protected override async Task HandleSignInAsync(ClaimsPrincipal principal, AuthenticationProperties? properties) {
         var ct    = Context.RequestAborted;
         var items = properties?.Items ?? new Dictionary<string, string?>();
@@ -214,6 +294,9 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                                          SchemataResources.GetResourceString(SchemataResources.ST4008));
         }
 
+        // Filter claims to their registered destinations and annotate each
+        // claim with a destination marker so downstream logic can split them
+        // into access-token and identity-token claim sets.
         for (var i = claims.Count - 1; i >= 0; i--) {
             var destinations = new HashSet<string>();
 
@@ -261,6 +344,8 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             response.RefreshToken = await CreateTokenAsync(tokens, issuer, [..access], config.Value.RefreshTokenFormat, config.Value.RefreshTokenLifetime, TokenTypes.RefreshToken, @internal, app, authorizationName, sid, ct);
         }
 
+        // OIDC Core §3.1.3.7: ID tokens are only returned when openid is in scope
+        // and a user is present (not client_credentials).
         if (ScopeParser.Contains(scope, Scopes.OpenId) && IsUserGrant(items)) {
             response.IdToken = CreateIdToken(issuer, items, id, config.Value.IdTokenLifetime, response.AccessToken, null);
         }

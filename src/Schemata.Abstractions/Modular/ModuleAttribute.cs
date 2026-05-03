@@ -3,19 +3,19 @@ using System;
 namespace Schemata.Abstractions.Modular;
 
 /// <summary>
-///     Assembly-level attribute that declares a module by name for discovery.
+///     Assembly-level attribute that declares a module type for discovery.
 /// </summary>
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
 public sealed class ModuleAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="ModuleAttribute" /> class.
+    ///     Declares a module for assembly-level discovery.
     /// </summary>
     /// <param name="name">The fully-qualified type name of the module.</param>
     public ModuleAttribute(string name) { Name = name; }
 
     /// <summary>
-    ///     Gets the fully-qualified type name of the module.
+    ///     The fully-qualified type name, resolvable via <see cref="Type.GetType(string)" />.
     /// </summary>
     public string Name { get; }
 }

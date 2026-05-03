@@ -19,30 +19,35 @@ public class AdviceCodeExchangePkceShould
     private const string Verifier      = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     private const string ChallengeS256 = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 
-    private static AdviceCodeExchangePkce<SchemataApplication, SchemataToken> CreateAdvisor(bool requireS256 = true, bool downgradeProtection = true) {
+    private static AdviceCodeExchangePkce<SchemataApplication, SchemataToken> CreateAdvisor(
+        bool requireS256         = true,
+        bool downgradeProtection = true
+    ) {
         var opts = new CodeFlowOptions {
             RequirePkceS256 = requireS256, RequirePkceDowngradeProtection = downgradeProtection,
         };
-        return new AdviceCodeExchangePkce<SchemataApplication, SchemataToken>(Options.Create(opts));
+        return new(Options.Create(opts));
     }
 
     private static AdviceContext CreateContext() { return new(new ServiceCollection().BuildServiceProvider()); }
 
-    private static CodeExchangeContext<SchemataApplication, SchemataToken> Exchange(TokenRequest request, AuthorizeRequest payload) {
+    private static CodeExchangeContext<SchemataApplication, SchemataToken> Exchange(
+        TokenRequest     request,
+        AuthorizeRequest payload
+    ) {
         return new() {
-            Request   = request,
-            Application = new SchemataApplication { ClientId = "test" },
-            CodeToken = new SchemataToken(),
-            Payload   = payload,
+            Request     = request,
+            Application = new() { ClientId = "test" },
+            CodeToken   = new(),
+            Payload     = payload,
         };
     }
 
     [Fact]
     public async Task Continues_WhenS256Challenge_MatchesVerifier() {
-        var advisor  = CreateAdvisor();
-        var exchange = Exchange(
-            new TokenRequest { CodeVerifier = Verifier },
-            new AuthorizeRequest { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
+        var advisor = CreateAdvisor();
+        var exchange = Exchange(new() { CodeVerifier  = Verifier },
+                                new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var result = await advisor.AdviseAsync(CreateContext(), exchange);
 
@@ -51,10 +56,9 @@ public class AdviceCodeExchangePkceShould
 
     [Fact]
     public async Task ThrowsInvalidGrant_WhenS256Challenge_DoesNotMatchVerifier() {
-        var advisor  = CreateAdvisor();
-        var exchange = Exchange(
-            new TokenRequest { CodeVerifier = "wrong-verifier" },
-            new AuthorizeRequest { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
+        var advisor = CreateAdvisor();
+        var exchange = Exchange(new() { CodeVerifier  = "wrong-verifier" },
+                                new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
@@ -63,9 +67,7 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenVerifierMissing_AndChallengePresent() {
         var advisor  = CreateAdvisor();
-        var exchange = Exchange(
-            new TokenRequest(),
-            new AuthorizeRequest { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
+        var exchange = Exchange(new(), new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
@@ -74,7 +76,7 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task Continues_WhenNoChallengeAndNoVerifier() {
         var advisor  = CreateAdvisor();
-        var exchange = Exchange(new TokenRequest(), new AuthorizeRequest());
+        var exchange = Exchange(new(), new());
 
         var result = await advisor.AdviseAsync(CreateContext(), exchange);
 
@@ -85,9 +87,8 @@ public class AdviceCodeExchangePkceShould
     public async Task Continues_WhenPlainChallenge_MatchesVerifier() {
         var advisor       = CreateAdvisor(false);
         var plainVerifier = "my-plain-verifier-that-is-at-least-43-chars-long_ok";
-        var exchange      = Exchange(
-            new TokenRequest { CodeVerifier = plainVerifier },
-            new AuthorizeRequest { CodeChallenge = plainVerifier, CodeChallengeMethod = PkceMethods.Plain });
+        var exchange = Exchange(new() { CodeVerifier  = plainVerifier },
+                                new() { CodeChallenge = plainVerifier, CodeChallengeMethod = PkceMethods.Plain });
 
         var result = await advisor.AdviseAsync(CreateContext(), exchange);
 
@@ -97,9 +98,7 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenDowngradeProtection_VerifierWithoutChallenge() {
         var advisor  = CreateAdvisor(downgradeProtection: true);
-        var exchange = Exchange(
-            new TokenRequest { CodeVerifier = Verifier },
-            new AuthorizeRequest());
+        var exchange = Exchange(new() { CodeVerifier = Verifier }, new());
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);

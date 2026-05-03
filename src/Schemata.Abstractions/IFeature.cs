@@ -1,17 +1,19 @@
 namespace Schemata.Abstractions;
 
 /// <summary>
-///     Base interface for all features and advisors, providing ordering and priority for pipeline execution.
+///     Base interface for all features, providing ordering values so the
+///     pipeline executor can sort and sequence them correctly.
 /// </summary>
 public interface IFeature
 {
     /// <summary>
-    ///     Gets the execution order used to sort features during service configuration.
+    ///     Insertion order during service registration. Lower values run earlier.
     /// </summary>
     int Order { get; }
 
     /// <summary>
-    ///     Gets the priority used to sort features during application and endpoint configuration.
+    ///     Insertion order during application and endpoint pipeline construction.
+    ///     Lower values run earlier.
     /// </summary>
     int Priority { get; }
 }

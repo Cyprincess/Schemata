@@ -4,13 +4,12 @@ namespace Schemata.Entity.Repository.Advisors;
 
 /// <summary>
 ///     Advisor invoked during query construction, before the user predicate is applied.
+///     Receives a <see cref="QueryContainer{TEntity}" /> and may call
+///     <see cref="QueryContainer{TEntity}.ApplyModification" /> to append global filters
+///     (e.g., soft-delete exclusion via <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>/
+///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>).
+///     All three <see cref="AdviseResult" /> values allow the query to proceed.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being queried.</typeparam>
-/// <remarks>
-///     Use this to modify the <see cref="QueryContainer{TEntity}" /> (e.g., add global filters such as soft-delete).
-///     The advisor receives the raw <see cref="QueryContainer{TEntity}" /> and may call
-///     <see cref="QueryContainer{TEntity}.ApplyModification" /> to append query operators.
-///     <see cref="AdviseResult" /> values are observed but all three currently allow the query to proceed.
-/// </remarks>
 public interface IRepositoryBuildQueryAdvisor<TEntity> : IAdvisor<QueryContainer<TEntity>>
     where TEntity : class;

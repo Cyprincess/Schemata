@@ -1,22 +1,27 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Schemata.Core;
 
 /// <summary>
-///     Registry for deferred configuration actions that are accumulated during builder setup and applied later.
+///     Deferred configurator registry. Configuration actions registered during
+///     builder setup are accumulated here and applied later via <see cref="Invoke" />,
+///     which wraps each action as a <see cref="ConfigureNamedOptions{TOptions}" />
+///     singleton.
 /// </summary>
 public sealed class Configurators
 {
     private readonly Dictionary<Type, object> _configurators = [];
 
     /// <summary>
-    ///     Registers or chains a configuration action for the specified type.
+    ///     Records an options-configuration delegate. If a delegate of the same
+    ///     type already exists, the new delegate is chained after the existing one.
     /// </summary>
-    /// <typeparam name="T">The options type to configure.</typeparam>
-    /// <param name="action">The configuration action.</param>
+    /// <typeparam name="T">The options type keyed by <c>typeof(T)</c>.</typeparam>
+    /// <param name="action">The configuration delegate to record.</param>
     public void Set<T>(Action<T> action) {
         var key = typeof(T);
 
@@ -32,11 +37,11 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Registers or chains a configuration action with two parameters.
+    ///     Records a two-parameter configuration delegate (e.g. an
+    ///     <see cref="AuthenticationBuilder" /> callback), keyed by the tuple
+    ///     <c>(T1, T2)</c>.
     /// </summary>
-    /// <typeparam name="T1">The first parameter type.</typeparam>
-    /// <typeparam name="T2">The second parameter type.</typeparam>
-    /// <param name="action">The configuration action.</param>
+    /// <param name="action">The configuration delegate to record.</param>
     public void Set<T1, T2>(Action<T1, T2> action) {
         var key = typeof((T1, T2));
 
@@ -52,11 +57,11 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Attempts to retrieve a configuration action for the specified type.
+    ///     Attempts to retrieve a registered configuration action without throwing.
     /// </summary>
-    /// <typeparam name="T">The options type.</typeparam>
-    /// <param name="action">When this method returns, contains the action if found.</param>
-    /// <returns><see langword="true" /> if an action was found.</returns>
+    /// <typeparam name="T">The options type keyed by <c>typeof(T)</c>.</typeparam>
+    /// <param name="action">The registered action, or <see langword="null" /> when absent.</param>
+    /// <returns><see langword="true" /> when an action was found for <typeparamref name="T" />.</returns>
     public bool TryGet<T>(out Action<T>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof(T), out var @object)) {
@@ -72,12 +77,11 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Attempts to retrieve a two-parameter configuration action.
+    ///     Two-parameter variant of <see cref="TryGet{T}(out Action{T})" />, keyed
+    ///     by the tuple <c>(T1, T2)</c>.
     /// </summary>
-    /// <typeparam name="T1">The first parameter type.</typeparam>
-    /// <typeparam name="T2">The second parameter type.</typeparam>
-    /// <param name="action">When this method returns, contains the action if found.</param>
-    /// <returns><see langword="true" /> if an action was found.</returns>
+    /// <param name="action">The registered action, or <see langword="null" /> when absent.</param>
+    /// <returns><see langword="true" /> when an action was found for <c>(T1, T2)</c>.</returns>
     public bool TryGet<T1, T2>(out Action<T1, T2>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof((T1, T2)), out var @object)) {
@@ -93,11 +97,11 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves a configuration action, throwing if not found.
+    ///     Retrieves a registered configuration action, throwing
+    ///     <see cref="KeyNotFoundException" /> when absent.
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    /// <returns>The configuration action.</returns>
-    /// <exception cref="KeyNotFoundException">Thrown when no configurator is registered for the type.</exception>
+    /// <returns>The registered action.</returns>
     public Action<T> Get<T>() {
         if (TryGet<T>(out var action)) {
             return action!;
@@ -107,12 +111,10 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves a two-parameter configuration action, throwing if not found.
+    ///     Two-parameter variant of <see cref="Get{T}" />, keyed by the tuple
+    ///     <c>(T1, T2)</c>.
     /// </summary>
-    /// <typeparam name="T1">The first parameter type.</typeparam>
-    /// <typeparam name="T2">The second parameter type.</typeparam>
-    /// <returns>The configuration action.</returns>
-    /// <exception cref="KeyNotFoundException">Thrown when no configurator is registered for the type pair.</exception>
+    /// <returns>The registered action.</returns>
     public Action<T1, T2> Get<T1, T2>() {
         if (TryGet<T1, T2>(out var action)) {
             return action!;
@@ -122,10 +124,10 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves and removes a configuration action, throwing if not found.
+    ///     Retrieves and removes a configuration action, throwing when absent.
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    /// <returns>The configuration action.</returns>
+    /// <returns>The registered action.</returns>
     public Action<T> Pop<T>() {
         var action = Get<T>();
         _configurators.Remove(typeof(T));
@@ -133,11 +135,10 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves and removes a two-parameter configuration action, throwing if not found.
+    ///     Two-parameter variant of <see cref="Pop{T}" />. Retrieves and removes,
+    ///     throwing when absent.
     /// </summary>
-    /// <typeparam name="T1">The first parameter type.</typeparam>
-    /// <typeparam name="T2">The second parameter type.</typeparam>
-    /// <returns>The configuration action.</returns>
+    /// <returns>The registered action.</returns>
     public Action<T1, T2> Pop<T1, T2>() {
         var action = Get<T1, T2>();
         _configurators.Remove(typeof((T1, T2)));
@@ -145,10 +146,11 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves and removes a configuration action, returning a no-op if not found.
+    ///     Retrieves and removes a configuration action, returning a no-op when
+    ///     absent.
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    /// <returns>The configuration action, or a no-op action.</returns>
+    /// <returns>The registered action, or a no-op.</returns>
     public Action<T> PopOrDefault<T>() {
         if (!TryGet<T>(out var action)) {
             return _ => { };
@@ -160,11 +162,10 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Retrieves and removes a two-parameter configuration action, returning a no-op if not found.
+    ///     Two-parameter variant of <see cref="PopOrDefault{T}" />. Retrieves and
+    ///     removes, returning a no-op when absent.
     /// </summary>
-    /// <typeparam name="T1">The first parameter type.</typeparam>
-    /// <typeparam name="T2">The second parameter type.</typeparam>
-    /// <returns>The configuration action, or a no-op action.</returns>
+    /// <returns>The registered action, or a no-op.</returns>
     public Action<T1, T2> PopOrDefault<T1, T2>() {
         if (!TryGet<T1, T2>(out var action)) {
             return (_, _) => { };
@@ -175,6 +176,13 @@ public sealed class Configurators
         return action!;
     }
 
+    /// <summary>
+    ///     Wraps every outstanding configurator as a
+    ///     <see cref="ConfigureNamedOptions{TOptions}" /> singleton registered in the
+    ///     service collection, then clears the registry.
+    /// </summary>
+    /// <param name="services">The service collection to register into.</param>
+    /// <returns>The given service collection for chaining.</returns>
     public IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 

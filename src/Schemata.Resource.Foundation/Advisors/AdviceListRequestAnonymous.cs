@@ -9,11 +9,23 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceListRequestAnonymous{TEntity}" />.
+/// </summary>
 public static class AdviceListRequestAnonymous
 {
+    /// <summary>
+    ///     Default order at <see cref="Orders.Base" />.
+    /// </summary>
     public const int DefaultOrder = Orders.Base;
 }
 
+/// <summary>
+///     Sets <see cref="AnonymousGranted" /> in the context when the list operation,
+///     per <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>, is configured for
+///     anonymous access via <see cref="AnonymousAccess" />.
+/// </summary>
+/// <typeparam name="TEntity">The entity type.</typeparam>
 public sealed class AdviceListRequestAnonymous<TEntity> : IResourceListRequestAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {

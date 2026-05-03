@@ -12,13 +12,15 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-///     Generic REST controller that exposes CRUD endpoints for a resource, delegating to
-///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.
+///     Generic REST controller that exposes CRUD endpoints for a resource,
+///     delegating to <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />, including
+///     <seealso href="https://google.aip.dev/127">AIP-127: HTTP and gRPC Transcoding</seealso>,
+///     <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso>,
+///     <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>,
+///     <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>,
+///     <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>, and
+///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>.
 /// </summary>
-/// <typeparam name="TEntity">The persistent entity type.</typeparam>
-/// <typeparam name="TRequest">The request DTO type for create and update operations.</typeparam>
-/// <typeparam name="TDetail">The detail DTO type returned from get, create, and update operations.</typeparam>
-/// <typeparam name="TSummary">The summary DTO type returned from list operations.</typeparam>
 [ApiController]
 [Route("~/Resource")]
 public class ResourceController<TEntity, TRequest, TDetail, TSummary> : ControllerBase
@@ -33,7 +35,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
-    ///     Initializes a new resource controller instance.
+    ///     Initializes a new <see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" /> instance.
     /// </summary>
     /// <param name="handler">The operation handler.</param>
     /// <param name="json">The JSON serializer options.</param>
@@ -48,12 +50,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    ///     Gets the configured JSON serializer options with resource-specific naming conventions.
+    ///     Gets the configured JSON serializer options with resource-specific naming conventions
+    ///     from <see cref="ResourceJsonOptions" />.
     /// </summary>
     protected JsonSerializerOptions JsonOptions { get; }
 
     /// <summary>
-    ///     Gets the empty result returned when an operation is blocked.
+    ///     Gets the empty result returned when an operation is blocked by an advisor.
     /// </summary>
     protected virtual EmptyResult EmptyResult { get; } = new();
 
@@ -66,12 +69,15 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    ///     Lists resources with filtering, ordering, and pagination.
+    ///     Lists resources with filtering, ordering, and pagination
+    ///     per <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>.
     /// </summary>
     /// <param name="request">The list request parameters from the query string.</param>
     /// <returns>A JSON result containing the paginated list, or an empty result if blocked.</returns>
     [HttpGet]
     public virtual async Task<IActionResult> ListAsync([FromQuery] ListRequest request) {
+        // Auto-populate the parent field from route values so that nested
+        // resources (e.g. /publishers/{id}/books) are correctly scoped.
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
         var result = await Handler.ListAsync(request, HttpContext.User, HttpContext.RequestAborted);
@@ -83,7 +89,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    ///     Gets a single resource by name.
+    ///     Gets a single resource by name
+    ///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso>.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
     /// <returns>A JSON result containing the detail DTO, or an empty result if blocked.</returns>
@@ -98,7 +105,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    ///     Creates a new resource from the request body.
+    ///     Creates a new resource from the request body
+    ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
     /// </summary>
     /// <param name="request">The creation request from the body.</param>
     /// <returns>A 201 Created JSON result with the detail DTO, or an empty result if blocked.</returns>
@@ -111,19 +119,24 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
+        // AIP-133 requires a Location header pointing to the created resource.
         HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail!.Name });
 
         return new JsonResult(result.Detail, JsonOptions) { StatusCode = StatusCodes.Status201Created };
     }
 
     /// <summary>
-    ///     Updates an existing resource by name with a partial or full update from the request body.
+    ///     Updates an existing resource by name with a partial or full update from the request body
+    ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
     /// <param name="request">The update request from the body.</param>
     /// <returns>A JSON result containing the updated detail DTO, or an empty result if blocked.</returns>
     [HttpPatch("{name}")]
     public virtual async Task<IActionResult> UpdateAsync(string name, [FromBody] TRequest request) {
+        // Read ETag from query string first, then fall back to If-Match header.
+        // Some HTTP clients cannot set custom headers, but AIP-154 requires
+        // ETag-based concurrency for updates.
         if (request is IFreshness freshness && string.IsNullOrWhiteSpace(freshness.EntityTag)) {
             var tag = HttpContext.Request.Query[Parameters.EntityTag].ToString();
             if (string.IsNullOrWhiteSpace(tag)) {
@@ -144,10 +157,11 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     }
 
     /// <summary>
-    ///     Deletes a resource by name with optional ETag concurrency check.
+    ///     Deletes a resource by name with optional ETag concurrency check
+    ///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>.
     /// </summary>
     /// <param name="name">The resource name from the route.</param>
-    /// <param name="etag">Optional ETag for concurrency checking (also read from If-Match header).</param>
+    /// <param name="etag">Optional ETag for concurrency checking.</param>
     /// <param name="force">Whether to bypass the freshness check.</param>
     /// <returns>A 204 No Content result on success, or an empty result if blocked.</returns>
     [HttpDelete("{name}")]
@@ -156,6 +170,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         [FromQuery] string? etag  = null,
         [FromQuery] bool?   force = null
     ) {
+        // Fall back to If-Match header when the ?etag query param is absent.
+        // Same rationale as UpdateAsync — some clients cannot set headers.
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {
             tag = HttpContext.Request.Headers.IfMatch.ToString();

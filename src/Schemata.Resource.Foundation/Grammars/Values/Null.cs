@@ -5,23 +5,30 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars.Values;
 
 /// <summary>
-///     Represents a null literal value in the filter grammar.
+///     A null literal (<c>NULL</c>).
 /// </summary>
 public class Null : IValue
 {
+    /// <summary>
+    ///     Initializes a new null literal.
+    /// </summary>
     public Null(TextPosition position) { Position = position; }
 
     #region IValue Members
 
     object? IValue.Value => null;
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => true;
 
+    /// <inheritdoc />
     public Expression ToExpression(Container ctx) { return Expression.Constant(null); }
 
     #endregion
 
+    /// <inheritdoc />
     public override string ToString() { return "\u2205"; }
 }

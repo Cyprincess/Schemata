@@ -6,15 +6,17 @@ using Schemata.Resource.Grpc.Features;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for enabling gRPC transport on the resource builder.
+///     Extension methods for enabling gRPC transport on
+///     <see cref="SchemataResourceBuilder" />.
 /// </summary>
 public static class SchemataResourceBuilderExtensions
 {
     /// <summary>
-    ///     Enables gRPC transport for resources and returns a builder for gRPC-specific configuration.
+    ///     Enables gRPC transport for resources and returns a
+    ///     <see cref="SchemataGrpcResourceBuilder" /> for gRPC-specific configuration.
     /// </summary>
-    /// <param name="builder">The resource builder.</param>
-    /// <returns>A gRPC resource builder for registering gRPC-only resources.</returns>
+    /// <param name="builder">The <see cref="SchemataResourceBuilder" />.</param>
+    /// <returns>A <see cref="SchemataGrpcResourceBuilder" /> for registering gRPC resources.</returns>
     public static SchemataGrpcResourceBuilder MapGrpc(this SchemataResourceBuilder builder) {
         builder.AddFeature<SchemataGrpcResourceFeature>();
 

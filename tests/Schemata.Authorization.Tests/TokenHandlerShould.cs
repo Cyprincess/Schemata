@@ -33,7 +33,8 @@ public class TokenHandlerShould
     [Fact]
     public async Task RoutesToMatchingGrantHandler() {
         var grant = MockGrant(GrantTypes.ClientCredentials);
-        grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
+                                       It.IsAny<CancellationToken>()))
              .ReturnsAsync(AuthorizationResult.Content(new { }));
 
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
@@ -50,7 +51,8 @@ public class TokenHandlerShould
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = "unknown" };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Code);
     }
@@ -61,7 +63,8 @@ public class TokenHandlerShould
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = null };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Code);
     }
@@ -70,7 +73,8 @@ public class TokenHandlerShould
     public async Task ReturnsResultFromMatchedHandler() {
         var expected = AuthorizationResult.Content(new { token = "abc" });
         var grant    = MockGrant(GrantTypes.RefreshToken);
-        grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
+                                       It.IsAny<CancellationToken>()))
              .ReturnsAsync(expected);
 
         var handler = CreateHandler((GrantTypes.RefreshToken, grant));
@@ -86,7 +90,8 @@ public class TokenHandlerShould
         var cc      = MockGrant(GrantTypes.ClientCredentials);
         var refresh = MockGrant(GrantTypes.RefreshToken);
 
-        refresh.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        refresh.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
+                                         It.IsAny<CancellationToken>()))
                .ReturnsAsync(AuthorizationResult.Content(new { }));
 
         var handler = CreateHandler((GrantTypes.ClientCredentials, cc), (GrantTypes.RefreshToken, refresh));
@@ -95,6 +100,8 @@ public class TokenHandlerShould
         await handler.HandleAsync(request, null, CancellationToken.None);
 
         refresh.Verify(h => h.HandleAsync(request, null, CancellationToken.None), Times.Once);
-        cc.Verify(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()), Times.Never);
+        cc.Verify(
+            h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
+                               It.IsAny<CancellationToken>()), Times.Never);
     }
 }

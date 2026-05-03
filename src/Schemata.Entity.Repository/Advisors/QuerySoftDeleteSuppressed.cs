@@ -1,14 +1,9 @@
 namespace Schemata.Entity.Repository.Advisors;
 
 /// <summary>
-///     Context flag that suppresses the soft-delete query filter.
+///     Context flag that suppresses the soft-delete global query filter so that queries return
+///     soft-deleted entities, per
+///     <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso> and
+///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>.
 /// </summary>
-/// <remarks>
-///     Set via <see cref="IRepository.SuppressQuerySoftDelete" /> or
-///     <see cref="IRepository{TEntity}.SuppressQuerySoftDelete" />.
-///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
-///     <see cref="AdviceBuildQuerySoftDelete{TEntity}" /> will not filter out soft-deleted entities,
-///     allowing queries to return entities where <see cref="Schemata.Abstractions.Entities.ISoftDelete.DeleteTime" /> is
-///     non-null.
-/// </remarks>
 public sealed class QuerySoftDeleteSuppressed;

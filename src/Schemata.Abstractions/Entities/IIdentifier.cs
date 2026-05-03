@@ -1,12 +1,12 @@
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Indicates that an entity has a unique numeric identifier.
+///     Provides a unique numeric identifier suitable for use as a primary key.
 /// </summary>
 public interface IIdentifier
 {
     /// <summary>
-    ///     Gets or sets the unique identifier for the entity.
+    ///     The unique numeric identifier.
     /// </summary>
     long Id { get; set; }
 }

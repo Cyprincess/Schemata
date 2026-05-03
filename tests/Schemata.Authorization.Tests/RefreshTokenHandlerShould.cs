@@ -32,11 +32,8 @@ public class RefreshTokenHandlerShould
         var refreshOpts  = Options.Create(new RefreshTokenFlowOptions());
         var tokenService = new TokenService(opts);
 
-        var claims = new List<Claim> {
-            new(Claims.Subject, "user-1"),
-            new(Claims.Scope,   approvedScope ?? ""),
-        };
-        var jwt = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var claims = new List<Claim> { new(Claims.Subject, "user-1"), new(Claims.Scope, approvedScope ?? "") };
+        var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
             Id                = 1,
@@ -50,18 +47,19 @@ public class RefreshTokenHandlerShould
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();
-        tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>()))
-              .ReturnsAsync(refreshToken);
+        tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>())).ReturnsAsync(refreshToken);
 
-        var app = new SchemataApplication { Id = 1, ClientId = "test" };
+        var app        = new SchemataApplication { Id = 1, ClientId = "test" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(
-                              It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                              It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
-        var sp      = new ServiceCollection().BuildServiceProvider();
-        var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(
+            clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
 
         return new(handler, tokens, refreshToken);
     }
@@ -82,8 +80,9 @@ public class RefreshTokenHandlerShould
     public async Task ThrowsInvalidGrant_WhenRefreshTokenEmpty(string? refreshToken) {
         var f = CreateFixture();
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(
-            () => f.Handler.HandleAsync(CreateRequest(refresh: refreshToken), null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
+                                                              CreateRequest(refresh: refreshToken), null,
+                                                              CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
@@ -95,10 +94,8 @@ public class RefreshTokenHandlerShould
         var result = await f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
         Assert.NotNull(result.Properties);
-        Assert.Equal("auth-42",
-                     result.Properties![Properties.AuthorizationName]);
-        Assert.Equal("session-xyz",
-                     result.Properties[Properties.SessionId]);
+        Assert.Equal("auth-42", result.Properties![Properties.AuthorizationName]);
+        Assert.Equal("session-xyz", result.Properties[Properties.SessionId]);
     }
 
     [Fact]
@@ -116,8 +113,8 @@ public class RefreshTokenHandlerShould
 
     private record Fixture(
         RefreshTokenHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>> Tokens,
-        SchemataToken                      RefreshToken
+        Mock<ITokenManager<SchemataToken>>                      Tokens,
+        SchemataToken                                           RefreshToken
     );
 
     #endregion

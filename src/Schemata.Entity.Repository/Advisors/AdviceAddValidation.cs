@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
@@ -14,22 +13,21 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceAddValidation{TEntity}" />.</summary>
 public static class AdviceAddValidation
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>
+    ///     Default execution order: after <see cref="AdviceAddCanonicalName{TEntity}" />
+    ///     (220,000,000 + 10,000,000 = 230,000,000).
+    /// </summary>
     public const int DefaultOrder = AdviceAddCanonicalName.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Runs registered validation advisors against the entity before it is added.
+///     Runs registered <see cref="IValidationAdvisor{TEntity}" /> advisors against the entity
+///     before it is added. Throws <see cref="ValidationException" /> if any advisor returns
+///     <see cref="AdviseResult.Block" />.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" /> (2,147,400,000). Runs last in the add pipeline.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.
-///     </para>
-///     <para>Throws <see cref="ValidationException" /> when validation fails with <see cref="AdviseResult.Block" />.</para>
-///     <para>Suppressed when <see cref="AddValidationSuppressed" /> is present in the advice context.</para>
+///     Suppressed by <see cref="AddValidationSuppressed" />.
 /// </remarks>
 public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class

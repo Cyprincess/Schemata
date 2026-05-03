@@ -1,26 +1,7 @@
-// Some code is borrowed from linq2db
+// Portions adapted from linq2db
 // https://github.com/linq2db/linq2db/blob/fcf358851ac47c9d7a6ef2dd99e9561edd7fa985/Source/LinqToDB/Metadata/SystemComponentModelDataAnnotationsSchemaAttributeReader.cs
-// The borrowed code is licensed under the MIT License:
-//
+// Licensed under the MIT License.
 // Copyright (c) 2024 Igor Tkachev, Ilya Chudin, Svyatoslav Danyliv, Dmitry Lukashenko
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
@@ -33,8 +14,8 @@ using LinqToDB.Metadata;
 namespace Schemata.Entity.LinqToDB;
 
 /// <summary>
-///     LINQ to DB metadata reader that maps <c>System.ComponentModel.DataAnnotations.Schema</c> attributes to LINQ to DB
-///     mapping attributes.
+///     LINQ to DB metadata reader that translates <c>System.ComponentModel.DataAnnotations.Schema</c> attributes into
+///     LINQ to DB mapping attributes.
 /// </summary>
 /// <remarks>
 ///     Translates <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />,
@@ -50,7 +31,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
     /// <summary>
     ///     Returns LINQ to DB mapping attributes for the specified type by reading
-    ///     <c>System.ComponentModel.DataAnnotations.Schema.TableAttribute</c>.
+    ///     <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />.
     /// </summary>
     /// <param name="type">The type to inspect.</param>
     /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
