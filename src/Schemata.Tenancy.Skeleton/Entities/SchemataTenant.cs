@@ -23,8 +23,8 @@ public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDescriptive, I
     /// <summary>Gets or sets the tenant-specific identifier used for resolution.</summary>
     public virtual TKey? TenantId { get; set; }
 
-    /// <summary>Gets or sets the JSON-serialized host names associated with this tenant.</summary>
-    public virtual string? Hosts { get; set; }
+    /// <summary>Gets or sets the host names associated with this tenant.</summary>
+    public virtual ICollection<SchemataTenantHost>? Hosts { get; set; }
 
     #region ICanonicalName Members
 

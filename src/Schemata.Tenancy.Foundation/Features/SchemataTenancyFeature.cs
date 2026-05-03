@@ -1,10 +1,10 @@
 using System;
-using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Tenancy.Foundation.Middlewares;
@@ -43,6 +43,8 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.AddOptions<SchemataTenancyOptions>();
+
         services.TryAddScoped<ITenantManager<TTenant, TKey>, TManager>();
 
         services.TryAddScoped<SchemataTenantContextAccessor<TTenant, TKey>>();
@@ -51,18 +53,14 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
         services.TryAddScoped<SchemataTenantServiceScopeFactory<TTenant, TKey>>();
         services.TryAddTransient<ITenantServiceScopeFactory<TTenant, TKey>>(sp => sp.GetRequiredService<SchemataTenantServiceScopeFactory<TTenant, TKey>>());
 
+        services.TryAddSingleton<ITenantProviderCache, MemoryCacheTenantProviderCache>();
+
         if (typeof(TTenant) == typeof(SchemataTenant<Guid>)) {
             services.TryAddTransient<ITenantContextAccessor>(sp => (ITenantContextAccessor)sp.GetRequiredService<ITenantContextAccessor<SchemataTenant<Guid>, Guid>>());
             services.TryAddTransient<ITenantManager>(sp => (ITenantManager)sp.GetRequiredService<ITenantManager<SchemataTenant<Guid>, Guid>>());
         }
 
-        if (services.Any(s => s.ServiceType == typeof(ITenantServiceProviderFactory<TTenant, TKey>))) {
-            return;
-        }
-
-        var configure = configurators.PopOrDefault<IServiceCollection, TTenant?>();
-        services.AddSingleton(_ => new SchemataTenantServiceProviderFactory<TTenant, TKey>(services, configure));
-        services.TryAddTransient<ITenantServiceProviderFactory<TTenant, TKey>>(sp => sp.GetRequiredService<SchemataTenantServiceProviderFactory<TTenant, TKey>>());
+        services.TryAddSingleton<ITenantServiceProviderFactory<TTenant, TKey>>(sp => new SchemataTenantServiceProviderFactory<TTenant, TKey>(services, sp, sp.GetRequiredService<ITenantProviderCache>(), sp.GetRequiredService<IOptions<SchemataTenancyOptions>>()));
     }
 
     /// <inheritdoc />
@@ -71,7 +69,6 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TKey> : FeatureBas
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        app.UseMiddleware<SchemataTenantContextAccessorInitializer<TTenant, TKey>>();
-        app.UseMiddleware<SchemataTenantServiceProviderReplacer<TTenant, TKey>>();
+        app.UseMiddleware<SchemataTenancyMiddleware<TTenant, TKey>>();
     }
 }

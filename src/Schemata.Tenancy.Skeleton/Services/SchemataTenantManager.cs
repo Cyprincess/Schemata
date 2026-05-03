@@ -2,11 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
-using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton.Entities;
 
@@ -18,8 +15,11 @@ namespace Schemata.Tenancy.Skeleton.Services;
 public class SchemataTenantManager : SchemataTenantManager<SchemataTenant<Guid>, Guid>, ITenantManager
 {
     /// <inheritdoc />
-    public SchemataTenantManager(ICacheProvider cache, IRepository<SchemataTenant<Guid>> tenants) :
-        base(cache, tenants) { }
+    public SchemataTenantManager(
+        IRepository<SchemataTenant<Guid>> tenants,
+        IRepository<SchemataTenantHost>   hosts,
+        ITenantProviderCache              cache
+    ) : base(tenants, hosts, cache) { }
 }
 
 /// <summary>
@@ -31,15 +31,21 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    private readonly ICacheProvider       _cache;
-    private readonly IRepository<TTenant> _tenants;
+    private readonly ITenantProviderCache            _cache;
+    private readonly IRepository<SchemataTenantHost> _hosts;
+    private readonly IRepository<TTenant>            _tenants;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SchemataTenantManager{TTenant, TKey}" /> class.
     /// </summary>
-    public SchemataTenantManager(ICacheProvider cache, IRepository<TTenant> tenants) {
-        _cache   = cache;
+    public SchemataTenantManager(
+        IRepository<TTenant>            tenants,
+        IRepository<SchemataTenantHost> hosts,
+        ITenantProviderCache            cache
+    ) {
         _tenants = tenants;
+        _hosts   = hosts;
+        _cache   = cache;
     }
 
     #region ITenantManager<TTenant,TKey> Members
@@ -55,29 +61,26 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     }
 
     /// <inheritdoc />
-    public ValueTask<TTenant?> FindByHost(string host, CancellationToken ct) {
-        var wrapped = $"\"{host}\"";
-        return _tenants.SingleOrDefaultAsync(q => q.Where(t => t.Hosts!.Contains(wrapped)), ct);
+    public virtual async ValueTask<TTenant?> FindByHost(string host, CancellationToken ct) {
+        var match = await _hosts.SingleOrDefaultAsync(q => q.Where(h => h.Host == host), ct);
+        if (match is null) {
+            return null;
+        }
+
+        return await _tenants.SingleOrDefaultAsync(q => q.Where(t => t.Id == match.SchemataTenantId), ct);
     }
 
     /// <inheritdoc />
     public virtual async ValueTask<ImmutableArray<string>> GetHostsAsync(TTenant tenant, CancellationToken ct) {
-        if (string.IsNullOrWhiteSpace(tenant.Hosts)) {
-            return ImmutableArray<string>.Empty;
+        var builder = ImmutableArray.CreateBuilder<string>();
+
+        await foreach (var row in _hosts.ListAsync(q => q.Where(h => h.SchemataTenantId == tenant.Id), ct)) {
+            if (!string.IsNullOrWhiteSpace(row.Host)) {
+                builder.Add(row.Host!);
+            }
         }
 
-        var key   = tenant.Hosts!.ToCacheKey(SchemataConstants.Keys.Tenancy);
-        var bytes = await _cache.GetAsync(key, ct);
-        if (bytes is not null) {
-            return JsonSerializer.Deserialize<ImmutableArray<string>>(bytes);
-        }
-
-        var hosts = JsonSerializer.Deserialize<ImmutableArray<string>?>(tenant.Hosts!) ?? ImmutableArray<string>.Empty;
-        await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(hosts), new() {
-            SlidingExpiration = TimeSpan.FromMinutes(1),
-        }, ct);
-
-        return hosts;
+        return builder.ToImmutable();
     }
 
     /// <inheritdoc />
@@ -98,26 +101,29 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
         Dictionary<string, string> names,
         CancellationToken          ct
     ) {
-        if (names is not { Count: > 0 }) {
-            tenant.DisplayNames = null;
-            return default;
-        }
-
-        tenant.DisplayNames = names;
+        tenant.DisplayNames = names is { Count: > 0 } ? names : null;
 
         return default;
     }
 
     /// <inheritdoc />
-    public virtual ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct) {
-        if (hosts.IsDefaultOrEmpty) {
-            tenant.Hosts = null;
-            return default;
+    public virtual async ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct) {
+        var existing = new List<SchemataTenantHost>();
+        await foreach (var row in _hosts.ListAsync(q => q.Where(h => h.SchemataTenantId == tenant.Id), ct)) {
+            existing.Add(row);
         }
 
-        tenant.Hosts = JsonSerializer.Serialize(hosts);
+        if (existing.Count > 0) {
+            await _hosts.RemoveRangeAsync(existing, ct);
+        }
 
-        return default;
+        if (!hosts.IsDefaultOrEmpty) {
+            foreach (var host in hosts) {
+                await _hosts.AddAsync(new() { SchemataTenantId = tenant.Id, Host = host }, ct);
+            }
+        }
+
+        await _hosts.CommitAsync(ct);
     }
 
     /// <inheritdoc />
@@ -130,6 +136,11 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     public virtual async ValueTask DeleteAsync(TTenant tenant, CancellationToken ct) {
         await _tenants.RemoveAsync(tenant, ct);
         await _tenants.CommitAsync(ct);
+
+        // §5.1: a tenant-delete event must evict the cached per-tenant service provider.
+        if (tenant.TenantId is { } key) {
+            _cache.Remove(key.ToString()!);
+        }
     }
 
     /// <inheritdoc />

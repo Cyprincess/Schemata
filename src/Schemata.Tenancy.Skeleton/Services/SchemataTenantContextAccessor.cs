@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton.Services;
@@ -61,7 +61,7 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
 
         var tenant = await _manager.FindByTenantId(id.Value, ct);
         if (tenant is not { TenantId: not null }) {
-            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1027));
+            throw new TenantResolveException();
         }
 
         await InitializeAsync(tenant, ct);
