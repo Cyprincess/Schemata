@@ -73,6 +73,7 @@
     <Project Path="tests/Schemata.Resource.Grpc.Integration.Tests/Schemata.Resource.Grpc.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Http.Integration.Tests/Schemata.Resource.Http.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />
+    <Project Path="tests/Schemata.Tenancy.Tests/Schemata.Tenancy.Tests.csproj" />
     <Project Path="tests/Schemata.Workflow.Tests/Schemata.Workflow.Tests.csproj" />
   </Folder>
 </Solution>
