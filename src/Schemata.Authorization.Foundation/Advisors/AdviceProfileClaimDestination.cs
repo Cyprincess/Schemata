@@ -9,14 +9,29 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>
+///     Claim destination advisor for standard OIDC profile claims (name, picture, locale, etc.), per
+///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#IndividualClaimsLanguages">
+///         OpenID Connect Core 1.0 §5.5.2:
+///         Languages and Scripts for Individual Claims
+///     </seealso>
+///     .
+/// </summary>
+/// <remarks>
+///     Always includes the claim in access tokens. If the <c>profile</c> scope was granted,
+///     also includes it in identity tokens and UserInfo responses.
+/// </remarks>
+/// <seealso cref="AdviceSubjectClaimDestination" />
 public sealed class AdviceProfileClaimDestination : IDestinationAdvisor
 {
     public const int DefaultOrder = AdviceSubjectClaimDestination.DefaultOrder + 10_000_000;
 
     #region IDestinationAdvisor Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
+    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,

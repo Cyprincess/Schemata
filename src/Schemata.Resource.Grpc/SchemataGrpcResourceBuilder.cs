@@ -3,18 +3,20 @@ using Schemata.Resource.Foundation;
 namespace Schemata.Resource.Grpc;
 
 /// <summary>
-///     Fluent builder for configuring resources specifically for gRPC transport.
+///     Fluent builder returned by <c>MapGrpc()</c> for configuring resources
+///     over gRPC transport.
 /// </summary>
 public sealed class SchemataGrpcResourceBuilder
 {
     /// <summary>
-    ///     Initializes a new gRPC resource builder wrapping the base resource builder.
+    ///     Initializes a new gRPC resource builder wrapping a base
+    ///     <see cref="SchemataResourceBuilder" />.
     /// </summary>
     /// <param name="builder">The base resource builder.</param>
     public SchemataGrpcResourceBuilder(SchemataResourceBuilder builder) { Builder = builder; }
 
     /// <summary>
-    ///     Gets the underlying resource builder for shared configuration.
+    ///     The underlying <see cref="SchemataResourceBuilder" /> for shared configuration.
     /// </summary>
     public SchemataResourceBuilder Builder { get; }
 }

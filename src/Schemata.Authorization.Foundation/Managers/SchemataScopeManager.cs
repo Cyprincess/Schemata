@@ -8,6 +8,12 @@ using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
+/// <summary>
+///     Default implementation of <see cref="IScopeManager{TScope}" /> backed by an
+///     <see cref="IRepository{TEntity}" />.
+/// </summary>
+/// <typeparam name="TScope">The scope entity type, must derive from <see cref="SchemataScope" />.</typeparam>
+/// <seealso cref="SchemataApplicationManager{TApplication}" />
 public class SchemataScopeManager<TScope> : IScopeManager<TScope>
     where TScope : SchemataScope
 {
@@ -17,6 +23,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
 
     #region IScopeManager<TScope> Members
 
+    /// <inheritdoc />
     public async Task<TScope?> FindByNameAsync(string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -27,6 +34,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
     }
 
+    /// <inheritdoc />
     public IAsyncEnumerable<TScope> ListAsync(IEnumerable<string>? names = null, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -37,6 +45,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name)), ct);
     }
 
+    /// <inheritdoc />
     public async Task<TScope?> CreateAsync(TScope? scope, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -50,6 +59,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return scope;
     }
 
+    /// <inheritdoc />
     public async Task UpdateAsync(TScope? scope, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -61,6 +71,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         await _scopes.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(TScope? scope, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -72,6 +83,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         await _scopes.CommitAsync(ct);
     }
 
+    /// <inheritdoc />
     public Task SetDisplayNameAsync(TScope? scope, string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -80,6 +92,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDisplayNamesAsync(TScope? scope, Dictionary<string, string>? names, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -88,6 +101,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDescriptionAsync(TScope? scope, string? description, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -96,6 +110,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetDescriptionsAsync(
         TScope?                     scope,
         Dictionary<string, string>? descriptions,
@@ -108,6 +123,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SetResourcesAsync(TScope? scope, ICollection<string>? resources, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

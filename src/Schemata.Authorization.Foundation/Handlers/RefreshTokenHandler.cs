@@ -23,6 +23,20 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     Handles the <c>refresh_token</c> grant type.
+///     Validates the refresh token via JWT signature verification (skipping
+///     lifetime checks), runs the <see cref="ITokenRequestAdvisor{TApp}" />
+///     and <see cref="IRefreshTokenAdvisor{TApp, TToken}" /> pipelines,
+///     validates subject existence, enforces optional refresh token rotation,
+///     and re-issues tokens with the stored scope,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.3">
+///         RFC 9700: The OAuth 2.0 Authorization
+///         Framework: Best Current Practice §2.1.3
+///     </seealso>
+///     .
+/// </summary>
 public sealed class RefreshTokenHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
     ITokenManager<TToken>              tokens,
@@ -35,9 +49,26 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.RefreshToken;
 
+    /// <summary>
+    ///     Exchanges a refresh token for new tokens.
+    ///     Validates the token payload (with lifetime validation disabled so
+    ///     expired refresh tokens can still be inspected), checks subject
+    ///     existence via <see cref="ISubjectProvider" />, and optionally
+    ///     rotates the refresh token when <see cref="RefreshTokenFlowOptions.RequireRefreshTokenRotation" />
+    ///     is enabled,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.3">
+    ///         RFC 9700: The OAuth 2.0 Authorization
+    ///         Framework: Best Current Practice §2.1.3
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <param name="request">Token request containing the refresh token.</param>
+    /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,
@@ -73,6 +104,8 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
         }
 
+        // Validate without lifetime enforcement so expired refresh tokens
+        // can still be inspected for subject and scope extraction.
         var principal = await issuer.Validate(token.Payload, lifetime: false);
         if (principal is null) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
@@ -104,7 +137,9 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             }
         }
 
-        // Validate the subject still exists.
+        // Reject if the subject referenced by the refresh token no longer exists
+        // (e.g. de-provisioned account).  The ISubjectProvider is resolved
+        // via DI and is optional — when absent, the check is skipped.
         if (!string.IsNullOrWhiteSpace(token.Subject)) {
             var provider = sp.GetService<ISubjectProvider>();
             if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {

@@ -12,11 +12,26 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceDeviceAuthorizeScopeValidation{TApp, TScope}" />.</summary>
 public static class AdviceDeviceAuthorizeScopeValidation
 {
     public const int DefaultOrder = AdviceDeviceAuthorizeGrantPermission.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Validates scopes at the device authorization endpoint, per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.1">
+///         RFC 8628: OAuth 2.0 Device Authorization
+///         Grant §3.1: Device Authorization Request
+///     </seealso>
+///     .
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <remarks>
+///     Rejects the <c>openid</c> scope explicitly because the OIDC flow uses a different interaction model.
+/// </remarks>
+/// <seealso cref="AdviceDeviceAuthorizeGrantPermission{TApp}" />
 public sealed class AdviceDeviceAuthorizeScopeValidation<TApp, TScope>(
     IApplicationManager<TApp> apps,
     IScopeManager<TScope>     scopes
@@ -26,8 +41,10 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp, TScope>(
 {
     #region IDeviceAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceAuthorizeScopeValidation.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         TApp                   application,

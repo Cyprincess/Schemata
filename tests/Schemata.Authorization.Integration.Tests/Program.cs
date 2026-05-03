@@ -25,10 +25,12 @@ var appMock = new Mock<IApplicationManager<SchemataApplication>>();
 appMock.Setup(m => m.FindByCanonicalNameAsync("test-client", It.IsAny<CancellationToken>())).ReturnsAsync(testApp);
 appMock.Setup(m => m.ValidateClientSecretAsync(testApp, "test-secret", It.IsAny<CancellationToken>()))
        .ReturnsAsync(true);
-appMock.Setup(m => m.ValidateClientSecretAsync(testApp, It.Is<string>(s => s != "test-secret"), It.IsAny<CancellationToken>()))
+appMock.Setup(m => m.ValidateClientSecretAsync(testApp, It.Is<string>(s => s != "test-secret"),
+                                               It.IsAny<CancellationToken>()))
        .ReturnsAsync(false);
 appMock.Setup(m => m.HasPermissionAsync(testApp, It.IsAny<string>(), It.IsAny<CancellationToken>()))
-       .Returns((SchemataApplication app, string perm, CancellationToken _) => Task.FromResult(app.Permissions!.Contains(perm)));
+       .Returns((SchemataApplication app, string perm, CancellationToken _)
+                    => Task.FromResult(app.Permissions!.Contains(perm)));
 
 var scopeMock = new Mock<IScopeManager<SchemataScope>>();
 scopeMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
@@ -67,4 +69,4 @@ app.Run();
 static async IAsyncEnumerable<T> EmptyAsync<T>() { yield break; }
 #pragma warning restore CS1998
 
-public partial class Program { }
+public partial class Program;

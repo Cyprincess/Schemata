@@ -3,23 +3,27 @@ using System.Collections.Generic;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Result of a List operation containing the matched entities and pagination information.
+///     Result container for a list operation per
+///     <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>,
+///     carrying matched items, total count, and a continuation token.
 /// </summary>
-/// <typeparam name="TSummary">The type of the entity summary.</typeparam>
+/// <typeparam name="TSummary">The type of each item in the list.</typeparam>
 public class ListResult<TSummary> : OperationResult<ListResult<TSummary>>
 {
     /// <summary>
-    ///     Gets or sets the collection of matched entities.
+    ///     The matched resource summaries for the current page.
     /// </summary>
     public virtual IEnumerable<TSummary>? Entities { get; set; }
 
     /// <summary>
-    ///     Gets or sets the total count of matching entities across all pages.
+    ///     Total number of matching resources across all pages.
+    ///     May be <see langword="null" /> when the server cannot compute a total.
     /// </summary>
     public virtual int? TotalSize { get; set; }
 
     /// <summary>
-    ///     Gets or sets the token for retrieving the next page of results.
+    ///     Token for retrieving the next page. <see langword="null" /> or empty
+    ///     signals the last page.
     /// </summary>
     public virtual string? NextPageToken { get; set; }
 

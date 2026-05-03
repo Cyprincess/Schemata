@@ -1,6 +1,6 @@
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents a field access token in the filter grammar (member property or index).
+///     A field access token (member property or index) in the filter grammar.
 /// </summary>
 public interface IField : IToken;

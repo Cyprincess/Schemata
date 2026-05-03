@@ -5,13 +5,16 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 namespace Schemata.Core;
 
 /// <summary>
-///     An MVC application part that exposes the assembly of <typeparamref name="T" /> for controller discovery.
+///     An <see cref="ApplicationPart" /> that exposes the assembly of
+///     <typeparamref name="T" /> for controller discovery without requiring an
+///     explicit <c>[assembly: ApplicationPart(...)]</c> attribute.
 /// </summary>
-/// <typeparam name="T">A type whose assembly should be registered as an application part.</typeparam>
+/// <typeparam name="T">Any type whose assembly contains controllers to register.</typeparam>
 public sealed class SchemataExtensionPart<T> : ApplicationPart, IApplicationPartTypeProvider
 {
     /// <summary>
-    ///     Gets the assembly containing type <typeparamref name="T" />.
+    ///     The assembly containing controllers to register, derived from
+    ///     <typeparamref name="T" />.
     /// </summary>
     public Assembly Assembly { get; } = typeof(T).Assembly;
 

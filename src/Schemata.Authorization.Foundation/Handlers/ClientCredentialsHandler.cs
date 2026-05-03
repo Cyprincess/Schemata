@@ -18,14 +18,32 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     Handles the <c>client_credentials</c> grant type.
+///     Authenticates the client, runs the <see cref="ITokenRequestAdvisor{TApp}" /> pipeline,
+///     and emits a <see cref="AuthorizationResult.SignIn" /> with the client_id claim.
+///     No user subject is associated — the client is the resource owner,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.1">
+///         RFC 9700: The OAuth 2.0 Authorization
+///         Framework: Best Current Practice §2.1.1
+///     </seealso>
+///     .
+/// </summary>
 public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<TApp> client, IServiceProvider sp) : IGrantHandler
     where TApp : SchemataApplication
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.ClientCredentials;
 
+    /// <summary>
+    ///     Issues tokens on behalf of a confidential client using client credentials.
+    /// </summary>
+    /// <param name="request">Token request containing client credentials.</param>
+    /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,

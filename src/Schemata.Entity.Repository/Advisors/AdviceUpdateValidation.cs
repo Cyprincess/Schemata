@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
@@ -14,22 +13,21 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceUpdateValidation{TEntity}" />.</summary>
 public static class AdviceUpdateValidation
 {
-    /// <summary>Default execution order.</summary>
+    /// <summary>
+    ///     Default execution order: after <see cref="AdviceUpdateTimestamp{TEntity}" />
+    ///     (100,000,000 + 10,000,000 = 110,000,000).
+    /// </summary>
     public const int DefaultOrder = AdviceUpdateTimestamp.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Runs registered validation advisors against the entity before it is updated.
+///     Runs registered <see cref="IValidationAdvisor{TEntity}" /> advisors against the entity
+///     before it is updated. Throws <see cref="ValidationException" /> if any advisor returns
+///     <see cref="AdviseResult.Block" />.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" /> (2,147,400,000). Runs last in the update pipeline.</para>
-///     <para>
-///         Auto-registered by
-///         <see cref="Microsoft.Extensions.DependencyInjection.ServiceCollectionExtensions.AddRepository" />.
-///     </para>
-///     <para>Throws <see cref="ValidationException" /> when validation fails with <see cref="AdviseResult.Block" />.</para>
-///     <para>Suppressed when <see cref="UpdateValidationSuppressed" /> is present in the advice context.</para>
+///     Suppressed by <see cref="UpdateValidationSuppressed" />.
 /// </remarks>
 public sealed class AdviceUpdateValidation<TEntity> : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class

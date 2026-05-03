@@ -18,6 +18,15 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
+/// <summary>
+///     Handles device-code consent/login interaction for the OAuth 2.0 Device
+///     Authorization flow per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html">RFC 8628: OAuth 2.0 Device Authorization Grant</seealso>
+///     .
+///     An SPA calls GET to render the device
+///     consent screen and POST to approve or deny.
+///     Implements <see cref="IInteractionHandler" /> for <see cref="TokenTypeUris.UserCode" />.
+/// </summary>
 public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     IApplicationManager<TApp>              apps,
     ITokenManager<TToken>                  tokens,
@@ -33,9 +42,16 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
 {
     #region IInteractionHandler Members
 
-    /// <inheritdoc />
+    /// <inheritdoc cref="IInteractionHandler.CodeType" />
     public string CodeType => TokenTypeUris.UserCode;
 
+    /// <summary>
+    ///     Returns the device consent details: the client application metadata
+    ///     and requested scopes resolved from the device code payload.
+    /// </summary>
+    /// <param name="request">Interaction request containing the user code.</param>
+    /// <param name="issuer">Token issuer URI.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> GetDetailsAsync(
         InteractRequest   request,
         string            issuer,
@@ -94,6 +110,16 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         });
     }
 
+    /// <summary>
+    ///     Approves the device authorization request: updates the device code
+    ///     status to <see cref="TokenStatuses.Authorized" />, attaches the subject
+    ///     and authorization reference, then revokes the user code.
+    ///     Returns HTTP 204 via <see cref="NoContentException" />.
+    /// </summary>
+    /// <param name="request">Interaction request containing the user code.</param>
+    /// <param name="principal">The authenticated resource owner.</param>
+    /// <param name="issuer">Token issuer URI.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<AuthorizationResult> ApproveAsync(
         InteractRequest   request,
         ClaimsPrincipal   principal,
@@ -158,6 +184,12 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         throw new NoContentException();
     }
 
+    /// <summary>
+    ///     Denies the device authorization request: sets the device code status
+    ///     to <see cref="TokenStatuses.Denied" /> and revokes the user code.
+    /// </summary>
+    /// <param name="request">Interaction request containing the user code.</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
         if (token?.Type != TokenTypes.UserCode || string.IsNullOrWhiteSpace(token.Payload)) {

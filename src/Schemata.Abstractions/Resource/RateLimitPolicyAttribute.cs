@@ -3,19 +3,20 @@ using System;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Associates a named rate-limiting policy with a resource.
+///     Associates a named rate-limiting policy with a resource, allowing
+///     per-resource throttling without duplicating policy configuration.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class RateLimitPolicyAttribute : Attribute
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="RateLimitPolicyAttribute" /> class.
+    ///     Associates the named policy with the annotated resource.
     /// </summary>
-    /// <param name="policyName">The name of the rate-limiting policy to apply.</param>
+    /// <param name="policyName">The rate-limit policy name to apply.</param>
     public RateLimitPolicyAttribute(string policyName) { PolicyName = policyName; }
 
     /// <summary>
-    ///     Gets the name of the rate-limiting policy.
+    ///     The policy name to look up in the rate-limiting configuration.
     /// </summary>
     public string PolicyName { get; }
 }

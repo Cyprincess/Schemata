@@ -7,7 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Base class for features providing default no-op implementations of the <see cref="ISimpleFeature" /> methods.
+///     No-op base implementation of <see cref="ISimpleFeature" />. Override individual
+///     lifecycle methods to add behaviour.
 /// </summary>
 public abstract class FeatureBase : ISimpleFeature
 {
@@ -16,7 +17,9 @@ public abstract class FeatureBase : ISimpleFeature
     /// <inheritdoc />
     public virtual int Order => Priority;
 
-    /// <inheritdoc />
+    /// <summary>
+    ///     Lower values run earlier.
+    /// </summary>
     public virtual int Priority => int.MaxValue;
 
     /// <inheritdoc />

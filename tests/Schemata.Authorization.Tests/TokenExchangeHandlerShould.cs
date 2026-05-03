@@ -21,7 +21,7 @@ public class TokenExchangeHandlerShould
     private static readonly SchemataApplication TestApp = new() { Id = 1, ClientId = "test-client" };
 
     private static TokenExchangeHandler<SchemataApplication> CreateHandler(
-        Mock<IClientAuthenticationService<SchemataApplication>> clientAuth,
+        Mock<IClientAuthenticationService<SchemataApplication>>                            clientAuth,
         params (string tokenType, Mock<ITokenExchangeHandler<SchemataApplication>> mock)[] subHandlers
     ) {
         var services = new ServiceCollection();
@@ -35,7 +35,10 @@ public class TokenExchangeHandlerShould
 
     private static Mock<IClientAuthenticationService<SchemataApplication>> MockClientAuth() {
         var mock = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        mock.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<Dictionary<string, List<string?>>?>(), It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                            It.IsAny<Dictionary<string, List<string?>>?>(),
+                                            It.IsAny<Dictionary<string, List<string?>>?>(),
+                                            It.IsAny<CancellationToken>()))
             .ReturnsAsync(TestApp);
         return mock;
     }
@@ -50,7 +53,8 @@ public class TokenExchangeHandlerShould
             SubjectTokenType = "urn:ietf:params:oauth:token-type:access_token",
         };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -63,7 +67,8 @@ public class TokenExchangeHandlerShould
             GrantType = GrantTypes.TokenExchange, SubjectToken = "some-token", SubjectTokenType = "",
         };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -77,7 +82,8 @@ public class TokenExchangeHandlerShould
             GrantType = GrantTypes.TokenExchange, SubjectToken = "ref-1", SubjectTokenType = "urn:unknown:type",
         };
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(request, null, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -89,7 +95,8 @@ public class TokenExchangeHandlerShould
 
         var subHandler = new Mock<ITokenExchangeHandler<SchemataApplication>>();
         subHandler.SetupGet(h => h.SubjectTokenType).Returns(tokenType);
-        subHandler.Setup(h => h.HandleAsync(It.IsAny<SchemataApplication>(), It.IsAny<TokenRequest>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        subHandler.Setup(h => h.HandleAsync(It.IsAny<SchemataApplication>(), It.IsAny<TokenRequest>(),
+                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
                   .ReturnsAsync(expected);
 
         var clientAuth = MockClientAuth();

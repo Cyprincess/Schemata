@@ -6,6 +6,16 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
+/// <summary>
+///     Represents an OAuth 2.0 scope registered with the authorization server.
+///     Scopes define the permissions an application can request,
+///     per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.3">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §3.3: Access Token Scope
+///     </seealso>
+///     .
+/// </summary>
 [DisplayName("Scope")]
 [Table("SchemataScopes")]
 [CanonicalName("scopes/{scope}")]
@@ -16,50 +26,40 @@ public class SchemataScope : IIdentifier, ICanonicalName, IDescriptive, IConcurr
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
     public virtual string? Name { get; set; }
 
-    /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IConcurrency Members
 
-    /// <inheritdoc />
     public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IDescriptive Members
 
-    /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Description { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    /// <inheritdoc />
     public virtual long Id { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

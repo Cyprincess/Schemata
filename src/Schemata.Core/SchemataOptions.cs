@@ -5,7 +5,9 @@ using Microsoft.Extensions.Logging;
 namespace Schemata.Core;
 
 /// <summary>
-///     Central options container for the Schemata framework, providing named option storage and logging.
+///     Central options store for the Schemata framework. Provides named option
+///     get/set with removal semantics, a pluggable logger factory, and is the
+///     anchor for feature registration lookups.
 /// </summary>
 public sealed class SchemataOptions
 {
@@ -13,27 +15,32 @@ public sealed class SchemataOptions
     private          ILogger<SchemataBuilder>?  _logger;
 
     /// <summary>
-    ///     Gets the logger factory used to create loggers for Schemata components.
+    ///     Logger factory used to create loggers for features and infrastructure
+    ///     components.
     /// </summary>
     public ILoggerFactory Logging { get; private set; } = LoggerFactory.Create(_ => { });
 
     /// <summary>
-    ///     Gets the default logger for the Schemata builder.
+    ///     Lazily-created default logger for the builder.
     /// </summary>
     public ILogger<SchemataBuilder> Logger => _logger ??= CreateLogger<SchemataBuilder>();
 
     /// <summary>
-    ///     Creates a typed logger using the current logging factory.
+    ///     Creates a typed <see cref="ILogger{T}" /> from the current
+    ///     <see cref="Logging" /> factory.
     /// </summary>
-    /// <typeparam name="T">The type to create a logger for.</typeparam>
-    /// <returns>A logger instance.</returns>
+    /// <typeparam name="T">The category type for the logger.</typeparam>
+    /// <returns>A <see cref="ILogger{T}" /> instance.</returns>
     public ILogger<T> CreateLogger<T>() { return Logging.CreateLogger<T>(); }
 
     /// <summary>
-    ///     Creates a logger for the specified type using reflection.
+    ///     Creates a typed <c>ILogger</c> instance via <c>Logger&lt;T&gt;</c>
+    ///     reflection, using the current <see cref="Logging" /> factory.
     /// </summary>
-    /// <param name="type">The type to create a logger for.</param>
-    /// <returns>A logger instance, or <see langword="null" /> if creation fails.</returns>
+    /// <param name="type">The category type for the logger.</param>
+    /// <returns>
+    ///     An <see cref="ILogger" /> instance, or <see langword="null" /> if creation fails.
+    /// </returns>
     public object? CreateLogger(Type type) {
         var logger  = typeof(Logger<>);
         var generic = logger.MakeGenericType(type);
@@ -42,17 +49,21 @@ public sealed class SchemataOptions
     }
 
     /// <summary>
-    ///     Replaces the current logger factory with a new one.
+    ///     Swaps the logger factory used by the builder and all features that log
+    ///     through <see cref="SchemataOptions" />.
     /// </summary>
-    /// <param name="factory">The new logger factory.</param>
+    /// <param name="factory">The replacement <see cref="ILoggerFactory" />.</param>
     public void ReplaceLoggerFactory(ILoggerFactory factory) { Logging = factory; }
 
     /// <summary>
-    ///     Retrieves and removes a named option from storage.
+    ///     Retrieves and removes a named option. Returns <see langword="null" /> when
+    ///     the key is absent.
     /// </summary>
-    /// <typeparam name="TOptions">The type of the option.</typeparam>
-    /// <param name="name">The option key.</param>
-    /// <returns>The option value, or <see langword="null" /> if not found.</returns>
+    /// <typeparam name="TOptions">Expected option type.</typeparam>
+    /// <param name="name">
+    ///     The key under which the option was stored via <see cref="Set{TOptions}" />.
+    /// </param>
+    /// <returns>The option value, or <see langword="null" />.</returns>
     public TOptions? Pop<TOptions>(string name)
         where TOptions : class {
         if (!_options.Remove(name, out var value)) {
@@ -63,11 +74,14 @@ public sealed class SchemataOptions
     }
 
     /// <summary>
-    ///     Retrieves a named option from storage without removing it.
+    ///     Retrieves a named option without removing it. Returns
+    ///     <see langword="null" /> when the key is absent.
     /// </summary>
-    /// <typeparam name="TOptions">The type of the option.</typeparam>
-    /// <param name="name">The option key.</param>
-    /// <returns>The option value, or <see langword="null" /> if not found.</returns>
+    /// <typeparam name="TOptions">Expected option type.</typeparam>
+    /// <param name="name">
+    ///     The key under which the option was stored via <see cref="Set{TOptions}" />.
+    /// </param>
+    /// <returns>The option value, or <see langword="null" />.</returns>
     public TOptions? Get<TOptions>(string name)
         where TOptions : class {
         if (!_options.TryGetValue(name, out var value)) {
@@ -78,11 +92,14 @@ public sealed class SchemataOptions
     }
 
     /// <summary>
-    ///     Stores a named option, or removes it if the value is <see langword="null" />.
+    ///     Stores a named option. Passing <see langword="null" /> removes any
+    ///     existing entry for <paramref name="name" />.
     /// </summary>
-    /// <typeparam name="TOptions">The type of the option.</typeparam>
-    /// <param name="name">The option key.</param>
-    /// <param name="options">The option value to store.</param>
+    /// <typeparam name="TOptions">The option type.</typeparam>
+    /// <param name="name">A stable key known to consumers.</param>
+    /// <param name="options">
+    ///     The value to store, or <see langword="null" /> to remove.
+    /// </param>
     public void Set<TOptions>(string name, TOptions? options)
         where TOptions : class {
         if (options is null) {

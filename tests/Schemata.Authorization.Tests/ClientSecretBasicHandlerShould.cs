@@ -17,7 +17,9 @@ namespace Schemata.Authorization.Tests;
 
 public class ClientSecretBasicHandlerShould
 {
-    private static readonly SchemataApplication TestApp = new() { Id = 1, ClientId = "my-client", ClientType = "confidential" };
+    private static readonly SchemataApplication TestApp = new() {
+        Id = 1, ClientId = "my-client", ClientType = "confidential",
+    };
 
     private static ClientSecretBasicAuthentication<SchemataApplication> CreateHandler(
         Mock<IApplicationManager<SchemataApplication>>? managerMock = null
@@ -31,11 +33,11 @@ public class ClientSecretBasicHandlerShould
     private static Mock<IApplicationManager<SchemataApplication>> MockManager(SchemataApplication? app = null) {
         var mock = new Mock<IApplicationManager<SchemataApplication>>();
         if (app is not null) {
-            mock.Setup(m => m.FindByCanonicalNameAsync(app.ClientId!, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(app);
+            mock.Setup(m => m.FindByCanonicalNameAsync(app.ClientId!, It.IsAny<CancellationToken>())).ReturnsAsync(app);
             mock.Setup(m => m.ValidateClientSecretAsync(app, "my-secret", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
         }
+
         return mock;
     }
 
@@ -61,8 +63,7 @@ public class ClientSecretBasicHandlerShould
     public async Task Authenticates_WithUrlEncodedValues() {
         var app     = new SchemataApplication { Id = 1, ClientId = "my client", ClientType = "confidential" };
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
-        manager.Setup(m => m.FindByCanonicalNameAsync("my client", It.IsAny<CancellationToken>()))
-               .ReturnsAsync(app);
+        manager.Setup(m => m.FindByCanonicalNameAsync("my client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateClientSecretAsync(app, "my:secret", It.IsAny<CancellationToken>()))
                .ReturnsAsync(true);
 
@@ -99,7 +100,8 @@ public class ClientSecretBasicHandlerShould
         var handler = CreateHandler();
         var headers = BasicHeader("Basic !!!not-base64!!!");
 
-        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(null, null, headers, CancellationToken.None));
+        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
+                                                     null, null, headers, CancellationToken.None));
     }
 
     [Fact]
@@ -107,6 +109,7 @@ public class ClientSecretBasicHandlerShould
         var handler = CreateHandler();
         var headers = BasicHeader(Encode("client-without-secret"));
 
-        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(null, null, headers, CancellationToken.None));
+        await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
+                                                     null, null, headers, CancellationToken.None));
     }
 }

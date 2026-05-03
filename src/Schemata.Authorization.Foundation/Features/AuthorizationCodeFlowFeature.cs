@@ -11,6 +11,30 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
+/// <summary>
+///     Registers the OAuth 2.0 Authorization Code flow per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §4.1: Authorization Code Grant
+///     </seealso>
+///     and
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc7636.html">
+///         RFC 7636: Proof Key for Code Exchange by OAuth Public
+///         Clients
+///     </seealso>
+///     :
+///     authorize and token exchange endpoints, PKCE advisors, consent, and the discovery metadata for the
+///     <c>code</c> grant.
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TAuth">The authorization entity type.</typeparam>
+/// <typeparam name="TScope">The scope entity type.</typeparam>
+/// <typeparam name="TToken">The token entity type.</typeparam>
+/// <remarks>
+///     Installed via <c>UseCodeFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+/// </remarks>
+/// <seealso cref="IAuthorizationFlowFeature" />
+/// <seealso cref="RefreshTokenFlowFeature{TApp, TToken}" />
 public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -19,8 +43,10 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
 {
     #region IAuthorizationFlowFeature Members
 
+    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_100;
 
+    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         var options = configurators.PopOrDefault<CodeFlowOptions>();
         services.Configure(options);

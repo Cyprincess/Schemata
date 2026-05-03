@@ -10,22 +10,33 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Core;
 
 /// <summary>
-///     Extension methods for managing features within <see cref="SchemataOptions" />.
+///     Feature registration and introspection extensions on
+///     <see cref="SchemataOptions" />. Handles dependency resolution,
+///     auto-registration of <see cref="DependsOnAttribute" /> /
+///     <see cref="DependsOnAttribute{T}" /> dependencies, and
+///     <see cref="InformationAttribute" /> logging.
 /// </summary>
 public static class SchemataOptionsExtensions
 {
     /// <summary>
-    ///     Gets the registered features dictionary from the options.
+    ///     Retrieves the feature dictionary stored under the
+    ///     <see cref="Keys.Features" /> key. Returns <see langword="null" /> when no
+    ///     features have been registered.
     /// </summary>
-    /// <param name="schemata">The Schemata options.</param>
-    /// <returns>The features dictionary, or <see langword="null" /> if none are registered.</returns>
+    /// <param name="schemata">The options container.</param>
+    /// <returns>The feature dictionary, or <see langword="null" />.</returns>
     public static Dictionary<RuntimeTypeHandle, ISimpleFeature>? GetFeatures(this SchemataOptions schemata) {
         return schemata.Get<Dictionary<RuntimeTypeHandle, ISimpleFeature>>(Keys.Features);
     }
 
     /// <summary>
-    ///     Stores the features dictionary in the options.
+    ///     Stores the given feature dictionary, replacing any previously
+    ///     registered features.
     /// </summary>
+    /// <param name="schemata">The options container.</param>
+    /// <param name="value">
+    ///     The feature dictionary to store, or <see langword="null" /> to remove.
+    /// </param>
     public static void SetFeatures(
         this SchemataOptions                           schemata,
         Dictionary<RuntimeTypeHandle, ISimpleFeature>? value
@@ -37,28 +48,33 @@ public static class SchemataOptionsExtensions
     ///     Registers a feature by type.
     /// </summary>
     /// <typeparam name="T">The feature type to register.</typeparam>
-    /// <param name="schemata">The Schemata options.</param>
+    /// <param name="schemata">The options container.</param>
     public static void AddFeature<T>(this SchemataOptions schemata)
         where T : ISimpleFeature {
         schemata.AddFeature(typeof(T));
     }
 
     /// <summary>
-    ///     Registers a feature by runtime type, creating an instance via reflection.
+    ///     Registers a feature by its runtime type, creating an instance with a
+    ///     logger injected.
     /// </summary>
-    /// <param name="schemata">The Schemata options.</param>
-    /// <param name="type">The feature type to register.</param>
+    /// <param name="schemata">The options container.</param>
+    /// <param name="type">The concrete feature type.</param>
     public static void AddFeature(this SchemataOptions schemata, Type type) {
         var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))!;
         schemata.AddFeature(type, feature);
     }
 
     /// <summary>
-    ///     Registers a feature instance, resolving dependencies and logging information attributes.
+    ///     Registers a pre-constructed feature instance. Resolves
+    ///     <see cref="DependsOnAttribute" /> and
+    ///     <see cref="DependsOnAttribute{T}" /> dependencies recursively, logs
+    ///     <see cref="InformationAttribute" /> messages, and stores the feature
+    ///     keyed by <see cref="Type.TypeHandle" />.
     /// </summary>
-    /// <param name="schemata">The Schemata options.</param>
-    /// <param name="type">The feature type.</param>
-    /// <param name="feature">The feature instance to register.</param>
+    /// <param name="schemata">The options container.</param>
+    /// <param name="type">The feature's concrete type.</param>
+    /// <param name="feature">The feature instance.</param>
     public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
         var features = schemata.GetFeatures() ?? [];
         if (features.ContainsKey(type.TypeHandle)) {
@@ -69,6 +85,7 @@ public static class SchemataOptionsExtensions
         foreach (var attribute in attributes) {
             var at = attribute.GetType();
 
+            // Only process attributes defined in Schemata.Core.Features namespace
             if (at.Namespace != "Schemata.Core.Features") {
                 continue;
             }
@@ -111,22 +128,24 @@ public static class SchemataOptionsExtensions
     }
 
     /// <summary>
-    ///     Checks whether a feature is registered by type.
+    ///     Checks whether a feature of type <typeparamref name="T" /> is registered.
     /// </summary>
-    /// <typeparam name="T">The feature type to check for.</typeparam>
-    /// <param name="schemata">The Schemata options.</param>
-    /// <returns><see langword="true" /> if the feature is registered.</returns>
+    /// <typeparam name="T">The feature type to check.</typeparam>
+    /// <param name="schemata">The options container.</param>
+    /// <returns><see langword="true" /> when the feature is registered.</returns>
     public static bool HasFeature<T>(this SchemataOptions schemata)
         where T : ISimpleFeature {
         return schemata.HasFeature(typeof(T));
     }
 
     /// <summary>
-    ///     Checks whether a feature is registered by runtime type, including open generic definitions.
+    ///     Checks whether a feature type is registered, including matching open
+    ///     generic type definitions (e.g. <c>SchemataSessionFeature&lt;&gt;</c>
+    ///     against a registered <c>SchemataSessionFeature&lt;T&gt;</c>).
     /// </summary>
-    /// <param name="schemata">The Schemata options.</param>
-    /// <param name="type">The feature type or open generic type definition to check for.</param>
-    /// <returns><see langword="true" /> if the feature is registered.</returns>
+    /// <param name="schemata">The options container.</param>
+    /// <param name="type">The feature type to check.</param>
+    /// <returns><see langword="true" /> when a matching feature is registered.</returns>
     public static bool HasFeature(this SchemataOptions schemata, Type type) {
         var features = schemata.GetFeatures();
         if (features is null) {

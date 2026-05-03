@@ -4,10 +4,18 @@ using Parlot;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents an optionally negated simple expression (NOT/- prefix) in the filter grammar.
+///     An optionally negated simple expression (prefix <c>NOT</c> or <c>-</c>).
+///     On constant children, negation is applied at compile-time. On non-constant
+///     children, <see cref="Expression.Not(Expression)" /> or <see cref="Expression.Negate(Expression)" /> is used.
 /// </summary>
 public class Term : IToken
 {
+    /// <summary>
+    ///     Initializes a new term with an optional unary modifier.
+    /// </summary>
+    /// <param name="position">The position in the source text.</param>
+    /// <param name="unary">The unary modifier string, or <see langword="null" />.</param>
+    /// <param name="simple">The inner simple expression.</param>
     public Term(TextPosition position, string? unary, ISimple simple) {
         Modifier = unary;
         Simple   = simple;
@@ -15,7 +23,7 @@ public class Term : IToken
     }
 
     /// <summary>
-    ///     Gets the unary modifier ("NOT" or "-"), or <see langword="null" /> if not negated.
+    ///     Gets the unary modifier (<c>"NOT"</c> or <c>"-"</c>), or <see langword="null" />.
     /// </summary>
     public string? Modifier { get; }
 
@@ -26,10 +34,13 @@ public class Term : IToken
 
     #region IToken Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => Simple.IsConstant;
 
+    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         var expression = Simple.ToExpression(ctx);
 
@@ -55,5 +66,6 @@ public class Term : IToken
 
     #endregion
 
+    /// <inheritdoc />
     public override string? ToString() { return Modifier is not null ? $"{Modifier} {Simple}" : Simple.ToString(); }
 }

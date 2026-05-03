@@ -13,6 +13,16 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
+/// <summary>
+///     Authenticates clients via client credentials in the POST body per
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
+///         RFC 6749: The OAuth 2.0 Authorization
+///         Framework §2.3.1: Client Password
+///     </seealso>
+///     .
+///     Reads <c>client_id</c> and <c>client_secret</c> from the form body,
+///     looks up the application, and validates the client secret.
+/// </summary>
 public sealed class ClientSecretPostAuthentication<TApp>(
     IApplicationManager<TApp>              manager,
     IOptions<SchemataAuthorizationOptions> options
@@ -21,11 +31,16 @@ public sealed class ClientSecretPostAuthentication<TApp>(
 {
     #region IClientAuthentication<TApp> Members
 
+    /// <summary>
+    ///     Authenticates the client using form-posted credentials.  Returns
+    ///     <c>null</c> when <c>client_secret_post</c> is not an allowed method.
+    /// </summary>
+    /// <inheritdoc cref="IClientAuthentication{TApp}.AuthenticateAsync" />
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,
         Dictionary<string, List<string?>>? headers,
-        CancellationToken                 ct
+        CancellationToken                  ct
     ) {
         if (!options.Value.AllowedClientAuthMethods.Contains(ClientAuthMethods.ClientSecretPost)) {
             return null;

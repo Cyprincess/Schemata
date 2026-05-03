@@ -11,14 +11,21 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures rate limiting middleware with structured error responses on rejection.
+///     Enables ASP.NET Core rate limiting. On rejection, throws a
+///     <see cref="QuotaExceededException" /> so the exception handler can produce a
+///     structured <see cref="ErrorResponse" />. See <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 public sealed class SchemataQuotaFeature : FeatureBase
 {
+    /// <summary>
+    ///     Priority for ordering the middleware registration in the application pipeline.
+    /// </summary>
     public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 10_000_000;
 
+    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
+    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -55,6 +62,7 @@ public sealed class SchemataQuotaFeature : FeatureBase
         });
     }
 
+    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

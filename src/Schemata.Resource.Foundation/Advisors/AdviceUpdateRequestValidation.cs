@@ -6,24 +6,28 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceUpdateRequestValidation{TEntity,TRequest}" />.
+/// </summary>
 public static class AdviceUpdateRequestValidation
 {
+    /// <summary>
+    ///     Default order: runs after <see cref="AdviceUpdateRequestAuthorize{TEntity,TRequest}" />.
+    /// </summary>
     public const int DefaultOrder = AdviceUpdateRequestAuthorize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Validates update requests using registered validation advisors.
+///     Validates update requests
+///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> by delegating to all
+///     registered <c>IValidationAdvisor&lt;TRequest&gt;</c> implementations.
+///     When the request has <c>ValidateOnly = true</c>, throws
+///     <c>NoContentException</c> after validation to signal a dry-run.
+///     Suppressed when <see cref="UpdateRequestValidationSuppressed" /> is present
+///     or <see cref="SchemataResourceOptions.SuppressUpdateValidation" /> is set.
 /// </summary>
-/// <typeparam name="TEntity">The entity type being updated.</typeparam>
-/// <typeparam name="TRequest">The request DTO type to validate.</typeparam>
-/// <remarks>
-///     Order: 200,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature" />.
-///     Delegates to <c>IValidationAdvisor&lt;TRequest&gt;</c> implementations.
-///     When the request has <see cref="Schemata.Abstractions.Resource.IValidation.ValidateOnly" /> =
-///     <see langword="true" />, throws <see cref="Schemata.Abstractions.Exceptions.NoContentException" /> after validation
-///     to signal a dry-run. Suppressed when <see cref="UpdateRequestValidationSuppressed" /> is present
-///     in the advice context or when <see cref="SchemataResourceOptions.SuppressUpdateValidation" /> is set.
-/// </remarks>
+/// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TRequest">The request DTO type.</typeparam>
 public sealed class AdviceUpdateRequestValidation<TEntity, TRequest> : IResourceUpdateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

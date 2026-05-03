@@ -22,8 +22,9 @@ using Schemata.Resource.Grpc.Interceptors;
 namespace Schemata.Resource.Grpc.Features;
 
 /// <summary>
-///     Feature that configures gRPC transport for resources, including protobuf-net serialization, service mapping, and
-///     gRPC reflection.
+///     Feature that registers gRPC transport for resources: code-first protobuf-net
+///     serialization, per-resource service routing, exception→status mapping,
+///     and gRPC server reflection for tooling.
 /// </summary>
 [DependsOn<SchemataResourceFeature>]
 public sealed class SchemataGrpcResourceFeature : FeatureBase
@@ -54,10 +55,13 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
         services.TryAddSingleton<ExceptionMappingInterceptor>();
 
-        // Register open generic so DI can construct ResourceService<A,B,C,D> for any resource
+        // Open generic registration so DI can resolve ResourceService<A,B,C,D> for any
+        // resource type combination.
         services.TryAddScoped(typeof(ResourceService<,,,>));
 
-        // Build ResourceBinderConfiguration lazily (isolates RuntimeTypeModel and BinderConfiguration from user DI)
+        // Build ResourceBinderConfiguration lazily — isolates RuntimeTypeModel and
+        // BinderConfiguration from the global DI container so user-registered
+        // protobuf-net.Grpc services are not affected.
         services.TryAddSingleton(sp => {
             var options    = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
             var model      = RuntimeTypeModelConfigurator.Configure(options.Value);
@@ -66,14 +70,16 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
             return new ResourceBinderConfiguration(model, binder);
         });
 
-        // Forward BinderConfiguration for client-side usage (e.g. test factories)
+        // Forward BinderConfiguration for client-side usage (e.g. test factories).
         services.TryAddSingleton(sp => sp.GetRequiredService<ResourceBinderConfiguration>().Binder);
 
-        // Open generic method provider — only activates for ResourceService<,,,> types;
-        // no-op for proto-first or other gRPC services.
-        services.TryAddEnumerable(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ResourceServiceMethodProvider<>)));
+        // Open generic IServiceMethodProvider<> — grpc-dotnet discovers all registered
+        // providers via IEnumerable, and ResourceServiceMethodProvider<> is a no-op
+        // for TService types that are not closed ResourceService<,,,>.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ResourceServiceMethodProvider<>)));
 
-        // Pre-register ReflectionServiceImpl before AddGrpcReflection() so our factory wins via TryAdd
+        // Pre-register ReflectionServiceImpl via TryAdd so our code-first descriptor
+        // factory wins over the default proto-first factory registered by AddGrpcReflection().
         services.TryAddSingleton(sp => {
             var descriptors = BuildCodeFirstDescriptors(sp);
             return new ReflectionServiceImpl(descriptors);
@@ -105,7 +111,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
                 var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
 
-                // Call endpoints.MapGrpcService<T>() via reflection
                 var result = MapGrpcService(endpoints, service);
 
                 if (result is not IEndpointConventionBuilder builder) {
@@ -117,6 +122,9 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                     builder.RequireRateLimiting(quota.PolicyName);
                 }
 
+                // If an authentication scheme is configured, require authentication
+                // but do NOT demand a specific authorization policy — policy evaluation
+                // is deferred to the advisor pipeline (AIP-211).
                 if (!string.IsNullOrWhiteSpace(options.Value.AuthenticationScheme)) {
                     var policy = new AuthorizationPolicyBuilder(options.Value.AuthenticationScheme)
                                 .RequireAssertion(_ => true)

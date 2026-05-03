@@ -11,16 +11,17 @@ using Schemata.Resource.Foundation.Grammars.Values;
 namespace Schemata.Resource.Foundation.Grammars.Expressions;
 
 /// <summary>
-///     Represents a member access expression (e.g. <c>entity.property</c>) in the filter grammar.
+///     A member access expression (e.g., <c>entity.property</c>).
+///     Supports dot-separated field chains, dictionary indexing, and array element access.
 /// </summary>
 public class Member : IComparableArg
 {
     /// <summary>
-    ///     Initializes a new member with a root value and optional field chain.
+    ///     Initializes a new member access.
     /// </summary>
     /// <param name="position">The position in the source text.</param>
     /// <param name="value">The root value token.</param>
-    /// <param name="fields">The chain of field accesses following the root.</param>
+    /// <param name="fields">The chain of field accesses.</param>
     public Member(TextPosition position, IValue value, IReadOnlyCollection<IField>? fields) {
         Position = position;
 
@@ -32,21 +33,24 @@ public class Member : IComparableArg
     }
 
     /// <summary>
-    ///     Gets the root value token of this member access.
+    ///     Gets the root value token.
     /// </summary>
     public IValue Value { get; }
 
     /// <summary>
-    ///     Gets the chain of field accesses following the root value.
+    ///     Gets the field access chain.
     /// </summary>
     public List<IField> Fields { get; } = [];
 
-    #region IComparable Members
+    #region IComparableArg Members
 
+    /// <inheritdoc />
     public TextPosition Position { get; }
 
+    /// <inheritdoc />
     public bool IsConstant => Value.IsConstant && Fields.Count == 0;
 
+    /// <inheritdoc />
     public Expression ToExpression(Container ctx) {
         var expression = ToMemberExpression(ctx);
 
@@ -60,7 +64,7 @@ public class Member : IComparableArg
     #endregion
 
     /// <summary>
-    ///     Builds the member access expression chain up to (but not including) the last field.
+    ///     Builds the member access chain up to, but not including, the last field.
     /// </summary>
     /// <param name="ctx">The expression-building container.</param>
     /// <returns>The intermediate member expression.</returns>
@@ -82,6 +86,7 @@ public class Member : IComparableArg
         return expression;
     }
 
+    /// <inheritdoc />
     public override string? ToString() {
         return Fields.Count > 0 ? $"{Value}.{string.Join('.', Fields)}" : Value.ToString();
     }

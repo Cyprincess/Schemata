@@ -16,11 +16,23 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceAuthorizeAutoApproveSignIn{TApp, TAuth}" />.</summary>
 public static class AdviceAuthorizeAutoApproveSignIn
 {
     public const int DefaultOrder = AdviceAuthorizeConsent.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Handles auto-approval of authorization when the user has previously granted consent and reauthentication is
+///     not required.
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TAuth">The authorization entity type.</typeparam>
+/// <remarks>
+///     An auto-approved grant must still materialize a <typeparamref name="TAuth" /> so tokens are revocable
+///     per-authorization and reachable by the end-session logout helper.
+/// </remarks>
+/// <seealso cref="AdviceAuthorizeConsent" />
 public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
     IOptions<SchemataAuthorizationOptions> authOptions,
     IAuthorizationManager<TAuth>           authorizations
@@ -30,8 +42,10 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 {
     #region IAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeAutoApproveSignIn.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
@@ -68,9 +82,6 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType);
         var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
 
-        // Mirror the explicit-consent path (AuthorizeInteractionHandler.ApproveAsync): an
-        // auto-approved grant must still materialize a SchemataAuthorization so tokens
-        // are revocable per-authorization and reachable by the end-session logout helper.
         var authorization = new TAuth {
             ApplicationName = authz.Application.Name,
             Subject         = subject,

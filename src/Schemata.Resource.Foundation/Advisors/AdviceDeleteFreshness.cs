@@ -9,22 +9,27 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceDeleteFreshness{TEntity}" />.
+/// </summary>
 public static class AdviceDeleteFreshness
 {
+    /// <summary>
+    ///     Default order at <see cref="Orders.Base" />.
+    /// </summary>
     public const int DefaultOrder = Orders.Base;
 }
 
 /// <summary>
-///     Enforces optimistic concurrency for delete operations by comparing the request ETag with the entity timestamp.
+///     Enforces optimistic concurrency for delete operations
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso> by comparing the
+///     request
+///     ETag with the entity's concurrency timestamp.
+///     Skipped when <see cref="DeleteRequest.Force" /> is <see langword="true" />.
+///     Throws <see cref="ConcurrencyException" /> on mismatch.
+///     Suppressed when <see cref="FreshnessSuppressed" /> is present.
 /// </summary>
-/// <typeparam name="TEntity">The entity type being deleted.</typeparam>
-/// <remarks>
-///     Order: 200,000,000. Auto-registered by <see cref="Features.SchemataResourceFeature" />.
-///     Skipped when the <see cref="Schemata.Abstractions.Resource.DeleteRequest.Force" /> flag is set on the delete
-///     request.
-///     Throws <see cref="Schemata.Abstractions.Exceptions.ConcurrencyException" /> when the ETag does not match.
-///     Suppressed when <see cref="FreshnessSuppressed" /> is present in the advice context.
-/// </remarks>
+/// <typeparam name="TEntity">The entity type.</typeparam>
 public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {

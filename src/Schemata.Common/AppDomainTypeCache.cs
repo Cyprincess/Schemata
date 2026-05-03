@@ -7,22 +7,23 @@ using System.Reflection;
 namespace Schemata.Common;
 
 /// <summary>
-///     Thread-safe cache of all assemblies, exported types, and property metadata in the current AppDomain.
+///     Thread-safe cache of all assemblies, exported types, and property metadata in the current
+///     <see cref="AppDomain" />.
 /// </summary>
 public static class AppDomainTypeCache
 {
     /// <summary>
-    ///     Cache of assemblies keyed by assembly name.
+    ///     Assemblies keyed by assembly name.
     /// </summary>
     public static readonly ConcurrentDictionary<string, Assembly> Assemblies;
 
     /// <summary>
-    ///     Cache of types keyed by full type name.
+    ///     Exported types keyed by full type name.
     /// </summary>
     public static readonly ConcurrentDictionary<string, Type> Types;
 
     /// <summary>
-    ///     Cache of public instance property dictionaries keyed by type handle.
+    ///     Public instance property dictionaries keyed by type handle.
     /// </summary>
     public static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> Properties;
 
@@ -57,7 +58,7 @@ public static class AppDomainTypeCache
     }
 
     /// <summary>
-    ///     Gets an assembly by name, searching loaded assemblies if not cached.
+    ///     Gets an assembly by name, searching all loaded assemblies if not already cached.
     /// </summary>
     /// <param name="name">The assembly name.</param>
     /// <returns>The assembly, or <see langword="null" /> if not found.</returns>
@@ -78,7 +79,8 @@ public static class AppDomainTypeCache
     }
 
     /// <summary>
-    ///     Gets a type by full name, searching all cached assemblies if not found.
+    ///     Gets a type by full name, searching all cached assemblies if not found by
+    ///     <see cref="Type.GetType(string, bool)" />.
     /// </summary>
     /// <param name="name">The full type name.</param>
     /// <returns>The type, or <see langword="null" /> if not found.</returns>

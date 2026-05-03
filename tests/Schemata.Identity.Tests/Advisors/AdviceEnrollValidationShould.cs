@@ -22,14 +22,16 @@ public class AdviceEnrollValidationShould
 {
     private static readonly ClaimsPrincipal Anonymous = new();
 
-    private static readonly ClaimsPrincipal Alice = new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
+    private static readonly ClaimsPrincipal Alice
+        = new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
              .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice" });
         var sp = new ServiceCollection().BuildServiceProvider();
-        return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [], new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
+        return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [],
+                   new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
     }
 
     [Fact]
@@ -39,7 +41,8 @@ public class AdviceEnrollValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new AuthenticatorRequest { TwoFactorCode = "123456" };
 
-        await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(ctx, request, IdentityOperation.Enroll, Anonymous));
+        await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
+                                                        ctx, request, IdentityOperation.Enroll, Anonymous));
     }
 
     [Fact]
@@ -49,7 +52,8 @@ public class AdviceEnrollValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new AuthenticatorRequest();
 
-        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, request, IdentityOperation.Enroll, Alice));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
+                                                          ctx, request, IdentityOperation.Enroll, Alice));
     }
 
     [Fact]

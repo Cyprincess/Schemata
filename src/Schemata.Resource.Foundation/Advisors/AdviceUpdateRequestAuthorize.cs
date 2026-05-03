@@ -8,11 +8,30 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Default order constants for <see cref="AdviceUpdateRequestAuthorize{TEntity,TRequest}" />.
+/// </summary>
 public static class AdviceUpdateRequestAuthorize
 {
+    /// <summary>
+    ///     Default order: runs after <see cref="AdviceUpdateRequestAnonymous{TEntity,TRequest}" />.
+    /// </summary>
     public const int DefaultOrder = AdviceUpdateRequestAnonymous.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Authorizes update requests
+///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso> and
+///     <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> via
+///     <see cref="IAccessProvider{TEntity,TRequest}" /> and applies row-level
+///     entitlement filtering via
+///     <see cref="IEntitlementProvider{TEntity,TRequest}" />.
+///     Skips access check when <see cref="AnonymousGranted" /> is present.
+///     Entitlement filtering is always applied regardless of anonymous access.
+///     Throws <see cref="AuthorizationException" /> on denial.
+/// </summary>
+/// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TRequest">The request DTO type.</typeparam>
 public sealed class AdviceUpdateRequestAuthorize<TEntity, TRequest> : IResourceUpdateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -20,6 +39,11 @@ public sealed class AdviceUpdateRequestAuthorize<TEntity, TRequest> : IResourceU
     private readonly IAccessProvider<TEntity, TRequest>      _access;
     private readonly IEntitlementProvider<TEntity, TRequest> _entitlement;
 
+    /// <summary>
+    ///     Initializes a new instance with access and entitlement providers.
+    /// </summary>
+    /// <param name="access">The <see cref="IAccessProvider{TEntity,TRequest}" />.</param>
+    /// <param name="entitlement">The <see cref="IEntitlementProvider{TEntity,TRequest}" />.</param>
     public AdviceUpdateRequestAuthorize(
         IAccessProvider<TEntity, TRequest>      access,
         IEntitlementProvider<TEntity, TRequest> entitlement

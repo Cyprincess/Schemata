@@ -1,22 +1,23 @@
 namespace Schemata.Abstractions.Advisors;
 
 /// <summary>
-///     Controls the flow of the advisor pipeline after an advisor executes.
+///     Controls advisor pipeline flow. Returned by
+///     <see cref="IAdvisor{T1}.AdviseAsync" /> and its overloads.
 /// </summary>
 public enum AdviseResult
 {
     /// <summary>
-    ///     The pipeline should continue to the next advisor.
+    ///     Proceed to the next advisor in the pipeline.
     /// </summary>
     Continue,
 
     /// <summary>
-    ///     The pipeline should stop; the operation is blocked.
+    ///     Abort the operation. No further advisors execute.
     /// </summary>
     Block,
 
     /// <summary>
-    ///     The pipeline should stop; the advisor has handled the operation.
+    ///     The operation was handled by this advisor. No further advisors execute.
     /// </summary>
     Handle,
 }

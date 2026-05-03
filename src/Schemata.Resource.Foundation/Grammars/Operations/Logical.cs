@@ -8,7 +8,9 @@ using Schemata.Resource.Foundation.Grammars.Values;
 namespace Schemata.Resource.Foundation.Grammars.Operations;
 
 /// <summary>
-///     Base class for logical combinators (AND/OR) that fold multiple child tokens into a single boolean expression.
+///     Base class for logical combinators (AND/OR) that fold child tokens into a single
+///     boolean expression. Bare (non-boolean) children are promoted via an implicit
+///     <see cref="Has" /> operator with the root parameter as the left side.
 /// </summary>
 public abstract class Logical : IToken
 {
@@ -18,16 +20,20 @@ public abstract class Logical : IToken
     public abstract IEnumerable<IToken> Tokens { get; }
 
     /// <summary>
-    ///     Gets the LINQ expression type for combining children (AndAlso or OrElse).
+    ///     Gets the LINQ expression type for combining children (<see cref="ExpressionType.AndAlso" />
+    ///     or <see cref="ExpressionType.OrElse" />).
     /// </summary>
     public abstract ExpressionType Operator { get; }
 
     #region IToken Members
 
+    /// <inheritdoc />
     public abstract TextPosition Position { get; }
 
+    /// <inheritdoc />
     public abstract bool IsConstant { get; }
 
+    /// <inheritdoc />
     public virtual Expression ToExpression(Container ctx) {
         var first = Tokens.FirstOrDefault();
 
@@ -66,6 +72,10 @@ public abstract class Logical : IToken
 
     #endregion
 
+    /// <summary>
+    ///     Promotes a non-boolean token to a restriction by wrapping it in an implicit
+    ///     <c>q : token</c> comparison.
+    /// </summary>
     protected virtual Expression? ToRestrictionExpression(IToken token, Container ctx) {
         var member = new Member(token.Position, new Text(token.Position, "q"), null);
 
@@ -79,6 +89,9 @@ public abstract class Logical : IToken
         return restriction.ToExpression(ctx);
     }
 
+    /// <summary>
+    ///     Unwraps a token to its innermost <see cref="IArg" /> for implicit comparison.
+    /// </summary>
     protected virtual IArg? ToArg(IToken token) {
         return token switch {
             Filter f                           => f,

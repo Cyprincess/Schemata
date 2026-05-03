@@ -3,16 +3,20 @@ using Schemata.Abstractions.Advisors;
 namespace Schemata.Advice;
 
 /// <summary>
-///     Entry point for creating type-safe advisor pipelines.
+///     Entry point for the Advice pattern. Call <see cref="For{TAdvisor}" /> to obtain an
+///     <see cref="AdvicePipeline{TAdvisor}" /> token, then chain any source-generated
+///     <c>RunAsync</c> extension method to execute the advisor chain-of-responsibility.
 /// </summary>
 public static class Advisor
 {
     /// <summary>
-    ///     Creates an <see cref="AdvicePipeline{TAdvisor}" /> token for the specified advisor type, enabling extension method
-    ///     dispatch.
+    ///     Returns the <see cref="AdvicePipeline{TAdvisor}" /> pipeline token for
+    ///     <typeparamref name="TAdvisor" />. This is a zero-size struct whose sole
+    ///     purpose is to carry the advisor type so that source-generated
+    ///     <c>RunAsync</c> overloads resolve without heap allocation.
     /// </summary>
-    /// <typeparam name="TAdvisor">The advisor interface type.</typeparam>
-    /// <returns>A pipeline token used to invoke <c>RunAsync</c> extension methods.</returns>
+    /// <typeparam name="TAdvisor">The advisor interface type that carries the advice contract and arguments.</typeparam>
+    /// <returns>A zero-size <see cref="AdvicePipeline{TAdvisor}" /> struct.</returns>
     public static AdvicePipeline<TAdvisor> For<TAdvisor>()
         where TAdvisor : IAdvisor {
         return default;

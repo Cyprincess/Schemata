@@ -11,18 +11,27 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceAuthorizeEndpointPermission{TApp}" />.</summary>
 public static class AdviceAuthorizeEndpointPermission
 {
     public const int DefaultOrder = AdviceAuthorizeClientAndRedirect.DefaultOrder + 10_000_000;
 }
 
+/// <summary>
+///     Checks that the application has the <c>endpoint:authorization</c> permission before the authorize endpoint
+///     processes the request.
+/// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <seealso cref="AdviceTokenEndpointPermission{TApp}" />
 public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<TApp> manager) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
     #region IAuthorizeAdvisor<TApp> Members
 
+    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeEndpointPermission.DefaultOrder;
 
+    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

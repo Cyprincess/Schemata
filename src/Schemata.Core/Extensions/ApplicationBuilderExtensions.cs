@@ -12,16 +12,18 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for configuring the Schemata middleware pipeline on <see cref="IApplicationBuilder" />.
+///     Extension methods for wiring the Schemata middleware pipeline and cleaning
+///     up after configuration.
 /// </summary>
 public static class ApplicationBuilderExtensions
 {
     /// <summary>
-    ///     Configures the Schemata middleware pipeline by invoking all registered features.
+    ///     Invokes <see cref="ISimpleFeature.ConfigureApplication" /> for every
+    ///     registered feature in priority order.
     /// </summary>
     /// <param name="app">The application builder.</param>
-    /// <param name="configuration">The application configuration.</param>
-    /// <param name="environment">The web host environment.</param>
+    /// <param name="configuration">Application configuration.</param>
+    /// <param name="environment">Host environment.</param>
     /// <returns>The application builder for chaining.</returns>
     public static IApplicationBuilder UseSchemata(
         this IApplicationBuilder app,
@@ -49,7 +51,9 @@ public static class ApplicationBuilderExtensions
     }
 
     /// <summary>
-    ///     Removes the features dictionary from Schemata options after pipeline configuration is complete.
+    ///     Removes the feature dictionary from <see cref="SchemataOptions" /> after
+    ///     pipeline configuration is complete, freeing memory for the remainder of
+    ///     the application lifetime.
     /// </summary>
     /// <param name="app">The application builder.</param>
     /// <returns>The application builder for chaining.</returns>

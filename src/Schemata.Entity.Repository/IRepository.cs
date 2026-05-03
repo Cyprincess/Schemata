@@ -4,155 +4,145 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Non-generic repository interface for type-erased entity access.
+///     Type-erased repository interface providing a common service type for dependency
+///     injection. Members mirror <see cref="IRepository{TEntity}" /> with untyped signatures.
 /// </summary>
 public interface IRepository
 {
     /// <summary>
-    ///     Gets the advice context used for advisor pipeline configuration on this repository instance.
+    ///     Carries the advice context that gates advisor execution and holds suppression
+    ///     flags for this repository instance.
     /// </summary>
     AdviceContext AdviceContext { get; }
 
     /// <summary>
-    ///     Lists entities matching the predicate, applying build-query advisors.
+    ///     Enumerates entities through the build-query advisor pipeline
+    ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />), returning results
+    ///     as untyped objects.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <param name="predicate">
+    ///     An optional filter expression. When <see langword="null" />, all entities of type
+    ///     <typeparamref name="T" /> are returned.
+    /// </param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>An async enumerable of matching entities as <see cref="object" />.</returns>
     IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Searches entities matching the predicate (full-text or provider-specific search).
+    ///     Searches entities through the build-query advisor pipeline, using provider-specific
+    ///     full-text search when available. Falls back to <see cref="ListAsync{T}" /> otherwise.
     /// </summary>
     /// <typeparam name="T">The entity type to search.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>An async enumerable of matching entities as <see cref="object" />.</returns>
     IAsyncEnumerable<object> SearchAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the first entity matching the predicate, or <see langword="null" />.
+    ///     Returns the first matching entity or <see langword="null" />, applying build-query
+    ///     advisors.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The first matching entity or <see langword="null" />.</returns>
     ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the single entity matching the predicate, or <see langword="null" />.
+    ///     Returns the single matching entity or <see langword="null" />, applying build-query
+    ///     advisors.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The single matching entity or <see langword="null" />.</returns>
     ValueTask<object?> SingleOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns whether any entity matches the predicate.
+    ///     Returns <see langword="true" /> if any entity matches the predicate, after build-query
+    ///     advisors are applied.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns><see langword="true" /> if at least one entity matches.</returns>
     ValueTask<bool> AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the count of entities matching the predicate.
+    ///     Returns the count of entities matching the predicate, after build-query advisors
+    ///     are applied.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The number of matching entities.</returns>
     ValueTask<int> CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the long count of entities matching the predicate.
+    ///     Returns the long count of entities matching the predicate, after build-query
+    ///     advisors are applied.
     /// </summary>
     /// <typeparam name="T">The entity type to query.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The number of matching entities as <see cref="long" />.</returns>
     ValueTask<long> LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Adds an entity through the advisor pipeline.
+    ///     Drives the entity through the add advisor pipeline
+    ///     (see <see cref="IRepositoryAddAdvisor{TEntity}" />) before persistence.
     /// </summary>
-    /// <param name="entity">The entity to add.</param>
+    /// <param name="entity">The entity to persist.</param>
     /// <param name="ct">A cancellation token.</param>
     Task AddAsync(object entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Updates an entity through the advisor pipeline.
+    ///     Drives the entity through the update advisor pipeline
+    ///     (see <see cref="IRepositoryUpdateAdvisor{TEntity}" />) before persistence.
     /// </summary>
-    /// <param name="entity">The entity to update.</param>
+    /// <param name="entity">The entity to persist.</param>
     /// <param name="ct">A cancellation token.</param>
     Task UpdateAsync(object entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Removes an entity through the advisor pipeline.
+    ///     Drives the entity through the remove advisor pipeline
+    ///     (see <see cref="IRepositoryRemoveAdvisor{TEntity}" />). When soft-delete
+    ///     is active and not suppressed, <see cref="AdviceRemoveSoftDelete{TEntity}" />
+    ///     intercepts the deletion and converts it to a soft-delete update, per
+    ///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>.
     /// </summary>
     /// <param name="entity">The entity to remove.</param>
     /// <param name="ct">A cancellation token.</param>
     Task RemoveAsync(object entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Commits pending changes to the data store.
+    ///     Persists all pending changes to the underlying data store.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The number of rows affected.</returns>
     ValueTask<int> CommitAsync(CancellationToken ct = default);
 
     /// <summary>
-    ///     Detaches the entity from the change tracker.
+    ///     Detaches an entity from the change tracker so subsequent mutations are not persisted.
     /// </summary>
     /// <param name="entity">The entity to detach.</param>
     void Detach(object entity);
 
     /// <summary>
-    ///     Creates a new repository instance with a fresh advice context, isolating subsequent suppress calls.
+    ///     Creates a new repository instance with a fresh <see cref="AdviceContext" />,
+    ///     isolating any subsequent <c>Suppress*</c> calls.
     /// </summary>
     /// <returns>A new <see cref="IRepository" /> instance.</returns>
     IRepository Once();
 
-    /// <summary>
-    ///     Suppresses validation during add operations for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressAddValidation();
 
-    /// <summary>
-    ///     Suppresses validation during update operations for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressUpdateValidation();
 
-    /// <summary>
-    ///     Suppresses concurrency-stamp checks for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressConcurrency();
 
-    /// <summary>
-    ///     Suppresses the soft-delete query filter for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressQuerySoftDelete();
 
-    /// <summary>
-    ///     Suppresses soft-delete behavior on add and remove for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressSoftDelete();
 
-    /// <summary>
-    ///     Suppresses automatic timestamp assignment for this repository instance.
-    /// </summary>
-    /// <returns>This repository instance for chaining.</returns>
     IRepository SuppressTimestamp();
 }

@@ -6,7 +6,10 @@ using Schemata.Resource.Http;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Convenience overloads for registering HTTP-only resources with fewer type parameters.
+///     Convenience overloads for registering HTTP-only resources with fewer type parameters
+///     per <seealso href="https://google.aip.dev/121">AIP-121: Resource-oriented design</seealso>.
+///     Each overload delegates to the most-specific <c>Use&lt;TEntity,TRequest,TDetail,TSummary&gt;</c>
+///     registration, duplicating type arguments where a DTO type is omitted.
 /// </summary>
 public static class SchemataHttpResourceBuilderExtensions
 {
@@ -14,8 +17,8 @@ public static class SchemataHttpResourceBuilderExtensions
     ///     Registers an HTTP-only resource using the entity type for all four type parameters.
     /// </summary>
     /// <typeparam name="TEntity">The entity type used as entity, request, detail, and summary.</typeparam>
-    /// <param name="builder">The HTTP resource builder.</param>
-    /// <returns>The HTTP resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataHttpResourceBuilder" /> instance.</param>
+    /// <returns>The <see cref="SchemataHttpResourceBuilder" /> for chaining.</returns>
     public static SchemataHttpResourceBuilder Use<TEntity>(this SchemataHttpResourceBuilder builder)
         where TEntity : class, ICanonicalName {
         return builder.Use<TEntity, TEntity, TEntity, TEntity>();
@@ -26,8 +29,8 @@ public static class SchemataHttpResourceBuilderExtensions
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type, also used as detail and summary.</typeparam>
-    /// <param name="builder">The HTTP resource builder.</param>
-    /// <returns>The HTTP resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataHttpResourceBuilder" /> instance.</param>
+    /// <returns>The <see cref="SchemataHttpResourceBuilder" /> for chaining.</returns>
     public static SchemataHttpResourceBuilder Use<TEntity, TRequest>(this SchemataHttpResourceBuilder builder)
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName {
@@ -40,8 +43,8 @@ public static class SchemataHttpResourceBuilderExtensions
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <typeparam name="TRequest">The request type.</typeparam>
     /// <typeparam name="TDetail">The detail type, also used as summary.</typeparam>
-    /// <param name="builder">The HTTP resource builder.</param>
-    /// <returns>The HTTP resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataHttpResourceBuilder" /> instance.</param>
+    /// <returns>The <see cref="SchemataHttpResourceBuilder" /> for chaining.</returns>
     public static SchemataHttpResourceBuilder Use<TEntity, TRequest, TDetail>(this SchemataHttpResourceBuilder builder)
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
@@ -56,8 +59,8 @@ public static class SchemataHttpResourceBuilderExtensions
     /// <typeparam name="TRequest">The request type.</typeparam>
     /// <typeparam name="TDetail">The detail type.</typeparam>
     /// <typeparam name="TSummary">The summary type.</typeparam>
-    /// <param name="builder">The HTTP resource builder.</param>
-    /// <returns>The HTTP resource builder for chaining.</returns>
+    /// <param name="builder">The <see cref="SchemataHttpResourceBuilder" /> instance.</param>
+    /// <returns>The <see cref="SchemataHttpResourceBuilder" /> for chaining.</returns>
     public static SchemataHttpResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
         this SchemataHttpResourceBuilder builder
     )

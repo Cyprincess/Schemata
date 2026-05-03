@@ -9,13 +9,18 @@ using Schemata.Resource.Foundation.Grammars.Expressions;
 namespace Schemata.Resource.Foundation.Grammars;
 
 /// <summary>
-///     Holds parameter bindings, expression bindings, and custom function registrations for building LINQ expressions from
-///     filter tokens.
+///     Holds parameter bindings, expression bindings, and custom function registrations
+///     used during LINQ expression building from parsed filter tokens
+///     per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>.
 /// </summary>
 public class Container
 {
     private static readonly ConcurrentDictionary<string, MethodInfo> MethodCache = [];
 
+    /// <summary>
+    ///     Initializes a new container for the specified token.
+    /// </summary>
+    /// <param name="token">The root <see cref="IToken" />.</param>
     public Container(IToken token) { Token = token; }
 
     /// <summary>
@@ -30,17 +35,17 @@ public class Container
     private Dictionary<string, ParameterExpression> Parameters { get; } = [];
 
     /// <summary>
-    ///     Creates a new container for the specified token.
+    ///     Creates a container for the specified token.
     /// </summary>
-    /// <param name="token">The root token to build expressions from.</param>
-    /// <returns>A new container.</returns>
+    /// <param name="token">The root <see cref="IToken" />.</param>
+    /// <returns>A new <see cref="Container" />.</returns>
     public static Container Build(IToken token) { return new(token); }
 
     /// <summary>
-    ///     Registers a custom function that can be called in filter expressions.
+    ///     Registers a custom function callable in filter expressions.
     /// </summary>
     /// <param name="name">The function name as it appears in the filter string.</param>
-    /// <param name="factory">A factory that produces an expression from argument expressions.</param>
+    /// <param name="factory">A factory producing an expression from arguments and the container.</param>
     /// <returns>This container for chaining.</returns>
     public Container RegisterFunction(string name, Func<Expression[], Container, Expression> factory) {
         Functions[name] = new(factory);
@@ -77,8 +82,8 @@ public class Container
     ///     Attempts to retrieve a bound expression by name.
     /// </summary>
     /// <param name="name">The expression name.</param>
-    /// <param name="expression">The bound expression if found.</param>
-    /// <returns><see langword="true" /> if the expression was found.</returns>
+    /// <param name="expression">The bound expression, if found.</param>
+    /// <returns><see langword="true" /> if found.</returns>
     public bool TryGetExpression(string? name, out Expression? expression) {
         if (!string.IsNullOrWhiteSpace(name)) {
             return Expressions.TryGetValue(name, out expression);
@@ -92,8 +97,8 @@ public class Container
     ///     Attempts to retrieve a bound parameter expression by name.
     /// </summary>
     /// <param name="name">The parameter name.</param>
-    /// <param name="parameter">The parameter expression if found.</param>
-    /// <returns><see langword="true" /> if the parameter was found.</returns>
+    /// <param name="parameter">The parameter expression, if found.</param>
+    /// <returns><see langword="true" /> if found.</returns>
     public bool TryGetParameter(string? name, out ParameterExpression? parameter) {
         if (!string.IsNullOrWhiteSpace(name)) {
             return Parameters.TryGetValue(name, out parameter);
@@ -104,13 +109,8 @@ public class Container
     }
 
     /// <summary>
-    ///     Gets a cached method info by type, name, and parameter types.
+    ///     Gets a cached <see cref="MethodInfo" /> by type, name, and parameter types.
     /// </summary>
-    /// <param name="type">The declaring type.</param>
-    /// <param name="name">The method name.</param>
-    /// <param name="types">The parameter types, or <see langword="null" /> to match by name only.</param>
-    /// <param name="flag">The binding flags to use.</param>
-    /// <returns>The method info if found.</returns>
     public MethodInfo? GetMethod(
         Type          type,
         string        name,
@@ -127,13 +127,9 @@ public class Container
     }
 
     /// <summary>
-    ///     Gets a cached method info with a custom getter factory for complex method resolution.
+    ///     Gets a cached <see cref="MethodInfo" /> with a custom getter factory
+    ///     for complex method resolution.
     /// </summary>
-    /// <param name="type">The declaring type.</param>
-    /// <param name="name">The method name.</param>
-    /// <param name="types">The parameter types for cache key generation.</param>
-    /// <param name="getter">A factory to resolve the method info if not cached.</param>
-    /// <returns>The method info if found.</returns>
     public MethodInfo? GetMethod(
         Type               type,
         string             name,
