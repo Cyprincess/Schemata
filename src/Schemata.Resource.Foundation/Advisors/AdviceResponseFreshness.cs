@@ -21,7 +21,8 @@ public static class AdviceResponseFreshness
 
 /// <summary>
 ///     Sets the ETag on response DTOs that implement <see cref="IFreshness" />
-///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>. Computes a weak ETag
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>. Computes a weak
+///     ETag
 ///     from
 ///     the entity's <see cref="IConcurrency.Timestamp" />.
 ///     Suppressed when <see cref="FreshnessSuppressed" /> is present.

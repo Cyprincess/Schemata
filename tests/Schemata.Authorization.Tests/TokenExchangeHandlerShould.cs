@@ -35,10 +35,13 @@ public class TokenExchangeHandlerShould
 
     private static Mock<IClientAuthenticationService<SchemataApplication>> MockClientAuth() {
         var mock = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        mock.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                            It.IsAny<Dictionary<string, List<string?>>?>(),
-                                            It.IsAny<Dictionary<string, List<string?>>?>(),
-                                            It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.AuthenticateAsync(
+                       It.IsAny<Dictionary<string, List<string?>>?>(),
+                       It.IsAny<Dictionary<string, List<string?>>?>(),
+                       It.IsAny<Dictionary<string, List<string?>>?>(),
+                       It.IsAny<CancellationToken>()
+                   )
+             )
             .ReturnsAsync(TestApp);
         return mock;
     }
@@ -54,7 +57,11 @@ public class TokenExchangeHandlerShould
         };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -68,7 +75,11 @@ public class TokenExchangeHandlerShould
         };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -83,7 +94,11 @@ public class TokenExchangeHandlerShould
         };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request,
+                                                              null,
+                                                              CancellationToken.None
+                                                          )
+        );
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -95,8 +110,13 @@ public class TokenExchangeHandlerShould
 
         var subHandler = new Mock<ITokenExchangeHandler<SchemataApplication>>();
         subHandler.SetupGet(h => h.SubjectTokenType).Returns(tokenType);
-        subHandler.Setup(h => h.HandleAsync(It.IsAny<SchemataApplication>(), It.IsAny<TokenRequest>(),
-                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+        subHandler.Setup(h => h.HandleAsync(
+                             It.IsAny<SchemataApplication>(),
+                             It.IsAny<TokenRequest>(),
+                             It.IsAny<ClaimsPrincipal?>(),
+                             It.IsAny<CancellationToken>()
+                         )
+                   )
                   .ReturnsAsync(expected);
 
         var clientAuth = MockClientAuth();

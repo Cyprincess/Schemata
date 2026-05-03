@@ -33,7 +33,10 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler == null) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+            );
         }
 
         return handler.GetDetailsAsync(request, issuer, ct);
@@ -54,7 +57,10 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler == null) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+            );
         }
 
         return handler.ApproveAsync(request, principal, issuer, ct);
@@ -68,7 +74,10 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     public override async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler == null) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+            );
         }
 
         await handler.DenyAsync(request, ct);

@@ -68,7 +68,10 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.DeviceCode));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.DeviceCode)
+            );
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -76,7 +79,10 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+            throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4001)
+            );
         }
 
         var ctx = new AdviceContext(sp);
@@ -89,12 +95,18 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+                throw new OAuthException(
+                    OAuthErrors.InvalidClient,
+                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                );
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.DeviceCode, ct);
         if (token is null) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var exchange = new DeviceCodeExchangeContext<TApp, TToken> {
@@ -111,22 +123,34 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                );
         }
 
         if (string.IsNullOrWhiteSpace(token.Payload)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var payload = JsonSerializer.Deserialize<DeviceCodePayload>(token.Payload, json.Value);
         if (payload is null) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         var scope = payload.Scope;
         if (!string.IsNullOrWhiteSpace(request.Scope)) {
             if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
-                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006));
+                throw new OAuthException(
+                    OAuthErrors.InvalidScope,
+                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                );
             }
 
             scope = request.Scope;

@@ -14,9 +14,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Features;
 
 /// <summary>
-///     Core feature that registers the resource advisor pipeline, the
-///     <see cref="IIdempotencyStore" /> implementation, and auto-discovers resources
-///     decorated with <see cref="ResourceAttribute" />.
+///     Core feature that registers the resource advisor pipeline, and
+///     auto-discovers resources decorated with <see cref="ResourceAttribute" />.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
 [DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
@@ -48,8 +47,6 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseFreshness<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseIdempotency<,>)));
 
-        services.TryAddSingleton<IIdempotencyStore, IdempotencyStore>();
-
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
             if (assembly.IsDynamic) continue;
 
@@ -71,8 +68,8 @@ public sealed class SchemataResourceFeature : FeatureBase
     }
 
     /// <summary>
-///     Registers a single resource: resolves endpoints, adds the idempotency advisor
-///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>, and stores the
+    ///     Registers a single resource: resolves endpoints, adds the idempotency advisor
+    ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>, and stores the
     ///     <see cref="ResourceAttribute" /> in <see cref="SchemataResourceOptions" />.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection" />.</param>

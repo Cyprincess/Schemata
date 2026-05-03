@@ -54,7 +54,10 @@ public sealed class IntrospectionHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.Token)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token)
+            );
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -62,7 +65,10 @@ public sealed class IntrospectionHandler<TApp, TToken>(
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+            throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4001)
+            );
         }
 
         var entity = await tokens.FindByReferenceIdAsync(request.Token, ct);

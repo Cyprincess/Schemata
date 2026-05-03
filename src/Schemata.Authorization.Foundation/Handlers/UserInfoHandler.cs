@@ -62,7 +62,10 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                );
         }
 
         var claims = new List<Claim>();
@@ -83,7 +86,10 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.GetResourceString(SchemataResources.ST4008));
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                );
         }
 
         // Filter claims: only include those whose destination set contains "userinfo".

@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
   </ItemGroup>
 
 </Project>

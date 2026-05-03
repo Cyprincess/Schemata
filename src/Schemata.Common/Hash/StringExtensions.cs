@@ -10,18 +10,12 @@ namespace System;
 public static class StringExtensions
 {
     /// <summary>
-    ///     Computes the 64-bit CityHash for the string.
+    ///     Generates a Schemata cache key by combining the framework GUID, domain, and the CityHash of the string.
     /// </summary>
-    /// <param name="value">The string to hash.</param>
-    /// <returns>The 64-bit hash value.</returns>
-    public static ulong CityHash64(this string value) { return CityHash.CityHash64(value); }
-
-    /// <summary>
-    ///     Generates a Schemata cache key by combining the framework GUID with the CityHash of the string.
-    /// </summary>
-    /// <param name="value">The string to generate a cache key for.</param>
+    /// <param name="key">The string to generate a cache key for.</param>
+    /// <param name="domain">The cache domain.</param>
     /// <returns>A unique cache key string.</returns>
-    public static string ToCacheKey(this string value) {
-        return string.Concat(SchemataConstants.Schemata, "\x1e", value.CityHash64());
+    public static string ToCacheKey(this string key, string domain) {
+        return string.Concat(SchemataConstants.Schemata, "\x1e", domain, "\x1e", CityHash.CityHash128(key));
     }
 }

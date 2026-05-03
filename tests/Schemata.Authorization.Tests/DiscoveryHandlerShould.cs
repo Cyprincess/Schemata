@@ -34,9 +34,11 @@ public class DiscoveryHandlerShould
         out DefaultHttpContext      httpContext,
         Action<IServiceCollection>? configure = null
     ) {
-        var options = Options.Create(new SchemataAuthorizationOptions {
-            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
-        });
+        var options = Options.Create(
+            new SchemataAuthorizationOptions {
+                Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
+            }
+        );
 
         var services = new ServiceCollection();
         services.AddSingleton(options);
@@ -70,12 +72,17 @@ public class DiscoveryHandlerShould
 
     [Fact]
     public async Task GetDiscovery_ComposesMultipleAdvisors() {
-        var handler = CreateHandler(out var http, services => {
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientCredentials>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRefreshToken>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIntrospection>());
-        });
+        var handler = CreateHandler(
+            out var http,
+            services => {
+                services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
+                services.TryAddEnumerable(
+                    ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientCredentials>()
+                );
+                services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRefreshToken>());
+                services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIntrospection>());
+            }
+        );
 
         var result   = await handler.GetDiscoveryDocumentAsync(Issuer, http.RequestAborted);
         var document = ExtractDocument(result);

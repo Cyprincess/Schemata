@@ -99,7 +99,10 @@ public class Member : IComparableArg
         var property = field switch {
             Text text       => text.Value,
             Integer integer => integer.Value.ToString(),
-            var _           => throw new ParseException(SchemataResources.GetResourceString(SchemataResources.ST2005), field.Position),
+            var _ => throw new ParseException(
+                SchemataResources.GetResourceString(SchemataResources.ST2005),
+                field.Position
+            ),
         };
 
         if (typeof(IDictionary).IsAssignableFrom(expression.Type)) {
@@ -126,7 +129,10 @@ public class Member : IComparableArg
         try {
             return Expression.PropertyOrField(expression, property);
         } catch (ArgumentException) {
-            throw new ParseException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST2006), property), field.Position);
+            throw new ParseException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST2006), property),
+                field.Position
+            );
         }
     }
 }

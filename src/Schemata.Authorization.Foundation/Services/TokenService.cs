@@ -62,7 +62,9 @@ public class TokenService
     /// <param name="encrypt">When <c>true</c>, wraps the JWT as a JWE.</param>
     public string CreateToken(IEnumerable<Claim> claims, TimeSpan lifetime, bool encrypt = false) {
         if (encrypt && _encrypting is null) {
-            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Encryption key"));
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Encryption key")
+            );
         }
 
         var now = DateTime.UtcNow;

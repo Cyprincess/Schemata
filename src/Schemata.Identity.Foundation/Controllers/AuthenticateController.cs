@@ -11,4 +11,5 @@ namespace Schemata.Identity.Foundation.Controllers;
 public sealed partial class AuthenticateController<TUser>(
     IdentityHandler<TUser>              handler,
     IOptionsMonitor<BearerTokenOptions> bearer
-) : ControllerBase where TUser : SchemataUser, new();
+) : ControllerBase
+    where TUser : SchemataUser, new();

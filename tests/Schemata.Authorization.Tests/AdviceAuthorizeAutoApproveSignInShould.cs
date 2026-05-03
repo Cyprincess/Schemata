@@ -27,9 +27,10 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
-                     a.Name = "auth-generated-name";
-                     return a;
-                 });
+                         a.Name = "auth-generated-name";
+                         return a;
+                     }
+                 );
 
         return (new(opts, authzMgr.Object), authzMgr);
     }
@@ -62,9 +63,10 @@ public class AdviceAuthorizeAutoApproveSignInShould
         Assert.True(ctx.TryGet<AuthorizationResult>(out var authResult));
         Assert.Equal("auth-generated-name", authResult!.Properties![Properties.AuthorizationName]);
 
-        var invocation = Assert.Single(authzMgr.Invocations,
-                                       i => i.Method.Name
-                                         == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync));
+        var invocation = Assert.Single(
+            authzMgr.Invocations,
+            i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync)
+        );
         var captured = Assert.IsType<SchemataAuthorization>(invocation.Arguments[0]);
         Assert.Equal("app-1", captured.ApplicationName);
         Assert.Equal("user-1", captured.Subject);
@@ -94,8 +96,10 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var result = await advisor.AdviseAsync(ctx, authz);
 
         Assert.Equal(AdviseResult.Continue, result);
-        authzMgr.Verify(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
-                        Times.Never);
+        authzMgr.Verify(
+            m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
+            Times.Never
+        );
     }
 
     [Fact]
@@ -108,8 +112,10 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var result = await advisor.AdviseAsync(ctx, authz);
 
         Assert.Equal(AdviseResult.Continue, result);
-        authzMgr.Verify(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
-                        Times.Never);
+        authzMgr.Verify(
+            m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
+            Times.Never
+        );
     }
 
     [Fact]

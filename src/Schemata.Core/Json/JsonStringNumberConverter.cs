@@ -39,7 +39,13 @@ public class JsonStringNumberConverter : JsonConverter<long>
             }
         }
 
-        throw new JsonException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1025), reader.GetString(), typeToConvert));
+        throw new JsonException(
+            string.Format(
+                SchemataResources.GetResourceString(SchemataResources.ST1025),
+                reader.GetString(),
+                typeToConvert
+            )
+        );
     }
 
     /// <inheritdoc />

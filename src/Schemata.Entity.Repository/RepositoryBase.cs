@@ -31,9 +31,9 @@ public abstract class RepositoryBase
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of key property infos.</returns>
-    protected static IList<PropertyInfo> KeyPropertiesCache(Type type) {
+    public static IReadOnlyList<PropertyInfo> KeyPropertiesCache(Type type) {
         if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
-            return pi;
+            return pi.ToList();
         }
 
         var allProperties = TypePropertiesCache(type);
@@ -56,7 +56,7 @@ public abstract class RepositoryBase
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of mapped property infos.</returns>
-    protected static IList<PropertyInfo> TypePropertiesCache(Type type) {
+    protected static IReadOnlyList<PropertyInfo> TypePropertiesCache(Type type) {
         var properties = AppDomainTypeCache.GetProperties(type).Values.Where(IsNotVirtual).ToList();
         return properties;
     }

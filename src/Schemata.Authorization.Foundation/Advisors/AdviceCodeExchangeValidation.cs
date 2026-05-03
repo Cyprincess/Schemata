@@ -50,31 +50,52 @@ public sealed class AdviceCodeExchangeValidation<TApp, TToken> : ICodeExchangeAd
         CancellationToken                 ct = default
     ) {
         if (exchange.CodeToken?.Type != TokenTypes.AuthorizationCode) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (exchange.CodeToken.ApplicationName != exchange.Application?.Name) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (exchange.CodeToken.ExpireTime.HasValue && exchange.CodeToken.ExpireTime.Value <= DateTime.UtcNow) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (exchange.CodeToken.Status != TokenStatuses.Valid) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (string.IsNullOrWhiteSpace(exchange.Payload?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (exchange.Application?.ClientId != exchange.Payload.ClientId) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         if (exchange.Request?.RedirectUri != exchange.Payload.RedirectUri) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4004));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4004)
+            );
         }
 
         return Task.FromResult(AdviseResult.Continue);

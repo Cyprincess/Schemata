@@ -101,7 +101,12 @@ public class ClientSecretBasicHandlerShould
         var headers = BasicHeader("Basic !!!not-base64!!!");
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
-                                                     null, null, headers, CancellationToken.None));
+                                                     null,
+                                                     null,
+                                                     headers,
+                                                     CancellationToken.None
+                                                 )
+        );
     }
 
     [Fact]
@@ -110,6 +115,11 @@ public class ClientSecretBasicHandlerShould
         var headers = BasicHeader(Encode("client-without-secret"));
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
-                                                     null, null, headers, CancellationToken.None));
+                                                     null,
+                                                     null,
+                                                     headers,
+                                                     CancellationToken.None
+                                                 )
+        );
     }
 }

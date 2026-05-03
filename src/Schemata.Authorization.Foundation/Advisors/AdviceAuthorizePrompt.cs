@@ -64,7 +64,10 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
 
             foreach (var v in values) {
                 if (!AdviceAuthorizePrompt.KnownValues.Contains(v, StringComparer.Ordinal)) {
-                    throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), v));
+                    throw new OAuthException(
+                        OAuthErrors.InvalidRequest,
+                        string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), v)
+                    );
                 }
             }
 
@@ -73,9 +76,15 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
 
             switch (none) {
                 case true when values.Length > 1:
-                    throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST4015), PromptValues.None));
+                    throw new OAuthException(
+                        OAuthErrors.InvalidRequest,
+                        string.Format(SchemataResources.GetResourceString(SchemataResources.ST4015), PromptValues.None)
+                    );
                 case true when (authz.Principal?.Identity?.IsAuthenticated != true):
-                    throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.GetResourceString(SchemataResources.ST4011));
+                    throw new OAuthException(
+                        OAuthErrors.LoginRequired,
+                        SchemataResources.GetResourceString(SchemataResources.ST4011)
+                    );
             }
 
             if (login || values.Contains(PromptValues.SelectAccount)) {
@@ -88,7 +97,10 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
         }
 
         if (!int.TryParse(authz.Request.MaxAge, out var age) || age < 0) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.MaxAge));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.MaxAge)
+            );
         }
 
         var at = authz.Principal?.FindFirstValue(Claims.AuthTime);
@@ -100,7 +112,10 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
         }
 
         if (none) {
-            throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.GetResourceString(SchemataResources.ST4011));
+            throw new OAuthException(
+                OAuthErrors.LoginRequired,
+                SchemataResources.GetResourceString(SchemataResources.ST4011)
+            );
         }
 
         authz.RequireReauthentication = true;

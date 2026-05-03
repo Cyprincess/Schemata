@@ -43,7 +43,11 @@ public sealed class AdviceDeviceEndpointPermission<TApp>(IApplicationManager<TAp
         CancellationToken      ct = default
     ) {
         if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + "device_authorization", ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007), 403);
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007),
+                403
+            );
         }
 
         return AdviseResult.Continue;

@@ -40,7 +40,7 @@ public static class AsyncEnumerableExtensions
 
 #if !NET10_0_OR_GREATER
     /// <summary>
-    ///     Materializes an async enumerable into a <see cref="List{T}"/>.
+    ///     Materializes an async enumerable into a <see cref="List{T}" />.
     ///     Conditional on <c>!NET10_0_OR_GREATER</c> because .NET 10 ships
     ///     a built-in <c>ToListAsync</c>.
     /// </summary>

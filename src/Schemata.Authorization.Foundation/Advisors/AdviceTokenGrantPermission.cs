@@ -47,7 +47,10 @@ public sealed class AdviceTokenGrantPermission<TApp>(IApplicationManager<TApp> m
         var grant = request.GrantType;
 
         if (!await manager.HasPermissionAsync(application, PermissionPrefixes.GrantType + grant, ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007));
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007)
+            );
         }
 
         return AdviseResult.Continue;

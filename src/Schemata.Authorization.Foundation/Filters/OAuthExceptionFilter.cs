@@ -28,10 +28,11 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
                 parameters[Claims.Issuer] = options.Value.Issuer;
             }
 
-            context.Result = ResponseModeService.CreateCallback(oauth.RedirectUri,
-                                                                parameters.Where(p => p.Value is not null)
-                                                                          .ToDictionary(p => p.Key, p => p.Value),
-                                                                oauth.ResponseMode ?? ResponseModes.Query);
+            context.Result = ResponseModeService.CreateCallback(
+                oauth.RedirectUri,
+                parameters.Where(p => p.Value is not null).ToDictionary(p => p.Key, p => p.Value),
+                oauth.ResponseMode ?? ResponseModes.Query
+            );
         } else {
             context.Result = new JsonResult(oauth.CreateErrorResponse()) { StatusCode = oauth.Status };
         }

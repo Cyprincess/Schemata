@@ -7,7 +7,9 @@ namespace Schemata.Authorization.Skeleton.Handlers;
 
 /// <summary>
 ///     Abstract handler for the RP-Initiated Logout endpoint,
-///     per <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>,
+///     per
+///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>
+///     ,
 ///     OpenID Connect RP-Initiated Logout 1.0.
 /// </summary>
 public abstract class EndSessionEndpoint

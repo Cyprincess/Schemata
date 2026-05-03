@@ -139,11 +139,9 @@ public static class SchemataRepositoryBuilderExtensions
             return OptionsParameterType.DataOptions;
         }
 
-        throw new ArgumentException($"Missing constructor accepting '{
-            nameof(DataOptions)
-        }' on type {
-            typeof(TContextImplementation).Name
-        }.");
+        throw new ArgumentException(
+            $"Missing constructor accepting '{nameof(DataOptions)}' on type {typeof(TContextImplementation).Name}."
+        );
     }
 
     #region Nested type: OptionsParameterType

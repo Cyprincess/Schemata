@@ -31,11 +31,18 @@ public sealed class AdviceUserInfoOpenIdRequirement : IUserInfoAdvisor
     /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(AdviceContext ctx, UserInfoContext info, CancellationToken ct = default) {
         if (!info.GrantedScopes.Contains(Scopes.OpenId)) {
-            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.GetResourceString(SchemataResources.ST4006), 403);
+            throw new OAuthException(
+                OAuthErrors.InvalidScope,
+                SchemataResources.GetResourceString(SchemataResources.ST4006),
+                403
+            );
         }
 
         if (string.IsNullOrWhiteSpace(info.InternalSubject)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.GetResourceString(SchemataResources.ST4017));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.GetResourceString(SchemataResources.ST4017)
+            );
         }
 
         return Task.FromResult(AdviseResult.Continue);

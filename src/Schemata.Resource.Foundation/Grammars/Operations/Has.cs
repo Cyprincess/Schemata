@@ -127,10 +127,14 @@ public class Has : IBinary
             right = Expression.Convert(right, elementType);
         }
 
-        var method = ctx.GetMethod(typeof(Enumerable), "Contains", [elementType],
-                                   () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                                           .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
-                                                           .MakeGenericMethod(elementType));
+        var method = ctx.GetMethod(
+            typeof(Enumerable),
+            "Contains",
+            [elementType],
+            () => typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                    .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
+                                    .MakeGenericMethod(elementType)
+        );
 
         return Expression.Call(method!, left, right);
     }

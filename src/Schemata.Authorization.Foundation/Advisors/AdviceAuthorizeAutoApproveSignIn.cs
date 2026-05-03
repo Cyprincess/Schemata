@@ -65,7 +65,10 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 
         var subject = authz.Principal?.FindFirstValue(Claims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
-            throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.GetResourceString(SchemataResources.ST4011)) {
+            throw new OAuthException(
+                OAuthErrors.LoginRequired,
+                SchemataResources.GetResourceString(SchemataResources.ST4011)
+            ) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
                 ResponseMode = authz.ResponseMode,

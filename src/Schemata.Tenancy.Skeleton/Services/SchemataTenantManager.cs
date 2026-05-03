@@ -5,7 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Distributed;
+using Schemata.Abstractions;
+using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton.Entities;
 
@@ -17,7 +18,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 public class SchemataTenantManager : SchemataTenantManager<SchemataTenant<Guid>, Guid>, ITenantManager
 {
     /// <inheritdoc />
-    public SchemataTenantManager(IDistributedCache cache, IRepository<SchemataTenant<Guid>> tenants) :
+    public SchemataTenantManager(ICacheProvider cache, IRepository<SchemataTenant<Guid>> tenants) :
         base(cache, tenants) { }
 }
 
@@ -30,13 +31,13 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
     where TTenant : SchemataTenant<TKey>
     where TKey : struct, IEquatable<TKey>
 {
-    private readonly IDistributedCache    _cache;
+    private readonly ICacheProvider       _cache;
     private readonly IRepository<TTenant> _tenants;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SchemataTenantManager{TTenant, TKey}" /> class.
     /// </summary>
-    public SchemataTenantManager(IDistributedCache cache, IRepository<TTenant> tenants) {
+    public SchemataTenantManager(ICacheProvider cache, IRepository<TTenant> tenants) {
         _cache   = cache;
         _tenants = tenants;
     }
@@ -65,7 +66,7 @@ public class SchemataTenantManager<TTenant, TKey> : ITenantManager<TTenant, TKey
             return ImmutableArray<string>.Empty;
         }
 
-        var key   = tenant.Hosts!.ToCacheKey();
+        var key   = tenant.Hosts!.ToCacheKey(SchemataConstants.Keys.Tenancy);
         var bytes = await _cache.GetAsync(key, ct);
         if (bytes is not null) {
             return JsonSerializer.Deserialize<ImmutableArray<string>>(bytes);

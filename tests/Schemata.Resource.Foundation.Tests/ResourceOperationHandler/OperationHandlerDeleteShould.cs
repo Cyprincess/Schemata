@@ -29,19 +29,27 @@ public class OperationHandlerDeleteShould
     [Fact]
     public async Task Delete_ETagMismatch_ThrowsConcurrencyException() {
         var handler = _fixture.CreateHandler(services => {
-            services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
-        });
+                services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
+            }
+        );
         var entity = _fixture.Students[0]; // already has Timestamp set
 
         await Assert.ThrowsAsync<ConcurrencyException>(() => handler.DeleteAsync(
-                                                           entity.CanonicalName!, "W/\"wrongtag\"", false, null, null));
+                                                           entity.CanonicalName!,
+                                                           "W/\"wrongtag\"",
+                                                           false,
+                                                           null,
+                                                           null
+                                                       )
+        );
     }
 
     [Fact]
     public async Task Delete_Force_BypassesFreshnessCheck() {
         var handler = _fixture.CreateHandler(services => {
-            services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
-        });
+                services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
+            }
+        );
         var entity = _fixture.Students[0]; // has Timestamp set
 
         var deleted = await handler.DeleteAsync(entity.CanonicalName!, "W/\"wrongtag\"", true, null, null);

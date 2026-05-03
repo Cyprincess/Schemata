@@ -41,7 +41,10 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
 
         var handler = sp.GetKeyedService<IGrantHandler>(grant);
         if (handler is null) {
-            throw new OAuthException(OAuthErrors.UnsupportedGrantType, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.GrantType));
+            throw new OAuthException(
+                OAuthErrors.UnsupportedGrantType,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.GrantType)
+            );
         }
 
         return await handler.HandleAsync(request, headers, ct);

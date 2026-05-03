@@ -26,8 +26,11 @@ public partial class ConnectController(IOptions<SchemataAuthorizationOptions> op
                 new(result.Properties ?? []),
                 result.Properties?.ContainsKey(Properties.ResponseType) == true
                     ? options.Value.CodeScheme
-                    : options.Value.BearerScheme),
-            AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(result.RedirectUri),
+                    : options.Value.BearerScheme
+            ),
+            AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(
+                result.RedirectUri
+            ),
             AuthorizationStatus.Content   => new JsonResult(result.Data),
             AuthorizationStatus.Challenge => result.Data is string scheme ? Challenge(scheme) : Challenge(),
             var _                         => throw new NoContentException(),

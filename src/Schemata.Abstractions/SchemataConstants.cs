@@ -613,8 +613,17 @@ public static class SchemataConstants
         /// <summary>Key for the modular modules list in configuration.</summary>
         public const string ModularModules = "Modular:Modules";
 
-        /// <summary>Key prefix for Device Poll cache.</summary>
-        public const string DevicePoll = "device_poll";
+        /// <summary>Key for Authorization.</summary>
+        public const string Authorization = "authorization";
+
+        /// <summary>Key for Entity.</summary>
+        public const string Entity = "entity";
+
+        /// <summary>Key for Resource.</summary>
+        public const string Resource = "resource";
+        
+        /// <summary>Key for Tenancy.</summary>
+        public const string Tenancy = "tenancy";
     }
 
     #endregion
@@ -1103,19 +1112,6 @@ public static class SchemataConstants
     {
         /// <summary>The request itself is the subject.</summary>
         public const string Request = "request";
-    }
-
-    #endregion
-
-    #region Nested type: PreconditionTypes
-
-    /// <summary>
-    ///     Well-known precondition type identifiers.
-    /// </summary>
-    public static class PreconditionTypes
-    {
-        /// <summary>A tenant precondition.</summary>
-        public const string Tenant = "TENANT";
     }
 
     #endregion

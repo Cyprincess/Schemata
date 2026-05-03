@@ -195,7 +195,10 @@ public class SchemataAuthorizationOptions
             SigningAlgorithms.HmacSha256 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)),
             SigningAlgorithms.HmacSha384 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(48)),
             SigningAlgorithms.HmacSha512 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(64)),
-            var _ => throw new ArgumentException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm), nameof(algorithm)),
+            var _ => throw new ArgumentException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm),
+                nameof(algorithm)
+            ),
         };
         SigningAlgorithm = algorithm;
         return this;
@@ -212,7 +215,10 @@ public class SchemataAuthorizationOptions
             EncryptionAlgorithms.A128Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(16)),
             EncryptionAlgorithms.A192Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(24)),
             EncryptionAlgorithms.A256Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)),
-            var _ => throw new ArgumentException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm), nameof(algorithm)),
+            var _ => throw new ArgumentException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm),
+                nameof(algorithm)
+            ),
         };
         EncryptionAlgorithm = algorithm;
         return this;

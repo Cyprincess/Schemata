@@ -24,8 +24,12 @@ public class EndSessionHandlerShould
         opts.Issuer = "https://localhost";
 
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
-        apps.Setup(a => a.ValidatePostLogoutRedirectUriAsync(It.IsAny<SchemataApplication?>(), It.IsAny<string?>(),
-                                                             It.IsAny<CancellationToken>()))
+        apps.Setup(a => a.ValidatePostLogoutRedirectUriAsync(
+                       It.IsAny<SchemataApplication?>(),
+                       It.IsAny<string?>(),
+                       It.IsAny<CancellationToken>()
+                   )
+             )
             .ReturnsAsync(true);
 
         var tokenService = new TokenService(Options.Create(opts));
@@ -102,10 +106,13 @@ public class EndSessionHandlerShould
     [Fact]
     public async Task ReturnsHtml_WhenFrontChannelUrisExist() {
         var notifier = new Mock<ILogoutNotifier>();
-        notifier
-           .Setup(n => n.GetFrontChannelUrisAsync(It.IsAny<string?>(), It.IsAny<string?>(),
-                                                  It.IsAny<CancellationToken>()))
-           .ReturnsAsync(["https://rp1.example.com/logout", "https://rp2.example.com/logout"]);
+        notifier.Setup(n => n.GetFrontChannelUrisAsync(
+                           It.IsAny<string?>(),
+                           It.IsAny<string?>(),
+                           It.IsAny<CancellationToken>()
+                       )
+                 )
+                .ReturnsAsync(["https://rp1.example.com/logout", "https://rp2.example.com/logout"]);
 
         var handler = CreateHandler(notifier.Object);
         var request = new EndSessionRequest { PostLogoutRedirectUri = "https://example.com/done" };

@@ -25,12 +25,17 @@ var appMock = new Mock<IApplicationManager<SchemataApplication>>();
 appMock.Setup(m => m.FindByCanonicalNameAsync("test-client", It.IsAny<CancellationToken>())).ReturnsAsync(testApp);
 appMock.Setup(m => m.ValidateClientSecretAsync(testApp, "test-secret", It.IsAny<CancellationToken>()))
        .ReturnsAsync(true);
-appMock.Setup(m => m.ValidateClientSecretAsync(testApp, It.Is<string>(s => s != "test-secret"),
-                                               It.IsAny<CancellationToken>()))
+appMock.Setup(m => m.ValidateClientSecretAsync(
+                  testApp,
+                  It.Is<string>(s => s != "test-secret"),
+                  It.IsAny<CancellationToken>()
+              )
+        )
        .ReturnsAsync(false);
 appMock.Setup(m => m.HasPermissionAsync(testApp, It.IsAny<string>(), It.IsAny<CancellationToken>()))
        .Returns((SchemataApplication app, string perm, CancellationToken _)
-                    => Task.FromResult(app.Permissions!.Contains(perm)));
+                    => Task.FromResult(app.Permissions!.Contains(perm))
+        );
 
 var scopeMock = new Mock<IScopeManager<SchemataScope>>();
 scopeMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
@@ -50,16 +55,18 @@ builder.Services.AddSingleton(authzMock.Object);
 builder.Services.AddSingleton(tokenMock.Object);
 
 builder.UseSchemata(schema => {
-    schema.UseWellKnown();
-    schema.UseAuthorization(o => {
-               o.Issuer = "https://localhost";
-               o.AddEphemeralSigningKey();
-               o.AddEphemeralEncryptionKey();
-               o.AllowedClientAuthMethods.Add("client_secret_post");
-               o.PermitResponseType("code");
-           })
-          .UseClientCredentialsFlow();
-});
+        schema.UseWellKnown();
+        schema.UseAuthorization(o => {
+                       o.Issuer = "https://localhost";
+                       o.AddEphemeralSigningKey();
+                       o.AddEphemeralEncryptionKey();
+                       o.AllowedClientAuthMethods.Add("client_secret_post");
+                       o.PermitResponseType("code");
+                   }
+               )
+              .UseClientCredentialsFlow();
+    }
+);
 
 var app = builder.Build();
 

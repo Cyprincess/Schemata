@@ -57,7 +57,10 @@ public sealed class RevocationHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.Token)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token)
+            );
         }
 
         var application = await client.AuthenticateAsync(null, new(){

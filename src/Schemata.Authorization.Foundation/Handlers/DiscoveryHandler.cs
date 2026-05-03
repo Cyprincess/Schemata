@@ -78,7 +78,10 @@ public sealed class DiscoveryHandler<TScope>(
                 return AuthorizationResult.Content(discovery.Document);
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.ServerError, SchemataResources.GetResourceString(SchemataResources.ST4014));
+                throw new OAuthException(
+                    OAuthErrors.ServerError,
+                    SchemataResources.GetResourceString(SchemataResources.ST4014)
+                );
         }
 
         var names = await scopes.ListAsync(ct: ct).Map(s => s.Name!, ct).ToListAsync(ct);
@@ -93,11 +96,18 @@ public sealed class DiscoveryHandler<TScope>(
     ///     Private key components are stripped before publication.
     ///     Symmetric keys result in an empty <c>keys</c> array because they
     ///     cannot be disclosed publicly,
-    ///     per <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html#section-4.2">RFC 7517: JSON Web Key (JWK) §4.2: "use" (Public Key Use) Parameter</seealso>.
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html#section-4.2">
+    ///         RFC 7517: JSON Web Key (JWK) §4.2: "use"
+    ///         (Public Key Use) Parameter
+    ///     </seealso>
+    ///     .
     /// </summary>
     public AuthorizationResult GetJwks() {
         if (options.Value.SigningKey == null) {
-            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Signing key"));
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Signing key")
+            );
         }
 
         // symmetric keys MUST NOT appear in a public JWKS.

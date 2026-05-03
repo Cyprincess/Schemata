@@ -59,18 +59,27 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         if (string.IsNullOrWhiteSpace(exchange.Payload?.CodeChallenge)) {
             if (!string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)
              && options.Value.RequirePkceDowngradeProtection) {
-                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4005));
+                throw new OAuthException(
+                    OAuthErrors.InvalidGrant,
+                    SchemataResources.GetResourceString(SchemataResources.ST4005)
+                );
             }
 
             return Task.FromResult(AdviseResult.Continue);
         }
 
         if (string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4005));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4005)
+            );
         }
 
         if (exchange.Request.CodeVerifier.Length is < 43 or > 128 || !exchange.Request.CodeVerifier.All(IsUnreserved)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4005));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4005)
+            );
         }
 
         var valid = exchange.Payload.CodeChallengeMethod switch {
@@ -80,7 +89,10 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         };
 
         if (!valid) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.GetResourceString(SchemataResources.ST4005));
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.ST4005)
+            );
         }
 
         return Task.FromResult(AdviseResult.Continue);

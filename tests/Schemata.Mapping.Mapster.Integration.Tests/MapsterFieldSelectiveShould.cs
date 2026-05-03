@@ -13,13 +13,15 @@ public class MapsterFieldSelectiveShould
     private static ISimpleMapper CreateMapper() {
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => {
-            schema.UseMapster()
-                  .Map<Source, Destination>(map => {
-                       map.For(d => d.DisplayName)
-                          .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
-                       map.For(d => d.Sex).From(s => s.Sex.ToString());
-                   });
-        });
+                schema.UseMapster()
+                      .Map<Source, Destination>(map => {
+                               map.For(d => d.DisplayName)
+                                  .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
+                               map.For(d => d.Sex).From(s => s.Sex.ToString());
+                           }
+                       );
+            }
+        );
 
         var app   = builder.Build();
         var scope = app.Services.CreateScope();

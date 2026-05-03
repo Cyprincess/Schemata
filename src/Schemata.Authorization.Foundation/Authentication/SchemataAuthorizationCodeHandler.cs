@@ -95,8 +95,10 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
                 break;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.AccessDenied,
-                                         SchemataResources.GetResourceString(SchemataResources.ST4008));
+                throw new OAuthException(
+                    OAuthErrors.AccessDenied,
+                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                );
         }
 
         for (var i = claims.Count - 1; i >= 0; i--) {

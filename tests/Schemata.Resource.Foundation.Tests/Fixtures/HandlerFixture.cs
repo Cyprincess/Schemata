@@ -27,65 +27,85 @@ public class HandlerFixture
         // Field-selective mapper for UpdateMask: copies named properties from source to destination
         Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>(), It.IsAny<IEnumerable<string>>()))
               .Callback<Student, Student, IEnumerable<string>>((src, dst, fields) => {
-                   foreach (var field in fields) {
-                       var prop = typeof(Student).GetProperty(field);
-                       prop?.SetValue(dst, prop.GetValue(src));
+                       foreach (var field in fields) {
+                           var prop = typeof(Student).GetProperty(field);
+                           prop?.SetValue(dst, prop.GetValue(src));
+                       }
                    }
-               });
+               );
 
         // Full-object mapper (no fields): copy all public properties
         Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>()))
               .Callback<Student, Student>((src, dst) => {
-                   foreach (var prop in typeof(Student).GetProperties()) {
-                       if (prop.CanWrite) prop.SetValue(dst, prop.GetValue(src));
+                       foreach (var prop in typeof(Student).GetProperties()) {
+                           if (prop.CanWrite) prop.SetValue(dst, prop.GetValue(src));
+                       }
                    }
-               });
+               );
 
         Repository.Setup(r => r.Once()).Returns(Repository.Object);
         Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Repository.Object);
 
         Repository
-           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                   It.IsAny<CancellationToken>()))
+           .Setup(r => r.ListAsync(
+                      It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                      It.IsAny<CancellationToken>()
+                  )
+            )
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken ct)
-                        => AsyncList(q(Students.AsQueryable()), ct));
+                        => AsyncList(q(Students.AsQueryable()), ct)
+            );
+
+        Repository.Setup(r => r.SingleOrDefaultAsync<Student>(
+                             It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                             It.IsAny<CancellationToken>()
+                         )
+                   )
+                  .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _)
+                               => ValueTask.FromResult(q(Students.AsQueryable()).SingleOrDefault())
+                   );
 
         Repository
-           .Setup(r => r.SingleOrDefaultAsync<Student>(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                                       It.IsAny<CancellationToken>()))
+           .Setup(r => r.CountAsync(
+                      It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                      It.IsAny<CancellationToken>()
+                  )
+            )
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _)
-                        => ValueTask.FromResult(q(Students.AsQueryable()).SingleOrDefault()));
+                        => ValueTask.FromResult(q(Students.AsQueryable()).Count())
+            );
 
         Repository
-           .Setup(r => r.CountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                    It.IsAny<CancellationToken>()))
+           .Setup(r => r.LongCountAsync(
+                      It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                      It.IsAny<CancellationToken>()
+                  )
+            )
            .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _)
-                        => ValueTask.FromResult(q(Students.AsQueryable()).Count()));
-
-        Repository
-           .Setup(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                                        It.IsAny<CancellationToken>()))
-           .Returns((Func<IQueryable<Student>, IQueryable<Student>> q, CancellationToken _)
-                        => ValueTask.FromResult((long)q(Students.AsQueryable()).Count()));
+                        => ValueTask.FromResult((long)q(Students.AsQueryable()).Count())
+            );
 
         Repository.Setup(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
                   .Returns((Student s, CancellationToken _) => {
-                       Students.Add(s);
-                       return Task.CompletedTask;
-                   });
+                           Students.Add(s);
+                           return Task.CompletedTask;
+                       }
+                   );
 
         Repository.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
                   .Returns((Student s, CancellationToken _) => {
-                       var idx                     = Students.FindIndex(x => x.Id == s.Id);
-                       if (idx >= 0) Students[idx] = s;
-                       return Task.CompletedTask;
-                   });
+                           var idx                     = Students.FindIndex(x => x.Id == s.Id);
+                           if (idx >= 0) Students[idx] = s;
+                           return Task.CompletedTask;
+                       }
+                   );
 
         Repository.Setup(r => r.RemoveAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
                   .Returns((Student s, CancellationToken _) => {
-                       Students.Remove(s);
-                       return Task.CompletedTask;
-                   });
+                           Students.Remove(s);
+                           return Task.CompletedTask;
+                       }
+                   );
 
         Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult(0));
     }

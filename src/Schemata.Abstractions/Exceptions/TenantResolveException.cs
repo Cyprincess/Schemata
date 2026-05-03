@@ -27,7 +27,7 @@ public class TenantResolveException : SchemataException
     ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1002)) {
         Details = [new PreconditionFailureDetail {
             Violations = [new() {
-                Type        = PreconditionTypes.Tenant,
+                Type        = Keys.Tenancy,
                 Subject     = PreconditionSubjects.Request,
                 Description = SchemataResources.GetResourceString(SchemataResources.ST1002),
             }],

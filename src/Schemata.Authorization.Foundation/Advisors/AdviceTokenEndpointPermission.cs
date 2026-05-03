@@ -36,7 +36,11 @@ public sealed class AdviceTokenEndpointPermission<TApp>(IApplicationManager<TApp
         CancellationToken ct = default
     ) {
         if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + "token", ct)) {
-            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.GetResourceString(SchemataResources.ST4007), 403);
+            throw new OAuthException(
+                OAuthErrors.UnauthorizedClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4007),
+                403
+            );
         }
 
         return AdviseResult.Continue;

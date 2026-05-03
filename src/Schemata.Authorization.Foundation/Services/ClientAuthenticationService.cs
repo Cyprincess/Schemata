@@ -53,8 +53,14 @@ public sealed class ClientAuthenticationService<TApp>(IEnumerable<IClientAuthent
 
         return results.Count switch {
             1 => results.FirstOrDefault(),
-            > 1 => throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.GetResourceString(SchemataResources.ST4003)),
-            var _ => throw new OAuthException(OAuthErrors.InvalidClient, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)),
+            > 1 => throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.GetResourceString(SchemataResources.ST4003)
+            ),
+            var _ => throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)
+            ),
         };
     }
 

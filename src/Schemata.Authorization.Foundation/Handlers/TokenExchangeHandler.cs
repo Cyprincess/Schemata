@@ -47,11 +47,20 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.SubjectToken)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.SubjectToken));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.SubjectToken)
+            );
         }
 
         if (string.IsNullOrWhiteSpace(request.SubjectTokenType)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.SubjectTokenType));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(
+                    SchemataResources.GetResourceString(SchemataResources.ST1013),
+                    Parameters.SubjectTokenType
+                )
+            );
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -59,7 +68,10 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+            throw new OAuthException(
+                OAuthErrors.InvalidClient,
+                SchemataResources.GetResourceString(SchemataResources.ST4001)
+            );
         }
 
         var ctx = new AdviceContext(sp);
@@ -72,12 +84,21 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.GetResourceString(SchemataResources.ST4001));
+                throw new OAuthException(
+                    OAuthErrors.InvalidClient,
+                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                );
         }
 
         var handler = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
         if (handler is null) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.SubjectTokenType));
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(
+                    SchemataResources.GetResourceString(SchemataResources.ST1015),
+                    Parameters.SubjectTokenType
+                )
+            );
         }
 
         return await handler.HandleAsync(application, request, null, ct);

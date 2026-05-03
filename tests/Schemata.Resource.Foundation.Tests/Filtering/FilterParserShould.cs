@@ -25,14 +25,23 @@ public class FilterParserShould
     [InlineData("package=com.google", """[= "package" "com"."google"]""", false)]
     [InlineData("yesterday < request.time", """[< "yesterday" "request"."time"]""", false)]
     [InlineData("expr.type_map.1.type", @"""expr"".""type_map"".1.""type""", false)]
-    [InlineData("experiment.rollout <= cohort(request.user)",
-                """[<= "experiment"."rollout" "cohort"("request"."user")]""", false)]
+    [InlineData(
+        "experiment.rollout <= cohort(request.user)",
+        """[<= "experiment"."rollout" "cohort"("request"."user")]""",
+        false
+    )]
     [InlineData("regex(m.key, '^.*prod.*$')", @"""regex""(""m"".""key"",""^.*prod.*$"")", false)]
     [InlineData("math.mem('30mb')", @"""math"".""mem""(""30mb"")", false)]
-    [InlineData("(msg.endsWith('world') AND retries < 10)", """[AND "msg"."endsWith"("world") [< "retries" 10]]""",
-                false)]
-    [InlineData("(endsWith(msg, 'world') AND retries < 10)", """[AND "endsWith"("msg","world") [< "retries" 10]]""",
-                false)]
+    [InlineData(
+        "(msg.endsWith('world') AND retries < 10)",
+        """[AND "msg"."endsWith"("world") [< "retries" 10]]""",
+        false
+    )]
+    [InlineData(
+        "(endsWith(msg, 'world') AND retries < 10)",
+        """[AND "endsWith"("msg","world") [< "retries" 10]]""",
+        false
+    )]
     [InlineData("time.now()", @"""time"".""now""()", false)]
     [InlineData("timestamp(\"2012-04-21T11:30:00-04:00\")", @"""timestamp""(""2012-04-21T11:30:00-04:00"")", false)]
     [InlineData("duration(\"32s\")", @"""duration""(""32s"")", false)]
@@ -44,7 +53,8 @@ public class FilterParserShould
     [InlineData(
         "start_time > timestamp(\"2006-01-02T15:04:05+07:00\") AND (driver = \"driver1\" OR start_driver = \"driver1\" OR end_driver = \"driver1\")",
         """[AND [> "start_time" "timestamp"("2006-01-02T15:04:05+07:00")] [OR [= "driver" "driver1"] [= "start_driver" "driver1"] [= "end_driver" "driver1"]]]""",
-        false)]
+        false
+    )]
     [InlineData("a = 1", """[= "a" 1]""", false)]
     [InlineData("a != 1", """[!= "a" 1]""", false)]
     [InlineData("a < 10", """[< "a" 10]""", false)]

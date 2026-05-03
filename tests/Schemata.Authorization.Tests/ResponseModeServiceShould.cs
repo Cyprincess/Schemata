@@ -16,8 +16,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_Query_AppendsQueryString() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("code", "abc123"), ("state", "xyz")), "query");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("code", "abc123"), ("state", "xyz")),
+            "query"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("https://client.example.com/cb?code=abc123&state=xyz", redirect.Url);
@@ -25,8 +28,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_Query_UsesSeparatorWhenQueryAlreadyPresent() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb?existing=1",
-                                                        Params(("code", "abc123")), "query");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb?existing=1",
+            Params(("code", "abc123")),
+            "query"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("https://client.example.com/cb?existing=1&code=abc123", redirect.Url);
@@ -34,9 +40,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_Fragment_AppendsFragment() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("access_token", "tok"), ("token_type", "Bearer")),
-                                                        "fragment");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("access_token", "tok"), ("token_type", "Bearer")),
+            "fragment"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("https://client.example.com/cb#access_token=tok&token_type=Bearer", redirect.Url);
@@ -44,8 +52,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_FormPost_ReturnsHtmlWithHiddenFields() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("code", "abc123"), ("state", "xyz")), "form_post");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("code", "abc123"), ("state", "xyz")),
+            "form_post"
+        );
 
         var content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html", content.ContentType);
@@ -59,8 +70,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_FormPost_HtmlEncodesRedirectUri() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb?a=1&b=2",
-                                                        Params(("code", "abc")), "form_post");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb?a=1&b=2",
+            Params(("code", "abc")),
+            "form_post"
+        );
 
         var content = Assert.IsType<ContentResult>(result);
         Assert.Contains("action=\"https://client.example.com/cb?a=1&amp;b=2\"", content.Content);
@@ -68,8 +82,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_FormPost_HtmlEncodesParameterValues() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("state", "<script>alert(1)</script>")), "form_post");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("state", "<script>alert(1)</script>")),
+            "form_post"
+        );
 
         var content = Assert.IsType<ContentResult>(result);
         Assert.DoesNotContain("<script>", content.Content);
@@ -78,8 +95,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_NullValues_ExcludedFromOutput() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("code", "abc"), ("state", null)), "query");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("code", "abc"), ("state", null)),
+            "query"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("https://client.example.com/cb?code=abc", redirect.Url);
@@ -87,8 +107,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_UnknownMode_FallsBackToQuery() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb", Params(("code", "abc")),
-                                                        "unknown_mode");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("code", "abc")),
+            "unknown_mode"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.StartsWith("https://client.example.com/cb?", redirect.Url);
@@ -120,8 +143,11 @@ public class ResponseModeServiceShould
 
     [Fact]
     public void CreateCallback_Query_UrlEncodesSpecialChars() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
-                                                        Params(("state", "hello world+test")), "query");
+        var result = ResponseModeService.CreateCallback(
+            "https://client.example.com/cb",
+            Params(("state", "hello world+test")),
+            "query"
+        );
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Contains("state=hello%20world%2Btest", redirect.Url);

@@ -20,10 +20,13 @@ public class ResourceGrpcErrorIntegrationShould
         var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
 
         var rpc = await Assert.ThrowsAsync<RpcException>(() => client
-                                                              .GetAsync(new() {
-                                                                   CanonicalName = "students/does-not-exist-99999",
-                                                               })
-                                                              .AsTask());
+                                                              .GetAsync(
+                                                                   new() {
+                                                                       CanonicalName = "students/does-not-exist-99999",
+                                                                   }
+                                                               )
+                                                              .AsTask()
+        );
 
         Assert.Equal(StatusCode.NotFound, rpc.StatusCode);
     }

@@ -17,11 +17,11 @@ public class TokenEndpointShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task ClientCredentials_ReturnsAccessToken() {
-        var content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = "test-client",
-            ["client_secret"] = "test-secret",
-        });
+        var content = new FormUrlEncodedContent(
+            new Dictionary<string, string> {
+                ["grant_type"] = "client_credentials", ["client_id"] = "test-client", ["client_secret"] = "test-secret",
+            }
+        );
 
         var response = await _client.PostAsync("/connect/token", content);
 
@@ -38,11 +38,11 @@ public class TokenEndpointShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task InvalidGrantType_ReturnsError() {
-        var content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            ["grant_type"] = "unsupported_grant",
-            ["client_id"] = "test-client",
-            ["client_secret"] = "test-secret",
-        });
+        var content = new FormUrlEncodedContent(
+            new Dictionary<string, string> {
+                ["grant_type"] = "unsupported_grant", ["client_id"] = "test-client", ["client_secret"] = "test-secret",
+            }
+        );
 
         var response = await _client.PostAsync("/connect/token", content);
 
@@ -54,11 +54,13 @@ public class TokenEndpointShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task InvalidClientCredentials_ReturnsError() {
-        var content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = "test-client",
-            ["client_secret"] = "wrong-secret",
-        });
+        var content = new FormUrlEncodedContent(
+            new Dictionary<string, string> {
+                ["grant_type"]    = "client_credentials",
+                ["client_id"]     = "test-client",
+                ["client_secret"] = "wrong-secret",
+            }
+        );
 
         var response = await _client.PostAsync("/connect/token", content);
 

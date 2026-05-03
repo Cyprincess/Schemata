@@ -41,16 +41,24 @@ public class DeviceAuthorizeHandlerShould
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
 
         if (application is not null) {
-            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<CancellationToken>()))
+            clientAuth.Setup(c => c.AuthenticateAsync(
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<Dictionary<string, List<string?>>?>(),
+                                 It.IsAny<CancellationToken>()
+                             )
+                       )
                       .ReturnsAsync(application);
         }
 
         var sp = services.BuildServiceProvider();
         var handler = new DeviceAuthorizeHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokens.Object, Options.Create(opts), sp, jsonOpts);
+            clientAuth.Object,
+            tokens.Object,
+            Options.Create(opts),
+            sp,
+            jsonOpts
+        );
         return (handler, tokens);
     }
 

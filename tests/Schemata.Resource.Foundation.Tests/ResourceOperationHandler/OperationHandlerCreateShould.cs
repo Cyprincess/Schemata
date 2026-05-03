@@ -38,9 +38,10 @@ public class OperationHandlerCreateShould
     [Fact]
     public async Task Create_ValidateOnly_ThrowsNoContent() {
         var handler = _fixture.CreateHandler(services => {
-            services.TryAddScoped<IResourceCreateRequestAdvisor<Student, Student>,
-                AdviceCreateRequestValidation<Student, Student>>();
-        });
+                services.TryAddScoped<IResourceCreateRequestAdvisor<Student, Student>,
+                    AdviceCreateRequestValidation<Student, Student>>();
+            }
+        );
         var request = new Student {
             FullName     = "DryRun",
             Age          = 20,
