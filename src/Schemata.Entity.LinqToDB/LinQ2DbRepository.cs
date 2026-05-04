@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Transactions;
 using Humanizer;
 using LinqToDB;
 using LinqToDB.Async;
@@ -19,7 +18,8 @@ using Schemata.Entity.Repository.Advisors;
 namespace Schemata.Entity.LinqToDB;
 
 /// <summary>
-///     LINQ to DB implementation of <see cref="RepositoryBase{TEntity}" />.
+///     LINQ to DB implementation of <see cref="RepositoryBase{TEntity}" /> with deferred execution
+///     when no unit of work is active, aligning with Entity Framework Core semantics.
 /// </summary>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
@@ -27,12 +27,15 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
+    private readonly List<PendingOperation> _pending = new();
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="LinQ2DbRepository{TContext, TEntity}" /> class.
     /// </summary>
     /// <param name="sp">The service provider.</param>
     /// <param name="context">The LINQ to DB data connection.</param>
-    public LinQ2DbRepository(IServiceProvider sp, TContext context) : base(sp) {
+    /// <param name="uow">An optional unit of work for coordinating cross-repository transactions.</param>
+    public LinQ2DbRepository(IServiceProvider sp, TContext context, IUnitOfWork<TContext>? uow = null) : base(sp, uow) {
         Context = context;
 
         var entity = typeof(TEntity);
@@ -49,16 +52,6 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     ///     Gets the LINQ to DB table for the managed entity type.
     /// </summary>
     protected virtual ITable<TEntity> Table => field ??= Context.GetTable<TEntity>().TableName(TableName);
-
-    /// <summary>
-    ///     The current transaction, if one is active.
-    /// </summary>
-    protected virtual DataConnectionTransaction? Transaction { get; set; }
-
-    /// <summary>
-    ///     Cumulative number of rows affected by operations in the current transaction.
-    /// </summary>
-    protected virtual int RowsAffected { get; set; }
 
     /// <summary>
     ///     The table name used for CRUD operations, derived from <see cref="TableAttribute" /> or the pluralized entity name.
@@ -273,8 +266,6 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     /// <inheritdoc />
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        await BeginTransactionAsync(ct);
-
         switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
                              .RunAsync(AdviceContext, this, entity, ct)) {
             case AdviseResult.Block:
@@ -285,13 +276,18 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
                 break;
         }
 
-        RowsAffected += await Context.InsertAsync(entity, TableName, token: ct);
+        if (UnitOfWork?.IsActive == true) {
+            await Context.InsertAsync(entity, TableName, token: ct);
+            return;
+        }
+
+        _pending.Add(new(async token => {
+            await Context.InsertAsync(entity, TableName, token: token); return 1;
+        }, entity));
     }
 
     /// <inheritdoc />
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
-        await BeginTransactionAsync(ct);
-
         switch (await Advisor.For<IRepositoryUpdateAdvisor<TEntity>>()
                              .RunAsync(AdviceContext, this, entity, ct)) {
             case AdviseResult.Block:
@@ -302,13 +298,18 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
                 break;
         }
 
-        RowsAffected += await Context.UpdateAsync(entity, TableName, token: ct);
+        if (UnitOfWork?.IsActive == true) {
+            await Context.UpdateAsync(entity, TableName, token: ct);
+            return;
+        }
+
+        _pending.Add(new(async token => {
+            await Context.UpdateAsync(entity, TableName, token: token); return 1;
+        }, entity));
     }
 
     /// <inheritdoc />
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        await BeginTransactionAsync(ct);
-
         switch (await Advisor.For<IRepositoryRemoveAdvisor<TEntity>>()
                              .RunAsync(AdviceContext, this, entity, ct)) {
             case AdviseResult.Block:
@@ -319,29 +320,32 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
                 break;
         }
 
-        RowsAffected += await Context.DeleteAsync(entity, TableName, token: ct);
+        if (UnitOfWork?.IsActive == true) {
+            await Context.DeleteAsync(entity, TableName, token: ct);
+            return;
+        }
+
+        _pending.Add(new(async token => {
+            await Context.DeleteAsync(entity, TableName, token: token); return 1;
+        }, entity));
     }
 
     /// <inheritdoc />
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
+        if (UnitOfWork?.IsActive == true) {
+            throw new InvalidOperationException("Commit is not allowed within a unit of work.");
+        }
 
-        if (Transaction is null) {
+        if (_pending.Count == 0) {
             return 0;
         }
 
-        try {
-            await Transaction.CommitAsync(ct);
-        } catch (Exception ex) {
-            await Transaction.RollbackAsync(ct);
-
-            throw new TransactionAbortedException(ex.Message, ex);
+        var rows = 0;
+        foreach (var op in _pending) {
+            rows += await op.Execute(ct);
         }
 
-        var rows = RowsAffected;
-
-        Transaction  = null;
-        RowsAffected = 0;
+        _pending.Clear();
 
         return rows;
     }
@@ -369,13 +373,19 @@ public class LinQ2DbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return BuildQuery(container.Query, predicate);
     }
 
-    private async Task BeginTransactionAsync(CancellationToken ct) {
-        ct.ThrowIfCancellationRequested();
+    #region Nested type: PendingOperation
 
-        if (Transaction is not null) {
-            return;
+    private readonly struct PendingOperation
+    {
+        public PendingOperation(Func<CancellationToken, Task<int>> execute, TEntity entity) {
+            Execute = execute;
+            Entity  = entity;
         }
 
-        Transaction = await Context.BeginTransactionAsync(ct);
+        public Func<CancellationToken, Task<int>> Execute { get; }
+
+        public TEntity Entity { get; }
     }
+
+    #endregion
 }

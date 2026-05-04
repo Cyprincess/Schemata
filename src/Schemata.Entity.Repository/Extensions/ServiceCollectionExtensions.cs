@@ -49,7 +49,29 @@ public static class ServiceCollectionExtensions
         }
 
         services.TryAddScoped(serviceType, implementationType);
+        RegisterAdvisors(services);
 
+        return new(services);
+    }
+
+    /// <summary>
+    ///     Registers a closed-generic repository implementation for a specific entity type.
+    ///     This allows multiple different repository implementations to coexist in the same DI container.
+    /// </summary>
+    /// <typeparam name="TEntity">The entity type managed by the repository.</typeparam>
+    /// <typeparam name="TImplementation">The concrete repository implementation type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>A <see cref="SchemataRepositoryBuilder" /> for fluent configuration.</returns>
+    public static SchemataRepositoryBuilder AddRepository<TEntity, TImplementation>(this IServiceCollection services)
+        where TEntity : class
+        where TImplementation : class, IRepository<TEntity> {
+        services.AddScoped<IRepository<TEntity>, TImplementation>();
+        RegisterAdvisors(services);
+
+        return new(services);
+    }
+
+    private static void RegisterAdvisors(IServiceCollection services) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQuerySoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddCanonicalName<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddConcurrency<>)));
@@ -60,7 +82,5 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateConcurrency<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateTimestamp<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateValidation<>)));
-
-        return new(services);
     }
 }

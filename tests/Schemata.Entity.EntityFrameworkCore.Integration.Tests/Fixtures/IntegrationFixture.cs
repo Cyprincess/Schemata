@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -24,7 +23,10 @@ public class IntegrationFixture : IAsyncLifetime
 
         services.AddDbContext<TestDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath}"));
 
-        services.TryAddScoped<IRepository<Student>, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+        services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+        services.AddRepository<Course, EntityFrameworkCoreRepository<TestDbContext, Course>>();
+
+        services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
 
         _root = services.BuildServiceProvider();
 
@@ -52,5 +54,19 @@ public class IntegrationFixture : IAsyncLifetime
         var scope      = _root!.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         return (repository, scope);
+    }
+
+    public (IRepository<Course> Repository, IServiceScope Scope) CreateScopeWithCourseRepository() {
+        var scope      = _root!.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();
+        return (repository, scope);
+    }
+
+    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDbContext> Uow, IServiceScope Scope) CreateScopeWithUoW() {
+        var scope       = _root!.CreateScope();
+        var studentRepo = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var courseRepo  = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();
+        var uow         = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDbContext>>();
+        return (studentRepo, courseRepo, uow, scope);
     }
 }

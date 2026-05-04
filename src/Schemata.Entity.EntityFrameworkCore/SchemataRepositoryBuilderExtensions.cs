@@ -1,6 +1,8 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 
 // ReSharper disable once CheckNamespace
@@ -53,7 +55,25 @@ public static class SchemataRepositoryBuilderExtensions
         ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped
     )
         where TContextImplementation : DbContext, TContextService {
-        builder.Services.AddDbContext<TContextService, TContextImplementation>(configure, contextLifetime, optionsLifetime);
+        builder.Services.AddDbContext<TContextService, TContextImplementation>(
+            configure,
+            contextLifetime,
+            optionsLifetime
+        );
+
+        return builder;
+    }
+
+    /// <summary>
+    ///     Registers a unit of work for the specified Entity Framework Core <see cref="DbContext" />,
+    ///     enabling cross-repository transactions.
+    /// </summary>
+    /// <typeparam name="TContext">The <see cref="DbContext" /> type.</typeparam>
+    /// <param name="builder">The repository builder.</param>
+    /// <returns>The same builder for chaining.</returns>
+    public static SchemataRepositoryBuilder WithUnitOfWork<TContext>(this SchemataRepositoryBuilder builder)
+        where TContext : DbContext {
+        builder.Services.TryAddScoped<IUnitOfWork<TContext>, EfCoreUnitOfWork<TContext>>();
 
         return builder;
     }
