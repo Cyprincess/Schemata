@@ -40,7 +40,12 @@ public abstract class RepositoryBase
         var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
 
         if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p => string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase));
+            var id = allProperties.FirstOrDefault(p => string.Equals(
+                                                      p.Name,
+                                                      "id",
+                                                      StringComparison.InvariantCultureIgnoreCase
+                                                  )
+            );
             if (id is not null) {
                 keyProperties.Add(id);
             }
@@ -92,8 +97,10 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     The service provider for resolving advisors and creating new instances via
     ///     <see cref="Once" />.
     /// </param>
-    protected RepositoryBase(IServiceProvider sp) {
+    /// <param name="uow">An optional unit of work for coordinating cross-repository transactions.</param>
+    protected RepositoryBase(IServiceProvider sp, IUnitOfWork? uow = null) {
         ServiceProvider = sp;
+        UnitOfWork      = uow;
         AdviceContext   = new(sp);
     }
 
@@ -103,10 +110,18 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// </summary>
     protected virtual IServiceProvider ServiceProvider { get; }
 
+    /// <summary>
+    ///     Gets the unit of work for coordinating cross-repository transactions, if one was provided.
+    /// </summary>
+    protected virtual IUnitOfWork? UnitOfWork { get; }
+
     #region IRepository Members
 
     /// <inheritdoc />
     AdviceContext IRepository.AdviceContext => AdviceContext;
+
+    /// <inheritdoc />
+    IUnitOfWork IRepository.BeginWork() { return BeginWork(); }
 
     /// <inheritdoc />
     async IAsyncEnumerable<object> IRepository.ListAsync<T>(
@@ -435,6 +450,18 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public virtual IRepository<TEntity> SuppressTimestamp() {
         AdviceContext.Set<TimestampSuppressed>(null);
         return this;
+    }
+
+    /// <inheritdoc />
+    public virtual IUnitOfWork BeginWork() {
+        if (UnitOfWork is null) {
+            throw new InvalidOperationException(
+                "IUnitOfWork not registered. Call `.WithUnitOfWork<TContext>()` during configuration."
+            );
+        }
+
+        UnitOfWork.Begin();
+        return UnitOfWork;
     }
 
     #endregion
