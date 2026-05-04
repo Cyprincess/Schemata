@@ -104,19 +104,49 @@ public static class SchemataRepositoryBuilderExtensions
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
-        builder.Services.TryAdd(new ServiceDescriptor(typeof(TContext), typeof(TContextImplementation), contextLifetime));
+        builder.Services.TryAdd(
+            new ServiceDescriptor(typeof(TContext), typeof(TContextImplementation), contextLifetime)
+        );
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())), optionsLifetime));
+                builder.Services.TryAdd(
+                    new ServiceDescriptor(
+                        typeof(DataOptions<TContextImplementation>),
+                        sp => new DataOptions<TContextImplementation>(configure(sp, new())),
+                        optionsLifetime
+                    )
+                );
                 break;
             case OptionsParameterType.DataOptionsTContext:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())), optionsLifetime));
+                builder.Services.TryAdd(
+                    new ServiceDescriptor(
+                        typeof(DataOptions<TContext>),
+                        sp => new DataOptions<TContext>(configure(sp, new())),
+                        optionsLifetime
+                    )
+                );
                 break;
             case OptionsParameterType.DataOptions:
-                builder.Services.TryAdd(new ServiceDescriptor(typeof(DataOptions), sp => configure(sp, new()), optionsLifetime));
+                builder.Services.TryAdd(
+                    new ServiceDescriptor(typeof(DataOptions), sp => configure(sp, new()), optionsLifetime)
+                );
                 break;
         }
+
+        return builder;
+    }
+
+    /// <summary>
+    ///     Registers a unit of work for the specified LINQ to DB <see cref="DataConnection" />,
+    ///     enabling cross-repository transactions.
+    /// </summary>
+    /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
+    /// <param name="builder">The repository builder.</param>
+    /// <returns>The same builder for chaining.</returns>
+    public static SchemataRepositoryBuilder WithUnitOfWork<TContext>(this SchemataRepositoryBuilder builder)
+        where TContext : DataConnection {
+        builder.Services.TryAddScoped<IUnitOfWork<TContext>, LinqToDbUnitOfWork<TContext>>();
 
         return builder;
     }
@@ -127,7 +157,8 @@ public static class SchemataRepositoryBuilderExtensions
         var constructors = typeof(TContextImplementation).GetConstructors(BindingFlags.Public | BindingFlags.Instance);
 
         if (constructors.Any(c => c.GetParameters()
-                                   .Any(p => p.ParameterType == typeof(DataOptions<TContextImplementation>)))) {
+                                   .Any(p => p.ParameterType == typeof(DataOptions<TContextImplementation>))
+            )) {
             return OptionsParameterType.DataOptionsTImpl;
         }
 

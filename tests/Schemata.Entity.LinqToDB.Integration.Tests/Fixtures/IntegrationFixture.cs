@@ -34,14 +34,18 @@ public class IntegrationFixture : IAsyncLifetime
             }
         );
 
-        services.TryAddScoped<IRepository<Student>, LinQ2DbRepository<TestDataConnection, Student>>();
+        services.AddRepository<Student, LinQ2DbRepository<TestDataConnection, Student>>();
+        services.AddRepository<Course, LinQ2DbRepository<TestDataConnection, Course>>();
+
+        services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
 
         _root = services.BuildServiceProvider();
 
-        // Create the table
+        // Create the tables
         using var scope      = _root.CreateScope();
         var       connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
         connection.CreateTable<Student>(tableOptions: TableOptions.CreateIfNotExists);
+        connection.CreateTable<Course>(tableOptions: TableOptions.CreateIfNotExists);
 
         return Task.CompletedTask;
     }
@@ -64,5 +68,19 @@ public class IntegrationFixture : IAsyncLifetime
         var scope      = _root!.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         return (repository, scope);
+    }
+
+    public (IRepository<Course> Repository, IServiceScope Scope) CreateScopeWithCourseRepository() {
+        var scope      = _root!.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();
+        return (repository, scope);
+    }
+
+    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDataConnection> Uow, IServiceScope Scope) CreateScopeWithUoW() {
+        var scope       = _root!.CreateScope();
+        var studentRepo = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var courseRepo  = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();
+        var uow         = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
+        return (studentRepo, courseRepo, uow, scope);
     }
 }

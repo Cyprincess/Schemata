@@ -310,7 +310,7 @@ public class CityHash {
         }
         a = HashLen16(a, c);
         b = HashLen16(d, b);
-        return new Uint128(a ^ b, HashLen16(b, a));
+        return new(a ^ b, HashLen16(b, a));
     }
     #endregion
 
@@ -583,8 +583,8 @@ public class CityHash {
 #endif
     protected static Uint128 CityHash128(byte[] value) {
         return value.Length >= 16
-            ? CityHash128(value, new Uint128(Fetch64(value), Fetch64(value, 8) + K0), 16)
-            : CityHash128(value, new Uint128(K0, K1), 0);
+            ? CityHash128(value, new(Fetch64(value), Fetch64(value, 8) + K0), 16)
+            : CityHash128(value, new(K0, K1), 0);
     }
 
     /// <summary>
@@ -678,7 +678,7 @@ public class CityHash {
         x = HashLen16(x, v.Low);
         y = HashLen16(y + z, w.Low);
 
-        return new Uint128 {
+        return new() {
             Low  = HashLen16(x + v.High, w.High) + y,
             High = HashLen16(x + w.High, y + v.High)
         };
@@ -691,7 +691,7 @@ public class CityHash {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
     private static ulong HashLen16(ulong u, ulong v) {
-        return Hash128To64(new Uint128(u, v));
+        return Hash128To64(new(u, v));
     }
 
 #if NETSTANDARD
@@ -831,7 +831,7 @@ public class CityHash {
 
         b += Rotate(a, 44);
 
-        return new Uint128(a + z, b + c);
+        return new(a + z, b + c);
     }
 
 #if NETSTANDARD

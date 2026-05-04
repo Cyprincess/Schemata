@@ -96,6 +96,8 @@ public class SchemataTenantManagerShould
 
         public AdviceContext AdviceContext { get; } = new(new ServiceCollection().BuildServiceProvider());
 
+        public IUnitOfWork BeginWork() { throw new NotSupportedException(); }
+
         public IAsyncEnumerable<T> AsAsyncEnumerable() { return ToAsync(Items); }
 
         public IQueryable<T> AsQueryable() { return Items.AsQueryable(); }

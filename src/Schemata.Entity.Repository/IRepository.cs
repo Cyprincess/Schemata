@@ -115,6 +115,13 @@ public interface IRepository
     Task RemoveAsync(object entity, CancellationToken ct = default);
 
     /// <summary>
+    ///     Begins a new unit of work for this repository, creating a database transaction
+    ///     that coordinates all subsequent operations on this and related repositories.
+    /// </summary>
+    /// <returns>A disposable unit of work that must be committed or rolled back.</returns>
+    IUnitOfWork BeginWork();
+
+    /// <summary>
     ///     Persists all pending changes to the underlying data store.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>

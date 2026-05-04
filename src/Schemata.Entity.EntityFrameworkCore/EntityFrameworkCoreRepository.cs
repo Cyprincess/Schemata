@@ -28,7 +28,10 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     /// </summary>
     /// <param name="sp">The service provider.</param>
     /// <param name="context">The EF Core database context.</param>
-    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context) : base(sp) { _context = context; }
+    /// <param name="uow">An optional unit of work for coordinating cross-repository transactions.</param>
+    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context, IUnitOfWork<TContext>? uow = null) : base(sp, uow) {
+        _context = context;
+    }
 
     /// <summary>
     ///     Gets the underlying <typeparamref name="TContext" />.
@@ -301,7 +304,11 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
 
     /// <inheritdoc />
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
-        return await Context.SaveChangesAsync(ct);
+        if (UnitOfWork?.IsActive == true) {
+            throw new InvalidOperationException("Commit is not allowed within a unit of work.");
+        }
+
+        return await _context.SaveChangesAsync(ct);
     }
 
     /// <inheritdoc />

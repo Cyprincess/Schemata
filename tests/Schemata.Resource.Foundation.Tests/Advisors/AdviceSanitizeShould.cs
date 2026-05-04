@@ -14,18 +14,18 @@ public class AdviceSanitizeShould
     [Fact]
     public async Task Create_Sanitize_ClearsSystemManagedFields() {
         var request = new ManagedRequest {
-            Name         = "managed/forged",
-            Id           = 777,
-            Owner        = "hacker",
-            State        = "Active",
-            Uid          = "uid-forged",
-            CreateTime   = DateTimeOffset.UtcNow,
-            UpdateTime   = DateTimeOffset.UtcNow,
-            DeleteTime   = DateTimeOffset.UtcNow,
-            PurgeTime    = DateTimeOffset.UtcNow,
-            Reconciling  = true,
-            Parent       = "parents/1",
-            DisplayName  = "keep-me",
+            Name        = "managed/forged",
+            Id          = 777,
+            Owner       = "hacker",
+            State       = "Active",
+            Uid         = "uid-forged",
+            CreateTime  = DateTimeOffset.UtcNow,
+            UpdateTime  = DateTimeOffset.UtcNow,
+            DeleteTime  = DateTimeOffset.UtcNow,
+            PurgeTime   = DateTimeOffset.UtcNow,
+            Reconciling = true,
+            Parent      = "parents/1",
+            DisplayName = "keep-me",
         };
 
         var advisor   = new AdviceCreateRequestSanitize<ManagedEntity, ManagedRequest>();
@@ -80,7 +80,7 @@ public class AdviceSanitizeShould
         var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
 
-        await advisor.AdviseAsync(ctx, request, new ResourceRequestContainer<ManagedEntity>(), null);
+        await advisor.AdviseAsync(ctx, request, new(), null);
 
         Assert.Equal("", request.UpdateMask);
     }
@@ -92,7 +92,7 @@ public class AdviceSanitizeShould
         var advisor = new AdviceCreateRequestSanitize<MinimalEntity, MinimalRequest>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
 
-        var result = await advisor.AdviseAsync(ctx, request, new ResourceRequestContainer<MinimalEntity>(), null);
+        var result = await advisor.AdviseAsync(ctx, request, new(), null);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(request.Name);
@@ -103,39 +103,62 @@ public class AdviceSanitizeShould
 
     public sealed class ManagedEntity : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
     public sealed class ManagedRequest : ICanonicalName, IUpdateMask
     {
-        public string?        Name          { get; set; }
-        public string?        CanonicalName { get; set; }
-        public long           Id            { get; set; }
-        public string?        Owner         { get; set; }
-        public string?        State         { get; set; }
-        public string?        Uid           { get; set; }
-        public DateTimeOffset CreateTime    { get; set; }
-        public DateTimeOffset UpdateTime    { get; set; }
-        public DateTimeOffset DeleteTime    { get; set; }
-        public DateTimeOffset PurgeTime     { get; set; }
-        public bool           Reconciling   { get; set; }
-        public string?        Parent        { get; set; }
-        public string?        DisplayName   { get; set; }
-        public string?        UpdateMask    { get; set; }
+        public long           Id          { get; set; }
+        public string?        Owner       { get; set; }
+        public string?        State       { get; set; }
+        public string?        Uid         { get; set; }
+        public DateTimeOffset CreateTime  { get; set; }
+        public DateTimeOffset UpdateTime  { get; set; }
+        public DateTimeOffset DeleteTime  { get; set; }
+        public DateTimeOffset PurgeTime   { get; set; }
+        public bool           Reconciling { get; set; }
+        public string?        Parent      { get; set; }
+        public string?        DisplayName { get; set; }
+
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region IUpdateMask Members
+
+        public string? UpdateMask { get; set; }
+
+        #endregion
     }
 
     public sealed class MinimalEntity : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
     public sealed class MinimalRequest : ICanonicalName
     {
+        public string? Label { get; set; }
+
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
-        public string? Label         { get; set; }
+
+        #endregion
     }
 
     #endregion
