@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Flow Skeleton</Description>
+    <PackageTags>application;business;framework;state;flow;workflow</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Humanizer.Core" />
+    <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

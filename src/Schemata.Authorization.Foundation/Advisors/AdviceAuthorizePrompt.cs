@@ -50,7 +50,6 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizePrompt.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

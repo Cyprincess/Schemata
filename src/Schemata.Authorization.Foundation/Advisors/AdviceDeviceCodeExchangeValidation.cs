@@ -47,7 +47,6 @@ public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken> : IDeviceCo
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodeExchangeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                           ctx,
         DeviceCodeExchangeContext<TApp, TToken> exchange,

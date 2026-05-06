@@ -54,10 +54,8 @@ public sealed class AdviceUpdateRequestAuthorize<TEntity, TRequest> : IResourceU
 
     #region IResourceUpdateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateRequestAuthorize.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,

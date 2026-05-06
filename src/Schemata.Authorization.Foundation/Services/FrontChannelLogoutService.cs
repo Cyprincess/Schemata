@@ -87,7 +87,6 @@ public sealed class FrontChannelLogoutService<TApp, TToken>(
         return uris;
     }
 
-    /// <inheritdoc />
     public Task EnqueueBackChannelAsync(string? subject, string? session, CancellationToken ct = default) {
         return Task.CompletedTask;
     }

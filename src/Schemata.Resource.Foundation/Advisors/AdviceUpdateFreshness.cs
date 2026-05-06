@@ -37,10 +37,8 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
 {
     #region IResourceUpdateAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateFreshness.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TRequest          request,

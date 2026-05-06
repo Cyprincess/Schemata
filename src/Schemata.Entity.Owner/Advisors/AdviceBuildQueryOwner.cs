@@ -30,10 +30,8 @@ public sealed class AdviceBuildQueryOwner<TEntity>(IOwnerResolver<TEntity> resol
 {
     #region IRepositoryBuildQueryAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceBuildQueryOwner.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext           ctx,
         QueryContainer<TEntity> container,

@@ -39,7 +39,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
 
     #region IModulesRunner Members
 
-    /// <inheritdoc />
     public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
@@ -69,7 +68,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
-    /// <inheritdoc />
     public void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
@@ -91,7 +89,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
-    /// <inheritdoc />
     public void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

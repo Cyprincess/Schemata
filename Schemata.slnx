@@ -27,6 +27,11 @@
     <Project Path="src/Schemata.Entity.LinqToDB/Schemata.Entity.LinqToDB.csproj" />
     <Project Path="src/Schemata.Entity.Owner/Schemata.Entity.Owner.csproj" />
     <Project Path="src/Schemata.Entity.Repository/Schemata.Entity.Repository.csproj" />
+    <Project Path="src/Schemata.Flow.Foundation/Schemata.Flow.Foundation.csproj" />
+    <Project Path="src/Schemata.Flow.Grpc/Schemata.Flow.Grpc.csproj" />
+    <Project Path="src/Schemata.Flow.Http/Schemata.Flow.Http.csproj" />
+    <Project Path="src/Schemata.Flow.Skeleton/Schemata.Flow.Skeleton.csproj" />
+    <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
     <Project Path="src/Schemata.Identity.Foundation/Schemata.Identity.Foundation.csproj" />
     <Project Path="src/Schemata.Identity.Skeleton/Schemata.Identity.Skeleton.csproj" />
     <Project Path="src/Schemata.Mapping.AutoMapper/Schemata.Mapping.AutoMapper.csproj" />
@@ -43,8 +48,6 @@
     <Project Path="src/Schemata.Tenancy.Skeleton/Schemata.Tenancy.Skeleton.csproj" />
     <Project Path="src/Schemata.Validation.FluentValidation/Schemata.Validation.FluentValidation.csproj" />
     <Project Path="src/Schemata.Validation.Skeleton/Schemata.Validation.Skeleton.csproj" />
-    <Project Path="src/Schemata.Workflow.Foundation/Schemata.Workflow.Foundation.csproj" />
-    <Project Path="src/Schemata.Workflow.Skeleton/Schemata.Workflow.Skeleton.csproj" />
   </Folder>
   <Folder Name="/targets/">
     <Project Path="targets/Schemata.Application.Targets/Schemata.Application.Complex.Targets.csproj" />
@@ -70,11 +73,11 @@
     <Project Path="tests/Schemata.Mapping.AutoMapper.Integration.Tests/Schemata.Mapping.AutoMapper.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.Mapster.Integration.Tests/Schemata.Mapping.Mapster.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Modeling.Generator.Tests/Schemata.Modeling.Generator.Tests.csproj" />
-    <Project Path="tests/Schemata.Resource.Foundation.Tests/Schemata.Resource.Foundation.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Grpc.Integration.Tests/Schemata.Resource.Grpc.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Http.Integration.Tests/Schemata.Resource.Http.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />
     <Project Path="tests/Schemata.Tenancy.Tests/Schemata.Tenancy.Tests.csproj" />
-    <Project Path="tests/Schemata.Workflow.Tests/Schemata.Workflow.Tests.csproj" />
+    <Project Path="tests/Schemata.Flow.Tests/Schemata.Flow.Tests.csproj" />
+    <Project Path="tests\Schemata.Resource.Tests\Schemata.Resource.Tests.csproj" />
   </Folder>
 </Solution>

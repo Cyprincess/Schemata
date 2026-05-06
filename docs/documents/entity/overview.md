@@ -11,7 +11,7 @@ Entities declare capabilities through small marker interfaces. The framework det
 - `IConcurrency` → advisor manages optimistic concurrency tokens
 - `ICanonicalName` → advisor generates resource names
 
-No explicit wiring is needed. Adding a trait interface to an entity activates the behavior.
+Adding a trait interface to an entity activates the behavior.
 
 ## Trait Categories
 

@@ -11,7 +11,6 @@ public class SchemataUserClaim : IdentityUserClaim<Guid>, IIdentifier, ITimestam
 {
     #region IIdentifier Members
 
-    /// <inheritdoc />
     [TableKey]
     public virtual Guid Uid { get; set; }
 
@@ -19,10 +18,8 @@ public class SchemataUserClaim : IdentityUserClaim<Guid>, IIdentifier, ITimestam
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

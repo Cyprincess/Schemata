@@ -16,15 +16,10 @@ namespace Schemata.Core.Features;
 [Information("W3CLogger can potentially log personally identifiable information (PII). Fields could contain PII aren't logged.", Level = LogLevel.Warning)]
 public sealed class SchemataW3CLoggingFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataHttpLoggingFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -36,7 +31,6 @@ public sealed class SchemataW3CLoggingFeature : FeatureBase
         services.AddW3CLogging(configure);
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

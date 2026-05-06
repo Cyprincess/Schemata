@@ -6,7 +6,7 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 public class Course : IIdentifier, ICanonicalName, ITimestamp
 {
-    public string? Title { get; set; }
+    public string? Title   { get; set; }
     public int     Credits { get; set; }
 
     #region ICanonicalName Members

@@ -25,7 +25,6 @@ public class RequestPathResolver : ITenantResolver
 
     #region ITenantResolver Members
 
-    /// <inheritdoc />
     public Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.RouteValues.TryGetValue("Tenant", out var value) != true) {
             return Task.FromResult<Guid?>(null);

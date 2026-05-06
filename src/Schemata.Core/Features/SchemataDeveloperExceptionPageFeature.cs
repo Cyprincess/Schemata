@@ -13,15 +13,10 @@ namespace Schemata.Core.Features;
 [Information("Developer Exception Page will only be enabled in Development environment.", Level = LogLevel.Debug)]
 public sealed class SchemataDeveloperExceptionPageFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataForwardedHeadersFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

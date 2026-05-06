@@ -19,10 +19,7 @@ schema.UseTenancy()
       .UseHeaderResolver();
 ```
 
-`UseTenancy()` registers the default `SchemataTenant<Guid>` entity type with `Guid` keys. It adds two pieces of middleware to the request pipeline automatically:
-
-1. `SchemataTenantContextAccessorInitializer` -- calls `ITenantResolver<TKey>.ResolveAsync` to find the tenant identifier, then loads the `SchemataTenant` from the `ITenantManager` and stores it in `ITenantContextAccessor`.
-2. `SchemataTenantServiceProviderReplacer` -- swaps the request `IServiceProvider` with a tenant-scoped container so all downstream services resolve in tenant isolation.
+`UseTenancy()` registers the default `SchemataTenant<Guid>` entity type with `Guid` keys. It installs `SchemataTenancyMiddleware` in the request pipeline, which resolves the tenant, initializes the `ITenantContextAccessor`, and swaps the request `IServiceProvider` with a tenant-scoped container.
 
 ## Choose a resolver
 
@@ -74,18 +71,28 @@ public DbSet<Tenant> Tenants => Set<Tenant>();
 
 ## Configure per-tenant data isolation
 
-The `UseTenancy` call accepts a configure delegate that runs once per tenant when its isolated DI container is first built. Use this to register tenant-specific service overrides -- for example, pointing each tenant at a separate database:
+Use `ForAll` and `ForTenant` extension methods on the builder to register services scoped to all tenants or specific tenants — for example, pointing each tenant at a separate database:
 
 ```csharp
-schema.UseTenancy<Tenant, Guid>((services, tenant) => {
+schema.UseTenancy<Tenant, Guid>()
+      .ForAll(services => {
+          // Services common to all tenants
+      })
+      .ForTenant("00000000-0000-0000-0000-000000000001", services => {
+          // Overrides for a specific tenant
+      })
+      .ForTenant((tenantId, services, root) => {
+          // Dynamic per-tenant override with access to the root provider
           services.AddDbContext<AppDbContext>(options => {
-              options.UseSqlite($"Data Source=tenant_{tenant?.TenantId}.db");
+              options.UseSqlite($"Data Source=tenant_{tenantId}.db");
           });
       })
       .UseHeaderResolver();
 ```
 
-The `SchemataTenantServiceProviderFactory` copies the root service collection and applies the configure delegate for each tenant. The resulting `IServiceProvider` is cached per tenant for the application lifetime.
+`ForAll` applies to every tenant container and the no-tenant root. `ForTenant(string, action)` targets a specific tenant by ID. `ForTenant(action)` runs for every tenant with the tenant ID, service collection, and root `IServiceProvider` available.
+
+`SchemataTenantServiceProviderFactory` copies the root service collection and applies these overrides for each tenant. The resulting `IServiceProvider` is cached per tenant for the application lifetime.
 
 ## Access the current tenant
 

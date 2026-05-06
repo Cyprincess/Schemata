@@ -46,10 +46,8 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
 
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
 
-    /// <inheritdoc />
     public int Order => AdviceQueryCache.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         QueryContext<TEntity, TResult, T> context,

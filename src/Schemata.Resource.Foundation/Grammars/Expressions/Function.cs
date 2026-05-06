@@ -43,13 +43,10 @@ public class Function : IComparableArg
 
     #region IComparableArg Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => false;
 
-    /// <inheritdoc />
     public Expression ToExpression(Container ctx) {
         var segments = new List<string>();
 
@@ -91,6 +88,5 @@ public class Function : IComparableArg
 
     #endregion
 
-    /// <inheritdoc />
     public override string ToString() { return $"{Member}({string.Join(',', Args)})"; }
 }

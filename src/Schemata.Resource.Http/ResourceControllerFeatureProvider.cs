@@ -29,14 +29,12 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
 
     #region IActionDescriptorChangeProvider Members
 
-    /// <inheritdoc />
     public IChangeToken GetChangeToken() { return new CancellationChangeToken(_cts.Token); }
 
     #endregion
 
     #region IApplicationFeatureProvider<ControllerFeature> Members
 
-    /// <inheritdoc />
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
         foreach (var (_, resource) in Resources) {
             // Skip resources that have explicit endpoint declarations but none of them

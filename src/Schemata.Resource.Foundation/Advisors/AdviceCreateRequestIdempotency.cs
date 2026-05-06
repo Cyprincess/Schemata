@@ -51,10 +51,8 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
 
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceCreateRequestIdempotency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,
@@ -76,7 +74,7 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
             return default;
         }
 
-        var cached = JsonSerializer.Deserialize<CreateResult<TDetail>>(bytes);
+        var cached = JsonSerializer.Deserialize<CreateResultBase<TDetail>>(bytes);
         if (cached is not null) {
             ctx.Set(cached);
             return AdviseResult.Handle;

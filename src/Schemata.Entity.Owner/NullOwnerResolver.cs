@@ -14,7 +14,6 @@ public sealed class NullOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 {
     #region IOwnerResolver<TEntity> Members
 
-    /// <inheritdoc />
     public ValueTask<string?> ResolveAsync(CancellationToken ct) {
         return new((string?)null);
     }

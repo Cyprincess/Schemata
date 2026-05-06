@@ -192,7 +192,6 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             Payload           = payload,
             Subject           = subject,
             ExpireTime        = now + lifetime,
-            CreateTime        = now,
             ApplicationName   = application,
             AuthorizationName = authorization,
             SessionId         = session,
@@ -250,7 +249,6 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
 
-    /// <inheritdoc />
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) { return Task.CompletedTask; }
 
     /// <summary>

@@ -8,10 +8,8 @@ public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser>
 {
     #region IMessageSender<TUser> Members
 
-    /// <inheritdoc />
     public Task SendConfirmationCodeAsync(TUser user, string email, string code) { return Task.CompletedTask; }
 
-    /// <inheritdoc />
     public Task SendPasswordResetCodeAsync(TUser user, string email, string code) { return Task.CompletedTask; }
 
     #endregion

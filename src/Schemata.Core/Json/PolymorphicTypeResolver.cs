@@ -41,7 +41,6 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
     /// </summary>
     public static PolymorphicTypeResolver Instance { get; } = new();
 
-    /// <inheritdoc />
     public override JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options) {
         var info = base.GetTypeInfo(type, options);
 

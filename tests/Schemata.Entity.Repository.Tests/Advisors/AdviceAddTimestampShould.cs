@@ -56,13 +56,4 @@ public class AdviceAddTimestampShould
         Assert.Null(entity.CreateTime);
         Assert.Null(entity.UpdateTime);
     }
-
-    #region Nested type: PlainEntity
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    #endregion
 }

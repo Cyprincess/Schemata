@@ -22,10 +22,8 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
 {
     public const int DefaultPriority = Orders.Extension + 80_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -49,7 +47,6 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         services.TryAddSingleton<IModulesRunner>(_ => context);
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
@@ -59,7 +56,6 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         runner.ConfigureApplication(app, configuration, environment);
     }
 
-    /// <inheritdoc />
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

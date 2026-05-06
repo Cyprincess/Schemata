@@ -19,7 +19,6 @@ public sealed class TokenFeature : IAuthorizationFlowFeature
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 1_000;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<TokenEndpoint, TokenHandler>();
     }

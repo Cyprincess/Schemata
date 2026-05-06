@@ -20,17 +20,21 @@ IResourceUpdateRequestAdvisor<TEntity, TRequest>
 
 Multiple advisors run in order:
 
-| Order       | Advisor                         | Behavior                                                         |
-| ----------- | ------------------------------- | ---------------------------------------------------------------- |
-| 100,000,000 | `AdviceUpdateRequestAuthorize`  | Checks authorization (only if `WithAuthorization()` was called). |
-| 110,000,000 | `AdviceUpdateRequestValidation` | Validates the request through `IValidationAdvisor<TRequest>`.    |
+| Order       | Advisor                                | Behavior                                                                    |
+| ----------- | -------------------------------------- | --------------------------------------------------------------------------- |
+| 100,000,000 | `AdviceUpdateRequestSanitize`          | Silently clears server-managed fields on the request and strips them from the update mask. |
+| 110,000,000 | `AdviceUpdateRequestAnonymous`         | Sets `AnonymousGranted` if the entity allows anonymous update.                             |
+| 120,000,000 | `AdviceUpdateRequestAuthorize`         | Checks authorization (only if `WithAuthorization()` was called).                           |
+| 130,000,000 | `AdviceUpdateRequestValidation`        | Validates the request through `IValidationAdvisor<TRequest>`.                              |
+
+`AdviceUpdateRequestSanitize` runs first at `Orders.Base`. Like the create sanitizer, it clears nine server-managed fields by property name: `Name`, `Timestamp`, `Id`, `Owner`, `State`, `CreateTime`, `UpdateTime`, `DeleteTime`, and `PurgeTime`. Unlike the create variant, it also **strips these fields from the `IUpdateMask`** if the request implements `IUpdateMask` with a non-null mask. This prevents a client from bypassing field-level sanitization by setting `update_mask=owner` while the payload field was cleared — since partial update logic merges the mask into the entity, not the payload.
 
 #### Authorization
 
 `AdviceUpdateRequestAuthorize` is only registered when `WithAuthorization()` is called. It:
 
 1. Checks if the entity type has `[Anonymous(Operations.Update)]` -- if so, skips authorization.
-2. Calls `IAccessProvider<TEntity, ResourceRequestContext<TRequest>>.HasAccessAsync` with the current `ClaimsPrincipal`.
+2. Calls `IAccessProvider<TEntity, TRequest>.HasAccessAsync` with the current `ClaimsPrincipal`.
 3. Throws `AuthorizationException` if access is denied.
 
 #### Validation
@@ -68,16 +72,7 @@ When the request does not carry an ETag, the check is silently skipped -- this a
 
 Freshness can be suppressed globally via `WithoutFreshness()` on the builder, which places a `SuppressFreshness` marker in the `AdviceContext`.
 
-### 4. Request Sanitization
-
-After the entity advisor runs, the handler clears identity and parent fields on the request to prevent them from overwriting the entity's values during mapping:
-
-- `request.Name` is set to `null`.
-- `request.CanonicalName` is set to `null`.
-- Parent properties are cleared via `ResourceNameDescriptor.ClearParentProperties`.
-- If the request implements `IIdentifier`, `request.Id` is reset to `default` (0).
-
-### 5. Field Mask Mapping
+### 4. Field Mask Mapping
 
 The handler applies the request fields to the entity using one of two strategies:
 
@@ -90,13 +85,15 @@ When the request implements `IUpdateMask` and `UpdateMask` is non-null, only the
 3. Filters to only fields that exist as properties on `TEntity`.
 4. Calls `ISimpleMapper.Map(request, entity, fields)` to update only those properties.
 
+Note that `AdviceUpdateRequestSanitize` (step 2) already stripped the system-managed fields from the mask, so no server fields appear here.
+
 This enables partial updates where only the fields listed in the mask are touched.
 
 #### Without Update Mask
 
-When no update mask is provided, the handler calls `ISimpleMapper.Map(request, entity)` which maps all non-null properties from the request onto the entity. Since identity fields and parent fields were already cleared in the previous step, they will not overwrite the entity.
+When no update mask is provided, the handler calls `ISimpleMapper.Map(request, entity)` which maps all non-null properties from the request onto the entity. Since identity and server-managed fields were already cleared by `AdviceUpdateRequestSanitize`, they will not overwrite the entity's values.
 
-### 6. Persistence
+### 5. Persistence
 
 The entity is updated in the repository and committed:
 
@@ -105,7 +102,7 @@ await _repository.UpdateAsync(entity, ct);
 await _repository.CommitAsync(ct);
 ```
 
-### 7. Response Mapping and Advisors
+### 6. Response Mapping and Advisors
 
 The updated entity is mapped to `TDetail` via `ISimpleMapper.Map<TEntity, TDetail>`.
 
@@ -120,7 +117,7 @@ Built-in response advisors:
 | 100,000,000 | `AdviceResponseFreshness`   | Sets the updated ETag on the detail if the entity implements `IConcurrency` and the detail implements `IFreshness`. |
 | 900,000,000 | `AdviceResponseIdempotency` | Only stores results for create operations (no-op for update).                                                       |
 
-### 8. Result
+### 7. Result
 
 An `UpdateResult<TDetail>` is returned with the `Detail` property populated. In the [HTTP transport](./http-transport.md), this becomes a 200 OK response with the updated detail as JSON.
 

@@ -24,7 +24,6 @@ public sealed class AdviceRoleClaimDestination : IDestinationAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,

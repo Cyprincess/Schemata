@@ -40,7 +40,6 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRevocationTokenValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

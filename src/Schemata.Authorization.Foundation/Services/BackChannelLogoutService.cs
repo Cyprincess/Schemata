@@ -47,7 +47,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 {
     #region ILogoutNotifier Members
 
-    /// <inheritdoc />
     public Task<List<string>>
         GetFrontChannelUrisAsync(string? subject, string? session, CancellationToken ct = default) {
         return Task.FromResult<List<string>>([]);

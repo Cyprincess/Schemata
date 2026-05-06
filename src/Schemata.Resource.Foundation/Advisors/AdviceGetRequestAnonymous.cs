@@ -31,10 +31,8 @@ public sealed class AdviceGetRequestAnonymous<TEntity> : IResourceGetRequestAdvi
 {
     #region IResourceGetRequestAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceGetRequestAnonymous.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         GetRequest                        request,

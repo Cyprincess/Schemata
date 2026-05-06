@@ -35,10 +35,8 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
 {
     #region IResourceDeleteAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceDeleteFreshness.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity           entity,

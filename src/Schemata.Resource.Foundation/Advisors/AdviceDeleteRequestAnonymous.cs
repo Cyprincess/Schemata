@@ -31,10 +31,8 @@ public sealed class AdviceDeleteRequestAnonymous<TEntity> : IResourceDeleteReque
 {
     #region IResourceDeleteRequestAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceDeleteRequestAnonymous.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         DeleteRequest                     request,

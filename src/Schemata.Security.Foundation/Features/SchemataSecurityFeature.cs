@@ -11,12 +11,10 @@ namespace Schemata.Security.Foundation.Features;
 
 public sealed class SchemataSecurityFeature : FeatureBase
 {
-    public const int DefaultPriority = Orders.Extension;
+    public const int DefaultPriority = Orders.Extension + 5_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -24,9 +22,6 @@ public sealed class SchemataSecurityFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var configure = configurators.PopOrDefault<SchemataSecurityOptions>();
-        services.Configure(configure);
-
         services.TryAddScoped<IPermissionResolver, DefaultPermissionResolver>();
         services.TryAddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
         services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,>));

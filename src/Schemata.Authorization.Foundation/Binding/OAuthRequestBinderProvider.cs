@@ -30,7 +30,6 @@ public sealed class OAuthRequestBinderProvider : IModelBinderProvider
 
     #region IModelBinderProvider Members
 
-    /// <inheritdoc />
     public IModelBinder? GetBinder(ModelBinderProviderContext context) {
         if (!Supported.Contains(context.Metadata.ModelType)) return null;
 

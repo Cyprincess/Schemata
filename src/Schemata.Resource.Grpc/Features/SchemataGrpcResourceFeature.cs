@@ -40,10 +40,8 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                                                                    IsGenericMethodDefinition: true,
                                                                } && m.GetParameters().Length == 1);
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -89,7 +87,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         services.TryAddSingleton(sp => new ReflectionV1ServiceImpl(MergeDescriptors(sp)));
     }
 
-    /// <inheritdoc />
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

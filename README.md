@@ -52,7 +52,7 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 - Task
 - [Tenant](https://nuget.org/packages/Schemata.Tenancy.Foundation)
 - [Validation](https://nuget.org/packages/Schemata.Validation.FluentValidation)
-- [Workflow](https://nuget.org/packages/Schemata.Workflow.Foundation)
+- [Flow](https://nuget.org/packages/Schemata.Flow.Foundation)
 
 ## Features
 
@@ -95,7 +95,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 410_000_000 | Schemata.Identity.Foundation      | Identity             | ASP.NET Core Identity integration     |
 | 420_000_000 | Schemata.Authorization.Foundation | Authorization        | OAuth 2.0 / OpenID Connect server     |
 | 430_000_000 | Schemata.Mapping.Foundation       | Mapping              | Unified object mapper abstraction     |
-| 440_000_000 | Schemata.Workflow.Foundation      | Workflow             | Stateful workflow / state machine     |
+| 440_000_000 | Schemata.Flow.Foundation          | Flow                 | BPMN 2.0.2 process engine            |
 | 450_000_000 | Schemata.Resource.Foundation      | Resource             | Google AIP-compliant resource service |
 | 460_000_000 | Schemata.Resource.Http            | Resource (`MapHttp`) | HTTP/REST endpoint                    |
 | 470_000_000 | Schemata.Resource.Grpc            | Resource (`MapGrpc`) | gRPC endpoint                         |
@@ -118,7 +118,6 @@ Some packages may have additional compliance requirements, which are documented 
 | Schemata.Resource.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
 | Schemata.Security.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
 | Schemata.Tenancy.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Workflow.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
 
@@ -138,6 +137,6 @@ It provides a unified interface for these libraries, enabling developers to swit
 
 The Schemata Resource Foundation complies with the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals.
 
-### Schemata.Workflow.Foundation
+### Schemata.Flow.Foundation
 
-Unfortunately, the Schemata Workflow Foundation is not yet compliant with enterprise standards such as [BPMN 2.0](https://www.omg.org/spec/BPMN/2.0.2/).
+The Schemata Flow Engine implements a subset of [BPMN 2.0.2](https://www.omg.org/spec/BPMN/2.0.2/) supporting start events, end events, exclusive gateways, event-based gateways, interrupting boundary events, and a strongly-typed C# DSL for process graph construction.

@@ -26,7 +26,6 @@ public class RequestQueryResolver : ITenantResolver
 
     #region ITenantResolver Members
 
-    /// <inheritdoc />
     public Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.Query.TryGetValue("Tenant", out var values) != true) {
             return Task.FromResult<Guid?>(null);

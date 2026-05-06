@@ -33,7 +33,6 @@ public sealed class ClientCredentialsFlowFeature<TApp> : IAuthorizationFlowFeatu
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_300;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddKeyedScoped<IGrantHandler, ClientCredentialsHandler<TApp>>(GrantTypes.ClientCredentials);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientCredentials>());

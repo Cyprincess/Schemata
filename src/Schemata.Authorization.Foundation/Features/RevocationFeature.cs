@@ -29,7 +29,6 @@ public sealed class RevocationFeature<TApp, TToken> : IAuthorizationFlowFeature
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 5_000;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<RevocationEndpoint, RevocationHandler<TApp, TToken>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRevocationAdvisor<TApp, TToken>, AdviceRevocationEndpointPermission<TApp, TToken>>());

@@ -27,7 +27,6 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     #region IDisposable Members
 
-    /// <inheritdoc />
     public void Dispose() {
         lock (_gate) {
             foreach (var entry in _order) {
@@ -43,7 +42,6 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     #region ITenantProviderCache Members
 
-    /// <inheritdoc />
     public IServiceProvider GetOrAdd(string id, Func<IServiceProvider> factory) {
         lock (_gate) {
             EvictExpired();
@@ -74,7 +72,6 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         }
     }
 
-    /// <inheritdoc />
     public void Remove(string id) {
         lock (_gate) {
             if (!_index.TryGetValue(id, out var node)) {

@@ -38,19 +38,14 @@ public class Has : IBinary
 
     #region IBinary Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => false;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) { return null; }
 
-    /// <inheritdoc />
     public ExpressionType? Type => null;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Expression left, Expression right, Container ctx) {
         if (right is ConstantExpression { Value: "*" }) {
             return BuildPresenceExpression(left);
@@ -148,6 +143,5 @@ public class Has : IBinary
         return Expression.Call(left, method!, right);
     }
 
-    /// <inheritdoc />
     public override string ToString() { return $"{Char}"; }
 }

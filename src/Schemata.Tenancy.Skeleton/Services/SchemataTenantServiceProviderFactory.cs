@@ -43,7 +43,6 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
 
     #region ITenantServiceProviderFactory<TTenant> Members
 
-    /// <inheritdoc />
     public IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant> accessor) {
         if (accessor.Tenant?.Uid is not { } tenantKey) {
             throw new TenantResolveException();

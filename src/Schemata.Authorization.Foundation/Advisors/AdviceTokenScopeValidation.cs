@@ -39,7 +39,6 @@ public sealed class AdviceTokenScopeValidation<TApp>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenScopeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

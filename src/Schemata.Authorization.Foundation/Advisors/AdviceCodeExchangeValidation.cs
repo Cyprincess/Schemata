@@ -43,7 +43,6 @@ public sealed class AdviceCodeExchangeValidation<TApp, TToken> : ICodeExchangeAd
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceCodeExchangeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         CodeExchangeContext<TApp, TToken> exchange,

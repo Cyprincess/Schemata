@@ -46,11 +46,7 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_100;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        var options = configurators.PopOrDefault<CodeFlowOptions>();
-        services.Configure(options);
-
         services.Configure<SchemataAuthorizationOptions>(o => {
             o.AllowedResponseTypes.Add(ResponseTypes.Code);
             o.AllowedResponseModes.Add(ResponseModes.FormPost);

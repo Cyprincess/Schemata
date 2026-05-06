@@ -52,6 +52,19 @@ The CRUD service layer and transport bindings.
 | [gRPC Transport](resource/grpc-transport.md)   | gRPC service generation                      |
 | [Filtering](resource/filtering.md)             | AIP-160 filter grammar, ordering, pagination |
 
+### Flow
+
+The BPMN 2.0.2 process engine with a strongly-typed DSL.
+
+| Document                                   | Description                              |
+| ------------------------------------------ | ---------------------------------------- |
+| [Overview](flow/overview.md)               | Architecture and package structure       |
+| [AST Reference](flow/ast.md)              | FlowElement type hierarchy               |
+| [DSL Reference](flow/dsl.md)              | Fluent builder API for process graphs    |
+| [Engine](flow/engine.md)                   | Single-token state machine engine        |
+| [Validator](flow/validator.md)             | Process definition validation rules      |
+| [Runtime Services](flow/runtime.md)        | ProcessRuntime, endpoints, registration  |
+
 ### Feature-Specific
 
 | Document                          | Description                             |
@@ -62,6 +75,5 @@ The CRUD service layer and transport bindings.
 | [Identity](identity.md)           | ASP.NET Core Identity                   |
 | [Authorization](authorization.md) | OAuth 2.0 / OIDC                        |
 | [Tenancy](tenancy.md)             | Multi-tenant resolution                 |
-| [Workflow](workflow.md)           | State machine orchestration             |
 | [Modules](modules.md)             | Module discovery and lifecycle          |
 | [Packages](packages.md)           | Meta-package matrix                     |

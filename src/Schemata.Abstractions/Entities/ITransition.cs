@@ -1,5 +1,3 @@
-using System;
-
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
@@ -21,12 +19,7 @@ public interface ITransition
     string? Note { get; set; }
 
     /// <summary>
-    ///     The numeric identifier of the principal who triggered the event.
+    ///     The canonical resource name of the principal who triggered the event.
     /// </summary>
-    Guid? UpdatedById { get; set; }
-
-    /// <summary>
-    ///     The display name of the principal who triggered the event.
-    /// </summary>
-    string? UpdatedBy { get; set; }
+    string? UpdatedByName { get; set; }
 }

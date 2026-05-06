@@ -45,7 +45,6 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeAutoApproveSignIn.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

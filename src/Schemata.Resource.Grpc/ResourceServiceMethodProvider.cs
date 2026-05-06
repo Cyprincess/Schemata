@@ -60,7 +60,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var metadata = Array.Empty<object>();
 
         context.AddUnaryMethod(
-            new Method<ListRequest, ListResult<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResult<TSummary>>(model)), metadata,
+            new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResultBase<TSummary>>(model)), metadata,
             async (svc, req, _) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
                 return await rs.ListAsync(req);

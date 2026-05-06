@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Flow gRPC</Description>
+    <PackageTags>application;business;framework;state;flow;workflow;grpc</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="protobuf-net" />
+    <PackageReference Include="protobuf-net.Grpc" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
+  </ItemGroup>
+
+</Project>

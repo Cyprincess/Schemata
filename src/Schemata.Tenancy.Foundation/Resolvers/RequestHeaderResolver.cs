@@ -26,7 +26,6 @@ public class RequestHeaderResolver : ITenantResolver
 
     #region ITenantResolver Members
 
-    /// <inheritdoc />
     public Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         if (_accessor.HttpContext?.Request.Headers.TryGetValue("x-tenant-id", out var values) != true) {
             return Task.FromResult<Guid?>(null);

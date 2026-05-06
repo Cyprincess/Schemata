@@ -17,7 +17,7 @@ Pick the variant that matches the capabilities you need:
 | -------------------------------------- | --------------------------------------------------------------------------- |
 | `Schemata.Business.Targets`            | Base: Abstractions                                                          |
 | `Schemata.Business.Persisting.Targets` | Base + Repository pattern                                                   |
-| `Schemata.Business.Complex.Targets`    | Persisting + DSL + Mapping + Authorization + Identity + Security + Workflow |
+| `Schemata.Business.Complex.Targets`    | Persisting + DSL + Mapping + Authorization + Identity + Security + Flow + Workflow |
 
 ## Quick Start
 

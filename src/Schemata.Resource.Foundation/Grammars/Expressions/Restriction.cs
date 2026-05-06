@@ -44,13 +44,10 @@ public class Restriction : ISimple
 
     #region ISimple Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => Comparable.IsConstant && Comparator is null;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         var left = Comparable.ToExpression(ctx);
         if (left is null) {
@@ -79,7 +76,6 @@ public class Restriction : ISimple
 
     #endregion
 
-    /// <inheritdoc />
     public override string? ToString() {
         return Comparator is not null ? $"[{Comparator} {Comparable} {Arg}]" : Comparable.ToString();
     }

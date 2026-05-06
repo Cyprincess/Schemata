@@ -26,17 +26,13 @@ public class Truth : IValue
 
     object IValue.Value => Value;
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => true;
 
-    /// <inheritdoc />
     public Expression ToExpression(Container ctx) { return Expression.Constant(Value); }
 
     #endregion
 
-    /// <inheritdoc />
     public override string ToString() { return Value ? "\u2611" : "\u2612"; }
 }

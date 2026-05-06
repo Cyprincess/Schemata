@@ -39,7 +39,6 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_400;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (string.IsNullOrWhiteSpace(o.DeviceVerificationUri)) {

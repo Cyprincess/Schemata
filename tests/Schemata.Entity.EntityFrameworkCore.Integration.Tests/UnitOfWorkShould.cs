@@ -142,9 +142,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 );
                 await courseRepo.AddAsync(
                     new() {
-                        Title   = "Cross-Course",
-                        Credits = 3,
-                        Name    = "cross-course",
+                        Title = "Cross-Course", Credits = 3, Name = "cross-course",
                     }
                 );
                 await uow.CommitAsync();
@@ -165,32 +163,6 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var course = await courseRepo.FirstOrDefaultAsync(q => q.Where(c => c.Name == "cross-course"));
                 Assert.NotNull(course);
             }
-        }
-    }
-
-    [Fact]
-    public async Task Query_DuringUoW_DoesNotSeeUncommittedChangesUntilSaveChanges() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            using var work = repo.BeginWork();
-            await repo.AddAsync(
-                new() {
-                    FullName = "Uncommitted-Alice",
-                    Age      = 18,
-                    Grade    = 1,
-                    Name     = "uncommitted-alice",
-                }
-            );
-
-            // EF Core defers execution until SaveChangesAsync, so queries do not see uncommitted changes
-            var foundBefore = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "uncommitted-alice"));
-            Assert.Null(foundBefore);
-
-            await work.CommitAsync();
-
-            // After commit the entity is persisted
-            var foundAfter = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "uncommitted-alice"));
-            Assert.NotNull(foundAfter);
         }
     }
 

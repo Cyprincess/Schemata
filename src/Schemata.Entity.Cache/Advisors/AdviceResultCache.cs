@@ -57,10 +57,8 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
 
     #region IRepositoryResultAdvisor<TEntity,TResult,T> Members
 
-    /// <inheritdoc />
     public int Order => AdviceResultCache.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         QueryContext<TEntity, TResult, T> context,

@@ -25,16 +25,12 @@ public class Equal : IBinary
 
     #region IBinary Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => false;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) { return null; }
 
-    /// <inheritdoc />
     public Expression? ToExpression(Expression left, Expression right, Container ctx) {
         if (right is ConstantExpression { Value: string pattern } && pattern.Contains('*')) {
             return BuildWildcardExpression(left, pattern, ctx);
@@ -47,7 +43,6 @@ public class Equal : IBinary
         return Expression.MakeBinary(ExpressionType.Equal, left, right);
     }
 
-    /// <inheritdoc />
     public ExpressionType? Type => null;
 
     #endregion
@@ -81,6 +76,5 @@ public class Equal : IBinary
         return Expression.MakeBinary(ExpressionType.Equal, left, Expression.Constant(pattern));
     }
 
-    /// <inheritdoc />
     public override string ToString() { return $"{Char}"; }
 }

@@ -16,7 +16,7 @@ public static class DistributedCacheExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The same service collection for chaining.</returns>
-    public static IServiceCollection AddDistributedCacheProvider(this IServiceCollection services) {
+    public static IServiceCollection AddDistributedCache(this IServiceCollection services) {
         services.TryAddSingleton<ICacheProvider, DistributedCacheProvider>();
         return services;
     }

@@ -27,10 +27,8 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
 
     #region IUnitOfWork<TContext> Members
 
-    /// <inheritdoc />
     public bool IsActive => _transaction is not null;
 
-    /// <inheritdoc />
     public void Begin() {
         if (_transaction is not null) {
             throw new InvalidOperationException("Unit of work already active.");
@@ -39,7 +37,6 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
         _transaction = _context.Database.BeginTransaction();
     }
 
-    /// <inheritdoc />
     public async Task CommitAsync(CancellationToken ct = default) {
         if (_transaction is null) {
             throw new InvalidOperationException("Unit of work not started.");
@@ -51,7 +48,6 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
         _transaction = null;
     }
 
-    /// <inheritdoc />
     public async Task RollbackAsync(CancellationToken ct = default) {
         if (_transaction is null) {
             return;
@@ -62,7 +58,6 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
         _transaction = null;
     }
 
-    /// <inheritdoc />
     public void Dispose() {
         if (_disposed) {
             return;

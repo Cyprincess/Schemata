@@ -20,7 +20,7 @@ builder.UseSchemata(schema => {
         resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
 
         schema.Services.AddDistributedMemoryCache();
-        schema.Services.AddDistributedCacheProvider();
+        schema.Services.AddDistributedCache();
 
         var dbName = "integration-" + Guid.NewGuid();
         schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));

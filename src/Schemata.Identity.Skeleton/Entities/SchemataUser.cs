@@ -30,40 +30,32 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
     public virtual string? Name { get; set; }
 
-    /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IConcurrency Members
 
-    /// <inheritdoc />
     public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IDescriptive Members
 
-    /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Description { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
 
-    /// <inheritdoc />
     [TableKey]
     public virtual Guid Uid { get; set; }
 
@@ -71,10 +63,8 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

@@ -80,24 +80,13 @@ Supports wildcards:
 
 Requires a non-null `ClaimsPrincipal`; returns `false` when the principal is `null`.
 
-The context type is `ResourceRequestContext<TRequest>`, which carries the `Operation` value.
+The context type is `AccessContext<TRequest>`, which carries the `Operation` value.
 
-### WorkflowAccessProvider\<T, TRequest\>
+### Workflow authorization
 
-Located in `Schemata.Workflow.Skeleton.Security`. Uses the same pattern as the resource provider but with a different prefix:
+Workflow authorization uses the same `DefaultAccessProvider<,>` and permission format as resource authorization. The workflow advisors (`IStatusAdvisor`, `ISubmitAdvisor`, `IRaiseAdvisor`) call `IAccessProvider<SchemataWorkflow, TRequest>.HasAccessAsync` with the `SchemataWorkflow` entity and the operation-specific request type. Permission strings follow the same `{entity}.{operation}` format (e.g., `"student-workflow.status"`, `"student-workflow.submit"`, `"student-workflow.raise"`).
 
-```
-workflow-{operation}-{entity}
-```
-
-Where `{operation}` corresponds to workflow operations (e.g. `get`, `submit`, `raise`), kebab-cased.
-
-Supports the same wildcard patterns:
-
-- `workflow-*-approval` -- grants all operations on `Approval` workflows
-- `workflow-get-*` -- grants read access to all workflow types
-
-The context type is `WorkflowRequestContext<TRequest>`, which carries the `Operation` string and the associated `SchemataWorkflow`.
+Workflow controllers and advisors are registered when `.WithAuthorization()` is chained on the workflow builder. The generic `DefaultAccessProvider<,>` serves workflow authorization using the same `{entity}.{operation}` permission format as resource authorization.
 
 ## Registration
 
@@ -116,7 +105,7 @@ This registers `DefaultAccessProvider<,>` and `DefaultEntitlementProvider<,>` as
 Register a custom access provider using the generic extension method:
 
 ```csharp
-services.AddAccessProvider<Product, ResourceRequestContext<CreateProductRequest>, ProductAccessProvider>();
+services.AddAccessProvider<Product, CreateProductRequest, ProductAccessProvider>();
 ```
 
 Or using runtime types:
@@ -125,7 +114,7 @@ Or using runtime types:
 services.AddAccessProvider(entityType, contextType, providerType);
 ```
 
-Both use `TryAddScoped` internally, so the first registration for a given `IAccessProvider<T, TContext>` wins.
+Both use `TryAddScoped` internally, so the first registration for a given `IAccessProvider<T, TRequest>` wins.
 
 ### AddEntitlementProvider
 

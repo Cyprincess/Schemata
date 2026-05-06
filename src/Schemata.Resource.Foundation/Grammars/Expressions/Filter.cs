@@ -9,7 +9,7 @@ namespace Schemata.Resource.Foundation.Grammars.Expressions;
 /// <summary>
 ///     Top-level filter expression: sequences joined by explicit AND.
 /// </summary>
-public class Filter : Logical, IArg, ISimple
+public class Filter : LogicalBase, IArg, ISimple
 {
     /// <summary>
     ///     Initializes a new filter with a mandatory sequence and optional additional sequences.
@@ -29,23 +29,18 @@ public class Filter : Logical, IArg, ISimple
     /// </summary>
     public List<Sequence> Sequences { get; } = [];
 
-    /// <inheritdoc />
     public override IEnumerable<IToken> Tokens => Sequences;
 
-    /// <inheritdoc />
     public override ExpressionType Operator => ExpressionType.AndAlso;
 
     #region IArg Members
 
-    /// <inheritdoc />
     public override TextPosition Position { get; }
 
-    /// <inheritdoc />
     public override bool IsConstant => Sequences.All(s => s.IsConstant);
 
     #endregion
 
-    /// <inheritdoc />
     public override string? ToString() {
         return Sequences.Count > 1 ? $"[AND {string.Join(' ', Sequences)}]" : Sequences.FirstOrDefault()?.ToString();
     }

@@ -21,23 +21,17 @@ public class LessThanOrEqual : IBinary
 
     #region IBinary Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => false;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) { return null; }
 
-    /// <inheritdoc />
     public ExpressionType? Type => ExpressionType.LessThanOrEqual;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Expression left, Expression right, Container ctx) { return null; }
 
     #endregion
 
-    /// <inheritdoc />
     public override string ToString() { return $"{Name}"; }
 }

@@ -30,13 +30,10 @@ public class Text : IValue
 
     object IValue.Value => Value;
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => true;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         if (ctx.TryGetParameter(Value, out var value)) {
             return value;
@@ -51,6 +48,5 @@ public class Text : IValue
 
     #endregion
 
-    /// <inheritdoc />
     public override string ToString() { return $"\"{Value}\""; }
 }

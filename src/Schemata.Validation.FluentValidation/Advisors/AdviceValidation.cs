@@ -45,10 +45,8 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
 
     #region IValidationAdvisor<T> Members
 
-    /// <inheritdoc />
     public int Order => AdviceValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext              ctx,
         Operations                 operation,

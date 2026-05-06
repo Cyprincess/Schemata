@@ -23,7 +23,6 @@ public sealed class SchemataStartup : IStartupFilter
 
     #region IStartupFilter Members
 
-    /// <inheritdoc />
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) {
         return app => {
             app.UseSchemata(_configuration, _environment);

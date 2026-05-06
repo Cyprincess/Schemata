@@ -36,10 +36,10 @@ Receives a `DeleteRequest` containing:
 | `Etag`   | `string?` | The ETag for concurrency checking.     |
 | `Force`  | `bool`    | Whether to bypass the freshness check. |
 
-When `WithAuthorization()` is enabled, `AdviceDeleteRequestAuthorize` runs at order 100,000,000:
+When `WithAuthorization()` is enabled, `AdviceDeleteRequestAuthorize` runs at order 110,000,000:
 
 1. Checks if the entity type has `[Anonymous(Operations.Delete)]` -- if so, skips authorization.
-2. Calls `IAccessProvider<TEntity, ResourceRequestContext<DeleteRequest>>.HasAccessAsync` with the current `ClaimsPrincipal`.
+2. Calls `IAccessProvider<TEntity, TRequest>.HasAccessAsync` with the current `ClaimsPrincipal`.
 3. Throws `AuthorizationException` if access is denied.
 
 ### 3. Delete Entity Advisor

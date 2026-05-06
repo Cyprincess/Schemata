@@ -17,7 +17,6 @@ public sealed class ResourceControllerConvention(string? scheme = null) : IContr
 {
     #region IControllerModelConvention Members
 
-    /// <inheritdoc />
     public void Apply(ControllerModel controller) {
         // Only rewrite routes for the generic resource controller — non-generic
         // controllers are regular user-defined controllers that should be left alone.

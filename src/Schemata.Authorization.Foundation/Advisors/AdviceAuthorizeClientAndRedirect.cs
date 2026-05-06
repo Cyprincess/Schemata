@@ -58,7 +58,6 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeClientAndRedirect.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

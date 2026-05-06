@@ -49,10 +49,8 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 {
     public const int DefaultPriority = Orders.Extension + 20_000_000;
 
-    /// <inheritdoc cref="FeatureBase.Priority" />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

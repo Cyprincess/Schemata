@@ -36,7 +36,6 @@ public sealed class AdviceAuthorizeResponseMode<TApp>(IOptions<CodeFlowOptions> 
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeResponseMode.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

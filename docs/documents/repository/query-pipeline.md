@@ -94,7 +94,28 @@ To include soft-deleted entities in a query, suppress the filter:
 var all = repository.Once().SuppressQuerySoftDelete().ListAsync<Product>(null);
 ```
 
-The framework does not ship built-in `IRepositoryQueryAdvisor` or `IRepositoryResultAdvisor` implementations. These extension points exist for application-level concerns such as caching, logging, or access-control checks that need to run around query execution.
+`IRepositoryQueryAdvisor` and `IRepositoryResultAdvisor` are extension points for application-level concerns such as caching, logging, or access-control checks that need to run around query execution. Built-in implementations ship with extension packages — call `UseQueryCache()` to register the query caching advisors (`AdviceQueryCache` and `AdviceResultCache`). See [Caching](caching.md).
+
+### AdviceBuildQueryOwner
+
+| Property      | Value                                                  |
+| ------------- | ------------------------------------------------------ |
+| Interface     | `IRepositoryBuildQueryAdvisor<TEntity>`                |
+| Order         | 110,000,000 (`AdviceBuildQuerySoftDelete` + 10M)       |
+| Trait         | `IOwnable`                                             |
+| Suppressed by | `QueryOwnerSuppressed`                                 |
+| Registered by | `UseOwner()`                                           |
+
+This advisor applies a global query filter that restricts results to entities owned by the current caller. When the entity type implements `IOwnable`, it resolves the owner via `IOwnerResolver<TEntity>` and appends an equality filter:
+
+```csharp
+container.ApplyModification(q =>
+    q.OfType<IOwnable>()
+     .Where(e => e.Owner == owner)
+     .OfType<TEntity>());
+```
+
+No filter is applied when the resolver returns null or empty. See [Ownership](ownership.md) for details.
 
 ## QueryContainer and QueryContext
 
