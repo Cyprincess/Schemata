@@ -35,10 +35,8 @@ public sealed class AdviceUpdateRequestSanitize<TEntity, TRequest> : IResourceUp
 {
     #region IResourceUpdateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateRequestSanitize.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,

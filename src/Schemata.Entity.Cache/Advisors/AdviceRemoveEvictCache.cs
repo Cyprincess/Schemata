@@ -53,10 +53,8 @@ public sealed class AdviceRemoveEvictCache<TEntity> : IRepositoryRemoveAdvisor<T
 
     #region IRepositoryRemoveAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceRemoveEvictCache.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

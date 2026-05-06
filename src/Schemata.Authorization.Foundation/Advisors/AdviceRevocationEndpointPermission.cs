@@ -38,7 +38,6 @@ public sealed class AdviceRevocationEndpointPermission<TApp, TToken>(IApplicatio
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRevocationEndpointPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

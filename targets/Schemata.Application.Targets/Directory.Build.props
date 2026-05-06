@@ -72,8 +72,4 @@
     <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Foundation\Schemata.Workflow.Foundation.csproj" />
-  </ItemGroup>
-
 </Project>

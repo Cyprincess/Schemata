@@ -99,8 +99,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="ListResult{TSummary}" /> with summaries and an optional next page token.</returns>
-    public async Task<ListResult<TSummary>> ListAsync(
+    /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
+    public async Task<ListResultBase<TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -113,11 +113,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.List, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -126,11 +126,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
@@ -238,11 +238,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, immutable, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         return new() {
@@ -260,8 +260,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="name">The resource name.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="GetResult{TDetail}" /> containing the detail DTO.</returns>
-    public async Task<GetResult<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
+    /// <returns>A <see cref="GetResultBase{TDetail}" /> containing the detail DTO.</returns>
+    public async Task<GetResultBase<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
         var ctx = CreateAdviceContext();
@@ -270,11 +270,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.Get, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -284,11 +284,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, new() { Name = name }, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         var entity = await _repository.Once()
@@ -302,11 +302,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, entity, detail, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         return new() { Detail = detail };
@@ -320,8 +320,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="CreateResult{TDetail}" /> containing the new resource's detail DTO.</returns>
-    public async Task<CreateResult<TDetail>> CreateAsync(
+    /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the new resource's detail DTO.</returns>
+    public async Task<CreateResultBase<TDetail>> CreateAsync(
         TRequest           request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -334,11 +334,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.Create, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return CreateResult<TDetail>.Blocked;
+                return CreateResultBase<TDetail>.Blocked;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -347,11 +347,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return CreateResult<TDetail>.Blocked;
+                return CreateResultBase<TDetail>.Blocked;
         }
 
         var entity = _mapper.Map<TRequest, TEntity>(request);
@@ -367,11 +367,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, entity, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return CreateResult<TDetail>.Blocked;
+                return CreateResultBase<TDetail>.Blocked;
         }
 
         await _repository.AddAsync(entity, ct.Value);
@@ -383,11 +383,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, entity, detail, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return CreateResult<TDetail>.Blocked;
+                return CreateResultBase<TDetail>.Blocked;
         }
 
         return new() { Detail = detail };
@@ -407,8 +407,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The update request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>An <see cref="UpdateResult{TDetail}" /> containing the updated detail DTO.</returns>
-    public async Task<UpdateResult<TDetail>> UpdateAsync(
+    /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
+    public async Task<UpdateResultBase<TDetail>> UpdateAsync(
         string             name,
         TRequest           request,
         ClaimsPrincipal?   principal,
@@ -422,11 +422,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.Update, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
@@ -438,11 +438,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         var entity = await _repository.Once()
@@ -454,11 +454,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, entity, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         if (request is IUpdateMask { UpdateMask: { } mask }) {
@@ -478,11 +478,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, entity, detail, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         return new() { Detail = detail };

@@ -30,7 +30,6 @@ public sealed class IntrospectionFeature<TApp, TToken> : IAuthorizationFlowFeatu
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 4_000;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<IntrospectionEndpoint, IntrospectionHandler<TApp, TToken>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIntrospection>());

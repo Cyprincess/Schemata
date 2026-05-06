@@ -18,7 +18,6 @@ public sealed class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
     /// </summary>
     public static ClaimStoreJsonConverter Instance { get; } = new();
 
-    /// <inheritdoc />
     public override ClaimStore? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         if (reader.TokenType == JsonTokenType.Null) {
             return null;
@@ -49,7 +48,6 @@ public sealed class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
         return store;
     }
 
-    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, ClaimStore? value, JsonSerializerOptions options) {
         if (value is null) {
             writer.WriteNullValue();

@@ -34,10 +34,8 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
 {
     public const int DefaultPriority = Orders.Extension + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -47,11 +45,6 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
     ) {
         var configure = configurators.Pop<IdentityOptions>();
         var build     = configurators.Pop<IdentityBuilder>();
-
-        var identify = configurators.Pop<SchemataIdentityOptions>();
-        var opts     = new SchemataIdentityOptions();
-        identify(opts);
-        services.Configure(identify);
 
         services.Configure<JsonSerializerOptions>(options => {
             options.Converters.Add(ClaimStoreJsonConverter.Instance);

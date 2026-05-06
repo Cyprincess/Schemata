@@ -37,10 +37,10 @@ The call chain breaks down as follows:
 1. **`UseResource()`** -- adds `SchemataResourceFeature`, which registers the core services:
    - `ResourceOperationHandler<,,,>` as a scoped open generic.
    - Built-in advisors for validation, freshness, and idempotency.
-   - A default `IIdempotencyStore` backed by `IDistributedCache`.
+   - Idempotency advisors backed by the cache.
    - Scans all loaded assemblies for types decorated with `[ResourceAttribute]` and registers each one automatically.
 
-2. **`WithAuthorization()`** (optional) -- registers authorization advisors for all five operations. Without this call, no access checks run.
+2. **`WithAuthorization()`** (optional) -- registers authorization advisors for all five operations. Call `WithAuthorization()` to enable access checks on all five operations.
 
 3. **`MapHttp()`** / **`MapGrpc()`** -- activates a transport layer and returns a transport-specific builder. See [HTTP Transport](./http-transport.md) and [gRPC Transport](./grpc-transport.md).
 
@@ -90,8 +90,8 @@ See the individual pipeline pages for the full step-by-step flow: [Create](./cre
 
 | Advisor                         | Interface                       | Order       |
 | ------------------------------- | ------------------------------- | ----------- |
-| `AdviceCreateRequestValidation` | `IResourceCreateRequestAdvisor` | 120,000,000 |
-| `AdviceUpdateRequestValidation` | `IResourceUpdateRequestAdvisor` | 110,000,000 |
+| `AdviceCreateRequestValidation` | `IResourceCreateRequestAdvisor` | 140,000,000 |
+| `AdviceUpdateRequestValidation` | `IResourceUpdateRequestAdvisor` | 130,000,000 |
 | `AdviceUpdateFreshness`         | `IResourceUpdateAdvisor`        | 100,000,000 |
 | `AdviceDeleteFreshness`         | `IResourceDeleteAdvisor`        | 100,000,000 |
 | `AdviceResponseFreshness`       | `IResourceResponseAdvisor`      | 100,000,000 |
@@ -101,17 +101,17 @@ Per-resource registration additionally adds:
 
 | Advisor                          | Interface                       | Order       |
 | -------------------------------- | ------------------------------- | ----------- |
-| `AdviceCreateRequestIdempotency` | `IResourceCreateRequestAdvisor` | 100,000,000 |
+| `AdviceCreateRequestIdempotency` | `IResourceCreateRequestAdvisor` | 110,000,000 |
 
 When `WithAuthorization()` is called, these are also registered:
 
 | Advisor                        | Interface                       | Order       |
 | ------------------------------ | ------------------------------- | ----------- |
-| `AdviceListRequestAuthorize`   | `IResourceListRequestAdvisor`   | 100,000,000 |
-| `AdviceGetRequestAuthorize`    | `IResourceGetRequestAdvisor`    | 100,000,000 |
-| `AdviceCreateRequestAuthorize` | `IResourceCreateRequestAdvisor` | 110,000,000 |
-| `AdviceUpdateRequestAuthorize` | `IResourceUpdateRequestAdvisor` | 100,000,000 |
-| `AdviceDeleteRequestAuthorize` | `IResourceDeleteRequestAdvisor` | 100,000,000 |
+| `AdviceListRequestAuthorize`   | `IResourceListRequestAdvisor`   | 110,000,000 |
+| `AdviceGetRequestAuthorize`    | `IResourceGetRequestAdvisor`    | 110,000,000 |
+| `AdviceCreateRequestAuthorize` | `IResourceCreateRequestAdvisor` | 130,000,000 |
+| `AdviceUpdateRequestAuthorize` | `IResourceUpdateRequestAdvisor` | 120,000,000 |
+| `AdviceDeleteRequestAuthorize` | `IResourceDeleteRequestAdvisor` | 110,000,000 |
 
 ## Global Options
 

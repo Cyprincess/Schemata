@@ -34,10 +34,8 @@ public sealed class AdviceUpdateValidation<TEntity> : IRepositoryUpdateAdvisor<T
 {
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

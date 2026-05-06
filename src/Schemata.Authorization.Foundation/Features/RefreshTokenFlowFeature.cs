@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Advisors;
-using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
@@ -36,11 +35,7 @@ public sealed class RefreshTokenFlowFeature<TApp, TToken> : IAuthorizationFlowFe
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_200;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        var options = configurators.PopOrDefault<RefreshTokenFlowOptions>();
-        services.Configure(options);
-
         services.TryAddKeyedScoped<IGrantHandler, RefreshTokenHandler<TApp, TToken>>(GrantTypes.RefreshToken);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRefreshTokenAdvisor<TApp, TToken>, AdviceRefreshTokenValidation<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRefreshToken>());

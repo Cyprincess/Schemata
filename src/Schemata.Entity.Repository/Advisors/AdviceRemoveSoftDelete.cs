@@ -31,10 +31,8 @@ public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAdvisor<T
 {
     #region IRepositoryRemoveAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceRemoveSoftDelete.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

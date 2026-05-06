@@ -41,7 +41,6 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceAuthorizeScopeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         TApp                   application,

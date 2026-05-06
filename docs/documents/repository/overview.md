@@ -125,14 +125,20 @@ Under the hood, `Once` calls `ActivatorUtilities.CreateInstance` to construct a 
 
 Every suppression method stores a marker type in the `AdviceContext`. The corresponding advisor checks for that marker at the start of its `AdviseAsync` and skips its logic when the marker is present. All methods return the repository instance for fluent chaining.
 
-| Method                       | Marker                     | Advisors Affected                                 |
-| ---------------------------- | -------------------------- | ------------------------------------------------- |
-| `SuppressAddValidation()`    | `SuppressAddValidation`    | `AdviceAddValidation`                             |
-| `SuppressUpdateValidation()` | `SuppressUpdateValidation` | `AdviceUpdateValidation`                          |
-| `SuppressConcurrency()`      | `SuppressConcurrency`      | `AdviceAddConcurrency`, `AdviceUpdateConcurrency` |
-| `SuppressQuerySoftDelete()`  | `SuppressQuerySoftDelete`  | `AdviceBuildQuerySoftDelete`                      |
-| `SuppressSoftDelete()`       | `SuppressSoftDelete`       | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete`   |
-| `SuppressTimestamp()`        | `SuppressTimestamp`        | `AdviceAddTimestamp`, `AdviceUpdateTimestamp`     |
+| Method                          | Marker                        | Advisors Affected                                 |
+| ------------------------------- | ----------------------------- | ------------------------------------------------- |
+| `SuppressAddValidation()`       | `SuppressAddValidation`       | `AdviceAddValidation`                             |
+| `SuppressUpdateValidation()`    | `SuppressUpdateValidation`    | `AdviceUpdateValidation`                          |
+| `SuppressConcurrency()`         | `SuppressConcurrency`         | `AdviceAddConcurrency`, `AdviceUpdateConcurrency` |
+| `SuppressQuerySoftDelete()`     | `SuppressQuerySoftDelete`     | `AdviceBuildQuerySoftDelete`                      |
+| `SuppressSoftDelete()`          | `SuppressSoftDelete`          | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete`   |
+| `SuppressTimestamp()`           | `SuppressTimestamp`           | `AdviceAddTimestamp`, `AdviceUpdateTimestamp`     |
+| `SuppressOwner()`               | `OwnerSuppressed`             | `AdviceAddOwner`                                  |
+| `SuppressQueryOwner()`          | `QueryOwnerSuppressed`        | `AdviceBuildQueryOwner`                           |
+| `SuppressQueryCache()`          | `QueryCacheSuppressed`        | `AdviceQueryCache`, `AdviceResultCache`           |
+| `SuppressQueryCacheEviction()`  | `QueryCacheEvictionSuppressed` | `AdviceUpdateEvictCache`, `AdviceRemoveEvictCache` |
+
+The owner and cache suppression methods are available only when the corresponding packages (`Schemata.Entity.Owner`, `Schemata.Entity.Cache`) are referenced and their `UseOwner()` / `UseQueryCache()` methods have been called.
 
 ## AdviceContext
 
@@ -146,7 +152,7 @@ The `AdviceContext` also carries the `IServiceProvider`, giving advisors access 
 
 ## Unit of Work
 
-`IRepository<TEntity>` is registered as **scoped**. Within a single DI scope (typically one HTTP request), all injections of `IRepository<Product>` resolve to the same instance backed by the same `DbContext`. This means multiple repositories share the same unit of work:
+`IRepository<TEntity>` is registered as **scoped**. Within a single DI scope (typically one HTTP request), all injections of `IRepository<Product>` resolve to the same instance backed by the same `DbContext`. This means multiple repositories share the same underlying context:
 
 ```csharp
 public class OrderService(
@@ -166,3 +172,14 @@ public class OrderService(
 ```
 
 Because both repositories share the same `DbContext`, a single `CommitAsync` on either repository flushes all pending changes.
+
+For explicit transaction control, use `IUnitOfWork<TContext>`. Call `repository.BeginWork()` to start a transaction that coordinates all mutations until `CommitAsync` or `RollbackAsync`:
+
+```csharp
+using var uow = orders.BeginWork();
+await orders.AddAsync(order);
+await items.AddAsync(lineItem);
+await uow.CommitAsync();
+```
+
+`IUnitOfWork<TContext>` is registered when you chain `.WithUnitOfWork<TContext>()` on the repository builder. See [Unit of Work](unit-of-work.md) for the full API and provider-specific behavior.

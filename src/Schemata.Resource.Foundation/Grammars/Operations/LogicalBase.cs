@@ -1,0 +1,102 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using Parlot;
+using Schemata.Resource.Foundation.Grammars.Expressions;
+using Schemata.Resource.Foundation.Grammars.Values;
+
+namespace Schemata.Resource.Foundation.Grammars.Operations;
+
+/// <summary>
+///     Base class for logical combinators (AND/OR) that fold child tokens into a single
+///     boolean expression. Bare (non-boolean) children are promoted via an implicit
+///     <see cref="Has" /> operator with the root parameter as the left side.
+/// </summary>
+public abstract class LogicalBase : IToken
+{
+    /// <summary>
+    ///     Gets the child tokens to combine.
+    /// </summary>
+    public abstract IEnumerable<IToken> Tokens { get; }
+
+    /// <summary>
+    ///     Gets the LINQ expression type for combining children (<see cref="ExpressionType.AndAlso" />
+    ///     or <see cref="ExpressionType.OrElse" />).
+    /// </summary>
+    public abstract ExpressionType Operator { get; }
+
+    #region IToken Members
+
+    public abstract TextPosition Position { get; }
+
+    public abstract bool IsConstant { get; }
+
+    public virtual Expression ToExpression(Container ctx) {
+        var first = Tokens.FirstOrDefault();
+
+        var expression = first?.ToExpression(ctx);
+        if (expression is null) {
+            throw new ParseException("Except terms", Position);
+        }
+
+        if (expression.Type != typeof(bool)) {
+            expression = ToRestrictionExpression(first!, ctx);
+        }
+
+        if (expression is null) {
+            throw new ParseException("Except restriction", first!.Position);
+        }
+
+        foreach (var token in Tokens.Skip(1)) {
+            var right = token.ToExpression(ctx);
+            if (right is null) {
+                break;
+            }
+
+            if (right.Type != typeof(bool)) {
+                right = ToRestrictionExpression(token, ctx);
+            }
+
+            if (right is null) {
+                break;
+            }
+
+            expression = Expression.MakeBinary(Operator, expression, right);
+        }
+
+        return expression;
+    }
+
+    #endregion
+
+    /// <summary>
+    ///     Promotes a non-boolean token to a restriction by wrapping it in an implicit
+    ///     <c>q : token</c> comparison.
+    /// </summary>
+    protected virtual Expression? ToRestrictionExpression(IToken token, Container ctx) {
+        var member = new Member(token.Position, new Text(token.Position, "q"), null);
+
+        var arg = ToArg(token);
+        if (arg is null) {
+            throw new ParseException("Expect arg", token.Position);
+        }
+
+        var restriction = new Restriction(token.Position, member, (new Has(token.Position), arg));
+
+        return restriction.ToExpression(ctx);
+    }
+
+    /// <summary>
+    ///     Unwraps a token to its innermost <see cref="IArg" /> for implicit comparison.
+    /// </summary>
+    protected virtual IArg? ToArg(IToken token) {
+        return token switch {
+            Filter f                           => f,
+            Function f                         => f,
+            Member m                           => m,
+            Term { Modifier         : null } t => ToArg(t.Simple),
+            Restriction { Comparator: null } r => ToArg(r.Comparable),
+            var _                              => null,
+        };
+    }
+}

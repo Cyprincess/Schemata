@@ -9,7 +9,7 @@ namespace Schemata.Resource.Foundation.Grammars.Expressions;
 /// <summary>
 ///     Terms joined by explicit OR in the filter grammar.
 /// </summary>
-public class Factor : Logical, IToken
+public class Factor : LogicalBase, IToken
 {
     /// <summary>
     ///     Initializes a new factor with a mandatory term and optional additional terms.
@@ -29,23 +29,18 @@ public class Factor : Logical, IToken
     /// </summary>
     public List<Term> Terms { get; } = [];
 
-    /// <inheritdoc />
     public override IEnumerable<IToken> Tokens => Terms;
 
-    /// <inheritdoc />
     public override ExpressionType Operator => ExpressionType.OrElse;
 
     #region IToken Members
 
-    /// <inheritdoc />
     public override TextPosition Position { get; }
 
-    /// <inheritdoc />
     public override bool IsConstant => Terms.All(t => t.IsConstant);
 
     #endregion
 
-    /// <inheritdoc />
     public override string? ToString() {
         return Terms.Count > 1 ? $"[OR {string.Join(' ', Terms)}]" : Terms.FirstOrDefault()?.ToString();
     }

@@ -99,12 +99,10 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     /// <summary>Whether mutations are automatically committed to the repository. Default: true.</summary>
     public virtual bool AutoSaveChanges { get; set; } = true;
 
-    /// <inheritdoc />
     public override IQueryable<TUser> Users => UsersRepository.AsQueryable();
 
     #region IUserCanonicalNameStore<TUser> Members
 
-    /// <inheritdoc />
     public virtual async Task<TUser?> FindByCanonicalNameAsync(string canonicalName, CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -116,7 +114,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserDisplayNameStore<TUser> Members
 
-    /// <inheritdoc />
     public virtual Task<string?> GetDisplayNameAsync(TUser user, CancellationToken ct) {
         return Task.FromResult(user.DisplayName);
     }
@@ -125,7 +122,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserPhoneStore<TUser> Members
 
-    /// <inheritdoc />
     public override async Task<IdentityResult> CreateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -138,7 +134,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return IdentityResult.Success;
     }
 
-    /// <inheritdoc />
     public override async Task<IdentityResult> UpdateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -156,7 +151,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return IdentityResult.Success;
     }
 
-    /// <inheritdoc />
     public override async Task<IdentityResult> DeleteAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -181,7 +175,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return IdentityResult.Success;
     }
 
-    /// <inheritdoc />
     public virtual async Task<TUser?> FindByPhoneAsync(string phone, CancellationToken ct) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -193,7 +186,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserPrincipalNameStore<TUser> Members
 
-    /// <inheritdoc />
     public virtual Task<string?> GetUserPrincipalNameAsync(TUser user, CancellationToken ct) {
         return GetNormalizedUserNameAsync(user, ct);
     }
@@ -208,7 +200,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UsersRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -229,7 +220,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UserRoleRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task RemoveFromRoleAsync(
         TUser             user,
         string            normalizedRoleName,
@@ -259,7 +249,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UserRoleRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task<IList<string>> GetRolesAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -274,7 +263,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                     .ToListAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task<bool> IsInRoleAsync(
         TUser             user,
         string            normalizedRoleName,
@@ -299,7 +287,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return userRole is not null;
     }
 
-    /// <inheritdoc />
     public override async Task<IList<Claim>> GetClaimsAsync(TUser user, CancellationToken ct = default) {
         ThrowIfDisposed();
         if (user is null) {
@@ -311,7 +298,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                          .ToListAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task AddClaimsAsync(TUser user, IEnumerable<Claim> claims, CancellationToken ct = default) {
         ThrowIfDisposed();
         if (user is null) {
@@ -329,7 +315,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UserClaimsRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task ReplaceClaimAsync(
         TUser             user,
         Claim             claim,
@@ -360,7 +345,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
     }
 
-    /// <inheritdoc />
     public override async Task RemoveClaimsAsync(
         TUser              user,
         IEnumerable<Claim> claims,
@@ -388,7 +372,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
     }
 
-    /// <inheritdoc />
     public override async Task AddLoginAsync(TUser user, UserLoginInfo login, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -404,7 +387,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UserLoginsRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task RemoveLoginAsync(
         TUser             user,
         string            loginProvider,
@@ -426,7 +408,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UserLoginsRepository.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task<IList<UserLoginInfo>> GetLoginsAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -441,7 +422,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                          .ToListAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -456,7 +436,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Uid)), ct).ToListAsync(ct);
     }
 
-    /// <inheritdoc />
     public override async Task<IList<TUser>> GetUsersInRoleAsync(
         string            normalizedRoleName,
         CancellationToken ct = default
@@ -481,7 +460,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     }
 
 #nullable disable
-    /// <inheritdoc />
     protected override Task<TUserToken> FindTokenAsync(
         TUser             user,
         string            loginProvider,
@@ -492,20 +470,17 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     }
 #nullable restore
 
-    /// <inheritdoc />
     protected override async Task AddUserTokenAsync(TUserToken token) {
         await UserTokensRepository.AddAsync(token);
         await UserTokensRepository.CommitAsync();
     }
 
-    /// <inheritdoc />
     protected override async Task RemoveUserTokenAsync(TUserToken token) {
         await UserTokensRepository.RemoveAsync(token);
         await UserTokensRepository.CommitAsync();
     }
 
 #nullable disable
-    /// <inheritdoc />
     public override async Task<TUser> FindByIdAsync(string userId, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -513,7 +488,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == id), ct);
     }
 
-    /// <inheritdoc />
     public override async Task<TUser> FindByNameAsync(string normalizedUserName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
@@ -521,22 +495,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
 
-    /// <inheritdoc />
     protected override async Task<TRole> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
     }
 
-    /// <inheritdoc />
     protected override async Task<TUserRole> FindUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct) {
         return await UserRoleRepository.FindAsync([userId, roleId], ct).AsTask();
     }
 
-    /// <inheritdoc />
     protected override async Task<TUser> FindUserAsync(Guid userId, CancellationToken ct) {
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == userId), ct);
     }
 
-    /// <inheritdoc />
     protected override async Task<TUserLogin> FindUserLoginAsync(
         Guid              userId,
         string            loginProvider,
@@ -548,7 +518,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                                                               && l.ProviderKey == providerKey), ct);
     }
 
-    /// <inheritdoc />
     protected override async Task<TUserLogin> FindUserLoginAsync(
         string            loginProvider,
         string            providerKey,
@@ -557,7 +526,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UserLoginsRepository.SingleOrDefaultAsync(q => q.Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey), ct);
     }
 
-    /// <inheritdoc />
     public override async Task<TUser> FindByLoginAsync(
         string            loginProvider,
         string            providerKey,
@@ -573,7 +541,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return null;
     }
 
-    /// <inheritdoc />
     public override async Task<TUser> FindByEmailAsync(string normalizedEmail, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();

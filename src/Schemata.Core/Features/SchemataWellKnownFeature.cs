@@ -13,15 +13,10 @@ namespace Schemata.Core.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataWellKnownFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 5_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -35,7 +30,6 @@ public sealed class SchemataWellKnownFeature : FeatureBase
         services.AddSingleton(options);
     }
 
-    /// <inheritdoc />
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

@@ -45,13 +45,11 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    /// <inheritdoc />
     /// <exception cref="NotImplementedException">
     ///     The authorization-code scheme is write-only; validation is not supported.
     /// </exception>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() { throw new NotImplementedException(); }
 
-    /// <inheritdoc />
     /// <exception cref="NotImplementedException">
     ///     The authorization-code scheme is write-only; sign-out is not supported.
     /// </exception>
@@ -221,7 +219,6 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
             ApplicationName   = appName,
             AuthorizationName = authorizationName,
             SessionId         = sid,
-            CreateTime        = now,
         };
         await tokens.CreateAsync(entity, ct);
 

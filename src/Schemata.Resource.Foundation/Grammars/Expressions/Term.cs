@@ -34,13 +34,10 @@ public class Term : IToken
 
     #region IToken Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => Simple.IsConstant;
 
-    /// <inheritdoc />
     public Expression? ToExpression(Container ctx) {
         var expression = Simple.ToExpression(ctx);
 
@@ -66,6 +63,5 @@ public class Term : IToken
 
     #endregion
 
-    /// <inheritdoc />
     public override string? ToString() { return Modifier is not null ? $"{Modifier} {Simple}" : Simple.ToString(); }
 }

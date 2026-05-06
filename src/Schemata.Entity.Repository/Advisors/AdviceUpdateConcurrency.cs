@@ -32,10 +32,8 @@ public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAdvisor<
 {
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateConcurrency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

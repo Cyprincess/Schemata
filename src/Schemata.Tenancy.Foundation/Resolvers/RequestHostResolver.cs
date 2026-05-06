@@ -32,7 +32,6 @@ public class RequestHostResolver<TTenant> : ITenantResolver
 
     #region ITenantResolver Members
 
-    /// <inheritdoc />
     public async Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         var hostname = _accessor.HttpContext?.Request.Host.Host;
         if (string.IsNullOrWhiteSpace(hostname)) {

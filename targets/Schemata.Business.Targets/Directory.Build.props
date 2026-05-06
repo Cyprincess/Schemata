@@ -40,8 +40,4 @@
     <ProjectReference Include="..\..\src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" />
-  </ItemGroup>
-
 </Project>

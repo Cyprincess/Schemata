@@ -64,13 +64,4 @@ public class AdviceBuildQuerySoftDeleteShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal(2, container.Query.Count());
     }
-
-    #region Nested type: PlainEntity
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    #endregion
 }

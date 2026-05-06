@@ -50,7 +50,6 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceCodeExchangePkce.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         CodeExchangeContext<TApp, TToken> exchange,

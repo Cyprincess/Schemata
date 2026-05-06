@@ -529,6 +529,22 @@ public static class SchemataConstants
 
     #endregion
 
+    #region Nested type: FlowEngines
+
+    /// <summary>
+    ///     Well-known flow engine identifiers.
+    /// </summary>
+    public static class FlowEngines
+    {
+        /// <summary>The built-in single-token state machine engine.</summary>
+        public const string StateMachine = "statemachine";
+
+        /// <summary>The full BPMN 2.0 engine (future).</summary>
+        public const string Bpmn = "bpmn";
+    }
+
+    #endregion
+
     #region Nested type: GrantTypes
 
     /// <summary>
@@ -621,7 +637,7 @@ public static class SchemataConstants
 
         /// <summary>Key for Resource.</summary>
         public const string Resource = "resource";
-        
+
         /// <summary>Key for Tenancy.</summary>
         public const string Tenancy = "tenancy";
     }

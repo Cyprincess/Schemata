@@ -18,17 +18,13 @@ public class Null : IValue
 
     object? IValue.Value => null;
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => true;
 
-    /// <inheritdoc />
     public Expression ToExpression(Container ctx) { return Expression.Constant(null); }
 
     #endregion
 
-    /// <inheritdoc />
     public override string ToString() { return "\u2205"; }
 }

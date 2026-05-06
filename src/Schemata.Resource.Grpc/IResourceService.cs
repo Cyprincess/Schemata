@@ -28,9 +28,9 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     /// </summary>
     /// <param name="request">The <see cref="ListRequest" /> with filter, page size, and page token.</param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
-    /// <returns>A <see cref="ListResult{TSummary}" /> with the matching resource summaries.</returns>
+    /// <returns>A <see cref="ListResultBase{TSummary}" /> with the matching resource summaries.</returns>
     [Operation]
-    ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default);
+    ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default);
 
     /// <summary>
     ///     Gets a single resource by canonical name

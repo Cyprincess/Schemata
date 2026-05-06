@@ -31,7 +31,6 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
 
     #region ITenantServiceScopeFactory<TTenant> Members
 
-    /// <inheritdoc />
     public IServiceScope CreateScope() {
         return _accessor.Tenant switch {
             null when _root is IServiceScope scoop => scoop,

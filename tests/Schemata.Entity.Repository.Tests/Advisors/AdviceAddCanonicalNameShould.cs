@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Entity.Repository.Tests.Fixtures;
 using Xunit;
@@ -50,23 +49,4 @@ public class AdviceAddCanonicalNameShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(entity.CanonicalName);
     }
-
-    #region Test entities
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    public class NoPatternEntity : ICanonicalName
-    {
-        #region ICanonicalName Members
-
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-
-        #endregion
-    }
-
-    #endregion
 }

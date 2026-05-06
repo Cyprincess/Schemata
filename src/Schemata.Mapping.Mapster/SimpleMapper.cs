@@ -22,35 +22,28 @@ public sealed class SimpleMapper : ISimpleMapper
 
     #region ISimpleMapper Members
 
-    /// <inheritdoc />
     public T? Map<T>(object source) { return _mapper.Map<T>(source); }
 
-    /// <inheritdoc />
     public T? Map<T>(object source, Type sourceType, Type destinationType) {
         return (T?)_mapper.Map(source, sourceType, destinationType);
     }
 
-    /// <inheritdoc />
     public TDestination? Map<TSource, TDestination>(TSource source) {
         return _mapper.Map<TSource, TDestination>(source);
     }
 
-    /// <inheritdoc />
     public void Map<TSource, TDestination>(TSource source, TDestination destination) {
         _mapper.Map(source, destination);
     }
 
-    /// <inheritdoc />
     public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields) {
         SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
     }
 
-    /// <inheritdoc />
     public object? Map(object source, Type sourceType, Type destinationType) {
         return _mapper.Map(source, sourceType, destinationType);
     }
 
-    /// <inheritdoc />
     public void Map(
         object source,
         object destination,

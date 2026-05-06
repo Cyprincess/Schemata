@@ -31,7 +31,6 @@ public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeEndpointPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

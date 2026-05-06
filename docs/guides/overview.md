@@ -15,14 +15,16 @@ Start with [Getting Started](getting-started.md) and work through the guides in 
 | #   | Guide                                                     | What You Add                                                  |
 | --- | --------------------------------------------------------- | ------------------------------------------------------------- |
 | 1   | [Getting Started](getting-started.md)                     | Minimal Student HTTP CRUD API with timestamps and soft-delete |
-| 2   | [Object Mapping](object-mapping.md)                       | Separate request/response DTOs with Mapster                   |
-| 3   | [Concurrency and Freshness](concurrency-and-freshness.md) | Optimistic concurrency, ETags, partial updates                |
-| 4   | [Filtering and Pagination](filtering-and-pagination.md)   | List filtering, sorting, and cursor pagination                |
-| 5   | [Validation](validation.md)                               | Input validation with FluentValidation                        |
-| 6   | [Identity](identity.md)                                   | User management with ASP.NET Core Identity                    |
-| 7   | [Access Control](access-control.md)                       | Role-based authorization and row-level security               |
-| 8   | [Authorization](authorization.md)                         | OAuth 2.0 / OpenID Connect server                             |
-| 9   | [gRPC Transport](grpc-transport.md)                       | gRPC endpoints alongside HTTP                                 |
-| 10  | [Multi-Tenancy](multi-tenancy.md)                         | Tenant resolution and data isolation                          |
-| 11  | [Workflow](workflow.md)                                   | Enrollment state machine                                      |
-| 12  | [Module System](module-system.md)                         | Modular architecture                                          |
+| 2   | [Unit of Work](unit-of-work.md)                           | Explicit transaction control for batch mutations              |
+| 3   | [Object Mapping](object-mapping.md)                       | Separate request/response DTOs with Mapster                   |
+| 4   | [Concurrency and Freshness](concurrency-and-freshness.md) | Optimistic concurrency, ETags, partial updates                |
+| 5   | [Filtering and Pagination](filtering-and-pagination.md)   | List filtering, sorting, and cursor pagination                |
+| 6   | [Query Caching](query-caching.md)                         | Transparent query result caching with auto-eviction           |
+| 7   | [Validation](validation.md)                               | Input validation with FluentValidation                        |
+| 8   | [Identity](identity.md)                                   | User management with ASP.NET Core Identity                    |
+| 9   | [Access Control](access-control.md)                       | Role-based authorization and row-level security               |
+| 10  | [Authorization](authorization.md)                         | OAuth 2.0 / OpenID Connect server                             |
+| 11  | [gRPC Transport](grpc-transport.md)                       | gRPC endpoints alongside HTTP                                 |
+| 12  | [Multi-Tenancy](multi-tenancy.md)                         | Tenant resolution and data isolation                          |
+| 13  | [Flow — Process Engine](workflow.md)                        | BPMN process engine with typed DSL                               |
+| 14  | [Module System](module-system.md)                         | Modular architecture                                          |

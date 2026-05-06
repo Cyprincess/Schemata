@@ -44,13 +44,10 @@ public class Member : IComparableArg
 
     #region IComparableArg Members
 
-    /// <inheritdoc />
     public TextPosition Position { get; }
 
-    /// <inheritdoc />
     public bool IsConstant => Value.IsConstant && Fields.Count == 0;
 
-    /// <inheritdoc />
     public Expression ToExpression(Container ctx) {
         var expression = ToMemberExpression(ctx);
 
@@ -86,7 +83,6 @@ public class Member : IComparableArg
         return expression;
     }
 
-    /// <inheritdoc />
     public override string? ToString() {
         return Fields.Count > 0 ? $"{Value}.{string.Join('.', Fields)}" : Value.ToString();
     }

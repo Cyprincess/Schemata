@@ -56,13 +56,4 @@ public class AdviceUpdateTimestampShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal(original, entity.UpdateTime);
     }
-
-    #region Nested type: PlainEntity
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    #endregion
 }

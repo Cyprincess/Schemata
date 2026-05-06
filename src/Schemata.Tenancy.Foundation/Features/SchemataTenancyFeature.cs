@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -27,13 +26,10 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
     public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 10_000_000;
     public const int DefaultOrder    = Orders.Max;
 
-    /// <inheritdoc />
     public override int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -56,7 +52,6 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
         services.TryAddSingleton<ITenantServiceProviderFactory<TTenant>>(sp => new SchemataTenantServiceProviderFactory<TTenant>(services, sp, sp.GetRequiredService<ITenantProviderCache>(), sp.GetRequiredService<IOptions<SchemataTenancyOptions>>()));
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

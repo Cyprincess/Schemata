@@ -44,7 +44,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
     /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.ListAsync" />
-    public virtual async ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
+    public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
         var result = await Handler.ListAsync(request, Http?.User, Http?.RequestAborted);
         // Return empty list on denied rather than throwing — AIP-132 lists may legitimately be empty.
         if (!result.IsAllowed()) {

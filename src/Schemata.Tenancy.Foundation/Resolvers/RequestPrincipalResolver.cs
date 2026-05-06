@@ -25,7 +25,6 @@ public class RequestPrincipalResolver : ITenantResolver
 
     #region ITenantResolver Members
 
-    /// <inheritdoc />
     public Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         var claim = _accessor.HttpContext?.User.FindFirst("Tenant");
         if (claim is null) {

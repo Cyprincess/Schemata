@@ -36,7 +36,6 @@ public sealed class AdviceDeviceAuthorizeGrantPermission<TApp>(IApplicationManag
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceAuthorizeGrantPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         TApp                   application,

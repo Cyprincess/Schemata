@@ -71,7 +71,7 @@ internal static class RuntimeTypeModelConfigurator
 
                 // Map CanonicalName to "name" for AIP-122 wire compatibility.
                 case nameof(ICanonicalName.CanonicalName) when typeof(ICanonicalName).IsAssignableFrom(type):
-                    name = nameof(ICanonicalName.Name);
+                    name = Parameters.Name;
                     break;
 
                 // Map EntityTag to "etag" per AIP-154 concurrency token naming.
@@ -107,7 +107,7 @@ internal static class RuntimeTypeModelConfigurator
     }
 
     public static void ConfigureListResponseType(RuntimeTypeModel model, Type summary, Type entity) {
-        var response = typeof(ListResult<>).MakeGenericType(summary);
+        var response = typeof(ListResultBase<>).MakeGenericType(summary);
         ConfigureType(model, response);
 
         var meta  = model[response];

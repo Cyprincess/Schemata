@@ -11,15 +11,10 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataRoutingFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataCookiePolicyFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -30,7 +25,6 @@ public sealed class SchemataRoutingFeature : FeatureBase
         services.AddRouting();
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

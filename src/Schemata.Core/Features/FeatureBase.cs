@@ -14,7 +14,6 @@ public abstract class FeatureBase : ISimpleFeature
 {
     #region ISimpleFeature Members
 
-    /// <inheritdoc />
     public virtual int Order => Priority;
 
     /// <summary>
@@ -22,7 +21,6 @@ public abstract class FeatureBase : ISimpleFeature
     /// </summary>
     public virtual int Priority => int.MaxValue;
 
-    /// <inheritdoc />
     public virtual void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -31,14 +29,12 @@ public abstract class FeatureBase : ISimpleFeature
         IWebHostEnvironment environment
     ) { }
 
-    /// <inheritdoc />
     public virtual void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) { }
 
-    /// <inheritdoc />
     public virtual void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

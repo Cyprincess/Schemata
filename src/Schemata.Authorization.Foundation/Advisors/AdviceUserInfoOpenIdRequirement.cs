@@ -28,7 +28,6 @@ public sealed class AdviceUserInfoOpenIdRequirement : IUserInfoAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(AdviceContext ctx, UserInfoContext info, CancellationToken ct = default) {
         if (!info.GrantedScopes.Contains(Scopes.OpenId)) {
             throw new OAuthException(

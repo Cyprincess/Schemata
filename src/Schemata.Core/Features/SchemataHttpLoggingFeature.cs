@@ -16,15 +16,10 @@ namespace Schemata.Core.Features;
 [Information("HTTP Logging can potentially log personally identifiable information (PII).", Level = LogLevel.Warning)]
 public sealed class SchemataHttpLoggingFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataLoggingFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -36,7 +31,6 @@ public sealed class SchemataHttpLoggingFeature : FeatureBase
         services.AddHttpLogging(configure);
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

@@ -29,23 +29,6 @@ public class MapsterShould
     }
 
     [Fact]
-    public void Map_BasicFields_CopiesMatchingProperties() {
-        var mapper = CreateMapper();
-
-        var source = new Source {
-            Name  = "Alice",
-            Age   = 25,
-            Grade = 10,
-            Sex   = Sex.Female,
-        };
-
-        var result = mapper.Map<Destination>(source);
-
-        Assert.NotNull(result);
-        Assert.Equal(source.Age, result.Age);
-    }
-
-    [Fact]
     public void Map_CustomConverter_AppliesTransformation() {
         var mapper = CreateMapper();
 

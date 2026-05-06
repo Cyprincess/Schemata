@@ -33,7 +33,6 @@ public sealed class AdviceDiscoveryCodeFlow(IOptions<CodeFlowOptions> codeOption
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         DiscoveryContext  discovery,

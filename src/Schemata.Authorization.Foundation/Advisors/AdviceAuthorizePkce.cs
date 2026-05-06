@@ -50,7 +50,6 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizePkce.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

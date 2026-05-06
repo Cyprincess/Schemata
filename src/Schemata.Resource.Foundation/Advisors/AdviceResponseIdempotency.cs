@@ -43,10 +43,8 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
 
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
-    /// <inheritdoc />
     public int Order => AdviceResponseIdempotency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity?          entity,

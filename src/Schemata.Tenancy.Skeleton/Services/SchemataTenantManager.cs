@@ -35,12 +35,10 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
 
     #region ITenantManager<TTenant> Members
 
-    /// <inheritdoc />
     public virtual ValueTask<TTenant?> FindByTenantId(Guid identifier, CancellationToken ct) {
         return _tenants.SingleOrDefaultAsync(q => q.Where(t => t.Uid.Equals(identifier)), ct);
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask<TTenant?> FindByHost(string host, CancellationToken ct) {
         var match = await _hosts.SingleOrDefaultAsync(q => q.Where(h => h.Host == host), ct);
         if (match is null) {
@@ -50,7 +48,6 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         return await _tenants.SingleOrDefaultAsync(q => q.Where(t => t.Uid == match.SchemataTenantUid), ct);
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask<ImmutableArray<string>> GetHostsAsync(TTenant tenant, CancellationToken ct) {
         var builder = ImmutableArray.CreateBuilder<string>();
 
@@ -63,13 +60,11 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         return builder.ToImmutable();
     }
 
-    /// <inheritdoc />
     public virtual ValueTask SetDisplayNameAsync(TTenant tenant, string? name, CancellationToken ct) {
         tenant.DisplayName = name;
         return default;
     }
 
-    /// <inheritdoc />
     public virtual ValueTask SetDisplayNamesAsync(
         TTenant                    tenant,
         Dictionary<string, string> names,
@@ -80,7 +75,6 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         return default;
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct) {
         var existing = new List<SchemataTenantHost>();
         await foreach (var row in _hosts.ListAsync(q => q.Where(h => h.SchemataTenantUid == tenant.Uid), ct)) {
@@ -100,13 +94,11 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         await _hosts.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask CreateAsync(TTenant tenant, CancellationToken ct) {
         await _tenants.AddAsync(tenant, ct);
         await _tenants.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask DeleteAsync(TTenant tenant, CancellationToken ct) {
         await _tenants.RemoveAsync(tenant, ct);
         await _tenants.CommitAsync(ct);
@@ -114,7 +106,6 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         _cache.Remove(tenant.Uid.ToString()!);
     }
 
-    /// <inheritdoc />
     public virtual async ValueTask UpdateAsync(TTenant tenant, CancellationToken ct) {
         await _tenants.UpdateAsync(tenant, ct);
         await _tenants.CommitAsync(ct);

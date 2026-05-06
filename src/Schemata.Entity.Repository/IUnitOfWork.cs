@@ -38,5 +38,4 @@ public interface IUnitOfWork : IDisposable
 ///     allowing multiple different repository providers to coexist in the same DI container.
 /// </summary>
 /// <typeparam name="TContext">The data context type (e.g., <c>DbContext</c> or <c>DataConnection</c>).</typeparam>
-public interface IUnitOfWork<TContext> : IUnitOfWork
-{ }
+public interface IUnitOfWork<TContext> : IUnitOfWork;

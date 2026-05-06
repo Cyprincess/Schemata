@@ -32,10 +32,8 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
 
     #region ITenantContextAccessor<TTenant> Members
 
-    /// <inheritdoc />
     public TTenant? Tenant { get; private set; }
 
-    /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken ct) {
         var id = await _resolver.ResolveAsync(ct);
 
@@ -51,14 +49,12 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
         await InitializeAsync(tenant, ct);
     }
 
-    /// <inheritdoc />
     public Task InitializeAsync(TTenant tenant, CancellationToken ct) {
         Tenant = tenant;
 
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) { return Task.FromResult(_sp); }
 
     #endregion

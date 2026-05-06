@@ -27,7 +27,6 @@ public sealed class EndSessionFeature<TApp> : IAuthorizationFlowFeature
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 60_000;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<EndSessionEndpoint, EndSessionHandler<TApp>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryEndSession>());

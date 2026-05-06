@@ -109,7 +109,7 @@ The following identity endpoints are now available:
 # Register a user
 curl -X POST http://localhost:5000/Authenticate/Register \
      -H "Content-Type: application/json" \
-     -d '{"email_address":"alice@example.com","password":"P@ssw0rd!"}'
+     -d '{"username":"alice","emailAddress":"alice@example.com","password":"P@ssw0rd!"}'
 
 # Login
 curl -X POST http://localhost:5000/Authenticate/Login \

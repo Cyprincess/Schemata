@@ -29,10 +29,8 @@ public sealed class AdviceAddOwner<TEntity>(IOwnerResolver<TEntity> resolver) : 
 {
     #region IRepositoryAddAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceAddOwner.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

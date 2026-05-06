@@ -13,7 +13,6 @@ public sealed class DefaultAccessProvider<T, TRequest>(IPermissionResolver resol
 {
     #region IAccessProvider<T,TRequest> Members
 
-    /// <inheritdoc />
     public Task<bool> HasAccessAsync(
         T?                      entity,
         AccessContext<TRequest> context,

@@ -43,7 +43,6 @@ public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodePolling.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,

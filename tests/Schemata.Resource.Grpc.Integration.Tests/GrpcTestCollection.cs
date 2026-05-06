@@ -10,5 +10,4 @@ namespace Schemata.Resource.Grpc.Integration.Tests;
 ///     the same types in its own <c>RuntimeTypeModel</c>.
 /// </summary>
 [CollectionDefinition("GrpcIntegration")]
-public class GrpcTestCollection : ICollectionFixture<WebAppFactory>
-{ }
+public class GrpcTestCollection : ICollectionFixture<WebAppFactory>;

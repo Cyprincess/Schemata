@@ -38,7 +38,6 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAd
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRefreshTokenValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         RefreshTokenContext<TApp, TToken> exchange,

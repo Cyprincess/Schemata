@@ -22,45 +22,39 @@ Then chain `.WithAuthorization()` on the resource builder:
 schema.UseResource()
       .WithAuthorization()
       .MapHttp()
-      .Use<Student, Student, Student, Student>();
+      .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
-`UseSecurity()` registers the default open-generic `IAccessProvider<,>` and `IEntitlementProvider<,>` implementations. Without custom providers, all access is granted and no row filtering is applied. `WithAuthorization()` registers the built-in resource authorization advisors for all five CRUD operations (List, Get, Create, Update, Delete), which call into the access providers on every request.
+If you skipped [Object Mapping](object-mapping.md) and are using entity-only types, use `Use<Student, Student, Student, Student>()` instead.
 
-## The built-in ResourceAccessProvider
+`UseSecurity()` registers the default open-generic `IAccessProvider<,>` and `IEntitlementProvider<,>` implementations, plus the default `IPermissionResolver` and `IPermissionMatcher`. These defaults perform claims-based access checks: they resolve a permission string from `(entity, operation)` and match it against role claims on the principal.
 
-The `Schemata.Resource.Foundation` package includes `ResourceAccessProvider<T, TRequest>`, a claims-based access provider that checks for role claims in the format:
+`WithAuthorization()` registers `AdviceXxxRequestAnonymous` and `AdviceXxxRequestAuthorize` advisors for all five CRUD operations (List, Get, Create, Update, Delete). On every request, the authorize advisor calls `IAccessProvider<,>.HasAccessAsync`, which resolves and matches permissions.
+
+## How permissions work
+
+`DefaultPermissionResolver` produces permissions in the format:
 
 ```
-resource-{operation}-{entity}
+{entity}.{operation}
 ```
 
-Both `{operation}` and `{entity}` are kebab-cased. The operation comes from the `Operations` enum (`List`, `Get`, `Create`, `Update`, `Delete`) converted to kebab-case, and the entity is the class name converted to kebab-case. For the `Student` entity, the claim values are:
+Both parts are kebab-cased. For the `Student` entity, the resolved permissions are:
 
-| Operation | Required claim            |
-| --------- | ------------------------- |
-| List      | `resource-list-student`   |
-| Get       | `resource-get-student`    |
-| Create    | `resource-create-student` |
-| Update    | `resource-update-student` |
-| Delete    | `resource-delete-student` |
+| Operation | Permission      |
+| --------- | --------------- |
+| List      | `student.list`  |
+| Get       | `student.get`   |
+| Create    | `student.create`|
+| Update    | `student.update`|
+| Delete    | `student.delete`|
 
-Two wildcard patterns are also supported:
+`DefaultPermissionMatcher` checks claims of type `"role"` (configurable via `SchemataSecurityOptions.PermissionClaimType`). It supports exact match and wildcards:
 
-- `resource-*-student` -- grants all operations on the Student entity
-- `resource-list-*` -- grants the List operation on all entities
+- `student.*` — grants all operations on Student
+- `*.list` — grants List on any entity
 
-The provider checks for these values in `ClaimTypes.Role` claims on the current principal. If none match, access is denied.
-
-`ResourceAccessProvider` is not registered by default. To use it, register it in your service configuration:
-
-```csharp
-schema.ConfigureServices(services => {
-    services.AddAccessProvider<Student,
-                               ResourceRequestContext<Student>,
-                               ResourceAccessProvider<Student, Student>>();
-});
-```
+If no matching claim is found, access is denied.
 
 ## Assign claims to users
 
@@ -71,19 +65,55 @@ using System.Security.Claims;
 
 // In a seeding method or admin endpoint:
 var user = await userManager.FindByEmailAsync("alice@example.com");
-await userManager.AddClaimAsync(user!, new Claim(ClaimTypes.Role, "resource-*-student"));
+await userManager.AddClaimAsync(user!, new Claim("role", "student.*"));
 ```
 
 This grants Alice all CRUD operations on Student. For read-only access, assign only the list and get claims:
 
 ```csharp
-await userManager.AddClaimAsync(user!, new Claim(ClaimTypes.Role, "resource-list-student"));
-await userManager.AddClaimAsync(user!, new Claim(ClaimTypes.Role, "resource-get-student"));
+await userManager.AddClaimAsync(user!, new Claim("role", "student.list"));
+await userManager.AddClaimAsync(user!, new Claim("role", "student.get"));
 ```
+
+## Custom access provider
+
+Replace the default `IAccessProvider<,>` with a custom implementation for fine-grained access logic:
+
+```csharp
+using System.Security.Claims;
+using Schemata.Security.Skeleton;
+
+public class StudentAccessProvider : IAccessProvider<Student, StudentRequest>
+{
+    public Task<bool> HasAccessAsync(
+        Student?                entity,
+        AccessContext<StudentRequest> context,
+        ClaimsPrincipal?        principal,
+        CancellationToken       ct)
+    {
+        // Custom logic — e.g., only allow updates to entities the user owns
+        return Task.FromResult(true);
+    }
+}
+```
+
+Register it before `UseSecurity()` so it takes precedence over the default open-generic:
+
+```csharp
+schema.ConfigureServices(services => {
+    services.AddScoped<
+        IAccessProvider<Student, StudentRequest>,
+        StudentAccessProvider>();
+});
+
+schema.UseSecurity();
+```
+
+`SchemataSecurityFeature` uses `TryAddScoped` for the open-generic fallback, so any concrete registration made before it takes precedence.
 
 ## Row-level filtering with IEntitlementProvider
 
-`IEntitlementProvider<T, TContext>` generates LINQ expressions that are composed into repository queries, filtering rows at the data layer. The default implementation returns `_ => true` (no filtering).
+`IEntitlementProvider<T, TRequest>` generates LINQ expressions that are composed into repository queries, filtering rows at the data layer. The default implementation returns `_ => true` (no filtering).
 
 To restrict students so each user only sees records they created, implement a custom entitlement provider. First, add a `CreatedBy` property to the `Student` entity:
 
@@ -101,21 +131,19 @@ Then implement the provider:
 ```csharp
 using System.Linq.Expressions;
 using System.Security.Claims;
-using Schemata.Resource.Foundation;
 using Schemata.Security.Skeleton;
 
 public class StudentEntitlementProvider
-    : IEntitlementProvider<Student, ResourceRequestContext<Student>>
+    : IEntitlementProvider<Student, StudentRequest>
 {
     public Task<Expression<Func<Student, bool>>?> GenerateEntitlementExpressionAsync(
-        ResourceRequestContext<Student>? context,
-        ClaimsPrincipal?                 principal,
-        CancellationToken                ct = default)
+        AccessContext<StudentRequest>? context,
+        ClaimsPrincipal?              principal,
+        CancellationToken             ct = default)
     {
         var id = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(id))
         {
-            // No authenticated user -- return nothing
             Expression<Func<Student, bool>> deny = _ => false;
             return Task.FromResult<Expression<Func<Student, bool>>?>(deny);
         }
@@ -126,19 +154,17 @@ public class StudentEntitlementProvider
 }
 ```
 
-Register it before `UseSecurity()` so it takes precedence over the default open-generic:
+Register it before `UseSecurity()`:
 
 ```csharp
 schema.ConfigureServices(services => {
     services.AddScoped<
-        IEntitlementProvider<Student, ResourceRequestContext<Student>>,
+        IEntitlementProvider<Student, StudentRequest>,
         StudentEntitlementProvider>();
 });
 
 schema.UseSecurity();
 ```
-
-Because `SchemataSecurityFeature` uses `TryAddScoped` for the open-generic fallback, any concrete registration made before it will not be overwritten.
 
 ## Verify
 
@@ -147,7 +173,7 @@ dotnet run
 ```
 
 ```shell
-# Login as Alice (who has resource-*-student claims)
+# Login as Alice (who has student.* claims)
 curl -X POST http://localhost:5000/Authenticate/Login \
      -H "Content-Type: application/json" \
      -d '{"username":"alice@example.com","password":"P@ssw0rd!"}'
@@ -158,7 +184,7 @@ curl -X POST http://localhost:5000/students \
      -H "Authorization: Bearer <alice_token>" \
      -d '{"full_name":"Bob","age":22}'
 
-# List students -- only sees students created by Alice
+# List students — only sees students created by Alice
 curl http://localhost:5000/students \
      -H "Authorization: Bearer <alice_token>"
 
@@ -171,3 +197,4 @@ curl http://localhost:5000/students
 
 - [Authorization](authorization.md) -- add an OAuth 2.0 / OpenID Connect authorization server
 - For deeper technical details, see [Security](../documents/security.md)
+- For a simpler alternative to custom `IEntitlementProvider` for row-level ownership filtering, see [Ownership](../documents/repository/ownership.md). The `UseOwner()` pattern auto-assigns an `IOwnable.Owner` field on create and auto-filters queries by the current principal without writing custom LINQ expressions.

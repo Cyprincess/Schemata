@@ -35,6 +35,7 @@ The built-in add advisors execute in this order:
 | 110,000,000 | `AdviceAddConcurrency<TEntity>`   | `IConcurrency`   | Generates a new `Guid` for the `Timestamp` property. Suppressed by `SuppressConcurrency`.                                                                           |
 | 120,000,000 | `AdviceAddCanonicalName<TEntity>` | `ICanonicalName` | Resolves the entity's resource-name pattern and sets `CanonicalName`. Not suppressible.                                                                             |
 | 130,000,000 | `AdviceAddValidation<TEntity>`    | (any)            | Runs all registered `IValidationAdvisor<TEntity>` advisors for `Operations.Create`. Throws `ValidationException` on `Block`. Suppressed by `SuppressAddValidation`. |
+| 130,000,000 | `AdviceAddOwner<TEntity>`         | `IOwnable`       | Resolves the owner via `IOwnerResolver<TEntity>` and assigns it to `IOwnable.Owner`. Registered by `UseOwner()`. Suppressed by `SuppressOwner`.                    |
 | 900,000,000 | `AdviceAddSoftDelete<TEntity>`    | `ISoftDelete`    | Clears `DeleteTime` to `null`, ensuring newly added entities are never marked as deleted. Suppressed by `SuppressSoftDelete`.                                       |
 
 After all advisors return `Continue`, the entity is added to the backing store's change tracker (e.g. `DbContext.AddAsync`).
@@ -46,16 +47,18 @@ After all advisors return `Continue`, the entity is added to the backing store's
 | 100,000,000 | `AdviceUpdateTimestamp<TEntity>`   | `ITimestamp`   | Sets `UpdateTime` to `DateTime.UtcNow`. Suppressed by `SuppressTimestamp`.                                                                                                                                                                                   |
 | 110,000,000 | `AdviceUpdateValidation<TEntity>`  | (any)          | Runs all registered `IValidationAdvisor<TEntity>` advisors for `Operations.Update`. Throws `ValidationException` on `Block`. Suppressed by `SuppressUpdateValidation`.                                                                                       |
 | 900,000,000 | `AdviceUpdateConcurrency<TEntity>` | `IConcurrency` | Loads the stored entity via `repository.GetAsync<IConcurrency>` and compares its `Timestamp` to the incoming entity's `Timestamp`. Throws `ConcurrencyException` on mismatch. On success, generates a new `Guid` stamp. Suppressed by `SuppressConcurrency`. |
+| 900,000,000 | `AdviceUpdateEvictCache<TEntity>`   | (any)          | Evicts cached query results for this entity via the reverse index. Registered by `UseQueryCache()`. Suppressed by `SuppressQueryCacheEviction`.                                                                                                              |
 
 After all advisors return `Continue`, the entity is detached (to avoid "already tracked" errors) and then marked as updated in the change tracker.
 
-Concurrency checking runs last intentionally: it needs to see the final state of the entity after all other advisors have modified it, and its `GetAsync` call must reflect the current database state rather than a value that another advisor might overwrite.
+Concurrency checking and cache eviction both run at `Orders.Max` intentionally: concurrency needs to see the final state after all other advisors have modified the entity, and its `GetAsync` call must reflect the current database state. Cache eviction must run after concurrency succeeds — evicted data is re-cached on the next query regardless of whether the update ultimately commits.
 
 ## Remove Pipeline
 
 | Order       | Advisor                           | Trait         | Behavior                                                                                                                                                                                                       |
 | ----------- | --------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 900,000,000 | `AdviceRemoveSoftDelete<TEntity>` | `ISoftDelete` | Sets `DeleteTime` to `DateTime.UtcNow` and calls `repository.UpdateAsync` to persist the soft-delete. Returns `Handle`, which prevents the physical delete from occurring. Suppressed by `SuppressSoftDelete`. |
+| 900,000,000 | `AdviceRemoveEvictCache<TEntity>` | (any)          | Evicts cached query results for this entity via the reverse index. Registered by `UseQueryCache()`. Suppressed by `SuppressQueryCacheEviction`.                                                                 |
 
 When `AdviceRemoveSoftDelete` handles the remove, the entity stays in the database with a non-null `DeleteTime`. Subsequent queries automatically exclude it via the build-query soft-delete filter.
 

@@ -1,6 +1,6 @@
 # Filtering and Pagination
 
-This guide builds on [Concurrency and Freshness](concurrency-and-freshness.md). No code changes are needed -- filtering, ordering, and pagination are built into the resource pipeline and work automatically on any list endpoint.
+This guide builds on [Concurrency and Freshness](concurrency-and-freshness.md). Filtering, ordering, and pagination are built into the resource pipeline and work automatically on any list endpoint.
 
 ## Query parameters
 
@@ -215,7 +215,8 @@ Expected response:
 
 ## Next steps
 
-- [Validation](validation.md) -- add input validation with FluentValidation
+- [Query Caching](query-caching.md) — transparent query result caching with auto-eviction
+- [Validation](validation.md) — add input validation with FluentValidation
 
 ## Further reading
 

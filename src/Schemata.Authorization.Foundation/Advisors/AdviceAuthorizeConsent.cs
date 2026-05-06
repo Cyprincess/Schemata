@@ -47,7 +47,6 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeConsent.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

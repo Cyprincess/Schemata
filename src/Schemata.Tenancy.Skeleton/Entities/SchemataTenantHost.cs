@@ -25,7 +25,6 @@ public class SchemataTenantHost : IIdentifier, ITimestamp
 
     #region IIdentifier Members
 
-    /// <inheritdoc />
     [TableKey]
     public virtual Guid Uid { get; set; }
 
@@ -33,10 +32,8 @@ public class SchemataTenantHost : IIdentifier, ITimestamp
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

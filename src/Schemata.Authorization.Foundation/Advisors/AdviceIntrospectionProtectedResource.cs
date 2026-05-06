@@ -41,7 +41,6 @@ public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicat
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceIntrospectionProtectedResource.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                      ctx,
         IntrospectionContext<TApp, TToken> introspection,

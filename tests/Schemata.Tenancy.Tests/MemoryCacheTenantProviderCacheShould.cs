@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Microsoft.Extensions.Options;
+using Moq;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Services;
 using Xunit;
@@ -20,26 +21,32 @@ public class MemoryCacheTenantProviderCacheShould
 
     [Fact]
     public void Remove_Disposes_Cached_IDisposable_Provider() {
-        using var cache    = BuildCache();
-        var       provider = (DisposableProvider)cache.GetOrAdd("t1", BuildProvider);
+        using var cache      = BuildCache();
+        var       mock       = new Mock<IServiceProvider>();
+        var       disposable = mock.As<IDisposable>();
 
+        cache.GetOrAdd("t1", () => mock.Object);
         cache.Remove("t1");
 
-        Assert.True(provider.Disposed);
+        disposable.Verify(d => d.Dispose(), Times.Once);
     }
 
     [Fact]
     public void Capacity_Eviction_Disposes_The_Evicted_Provider() {
         using var cache = BuildCache(1);
 
-        var first = (DisposableProvider)cache.GetOrAdd("t1", BuildProvider);
-        cache.GetOrAdd("t2", BuildProvider);
+        var firstMock       = new Mock<IServiceProvider>();
+        var firstDisposable = firstMock.As<IDisposable>();
+        var disposed        = false;
+        firstDisposable.Setup(d => d.Dispose()).Callback(() => disposed = true);
 
-        // MemoryCache compaction runs on a background task; wait deterministically.
-        Assert.True(SpinUntil(() => first.Disposed, TimeSpan.FromSeconds(5)));
+        cache.GetOrAdd("t1", () => firstMock.Object);
+        cache.GetOrAdd("t2", () => new Mock<IServiceProvider>().Object);
+
+        Assert.True(SpinUntil(() => disposed, TimeSpan.FromSeconds(5)));
     }
 
-    private static IServiceProvider BuildProvider() { return new DisposableProvider(); }
+    private static IServiceProvider BuildProvider() { return new Mock<IServiceProvider>().Object; }
 
     private static MemoryCacheTenantProviderCache BuildCache(int capacity = 1000) {
         var options = Options.Create(
@@ -62,25 +69,4 @@ public class MemoryCacheTenantProviderCacheShould
 
         return predicate();
     }
-
-    #region Nested type: DisposableProvider
-
-    private sealed class DisposableProvider : IServiceProvider, IDisposable
-    {
-        public bool Disposed { get; private set; }
-
-        #region IDisposable Members
-
-        public void Dispose() { Disposed = true; }
-
-        #endregion
-
-        #region IServiceProvider Members
-
-        public object? GetService(Type serviceType) { return null; }
-
-        #endregion
-    }
-
-    #endregion
 }
