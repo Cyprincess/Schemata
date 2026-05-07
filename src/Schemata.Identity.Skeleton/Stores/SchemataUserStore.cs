@@ -56,7 +56,7 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
 }
 
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
-    UserStoreBase<TUser, TRole, long, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
+    UserStoreBase<TUser, TRole, Guid, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>,
     IUserCanonicalNameStore<TUser>, IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>,
     IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
     where TUser : SchemataUser
@@ -164,7 +164,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        await foreach (var role in UserRoleRepository.ListAsync(q => q.Where(ur => ur.UserId.Equals(user.Id)))
+        await foreach (var role in UserRoleRepository.ListAsync(q => q.Where(ur => ur.UserId.Equals(user.Uid)))
                                                      .WithCancellation(ct)) {
             await UserRoleRepository.RemoveAsync(role, ct);
         }
@@ -250,7 +250,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return;
         }
 
-        var userRole = await FindUserRoleAsync(user.Id, roleEntity.Id, ct);
+        var userRole = await FindUserRoleAsync(user.Uid, roleEntity.Uid, ct);
         if (userRole is null) {
             return;
         }
@@ -267,12 +267,10 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        var userId = user.Id;
-
-        var roles = await UserRoleRepository.ListAsync(q => q.Where(r => r.UserId == userId).Select(r => r.RoleId), ct)
+        var roles = await UserRoleRepository.ListAsync(q => q.Where(r => r.UserId == user.Uid).Select(r => r.RoleId), ct)
                                             .ToListAsync(ct);
 
-        return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Id)).Select(r => r.DisplayName!), ct)
+        return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Uid)).Select(r => r.DisplayName!), ct)
                                     .ToListAsync(ct);
     }
 
@@ -297,7 +295,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return false;
         }
 
-        var userRole = await FindUserRoleAsync(user.Id, role.Id, ct);
+        var userRole = await FindUserRoleAsync(user.Uid, role.Uid, ct);
         return userRole is not null;
     }
 
@@ -308,7 +306,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        return await UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Id)), ct)
+        return await UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)), ct)
                                          .Map(c => c.ToClaim(), ct)
                                          .ToListAsync(ct);
     }
@@ -352,7 +350,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var matchedClaims = await UserClaimsRepository
-                                 .ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Id)
+                                 .ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)
                                                             && uc.ClaimValue == claim.Value
                                                             && uc.ClaimType == claim.Type), ct)
                                  .ToListAsync(ct);
@@ -379,7 +377,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         foreach (var claim in claims) {
             await foreach (var c in UserClaimsRepository
-                                   .ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Id)
+                                   .ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)
                                                               && uc.ClaimValue == claim.Value
                                                               && uc.ClaimType == claim.Type))
                                    .WithCancellation(ct)) {
@@ -419,7 +417,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        var entry = await FindUserLoginAsync(user.Id, loginProvider, providerKey, ct);
+        var entry = await FindUserLoginAsync(user.Uid, loginProvider, providerKey, ct);
         if (entry is null) {
             return;
         }
@@ -436,8 +434,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        var userId = user.Id;
-        return await UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId.Equals(userId)), ct)
+        return await UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId.Equals(user.Uid)), ct)
                                          .Map(
                                               l => new UserLoginInfo(l.LoginProvider, l.ProviderKey,
                                                                      l.ProviderDisplayName), ct)
@@ -456,7 +453,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                          .ListAsync(q => q.Where(uc => uc.ClaimValue == claim.Value && uc.ClaimType == claim.Type).Select(uc => uc.UserId), ct)
                          .ToListAsync(ct);
 
-        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Id)), ct).ToListAsync(ct);
+        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Uid)), ct).ToListAsync(ct);
     }
 
     /// <inheritdoc />
@@ -477,10 +474,10 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var users = await UserRoleRepository
-                         .ListAsync(q => q.Where(ur => ur.RoleId == role.Id).Select(ur => ur.UserId), ct)
+                         .ListAsync(q => q.Where(ur => ur.RoleId == role.Uid).Select(ur => ur.UserId), ct)
                          .ToListAsync(ct);
 
-        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Id)), ct).ToListAsync(ct);
+        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Uid)), ct).ToListAsync(ct);
     }
 
 #nullable disable
@@ -491,7 +488,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string            name,
         CancellationToken ct
     ) {
-        return UserTokensRepository.FindAsync([user.Id, loginProvider, name], ct).AsTask();
+        return UserTokensRepository.FindAsync([user.Uid, loginProvider, name], ct).AsTask();
     }
 #nullable restore
 
@@ -513,7 +510,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         var id = ConvertIdFromString(userId);
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == id), ct);
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == id), ct);
     }
 
     /// <inheritdoc />
@@ -530,18 +527,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     }
 
     /// <inheritdoc />
-    protected override async Task<TUserRole> FindUserRoleAsync(long userId, long roleId, CancellationToken ct) {
+    protected override async Task<TUserRole> FindUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct) {
         return await UserRoleRepository.FindAsync([userId, roleId], ct).AsTask();
     }
 
     /// <inheritdoc />
-    protected override async Task<TUser> FindUserAsync(long userId, CancellationToken ct) {
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == userId), ct);
+    protected override async Task<TUser> FindUserAsync(Guid userId, CancellationToken ct) {
+        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == userId), ct);
     }
 
     /// <inheritdoc />
     protected override async Task<TUserLogin> FindUserLoginAsync(
-        long              userId,
+        Guid              userId,
         string            loginProvider,
         string            providerKey,
         CancellationToken ct

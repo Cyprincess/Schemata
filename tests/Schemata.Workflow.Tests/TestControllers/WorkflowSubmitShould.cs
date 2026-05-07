@@ -32,7 +32,7 @@ public class WorkflowSubmitShould
 
         var entity = _fixture.Orders.LastOrDefault();
         Assert.NotNull(entity);
-        Assert.Equal(response.Id, entity.Id);
+        Assert.Equal(response.Uid, entity.Uid);
         Assert.Equal(response.State, entity.State);
     }
 }

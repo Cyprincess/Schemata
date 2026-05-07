@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,7 +30,7 @@ public class AdviceChangePhoneValidationShould
     private static SchemataUserManager<SchemataUser> MockUserManager(string? phone = "+15551234567") {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice", PhoneNumber = phone });
+             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice", PhoneNumber = phone });
         var sp = new ServiceCollection().BuildServiceProvider();
         return new(
             sp,

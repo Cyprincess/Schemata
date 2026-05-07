@@ -1,7 +1,7 @@
 using System;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 
@@ -27,9 +27,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, I
 
     #region IIdentifier Members
 
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-    public long Id { get; set; }
+    [TableKey]
+    public Guid Uid { get; set; }
 
     #endregion
 

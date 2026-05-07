@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -72,7 +73,8 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region IIdentifier Members
 
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

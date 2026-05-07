@@ -62,8 +62,8 @@ public sealed class WorkflowController : ControllerBase
     /// </summary>
     /// <param name="id">The workflow identifier.</param>
     /// <returns>The workflow response, or 404 if not found.</returns>
-    [HttpGet("{id:long}")]
-    public async Task<IActionResult> Status(long id) {
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> Status(Guid id) {
         var type = typeof(IWorkflowManager<,,>).MakeGenericType(
             _options.CurrentValue.WorkflowType,
             _options.CurrentValue.TransitionType,
@@ -170,8 +170,8 @@ public sealed class WorkflowController : ControllerBase
     /// <param name="id">The workflow identifier.</param>
     /// <param name="request">The event data to raise.</param>
     /// <returns>The updated workflow response, or 404/400 on failure.</returns>
-    [HttpPost("{id:long}")]
-    public async Task<IActionResult> Raise(long id, ITransition request) {
+    [HttpPost("{id:guid}")]
+    public async Task<IActionResult> Raise(Guid id, ITransition request) {
         var type = typeof(IWorkflowManager<,,>).MakeGenericType(
             _options.CurrentValue.WorkflowType,
             _options.CurrentValue.TransitionType,

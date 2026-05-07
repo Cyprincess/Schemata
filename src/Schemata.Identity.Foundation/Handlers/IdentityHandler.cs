@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
-using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
@@ -11,7 +10,6 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
-    private readonly IClaimsProvider<TUser>     _claims;
     private readonly IMailSender<TUser>         _mail;
     private readonly IMessageSender<TUser>      _message;
     private readonly SignInManager<TUser>       _sign;
@@ -21,14 +19,12 @@ public sealed partial class IdentityHandler<TUser>
     public IdentityHandler(
         SchemataUserManager<TUser> users,
         SignInManager<TUser>       sign,
-        IClaimsProvider<TUser>     claims,
         IMailSender<TUser>         mail,
         IMessageSender<TUser>      message,
         IServiceProvider           sp
     ) {
         _users   = users;
         _sign    = sign;
-        _claims  = claims;
         _mail    = mail;
         _message = message;
         _sp      = sp;

@@ -90,7 +90,7 @@
         <value>Invalid table name '{0}' of type '{1}'.</value>
     </data>
   <data name="ST1020" xml:space="preserve">
-        <value>Entity must have at least one [Key].</value>
+        <value>Entity must have at least one [TableKey] or Id property.</value>
     </data>
   <data name="ST1021" xml:space="preserve">
         <value>Entity key cannot be null.</value>

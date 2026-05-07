@@ -1,14 +1,14 @@
 # Authorization
 
-This guide adds an OAuth 2.0 / OpenID Connect authorization server to the Student CRUD app. Building on the Identity and Access Control guides, you will configure token endpoints so that external clients can obtain access tokens through standard OAuth 2.0 flows.
+This guide adds an OAuth 2.0 / OpenID Connect authorization server to the Student CRUD app. Building on the Identity and Access Control guides, you will configure token endpoints so external clients can obtain access tokens through standard OAuth 2.0 flows.
 
-## Add the package
+## Configuration
+
+`Schemata.Application.Complex.Targets` already includes `Schemata.Authorization.Foundation`. If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Authorization.Foundation
 ```
-
-## Configure Authorization
 
 In `Program.cs`, add `UseAuthorization()` inside the `UseSchemata` block and chain the flows you need:
 
@@ -19,7 +19,7 @@ schema.UseAuthorization()
       .UseRefreshTokenFlow();
 ```
 
-`UseAuthorization()` sets up the authorization server with the Schemata entity stores (`SchemataApplication`, `SchemataAuthorization`, `SchemataScope`, `SchemataToken`). It returns a `SchemataAuthorizationBuilder` that provides fluent methods for enabling individual OAuth 2.0 flows:
+`UseAuthorization()` sets up the authorization server with the Schemata entity stores (`SchemataApplication`, `SchemataAuthorization`, `SchemataScope`, `SchemataToken`). It returns a `SchemataAuthorizationBuilder` with fluent methods for enabling individual OAuth 2.0 flows:
 
 | Method                       | Flow                         | Endpoint                                |
 | ---------------------------- | ---------------------------- | --------------------------------------- |
@@ -31,7 +31,7 @@ schema.UseAuthorization()
 | `UseRevocation()`            | Token Revocation             | `/Connect/Revoke`                       |
 | `UseEndSession()`            | OpenID Connect Logout        | `/Connect/EndSession`                   |
 
-`UseAuthorization()` also accepts an optional `Action<SchemataAuthorizationOptions>` for advanced configuration:
+`UseAuthorization()` also accepts an optional `Action<SchemataAuthorizationOptions>`:
 
 ```csharp
 schema.UseAuthorization(o => {
@@ -48,10 +48,13 @@ schema.UseAuthorization(o => {
 Add the authorization tables alongside the Identity tables:
 
 ```csharp
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<SchemataUser, SchemataRole, long,
+    : IdentityDbContext<SchemataUser, SchemataRole, Guid,
         SchemataUserClaim, SchemataUserRole, SchemataUserLogin,
         SchemataRoleClaim, SchemataUserToken>(options)
 {
@@ -61,6 +64,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SchemataAuthorization> Authorizations => Set<SchemataAuthorization>();
     public DbSet<SchemataScope>         Scopes         => Set<SchemataScope>();
     public DbSet<SchemataToken>         Tokens         => Set<SchemataToken>();
+
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.UseTableKeyConventions();
+    }
 }
 ```
 

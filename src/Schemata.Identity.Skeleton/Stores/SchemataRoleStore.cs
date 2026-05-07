@@ -91,7 +91,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        await foreach (var user in UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Id)))
+        await foreach (var user in UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Uid)))
                                                      .WithCancellation(ct)) {
             await UserRoleRepository.RemoveAsync(user, ct);
         }
@@ -116,7 +116,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult(role.Id.ToString());
+        return Task.FromResult(role.Uid.ToString());
     }
 
     /// <inheritdoc />
@@ -182,7 +182,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Id)), ct)
+        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)), ct)
                                          .Map(c => new Claim(c.ClaimType!, c.ClaimValue!), ct)
                                          .ToListAsync(ct);
     }
@@ -199,7 +199,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         }
 
         await RoleClaimsRepository.AddAsync(new() {
-                                                RoleId = role.Id, ClaimType = claim.Type, ClaimValue = claim.Value,
+                                                RoleId = role.Uid, ClaimType = claim.Type, ClaimValue = claim.Value,
                                             }, ct);
         await RoleClaimsRepository.CommitAsync(ct);
     }
@@ -216,7 +216,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
         }
 
         await foreach (var c in RoleClaimsRepository
-                               .ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Id)
+                               .ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)
                                                           && rc.ClaimValue == claim.Value
                                                           && rc.ClaimType == claim.Type))
                                .WithCancellation(ct)) {
@@ -241,8 +241,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     public virtual async Task<TRole> FindByIdAsync(string id, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        var roleId = long.Parse(id);
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.Id == roleId), ct);
+        var roleId = Guid.Parse(id);
+        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.Uid == roleId), ct);
     }
 
     /// <inheritdoc />

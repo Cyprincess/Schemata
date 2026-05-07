@@ -7,46 +7,30 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Schemata.Tenancy.Skeleton.Services;
 
 /// <summary>
-///     Default tenant context accessor using <see cref="SchemataTenant{TKey}" /> with <see cref="Guid" /> keys.
-/// </summary>
-public class SchemataTenantContextAccessor : SchemataTenantContextAccessor<SchemataTenant<Guid>, Guid>,
-                                             ITenantContextAccessor
-{
-    /// <inheritdoc />
-    public SchemataTenantContextAccessor(
-        IServiceProvider                           sp,
-        ITenantResolver<Guid>                      resolver,
-        ITenantManager<SchemataTenant<Guid>, Guid> manager
-    ) : base(sp, resolver, manager) { }
-}
-
-/// <summary>
 ///     Resolves and caches the current tenant for the request scope.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <typeparam name="TKey">The tenant identifier type.</typeparam>
-public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccessor<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTenant>
+    where TTenant : SchemataTenant
 {
-    private readonly ITenantManager<TTenant, TKey> _manager;
-    private readonly ITenantResolver<TKey>         _resolver;
-    private readonly IServiceProvider              _sp;
+    private readonly ITenantManager<TTenant> _manager;
+    private readonly ITenantResolver         _resolver;
+    private readonly IServiceProvider        _sp;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantContextAccessor{TTenant, TKey}" /> class.
+    ///     Initializes a new instance of the <see cref="SchemataTenantContextAccessor{TTenant}" /> class.
     /// </summary>
     public SchemataTenantContextAccessor(
-        IServiceProvider              sp,
-        ITenantResolver<TKey>         resolver,
-        ITenantManager<TTenant, TKey> manager
+        IServiceProvider        sp,
+        ITenantResolver         resolver,
+        ITenantManager<TTenant> manager
     ) {
         _sp       = sp;
         _resolver = resolver;
         _manager  = manager;
     }
 
-    #region ITenantContextAccessor<TTenant,TKey> Members
+    #region ITenantContextAccessor<TTenant> Members
 
     /// <inheritdoc />
     public TTenant? Tenant { get; private set; }
@@ -60,7 +44,7 @@ public class SchemataTenantContextAccessor<TTenant, TKey> : ITenantContextAccess
         }
 
         var tenant = await _manager.FindByTenantId(id.Value, ct);
-        if (tenant is not { TenantId: not null }) {
+        if (tenant is null) {
             throw new TenantResolveException();
         }
 

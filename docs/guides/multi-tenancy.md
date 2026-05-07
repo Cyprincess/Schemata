@@ -4,6 +4,8 @@ This guide adds tenant resolution and per-tenant data isolation to the Student A
 
 ## Add the tenancy package
 
+`Schemata.Application.Complex.Targets` already includes `Schemata.Tenancy.Foundation`. If you are composing packages manually:
+
 ```shell
 dotnet add package --prerelease Schemata.Tenancy.Foundation
 ```

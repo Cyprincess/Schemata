@@ -1,4 +1,6 @@
+using System;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.Cache.Tests.Fixtures;
 
@@ -9,7 +11,8 @@ public class Student : IIdentifier
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    [TableKey]
+    public Guid Uid { get; set; }
 
     #endregion
 }

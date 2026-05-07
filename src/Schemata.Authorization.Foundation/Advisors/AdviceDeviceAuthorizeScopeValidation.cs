@@ -12,7 +12,7 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceDeviceAuthorizeScopeValidation{TApp, TScope}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceDeviceAuthorizeScopeValidation{TApp}" />.</summary>
 public static class AdviceDeviceAuthorizeScopeValidation
 {
     public const int DefaultOrder = AdviceDeviceAuthorizeGrantPermission.DefaultOrder + 10_000_000;
@@ -27,17 +27,14 @@ public static class AdviceDeviceAuthorizeScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TScope">The scope entity type.</typeparam>
 /// <remarks>
 ///     Rejects the <c>openid</c> scope explicitly because the OIDC flow uses a different interaction model.
 /// </remarks>
 /// <seealso cref="AdviceDeviceAuthorizeGrantPermission{TApp}" />
-public sealed class AdviceDeviceAuthorizeScopeValidation<TApp, TScope>(
-    IApplicationManager<TApp> apps,
-    IScopeManager<TScope>     scopes
+public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
+    IApplicationManager<TApp> apps
 ) : IDeviceAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
-    where TScope : SchemataScope
 {
     #region IDeviceAuthorizeAdvisor<TApp> Members
 
@@ -68,15 +65,6 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp, TScope>(
         }
 
         foreach (var s in requested) {
-            var scope = await scopes.FindByNameAsync(s, ct);
-
-            if (string.IsNullOrWhiteSpace(scope?.Name)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
-                );
-            }
-
             if (!await apps.HasPermissionAsync(application, PermissionPrefixes.Scope + s, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,

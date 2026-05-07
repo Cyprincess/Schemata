@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
@@ -24,6 +25,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = new Student {
+                    Uid      = Guid.NewGuid(),
                     FullName = "Alice",
                     Age      = 18,
                     Grade    = 1,
@@ -88,6 +90,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = new Student {
+                    Uid      = Guid.NewGuid(),
                     FullName = "Charlie",
                     Age      = 20,
                     Grade    = 3,

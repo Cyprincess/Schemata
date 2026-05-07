@@ -60,7 +60,7 @@ var page = repository.ListAsync<ProductDto>(q =>
      .Take(10));
 ```
 
-`GetAsync` extracts key values from an entity instance (via `[Key]` attributes or the `Id` convention) and delegates to `FindAsync`. `FindAsync` builds a dynamic key-equality predicate and calls `SingleOrDefaultAsync`.
+`GetAsync` extracts key values from an entity instance (via `[TableKey]` attributes or the `Id` convention) and delegates to `FindAsync`. `FindAsync` builds a dynamic key-equality predicate and calls `SingleOrDefaultAsync`.
 
 ### Mutations
 

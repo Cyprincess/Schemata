@@ -450,7 +450,4 @@ advisor ordering:
 | `Extension` | 400,000,000 | Starting point for extension feature advisors                                                    |
 | `Max`       | 900,000,000 | Terminal advisors (soft-delete conversion, concurrency validation, response idempotency storage) |
 
-Built-in advisors chain by adding `10_000_000` increments from an anchor. For example,
-the create-request pipeline: idempotency at `Base` (100M), authorization at `Base + 10M`
-(110M), validation at `Base + 20M` (120M). Custom advisors can use any value outside the
-reserved range or between existing advisors.
+Built-in advisors chain by adding `10_000_000` increments from an anchor. For example, the create-request advisor chain: sanitize at `Base` (100M), idempotency at `Base + 10M` (110M), anonymous access at `Base + 20M` (120M), authorization at `Base + 30M` (130M), validation at `Base + 40M` (140M). Custom advisors can use any value that falls between the built-in increments or outside the reserved range.

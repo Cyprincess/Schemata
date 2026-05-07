@@ -90,7 +90,20 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceCreateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
 
         services.Configure<SchemataResourceOptions>(options => {
-            options.Resources.TryAdd(resource.Entity.TypeHandle, resource);
+            if (!options.Resources.TryGetValue(resource.Entity.TypeHandle, out var existing)) {
+                options.Resources[resource.Entity.TypeHandle] = resource;
+                return;
+            }
+
+            if (existing.Endpoints is null || resource.Endpoints is null) {
+                existing.Endpoints = null;
+            } else {
+                foreach (var ep in resource.Endpoints) {
+                    if (!existing.Endpoints.Contains(ep)) {
+                        existing.Endpoints.Add(ep);
+                    }
+                }
+            }
         });
     }
 }

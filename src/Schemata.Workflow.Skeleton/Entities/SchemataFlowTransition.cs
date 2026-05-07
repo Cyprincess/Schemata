@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
@@ -18,7 +19,7 @@ public class SchemataFlowTransition : IIdentifier, ICanonicalName, ITransition, 
     /// <summary>
     ///     The identifier of the parent workflow this transition belongs to.
     /// </summary>
-    public virtual long WorkflowId { get; set; }
+    public virtual Guid WorkflowId { get; set; }
 
     /// <summary>
     ///     The display name of the parent workflow.
@@ -48,8 +49,8 @@ public class SchemataFlowTransition : IIdentifier, ICanonicalName, ITransition, 
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 
@@ -72,7 +73,7 @@ public class SchemataFlowTransition : IIdentifier, ICanonicalName, ITransition, 
     public virtual string? Note { get; set; }
 
     /// <inheritdoc />
-    public virtual long? UpdatedById { get; set; }
+    public virtual Guid? UpdatedById { get; set; }
 
     /// <inheritdoc />
     public virtual string? UpdatedBy { get; set; }

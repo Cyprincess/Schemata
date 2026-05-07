@@ -10,18 +10,16 @@ namespace Schemata.Tenancy.Skeleton.Services;
 ///     Creates and caches isolated <see cref="IServiceProvider" /> instances for each tenant.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
 ///     The root <see cref="IServiceCollection" /> is copied once per tenant (with the
-///     <see cref="ITenantContextAccessor{TTenant,TKey}" /> bound to the tenant-scoped
+///     <see cref="ITenantContextAccessor{TTenant}" /> bound to the tenant-scoped
 ///     accessor instance). Tenant-specific and dynamic overrides from
 ///     <see cref="SchemataTenancyOptions" /> are then applied before the provider is built.
 ///     AllOverrides are applied at registration time by the builder, so they are already
 ///     present in the copied root services.
 /// </remarks>
-public class SchemataTenantServiceProviderFactory<TTenant, TKey> : ITenantServiceProviderFactory<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProviderFactory<TTenant>
+    where TTenant : SchemataTenant
 {
     private readonly ITenantProviderCache   _cache;
     private readonly SchemataTenancyOptions _options;
@@ -29,7 +27,7 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey> : ITenantServic
     private readonly IServiceCollection     _services;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantServiceProviderFactory{TTenant, TKey}" /> class.
+    ///     Initializes a new instance of the <see cref="SchemataTenantServiceProviderFactory{TTenant}" /> class.
     /// </summary>
     public SchemataTenantServiceProviderFactory(
         IServiceCollection               services,
@@ -43,32 +41,32 @@ public class SchemataTenantServiceProviderFactory<TTenant, TKey> : ITenantServic
         _options  = options.Value;
     }
 
-    #region ITenantServiceProviderFactory<TTenant,TKey> Members
+    #region ITenantServiceProviderFactory<TTenant> Members
 
     /// <inheritdoc />
-    public IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant, TKey> accessor) {
-        if (accessor.Tenant?.TenantId is not { } tenantKey) {
+    public IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant> accessor) {
+        if (accessor.Tenant?.Uid is not { } tenantKey) {
             throw new TenantResolveException();
         }
 
-        var id = tenantKey.ToString()!;
+        var id = tenantKey.ToString();
 
         return _cache.GetOrAdd(id, () => Build(id, accessor));
     }
 
     #endregion
 
-    private IServiceProvider Build(string id, ITenantContextAccessor<TTenant, TKey> accessor) {
+    private IServiceProvider Build(string id, ITenantContextAccessor<TTenant> accessor) {
         IServiceCollection container = new ServiceCollection();
 
         foreach (var service in _services) {
-            if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
-                container.Add(ServiceDescriptor.Singleton(typeof(ITenantContextAccessor<TTenant, TKey>), accessor));
+            if (service.ServiceType == typeof(ITenantContextAccessor<TTenant>)) {
+                container.Add(ServiceDescriptor.Singleton(typeof(ITenantContextAccessor<TTenant>), accessor));
 
                 continue;
             }
 
-            if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(service.ServiceType)) {
+            if (typeof(ITenantContextAccessor<TTenant>).IsAssignableFrom(service.ServiceType)) {
                 continue;
             }
 

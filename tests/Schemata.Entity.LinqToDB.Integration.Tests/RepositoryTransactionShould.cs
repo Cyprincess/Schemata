@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
@@ -25,6 +26,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
             using (scope) {
                 await repository.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Tx-Alice",
                         Age      = 18,
                         Grade    = 1,
@@ -53,6 +55,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
             using (scope) {
                 await repository.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Tx-Rollback",
                         Age      = 25,
                         Grade    = 5,

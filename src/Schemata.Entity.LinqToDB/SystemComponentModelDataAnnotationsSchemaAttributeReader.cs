@@ -5,8 +5,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Schemata.Abstractions;
+using Schemata.Entity.Repository;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
@@ -83,8 +85,11 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
         var attributes = new List<MappingAttribute>();
 
-        if (member.HasAttribute<System.ComponentModel.DataAnnotations.KeyAttribute>()) {
-            attributes.Add(new PrimaryKeyAttribute());
+        var keys = member.GetCustomAttributes<TableKeyAttribute>(true).ToList();
+        if (keys.Count > 0) {
+            foreach (var tk in keys.OrderBy(a => a.Order)) {
+                attributes.Add(new PrimaryKeyAttribute(tk.Order));
+            }
         }
 
         var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();

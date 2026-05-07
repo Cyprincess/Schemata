@@ -1,16 +1,16 @@
 # Identity
 
-This guide adds user management to the Student CRUD app using ASP.NET Core Identity. By the end you will have registration, login, and token refresh endpoints backed by the built-in `SchemataUser` and `SchemataRole` entities.
+This guide adds user management to the Student CRUD app using ASP.NET Core Identity. By the end you will have registration, login, and token refresh endpoints backed by `SchemataUser` and `SchemataRole`.
 
-Schemata provides headless JSON APIs only -- it does not include login or registration pages. You build the frontend yourself using any technology (SPA, mobile app, server-rendered pages). The curl examples below demonstrate the API contract your UI will call.
+Schemata provides headless JSON APIs — it does not include login or registration pages. The curl examples below demonstrate the API contract your UI should call.
 
-## Add the package
+## Configuration
+
+`Schemata.Application.Complex.Targets` already includes `Schemata.Identity.Foundation`. If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Identity.Foundation
 ```
-
-## Configure Identity
 
 In `Program.cs`, add `UseIdentity()` inside the `UseSchemata` block:
 
@@ -18,9 +18,9 @@ In `Program.cs`, add `UseIdentity()` inside the `UseSchemata` block:
 schema.UseIdentity();
 ```
 
-`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication. It configures `SchemataUser` and `SchemataRole` as the default user and role types, sets up the `SchemataUserStore` and `SchemataRoleStore`, and wires a composite authentication handler that checks both bearer tokens and application cookies.
+`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication. It configures `SchemataUser` and `SchemataRole` as the default user and role types, sets up `SchemataUserStore` and `SchemataRoleStore`, and wires a composite authentication handler that checks bearer tokens and application cookies.
 
-The method accepts optional callbacks for fine-grained control:
+Optional callbacks for fine-grained control:
 
 ```csharp
 schema.UseIdentity(
@@ -38,26 +38,26 @@ schema.UseIdentity(
 );
 ```
 
-- `identify` -- configures `SchemataIdentityOptions`, which controls which identity endpoints are enabled (registration, password reset, email change, two-factor authentication, etc.)
-- `configure` -- configures ASP.NET Core `IdentityOptions` (password policy, lockout, sign-in requirements)
-- `build` -- provides access to the `IdentityBuilder` for adding additional token providers or customizations
-- `bearer` -- configures `BearerTokenOptions` (token expiration, refresh behavior)
+- `identify` — configures `SchemataIdentityOptions`: which identity endpoints are enabled (registration, password reset, email change, two-factor authentication)
+- `configure` — configures ASP.NET Core `IdentityOptions` (password policy, lockout, sign-in requirements)
+- `build` — provides access to the `IdentityBuilder` for adding token providers or customizations
+- `bearer` — configures `BearerTokenOptions` (token expiration, refresh behavior)
 
 ## How entities work
 
-`SchemataUser` extends `IdentityUser<long>` and implements several Schemata trait interfaces:
+`SchemataUser` extends `IdentityUser<Guid>` and implements Schemata trait interfaces:
 
 | Trait            | Purpose                                     |
 | ---------------- | ------------------------------------------- |
-| `IIdentifier`    | `long` primary key                          |
-| `ICanonicalName` | Resource name (`users/{user}`)              |
+| `IIdentifier`    | `Guid` primary key via `Uid`                |
+| `ICanonicalName` | Resource name (`"users/{user}"`)            |
 | `IDescriptive`   | Human-readable display name and description |
-| `IConcurrency`   | Optimistic concurrency via `Timestamp`      |
+| `IConcurrency`   | Optimistic concurrency via `Guid? Timestamp` |
 | `ITimestamp`     | `CreateTime` and `UpdateTime` audit fields  |
 
 User records are stored in the `SchemataUsers` table. `SchemataRole` follows the same pattern, stored in `SchemataRoles`.
 
-If you need custom properties on your user, subclass `SchemataUser` and pass the custom types to the generic overload:
+To add custom properties to your user entity, subclass `SchemataUser` and pass the custom types to the generic overload:
 
 ```csharp
 schema.UseIdentity<CustomUser, SchemataRole>();
@@ -71,18 +71,25 @@ Add the Identity tables to your `AppDbContext`:
 
 ```csharp
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Schemata.Identity.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<SchemataUser, SchemataRole, long,
+    : IdentityDbContext<SchemataUser, SchemataRole, Guid,
         SchemataUserClaim, SchemataUserRole, SchemataUserLogin,
         SchemataRoleClaim, SchemataUserToken>(options)
 {
     public DbSet<Student> Students => Set<Student>();
+
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.UseTableKeyConventions();
+    }
 }
 ```
 
-The base class changes from `DbContext` to `IdentityDbContext` parameterized with the Schemata identity types.
+The base class changes from `DbContext` to `IdentityDbContext` parameterized with the Schemata identity types, using `Guid` as the key type.
 
 ## Verify
 

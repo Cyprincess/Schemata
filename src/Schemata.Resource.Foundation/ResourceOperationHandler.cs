@@ -341,13 +341,6 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return CreateResult<TDetail>.Blocked;
         }
 
-        request.Name          = null;
-        request.CanonicalName = null;
-
-        if (request is IIdentifier requestId) {
-            requestId.Id = 0;
-        }
-
         var container = new ResourceRequestContainer<TEntity>();
 
         switch (await Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
@@ -436,14 +429,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return UpdateResult<TDetail>.Blocked;
         }
 
-        request.Name          = null;
-        request.CanonicalName = null;
-
         ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
-
-        if (request is IIdentifier requestId) {
-            requestId.Id = 0;
-        }
 
         var container = new ResourceRequestContainer<TEntity>();
         ApplyIdentifierPredicates(container, name);

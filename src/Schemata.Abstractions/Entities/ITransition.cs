@@ -1,3 +1,5 @@
+using System;
+
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
@@ -21,7 +23,7 @@ public interface ITransition
     /// <summary>
     ///     The numeric identifier of the principal who triggered the event.
     /// </summary>
-    long? UpdatedById { get; set; }
+    Guid? UpdatedById { get; set; }
 
     /// <summary>
     ///     The display name of the principal who triggered the event.

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Moq;
@@ -39,7 +40,7 @@ public class OperationHandlerListShould
         for (var i = 3; i <= 5; i++) {
             _fixture.Students.Add(
                 new() {
-                    Id       = i,
+                    Uid      = Guid.NewGuid(),
                     FullName = $"Student{i}",
                     Age      = 20 + i,
                     Grade    = i,

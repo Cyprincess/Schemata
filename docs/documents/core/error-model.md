@@ -253,7 +253,7 @@ The constructor accepts `status`, `code`, and `message` parameters. Subclasses p
 
 | Exception                     | HTTP Status | Error Code            | Default Message                                               | Attached Details                         |
 | ----------------------------- | ----------- | --------------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `InvalidArgumentException`    | 422         | `INVALID_ARGUMENT`    | The request contains an invalid argument.                     | --                                       |
+| `InvalidArgumentException`    | 400         | `INVALID_ARGUMENT`    | The request contains an invalid argument.                     | --                                       |
 | `ValidationException`         | 422         | `INVALID_ARGUMENT`    | One or more validation errors occurred.                       | `BadRequestDetail`                       |
 | `NotFoundException`           | 404         | `NOT_FOUND`           | The requested resource was not found.                         | --                                       |
 | `AlreadyExistsException`      | 409         | `ALREADY_EXISTS`      | The resource already exists.                                  | --                                       |

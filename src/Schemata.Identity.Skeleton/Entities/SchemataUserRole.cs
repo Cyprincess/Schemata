@@ -2,17 +2,20 @@ using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
 [Table("SchemataUserRole")]
-public class SchemataUserRole : IdentityUserRole<long>, ITimestamp
+public class SchemataUserRole : IdentityUserRole<Guid>, ITimestamp
 {
     /// <inheritdoc />
-    public override long UserId { get; set; }
+    [TableKey(0)]
+    public override Guid UserId { get; set; }
 
     /// <inheritdoc />
-    public override long RoleId { get; set; }
+    [TableKey(1)]
+    public override Guid RoleId { get; set; }
 
     #region ITimestamp Members
 

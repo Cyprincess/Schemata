@@ -25,7 +25,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, I
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    [TableKey]
+    public Guid Uid { get; set; }
 
     #endregion
 

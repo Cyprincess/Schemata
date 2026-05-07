@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -44,7 +45,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
         // ClientId and Name are aliased on SchemataApplication; setting ClientId last.
         return new() {
-            Application     = new() { Id    = 1, ClientId = clientId },
+            Application     = new() { Uid   = Guid.NewGuid(), ClientId = clientId },
             Request         = new() { Scope = scope },
             Principal       = new(new ClaimsIdentity(claims, "test")),
             ConsentDecision = ConsentDecision.Granted,

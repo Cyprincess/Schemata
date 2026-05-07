@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Tenancy.Skeleton.Entities;
 
@@ -16,8 +17,8 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 [Table("SchemataTenantHosts")]
 public class SchemataTenantHost : IIdentifier, ITimestamp
 {
-    /// <summary>Gets or sets the primary-key identifier of the owning tenant (<see cref="IIdentifier.Id" />).</summary>
-    public virtual long SchemataTenantId { get; set; }
+    /// <summary>Gets or sets the primary-key identifier of the owning tenant (<see cref="IIdentifier.Uid" />).</summary>
+    public virtual Guid SchemataTenantUid { get; set; }
 
     /// <summary>Gets or sets the host name (case-insensitive match source).</summary>
     public virtual string? Host { get; set; }
@@ -25,7 +26,8 @@ public class SchemataTenantHost : IIdentifier, ITimestamp
     #region IIdentifier Members
 
     /// <inheritdoc />
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

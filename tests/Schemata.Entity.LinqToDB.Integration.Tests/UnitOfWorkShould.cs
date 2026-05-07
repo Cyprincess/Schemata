@@ -27,6 +27,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 using var work = repo.BeginWork();
                 await repo.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "UoW-Alice",
                         Age      = 18,
                         Grade    = 1,
@@ -35,6 +36,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 );
                 await repo.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "UoW-Bob",
                         Age      = 19,
                         Grade    = 2,
@@ -62,6 +64,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 using var work = repo.BeginWork();
                 await repo.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Rollback-Alice",
                         Age      = 18,
                         Grade    = 1,
@@ -89,6 +92,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 using var work = repo.BeginWork();
                 await repo.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Dispose-Alice",
                         Age      = 18,
                         Grade    = 1,
@@ -115,6 +119,7 @@ public class UnitOfWorkShould : IAsyncLifetime
             using var work = repo.BeginWork();
             await repo.AddAsync(
                 new() {
+                    Uid      = Guid.NewGuid(),
                     FullName = "Throw-Alice",
                     Age      = 18,
                     Grade    = 1,
@@ -134,6 +139,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 uow.Begin();
                 await studentRepo.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Cross-Alice",
                         Age      = 18,
                         Grade    = 1,
@@ -142,6 +148,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 );
                 await courseRepo.AddAsync(
                     new() {
+                        Uid     = Guid.NewGuid(),
                         Title   = "Cross-Course",
                         Credits = 3,
                         Name    = "cross-course",

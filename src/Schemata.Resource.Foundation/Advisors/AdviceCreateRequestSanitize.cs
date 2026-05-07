@@ -9,7 +9,10 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-/// <summary>Order constants and system-managed wire fields for <see cref="AdviceCreateRequestSanitize{TEntity, TRequest}" />.</summary>
+/// <summary>
+///     Order constants and system-managed wire fields for
+///     <see cref="AdviceCreateRequestSanitize{TEntity, TRequest}" />.
+/// </summary>
 public static class AdviceCreateRequestSanitize
 {
     /// <summary>
@@ -26,7 +29,7 @@ public static class AdviceCreateRequestSanitize
     public static readonly string[] SystemFields = [
         nameof(ICanonicalName.Name),
         nameof(IConcurrency.Timestamp),
-        nameof(IIdentifier.Id),
+        nameof(IIdentifier.Uid),
         nameof(IOwnable.Owner),
         nameof(IStateful.State),
         nameof(ITimestamp.CreateTime),

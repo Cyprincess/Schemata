@@ -42,8 +42,6 @@ public sealed class AdviceEmailClaimDestination : IDestinationAdvisor
         switch (claim.Type) {
             case Claims.Email:
             case Claims.EmailVerified:
-                destinations.Add(ClaimDestinations.AccessToken);
-
                 if (!principal.HasScope(Scopes.Email)) {
                     return Task.FromResult(AdviseResult.Handle);
                 }

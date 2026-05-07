@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,11 +15,11 @@ var builder = WebApplication.CreateBuilder(options);
 // Mock all four managers to avoid real IRepository<T> dependencies.
 
 var testApp = new SchemataApplication {
-    Id           = 1,
+    Uid          = Guid.NewGuid(),
     ClientId     = "test-client",
     ClientSecret = "test-secret",
     ClientType   = "confidential",
-    Permissions  = new List<string> { "e:token", "g:client_credentials" },
+    Permissions  = new List<string> { "e:/Connect/Token", "g:client_credentials" },
 };
 
 var appMock = new Mock<IApplicationManager<SchemataApplication>>();
@@ -60,7 +61,6 @@ builder.UseSchemata(schema => {
                        o.Issuer = "https://localhost";
                        o.AddEphemeralSigningKey();
                        o.AddEphemeralEncryptionKey();
-                       o.AllowedClientAuthMethods.Add("client_secret_post");
                        o.PermitResponseType("code");
                    }
                )

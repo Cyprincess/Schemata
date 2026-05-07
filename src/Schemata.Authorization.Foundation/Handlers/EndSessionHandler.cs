@@ -76,7 +76,7 @@ public sealed class EndSessionHandler<TApp>(
             // to prevent cross-RP logout injection.
             if (!string.IsNullOrWhiteSpace(request.ClientId) && application is not null) {
                 var requested = await apps.FindByClientIdAsync(request.ClientId, ct);
-                if (requested?.Id != application.Id) {
+                if (requested?.Uid != application.Uid) {
                     application = null;
                 }
             }

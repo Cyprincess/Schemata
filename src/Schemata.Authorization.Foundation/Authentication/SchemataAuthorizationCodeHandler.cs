@@ -71,14 +71,24 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         var items = properties?.Items ?? new Dictionary<string, string?>();
         var ctx   = new AdviceContext(Context.RequestServices);
 
+        if (principal.Identity is not ClaimsIdentity identity) {
+            return;
+        }
+        
         items.TryGetValue(Properties.Scope, out var scope);
         items.TryGetValue(Properties.AuthorizationName, out var authorizationName);
         items.TryGetValue(Properties.SessionId, out var sid);
 
-        var claims = new List<Claim>();
-        foreach (var identity in principal.Identities) {
-            claims.AddRange(identity.Claims);
+        if (!string.IsNullOrWhiteSpace(scope)) {
+            identity.AddClaim(new(Claims.Scope, scope));
         }
+
+        if (!string.IsNullOrWhiteSpace(sid)) {
+            identity.AddClaim(new(Claims.SessionId, sid));
+        }
+
+        var claims = new List<Claim>();
+        claims.AddRange(identity.Claims);
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
@@ -86,7 +96,8 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
             : null;
         var subject = principal.FindFirstValue(Claims.Subject);
 
-        switch (await Advisor.For<IClaimsAdvisor>().RunAsync(ctx, claims, ct)) {
+        switch (await Advisor.For<IClaimsAdvisor>()
+                             .RunAsync(ctx, claims, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TokenResponse>(out var _):
@@ -101,39 +112,30 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
                 );
         }
 
-        for (var i = claims.Count - 1; i >= 0; i--) {
+        foreach (var claim in claims) {
             var destinations = new HashSet<string>();
 
-            switch (await Advisor.For<IDestinationAdvisor>().RunAsync(ctx, claims[i], destinations, principal, ct)) {
+            switch (await Advisor.For<IDestinationAdvisor>()
+                                 .RunAsync(ctx, claim, destinations, principal, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                     break;
                 case AdviseResult.Block:
                 default:
-                    claims.RemoveAt(i);
                     continue;
             }
 
             if (destinations.Count == 0) {
-                claims.RemoveAt(i);
-            } else {
-                foreach (var d in destinations) {
-                    claims[i].Properties[d] = Parameters.Token;
-                }
+                continue;
+            }
+
+            foreach (var d in destinations) {
+                claim.Properties[d] = Parameters.Token;
             }
         }
 
         var access = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.AccessToken)).ToList();
         var id     = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.IdentityToken)).ToList();
-
-        if (!string.IsNullOrWhiteSpace(scope)) {
-            access.Add(new(Claims.Scope, scope));
-        }
-
-        if (!string.IsNullOrWhiteSpace(sid)) {
-            access.Add(new(Claims.SessionId, sid));
-            id.Add(new(Claims.SessionId, sid));
-        }
 
         items.TryGetValue(Properties.ResponseType, out var type);
         var types = type!.Split(' ');

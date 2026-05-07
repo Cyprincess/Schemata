@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,10 +28,10 @@ public class ClientCredentialsHandlerShould
         string type     = "confidential",
         bool   hasGrant = true,
         string clientId = "test-client",
-        long   id       = 42
+        Guid   uid      = default
     ) {
         var app = new SchemataApplication {
-            Id          = id,
+            Uid         = uid == default ? Guid.NewGuid() : uid,
             ClientId    = clientId,
             ClientType  = type,
             Permissions = new List<string>(),

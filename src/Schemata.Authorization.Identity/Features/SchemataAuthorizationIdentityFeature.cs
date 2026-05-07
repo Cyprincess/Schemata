@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,18 +9,16 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Identity.Skeleton.Claims;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Identity.Features;
 
 /// <summary>
 ///     Wires Schemata's Identity-backed <see cref="ISubjectProvider" /> and the subject-claims advisor into the
-///     Authorization pipeline. Detects the configured user type from the registered
-///     <see cref="IClaimsProvider{TUser}" /> open-generic.
+///     Authorization pipeline.
 /// </summary>
 [DependsOn("Schemata.Authorization.Foundation.Features.SchemataAuthorizationFeature`4")]
-[DependsOn("Schemata.Identity.Foundation.Features.SchemataIdentityFeature`1")]
+[DependsOn("Schemata.Identity.Foundation.Features.SchemataIdentityFeature`4")]
 public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
 {
     public const int DefaultPriority = Orders.Extension + 30_000_000;
@@ -33,7 +32,7 @@ public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var descriptor = services.FirstOrDefault(d => d.ServiceType.IsGenericType && d.ServiceType.GetGenericTypeDefinition() == typeof(IClaimsProvider<>));
+        var descriptor = services.FirstOrDefault(d => d.ServiceType.IsGenericType && d.ServiceType.GetGenericTypeDefinition() == typeof(IUserValidator<>));
 
         if (descriptor is null) {
             return;

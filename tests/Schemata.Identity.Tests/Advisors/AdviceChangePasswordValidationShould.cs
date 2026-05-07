@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,7 +30,7 @@ public class AdviceChangePasswordValidationShould
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice" });
+             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice" });
         var sp = new ServiceCollection().BuildServiceProvider();
         return new(
             sp,

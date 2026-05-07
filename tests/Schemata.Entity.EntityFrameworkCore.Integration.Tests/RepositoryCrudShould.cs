@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
@@ -20,7 +21,7 @@ public class RepositoryCrudShould : IAsyncLifetime
 
     [Fact]
     public async Task Add_ThenCommit_PersistsEntity() {
-        long id;
+        Guid uid;
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
@@ -32,15 +33,15 @@ public class RepositoryCrudShould : IAsyncLifetime
                 };
                 await repository.AddAsync(entity);
                 await repository.CommitAsync();
-                id = entity.Id;
-                Assert.NotEqual(0, id);
+                uid = entity.Uid;
+                Assert.NotEqual(Guid.Empty, uid);
             }
         }
 
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                var found = await repository.FindAsync([id]);
+                var found = await repository.FindAsync([uid]);
                 Assert.NotNull(found);
                 Assert.Equal("Alice", found.FullName);
             }
@@ -49,7 +50,7 @@ public class RepositoryCrudShould : IAsyncLifetime
 
     [Fact]
     public async Task Update_ThenCommit_ModifiesEntity() {
-        long id;
+        Guid uid;
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
@@ -61,14 +62,14 @@ public class RepositoryCrudShould : IAsyncLifetime
                 };
                 await repository.AddAsync(entity);
                 await repository.CommitAsync();
-                id = entity.Id;
+                uid = entity.Uid;
             }
         }
 
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                var entity = await repository.FindAsync([id]);
+                var entity = await repository.FindAsync([uid]);
                 Assert.NotNull(entity);
                 entity.FullName = "Bob Updated";
                 await repository.UpdateAsync(entity);
@@ -79,7 +80,7 @@ public class RepositoryCrudShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                var entity = await repository.FindAsync([id]);
+                var entity = await repository.FindAsync([uid]);
                 Assert.Equal("Bob Updated", entity?.FullName);
             }
         }
@@ -87,7 +88,7 @@ public class RepositoryCrudShould : IAsyncLifetime
 
     [Fact]
     public async Task Remove_ThenCommit_DeletesEntity() {
-        long id;
+        Guid uid;
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
@@ -99,14 +100,14 @@ public class RepositoryCrudShould : IAsyncLifetime
                 };
                 await repository.AddAsync(entity);
                 await repository.CommitAsync();
-                id = entity.Id;
+                uid = entity.Uid;
             }
         }
 
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                var entity = await repository.FindAsync([id]);
+                var entity = await repository.FindAsync([uid]);
                 Assert.NotNull(entity);
                 await repository.RemoveAsync(entity);
                 await repository.CommitAsync();
@@ -116,7 +117,7 @@ public class RepositoryCrudShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                var entity = await repository.FindAsync([id]);
+                var entity = await repository.FindAsync([uid]);
                 Assert.Null(entity);
             }
         }

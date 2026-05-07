@@ -20,8 +20,8 @@ public class AdviceBuildQuerySoftDeleteShould
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
-            new() { Id = 1, FullName = "Active", DeleteTime  = null },
-            new() { Id = 2, FullName = "Deleted", DeleteTime = DateTime.UtcNow },
+            new() { Uid = Guid.NewGuid(), FullName = "Active", DeleteTime  = null },
+            new() { Uid = Guid.NewGuid(), FullName = "Deleted", DeleteTime = DateTime.UtcNow },
         }.AsQueryable();
         var container = new QueryContainer<Student>(repository, data);
 
@@ -54,7 +54,8 @@ public class AdviceBuildQuerySoftDeleteShould
         ctx.Set(new QuerySoftDeleteSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
-            new() { Id = 1, DeleteTime = null }, new() { Id = 2, DeleteTime = DateTime.UtcNow },
+            new() { Uid = Guid.NewGuid(), DeleteTime = null },
+            new() { Uid = Guid.NewGuid(), DeleteTime = DateTime.UtcNow },
         }.AsQueryable();
         var container = new QueryContainer<Student>(repository, data);
 

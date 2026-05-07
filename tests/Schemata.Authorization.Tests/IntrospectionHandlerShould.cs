@@ -41,7 +41,7 @@ public class IntrospectionHandlerShould
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app        = new SchemataApplication { Id = 1, ClientId = callerAppName };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(
                              It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -78,7 +78,7 @@ public class IntrospectionHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Id              = 1,
+            Uid             = Guid.NewGuid(),
             Type            = type,
             ApplicationName = appName,
             ReferenceId     = referenceId,

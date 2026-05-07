@@ -59,8 +59,6 @@ public class SchemataTenantServiceProviderFactoryShould
 
     [Fact]
     public void Overrides_Run_In_Order_AllOverrides_Tenant_Dynamic() {
-        // AllOverrides are applied by the builder to the root SC; simulate that by
-        // putting MarkerA in root, then overriding it tenant-specifically, then dynamically.
         var services = new ServiceCollection();
         services.AddSingleton<IMarker, MarkerA>();
 
@@ -71,7 +69,6 @@ public class SchemataTenantServiceProviderFactoryShould
         var factory = Build(options, services);
         var sp      = factory.CreateServiceProvider(AccessorFor("alpha"));
 
-        // Last-registered wins under default DI, which is MarkerC (dynamic after tenant after root).
         Assert.IsType<MarkerC>(sp.GetRequiredService<IMarker>());
     }
 
@@ -79,8 +76,8 @@ public class SchemataTenantServiceProviderFactoryShould
     public void Null_Tenant_Id_Throws_TenantResolveException() {
         var factory = Build(new());
 
-        var accessor = new Mock<ITenantContextAccessor<SchemataTenant<Guid>, Guid>>();
-        accessor.SetupGet(a => a.Tenant).Returns((SchemataTenant<Guid>?)null);
+        var accessor = new Mock<ITenantContextAccessor<SchemataTenant>>();
+        accessor.SetupGet(a => a.Tenant).Returns((SchemataTenant?)null);
 
         Assert.Throws<TenantResolveException>(() => factory.CreateServiceProvider(accessor.Object));
     }
@@ -94,7 +91,7 @@ public class SchemataTenantServiceProviderFactoryShould
         Assert.Same(first, second);
     }
 
-    private static SchemataTenantServiceProviderFactory<SchemataTenant<Guid>, Guid> Build(
+    private static SchemataTenantServiceProviderFactory<SchemataTenant> Build(
         SchemataTenancyOptions options,
         IServiceCollection?    services = null
     ) {
@@ -105,10 +102,16 @@ public class SchemataTenantServiceProviderFactoryShould
         return new(services, new ServiceCollection().BuildServiceProvider(), cache, Options.Create(options));
     }
 
-    private static ITenantContextAccessor<SchemataTenant<Guid>, Guid> AccessorFor(string id) {
-        var guid     = DeterministicGuid(id);
-        var accessor = new StaticAccessor(new() { TenantId = guid });
-        return accessor;
+    private static ITenantContextAccessor<SchemataTenant> AccessorFor(string id) {
+        var guid = DeterministicGuid(id);
+        var mock = new Mock<ITenantContextAccessor<SchemataTenant>>();
+        mock.SetupGet(a => a.Tenant).Returns(new SchemataTenant { Uid = guid });
+        mock.Setup(a => a.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mock.Setup(a => a.InitializeAsync(It.IsAny<SchemataTenant>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(a => a.GetBaseServiceProviderAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ServiceCollection().BuildServiceProvider());
+        return mock.Object;
     }
 
     private static Guid DeterministicGuid(string label) {
@@ -138,29 +141,6 @@ public class SchemataTenantServiceProviderFactoryShould
     #region Nested type: MarkerC
 
     private sealed class MarkerC : IMarker;
-
-    #endregion
-
-    #region Nested type: StaticAccessor
-
-    private sealed class StaticAccessor : ITenantContextAccessor<SchemataTenant<Guid>, Guid>
-    {
-        public StaticAccessor(SchemataTenant<Guid> tenant) { Tenant = tenant; }
-
-        #region ITenantContextAccessor<SchemataTenant<Guid>,Guid> Members
-
-        public SchemataTenant<Guid>? Tenant { get; }
-
-        public Task InitializeAsync(CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task InitializeAsync(SchemataTenant<Guid> tenant, CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) {
-            return Task.FromResult<IServiceProvider>(new ServiceCollection().BuildServiceProvider());
-        }
-
-        #endregion
-    }
 
     #endregion
 }

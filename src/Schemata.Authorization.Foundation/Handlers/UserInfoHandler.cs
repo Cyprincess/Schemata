@@ -92,31 +92,36 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
                 );
         }
 
-        // Filter claims: only include those whose destination set contains "userinfo".
-        for (var i = claims.Count - 1; i >= 0; i--) {
+        
+        foreach (var claim in claims) {
             var destinations = new HashSet<string>();
 
             switch (await Advisor.For<IDestinationAdvisor>()
-                                 .RunAsync(ctx, claims[i], destinations, principal, ct)) {
+                                 .RunAsync(ctx, claim, destinations, principal, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                     break;
                 case AdviseResult.Block:
                 default:
-                    claims.RemoveAt(i);
                     continue;
             }
 
-            if (!destinations.Contains(ClaimDestinations.UserInfo)) {
-                claims.RemoveAt(i);
+            if (destinations.Count == 0) {
+                continue;
+            }
+
+            foreach (var d in destinations) {
+                claim.Properties[d] = Parameters.Token;
             }
         }
 
+        var list = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.UserInfo)).ToList();
+
         // Flatten duplicate claim types: single value → string, multiple → array.
-        var dict = claims.GroupBy(c => c.Type)
-                         .ToDictionary(
-                              g => g.Key,
-                              g => g.Count() == 1 ? (object)g.First().Value : g.Select(c => c.Value).ToArray());
+        var dict = list.GroupBy(c => c.Type)
+                       .ToDictionary(
+                            g => g.Key,
+                            g => g.Count() == 1 ? (object)g.First().Value : g.Select(c => c.Value).ToArray());
 
         return AuthorizationResult.Content(dict);
     }

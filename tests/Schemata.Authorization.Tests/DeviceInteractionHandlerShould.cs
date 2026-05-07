@@ -22,7 +22,7 @@ public class DeviceInteractionHandlerShould
         var jsonOpts = Options.Create(new JsonSerializerOptions());
         var authOpts = Options.Create(new SchemataAuthorizationOptions { SessionIdClaimType = "sid" });
 
-        var app  = new SchemataApplication { Id = 1, ClientId = "device-client" };
+        var app  = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "device-client" };
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByClientIdAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
 
@@ -32,7 +32,7 @@ public class DeviceInteractionHandlerShould
         );
 
         var device = new SchemataToken {
-            Id          = 2,
+            Uid         = Guid.NewGuid(),
             Name        = "device-1",
             Type        = TokenTypes.DeviceCode,
             Status      = TokenStatuses.Valid,
@@ -49,7 +49,7 @@ public class DeviceInteractionHandlerShould
         );
 
         var userCode = new SchemataToken {
-            Id          = 1,
+            Uid         = Guid.NewGuid(),
             Name        = "user-1",
             Type        = TokenTypes.UserCode,
             Status      = TokenStatuses.Valid,

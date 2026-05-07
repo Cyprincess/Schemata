@@ -57,7 +57,7 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryDeviceFlow>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeGrantPermission<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeScopeValidation<TApp, TScope>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeScopeValidation<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceCodeExchangeAdvisor<TApp, TToken>, AdviceDeviceCodeExchangeValidation<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceDeviceCodePolling<TApp>>());
     }

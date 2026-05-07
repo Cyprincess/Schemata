@@ -116,8 +116,8 @@
         <note />
       </trans-unit>
       <trans-unit id="ST1020">
-        <source>Entity must have at least one [Key].</source>
-        <target state="translated">實體必須至少有一個 [Key]。</target>
+        <source>Entity must have at least one [TableKey] or Id property.</source>
+        <target state="translated">實體必須至少有一個 [TableKey]。</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1021">

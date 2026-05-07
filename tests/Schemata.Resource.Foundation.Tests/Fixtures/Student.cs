@@ -1,6 +1,7 @@
 using System;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Resource.Foundation.Tests.Fixtures;
 
@@ -32,7 +33,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IV
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    [TableKey]
+    public Guid Uid { get; set; }
 
     #endregion
 

@@ -36,7 +36,7 @@ public class RefreshTokenHandlerShould
         var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
-            Id                = 1,
+            Uid               = Guid.NewGuid(),
             Type              = TokenTypes.RefreshToken,
             Status            = TokenStatuses.Valid,
             ReferenceId       = "rt-ref",
@@ -49,7 +49,7 @@ public class RefreshTokenHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>())).ReturnsAsync(refreshToken);
 
-        var app        = new SchemataApplication { Id = 1, ClientId = "test" };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(
                              It.IsAny<Dictionary<string, List<string?>>?>(),

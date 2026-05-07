@@ -18,7 +18,7 @@ public class WorkflowStatusShould
 
         var (controller, _) = _fixture.CreateWorkflowController();
 
-        var result = await controller.Status(workflow.Id);
+        var result = await controller.Status(workflow.Uid);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(ok);
@@ -26,7 +26,7 @@ public class WorkflowStatusShould
 
         var response = Assert.IsType<WorkflowResponse>(ok.Value);
         Assert.NotNull(response);
-        Assert.Equal(workflow.Id, response.Id);
+        Assert.Equal(workflow.Uid, response.Uid);
         Assert.Equal(instance.State, response.State);
     }
 }

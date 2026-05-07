@@ -12,7 +12,7 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceAuthorizeScopeValidation{TApp, TScope}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceAuthorizeScopeValidation{TApp}" />.</summary>
 public static class AdviceAuthorizeScopeValidation
 {
     public const int DefaultOrder = AdviceAuthorizeGrantPermission.DefaultOrder + 10_000_000;
@@ -28,14 +28,11 @@ public static class AdviceAuthorizeScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <seealso cref="AdviceTokenScopeValidation{TApp, TScope}" />
-public sealed class AdviceAuthorizeScopeValidation<TApp, TScope>(
-    IApplicationManager<TApp> apps,
-    IScopeManager<TScope>     scopes
+/// <seealso cref="AdviceTokenScopeValidation{TApp}" />
+public sealed class AdviceAuthorizeScopeValidation<TApp>(
+    IApplicationManager<TApp> apps
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
-    where TScope : SchemataScope
 {
     #region IAuthorizeAdvisor<TApp> Members
 
@@ -48,30 +45,36 @@ public sealed class AdviceAuthorizeScopeValidation<TApp, TScope>(
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        if (string.IsNullOrWhiteSpace(authz.Request?.Scope)) {
-            return AdviseResult.Continue;
+        var requested = ScopeParser.Parse(authz.Request?.Scope);
+
+        // OIDC Core §3.1.2.1: scope REQUIRED, MUST contain "openid" when response_type includes id_token.
+        if (!string.IsNullOrWhiteSpace(authz.Request?.ResponseType)
+         && authz.Request.ResponseType.Contains(ResponseTypes.IdToken)
+         && !requested.Contains(Scopes.OpenId)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidScope,
+                SchemataResources.GetResourceString(SchemataResources.ST4006)
+            ) {
+                RedirectUri  = authz.Request?.RedirectUri,
+                State        = authz.Request?.State,
+                ResponseMode = authz.ResponseMode,
+            };
         }
 
-        var requested = ScopeParser.Parse(authz.Request.Scope);
         if (requested.Count == 0) {
             return AdviseResult.Continue;
         }
 
         foreach (var s in requested) {
-            var scope = await scopes.FindByNameAsync(s, ct);
-
-            if (string.IsNullOrWhiteSpace(scope?.Name)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
-                );
-            }
-
             if (!await apps.HasPermissionAsync(authz.Application, PermissionPrefixes.Scope + s, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,
                     SchemataResources.GetResourceString(SchemataResources.ST4006)
-                );
+                ) {
+                    RedirectUri  = authz.Request?.RedirectUri,
+                    State        = authz.Request?.State,
+                    ResponseMode = authz.ResponseMode,
+                };
             }
         }
 

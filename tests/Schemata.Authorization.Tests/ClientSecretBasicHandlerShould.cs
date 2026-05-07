@@ -11,14 +11,13 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Xunit;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Tests;
 
 public class ClientSecretBasicHandlerShould
 {
     private static readonly SchemataApplication TestApp = new() {
-        Id = 1, ClientId = "my-client", ClientType = "confidential",
+        Uid = Guid.NewGuid(), ClientId = "my-client", ClientType = "confidential",
     };
 
     private static ClientSecretBasicAuthentication<SchemataApplication> CreateHandler(
@@ -26,7 +25,6 @@ public class ClientSecretBasicHandlerShould
     ) {
         var mock    = managerMock ?? new Mock<IApplicationManager<SchemataApplication>>();
         var options = new SchemataAuthorizationOptions();
-        options.AllowedClientAuthMethods.Add(ClientAuthMethods.ClientSecretBasic);
         return new(mock.Object, Options.Create(options));
     }
 
@@ -61,7 +59,7 @@ public class ClientSecretBasicHandlerShould
 
     [Fact]
     public async Task Authenticates_WithUrlEncodedValues() {
-        var app     = new SchemataApplication { Id = 1, ClientId = "my client", ClientType = "confidential" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "my client", ClientType = "confidential" };
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
         manager.Setup(m => m.FindByClientIdAsync("my client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateClientSecretAsync(app, "my:secret", It.IsAny<CancellationToken>()))

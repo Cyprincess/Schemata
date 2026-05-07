@@ -59,6 +59,17 @@ public class OAuthException : SchemataException
     public string? ResponseMode { get; set; }
 
     /// <summary>
+    ///     URI identifying a human-readable web page with information about the error,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §5.2: Error Response
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? ErrorUri { get; set; }
+
+    /// <summary>
     ///     Returns an <see cref="OAuthErrorResponse" /> instead of the default
     ///     <see cref="ErrorResponse" />.
     /// </summary>
@@ -67,7 +78,11 @@ public class OAuthException : SchemataException
     ///     <see cref="SchemataException.Details" />.
     /// </param>
     public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) {
-        var response = new OAuthErrorResponse { Error = Code, ErrorDescription = Message };
+        var response = new OAuthErrorResponse {
+            Error            = Code,
+            ErrorDescription = Message,
+            ErrorUri         = ErrorUri,
+        };
 
         if (Details is { Count: > 0 }) {
             response.Details = new(Details);

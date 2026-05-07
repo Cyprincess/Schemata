@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ namespace Schemata.Authorization.Tests;
 public class ClientSecretPostHandlerShould
 {
     private static readonly SchemataApplication TestApp = new() {
-        Id = 1, ClientId = "my-client", ClientType = "confidential",
+        Uid = Guid.NewGuid(), ClientId = "my-client", ClientType = "confidential",
     };
 
     private static ClientSecretPostAuthentication<SchemataApplication> CreateHandler(
@@ -24,7 +25,6 @@ public class ClientSecretPostHandlerShould
     ) {
         var mock    = managerMock ?? new Mock<IApplicationManager<SchemataApplication>>();
         var options = new SchemataAuthorizationOptions();
-        options.AllowedClientAuthMethods.Add(ClientAuthMethods.ClientSecretPost);
         return new(mock.Object, Options.Create(options));
     }
 

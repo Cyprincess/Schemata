@@ -15,9 +15,9 @@ Schemata's resource pipeline runs validation advisors before executing create an
 
 ## Add the FluentValidation package
 
-The `Schemata.Application.Complex.Targets` meta-package already includes `Schemata.Validation.FluentValidation`, so no additional package reference is needed.
+The `Schemata.Application.Complex.Targets` meta-package already includes `Schemata.Validation.FluentValidation`. An additional `dotnet add package` call is unnecessary when using Complex.Targets.
 
-If you are using a minimal setup without the complex targets, add the package directly:
+If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Validation.FluentValidation
@@ -99,7 +99,7 @@ var builder = WebApplication.CreateBuilder(args)
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
             services.TryAddEnumerable(
-                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentIdAdvisor>());
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
 
             services.AddValidator<StudentValidator>();
         });
@@ -121,13 +121,14 @@ app.Run();
 
 ## Error response format
 
-When validation fails, the pipeline throws a `ValidationException` which produces an HTTP 422 response with the following structure:
+When validation fails, the pipeline throws a `ValidationException` producing an HTTP 422 response:
 
 ```json
 {
   "error": {
-    "code": "INVALID_ARGUMENT",
-    "message": "The request contains invalid arguments.",
+    "code": 422,
+    "status": "INVALID_ARGUMENT",
+    "message": "One or more validation errors occurred.",
     "details": [
       {
         "@type": "type.googleapis.com/google.rpc.BadRequest",
@@ -178,8 +179,9 @@ Response (HTTP 422):
 ```json
 {
   "error": {
-    "code": "INVALID_ARGUMENT",
-    "message": "The request contains invalid arguments.",
+    "code": 422,
+    "status": "INVALID_ARGUMENT",
+    "message": "One or more validation errors occurred.",
     "details": [
       {
         "@type": "type.googleapis.com/google.rpc.BadRequest",
@@ -225,10 +227,9 @@ Response (HTTP 201):
 
 ```json
 {
-  "id": 1742956800000,
   "full_name": "Alice",
   "age": 20,
-  "name": "1742956800000",
+  "name": "students/a1b2c3d4e5f6a7b8",
   "etag": "W/\"dGVzdC10aW1lc3RhbXA\"",
   "create_time": "2026-03-26T12:00:00Z",
   "update_time": null

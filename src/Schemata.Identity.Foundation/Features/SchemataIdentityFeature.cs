@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -13,10 +14,9 @@ using Schemata.Core.Features;
 using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
-using Schemata.Identity.Foundation.Services;
 using Schemata.Identity.Skeleton.Advisors;
-using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
@@ -53,6 +53,18 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         identify(opts);
         services.Configure(identify);
 
+        services.Configure<JsonSerializerOptions>(options => {
+            options.Converters.Add(ClaimStoreJsonConverter.Instance);
+        });
+
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
+            options.SerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
+        });
+
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
+            options.JsonSerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
+        });
+        
         var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {
@@ -69,8 +81,6 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangePasswordValidation<TUser>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceEnrollValidation<TUser>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceDowngradeValidation>());
-
-        services.TryAddScoped<IClaimsProvider<TUser>, DefaultClaimsProvider<TUser>>();
 
         services.TryAddScoped(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddScoped(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));

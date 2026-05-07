@@ -73,11 +73,29 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                 }
 
                 var granted = ScopeParser.Parse(a.Scopes);
-
-                if (scopes.IsSubsetOf(granted)) {
-                    authorized = true;
-                    break;
+                if (!scopes.IsSubsetOf(granted)) {
+                    continue;
                 }
+
+                if (authz.Request?.RedirectUri != a.RedirectUri) {
+                    continue;
+                }
+
+                if (!ScopeParser.IsSubset(authz.Request?.ResponseType, a.ResponseType)) {
+                    continue;
+                }
+
+                if (authz.Request?.CodeChallengeMethod != a.CodeChallengeMethod) {
+                    continue;
+                }
+
+                if (!ScopeParser.IsSubset(authz.Request?.AcrValues, a.AcrValues)) {
+                    continue;
+                }
+
+                authorized = true;
+
+                break;
             }
         }
 

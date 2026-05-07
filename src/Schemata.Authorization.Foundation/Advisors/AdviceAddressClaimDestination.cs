@@ -43,8 +43,6 @@ public sealed class AdviceAddressClaimDestination : IDestinationAdvisor
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        destinations.Add(ClaimDestinations.AccessToken);
-
         if (!principal.HasScope(Scopes.Address)) {
             return Task.FromResult(AdviseResult.Handle);
         }

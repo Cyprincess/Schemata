@@ -9,29 +9,27 @@ namespace Schemata.Tenancy.Skeleton.Services;
 ///     or the root provider otherwise.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <typeparam name="TKey">The tenant identifier type.</typeparam>
-public class SchemataTenantServiceScopeFactory<TTenant, TKey> : ITenantServiceScopeFactory<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFactory<TTenant>
+    where TTenant : SchemataTenant
 {
-    private readonly ITenantContextAccessor<TTenant, TKey>        _accessor;
-    private readonly ITenantServiceProviderFactory<TTenant, TKey> _factory;
-    private readonly IServiceProvider                             _root;
+    private readonly ITenantContextAccessor<TTenant>        _accessor;
+    private readonly ITenantServiceProviderFactory<TTenant> _factory;
+    private readonly IServiceProvider                       _root;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantServiceScopeFactory{TTenant, TKey}" /> class.
+    ///     Initializes a new instance of the <see cref="SchemataTenantServiceScopeFactory{TTenant}" /> class.
     /// </summary>
     public SchemataTenantServiceScopeFactory(
-        IServiceProvider                             root,
-        ITenantContextAccessor<TTenant, TKey>        accessor,
-        ITenantServiceProviderFactory<TTenant, TKey> factory
+        IServiceProvider                       root,
+        ITenantContextAccessor<TTenant>        accessor,
+        ITenantServiceProviderFactory<TTenant> factory
     ) {
         _root     = root;
         _accessor = accessor;
         _factory  = factory;
     }
 
-    #region ITenantServiceScopeFactory<TTenant,TKey> Members
+    #region ITenantServiceScopeFactory<TTenant> Members
 
     /// <inheritdoc />
     public IServiceScope CreateScope() {

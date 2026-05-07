@@ -1,14 +1,14 @@
 # Access Control
 
-This guide adds role-based access control and row-level security to the Student CRUD app. Building on the Identity setup from the previous guide, you will gate every CRUD operation behind claims and filter query results per user.
+This guide adds role-based access control and row-level security to the Student CRUD app. Building on the Identity setup from the previous guide, you will gate CRUD operations behind claims and filter query results per user.
 
-## Add the package
+## Configuration
+
+`Schemata.Application.Complex.Targets` already includes `Schemata.Security.Foundation`. If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Security.Foundation
 ```
-
-## Configure Security
 
 In `Program.cs`, add `UseSecurity()` and enable resource authorization:
 

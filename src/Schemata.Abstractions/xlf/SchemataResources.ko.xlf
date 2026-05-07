@@ -116,8 +116,8 @@
         <note />
       </trans-unit>
       <trans-unit id="ST1020">
-        <source>Entity must have at least one [Key].</source>
-        <target state="translated">엔터티에는 [Key]가 하나 이상 있어야 합니다.</target>
+        <source>Entity must have at least one [TableKey] or Id property.</source>
+        <target state="translated">엔터티에는 [TableKey]가 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1021">

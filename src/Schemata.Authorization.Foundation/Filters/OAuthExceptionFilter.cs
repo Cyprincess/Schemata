@@ -21,6 +21,7 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
             var parameters = new Dictionary<string, string?> {
                 [Parameters.Error]            = oauth.Code,
                 [Parameters.ErrorDescription] = oauth.Message,
+                [Parameters.ErrorUri]         = oauth.ErrorUri,
                 [Parameters.State]            = oauth.State,
             };
 

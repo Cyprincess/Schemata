@@ -9,4 +9,9 @@ public class TestDbContext : DbContext
     public DbSet<Student> Students { get; set; } = null!;
 
     public DbSet<Course> Courses { get; set; } = null!;
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.UseTableKeyConventions();
+    }
 }

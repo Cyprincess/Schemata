@@ -117,8 +117,8 @@
         <note />
       </trans-unit>
       <trans-unit id="ST1020">
-        <source>Entity must have at least one [Key].</source>
-        <target state="translated">Varlık en az bir [Key] içermelidir.</target>
+        <source>Entity must have at least one [TableKey] or Id property.</source>
+        <target state="translated">Varlık en az bir [TableKey] içermelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1021">

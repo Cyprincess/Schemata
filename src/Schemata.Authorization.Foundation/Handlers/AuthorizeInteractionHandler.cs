@@ -216,11 +216,15 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
 
         // Record consent so future requests for the same client/scope can skip interaction.
         var authorization = new TAuth {
-            ApplicationName = application.Name,
-            Subject         = subject,
-            Type            = AuthorizationTypes.AdHoc,
-            Status          = TokenStatuses.Valid,
-            Scopes          = authorize.Scope,
+            ApplicationName     = application.Name,
+            Subject             = subject,
+            Type                = AuthorizationTypes.AdHoc,
+            Status              = TokenStatuses.Valid,
+            Scopes              = authorize.Scope,
+            RedirectUri         = authorize.RedirectUri,
+            ResponseType        = authorize.ResponseType,
+            CodeChallengeMethod = authorize.CodeChallengeMethod,
+            AcrValues           = authorize.AcrValues,
         };
 
         await _auths.CreateAsync(authorization, ct);

@@ -17,7 +17,7 @@ public class WorkflowRaiseShould
 
         var (controller, _) = _fixture.CreateWorkflowController();
 
-        var result = await controller.Raise(workflow.Id, new OrderEvent { Event = nameof(OrderStateMachine.Pay) });
+        var result = await controller.Raise(workflow.Uid, new OrderEvent { Event = nameof(OrderStateMachine.Pay) });
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(ok);
@@ -25,7 +25,7 @@ public class WorkflowRaiseShould
 
         var response = Assert.IsType<WorkflowResponse>(ok.Value);
         Assert.NotNull(response);
-        Assert.Equal(workflow.Id, response.Id);
+        Assert.Equal(workflow.Uid, response.Uid);
         Assert.Equal(nameof(OrderStateMachine.Progressing), response.State);
     }
 }

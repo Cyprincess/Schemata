@@ -27,7 +27,7 @@ public class WorkflowResponse : IIdentifier, IStateful, ITimestamp
     #region IIdentifier Members
 
     /// <inheritdoc />
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

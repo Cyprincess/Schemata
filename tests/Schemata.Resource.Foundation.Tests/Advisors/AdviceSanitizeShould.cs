@@ -15,7 +15,6 @@ public class AdviceSanitizeShould
     public async Task Create_Sanitize_ClearsSystemManagedFields() {
         var request = new ManagedRequest {
             Name        = "managed/forged",
-            Id          = 777,
             Owner       = "hacker",
             State       = "Active",
             Uid         = "uid-forged",
@@ -36,7 +35,7 @@ public class AdviceSanitizeShould
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(request.Name);
-        Assert.Equal(0, request.Id);
+        Assert.Null(request.Uid);
         Assert.Null(request.Owner);
         Assert.Null(request.State);
         Assert.Equal(default, request.CreateTime);
@@ -113,7 +112,6 @@ public class AdviceSanitizeShould
 
     public sealed class ManagedRequest : ICanonicalName, IUpdateMask
     {
-        public long           Id          { get; set; }
         public string?        Owner       { get; set; }
         public string?        State       { get; set; }
         public string?        Uid         { get; set; }

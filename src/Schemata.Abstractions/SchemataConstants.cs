@@ -1062,6 +1062,16 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string MaxAge = "max_age";
+
+        /// <summary>
+        ///     OAuth error_uri parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ErrorUri = "error_uri";
     }
 
     #endregion
@@ -1270,6 +1280,9 @@ public static class SchemataConstants
         /// <summary>Requests access to the end-user's default profile claims.</summary>
         public const string Profile = "profile";
 
+        /// <summary>Requests access to the end-user's role claims.</summary>
+        public const string Role = "role";
+
         /// <summary>Requests access to the end-user's email address.</summary>
         public const string Email = "email";
 
@@ -1441,6 +1454,7 @@ public static class SchemataConstants
                 Claims.PreferredUsername, Claims.Profile, Claims.Picture, Claims.Website, Claims.Gender,
                 Claims.Birthdate, Claims.Zoneinfo, Claims.Locale, Claims.UpdatedAt,
             ],
+            [Scopes.Role]    = [Claims.Role],
             [Scopes.Email]   = [Claims.Email, Claims.EmailVerified],
             [Scopes.Phone]   = [Claims.PhoneNumber, Claims.PhoneNumberVerified],
             [Scopes.Address] = [Claims.Address],

@@ -24,23 +24,27 @@ builder.UseSchemata(schema => {
 
 ### Endpoint Mapping
 
-| HTTP Method | Route                  | Action        | Request Source                                        | Response                                       |
-| ----------- | ---------------------- | ------------- | ----------------------------------------------------- | ---------------------------------------------- |
-| `GET`       | `/{collection}`        | `ListAsync`   | `[FromQuery] ListRequest`                             | JSON `ListResult<TSummary>`                    |
-| `GET`       | `/{collection}/{name}` | `GetAsync`    | Route `name`                                          | JSON `TDetail`                                 |
-| `POST`      | `/{collection}`        | `CreateAsync` | `[FromBody] TRequest`                                 | 201 Created, JSON `TDetail`, `Location` header |
-| `PATCH`     | `/{collection}/{name}` | `UpdateAsync` | Route `name`, `[FromBody] TRequest`                   | JSON `TDetail`                                 |
-| `DELETE`    | `/{collection}/{name}` | `DeleteAsync` | Route `name`, `[FromQuery] etag`, `[FromQuery] force` | 204 No Content                                 |
+| HTTP Method | Route                        | Action        | Request Source                                        | Response                                       |
+| ----------- | ---------------------------- | ------------- | ----------------------------------------------------- | ---------------------------------------------- |
+| `GET`       | `/{collection}`              | `ListAsync`   | `[FromQuery] ListRequest`                             | JSON `ListResult<TSummary>`                    |
+| `GET`       | `/{name={collection}/*}`     | `GetAsync`    | Route `name`                                          | JSON `TDetail`                                 |
+| `POST`      | `/{collection}`              | `CreateAsync` | `[FromBody] TRequest`                                 | 201 Created, JSON `TDetail`, `Location` header |
+| `PATCH`     | `/{name={collection}/*}`     | `UpdateAsync` | Route `name`, `[FromBody] TRequest`                   | JSON `TDetail`                                 |
+| `DELETE`    | `/{name={collection}/*}`     | `DeleteAsync` | Route `name`, `[FromQuery] etag`, `[FromQuery] force` | 204 No Content                                 |
 
-For hierarchical resources with a `[CanonicalName]` pattern, the route includes parent segments. For example, `[CanonicalName("publishers/{publisher}/books/{book}")]` produces routes like:
+The `{name=students/*}` syntax follows [AIP-127](https://google.aip.dev/127): the variable captures the entire resource name (e.g. `students/a1b2c3d4`), not just the ID component. The `*` wildcard matches all URI-safe characters except `/`.
 
-- `GET /publishers/{publisher}/books`
-- `GET /publishers/{publisher}/books/{name}`
-- `POST /publishers/{publisher}/books`
-- `PATCH /publishers/{publisher}/books/{name}`
-- `DELETE /publishers/{publisher}/books/{name}`
+For hierarchical resources with a `[CanonicalName]` pattern, the parent segments appear in the `{parent=.../*}` variable for collection endpoints and in the `{name=.../*/.../*}` variable for item endpoints. For example, `[CanonicalName("publishers/{publisher}/books/{book}")]` produces:
 
-When `[ResourcePackage("api/v1")]` is applied, the package prefixes the route: `GET /api/v1/publishers/{publisher}/books`.
+| Method   | Route                                     |
+| -------- | ----------------------------------------- |
+| `GET`    | `/{parent=publishers/*}/books`            |
+| `GET`    | `/{name=publishers/*/books/*}`            |
+| `POST`   | `/{parent=publishers/*}/books`            |
+| `PATCH`  | `/{name=publishers/*/books/*}`            |
+| `DELETE` | `/{name=publishers/*/books/*}`            |
+
+When `[ResourcePackage("api/v1")]` is applied, the package prefixes the route: `GET /api/v1/{parent=publishers/*}/books`.
 
 ### List Endpoint Details
 
@@ -52,7 +56,7 @@ The `ListAsync` action binds all `ListRequest` parameters from the query string:
 - `?skip=5` -- items to skip.
 - `?pageToken=...` -- continuation token.
 - `?showDeleted=true` -- include soft-deleted resources.
-- `?parent=publishers/acme` -- explicit parent (auto-resolved from route if not provided).
+- `?parent=publishers/acme` -- explicit parent (auto-resolved from the `{parent=publishers/*}` route variable if not provided).
 
 If the `Parent` parameter is not explicitly provided, the controller resolves it automatically from HTTP route values using `ResourceNameDescriptor.ResolveParent`.
 
@@ -100,7 +104,7 @@ The `Commit()` method signals MVC to refresh action descriptors via a `Cancellat
 
 `ResourceJsonOptions` creates a customized `JsonSerializerOptions` instance with these modifications:
 
-1. **CanonicalName removal.** The `CanonicalName` property is removed from serialization output for types implementing `ICanonicalName`. HTTP clients see only the short `Name` (the resource ID).
+1. The `Name` property on types implementing `ICanonicalName` is populated with the full qualified resource name (e.g. `"students/a1b2c3d4"`). HTTP clients use this value directly as the path segment in subsequent `GET`, `PATCH`, and `DELETE` calls.
 
 2. **Collection name in ListResult.** The `Entities` property in `ListResult<TSummary>` is renamed to the pluralized entity name (per AIP-132). The pluralized name is obtained from a `ResourceNameDescriptor` for the entity type and is then run through the active `PropertyNamingPolicy` (normally `SnakeCaseLower`). For example, `ListResult<BookSummary>` serializes the collection as `"books"` instead of `"entities"`.
 

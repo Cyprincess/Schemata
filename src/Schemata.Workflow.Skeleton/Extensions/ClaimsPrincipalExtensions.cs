@@ -22,7 +22,7 @@ public static class ClaimsPrincipalExtensions
     /// </summary>
     /// <param name="principal">The claims principal.</param>
     /// <returns>The user identifier, or <c>0</c> if the claim is absent or not a valid number.</returns>
-    public static long GetUserId(this ClaimsPrincipal principal) {
-        return long.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
+    public static Guid GetUserId(this ClaimsPrincipal principal) {
+        return Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : Guid.Empty;
     }
 }

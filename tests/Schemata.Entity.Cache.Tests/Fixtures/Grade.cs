@@ -1,3 +1,5 @@
+using System;
+
 namespace Schemata.Entity.Cache.Tests.Fixtures;
 
-public record Grade(long Id, int Level);
+public record Grade(Guid Uid, int Level);

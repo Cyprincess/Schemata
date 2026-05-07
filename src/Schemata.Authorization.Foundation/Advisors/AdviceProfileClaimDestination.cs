@@ -54,8 +54,6 @@ public sealed class AdviceProfileClaimDestination : IDestinationAdvisor
             case Claims.Zoneinfo:
             case Claims.Locale:
             case Claims.UpdatedAt:
-                destinations.Add(ClaimDestinations.AccessToken);
-
                 if (!principal.HasScope(Scopes.Profile)) {
                     return Task.FromResult(AdviseResult.Handle);
                 }

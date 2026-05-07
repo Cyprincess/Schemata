@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Skeleton.Entities;
@@ -126,7 +127,8 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
 
     #region IIdentifier Members
 
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

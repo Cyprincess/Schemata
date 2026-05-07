@@ -4,9 +4,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Entity.Repository;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
@@ -15,21 +17,29 @@ namespace Schemata.Authorization.Foundation.Managers;
 ///     <see cref="IRepository{TEntity}" /> and an <see cref="IPasswordHasher{TUser}" /> for client secret hashing.
 /// </summary>
 /// <typeparam name="TApplication">The application entity type, must derive from <see cref="SchemataApplication" />.</typeparam>
+/// <typeparam name="TScope">The scope entity type, must derive from <see cref="SchemataScope" />.</typeparam>
 /// <remarks>
 ///     Client secrets are hashed using <see cref="IPasswordHasher{TApplication}" /> before storage. Redirect URI
 ///     and permission checks use exact-match comparison against the application's configured lists.
 /// </remarks>
 /// <seealso cref="SchemataScopeManager{TScope}" />
 /// <seealso cref="SchemataTokenManager{TToken}" />
-public class SchemataApplicationManager<TApplication> : IApplicationManager<TApplication>
+public class SchemataApplicationManager<TApplication, TScope> : IApplicationManager<TApplication>
     where TApplication : SchemataApplication
+    where TScope : SchemataScope
 {
     private readonly IRepository<TApplication>     _applications;
     private readonly IPasswordHasher<TApplication> _hasher;
+    private readonly IScopeManager<TScope>         _scopes;
 
-    public SchemataApplicationManager(IRepository<TApplication> applications, IPasswordHasher<TApplication> hasher) {
+    public SchemataApplicationManager(
+        IRepository<TApplication>     applications,
+        IPasswordHasher<TApplication> hasher,
+        IScopeManager<TScope>         scopes
+    ) {
         _applications = applications;
         _hasher       = hasher;
+        _scopes       = scopes;
     }
 
     #region IApplicationManager<TApplication> Members
@@ -356,6 +366,70 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
 
         await _applications.RemoveAsync(application, ct);
         await _applications.CommitAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public Task PermitGrantTypeAsync(TApplication? application, string? grantType, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        if (application is null || string.IsNullOrWhiteSpace(grantType)) {
+            return Task.CompletedTask;
+        }
+
+        application.Permissions ??= [];
+        var permission = PermissionPrefixes.GrantType + grantType;
+        if (!application.Permissions.Contains(permission)) {
+            application.Permissions.Add(permission);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task PermitEndpointAsync(TApplication? application, string? endpoint, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        if (application is null || string.IsNullOrWhiteSpace(endpoint)) {
+            return Task.CompletedTask;
+        }
+
+        application.Permissions ??= [];
+        var permission = PermissionPrefixes.Endpoint + endpoint;
+        if (!application.Permissions.Contains(permission)) {
+            application.Permissions.Add(permission);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task PermitScopeAsync(TApplication? application, string? scope, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        if (application is null || string.IsNullOrWhiteSpace(scope)) {
+            return Task.CompletedTask;
+        }
+
+        application.Permissions ??= [];
+        var permission = PermissionPrefixes.Scope + scope;
+        if (!application.Permissions.Contains(permission)) {
+            application.Permissions.Add(permission);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RemovePermissionAsync(TApplication? application, string? permission, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        if (application is null || string.IsNullOrWhiteSpace(permission)) {
+            return Task.CompletedTask;
+        }
+
+        application.Permissions?.Remove(permission);
+
+        return Task.CompletedTask;
     }
 
     #endregion

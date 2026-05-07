@@ -15,7 +15,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 {
     private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>? Registrar;
 
-    private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete(), _ => new());
+    private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
     private readonly ResourceBinderConfiguration _config;
 

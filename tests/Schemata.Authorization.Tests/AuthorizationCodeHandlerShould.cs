@@ -49,7 +49,7 @@ public class AuthorizationCodeHandlerShould
         };
 
         return new() {
-            Id              = 1,
+            Uid             = Guid.NewGuid(),
             Type            = TokenTypes.AuthorizationCode,
             Status          = status,
             ExpireTime      = expireTime ?? DateTime.UtcNow.AddMinutes(5),
@@ -77,7 +77,7 @@ public class AuthorizationCodeHandlerShould
     ) {
         var jsonOpts = Options.Create(JsonOptions);
         var codeOpts = Options.Create(new CodeFlowOptions());
-        var app      = new SchemataApplication { Id = 1, ClientId = TestClientId };
+        var app      = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = TestClientId };
 
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(

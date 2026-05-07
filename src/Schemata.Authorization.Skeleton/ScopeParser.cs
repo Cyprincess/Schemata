@@ -33,9 +33,6 @@ public static class ScopeParser
         return r.Count == 0 || r.IsSubsetOf(Parse(approved));
     }
 
-    /// <summary>Checks whether two scope strings contain exactly the same tokens.</summary>
-    public static bool SetEquals(string? a, string? b) { return Parse(a).SetEquals(Parse(b)); }
-
     /// <summary>Checks whether a scope string contains a specific token.</summary>
     public static bool Contains(string? scope, string token) {
         return !string.IsNullOrWhiteSpace(scope) && Parse(scope).Contains(token);

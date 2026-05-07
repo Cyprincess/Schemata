@@ -4,6 +4,8 @@ This guide extracts the Student entity, DbContext, and advisor into a self-conta
 
 ## Add the modular package
 
+`Schemata.Application.Complex.Targets` already includes `Schemata.Modular`. If you are composing packages manually:
+
 ```shell
 dotnet add package --prerelease Schemata.Modular
 ```
@@ -60,7 +62,7 @@ public class StudentModule : ModuleBase
                 (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
         services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentIdAdvisor>());
+            ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
     }
 }
 ```

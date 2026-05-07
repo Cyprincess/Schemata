@@ -91,6 +91,18 @@ public interface IApplicationManager<TApplication>
         CancellationToken    ct = default
     );
 
+    /// <summary>Permits a grant type for the application.</summary>
+    Task PermitGrantTypeAsync(TApplication? application, string? grantType, CancellationToken ct = default);
+
+    /// <summary>Permits an endpoint for the application.</summary>
+    Task PermitEndpointAsync(TApplication? application, string? endpoint, CancellationToken ct = default);
+
+    /// <summary>Permits a scope for the application.</summary>
+    Task PermitScopeAsync(TApplication? application, string? scope, CancellationToken ct = default);
+
+    /// <summary>Removes a permission from the application.</summary>
+    Task RemovePermissionAsync(TApplication? application, string? permission, CancellationToken ct = default);
+
     /// <summary>
     ///     Sets the OAuth 2.0 client type.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.1">

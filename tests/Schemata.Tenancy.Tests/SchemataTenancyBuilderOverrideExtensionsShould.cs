@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -14,7 +13,7 @@ public class SchemataTenancyBuilderOverrideExtensionsShould
     [Fact]
     public void ForAll_Applies_Configure_To_Root_Services_Immediately() {
         var services = new ServiceCollection();
-        var builder  = new SchemataTenancyBuilder<SchemataTenant<Guid>, Guid>(services);
+        var builder  = new SchemataTenancyBuilder<SchemataTenant>(services);
 
         builder.ForAll(s => s.AddSingleton<IMarker, MarkerA>());
 
@@ -26,7 +25,7 @@ public class SchemataTenancyBuilderOverrideExtensionsShould
     public void ForTenant_String_Records_Into_Keyed_Options_Without_Touching_Root_Services() {
         var services = new ServiceCollection();
         services.AddOptions<SchemataTenancyOptions>();
-        var builder = new SchemataTenancyBuilder<SchemataTenant<Guid>, Guid>(services);
+        var builder = new SchemataTenancyBuilder<SchemataTenant>(services);
 
         builder.ForTenant("alpha", s => s.AddSingleton<IMarker, MarkerA>());
 
@@ -43,7 +42,7 @@ public class SchemataTenancyBuilderOverrideExtensionsShould
     public void ForTenant_Dynamic_Appends_To_DynamicOverrides_List() {
         var services = new ServiceCollection();
         services.AddOptions<SchemataTenancyOptions>();
-        var builder = new SchemataTenancyBuilder<SchemataTenant<Guid>, Guid>(services);
+        var builder = new SchemataTenancyBuilder<SchemataTenant>(services);
 
         builder.ForTenant((_, _, _) => { });
         builder.ForTenant((_, _, _) => { });

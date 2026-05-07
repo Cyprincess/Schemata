@@ -1,19 +1,19 @@
 using System;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
 [Table("SchemataUserClaims")]
-public class SchemataUserClaim : IdentityUserClaim<long>, IIdentifier, ITimestamp
+public class SchemataUserClaim : IdentityUserClaim<Guid>, IIdentifier, ITimestamp
 {
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
-    public new virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

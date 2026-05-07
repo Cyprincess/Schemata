@@ -63,6 +63,9 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         var configure = configurators.PopOrDefault<SchemataAuthorizationOptions>();
         services.Configure(configure);
 
+        var options = new SchemataAuthorizationOptions();
+        configure(options);
+
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (o.SigningKey is null) {
                 throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningKey)));
@@ -90,14 +93,6 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
             flow.ConfigureServices(services, schemata, configurators);
         }
 
-        var options = new SchemataAuthorizationOptions {
-            AllowedClientAuthMethods = { ClientAuthMethods.ClientSecretBasic, ClientAuthMethods.ClientSecretPost },
-            AllowedResponseModes     = { ResponseModes.Fragment, ResponseModes.Query },
-            SupportedClaims          = { Claims.Subject },
-        };
-
-        configure(options);
-
         var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
         services.AddMvcCore(mvc => {
                      mvc.ModelBinderProviders.Insert(0, new OAuthRequestBinderProvider());
@@ -114,7 +109,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenGrantPermission<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenScopeValidation<TApp, TScope>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenScopeValidation<TApp>>());
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceAudienceClaims>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdvicePairwiseProjection<TApp>>());
@@ -123,6 +118,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceEmailClaimDestination>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdvicePhoneClaimDestination>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceAddressClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceRoleClaimDestination>());
 
         services.TryAddScoped<DiscoveryHandler<TScope>>();
 
@@ -130,7 +126,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
 
         services.TryAddScoped<IPasswordHasher<TApp>, PasswordHasher<TApp>>();
-        services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
+        services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp, TScope>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();
         services.TryAddScoped<IAuthorizationManager<TAuth>, SchemataAuthorizationManager<TAuth>>();
         services.TryAddScoped<ITokenManager<TToken>, SchemataTokenManager<TToken>>();

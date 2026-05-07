@@ -22,10 +22,10 @@ public class TestFixture
     public TestFixture() {
         Orders = [
             new() {
-                Id = 1, State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
+                Uid = Guid.NewGuid(), State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
             },
             new() {
-                Id = 2, State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
+                Uid = Guid.NewGuid(), State = nameof(OrderStateMachine.Initial), Timestamp = Guid.NewGuid(),
             },
         ];
 
@@ -33,10 +33,10 @@ public class TestFixture
 
         Workflows = [
             new() {
-                Id = 1, InstanceType = typeof(Order).FullName!, InstanceId = 1,
+                Uid = Guid.NewGuid(), InstanceType = typeof(Order).FullName!, InstanceId = Orders[0].Uid,
             },
             new() {
-                Id = 2, InstanceType = typeof(Order).FullName!, InstanceId = 2,
+                Uid = Guid.NewGuid(), InstanceType = typeof(Order).FullName!, InstanceId = Orders[1].Uid,
             },
         ];
 

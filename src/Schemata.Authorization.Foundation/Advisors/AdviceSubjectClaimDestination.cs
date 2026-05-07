@@ -48,15 +48,26 @@ public sealed class AdviceSubjectClaimDestination : IDestinationAdvisor
         switch (claim.Type) {
             case Claims.Subject:
                 destinations.Add(ClaimDestinations.AccessToken);
+
                 destinations.Add(ClaimDestinations.IdentityToken);
                 destinations.Add(ClaimDestinations.UserInfo);
+
                 return Task.FromResult(AdviseResult.Handle);
             case Claims.ClientId:
                 destinations.Add(ClaimDestinations.AccessToken);
+
                 return Task.FromResult(AdviseResult.Handle);
             case Claims.Audience:
                 destinations.Add(ClaimDestinations.AccessToken);
+
                 destinations.Add(ClaimDestinations.IdentityToken);
+
+                return Task.FromResult(AdviseResult.Handle);
+            case Claims.Scope:
+                destinations.Add(ClaimDestinations.AccessToken);
+
+                destinations.Add(ClaimDestinations.IdentityToken);
+
                 return Task.FromResult(AdviseResult.Handle);
             default:
                 return Task.FromResult(AdviseResult.Continue);

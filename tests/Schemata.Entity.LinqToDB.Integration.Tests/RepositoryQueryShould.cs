@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ public class RepositoryQueryShould : IAsyncLifetime
         using (scope) {
             await repository.AddAsync(
                 new() {
+                    Uid      = Guid.NewGuid(),
                     FullName = "Alice",
                     Age      = 18,
                     Grade    = 1,
@@ -34,6 +36,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             using (scope2) {
                 await repo2.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Bob",
                         Age      = 19,
                         Grade    = 2,
@@ -49,6 +52,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             using (scope3) {
                 await repo3.AddAsync(
                     new() {
+                        Uid      = Guid.NewGuid(),
                         FullName = "Charlie",
                         Age      = 20,
                         Grade    = 2,

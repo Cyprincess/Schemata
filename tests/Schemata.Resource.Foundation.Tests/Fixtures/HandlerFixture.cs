@@ -94,7 +94,7 @@ public class HandlerFixture
 
         Repository.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
                   .Returns((Student s, CancellationToken _) => {
-                           var idx                     = Students.FindIndex(x => x.Id == s.Id);
+                           var idx                     = Students.FindIndex(x => x.Uid == s.Uid);
                            if (idx >= 0) Students[idx] = s;
                            return Task.CompletedTask;
                        }
@@ -115,7 +115,7 @@ public class HandlerFixture
 
     public List<Student> Students { get; } = [
         new() {
-            Id            = 1,
+            Uid           = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             FullName      = "Alice",
             Age           = 18,
             Grade         = 1,
@@ -124,7 +124,7 @@ public class HandlerFixture
             Timestamp     = Guid.NewGuid(),
         },
         new() {
-            Id            = 2,
+            Uid           = Guid.Parse("22222222-2222-2222-2222-222222222222"),
             FullName      = "Bob",
             Age           = 19,
             Grade         = 2,

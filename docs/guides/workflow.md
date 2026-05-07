@@ -4,6 +4,8 @@ This guide adds an enrollment state machine to the Student entity. After complet
 
 ## Add the workflow package
 
+`Schemata.Application.Complex.Targets` already includes `Schemata.Workflow.Foundation`. If you are composing packages manually:
+
 ```shell
 dotnet add package --prerelease Schemata.Workflow.Foundation
 ```
@@ -42,6 +44,7 @@ schema.UseWorkflow()
 Register the workflow entities so EF Core creates the backing tables:
 
 ```csharp
+using Microsoft.EntityFrameworkCore;
 using Schemata.Workflow.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
@@ -49,6 +52,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Student>            Students    => Set<Student>();
     public DbSet<SchemataWorkflow>   Workflows   => Set<SchemataWorkflow>();
     public DbSet<SchemataFlowTransition> Transitions => Set<SchemataFlowTransition>();
+
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.UseTableKeyConventions();
+    }
 }
 ```
 

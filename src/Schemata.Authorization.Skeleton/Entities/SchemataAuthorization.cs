@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -34,6 +35,18 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     /// <summary>Space-delimited scopes granted in this authorization.</summary>
     public virtual string? Scopes { get; set; }
 
+    /// <summary>The redirect URI associated with this authorization.</summary>
+    public virtual string? RedirectUri { get; set; }
+
+    /// <summary>The response type associated with this authorization.</summary>
+    public virtual string? ResponseType { get; set; }
+
+    /// <summary>The PKCE code challenge method associated with this authorization.</summary>
+    public virtual string? CodeChallengeMethod { get; set; }
+
+    /// <summary>The requested Authentication Context Class References associated with this authorization.</summary>
+    public virtual string? AcrValues { get; set; }
+
     #region ICanonicalName Members
 
     public string? Name          { get; set; }
@@ -49,7 +62,8 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
 
     #region IIdentifier Members
 
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

@@ -20,10 +20,10 @@ public class AdviceUpdateConcurrencyShould
         var advisor = new AdviceUpdateConcurrency<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var mock    = new Mock<IRepository<Student>>();
-        var stored  = new Student { Id = 1, Timestamp = shared };
+        var stored  = new Student { Uid = Guid.NewGuid(), Timestamp = shared };
         mock.Setup(r => r.GetAsync<IConcurrency>(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
-        var entity = new Student { Id = 1, Timestamp = shared };
+        var entity = new Student { Uid = Guid.NewGuid(), Timestamp = shared };
 
         var result = await advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None);
 
@@ -37,10 +37,10 @@ public class AdviceUpdateConcurrencyShould
         var advisor = new AdviceUpdateConcurrency<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var mock    = new Mock<IRepository<Student>>();
-        var stored  = new Student { Id = 1, Timestamp = Guid.NewGuid() };
+        var stored  = new Student { Uid = Guid.NewGuid(), Timestamp = Guid.NewGuid() };
         mock.Setup(r => r.GetAsync<IConcurrency>(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(stored);
-        var entity = new Student { Id = 1, Timestamp = Guid.NewGuid() };
+        var entity = new Student { Uid = Guid.NewGuid(), Timestamp = Guid.NewGuid() };
 
         await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(
                                                            ctx,
@@ -58,7 +58,7 @@ public class AdviceUpdateConcurrencyShould
         var mock    = new Mock<IRepository<Student>>();
         mock.Setup(r => r.GetAsync<IConcurrency>(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IConcurrency?)null);
-        var entity = new Student { Id = 1, Timestamp = Guid.NewGuid() };
+        var entity = new Student { Uid = Guid.NewGuid(), Timestamp = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class AdviceUpdateConcurrencyShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new ConcurrencySuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { Id = 1, Timestamp = Guid.NewGuid() };
+        var entity     = new Student { Uid = Guid.NewGuid(), Timestamp = Guid.NewGuid() };
         var original   = entity.Timestamp;
 
         var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);

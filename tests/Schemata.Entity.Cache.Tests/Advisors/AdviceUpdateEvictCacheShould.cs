@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,7 +32,8 @@ public class AdviceUpdateEvictCacheShould
     public async Task AdviseAsync_WhenEntityUpdated_RemovesAllKeysInCollection() {
         var cacheKey1 = "first-key";
         var cacheKey2 = "second-key";
-        var indexKey  = ReverseIndex.BuildKey(typeof(Student), new Student { Id = 7 });
+        var uid       = Guid.NewGuid();
+        var indexKey  = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
         var mock = new Mock<ICacheProvider>();
@@ -41,7 +43,7 @@ public class AdviceUpdateEvictCacheShould
         var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Id = 7, FullName = "Alice" };
+        var entity  = new Student { Uid = uid, FullName = "Alice" };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -58,7 +60,7 @@ public class AdviceUpdateEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new QueryCacheEvictionSuppressed());
         var repo   = new Mock<IRepository<Student>>().Object;
-        var entity = new Student { Id = 11 };
+        var entity = new Student { Uid = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -75,7 +77,7 @@ public class AdviceUpdateEvictCacheShould
         var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Id = 11 };
+        var entity  = new Student { Uid = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -93,7 +95,7 @@ public class AdviceUpdateEvictCacheShould
         var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Id = 999 };
+        var entity  = new Student { Uid = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -102,11 +104,13 @@ public class AdviceUpdateEvictCacheShould
 
     [Fact]
     public async Task AdviseAsync_DoesNotEvictEntriesForDifferentEntityId() {
-        var other      = new Student { Id = 100 };
+        var otherUid   = Guid.NewGuid();
+        var other      = new Student { Uid = otherUid };
         var otherIndex = ReverseIndex.BuildKey(typeof(Student), other);
         Assert.NotNull(otherIndex);
 
-        var targetIndex = ReverseIndex.BuildKey(typeof(Student), new Student { Id = 1 });
+        var targetUid   = Guid.NewGuid();
+        var targetIndex = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = targetUid });
         Assert.NotNull(targetIndex);
 
         var mock = new Mock<ICacheProvider>();
@@ -116,7 +120,7 @@ public class AdviceUpdateEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
 
-        var target = new Student { Id = 1 };
+        var target = new Student { Uid = targetUid };
         var result = await advisor.AdviseAsync(ctx, repo, target, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
@@ -149,7 +153,7 @@ public class AdviceUpdateEvictCacheShould
         var evict   = new AdviceUpdateEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
-        var student = new Student { Id = 4242, FullName = "Zed" };
+        var student = new Student { Uid = Guid.NewGuid(), FullName = "Zed" };
         var data    = new[] { student }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repo, data) { Result = student };
 

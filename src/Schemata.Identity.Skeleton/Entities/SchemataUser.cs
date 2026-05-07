@@ -1,18 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
 [DisplayName("User")]
 [Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
-public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
+public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
+    [NotMapped]
+    public override Guid Id
+    {
+        get => Uid;
+        set => Uid = value;
+    }
+
     /// <summary>Bridges Identity's string-based ConcurrencyStamp to the Guid-based Timestamp.</summary>
     [NotMapped]
     public override string? ConcurrencyStamp
@@ -56,9 +63,9 @@ public class SchemataUser : IdentityUser<long>, IIdentifier, ICanonicalName, IDe
 
     #region IIdentifier Members
 
-    /// <inheritdoc cref="Id" />
-    [Key]
-    public override long Id { get; set; }
+    /// <inheritdoc />
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

@@ -1,11 +1,11 @@
 # Getting Started
 
-This guide walks through building a minimal student-management API with full CRUD and auto-generated HTTP endpoints. By the end you will have a running application that supports creating, listing, reading, updating, and soft-deleting students.
+This guide walks through building a student CRUD API with auto-generated HTTP endpoints. By the end you will have a running application that supports creating, listing, reading, updating, and soft-deleting students.
 
 ## Prerequisites
 
 - .NET 8 SDK or later
-- Basic familiarity with ASP.NET Core
+- Familiarity with ASP.NET Core
 
 ## Create the project
 
@@ -15,7 +15,7 @@ cd StudentApp
 dotnet add package --prerelease Schemata.Application.Complex.Targets
 ```
 
-`Schemata.Application.Complex.Targets` is a meta-package that pulls in the core framework, Entity Framework Core, Mapster, resource services, and other commonly used packages. See [Packages](../documents/packages.md) for the full package matrix.
+`Schemata.Application.Complex.Targets` bundles the core framework, Entity Framework Core, Mapster, resource services, and commonly used packages. See [Packages](../documents/packages.md) for the full package matrix.
 
 ## Define the entity
 
@@ -31,7 +31,7 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
     public int     Age      { get; set; }
 
     // IIdentifier
-    public long Id { get; set; }
+    public Guid Uid { get; set; }
 
     // ICanonicalName
     public string? Name          { get; set; }
@@ -47,16 +47,16 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 }
 ```
 
-Each trait enables automatic behavior through built-in advisors:
+Each trait enables behavior through built-in advisors:
 
-| Trait            | Behavior                                                                                       |
-| ---------------- | ---------------------------------------------------------------------------------------------- |
-| `IIdentifier`    | Marks the entity as having a `long` surrogate primary key                                      |
-| `ICanonicalName` | Provides `Name` (short identifier) and `CanonicalName` (fully-qualified resource name)         |
-| `ITimestamp`     | Automatically sets `CreateTime` on add and `UpdateTime` on update                              |
-| `ISoftDelete`    | Sets `DeleteTime` instead of physically deleting the row; queries filter out soft-deleted rows |
+| Trait            | Behavior                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| `IIdentifier`    | Supplies a `Guid` primary key via the `Uid` property                                   |
+| `ICanonicalName` | Provides `Name` (short identifier) and `CanonicalName` (fully-qualified resource name) |
+| `ITimestamp`     | Sets `CreateTime` on add and `UpdateTime` on update automatically                      |
+| `ISoftDelete`    | Sets `DeleteTime` on delete instead of removing the row; queries exclude soft-deleted  |
 
-The `[CanonicalName("students/{student}")]` attribute defines the resource name pattern. The collection segment (`students`) determines the HTTP route prefix, and the variable segment (`{student}`) is resolved from the entity's `Name` property.
+The `[CanonicalName("students/{student}")]` attribute defines the resource name pattern. `students` is the collection segment (the HTTP route prefix) and `{student}` is a variable segment resolved from the entity's `Name` property.
 
 For a complete reference of all available traits, see [Traits](../documents/entity/traits.md).
 
@@ -70,22 +70,30 @@ using Microsoft.EntityFrameworkCore;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Student> Students => Set<Student>();
+
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.UseTableKeyConventions();
+    }
 }
 ```
 
-## Create the ID advisor
+`UseTableKeyConventions()` registers the Schemata `TableKeyConvention` so EF Core respects `[TableKey]` attributes when determining primary keys. Without it, entities that rely on `[TableKey]` for composite or custom key ordering will not be configured correctly.
 
-The resource pipeline clears `Name` on create requests to prevent client injection. Since `[CanonicalName]` requires `Name` to be non-null when the canonical name advisor runs, create an advisor that generates `Id` and `Name` before that happens:
+## Create the Name advisor
+
+The resource pipeline clears `Name` on create requests to prevent client injection. Since `[CanonicalName]` requires `Name` to be non-null when the canonical name advisor runs, create an advisor that populates `Uid` and `Name` before that happens:
 
 ```csharp
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
-public sealed class StudentIdAdvisor : IRepositoryAddAdvisor<Student>
+public sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
 {
-    // Runs before AdviceAddCanonicalName (Order 120_000_000)
-    public int Order => 115_000_000;
+    // Run early
+    public int Order => 0;
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
@@ -93,18 +101,20 @@ public sealed class StudentIdAdvisor : IRepositoryAddAdvisor<Student>
         Student              entity,
         CancellationToken    ct)
     {
-        if (entity.Id <= 0)
-            entity.Id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (entity.Uid == Guid.Empty)
+            entity.Uid = Guid.CreateVersion7();
 
         if (string.IsNullOrWhiteSpace(entity.Name))
-            entity.Name = entity.Id.ToString();
+            entity.Name = entity.Uid.ToString("N");
 
         return Task.FromResult(AdviseResult.Continue);
     }
 }
 ```
 
-The `Order` property controls where this advisor runs relative to the built-in advisors. The mutation pipeline runs advisors in ascending order. See [Mutation Pipeline](../documents/repository/mutation-pipeline.md) for the full advisor execution order.
+`Guid.CreateVersion7()` produces a time-ordered UUID that works well as a primary key for most databases. The advisor runs early (Order `50_000_000`, ahead of the built-in timestamp advisor at `100_000_000`) so that `Uid` and `Name` are set before any downstream advisor reads them.
+
+The `Order` property controls where this advisor runs relative to other advisors in the pipeline. Lower values execute first. See [Mutation Pipeline](../documents/repository/mutation-pipeline.md) for the full advisor execution order.
 
 ## Configure the application
 
@@ -129,7 +139,7 @@ var builder = WebApplication.CreateBuilder(args)
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
             services.TryAddEnumerable(
-                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentIdAdvisor>());
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
         });
 
         schema.UseResource()
@@ -165,41 +175,44 @@ dotnet run
 
 The following endpoints are now available:
 
-| Method   | Path               | Description           |
-| -------- | ------------------ | --------------------- |
-| `GET`    | `/students`        | List all students     |
-| `POST`   | `/students`        | Create a student      |
-| `GET`    | `/students/{name}` | Get a student by name |
-| `PATCH`  | `/students/{name}` | Update a student      |
-| `DELETE` | `/students/{name}` | Soft-delete a student |
+| Method   | Path                     | Description           |
+| -------- | ------------------------ | --------------------- |
+| `GET`    | `/students`              | List all students     |
+| `POST`   | `/students`              | Create a student      |
+| `GET`    | `/{name=students/*}`     | Get a student by name |
+| `PATCH`  | `/{name=students/*}`     | Update a student      |
+| `DELETE` | `/{name=students/*}`     | Soft-delete a student |
 
 ```shell
 # Create a student
 curl -X POST http://localhost:5000/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20}'
+# Response includes "name" (e.g. "students/a1b2c3d4e5f6a7b8")
 
 # List all students
 curl http://localhost:5000/students
 
-# Get by name (use the name from the create response)
-curl http://localhost:5000/students/1
+# Get by name (copy the "name" value directly from the create response)
+curl http://localhost:5000/<name-from-response>
 
 # Update
-curl -X PATCH http://localhost:5000/students/1 \
+curl -X PATCH http://localhost:5000/<name-from-response> \
      -H "Content-Type: application/json" \
      -d '{"age":21}'
 
 # Soft-delete
-curl -X DELETE http://localhost:5000/students/1
+curl -X DELETE http://localhost:5000/<name-from-response>
 
-# Verify: list no longer includes the deleted student
+# The deleted student no longer appears in the list
 curl http://localhost:5000/students
 ```
 
-Note that request and response bodies use `snake_case` property names (`full_name`, `create_time`, etc.). This is configured automatically by Schemata's JSON serialization feature -- see [JSON Serialization](../documents/core/json-serialization.md) for details.
+The `name` field in responses is the full qualified resource name (e.g. `"students/a1b2c3d4e5f6a7b8"`). The route pattern `{name=students/*}` captures the full name as a single route parameter, constrained to the `students/` prefix. Use the `name` value from the response directly in the URL — the framework resolves the entity from it.
 
-Beyond snake_case, the HTTP transport also renames a few resource properties to follow AIP conventions: `CanonicalName` is removed from responses (clients see only the short `name`, since the full path is already in the URL), `EntityTag` is serialized as `etag` rather than the default `entity_tag`, and the list collection uses the pluralized resource name (e.g. `students`) instead of the C# property name `Entities`. The gRPC transport applies equivalent but [different mappings](../documents/resource/grpc-transport.md#comparison-with-http).
+Request and response bodies use `snake_case` property names (`full_name`, `create_time`, etc.). This is configured automatically by Schemata's JSON serialization feature — see [JSON Serialization](../documents/core/json-serialization.md) for details.
+
+The HTTP transport serializes properties to follow AIP conventions: `Name` contains the full qualified resource name (`"students/a1b2c3d4"`), `EntityTag` serializes as `etag`, and list responses use the pluralized resource name (`"students"`) for the collection field. The gRPC transport applies equivalent but [different mappings](../documents/resource/grpc-transport.md#comparison-with-http).
 
 ## Next steps
 

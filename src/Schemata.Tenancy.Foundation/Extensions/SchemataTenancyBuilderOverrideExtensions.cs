@@ -16,12 +16,11 @@ public static class SchemataTenancyBuilderOverrideExtensions
     ///     Registers an override applied to every tenant container and the no-tenant root container,
     ///     executed in registration order before tenant-specific and dynamic overrides.
     /// </summary>
-    public static SchemataTenancyBuilder<TTenant, TKey> ForAll<TTenant, TKey>(
-        this SchemataTenancyBuilder<TTenant, TKey> builder,
-        Action<IServiceCollection>                 configure
+    public static SchemataTenancyBuilder<TTenant> ForAll<TTenant>(
+        this SchemataTenancyBuilder<TTenant> builder,
+        Action<IServiceCollection>           configure
     )
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
+        where TTenant : SchemataTenant {
         if (configure is null) {
             throw new ArgumentNullException(nameof(configure));
         }
@@ -34,15 +33,14 @@ public static class SchemataTenancyBuilderOverrideExtensions
 
     /// <summary>
     ///     Registers an override applied only when the current tenant identifier exactly matches
-    ///     <paramref name="tenantId" />; runs after <see cref="ForAll{TTenant,TKey}" /> overrides.
+    ///     <paramref name="tenantId" />; runs after <see cref="ForAll{TTenant}" /> overrides.
     /// </summary>
-    public static SchemataTenancyBuilder<TTenant, TKey> ForTenant<TTenant, TKey>(
-        this SchemataTenancyBuilder<TTenant, TKey> builder,
-        string                                     tenantId,
-        Action<IServiceCollection>                 configure
+    public static SchemataTenancyBuilder<TTenant> ForTenant<TTenant>(
+        this SchemataTenancyBuilder<TTenant> builder,
+        string                               tenantId,
+        Action<IServiceCollection>           configure
     )
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
+        where TTenant : SchemataTenant {
         if (string.IsNullOrWhiteSpace(tenantId)) {
             throw new ArgumentException("Tenant id must not be empty.", nameof(tenantId));
         }
@@ -66,15 +64,14 @@ public static class SchemataTenancyBuilderOverrideExtensions
 
     /// <summary>
     ///     Registers a dynamic override invoked for every tenant container with the tenant identifier
-    ///     and the root service provider; runs last, after <see cref="ForAll{TTenant,TKey}" /> and
+    ///     and the root service provider; runs last, after <see cref="ForAll{TTenant}" /> and
     ///     the tenant-specific overloads.
     /// </summary>
-    public static SchemataTenancyBuilder<TTenant, TKey> ForTenant<TTenant, TKey>(
-        this SchemataTenancyBuilder<TTenant, TKey>           builder,
+    public static SchemataTenancyBuilder<TTenant> ForTenant<TTenant>(
+        this SchemataTenancyBuilder<TTenant>                 builder,
         Action<string, IServiceCollection, IServiceProvider> configure
     )
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
+        where TTenant : SchemataTenant {
         if (configure is null) {
             throw new ArgumentNullException(nameof(configure));
         }

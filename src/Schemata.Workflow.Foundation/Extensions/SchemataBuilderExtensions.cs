@@ -83,7 +83,7 @@ public static class SchemataBuilderExtensions
             map.For(d => d.Graph).From(s => s.Graph);
             map.For(d => d.Events).From(s => s.Events);
             map.For(d => d.Transitions).From(s => s.Transitions);
-            map.For(d => d.Id).From(s => s.Workflow.Id);
+            map.For(d => d.Uid).From(s => s.Workflow.Uid);
             map.For(d => d.State).From(s => s.Instance.State);
             map.For(d => d.CreateTime).From(s => s.Workflow.CreateTime);
             map.For(d => d.UpdateTime).From(s => s.Workflow.UpdateTime);

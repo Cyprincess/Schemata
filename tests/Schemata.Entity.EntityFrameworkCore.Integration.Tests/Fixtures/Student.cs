@@ -1,5 +1,6 @@
 using System;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
@@ -25,7 +26,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, I
 
     #region IIdentifier Members
 
-    public long Id { get; set; }
+    [TableKey]
+    public Guid Uid { get; set; }
 
     #endregion
 

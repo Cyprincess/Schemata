@@ -2,7 +2,9 @@
 
 This guide adds gRPC endpoints alongside the existing HTTP API for the Student CRUD app. By the end, the same `Student` resource will be accessible over both HTTP and gRPC using code-first protobuf-net serialization.
 
-## Add the package
+## Add the gRPC package
+
+`Schemata.Application.Complex.Targets` already includes `Schemata.Resource.Grpc`. If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Resource.Grpc
@@ -63,10 +65,10 @@ using Schemata.Abstractions.Entities;
 
 [ProtoContract]
 [CanonicalName("students/{student}")]
-public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
+public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, IConcurrency
 {
     [ProtoMember(1)]
-    public long Id { get; set; }
+    public Guid Uid { get; set; }
 
     [ProtoMember(2)]
     public string? Name { get; set; }
@@ -75,24 +77,27 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
     public string? CanonicalName { get; set; }
 
     [ProtoMember(4)]
-    public string? FullName { get; set; }
+    public Guid? Timestamp { get; set; }
 
     [ProtoMember(5)]
-    public int Age { get; set; }
+    public string? FullName { get; set; }
 
     [ProtoMember(6)]
-    public DateTime? CreateTime { get; set; }
+    public int Age { get; set; }
 
     [ProtoMember(7)]
-    public DateTime? UpdateTime { get; set; }
+    public DateTime? CreateTime { get; set; }
 
     [ProtoMember(8)]
-    public DateTime? DeleteTime { get; set; }
+    public DateTime? UpdateTime { get; set; }
 
     [ProtoMember(9)]
-    public DateTime? PurgeTime { get; set; }
+    public DateTime? DeleteTime { get; set; }
 
     [ProtoMember(10)]
+    public DateTime? PurgeTime { get; set; }
+
+    [ProtoMember(11)]
     public string? CreatedBy { get; set; }
 }
 ```

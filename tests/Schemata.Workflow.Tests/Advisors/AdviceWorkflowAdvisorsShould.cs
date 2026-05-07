@@ -22,8 +22,8 @@ public class AdviceWorkflowAdvisorsShould
 
     private static AdviceContext CreateContext() { return new(new ServiceCollection().BuildServiceProvider()); }
 
-    private static SchemataWorkflow CreateWorkflow(long id = 1) {
-        return new() { Id = id, InstanceType = "Order", InstanceId = id };
+    private static SchemataWorkflow CreateWorkflow(Guid id) {
+        return new() { Uid = id, InstanceType = "Order", InstanceId = id };
     }
 
     #region StatusAnonymous
@@ -32,7 +32,7 @@ public class AdviceWorkflowAdvisorsShould
     public async Task StatusAnonymous_NoAttribute_DoesNotSetAnonymousGranted() {
         var advisor  = new AdviceStatusAnonymous();
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         var result = await advisor.AdviseAsync(ctx, workflow, CreateUser());
 
@@ -64,7 +64,7 @@ public class AdviceWorkflowAdvisorsShould
     public async Task RaiseAnonymous_NoAttribute_DoesNotSetAnonymousGranted() {
         var advisor  = new AdviceRaiseAnonymous();
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
         var request  = new OrderEvent { Event = "Approve" };
 
         var result = await advisor.AdviseAsync(ctx, workflow, request, CreateUser());
@@ -79,10 +79,10 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task StatusAuthorize_WithAnonymousGranted_SkipsAccessCheck() {
-        var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
+        var access      = new Mock<IAccessProvider<SchemataWorkflow, Guid>>(MockBehavior.Strict);
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, Guid>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<long>>(),
+                              It.IsAny<AccessContext<Guid>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -92,7 +92,7 @@ public class AdviceWorkflowAdvisorsShould
         var advisor = new AdviceStatusAuthorize(access.Object, entitlement.Object);
         var ctx     = CreateContext();
         ctx.Set(new AnonymousGranted());
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         var result = await advisor.AdviseAsync(ctx, workflow, CreateUser());
 
@@ -101,19 +101,19 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task StatusAuthorize_Unauthorized_ThrowsAuthorizationException() {
-        var access = new Mock<IAccessProvider<SchemataWorkflow, long>>();
+        var access = new Mock<IAccessProvider<SchemataWorkflow, Guid>>();
         access.Setup(a => a.HasAccessAsync(
                          It.IsAny<SchemataWorkflow?>(),
-                         It.IsAny<AccessContext<long>>(),
+                         It.IsAny<AccessContext<Guid>>(),
                          It.IsAny<ClaimsPrincipal?>(),
                          It.IsAny<CancellationToken>()
                      )
                )
               .ReturnsAsync(false);
 
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, Guid>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<long>>(),
+                              It.IsAny<AccessContext<Guid>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -122,26 +122,26 @@ public class AdviceWorkflowAdvisorsShould
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, CreateUser()));
     }
 
     [Fact]
     public async Task StatusAuthorize_Authorized_ReturnsContinue() {
-        var access = new Mock<IAccessProvider<SchemataWorkflow, long>>();
+        var access = new Mock<IAccessProvider<SchemataWorkflow, Guid>>();
         access.Setup(a => a.HasAccessAsync(
                          It.IsAny<SchemataWorkflow?>(),
-                         It.IsAny<AccessContext<long>>(),
+                         It.IsAny<AccessContext<Guid>>(),
                          It.IsAny<ClaimsPrincipal?>(),
                          It.IsAny<CancellationToken>()
                      )
                )
               .ReturnsAsync(true);
 
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, Guid>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<long>>(),
+                              It.IsAny<AccessContext<Guid>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
@@ -150,7 +150,7 @@ public class AdviceWorkflowAdvisorsShould
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         var result = await advisor.AdviseAsync(ctx, workflow, CreateUser());
 
@@ -159,39 +159,39 @@ public class AdviceWorkflowAdvisorsShould
 
     [Fact]
     public async Task StatusAuthorize_EntitlementDenied_ThrowsAuthorizationException() {
-        var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
+        var access      = new Mock<IAccessProvider<SchemataWorkflow, Guid>>(MockBehavior.Strict);
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, Guid>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<long>>(),
+                              It.IsAny<AccessContext<Guid>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
                     )
-                   .ReturnsAsync(w => w.Id == 999);
+                   .ReturnsAsync(w => w.Uid == Guid.NewGuid());
 
         var advisor  = new AdviceStatusAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, CreateUser()));
     }
 
     [Fact]
     public async Task StatusAuthorize_EntitlementDenied_Anonymous_StillThrows() {
-        var access      = new Mock<IAccessProvider<SchemataWorkflow, long>>(MockBehavior.Strict);
-        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, long>>();
+        var access      = new Mock<IAccessProvider<SchemataWorkflow, Guid>>(MockBehavior.Strict);
+        var entitlement = new Mock<IEntitlementProvider<SchemataWorkflow, Guid>>();
         entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
-                              It.IsAny<AccessContext<long>>(),
+                              It.IsAny<AccessContext<Guid>>(),
                               It.IsAny<ClaimsPrincipal?>(),
                               It.IsAny<CancellationToken>()
                           )
                     )
-                   .ReturnsAsync(w => w.Id == 999);
+                   .ReturnsAsync(w => w.Uid == Guid.NewGuid());
 
         var advisor = new AdviceStatusAuthorize(access.Object, entitlement.Object);
         var ctx     = CreateContext();
         ctx.Set(new AnonymousGranted());
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
 
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, CreateUser()));
     }
@@ -252,7 +252,7 @@ public class AdviceWorkflowAdvisorsShould
         var advisor = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
         var ctx     = CreateContext();
         ctx.Set(new AnonymousGranted());
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
         var request  = new OrderEvent { Event = "Approve" };
 
         var result = await advisor.AdviseAsync(ctx, workflow, request, CreateUser());
@@ -283,7 +283,7 @@ public class AdviceWorkflowAdvisorsShould
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
         var request  = new OrderEvent { Event = "Approve" };
 
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, request, CreateUser())
@@ -313,7 +313,7 @@ public class AdviceWorkflowAdvisorsShould
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
         var request  = new OrderEvent { Event = "Approve" };
 
         var result = await advisor.AdviseAsync(ctx, workflow, request, CreateUser());
@@ -331,11 +331,11 @@ public class AdviceWorkflowAdvisorsShould
                               It.IsAny<CancellationToken>()
                           )
                     )
-                   .ReturnsAsync(w => w.Id == 999);
+                   .ReturnsAsync(w => w.Uid == Guid.NewGuid());
 
         var advisor  = new AdviceRaiseAuthorize(access.Object, entitlement.Object);
         var ctx      = CreateContext();
-        var workflow = CreateWorkflow();
+        var workflow = CreateWorkflow(Guid.NewGuid());
         var request  = new OrderEvent { Event = "Approve" };
 
         await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(ctx, workflow, request, CreateUser())

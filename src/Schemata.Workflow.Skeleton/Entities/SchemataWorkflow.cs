@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Workflow.Skeleton.Entities;
 
@@ -17,7 +18,7 @@ public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
     /// <summary>
     ///     The identifier of the stateful entity instance that this workflow tracks.
     /// </summary>
-    public virtual long InstanceId { get; set; }
+    public virtual Guid InstanceId { get; set; }
 
     /// <summary>
     ///     The fully qualified CLR type name of the stateful entity instance.
@@ -37,8 +38,8 @@ public class SchemataWorkflow : IIdentifier, ICanonicalName, ITimestamp
     #region IIdentifier Members
 
     /// <inheritdoc />
-    [Key]
-    public virtual long Id { get; set; }
+    [TableKey]
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

@@ -109,7 +109,7 @@ builder.UseSchemata(schema => {
 
 ## Feature dependencies
 
-Features can declare dependencies using `[DependsOn<T>]` or `[DependsOn("full.type.name")]`. When a feature depends on another, the framework ensures the dependency is registered. Key dependency relationships:
+Features can declare dependencies using `[DependsOn("fully.qualified.type.name")]`. When a feature depends on another, the framework ensures the dependency is registered. Key dependency relationships:
 
 | Feature                           | Depends on                                                                    |
 | --------------------------------- | ----------------------------------------------------------------------------- |

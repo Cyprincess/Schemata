@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
 
@@ -23,36 +23,56 @@ namespace Schemata.Entity.Repository;
 /// </summary>
 public abstract class RepositoryBase
 {
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IList<PropertyInfo>> KeyProperties = [];
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, IReadOnlyList<PropertyInfo>> KeyProperties = new();
 
     /// <summary>
-    ///     Returns the cached list of key properties for the specified type, discovering
-    ///     them by <see cref="KeyAttribute" /> or by convention (property named "Id").
+    ///     Resolves the key properties for the specified type by scanning
+    ///     <see cref="TableKeyAttribute" /> or falling back to the "Id" convention.
+    /// </summary>
+    /// <param name="type">The entity type to inspect.</param>
+    /// <returns>The list of key property infos.</returns>
+    public static IReadOnlyList<PropertyInfo> ResolveKeyProperties(Type type) {
+        var properties = TypePropertiesCache(type);
+
+        var keys = properties
+                  .SelectMany(p => p.GetCustomAttributes<TableKeyAttribute>(true)
+                                    .Select(a => (Property: p, Order: a.Order)))
+                  .OrderBy(x => x.Order)
+                  .Select(x => x.Property)
+                  .ToList();
+
+        if (keys.Count > 0) {
+            return keys;
+        }
+
+        var id = properties.FirstOrDefault(p => string.Equals(
+                                               p.Name,
+                                               nameof(IIdentifier.Uid),
+                                               StringComparison.InvariantCultureIgnoreCase
+                                           )
+        );
+        if (id is not null) {
+            return new List<PropertyInfo> { id };
+        }
+
+        return new List<PropertyInfo>();
+    }
+
+    /// <summary>
+    ///     Returns the cached list of key properties for the specified type.
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
     /// <returns>The list of key property infos.</returns>
     public static IReadOnlyList<PropertyInfo> KeyPropertiesCache(Type type) {
-        if (KeyProperties.TryGetValue(type.TypeHandle, out var pi)) {
-            return pi.ToList();
+        if (KeyProperties.TryGetValue(type.TypeHandle, out var properties)) {
+            return properties;
         }
 
-        var allProperties = TypePropertiesCache(type);
-        var keyProperties = allProperties.Where(p => p.HasCustomAttribute<KeyAttribute>(true)).ToList();
+        properties = ResolveKeyProperties(type);
 
-        if (keyProperties.Count == 0) {
-            var id = allProperties.FirstOrDefault(p => string.Equals(
-                                                      p.Name,
-                                                      "id",
-                                                      StringComparison.InvariantCultureIgnoreCase
-                                                  )
-            );
-            if (id is not null) {
-                keyProperties.Add(id);
-            }
-        }
+        KeyProperties[type.TypeHandle] = properties;
 
-        KeyProperties[type.TypeHandle] = keyProperties;
-        return keyProperties;
+        return properties;
     }
 
     /// <summary>

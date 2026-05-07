@@ -119,8 +119,8 @@
         <note />
       </trans-unit>
       <trans-unit id="ST1020">
-        <source>Entity must have at least one [Key].</source>
-        <target state="translated">L'entità deve avere almeno un [Key].</target>
+        <source>Entity must have at least one [TableKey] or Id property.</source>
+        <target state="translated">L'entità deve avere almeno un [TableKey].</target>
         <note />
       </trans-unit>
       <trans-unit id="ST1021">

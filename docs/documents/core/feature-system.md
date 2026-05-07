@@ -156,13 +156,17 @@ Built-in core features form a chain starting at `Base`, each adding 10,000,000 o
 
 Extension features start at `Extension` (400M) with their own offsets:
 
+- Security: Extension + 0M
 - Identity: Extension + 10M
 - Authorization: Extension + 20M
 - Mapping: Extension + 30M
+- Workflow: Extension + 40M
 - Resource: Extension + 50M
+- HttpResource: Extension + 60M
+- GrpcResource: Extension + 70M
 - Modules: Extension + 80M
 
-Custom features should use values above the last built-in chain value but below `Extension` for core-level features, or above the last extension value for extension-level features.
+Custom features should use values above the highest built-in but below `Extension` for core-level features, or above the last extension value for extension-level features.
 
 ## SchemataOptions
 
@@ -224,21 +228,11 @@ After both `ConfigureApplication` and `ConfigureEndpoints` complete, `CleanSchem
 
 ## Feature dependencies
 
-Features can declare dependencies using two attributes:
-
-### DependsOn&lt;T&gt;
-
-The generic attribute takes a feature type. When the dependent feature is registered, the framework checks whether the dependency is already present. If not, it is **automatically registered**:
-
-```csharp
-[DependsOn<SchemataRoutingFeature>]
-[DependsOn<SchemataExceptionHandlerFeature>]
-public sealed class SchemataControllersFeature : FeatureBase { ... }
-```
+Features can declare dependencies using the `DependsOn` attribute:
 
 ### DependsOn (string name)
 
-The non-generic attribute takes a fully-qualified type name. This is used for cross-assembly dependencies where the type may not be directly referenceable. It logs a warning or error but does **not** auto-register:
+The attribute takes a fully-qualified type name. This is used for cross-assembly dependencies where the type may not be directly referenceable. When the dependent feature is registered, the framework checks whether each dependency is already present.
 
 ```csharp
 [DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
@@ -325,11 +319,11 @@ builder.UseSchemata(schema => {
 If your feature requires other features, annotate the class:
 
 ```csharp
-[DependsOn<SchemataRoutingFeature>]
+[DependsOn("Schemata.Core.Features.SchemataRoutingFeature")]
 public sealed class MyCustomFeature : FeatureBase { ... }
 ```
 
-Missing generic dependencies are auto-registered. This means the user does not need to explicitly call `UseRouting` if your feature depends on it -- but the auto-registered feature will use default options.
+Missing dependencies log at `Error` level. Use `[DependsOn("type.name", Optional = true)]` to log at `Information` level instead.
 
 ## Configurators
 

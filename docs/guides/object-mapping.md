@@ -1,10 +1,10 @@
 # Object Mapping
 
-This guide picks up where [Getting Started](getting-started.md) left off. You will introduce separate request and response types so that the API exposes only the fields clients need, while the persistent `Student` entity remains unchanged.
+This guide builds on [Getting Started](getting-started.md). You will introduce separate request and response types so the API exposes only the fields clients need, while the persistent `Student` entity remains unchanged.
 
 ## Create the request DTO
 
-`StudentRequest` is used for both `POST` (create) and `PATCH` (update) bodies. It implements `ICanonicalName` because the resource pipeline requires it on all four type parameters. `IFreshness` enables ETag-based conditional updates. `IUpdateMask` enables partial updates by specifying which fields to write. `IValidation` enables dry-run validation (covered in a later guide).
+`StudentRequest` is used for both `POST` (create) and `PATCH` (update) bodies. It implements `ICanonicalName` because the resource pipeline requires it on all four type parameters. `IFreshness` enables ETag-based conditional updates. `IUpdateMask` enables partial updates. `IValidation` enables dry-run validation (covered in a later guide).
 
 Create `StudentRequest.cs`:
 
@@ -82,9 +82,9 @@ public record StudentSummary : ICanonicalName
 
 ## Configure Mapster mappings
 
-The `UseMapster()` extension on `SchemataBuilder` returns a `SchemataMappingBuilder`. Call `Map<TSource, TDestination>()` to register each mapping pair. When source and destination properties have the same name and type, Mapster maps them automatically -- no extra configuration is needed.
+`UseMapster()` on `SchemataBuilder` returns a `SchemataMappingBuilder`. Call `Map<TSource, TDestination>()` to register each mapping pair. When source and destination properties share the same name and type, Mapster maps them automatically.
 
-In `Program.cs`, replace the `schema.UseMapster()` line:
+In `Program.cs`, replace `schema.UseMapster()`:
 
 ```csharp
 schema.UseMapster()
@@ -93,7 +93,7 @@ schema.UseMapster()
       .Map<StudentRequest, Student>();
 ```
 
-The `Map<S, D>()` method accepts an optional `Action<Map<S, D>>` for custom field mappings, but the default convention-based mapping is sufficient here.
+`Map<S, D>()` accepts an optional `Action<Map<S, D>>` for custom field mappings, but the default convention-based mapping works here.
 
 ## Update the resource registration
 
@@ -141,7 +141,7 @@ var builder = WebApplication.CreateBuilder(args)
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
             services.TryAddEnumerable(
-                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentIdAdvisor>());
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
         });
 
         schema.UseResource()
@@ -179,7 +179,7 @@ The response is now a `StudentDetail`:
 {
   "full_name": "Alice",
   "age": 20,
-  "name": "1742956800000",
+  "name": "students/a1b2c3d4e5f6a7b8",
   "etag": null,
   "create_time": "2026-03-26T12:00:00Z",
   "update_time": null
@@ -200,7 +200,7 @@ Each item in the `students` array is now a `StudentSummary`:
     {
       "full_name": "Alice",
       "age": 20,
-      "name": "1742956800000"
+      "name": "students/a1b2c3d4e5f6a7b8"
     }
   ],
   "total_size": 1,
@@ -208,7 +208,7 @@ Each item in the `students` array is now a `StudentSummary`:
 }
 ```
 
-Notice that `etag` is `null`. The ETag is derived from `IConcurrency.Timestamp` on the entity, which `Student` does not implement yet. The next guide adds that.
+The `etag` is `null` because `Student` does not implement `IConcurrency` yet. The next guide adds that.
 
 ## Next steps
 

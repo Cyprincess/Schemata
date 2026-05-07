@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +18,7 @@ public class AdviceAddCanonicalNameShould
         var advisor    = new AdviceAddCanonicalName<Student>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { Id = 1, Name = "alice" };
+        var entity     = new Student { Uid = Guid.NewGuid(), Name = "alice" };
 
         var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
 

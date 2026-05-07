@@ -13,7 +13,7 @@ namespace Schemata.Authorization.Foundation.Managers;
 ///     <see cref="IRepository{TEntity}" />.
 /// </summary>
 /// <typeparam name="TScope">The scope entity type, must derive from <see cref="SchemataScope" />.</typeparam>
-/// <seealso cref="SchemataApplicationManager{TApplication}" />
+/// <seealso cref="SchemataApplicationManager{TApplication, TScope}" />
 public class SchemataScopeManager<TScope> : IScopeManager<TScope>
     where TScope : SchemataScope
 {
