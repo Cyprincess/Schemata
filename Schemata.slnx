@@ -27,6 +27,8 @@
     <Project Path="src/Schemata.Entity.LinqToDB/Schemata.Entity.LinqToDB.csproj" />
     <Project Path="src/Schemata.Entity.Owner/Schemata.Entity.Owner.csproj" />
     <Project Path="src/Schemata.Entity.Repository/Schemata.Entity.Repository.csproj" />
+    <Project Path="src/Schemata.Event.Foundation/Schemata.Event.Foundation.csproj" />
+    <Project Path="src/Schemata.Event.Skeleton/Schemata.Event.Skeleton.csproj" />
     <Project Path="src/Schemata.Flow.Foundation/Schemata.Flow.Foundation.csproj" />
     <Project Path="src/Schemata.Flow.Grpc/Schemata.Flow.Grpc.csproj" />
     <Project Path="src/Schemata.Flow.Http/Schemata.Flow.Http.csproj" />
@@ -42,6 +44,8 @@
     <Project Path="src/Schemata.Resource.Foundation/Schemata.Resource.Foundation.csproj" />
     <Project Path="src/Schemata.Resource.Grpc/Schemata.Resource.Grpc.csproj" />
     <Project Path="src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />
+    <Project Path="src/Schemata.Scheduling.Foundation/Schemata.Scheduling.Foundation.csproj" />
+    <Project Path="src/Schemata.Scheduling.Skeleton/Schemata.Scheduling.Skeleton.csproj" />
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />
     <Project Path="src/Schemata.Tenancy.Foundation/Schemata.Tenancy.Foundation.csproj" />

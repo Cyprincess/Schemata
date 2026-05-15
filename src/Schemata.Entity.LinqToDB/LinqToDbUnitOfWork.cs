@@ -42,7 +42,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         }
 
         await _transaction.CommitAsync(ct);
-        _transaction.Dispose();
+        await _transaction.DisposeAsync();
         _transaction = null;
     }
 
@@ -52,7 +52,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         }
 
         await _transaction.RollbackAsync(ct);
-        _transaction.Dispose();
+        await _transaction.DisposeAsync();
         _transaction = null;
     }
 

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Scheduling Foundation</Description>
+    <PackageTags>application;business;framework;schedule;job;cron;timer</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cronos" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>
