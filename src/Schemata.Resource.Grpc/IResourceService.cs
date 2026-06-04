@@ -15,7 +15,6 @@ namespace Schemata.Resource.Grpc;
 ///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>; implemented by
 ///     <seealso cref="ResourceService{TEntity,TRequest,TDetail,TSummary}" />.
 /// </summary>
-[Service]
 public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

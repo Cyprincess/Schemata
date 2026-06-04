@@ -1,0 +1,2 @@
+# google/cel-spec commit: f91dffca5a862d017d923dc277528e0b88fefac7
+# scope: specs/cel/tests/simple/testdata/basic.textproto self_eval_* vectors

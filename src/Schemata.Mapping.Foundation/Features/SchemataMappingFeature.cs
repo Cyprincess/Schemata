@@ -36,5 +36,5 @@ public sealed class SchemataMappingFeature<T> : SchemataMappingFeature
 /// </summary>
 public abstract class SchemataMappingFeature : FeatureBase
 {
-    public const int DefaultPriority = Orders.Extension + 30_000_000;
+    public const int DefaultPriority = Orders.Extension + 40_000_000;
 }

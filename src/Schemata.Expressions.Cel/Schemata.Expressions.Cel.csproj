@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - CEL Expressions</Description>
+    <PackageTags>application;business;framework;expressions;cel</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Parlot" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
+    <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

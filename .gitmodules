@@ -1,0 +1,3 @@
+[submodule "specs/cel"]
+	path = specs/cel
+	url = https://github.com/google/cel-spec
