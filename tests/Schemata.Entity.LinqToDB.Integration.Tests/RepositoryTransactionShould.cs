@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
@@ -23,14 +24,13 @@ public class RepositoryTransactionShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                await repository.AddAsync(
-                    new() {
-                        FullName = "Tx-Alice",
-                        Age      = 18,
-                        Grade    = 1,
-                        Name     = "tx-alice",
-                    }
-                );
+                await repository.AddAsync(new() {
+                                              Uid      = Guid.NewGuid(),
+                                              FullName = "Tx-Alice",
+                                              Age      = 18,
+                                              Grade    = 1,
+                                              Name     = "tx-alice",
+                                          });
                 var rows = await repository.CommitAsync();
                 Assert.True(rows > 0);
             }
@@ -51,14 +51,13 @@ public class RepositoryTransactionShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                await repository.AddAsync(
-                    new() {
-                        FullName = "Tx-Rollback",
-                        Age      = 25,
-                        Grade    = 5,
-                        Name     = "tx-rollback",
-                    }
-                );
+                await repository.AddAsync(new() {
+                                              Uid      = Guid.NewGuid(),
+                                              FullName = "Tx-Rollback",
+                                              Age      = 25,
+                                              Grade    = 5,
+                                              Name     = "tx-rollback",
+                                          });
                 // intentionally no CommitAsync -- disposing scope should roll back
             }
         }

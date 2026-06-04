@@ -31,7 +31,6 @@ public sealed class AdviceProfileClaimDestination : IDestinationAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,
@@ -54,8 +53,6 @@ public sealed class AdviceProfileClaimDestination : IDestinationAdvisor
             case Claims.Zoneinfo:
             case Claims.Locale:
             case Claims.UpdatedAt:
-                destinations.Add(ClaimDestinations.AccessToken);
-
                 if (!principal.HasScope(Scopes.Profile)) {
                     return Task.FromResult(AdviseResult.Handle);
                 }

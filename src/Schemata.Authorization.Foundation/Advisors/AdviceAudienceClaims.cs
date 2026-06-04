@@ -32,7 +32,6 @@ public sealed class AdviceAudienceClaims : IClaimsAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
         if (claims.Any(c => c.Type == Claims.Audience)) {
             return Task.FromResult(AdviseResult.Continue);

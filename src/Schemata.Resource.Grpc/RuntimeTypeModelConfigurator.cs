@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Humanizer;
 using ProtoBuf;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Entities;
@@ -71,7 +70,7 @@ internal static class RuntimeTypeModelConfigurator
 
                 // Map CanonicalName to "name" for AIP-122 wire compatibility.
                 case nameof(ICanonicalName.CanonicalName) when typeof(ICanonicalName).IsAssignableFrom(type):
-                    name = nameof(ICanonicalName.Name);
+                    name = Parameters.Name;
                     break;
 
                 // Map EntityTag to "etag" per AIP-154 concurrency token naming.
@@ -85,8 +84,7 @@ internal static class RuntimeTypeModelConfigurator
             }
 
             var field = meta.AddField(number++, property.Name);
-            // Underscore field names for proto convention (snake_case over PascalCase).
-            field.Name = name.Underscore();
+            field.Name = SchemataNaming.ToWireName(name);
 
             var underlying = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
 
@@ -107,12 +105,12 @@ internal static class RuntimeTypeModelConfigurator
     }
 
     public static void ConfigureListResponseType(RuntimeTypeModel model, Type summary, Type entity) {
-        var response = typeof(ListResult<>).MakeGenericType(summary);
+        var response = typeof(ListResultBase<>).MakeGenericType(summary);
         ConfigureType(model, response);
 
         var meta  = model[response];
         var field = meta.GetFields().FirstOrDefault(f => f.Name == "entities");
         // Rename "entities" to the pluralized resource name per AIP-132.
-        field!.Name = ResourceNameDescriptor.ForType(entity).Plural.Underscore();
+        field!.Name = SchemataNaming.ToWireName(ResourceNameDescriptor.ForType(entity).Plural);
     }
 }

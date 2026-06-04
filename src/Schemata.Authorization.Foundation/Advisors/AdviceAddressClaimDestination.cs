@@ -31,7 +31,6 @@ public sealed class AdviceAddressClaimDestination : IDestinationAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,
@@ -42,8 +41,6 @@ public sealed class AdviceAddressClaimDestination : IDestinationAdvisor
         if (claim.Type is not Claims.Address) {
             return Task.FromResult(AdviseResult.Continue);
         }
-
-        destinations.Add(ClaimDestinations.AccessToken);
 
         if (!principal.HasScope(Scopes.Address)) {
             return Task.FromResult(AdviseResult.Handle);

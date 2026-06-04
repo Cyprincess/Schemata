@@ -50,7 +50,6 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceCodeExchangePkce.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         CodeExchangeContext<TApp, TToken> exchange,
@@ -82,9 +81,19 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
             );
         }
 
+        // Use CryptographicOperations.FixedTimeEquals to compare verifier-derived values so
+        // an attacker cannot probe individual character matches via timing. Different lengths
+        // short-circuit to false; that is acceptable here because PKCE verifiers/challenges
+        // are fixed-shape base64url strings whose length leakage is not a vulnerability.
         var valid = exchange.Payload.CodeChallengeMethod switch {
-            PkceMethods.S256 => Base64UrlEncoder.Encode(SHA256.HashData(Encoding.ASCII.GetBytes(exchange.Request.CodeVerifier))) == exchange.Payload.CodeChallenge,
-            PkceMethods.Plain when !options.Value.RequirePkceS256 => exchange.Request.CodeVerifier == exchange.Payload.CodeChallenge,
+            PkceMethods.S256 => CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(Base64UrlEncoder.Encode(SHA256.HashData(Encoding.ASCII.GetBytes(exchange.Request.CodeVerifier)))),
+                Encoding.ASCII.GetBytes(exchange.Payload.CodeChallenge)
+            ),
+            PkceMethods.Plain when !options.Value.RequirePkceS256 => CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(exchange.Request.CodeVerifier),
+                Encoding.ASCII.GetBytes(exchange.Payload.CodeChallenge)
+            ),
             var _ => false,
         };
 

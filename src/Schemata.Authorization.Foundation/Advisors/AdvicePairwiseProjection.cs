@@ -45,7 +45,6 @@ public sealed class AdvicePairwiseProjection<TApp>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdvicePairwiseProjection.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
         var sub    = claims.FirstOrDefault(c => c.Type == Claims.Subject)?.Value;
         var client = claims.FirstOrDefault(c => c.Type == Claims.ClientId)?.Value;

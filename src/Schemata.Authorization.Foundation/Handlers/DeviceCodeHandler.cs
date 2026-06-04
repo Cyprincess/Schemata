@@ -169,7 +169,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         return AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType]         = GrantTypes.DeviceCode,
             [Properties.Scope]             = scope,
-            [Properties.AuthorizationName] = token.AuthorizationName,
+            [Properties.AuthorizationName] = token.Authorization,
             [Properties.SessionId]         = token.SessionId,
         });
     }

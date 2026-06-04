@@ -62,7 +62,8 @@ public class IntegrationFixture : IAsyncLifetime
         return (repository, scope);
     }
 
-    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDbContext> Uow, IServiceScope Scope) CreateScopeWithUoW() {
+    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDbContext> Uow,
+        IServiceScope Scope) CreateScopeWithUoW() {
         var scope       = _root!.CreateScope();
         var studentRepo = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         var courseRepo  = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();

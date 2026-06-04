@@ -51,10 +51,8 @@ public sealed class AdviceDeleteRequestAuthorize<TEntity> : IResourceDeleteReque
 
     #region IResourceDeleteRequestAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceDeleteRequestAuthorize.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         DeleteRequest                     request,

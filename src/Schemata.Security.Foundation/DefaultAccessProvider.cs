@@ -7,20 +7,19 @@ namespace Schemata.Security.Foundation;
 
 /// <summary>
 ///     Composes IPermissionResolver and IPermissionMatcher into a claims-based access check.
-///     A null principal is always denied.
+///     A null or unauthenticated principal is always denied.
 /// </summary>
 public sealed class DefaultAccessProvider<T, TRequest>(IPermissionResolver resolver, IPermissionMatcher matcher) : IAccessProvider<T, TRequest>
 {
     #region IAccessProvider<T,TRequest> Members
 
-    /// <inheritdoc />
     public Task<bool> HasAccessAsync(
         T?                      entity,
         AccessContext<TRequest> context,
         ClaimsPrincipal?        principal,
         CancellationToken       ct = default
     ) {
-        if (principal is null) {
+        if (principal?.Identity?.IsAuthenticated != true) {
             return Task.FromResult(false);
         }
 

@@ -196,7 +196,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         }
 
         var authorization = new TAuth {
-            ApplicationName = application.Name,
+            Application     = application.Name,
             Subject         = subject,
             Type            = AuthorizationTypes.Device,
             Status          = TokenStatuses.Valid,
@@ -208,7 +208,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
 
         device.Subject           = subject;
         device.Status            = TokenStatuses.Authorized;
-        device.AuthorizationName = authorization.Name;
+        device.Authorization = authorization.Name;
         device.SessionId         = sid;
 
         await tokens.UpdateAsync(device, ct);

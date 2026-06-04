@@ -43,7 +43,6 @@ internal static class ValidationHelper
             case AdviseResult.Block:
                 throw new ValidationException(errors);
             case AdviseResult.Handle:
-                return AdviseResult.Handle;
             case AdviseResult.Continue:
             default:
                 break;

@@ -50,7 +50,6 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizePkce.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
@@ -72,9 +71,14 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             return Task.FromResult(AdviseResult.Continue);
         }
 
+        // Normalize a missing method to "plain" per RFC 7636 §4.3, and write the result back to
+        // the request so every downstream path (silent auto-approval, consent UI, code persistence)
+        // sees the same canonical value. Without this, AdviceCodeExchangePkce later receives a null
+        // method and rejects the otherwise-valid exchange.
         var method = authz.Request.CodeChallengeMethod;
         if (string.IsNullOrWhiteSpace(method)) {
-            method = PkceMethods.Plain;
+            method                            = PkceMethods.Plain;
+            authz.Request.CodeChallengeMethod = method;
         }
 
         switch (method) {

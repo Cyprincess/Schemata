@@ -17,29 +17,25 @@ public static class SchemataBuilderExtensions
     /// <summary>
     ///     Adds multi-tenancy using the default entity type and <see cref="Guid" /> keys.
     /// </summary>
-    public static SchemataTenancyBuilder<SchemataTenant<Guid>, Guid> UseTenancy(this SchemataBuilder builder) {
-        return builder.UseTenancy<SchemataTenant<Guid>, Guid>();
+    public static SchemataTenancyBuilder<SchemataTenant> UseTenancy(this SchemataBuilder builder) {
+        return builder.UseTenancy<SchemataTenant>();
     }
 
     /// <summary>
     ///     Adds multi-tenancy using a custom tenant entity type with the default manager.
     /// </summary>
-    public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TTenant, TKey>(this SchemataBuilder builder)
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
-        return builder.UseTenancy<SchemataTenantManager<TTenant, TKey>, TTenant, TKey>();
+    public static SchemataTenancyBuilder<TTenant> UseTenancy<TTenant>(this SchemataBuilder builder)
+        where TTenant : SchemataTenant {
+        return builder.UseTenancy<SchemataTenantManager<TTenant>, TTenant>();
     }
 
     /// <summary>
     ///     Adds multi-tenancy using custom manager and tenant entity types.
     /// </summary>
-    public static SchemataTenancyBuilder<TTenant, TKey> UseTenancy<TManager, TTenant, TKey>(
-        this SchemataBuilder builder
-    )
-        where TManager : class, ITenantManager<TTenant, TKey>
-        where TTenant : SchemataTenant<TKey>
-        where TKey : struct, IEquatable<TKey> {
-        builder.AddFeature<SchemataTenancyFeature<TManager, TTenant, TKey>>();
+    public static SchemataTenancyBuilder<TTenant> UseTenancy<TManager, TTenant>(this SchemataBuilder builder)
+        where TManager : class, ITenantManager<TTenant>
+        where TTenant : SchemataTenant {
+        builder.AddFeature<SchemataTenancyFeature<TManager, TTenant>>();
 
         return new(builder.Services);
     }

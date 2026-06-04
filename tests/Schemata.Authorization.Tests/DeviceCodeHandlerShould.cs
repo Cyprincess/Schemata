@@ -22,32 +22,27 @@ public class DeviceCodeHandlerShould
     private static Fixture CreateFixture(string? approvedScope = "openid profile email") {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
 
-        var app        = new SchemataApplication { Id = 1, ClientId = "test-client" };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<CancellationToken>()
-                         )
-                   )
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
-        var payload = JsonSerializer.Serialize(
-            new DeviceCodePayload { Scope = approvedScope, ClientId = app.ClientId },
-            jsonOpts.Value
-        );
+        var payload = JsonSerializer.Serialize(new DeviceCodePayload { Scope = approvedScope, ClientId = app.ClientId },
+                                               jsonOpts.Value);
 
         var device = new SchemataToken {
-            Id                = 1,
+            Uid               = Guid.NewGuid(),
             Name              = "device-1",
             Type              = TokenTypes.DeviceCode,
             Status            = TokenStatuses.Authorized,
-            ApplicationName   = app.Name,
+            Application       = app.Name,
             Subject           = "user-1",
             ReferenceId       = "dev-ref",
             Payload           = payload,
-            AuthorizationName = "auth-approved",
+            Authorization     = "auth-approved",
             SessionId         = "sess-approved",
             ExpireTime        = DateTime.UtcNow.AddMinutes(10),
         };
@@ -57,11 +52,7 @@ public class DeviceCodeHandlerShould
 
         var sp = new ServiceCollection().BuildServiceProvider();
         var handler = new DeviceCodeHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object,
-            tokens.Object,
-            sp,
-            jsonOpts
-        );
+            clientAuth.Object, tokens.Object, sp, jsonOpts);
 
         return new(handler, tokens, device, app);
     }
@@ -81,11 +72,7 @@ public class DeviceCodeHandlerShould
         var request = CreateRequest(deviceCode: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
@@ -96,11 +83,7 @@ public class DeviceCodeHandlerShould
         var request = CreateRequest(deviceCode: "missing");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }
@@ -142,11 +125,7 @@ public class DeviceCodeHandlerShould
         var request = CreateRequest("openid profile email");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
     }
@@ -157,11 +136,7 @@ public class DeviceCodeHandlerShould
         var request = CreateRequest("openid");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
     }
@@ -183,11 +158,7 @@ public class DeviceCodeHandlerShould
         f.Device.Payload = null;
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              CreateRequest(),
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              CreateRequest(), null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }

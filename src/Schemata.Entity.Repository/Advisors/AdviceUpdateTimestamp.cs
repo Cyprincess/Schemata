@@ -29,10 +29,8 @@ public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAdvisor<TE
 {
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateTimestamp.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

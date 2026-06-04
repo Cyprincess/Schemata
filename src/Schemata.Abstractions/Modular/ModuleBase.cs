@@ -9,10 +9,8 @@ public abstract class ModuleBase : IModule
 {
     #region IModule Members
 
-    /// <inheritdoc />
     public virtual int Order => 0;
 
-    /// <inheritdoc />
     public virtual int Priority => Order;
 
     #endregion

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Skeleton.Entities;
@@ -19,6 +20,7 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [DisplayName("Application")]
 [Table("SchemataApplications")]
 [CanonicalName("applications/{application}")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
     /// <summary>
@@ -125,8 +127,7 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     #endregion
 
     #region IIdentifier Members
-
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

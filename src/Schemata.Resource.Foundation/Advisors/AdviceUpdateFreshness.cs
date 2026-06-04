@@ -23,12 +23,21 @@ public static class AdviceUpdateFreshness
 /// <summary>
 ///     Enforces optimistic concurrency for update operations
 ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso> by comparing the
-///     request
-///     ETag with the entity's concurrency timestamp.
-///     The request must implement <see cref="IFreshness" /> and the ETag must start with
-///     <c>W/</c>; if it doesn't match, throws <see cref="ConcurrencyException" />.
-///     Suppressed when <see cref="FreshnessSuppressed" /> is present.
+///     request ETag with the entity's concurrency timestamp.
 /// </summary>
+/// <remarks>
+///     <para>
+///         The check fires only when the request implements <see cref="IFreshness" /> and the
+///         supplied ETag begins with <c>W/</c> (weak validator). Missing, empty, or non-<c>W/</c>
+///         tags are treated as opt-out — the request proceeds without concurrency validation.
+///         Hosts that need stronger guarantees should require <c>etag</c> earlier in the chain
+///         (e.g., via a validation advisor) or layer a stricter freshness advisor.
+///     </para>
+///     <para>
+///         Throws <see cref="ConcurrencyException" /> on mismatch. Suppressed when
+///         <see cref="FreshnessSuppressed" /> is present.
+///     </para>
+/// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
 public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
@@ -37,10 +46,8 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
 {
     #region IResourceUpdateAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateFreshness.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TRequest          request,

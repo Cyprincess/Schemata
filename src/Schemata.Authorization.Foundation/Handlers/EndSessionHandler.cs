@@ -40,17 +40,6 @@ public sealed class EndSessionHandler<TApp>(
 ) : EndSessionEndpoint
     where TApp : SchemataApplication
 {
-    /// <summary>
-    ///     Processes an RP-initiated logout request.
-    ///     When front-channel logout URIs are discovered, returns an HTML page
-    ///     with hidden <c>iframe</c> elements that trigger each RP's logout endpoint;
-    ///     the page meta-refreshes to the <c>post_logout_redirect_uri</c> after
-    ///     all iframes load (or after a 5-second timeout).
-    ///     Otherwise performs a direct redirect or returns an empty response.
-    /// </summary>
-    /// <param name="request">The logout request.</param>
-    /// <param name="principal">The authenticated user principal.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> HandleAsync(
         EndSessionRequest request,
         ClaimsPrincipal   principal,
@@ -62,9 +51,6 @@ public sealed class EndSessionHandler<TApp>(
         TApp? application = null;
 
         if (!string.IsNullOrWhiteSpace(request.IdTokenHint)) {
-            // Validate the id_token_hint. When a client_id is also provided,
-            // verify the audience matches for consistency (tightens acceptance
-            // against misdirected hints).
             var hint = await issuer.Validate(request.IdTokenHint, request.ClientId, false);
 
             var client = hint?.FindFirstValue(Claims.ClientId) ?? hint?.FindFirstValue(Claims.Audience);
@@ -72,23 +58,17 @@ public sealed class EndSessionHandler<TApp>(
                 application = await apps.FindByClientIdAsync(client, ct);
             }
 
-            // When client_id is provided alongside the hint, verify consistency
-            // to prevent cross-RP logout injection.
             if (!string.IsNullOrWhiteSpace(request.ClientId) && application is not null) {
                 var requested = await apps.FindByClientIdAsync(request.ClientId, ct);
-                if (requested?.Id != application.Id) {
+                if (requested?.Uid != application.Uid) {
                     application = null;
                 }
             }
 
-            // Pairwise subjects in the hint may differ from the session principal;
-            // prefer the session-level subject when available.
             subject ??= hint?.FindFirstValue(Claims.Subject);
             session ??= hint?.FindFirstValue(Claims.SessionId);
         }
 
-        // Fallback: no hint but client_id provided — resolve the application
-        // solely for post_logout_redirect_uri validation.
         if (application is null && !string.IsNullOrWhiteSpace(request.ClientId)) {
             application = await apps.FindByClientIdAsync(request.ClientId, ct);
         }

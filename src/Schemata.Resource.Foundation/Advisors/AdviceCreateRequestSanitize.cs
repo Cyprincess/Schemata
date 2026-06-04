@@ -5,18 +5,21 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-/// <summary>Order constants and system-managed wire fields for <see cref="AdviceCreateRequestSanitize{TEntity, TRequest}" />.</summary>
+/// <summary>
+///     Order constants and system-managed wire fields for
+///     <see cref="AdviceCreateRequestSanitize{TEntity, TRequest}" />.
+/// </summary>
 public static class AdviceCreateRequestSanitize
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" /> — runs early so cached responses
-    ///     short-circuit before authorization and validation.
+    ///     Default order: runs after <see cref="AdviceCreateRequestAuthorize{TEntity,TRequest}" />
+    ///     so authorization decisions are made against the unaltered client payload, then this
+    ///     advisor clears server-managed fields before validation reads them.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceCreateRequestAuthorize.DefaultOrder + 10_000_000;
 
     /// <summary>
     ///     Wire-level field names that clients MUST NOT populate on a Create request. The server
@@ -26,7 +29,7 @@ public static class AdviceCreateRequestSanitize
     public static readonly string[] SystemFields = [
         nameof(ICanonicalName.Name),
         nameof(IConcurrency.Timestamp),
-        nameof(IIdentifier.Id),
+        nameof(IIdentifier.Uid),
         nameof(IOwnable.Owner),
         nameof(IStateful.State),
         nameof(ITimestamp.CreateTime),
@@ -34,12 +37,34 @@ public static class AdviceCreateRequestSanitize
         nameof(ISoftDelete.DeleteTime),
         nameof(ISoftDelete.PurgeTime),
     ];
+
+    /// <summary>
+    ///     Clears every property on <paramref name="request" /> whose name matches an entry in
+    ///     <see cref="SystemFields" />. Shared by Create and Update sanitize so the field list
+    ///     stays single-sourced.
+    /// </summary>
+    /// <typeparam name="TRequest">The request DTO type.</typeparam>
+    /// <param name="request">The request instance to scrub.</param>
+    public static void ClearSystemFields<TRequest>(TRequest request) where TRequest : class {
+        var properties = AppDomainTypeCache.GetProperties(typeof(TRequest));
+
+        foreach (var field in SystemFields) {
+            if (!properties.TryGetValue(field, out var property) || !property.CanWrite) {
+                continue;
+            }
+
+            var @default = property.PropertyType.IsValueType
+                ? Activator.CreateInstance(property.PropertyType)
+                : null;
+            property.SetValue(request, @default);
+        }
+    }
 }
 
 /// <summary>
 ///     Silently clears server-managed fields on a Create request before validation and authorization. Fields are
-///     matched by their snake_case wire name (converted via <see cref="Humanizer.InflectorExtensions.Pascalize" />)
-///     against properties on <typeparamref name="TRequest" />; properties that do not exist on the request type are
+///     matched by their snake_case wire name against properties on <typeparamref name="TRequest" />; properties that do
+///     not exist on the request type are
 ///     skipped. Required to satisfy AIP-133 immutability rules without surfacing errors to the client.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being created.</typeparam>
@@ -50,10 +75,8 @@ public sealed class AdviceCreateRequestSanitize<TEntity, TRequest> : IResourceCr
 {
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceCreateRequestSanitize.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,
@@ -61,22 +84,7 @@ public sealed class AdviceCreateRequestSanitize<TEntity, TRequest> : IResourceCr
         ClaimsPrincipal?                  principal,
         CancellationToken                 ct = default
     ) {
-        var properties = AppDomainTypeCache.GetProperties(typeof(TRequest));
-
-        foreach (var field in AdviceCreateRequestSanitize.SystemFields) {
-            if (!properties.TryGetValue(field, out var property)) {
-                continue;
-            }
-
-            if (!property.CanWrite) {
-                continue;
-            }
-
-            var @default = property.PropertyType.IsValueType
-                ? Activator.CreateInstance(property.PropertyType)
-                : null;
-            property.SetValue(request, @default);
-        }
+        AdviceCreateRequestSanitize.ClearSystemFields(request);
 
         return Task.FromResult(AdviseResult.Continue);
     }

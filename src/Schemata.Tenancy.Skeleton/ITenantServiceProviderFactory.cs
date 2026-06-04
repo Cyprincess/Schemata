@@ -1,22 +1,27 @@
-using System;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton;
 
 /// <summary>
-///     Creates isolated <see cref="IServiceProvider" /> instances scoped to a specific tenant.
+///     Creates isolated <see cref="System.IServiceProvider" /> instances scoped to a specific tenant.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
-///     Each tenant gets its own DI container built from the root service collection
-///     with tenant-specific overrides applied via the configure delegate.
-///     Service providers are cached per tenant to avoid repeated container builds.
+///     <para>
+///         Each tenant gets its own DI container built from the root service collection.
+///         Tenant-specific and dynamic overrides registered through
+///         <see cref="SchemataTenancyOptions" /> are applied on container build.
+///         Service providers are cached per tenant via <see cref="ITenantProviderCache" />.
+///     </para>
+///     <para>
+///         The returned <see cref="ITenantProviderLease" /> pins the cached provider so it
+///         cannot be disposed while in use; callers must dispose the lease when the tenant
+///         scope it backs is disposed.
+///     </para>
 /// </remarks>
-public interface ITenantServiceProviderFactory<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public interface ITenantServiceProviderFactory<TTenant>
+    where TTenant : SchemataTenant
 {
-    /// <summary>Creates or retrieves the cached service provider for the tenant in the given accessor.</summary>
-    IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant, TKey> accessor);
+    /// <summary>Acquires a lease over the per-tenant service provider for the tenant in the given accessor.</summary>
+    ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<TTenant> accessor);
 }

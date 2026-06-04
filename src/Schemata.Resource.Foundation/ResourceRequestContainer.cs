@@ -1,10 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using Schemata.Abstractions.Entities;
-using Schemata.Resource.Foundation.Grammars;
-using Schemata.Resource.Foundation.Grammars.Expressions;
 using Schemata.Resource.Foundation.Models;
 
 namespace Schemata.Resource.Foundation;
@@ -20,27 +16,27 @@ namespace Schemata.Resource.Foundation;
 public class ResourceRequestContainer<T>
 {
     /// <summary>
-    ///     Gets or sets an optional callback to customize the filter grammar container
-    ///     before expression building.
-    /// </summary>
-    public Action<Container>? FilterConfigure { get; set; }
-
-    /// <summary>
     ///     Gets the composed query function that applies all accumulated modifications.
     /// </summary>
     public Func<IQueryable<T>, IQueryable<T>> Query { get; private set; } = q => q;
 
-    /// <summary>
-    ///     Applies a parsed filter expression to the query pipeline.
-    /// </summary>
-    /// <param name="filter">The parsed <see cref="Filter" />.</param>
-    public void ApplyFiltering(Filter? filter) { Query = Query.WithFiltering(filter, FilterConfigure); }
+    public void ApplyFiltering(Expression<Func<T, bool>>? predicate) {
+        if (predicate is null) {
+            return;
+        }
 
-    /// <summary>
-    ///     Applies ordering specifications to the query pipeline.
-    /// </summary>
-    /// <param name="order">The member-to-ordering mapping.</param>
-    public void ApplyOrdering(Dictionary<Member, Ordering>? order) { Query = Query.WithOrdering(order); }
+        var query = Query;
+        Query = q => query(q).Where(predicate);
+    }
+
+    public void ApplyOrdering(Func<IQueryable<T>, IOrderedQueryable<T>>? order) {
+        if (order is null) {
+            return;
+        }
+
+        var query = Query;
+        Query = q => order(query(q));
+    }
 
     /// <summary>
     ///     Applies skip/take pagination from the page token.

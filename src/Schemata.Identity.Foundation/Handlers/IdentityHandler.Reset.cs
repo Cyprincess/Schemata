@@ -1,10 +1,8 @@
-using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Identity.Skeleton;
@@ -78,9 +76,14 @@ public sealed partial class IdentityHandler<TUser>
                 throw new AuthorizationException();
         }
 
+        // Unauthenticated reset/confirm flows must not let an attacker distinguish "no such
+        // account", "account exists but contact unconfirmed", and "token invalid". All three
+        // failure modes surface as NoContentException — the same shape ForgotAsync uses —
+        // so the only observable difference between success and failure is the absence of a
+        // delivered reset code.
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (found is null) {
-            throw new NotFoundException();
+            throw new NoContentException();
         }
 
         var confirmed = request switch {
@@ -91,12 +94,12 @@ public sealed partial class IdentityHandler<TUser>
         };
 
         if (!confirmed) {
-            throw new InvalidArgumentException();
+            throw new NoContentException();
         }
 
         var result = await _users.ResetPasswordAsync(found, request.Code, request.Password);
         if (!result.Succeeded) {
-            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation { Reason = e.Code, Description = e.Description }));
+            throw new NoContentException();
         }
 
         switch (await Advisor.For<IIdentityRecoveryAdvisor>()

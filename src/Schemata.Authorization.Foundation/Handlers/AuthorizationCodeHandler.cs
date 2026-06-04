@@ -167,7 +167,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             [Properties.Scope]             = granted,
             [Properties.Nonce]             = payload.Nonce,
             [Properties.SessionId]         = token.SessionId,
-            [Properties.AuthorizationName] = token.AuthorizationName,
+            [Properties.AuthorizationName] = token.Authorization,
             [Properties.MaxAge]            = payload.MaxAge,
             [Properties.AuthTime]          = payload.AuthTime,
         };

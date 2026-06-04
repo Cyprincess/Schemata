@@ -35,7 +35,6 @@ public sealed class AdviceIntrospectionTokenValidation<TApp, TToken> : IIntrospe
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceIntrospectionTokenValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                      ctx,
         IntrospectionContext<TApp, TToken> introspection,

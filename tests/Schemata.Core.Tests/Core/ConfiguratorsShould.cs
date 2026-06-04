@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Schemata.Core.Tests.Core;
@@ -94,34 +92,4 @@ public class ConfiguratorsShould
         // Should not throw when invoked
         action("test", 42);
     }
-
-    [Fact]
-    public void Invoke_RegisterAsConfigureOptions() {
-        var configurators = new Configurators();
-        var called        = false;
-
-        configurators.Set<TestKeys>(opts => {
-                opts.Value = "configured";
-                called     = true;
-            }
-        );
-
-        var services = new ServiceCollection();
-        configurators.Invoke(services);
-
-        var provider = services.BuildServiceProvider();
-        var options  = provider.GetRequiredService<IOptions<TestKeys>>();
-
-        Assert.Equal("configured", options.Value.Value);
-        Assert.True(called);
-    }
-
-    #region Nested type: TestKeys
-
-    private sealed class TestKeys
-    {
-        public string? Value { get; set; }
-    }
-
-    #endregion
 }

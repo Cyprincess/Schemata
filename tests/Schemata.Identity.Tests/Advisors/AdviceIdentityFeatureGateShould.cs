@@ -51,13 +51,8 @@ public class AdviceIdentityFeatureGateShould
         var gate = Gate<RegisterRequest>(new() { AllowRegistration = false });
         var ctx  = new AdviceContext(null!);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(
-                                                        ctx,
-                                                        new(),
-                                                        IdentityOperation.Register,
-                                                        Anonymous
-                                                    )
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(ctx, new(), IdentityOperation.Register,
+                                                                           Anonymous));
     }
 
     [Theory]
@@ -75,13 +70,8 @@ public class AdviceIdentityFeatureGateShould
         var gate = Gate<ProfileRequest>(new() { AllowEmailChange = false });
         var ctx  = new AdviceContext(null!);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(
-                                                        ctx,
-                                                        new(),
-                                                        IdentityOperation.ChangeEmail,
-                                                        Anonymous
-                                                    )
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(ctx, new(), IdentityOperation.ChangeEmail,
+                                                                           Anonymous));
     }
 
     [Fact]
@@ -89,13 +79,8 @@ public class AdviceIdentityFeatureGateShould
         var gate = Gate<ProfileRequest>(new() { AllowPhoneNumberChange = false });
         var ctx  = new AdviceContext(null!);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(
-                                                        ctx,
-                                                        new(),
-                                                        IdentityOperation.ChangePhone,
-                                                        Anonymous
-                                                    )
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(ctx, new(), IdentityOperation.ChangePhone,
+                                                                           Anonymous));
     }
 
     [Fact]
@@ -103,13 +88,8 @@ public class AdviceIdentityFeatureGateShould
         var gate = Gate<ProfileRequest>(new() { AllowPasswordChange = false });
         var ctx  = new AdviceContext(null!);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(
-                                                        ctx,
-                                                        new(),
-                                                        IdentityOperation.ChangePassword,
-                                                        Anonymous
-                                                    )
-        );
+        await Assert.ThrowsAsync<NotFoundException>(() => gate.AdviseAsync(ctx, new(), IdentityOperation.ChangePassword,
+                                                                           Anonymous));
     }
 
     [Theory]

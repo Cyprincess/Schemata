@@ -29,9 +29,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     where TDetail : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
-    /// <summary>
-    ///     The operation handler that orchestrates the advisor pipeline.
-    /// </summary>
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
@@ -49,15 +46,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         JsonOptions = ResourceJsonOptions.GetOrCreate(json.Value, options.Value);
     }
 
-    /// <summary>
-    ///     Gets the configured JSON serializer options with resource-specific naming conventions
-    ///     from <see cref="ResourceJsonOptions" />.
-    /// </summary>
     protected JsonSerializerOptions JsonOptions { get; }
 
-    /// <summary>
-    ///     Gets the empty result returned when an operation is blocked by an advisor.
-    /// </summary>
     protected virtual EmptyResult EmptyResult { get; } = new();
 
     private string BuildFullName(string name) {
@@ -119,7 +109,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             return EmptyResult;
         }
 
-        // AIP-133 requires a Location header pointing to the created resource.
         HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail!.Name });
 
         return new JsonResult(result.Detail, JsonOptions) { StatusCode = StatusCodes.Status201Created };
@@ -134,9 +123,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     /// <returns>A JSON result containing the updated detail DTO, or an empty result if blocked.</returns>
     [HttpPatch("{name}")]
     public virtual async Task<IActionResult> UpdateAsync(string name, [FromBody] TRequest request) {
-        // Read ETag from query string first, then fall back to If-Match header.
-        // Some HTTP clients cannot set custom headers, but AIP-154 requires
-        // ETag-based concurrency for updates.
         if (request is IFreshness freshness && string.IsNullOrWhiteSpace(freshness.EntityTag)) {
             var tag = HttpContext.Request.Query[Parameters.EntityTag].ToString();
             if (string.IsNullOrWhiteSpace(tag)) {
@@ -175,8 +161,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         [FromQuery] string? etag  = null,
         [FromQuery] bool?   force = null
     ) {
-        // Fall back to If-Match header when the ?etag query param is absent.
-        // Same rationale as UpdateAsync — some clients cannot set headers.
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {
             tag = HttpContext.Request.Headers.IfMatch.ToString();

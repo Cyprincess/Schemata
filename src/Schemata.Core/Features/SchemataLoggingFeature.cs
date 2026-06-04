@@ -11,15 +11,10 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataLoggingFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataExceptionHandlerFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

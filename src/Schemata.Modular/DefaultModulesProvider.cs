@@ -60,7 +60,6 @@ public sealed class DefaultModulesProvider : IModulesProvider
 
     #region IModulesProvider Members
 
-    /// <inheritdoc />
     public IEnumerable<ModuleDescriptor> GetModules() { return Modules; }
 
     #endregion

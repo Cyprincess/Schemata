@@ -33,7 +33,6 @@ public sealed class FrontChannelLogoutFeature<TApp, TToken> : IAuthorizationFlow
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 60_100;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, FrontChannelLogoutService<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryFrontChannelLogout>());

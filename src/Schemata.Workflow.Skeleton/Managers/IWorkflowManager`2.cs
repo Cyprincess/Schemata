@@ -31,18 +31,18 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     /// <summary>
     ///     Finds a workflow by its identifier.
     /// </summary>
-    /// <param name="id">The workflow identifier.</param>
+    /// <param name="uid">The workflow identifier.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The workflow, or <see langword="null" /> if not found.</returns>
-    Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default);
+    Task<TWorkflow?> FindAsync(Guid uid, CancellationToken ct = default);
 
     /// <summary>
     ///     Finds the stateful entity instance associated with the given workflow identifier.
     /// </summary>
-    /// <param name="id">The workflow identifier.</param>
+    /// <param name="uid">The workflow identifier.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The entity instance, or <see langword="null" /> if not found.</returns>
-    Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default);
+    Task<IStatefulEntity?> FindInstanceAsync(Guid uid, CancellationToken ct = default);
 
     /// <summary>
     ///     Gets the stateful entity instance linked to the given workflow.
@@ -54,10 +54,10 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     /// <summary>
     ///     Lists all transitions recorded for the given workflow.
     /// </summary>
-    /// <param name="id">The workflow identifier.</param>
+    /// <param name="uid">The workflow identifier.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>An async enumerable of transitions.</returns>
-    IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default);
+    IAsyncEnumerable<TTransition> ListTransitionsAsync(Guid uid, CancellationToken ct = default);
 
     /// <summary>
     ///     Creates a new workflow for the given stateful entity instance.
@@ -76,10 +76,10 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     ///     Creates a new workflow record for an existing entity identified by type and identifier.
     /// </summary>
     /// <param name="instance">The CLR type of the entity.</param>
-    /// <param name="id">The entity identifier.</param>
+    /// <param name="uid">The entity identifier.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The created workflow, or <see langword="null" /> on failure.</returns>
-    Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default);
+    Task<TWorkflow?> CreateAsync(Type instance, Guid uid, CancellationToken ct = default);
 
     /// <summary>
     ///     Raises an event on the specified workflow, causing a state transition.
@@ -101,10 +101,10 @@ public interface IWorkflowManager<TWorkflow, TTransition, TResponse>
     ///     Raises an event on a workflow identified by its identifier.
     /// </summary>
     /// <typeparam name="TEvent">The event data type.</typeparam>
-    /// <param name="id">The workflow identifier.</param>
+    /// <param name="uid">The workflow identifier.</param>
     /// <param name="event">The event data.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
+    Task RaiseAsync<TEvent>(Guid uid, TEvent @event, CancellationToken ct = default)
         where TEvent : class, ITransition;
 
     /// <summary>

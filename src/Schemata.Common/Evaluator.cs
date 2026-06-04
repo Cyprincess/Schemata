@@ -50,7 +50,6 @@ public static class Evaluator
             return _candidates;
         }
 
-        /// <inheritdoc />
         public override Expression? Visit(Expression? expression) {
             if (expression == null) {
                 return expression;
@@ -88,7 +87,6 @@ public static class Evaluator
 
         internal Expression? Eval(Expression? exp) { return Visit(exp); }
 
-        /// <inheritdoc />
         public override Expression? Visit(Expression? exp) {
             if (exp == null) {
                 return null;

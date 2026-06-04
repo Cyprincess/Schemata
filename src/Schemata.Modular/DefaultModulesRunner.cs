@@ -39,7 +39,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
 
     #region IModulesRunner Members
 
-    /// <inheritdoc />
     public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
@@ -58,7 +57,7 @@ public sealed class DefaultModulesRunner : IModulesRunner
 
         foreach (var startup in startups) {
             services.TryAddSingleton(startup.GetType(), _ => startup);
-            services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IModule), startup));
+            services.TryAddEnumerable(ServiceDescriptor.Singleton(startup));
 
             if (startup.GetType()
                        .GetMethod(nameof(ConfigureServices), BindingFlags.Instance | BindingFlags.Public) is null) {
@@ -69,7 +68,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
-    /// <inheritdoc />
     public void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
@@ -91,7 +89,6 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
     }
 
-    /// <inheritdoc />
     public void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,

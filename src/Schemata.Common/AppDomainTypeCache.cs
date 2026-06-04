@@ -122,8 +122,7 @@ public static class AppDomainTypeCache
                               BindingFlags.GetProperty
                             | BindingFlags.IgnoreCase
                             | BindingFlags.Public
-                            | BindingFlags.Instance
-                          )
+                            | BindingFlags.Instance)
                          .ToDictionary(m => m.Name, m => m);
         Properties[type.TypeHandle] = properties;
 
@@ -151,6 +150,10 @@ public static class AppDomainTypeCache
     public static PropertyInfo? GetProperty(Type type, string name) {
         var properties = GetProperties(type);
 
-        return properties.TryGetValue(name, out var property) ? property : null;
+        if (properties.TryGetValue(name, out var value)) {
+            return value;
+        }
+
+        return null;
     }
 }

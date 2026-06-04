@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -19,6 +20,7 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [DisplayName("Scope")]
 [Table("SchemataScopes")]
 [CanonicalName("scopes/{scope}")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataScope : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
     /// <summary>API resources that this scope grants access to.</summary>
@@ -51,8 +53,7 @@ public class SchemataScope : IIdentifier, ICanonicalName, IDescriptive, IConcurr
     #endregion
 
     #region IIdentifier Members
-
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

@@ -17,34 +17,27 @@ public class SchemataTenantContextAccessorShould
     public async Task InitializeAsync_Throws_TenantResolveException_When_Tenant_Not_Found() {
         var id = Guid.NewGuid();
 
-        var resolver = new Mock<ITenantResolver<Guid>>();
+        var resolver = new Mock<ITenantResolver>();
         resolver.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(id);
 
-        var manager = new Mock<ITenantManager<SchemataTenant<Guid>, Guid>>();
-        manager.Setup(m => m.FindByTenantId(id, It.IsAny<CancellationToken>()))
-               .ReturnsAsync((SchemataTenant<Guid>?)null);
+        var manager = new Mock<ITenantManager<SchemataTenant>>();
+        manager.Setup(m => m.FindByTenantId(id, It.IsAny<CancellationToken>())).ReturnsAsync((SchemataTenant?)null);
 
-        var accessor = new SchemataTenantContextAccessor<SchemataTenant<Guid>, Guid>(
-            new ServiceCollection().BuildServiceProvider(),
-            resolver.Object,
-            manager.Object
-        );
+        var accessor = new SchemataTenantContextAccessor<SchemataTenant>(
+            new ServiceCollection().BuildServiceProvider(), resolver.Object, manager.Object);
 
         await Assert.ThrowsAsync<TenantResolveException>(() => accessor.InitializeAsync(CancellationToken.None));
     }
 
     [Fact]
     public async Task InitializeAsync_NoOp_When_Resolver_Returns_Null() {
-        var resolver = new Mock<ITenantResolver<Guid>>();
+        var resolver = new Mock<ITenantResolver>();
         resolver.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync((Guid?)null);
 
-        var manager = new Mock<ITenantManager<SchemataTenant<Guid>, Guid>>(MockBehavior.Strict);
+        var manager = new Mock<ITenantManager<SchemataTenant>>(MockBehavior.Strict);
 
-        var accessor = new SchemataTenantContextAccessor<SchemataTenant<Guid>, Guid>(
-            new ServiceCollection().BuildServiceProvider(),
-            resolver.Object,
-            manager.Object
-        );
+        var accessor = new SchemataTenantContextAccessor<SchemataTenant>(
+            new ServiceCollection().BuildServiceProvider(), resolver.Object, manager.Object);
 
         await accessor.InitializeAsync(CancellationToken.None);
 

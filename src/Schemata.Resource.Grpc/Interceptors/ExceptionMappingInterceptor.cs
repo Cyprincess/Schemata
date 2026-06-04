@@ -18,7 +18,6 @@ namespace Schemata.Resource.Grpc.Interceptors;
 /// </summary>
 public class ExceptionMappingInterceptor : Interceptor
 {
-    /// <inheritdoc />
     public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(
         TRequest                               request,
         ServerCallContext                      context,

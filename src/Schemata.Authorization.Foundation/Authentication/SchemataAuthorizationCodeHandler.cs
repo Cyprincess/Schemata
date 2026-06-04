@@ -45,40 +45,35 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    /// <inheritdoc />
-    /// <exception cref="NotImplementedException">
-    ///     The authorization-code scheme is write-only; validation is not supported.
-    /// </exception>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() { throw new NotImplementedException(); }
 
-    /// <inheritdoc />
-    /// <exception cref="NotImplementedException">
-    ///     The authorization-code scheme is write-only; sign-out is not supported.
-    /// </exception>
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) {
         throw new NotImplementedException();
     }
 
-    /// <summary>
-    ///     Creates an authorization code and returns the response via the
-    ///     appropriate callback mode (query, fragment, or form_post).
-    ///     For hybrid flows, may also include access tokens and ID tokens
-    ///     directly in the callback when the response_type includes
-    ///     <c>token</c> or <c>id_token</c>.
-    /// </summary>
     protected override async Task HandleSignInAsync(ClaimsPrincipal principal, AuthenticationProperties? properties) {
         var ct    = Context.RequestAborted;
         var items = properties?.Items ?? new Dictionary<string, string?>();
         var ctx   = new AdviceContext(Context.RequestServices);
 
+        if (principal.Identity is not ClaimsIdentity identity) {
+            return;
+        }
+
         items.TryGetValue(Properties.Scope, out var scope);
         items.TryGetValue(Properties.AuthorizationName, out var authorizationName);
         items.TryGetValue(Properties.SessionId, out var sid);
 
-        var claims = new List<Claim>();
-        foreach (var identity in principal.Identities) {
-            claims.AddRange(identity.Claims);
+        if (!string.IsNullOrWhiteSpace(scope)) {
+            identity.AddClaim(new(Claims.Scope, scope));
         }
+
+        if (!string.IsNullOrWhiteSpace(sid)) {
+            identity.AddClaim(new(Claims.SessionId, sid));
+        }
+
+        var claims = new List<Claim>();
+        claims.AddRange(identity.Claims);
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
@@ -86,12 +81,11 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
             : null;
         var subject = principal.FindFirstValue(Claims.Subject);
 
-        switch (await Advisor.For<IClaimsAdvisor>().RunAsync(ctx, claims, ct)) {
+        switch (await Advisor.For<IClaimsAdvisor>()
+                             .RunAsync(ctx, claims, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TokenResponse>(out var _):
-                // Authorization endpoint does not return a JSON token response;
-                // fall through to continue processing claims for redirect/form_post.
                 break;
             case AdviseResult.Block:
             default:
@@ -101,39 +95,30 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
                 );
         }
 
-        for (var i = claims.Count - 1; i >= 0; i--) {
+        foreach (var claim in claims) {
             var destinations = new HashSet<string>();
 
-            switch (await Advisor.For<IDestinationAdvisor>().RunAsync(ctx, claims[i], destinations, principal, ct)) {
+            switch (await Advisor.For<IDestinationAdvisor>()
+                                 .RunAsync(ctx, claim, destinations, principal, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                     break;
                 case AdviseResult.Block:
                 default:
-                    claims.RemoveAt(i);
                     continue;
             }
 
             if (destinations.Count == 0) {
-                claims.RemoveAt(i);
-            } else {
-                foreach (var d in destinations) {
-                    claims[i].Properties[d] = Parameters.Token;
-                }
+                continue;
+            }
+
+            foreach (var d in destinations) {
+                claim.Properties[d] = Parameters.Token;
             }
         }
 
         var access = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.AccessToken)).ToList();
         var id     = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.IdentityToken)).ToList();
-
-        if (!string.IsNullOrWhiteSpace(scope)) {
-            access.Add(new(Claims.Scope, scope));
-        }
-
-        if (!string.IsNullOrWhiteSpace(sid)) {
-            access.Add(new(Claims.SessionId, sid));
-            id.Add(new(Claims.SessionId, sid));
-        }
 
         items.TryGetValue(Properties.ResponseType, out var type);
         var types = type!.Split(' ');
@@ -170,13 +155,6 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         await actionResult.ExecuteResultAsync(new(Context, routeData, new()));
     }
 
-    /// <summary>
-    ///     Creates a short-lived authorization code token.  The code is a
-    ///     random reference that points to a stored entity containing the
-    ///     serialized <see cref="AuthorizeRequest" /> payload, which includes
-    ///     PKCE challenge, redirect URI, nonce, and other auth-time parameters
-    ///     needed by the token endpoint's code exchange.
-    /// </summary>
     private async Task<string> CreateAuthorizationCodeAsync(
         string?                      client,
         string?                      scope,
@@ -216,10 +194,9 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
             Payload           = JsonSerializer.Serialize(payload, json.Value),
             Subject           = subject,
             ExpireTime        = now + config.Value.AuthorizationCodeLifetime,
-            ApplicationName   = appName,
-            AuthorizationName = authorizationName,
+            Application       = appName,
+            Authorization     = authorizationName,
             SessionId         = sid,
-            CreateTime        = now,
         };
         await tokens.CreateAsync(entity, ct);
 

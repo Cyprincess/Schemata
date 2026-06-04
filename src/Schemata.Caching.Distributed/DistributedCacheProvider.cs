@@ -32,10 +32,8 @@ public sealed class DistributedCacheProvider : ICacheProvider
 
     #region ICacheProvider Members
 
-    /// <inheritdoc />
     public Task<byte[]?> GetAsync(string key, CancellationToken ct = default) { return _cache.GetAsync(key, ct); }
 
-    /// <inheritdoc />
     public Task SetAsync(
         string            key,
         byte[]            value,
@@ -45,10 +43,25 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
     }
 
-    /// <inheritdoc />
+    public async Task<bool> TryAddAsync(
+        string            key,
+        byte[]            value,
+        CacheEntryOptions options,
+        CancellationToken ct = default
+    ) {
+        using var _ = await IndexLocks.AcquireAsync(key, ct);
+
+        var existing = await _cache.GetAsync(key, ct);
+        if (existing is { Length: > 0 }) {
+            return false;
+        }
+
+        await _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
+        return true;
+    }
+
     public Task RemoveAsync(string key, CancellationToken ct = default) { return _cache.RemoveAsync(key, ct); }
 
-    /// <inheritdoc />
     public async Task CollectionAddAsync(
         string            key,
         string            member,
@@ -68,13 +81,11 @@ public sealed class DistributedCacheProvider : ICacheProvider
         await WriteSetAsync(key, payload.Members, options, ct);
     }
 
-    /// <inheritdoc />
     public async Task<IReadOnlyList<string>?> CollectionMembersAsync(string key, CancellationToken ct = default) {
         var payload = await ReadSetAsync(key, ct);
         return payload?.Members?.ToList();
     }
 
-    /// <inheritdoc />
     public async Task CollectionRemoveAsync(string key, ICollection<string> members, CancellationToken ct = default) {
         using var _ = await IndexLocks.AcquireAsync(key, ct);
 
@@ -82,7 +93,7 @@ public sealed class DistributedCacheProvider : ICacheProvider
         if (payload?.Members is null) {
             return;
         }
-        
+
         foreach (var member in members) {
             payload.Members.Remove(member);
         }
@@ -94,20 +105,15 @@ public sealed class DistributedCacheProvider : ICacheProvider
         }
     }
 
-    /// <inheritdoc />
     public async Task CollectionRemoveAsync(string key, string member, CancellationToken ct = default) {
         await CollectionRemoveAsync(key, [member], ct);
     }
 
-    /// <inheritdoc />
     public Task CollectionClearAsync(string key, CancellationToken ct = default) { return _cache.RemoveAsync(key, ct); }
 
     #endregion
 
-    private async Task<SetPayload?> ReadSetAsync(
-        string            key,
-        CancellationToken ct
-    ) {
+    private async Task<SetPayload?> ReadSetAsync(string key, CancellationToken ct) {
         var bytes = await _cache.GetAsync(key, ct);
         if (bytes is null || bytes.Length == 0) {
             return null;
@@ -116,6 +122,7 @@ public sealed class DistributedCacheProvider : ICacheProvider
         try {
             return JsonSerializer.Deserialize<SetPayload>(bytes);
         } catch (JsonException) {
+            await _cache.RemoveAsync(key, ct);
             return null;
         }
     }
@@ -148,9 +155,13 @@ public sealed class DistributedCacheProvider : ICacheProvider
 
         if (options.AbsoluteExpiration.HasValue) {
             result.AbsoluteExpiration = options.AbsoluteExpiration.Value;
-        } else if (options.AbsoluteExpirationRelativeToNow.HasValue) {
+        }
+
+        if (options.AbsoluteExpirationRelativeToNow.HasValue) {
             result.AbsoluteExpirationRelativeToNow = options.AbsoluteExpirationRelativeToNow.Value;
-        } else if (options.SlidingExpiration.HasValue) {
+        }
+
+        if (options.SlidingExpiration.HasValue) {
             result.SlidingExpiration = options.SlidingExpiration.Value;
         }
 

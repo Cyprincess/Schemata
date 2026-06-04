@@ -41,24 +41,16 @@ public class DeviceAuthorizeHandlerShould
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
 
         if (application is not null) {
-            clientAuth.Setup(c => c.AuthenticateAsync(
-                                 It.IsAny<Dictionary<string, List<string?>>?>(),
-                                 It.IsAny<Dictionary<string, List<string?>>?>(),
-                                 It.IsAny<Dictionary<string, List<string?>>?>(),
-                                 It.IsAny<CancellationToken>()
-                             )
-                       )
+            clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                      It.IsAny<CancellationToken>()))
                       .ReturnsAsync(application);
         }
 
         var sp = services.BuildServiceProvider();
         var handler = new DeviceAuthorizeHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object,
-            tokens.Object,
-            Options.Create(opts),
-            sp,
-            jsonOpts
-        );
+            clientAuth.Object, tokens.Object, Options.Create(opts), sp, jsonOpts);
         return (handler, tokens);
     }
 
@@ -68,7 +60,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task ReturnsResponse_WithAllRequiredFields() {
-        var app = new SchemataApplication { Id = 1, ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);
@@ -86,7 +78,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task UserCode_HasCorrectFormat() {
-        var app = new SchemataApplication { Id = 1, ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest(), null, CancellationToken.None);
@@ -105,7 +97,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task CreatesDeviceCodeAndUserCodeTokens() {
-        var app = new SchemataApplication { Id = 1, ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, tokens) = CreateHandler(app);
 
         await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);

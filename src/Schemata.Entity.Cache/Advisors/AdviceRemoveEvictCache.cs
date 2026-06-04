@@ -19,8 +19,9 @@ public static class AdviceRemoveEvictCache
 }
 
 /// <summary>
-///     Remove advisor that evicts every cache key associated with the entity's primary key from the reverse
-///     index before the entity is removed.
+///     Remove advisor that schedules cache eviction to run after the commit boundary
+///     succeeds, evicting every cache key associated with the entity's primary key from
+///     the reverse index.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being removed.</typeparam>
 /// <remarks>
@@ -29,7 +30,12 @@ public static class AdviceRemoveEvictCache
 ///         Registered by
 ///         <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />.
 ///     </para>
-///     <para>Eviction runs inside the advisor, before <see cref="IRepository{TEntity}.CommitAsync" />.</para>
+///     <para>
+///         Eviction is deferred via
+///         <see cref="IRepository{TEntity}.EnqueueAfterCommit" /> so it observes a
+///         successful commit boundary — concurrent readers cannot repopulate the cache
+///         with pre-remove state in the window between eviction and the actual delete.
+///     </para>
 ///     <para>
 ///         Suppressed when <see cref="QueryCacheEvictionSuppressed" /> is present in the advice context or when
 ///         <see cref="SchemataQueryCacheOptions.EvictionEnabled" /> is <see langword="false" />.
@@ -53,22 +59,21 @@ public sealed class AdviceRemoveEvictCache<TEntity> : IRepositoryRemoveAdvisor<T
 
     #region IRepositoryRemoveAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceRemoveEvictCache.DefaultOrder;
 
-    /// <inheritdoc />
-    public async Task<AdviseResult> AdviseAsync(
+    public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
         CancellationToken    ct = default
     ) {
         if (!_options.Value.EvictionEnabled || ctx.Has<QueryCacheEvictionSuppressed>()) {
-            return AdviseResult.Continue;
+            return Task.FromResult(AdviseResult.Continue);
         }
 
-        await EvictAsync(_cache, typeof(TEntity), entity, ct);
-        return AdviseResult.Continue;
+        var cache = _cache;
+        repository.EnqueueAfterCommit(token => EvictAsync(cache, typeof(TEntity), entity, token));
+        return Task.FromResult(AdviseResult.Continue);
     }
 
     #endregion
@@ -88,7 +93,7 @@ public sealed class AdviceRemoveEvictCache<TEntity> : IRepositoryRemoveAdvisor<T
         if (keys is { Count: > 0 }) {
             foreach (var key in keys) {
                 await cache.RemoveAsync(key, ct);
-            } 
+            }
         }
 
         await cache.CollectionClearAsync(indexKey, ct);

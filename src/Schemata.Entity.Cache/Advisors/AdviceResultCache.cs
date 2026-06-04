@@ -25,7 +25,10 @@ public static class AdviceResultCache
 /// <typeparam name="TResult">The projected result type of the query.</typeparam>
 /// <typeparam name="T">The scalar or aggregate return type.</typeparam>
 /// <remarks>
-///     <para>Order: <see cref="SchemataConstants.Orders.Max" />.</para>
+///     <para>
+///         Order: <see cref="SchemataConstants.Orders.Base" /> — runs first in the result advisor chain so the
+///         materialized result is cached before any downstream advisor mutates it.
+///     </para>
 ///     <para>
 ///         Registered by
 ///         <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />;
@@ -57,10 +60,8 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
 
     #region IRepositoryResultAdvisor<TEntity,TResult,T> Members
 
-    /// <inheritdoc />
     public int Order => AdviceResultCache.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         QueryContext<TEntity, TResult, T> context,

@@ -30,8 +30,8 @@ internal static class LogoutSessionHelper
 
         if (!string.IsNullOrWhiteSpace(session)) {
             await foreach (var token in tokens.ListBySessionAsync(session, ct)) {
-                if (!string.IsNullOrWhiteSpace(token.ApplicationName)) {
-                    clients.Add(token.ApplicationName);
+                if (!string.IsNullOrWhiteSpace(token.Application)) {
+                    clients.Add(token.Application);
                 }
             }
         }
@@ -44,8 +44,8 @@ internal static class LogoutSessionHelper
         }
 
         await foreach (var token in tokens.ListBySubjectAsync(subject, ct)) {
-            if (!string.IsNullOrWhiteSpace(token.ApplicationName)) {
-                clients.Add(token.ApplicationName);
+            if (!string.IsNullOrWhiteSpace(token.Application)) {
+                clients.Add(token.Application);
             }
         }
 

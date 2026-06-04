@@ -21,7 +21,6 @@ public class JsonStringNumberConverter : JsonConverter<long>
     /// </summary>
     public static JsonStringNumberConverter Instance { get; } = new();
 
-    /// <inheritdoc />
     public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         switch (reader.TokenType) {
             case JsonTokenType.Number:
@@ -48,7 +47,6 @@ public class JsonStringNumberConverter : JsonConverter<long>
         );
     }
 
-    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) {
         writer.WriteStringValue(value.ToString());
     }

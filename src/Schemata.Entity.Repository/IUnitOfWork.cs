@@ -31,6 +31,13 @@ public interface IUnitOfWork : IDisposable
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task RollbackAsync(CancellationToken ct = default);
+
+    /// <summary>
+    ///     Enqueues an action to run after the unit of work commits successfully.
+    ///     Used by advisors (e.g., cache eviction) that must observe a successful
+    ///     persistence boundary before acting. The queue is cleared on rollback or dispose.
+    /// </summary>
+    void EnqueueAfterCommit(Func<CancellationToken, Task> action);
 }
 
 /// <summary>
@@ -38,5 +45,4 @@ public interface IUnitOfWork : IDisposable
 ///     allowing multiple different repository providers to coexist in the same DI container.
 /// </summary>
 /// <typeparam name="TContext">The data context type (e.g., <c>DbContext</c> or <c>DataConnection</c>).</typeparam>
-public interface IUnitOfWork<TContext> : IUnitOfWork
-{ }
+public interface IUnitOfWork<TContext> : IUnitOfWork;

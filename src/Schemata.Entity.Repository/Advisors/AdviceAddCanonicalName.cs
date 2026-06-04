@@ -31,10 +31,8 @@ public sealed class AdviceAddCanonicalName<TEntity> : IRepositoryAddAdvisor<TEnt
 {
     #region IRepositoryAddAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceAddCanonicalName.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

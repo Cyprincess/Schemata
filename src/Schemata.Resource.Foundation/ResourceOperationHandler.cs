@@ -15,11 +15,13 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
+using Schemata.Caching.Skeleton;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Expressions.Aip;
+using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
-using Schemata.Resource.Foundation.Grammars;
 using Schemata.Resource.Foundation.Models;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -99,8 +101,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="ListResult{TSummary}" /> with summaries and an optional next page token.</returns>
-    public async Task<ListResult<TSummary>> ListAsync(
+    /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
+    public async Task<ListResultBase<TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -113,11 +115,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.List, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -126,11 +128,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
@@ -190,11 +192,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
             try {
-                var filter = Parser.Filter.Parse(request.Filter);
+                var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
+                var tree = compiler.Parse(request.Filter);
+                var filter = compiler.Compile<TEntity, bool>(tree);
                 container.ApplyFiltering(filter);
-            } catch (ParseException) {
+            } catch (Exception ex) when (ex is ParseException or ArgumentException) {
                 throw new ValidationException([new() {
-                    Field       = nameof(request.Filter).Underscore(),
+                    Field       = SchemataNaming.ToWireName(nameof(request.Filter)),
                     Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "filter"),
                     Reason      = FieldReasons.InvalidFilter,
                 }]);
@@ -203,11 +207,12 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
             try {
-                var order = Parser.Order.Parse(request.OrderBy);
+                var compiler = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name);
+                var order    = compiler.CompileOrder<TEntity>(request.OrderBy);
                 container.ApplyOrdering(order);
-            } catch (ParseException) {
+            } catch (Exception ex) when (ex is ParseException or ArgumentException) {
                 throw new ValidationException([new() {
-                    Field       = nameof(request.OrderBy).Underscore(),
+                    Field       = SchemataNaming.ToWireName(nameof(request.OrderBy)),
                     Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "order_by"),
                     Reason      = FieldReasons.InvalidOrderBy,
                 }]);
@@ -238,11 +243,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, immutable, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<ListResult<TSummary>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return ListResult<TSummary>.Blocked;
+                return ListResultBase<TSummary>.Blocked;
         }
 
         return new() {
@@ -260,8 +265,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="name">The resource name.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="GetResult{TDetail}" /> containing the detail DTO.</returns>
-    public async Task<GetResult<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
+    /// <returns>A <see cref="GetResultBase{TDetail}" /> containing the detail DTO.</returns>
+    public async Task<GetResultBase<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
         ct ??= CancellationToken.None;
 
         var ctx = CreateAdviceContext();
@@ -270,11 +275,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.Get, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -284,11 +289,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, new() { Name = name }, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         var entity = await _repository.Once()
@@ -302,11 +307,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, entity, detail, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<GetResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return GetResult<TDetail>.Blocked;
+                return GetResultBase<TDetail>.Blocked;
         }
 
         return new() { Detail = detail };
@@ -320,8 +325,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>A <see cref="CreateResult{TDetail}" /> containing the new resource's detail DTO.</returns>
-    public async Task<CreateResult<TDetail>> CreateAsync(
+    /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the new resource's detail DTO.</returns>
+    public async Task<CreateResultBase<TDetail>> CreateAsync(
         TRequest           request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -330,74 +335,87 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         var ctx = CreateAdviceContext();
 
-        switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, Operations.Create, ct.Value)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
-                return result!;
-            case AdviseResult.Block:
-            default:
-                return CreateResult<TDetail>.Blocked;
+        try {
+            switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
+                                 .RunAsync(ctx, principal, Operations.Create, ct.Value)) {
+                case AdviseResult.Continue:
+                    break;
+                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                    return result!;
+                case AdviseResult.Block:
+                default:
+                    return CreateResultBase<TDetail>.Blocked;
+            }
+
+            var container = new ResourceRequestContainer<TEntity>();
+
+            switch (await Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
+                                 .RunAsync(ctx, request, container, principal, ct.Value)) {
+                case AdviseResult.Continue:
+                    break;
+                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                    return result!;
+                case AdviseResult.Block:
+                default:
+                    return CreateResultBase<TDetail>.Blocked;
+            }
+
+            var entity = _mapper.Map<TRequest, TEntity>(request);
+            if (entity is null) {
+                throw new ValidationException([new() {
+                    Field       = "request",
+                    Description = SchemataResources.GetResourceString(SchemataResources.ST2001),
+                    Reason      = FieldReasons.InvalidPayload,
+                }]);
+            }
+
+            switch (await Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
+                                 .RunAsync(ctx, request, entity, principal, ct.Value)) {
+                case AdviseResult.Continue:
+                    break;
+                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                    return result!;
+                case AdviseResult.Block:
+                default:
+                    return CreateResultBase<TDetail>.Blocked;
+            }
+
+            await _repository.AddAsync(entity, ct.Value);
+            await _repository.CommitAsync(ct.Value);
+
+            var detail = _mapper.Map<TEntity, TDetail>(entity);
+
+            switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
+                                 .RunAsync(ctx, entity, detail, principal, ct.Value)) {
+                case AdviseResult.Continue:
+                    break;
+                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                    return result!;
+                case AdviseResult.Block:
+                default:
+                    return CreateResultBase<TDetail>.Blocked;
+            }
+
+            return new() { Detail = detail };
+        } catch {
+            if (ctx.TryGet<PendingIdempotencyKey>(out var pending) && pending is not null) {
+                await TryReleaseIdempotencyKeyAsync(pending.RequestId, ct.Value);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task TryReleaseIdempotencyKeyAsync(string requestId, CancellationToken ct) {
+        var cache = _sp.GetService<ICacheProvider>();
+        if (cache is null) {
+            return;
         }
 
-        request.Name          = null;
-        request.CanonicalName = null;
-
-        if (request is IIdentifier requestId) {
-            requestId.Id = 0;
-        }
-
-        var container = new ResourceRequestContainer<TEntity>();
-
-        switch (await Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
-                             .RunAsync(ctx, request, container, principal, ct.Value)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
-                return result!;
-            case AdviseResult.Block:
-            default:
-                return CreateResult<TDetail>.Blocked;
-        }
-
-        var entity = _mapper.Map<TRequest, TEntity>(request);
-        if (entity is null) {
-            throw new ValidationException([new() {
-                Field       = "request",
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2001),
-                Reason      = FieldReasons.InvalidPayload,
-            }]);
-        }
-
-        switch (await Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
-                             .RunAsync(ctx, request, entity, principal, ct.Value)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
-                return result!;
-            case AdviseResult.Block:
-            default:
-                return CreateResult<TDetail>.Blocked;
-        }
-
-        await _repository.AddAsync(entity, ct.Value);
-        await _repository.CommitAsync(ct.Value);
-
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
-
-        switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
-                             .RunAsync(ctx, entity, detail, principal, ct.Value)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<CreateResult<TDetail>>(out var result):
-                return result!;
-            case AdviseResult.Block:
-            default:
-                return CreateResult<TDetail>.Blocked;
-        }
-
-        return new() { Detail = detail };
+        var key = $"idempotency\x1e{requestId}".ToCacheKey(Keys.Resource);
+        try {
+            await cache.RemoveAsync(key, ct);
+        } catch { }
     }
 
     /// <summary>
@@ -414,8 +432,8 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// <param name="request">The update request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
-    /// <returns>An <see cref="UpdateResult{TDetail}" /> containing the updated detail DTO.</returns>
-    public async Task<UpdateResult<TDetail>> UpdateAsync(
+    /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
+    public async Task<UpdateResultBase<TDetail>> UpdateAsync(
         string             name,
         TRequest           request,
         ClaimsPrincipal?   principal,
@@ -429,21 +447,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, principal, Operations.Update, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
-
-        request.Name          = null;
-        request.CanonicalName = null;
 
         ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
-
-        if (request is IIdentifier requestId) {
-            requestId.Id = 0;
-        }
 
         var container = new ResourceRequestContainer<TEntity>();
         ApplyIdentifierPredicates(container, name);
@@ -452,11 +463,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, container, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         var entity = await _repository.Once()
@@ -468,16 +479,16 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, request, entity, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         if (request is IUpdateMask { UpdateMask: { } mask }) {
             var properties = AppDomainTypeCache.GetProperties(typeof(TEntity));
-            var fields     = mask.Split(',').Select(f => f.Trim().Pascalize()).Where(f => properties.ContainsKey(f));
+            var fields     = mask.Split(',').Select(f => SchemataNaming.ToClrMemberName(f.Trim())).Where(f => properties.ContainsKey(f));
             _mapper.Map(request, entity, fields);
         } else {
             _mapper.Map(request, entity);
@@ -492,11 +503,11 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                              .RunAsync(ctx, entity, detail, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<UpdateResult<TDetail>>(out var result):
+            case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
                 return result!;
             case AdviseResult.Block:
             default:
-                return UpdateResult<TDetail>.Blocked;
+                return UpdateResultBase<TDetail>.Blocked;
         }
 
         return new() { Detail = detail };

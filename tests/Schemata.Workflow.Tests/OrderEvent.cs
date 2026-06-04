@@ -1,3 +1,4 @@
+using System;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Workflow.Tests;
@@ -10,9 +11,7 @@ public class OrderEvent : ITransition
 
     public string? Note { get; set; }
 
-    public long? UpdatedById { get; set; }
-
-    public string? UpdatedBy { get; set; }
+    public string? UpdatedByName { get; set; }
 
     #endregion
 }

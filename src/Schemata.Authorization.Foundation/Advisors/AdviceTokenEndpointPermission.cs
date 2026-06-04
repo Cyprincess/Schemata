@@ -28,14 +28,13 @@ public sealed class AdviceTokenEndpointPermission<TApp>(IApplicationManager<TApp
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenEndpointPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,
         TokenRequest      request,
         CancellationToken ct = default
     ) {
-        if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + "token", ct)) {
+        if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + Endpoints.Token, ct)) {
             throw new OAuthException(
                 OAuthErrors.UnauthorizedClient,
                 SchemataResources.GetResourceString(SchemataResources.ST4007),

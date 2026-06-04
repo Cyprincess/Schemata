@@ -57,16 +57,6 @@ public class SubjectIdentifierService(IOptions<SchemataAuthorizationOptions> opt
 
     #endregion
 
-    /// <summary>
-    ///     Derives the sector identifier host per
-    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#PairwiseAlg">
-    ///         OpenID Connect Core 1.0 §8.1:
-    ///         Pairwise Identifier Algorithm
-    ///     </seealso>
-    ///     :
-    ///     uses <c>sector_identifier_uri</c> when configured, otherwise falls
-    ///     back to the host of the first registered redirect URI.
-    /// </summary>
     private static string GetSector(SchemataApplication application) {
         if (!string.IsNullOrWhiteSpace(application.SectorIdentifierUri)) {
             return new Uri(application.SectorIdentifierUri).Host;

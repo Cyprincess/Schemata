@@ -33,9 +33,12 @@ public sealed partial class IdentityHandler<TUser>
                 throw new AuthorizationException();
         }
 
+        // Match ForgotAsync's enumeration-safe response shape: missing accounts and invalid
+        // confirmation codes both surface as NoContentException so unauthenticated callers
+        // cannot distinguish the two cases by error code.
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (found is null) {
-            throw new NotFoundException();
+            throw new NoContentException();
         }
 
         var result = request switch {
@@ -45,7 +48,7 @@ public sealed partial class IdentityHandler<TUser>
         };
 
         if (result is not { Succeeded: true }) {
-            throw new InvalidArgumentException();
+            throw new NoContentException();
         }
 
         switch (await Advisor.For<IIdentityRecoveryAdvisor>()

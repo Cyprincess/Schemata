@@ -40,7 +40,7 @@ internal static class FileDescriptorBridge
         var requestType    = entityArgs[1];
         var detailType     = entityArgs[2];
         var summaryType    = entityArgs[3];
-        var listResultType = typeof(ListResult<>).MakeGenericType(summaryType);
+        var listResultType = typeof(ListResultBase<>).MakeGenericType(summaryType);
 
         var proto = new FileDescriptorProto {
             Name = $"{descriptor.Singular.ToLowerInvariant()}_service.proto", Syntax = "proto3",
@@ -50,9 +50,8 @@ internal static class FileDescriptorBridge
         }
 
         proto.Dependency.Add("google/protobuf/empty.proto");
+        proto.Dependency.Add("google/protobuf/timestamp.proto");
 
-        // Deduplicate message types by CLR type — the same type may appear in multiple
-        // roles (e.g. detail == summary).
         var messages = new Dictionary<Type, string> {
             [typeof(ListRequest)]   = nameof(ListRequest),
             [typeof(GetRequest)]    = nameof(GetRequest),
@@ -63,10 +62,8 @@ internal static class FileDescriptorBridge
         messages.TryAdd(summaryType, summaryType.Name);
         messages[listResultType] = $"List{descriptor.Plural}Response";
 
-        // Only scalar and well-known proto types are supported for reflection display.
-        // Nested message descriptors would require recursive building — deferred until needed.
         foreach (var (type, name) in messages) {
-            proto.MessageType.Add(BuildMessage(model, type, name));
+            proto.MessageType.Add(BuildMessage(model, type, name, messages, package));
         }
 
         var fqPrefix    = package is not null ? $".{package}." : ".";
@@ -100,13 +97,22 @@ internal static class FileDescriptorBridge
         });
         proto.Service.Add(service);
 
-        var deps = new[] { WellKnownReflection.EmptyReflection.Descriptor };
+        var deps = new List<FileDescriptor> {
+            WellKnownReflection.EmptyReflection.Descriptor,
+            WellKnownReflection.TimestampReflection.Descriptor,
+        };
 
         return FileDescriptor.BuildFromByteStrings(deps.Select(d => d.SerializedData).Append(proto.ToByteString()))
                              .Last();
     }
 
-    private static DescriptorProto BuildMessage(RuntimeTypeModel model, Type type, string name) {
+    private static DescriptorProto BuildMessage(
+        RuntimeTypeModel         model,
+        Type                     type,
+        string                   name,
+        Dictionary<Type, string> messages,
+        string?                  package
+    ) {
         var message = new DescriptorProto { Name = name };
 
         if (!model.CanSerialize(type)) {
@@ -123,11 +129,20 @@ internal static class FileDescriptorBridge
             var fdp = new FieldDescriptorProto {
                 Name   = field.Name,
                 Number = field.FieldNumber,
-                Type   = MapProtoType(elementType),
                 Label = repeated
                     ? FieldDescriptorProto.Types.Label.Repeated
                     : FieldDescriptorProto.Types.Label.Optional,
             };
+
+            if (messages.TryGetValue(elementType, out var typeName)) {
+                fdp.Type     = FieldDescriptorProto.Types.Type.Message;
+                fdp.TypeName = package is not null ? $".{package}.{typeName}" : $".{typeName}";
+            } else if (elementType == typeof(DateTime)) {
+                fdp.Type     = FieldDescriptorProto.Types.Type.Message;
+                fdp.TypeName = ".google.protobuf.Timestamp";
+            } else {
+                fdp.Type = MapProtoType(elementType);
+            }
 
             message.Field.Add(fdp);
         }
@@ -149,11 +164,8 @@ internal static class FileDescriptorBridge
         if (clr == typeof(byte[])) return FieldDescriptorProto.Types.Type.Bytes;
         if (clr == typeof(Guid)) return FieldDescriptorProto.Types.Type.String;
 
-        // Proto3 encodes enums as int32 on the wire — avoids building EnumDescriptorProto.
         if (clr.IsEnum) return FieldDescriptorProto.Types.Type.Int32;
 
-        // Fall back to string for complex types so reflection display still produces
-        // something readably useful rather than failing.
         return FieldDescriptorProto.Types.Type.String;
     }
 

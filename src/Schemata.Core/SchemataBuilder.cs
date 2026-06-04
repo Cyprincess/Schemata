@@ -157,7 +157,7 @@ public sealed class SchemataBuilder
     /// <summary>
     ///     Flushes all staged services into <paramref name="services" />, then
     ///     invokes <see cref="ISimpleFeature.ConfigureServices" /> for every
-    ///     registered feature in priority order.
+    ///     registered feature.
     /// </summary>
     /// <param name="services">The host service collection.</param>
     /// <returns>The builder for chaining.</returns>

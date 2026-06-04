@@ -37,7 +37,7 @@ public sealed class SchemataResourceBuilder
     /// <typeparam name="T">The <see cref="ISimpleFeature" /> type.</typeparam>
     public void AddFeature<T>()
         where T : ISimpleFeature {
-        Schemata.AddFeature(typeof(T));
+        Schemata.AddFeature<T>();
     }
 
     /// <summary>

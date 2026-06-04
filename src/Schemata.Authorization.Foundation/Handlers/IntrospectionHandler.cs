@@ -40,14 +40,6 @@ public sealed class IntrospectionHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    /// <summary>
-    ///     Introspects the given token: looks up the stored entity, validates
-    ///     the JWT payload, runs the <see cref="IIntrospectionAdvisor{TApp,TToken}" />
-    ///     pipeline, and populates the response.
-    /// </summary>
-    /// <param name="request">Introspection request containing the token.</param>
-    /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task<IntrospectionResponse> HandleAsync(
         IntrospectRequest                  request,
         Dictionary<string, List<string?>>? headers,

@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,25 +24,15 @@ public class AdviceEnrollValidationShould
     private static readonly ClaimsPrincipal Anonymous = new();
 
     private static readonly ClaimsPrincipal Alice = new(
-        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test")
-    );
+        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice" });
+             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice" });
         var sp = new ServiceCollection().BuildServiceProvider();
-        return new(
-            sp,
-            store.Object,
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<SchemataUser>(),
-            [],
-            [],
-            new UpperInvariantLookupNormalizer(),
-            new(),
-            NullLogger<SchemataUserManager<SchemataUser>>.Instance
-        );
+        return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [],
+                   new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
     }
 
     [Fact]
@@ -52,12 +43,7 @@ public class AdviceEnrollValidationShould
         var request = new AuthenticatorRequest { TwoFactorCode = "123456" };
 
         await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
-                                                        ctx,
-                                                        request,
-                                                        IdentityOperation.Enroll,
-                                                        Anonymous
-                                                    )
-        );
+                                                        ctx, request, IdentityOperation.Enroll, Anonymous));
     }
 
     [Fact]
@@ -68,12 +54,7 @@ public class AdviceEnrollValidationShould
         var request = new AuthenticatorRequest();
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx,
-                                                          request,
-                                                          IdentityOperation.Enroll,
-                                                          Alice
-                                                      )
-        );
+                                                          ctx, request, IdentityOperation.Enroll, Alice));
     }
 
     [Fact]

@@ -1,28 +1,24 @@
 using System;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
 [Table("SchemataRoleClaims")]
-public class SchemataRoleClaim : IdentityRoleClaim<long>, IIdentifier, ITimestamp
+[PrimaryKey(nameof(Uid))]
+public class SchemataRoleClaim : IdentityRoleClaim<Guid>, IIdentifier, ITimestamp
 {
     #region IIdentifier Members
-
-    /// <inheritdoc />
-    [Key]
-    public new virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

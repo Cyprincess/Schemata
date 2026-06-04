@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -27,10 +28,9 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
-                         a.Name = "auth-generated-name";
-                         return a;
-                     }
-                 );
+                     a.Name = "auth-generated-name";
+                     return a;
+                 });
 
         return (new(opts, authzMgr.Object), authzMgr);
     }
@@ -44,7 +44,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
         // ClientId and Name are aliased on SchemataApplication; setting ClientId last.
         return new() {
-            Application     = new() { Id    = 1, ClientId = clientId },
+            Application     = new() { Uid   = Guid.NewGuid(), ClientId = clientId },
             Request         = new() { Scope = scope },
             Principal       = new(new ClaimsIdentity(claims, "test")),
             ConsentDecision = ConsentDecision.Granted,
@@ -63,12 +63,10 @@ public class AdviceAuthorizeAutoApproveSignInShould
         Assert.True(ctx.TryGet<AuthorizationResult>(out var authResult));
         Assert.Equal("auth-generated-name", authResult!.Properties![Properties.AuthorizationName]);
 
-        var invocation = Assert.Single(
-            authzMgr.Invocations,
-            i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync)
-        );
+        var invocation = Assert.Single(authzMgr.Invocations,
+                                       i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync));
         var captured = Assert.IsType<SchemataAuthorization>(invocation.Arguments[0]);
-        Assert.Equal("app-1", captured.ApplicationName);
+        Assert.Equal("app-1", captured.Application);
         Assert.Equal("user-1", captured.Subject);
         Assert.Equal("openid profile", captured.Scopes);
         Assert.Equal(TokenStatuses.Valid, captured.Status);
@@ -96,10 +94,8 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var result = await advisor.AdviseAsync(ctx, authz);
 
         Assert.Equal(AdviseResult.Continue, result);
-        authzMgr.Verify(
-            m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
-            Times.Never
-        );
+        authzMgr.Verify(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
+                        Times.Never);
     }
 
     [Fact]
@@ -112,10 +108,8 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var result = await advisor.AdviseAsync(ctx, authz);
 
         Assert.Equal(AdviseResult.Continue, result);
-        authzMgr.Verify(
-            m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
-            Times.Never
-        );
+        authzMgr.Verify(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
+                        Times.Never);
     }
 
     [Fact]

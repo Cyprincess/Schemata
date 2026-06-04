@@ -529,6 +529,22 @@ public static class SchemataConstants
 
     #endregion
 
+    #region Nested type: FlowEngines
+
+    /// <summary>
+    ///     Well-known flow engine identifiers.
+    /// </summary>
+    public static class FlowEngines
+    {
+        /// <summary>The built-in single-token state machine engine.</summary>
+        public const string StateMachine = "statemachine";
+
+        /// <summary>The full BPMN 2.0 engine (future).</summary>
+        public const string Bpmn = "bpmn";
+    }
+
+    #endregion
+
     #region Nested type: GrantTypes
 
     /// <summary>
@@ -621,7 +637,7 @@ public static class SchemataConstants
 
         /// <summary>Key for Resource.</summary>
         public const string Resource = "resource";
-        
+
         /// <summary>Key for Tenancy.</summary>
         public const string Tenancy = "tenancy";
     }
@@ -1062,6 +1078,16 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string MaxAge = "max_age";
+
+        /// <summary>
+        ///     OAuth error_uri parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §5.2: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ErrorUri = "error_uri";
     }
 
     #endregion
@@ -1270,6 +1296,9 @@ public static class SchemataConstants
         /// <summary>Requests access to the end-user's default profile claims.</summary>
         public const string Profile = "profile";
 
+        /// <summary>Requests access to the end-user's role claims.</summary>
+        public const string Role = "role";
+
         /// <summary>Requests access to the end-user's email address.</summary>
         public const string Email = "email";
 
@@ -1441,6 +1470,7 @@ public static class SchemataConstants
                 Claims.PreferredUsername, Claims.Profile, Claims.Picture, Claims.Website, Claims.Gender,
                 Claims.Birthdate, Claims.Zoneinfo, Claims.Locale, Claims.UpdatedAt,
             ],
+            [Scopes.Role]    = [Claims.Role],
             [Scopes.Email]   = [Claims.Email, Claims.EmailVerified],
             [Scopes.Phone]   = [Claims.PhoneNumber, Claims.PhoneNumberVerified],
             [Scopes.Address] = [Claims.Address],

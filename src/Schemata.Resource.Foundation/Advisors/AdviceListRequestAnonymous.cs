@@ -31,10 +31,8 @@ public sealed class AdviceListRequestAnonymous<TEntity> : IResourceListRequestAd
 {
     #region IResourceListRequestAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceListRequestAnonymous.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         ListRequest                       request,

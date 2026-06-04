@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Caching.Redis;
 using Schemata.Caching.Skeleton;
-using StackExchange.Redis;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -14,13 +13,8 @@ public static class RedisCacheExtensions
     ///     <see cref="ICacheProvider" /> using the supplied Redis connection multiplexer.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="multiplexer">The Redis connection multiplexer.</param>
     /// <returns>The same service collection for chaining.</returns>
-    public static IServiceCollection AddRedisCache(
-        this IServiceCollection services,
-        IConnectionMultiplexer  multiplexer
-    ) {
-        services.TryAddSingleton(multiplexer);
+    public static IServiceCollection AddRedisCache(this IServiceCollection services) {
         services.TryAddSingleton<ICacheProvider, RedisCacheProvider>();
         return services;
     }

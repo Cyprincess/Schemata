@@ -20,6 +20,18 @@ public interface ICacheProvider
         CancellationToken ct = default
     );
 
+    /// <summary>
+    ///     Atomically stores <paramref name="value" /> under <paramref name="key" /> only when the
+    ///     key does not already exist. Returns <see langword="true" /> when the value was inserted
+    ///     and <see langword="false" /> when an entry already lived under the key.
+    /// </summary>
+    Task<bool> TryAddAsync(
+        string            key,
+        byte[]            value,
+        CacheEntryOptions options,
+        CancellationToken ct = default
+    );
+
     /// <summary>Removes the entry (key-value or collection) stored under <paramref name="key" />.</summary>
     Task RemoveAsync(string key, CancellationToken ct = default);
 

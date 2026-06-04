@@ -15,7 +15,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 {
     private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>? Registrar;
 
-    private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete(), _ => new());
+    private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
     private readonly ResourceBinderConfiguration _config;
 
@@ -50,48 +50,45 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         where TDetail : class, ICanonicalName
         where TSummary : class, ICanonicalName {
         var model = config.Model;
-        var descriptor = ResourceNameDescriptor.ForType(typeof(TEntity));
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
         var package = descriptor.Package ?? typeof(TEntity).Namespace;
         var service = package is not null ? $"{package}.{descriptor.Singular}Service" : $"{descriptor.Singular}Service";
 
-        // Empty metadata array — grpc-dotnet does not inject authorization metadata at
-        // the method provider level; that is handled by the endpoint builder in
-        // SchemataGrpcResourceFeature.
         var metadata = Array.Empty<object>();
 
         context.AddUnaryMethod(
-            new Method<ListRequest, ListResult<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResult<TSummary>>(model)), metadata,
-            async (svc, req, _) => {
+            new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResultBase<TSummary>>(model)), metadata,
+            async (svc, req, ctx) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.ListAsync(req);
+                return await rs.ListAsync(req, new(svc, ctx));
             });
 
         context.AddUnaryMethod(
             new Method<GetRequest, TDetail>(MethodType.Unary, service, $"Get{descriptor.Singular}", CreateMarshaller<GetRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, _) => {
+            metadata, async (svc, req, ctx) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.GetAsync(req);
+                return await rs.GetAsync(req, new(svc, ctx));
             });
 
         context.AddUnaryMethod(
             new Method<TRequest, TDetail>(MethodType.Unary, service, $"Create{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, _) => {
+            metadata, async (svc, req, ctx) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.CreateAsync(req);
+                return await rs.CreateAsync(req, new(svc, ctx));
             });
 
         context.AddUnaryMethod(
             new Method<TRequest, TDetail>(MethodType.Unary, service, $"Update{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, _) => {
+            metadata, async (svc, req, ctx) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.UpdateAsync(req);
+                return await rs.UpdateAsync(req, new(svc, ctx));
             });
 
         context.AddUnaryMethod(
             new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
-            async (svc, req, _) => {
+            async (svc, req, ctx) => {
                 var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                await rs.DeleteAsync(req);
+                await rs.DeleteAsync(req, new(svc, ctx));
                 return new();
             });
     }

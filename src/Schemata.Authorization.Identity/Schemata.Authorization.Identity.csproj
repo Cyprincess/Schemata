@@ -17,7 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
-    <ProjectReference Include="..\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

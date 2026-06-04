@@ -31,7 +31,6 @@ public sealed class AdvicePhoneClaimDestination : IDestinationAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         Claim             claim,
@@ -42,8 +41,6 @@ public sealed class AdvicePhoneClaimDestination : IDestinationAdvisor
         switch (claim.Type) {
             case Claims.PhoneNumber:
             case Claims.PhoneNumberVerified:
-                destinations.Add(ClaimDestinations.AccessToken);
-
                 if (!principal.HasScope(Scopes.Phone)) {
                     return Task.FromResult(AdviseResult.Handle);
                 }

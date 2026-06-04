@@ -32,7 +32,6 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
 
     #region IAuthorizationManager<TAuthorization> Members
 
-    /// <inheritdoc />
     public async IAsyncEnumerable<TAuthorization> ListAsync(
         string?                                    subject,
         string?                                    client,
@@ -49,12 +48,11 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         }
 
         await foreach (var authorization in _authorizations.ListAsync(
-                           q => q.Where(a => a.Subject == subject && a.ApplicationName == client), ct)) {
+                           q => q.Where(a => a.Subject == subject && a.Application == client), ct)) {
             yield return authorization;
         }
     }
 
-    /// <inheritdoc />
     public async Task<TAuthorization?> CreateAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -68,7 +66,6 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         return authorization;
     }
 
-    /// <inheritdoc />
     public async Task RevokeAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -82,7 +79,6 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         await _authorizations.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public async Task UpdateAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -94,7 +90,6 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
         await _authorizations.CommitAsync(ct);
     }
 
-    /// <inheritdoc />
     public async Task DeleteAsync(TAuthorization? authorization, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

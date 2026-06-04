@@ -70,7 +70,11 @@ public sealed class SchemataOptions
             return null;
         }
 
-        return value as TOptions;
+        if (value is TOptions options) {
+            return options;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -88,7 +92,11 @@ public sealed class SchemataOptions
             return null;
         }
 
-        return value as TOptions;
+        if (value is TOptions options) {
+            return options;
+        }
+
+        return null;
     }
 
     /// <summary>

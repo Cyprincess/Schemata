@@ -5,25 +5,29 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Schemata.Abstractions;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
+using EfPrimaryKey = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
 
 namespace Schemata.Entity.LinqToDB;
 
 /// <summary>
-///     LINQ to DB metadata reader that translates <c>System.ComponentModel.DataAnnotations.Schema</c> attributes into
-///     LINQ to DB mapping attributes.
+///     LINQ to DB metadata reader that translates <c>System.ComponentModel.DataAnnotations.Schema</c>
+///     attributes and the EF Core 7+ class-level
+///     <see cref="EfPrimaryKey" /> into LINQ to DB mapping attributes.
 /// </summary>
 /// <remarks>
 ///     Translates <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.ColumnAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute" />,
-///     <see cref="System.ComponentModel.DataAnnotations.KeyAttribute" />, and
-///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />
-///     into their LINQ to DB equivalents.
+///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />, and
+///     <see cref="EfPrimaryKey" /> into their LINQ to DB equivalents.
+///     <see cref="System.ComponentModel.DataAnnotations.KeyAttribute" /> is intentionally NOT
+///     translated; declare keys with class-level <c>[PrimaryKey]</c> on the entity.
 /// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
@@ -31,47 +35,53 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
     /// <summary>
     ///     Returns LINQ to DB mapping attributes for the specified type by reading
-    ///     <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />.
+    ///     <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" /> and the
+    ///     EF Core class-level <c>PrimaryKeyAttribute</c>.
     /// </summary>
     /// <param name="type">The type to inspect.</param>
     /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type) {
+        var attributes = new List<MappingAttribute>();
+
         var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
+        if (t is not null) {
+            var attr = new TableAttribute { IsColumnAttributeRequired = false };
 
-        if (t is null) {
-            return [];
+            var name = t.Name;
+
+            if (string.IsNullOrWhiteSpace(name)) {
+                attributes.Add(attr);
+            } else {
+                var names = name.Replace("[", "").Replace("]", "").Split('.');
+
+                switch (names.Length) {
+                    case 0:
+                        break;
+                    case 1:
+                        attr.Name = names[0];
+                        break;
+                    case 2:
+                        attr.Name   = names[0];
+                        attr.Schema = names[1];
+                        break;
+                    default:
+                        throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1019), name, type.FullName));
+                }
+
+                attributes.Add(attr);
+            }
         }
 
-        var attr = new TableAttribute { IsColumnAttributeRequired = false };
+        // EF Core class-level [PrimaryKey] is projected into LinqToDB PrimaryKey marks
+        // per-member from GetAttributes(Type, MemberInfo); nothing to add at the type level.
 
-        var name = t.Name;
-
-        if (string.IsNullOrWhiteSpace(name)) {
-            return [attr];
-        }
-
-        var names = name.Replace("[", "").Replace("]", "").Split('.');
-
-        switch (names.Length) {
-            case 0:
-                break;
-            case 1:
-                attr.Name = names[0];
-                break;
-            case 2:
-                attr.Name   = names[0];
-                attr.Schema = names[1];
-                break;
-            default:
-                throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1019), name, type.FullName));
-        }
-
-        return [attr];
+        return attributes.ToArray();
     }
 
     /// <summary>
     ///     Returns LINQ to DB mapping attributes for the specified member by reading
-    ///     <c>System.ComponentModel.DataAnnotations</c> attributes.
+    ///     <c>System.ComponentModel.DataAnnotations</c> attributes, and the EF Core 7+ class-level
+    ///     <c>PrimaryKeyAttribute</c> when the member name appears in its <c>PropertyNames</c> list.
     /// </summary>
     /// <param name="type">The declaring type.</param>
     /// <param name="member">The member to inspect.</param>
@@ -83,8 +93,17 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
         var attributes = new List<MappingAttribute>();
 
-        if (member.HasAttribute<System.ComponentModel.DataAnnotations.KeyAttribute>()) {
-            attributes.Add(new PrimaryKeyAttribute());
+        var classKey = type.GetCustomAttribute<EfPrimaryKey>(true);
+        if (classKey is not null) {
+            var order = 0;
+            foreach (var name in classKey.PropertyNames) {
+                if (string.Equals(name, member.Name, StringComparison.Ordinal)) {
+                    attributes.Add(new PrimaryKeyAttribute(order));
+                    break;
+                }
+
+                order++;
+            }
         }
 
         var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();

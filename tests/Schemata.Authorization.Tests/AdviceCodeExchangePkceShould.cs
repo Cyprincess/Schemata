@@ -46,10 +46,8 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task Continues_WhenS256Challenge_MatchesVerifier() {
         var advisor = CreateAdvisor();
-        var exchange = Exchange(
-            new() { CodeVerifier  = Verifier },
-            new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 }
-        );
+        var exchange = Exchange(new() { CodeVerifier  = Verifier },
+                                new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var result = await advisor.AdviseAsync(CreateContext(), exchange);
 
@@ -59,10 +57,8 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenS256Challenge_DoesNotMatchVerifier() {
         var advisor = CreateAdvisor();
-        var exchange = Exchange(
-            new() { CodeVerifier  = "wrong-verifier" },
-            new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 }
-        );
+        var exchange = Exchange(new() { CodeVerifier  = "wrong-verifier" },
+                                new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
@@ -91,10 +87,8 @@ public class AdviceCodeExchangePkceShould
     public async Task Continues_WhenPlainChallenge_MatchesVerifier() {
         var advisor       = CreateAdvisor(false);
         var plainVerifier = "my-plain-verifier-that-is-at-least-43-chars-long_ok";
-        var exchange = Exchange(
-            new() { CodeVerifier  = plainVerifier },
-            new() { CodeChallenge = plainVerifier, CodeChallengeMethod = PkceMethods.Plain }
-        );
+        var exchange = Exchange(new() { CodeVerifier  = plainVerifier },
+                                new() { CodeChallenge = plainVerifier, CodeChallengeMethod = PkceMethods.Plain });
 
         var result = await advisor.AdviseAsync(CreateContext(), exchange);
 

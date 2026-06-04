@@ -30,10 +30,8 @@ public sealed class AdviceBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryA
 {
     #region IRepositoryBuildQueryAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceBuildQuerySoftDelete.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext           ctx,
         QueryContainer<TEntity> container,

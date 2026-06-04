@@ -22,18 +22,13 @@ public sealed class SchemataTenancyOptions
     public int ProviderMaxCapacity { get; set; } = DefaultMaxCapacity;
 
     /// <summary>
-    ///     Overrides applied to every tenant container (and the no-tenant root container) in registration order.
-    /// </summary>
-    public List<Action<IServiceCollection>> AllOverrides { get; } = [];
-
-    /// <summary>
-    ///     Overrides keyed by tenant identifier applied after <see cref="AllOverrides" /> for matching tenants only.
+    ///     Overrides keyed by tenant identifier applied during tenant container construction.
     /// </summary>
     public Dictionary<string, List<Action<IServiceCollection>>> TenantOverrides { get; } = [];
 
     /// <summary>
     ///     Dynamic overrides invoked once per tenant container with the tenant id and the root service provider;
-    ///     applied after both <see cref="AllOverrides" /> and <see cref="TenantOverrides" />.
+    ///     applied after <see cref="TenantOverrides" />.
     /// </summary>
     public List<Action<string, IServiceCollection, IServiceProvider>> DynamicOverrides { get; } = [];
 }
