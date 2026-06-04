@@ -25,7 +25,7 @@ public sealed class SchemataResourceFeature : FeatureBase
     /// <summary>
     ///     The default priority for this feature.
     /// </summary>
-    public const int DefaultPriority = Orders.Extension + 50_000_000;
+    public const int DefaultPriority = Orders.Extension + 70_000_000;
 
     /// <inheritdoc />
     public override int Priority => DefaultPriority;

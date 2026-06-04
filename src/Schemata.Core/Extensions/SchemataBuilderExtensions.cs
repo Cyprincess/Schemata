@@ -98,6 +98,21 @@ public static class SchemataBuilderExtensions
     }
 
     /// <summary>
+    ///     Enables <c>ExceptionHandler</c>, which produces structured JSON error
+    ///     responses per <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>
+    ///     for <see cref="Schemata.Abstractions.Exceptions.SchemataException" /> instances, and a generic 500 response
+    ///     with a request trace identifier for unhandled exceptions.
+    ///     See <see cref="SchemataExceptionHandlerFeature" /> for details.
+    /// </summary>
+    /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataBuilder UseExceptionHandler(this SchemataBuilder builder) {
+        builder.AddFeature<SchemataExceptionHandlerFeature>();
+
+        return builder;
+    }
+
+    /// <summary>
     ///     Enables <c>ForwardedHeaders</c>, which respects <c>X-Forwarded-*</c>
     ///     headers from reverse proxies. See <seealso href="https://google.aip.dev/196">AIP-196: Regional endpoints</seealso>.
     ///     See <see cref="SchemataForwardedHeadersFeature" /> for details.
