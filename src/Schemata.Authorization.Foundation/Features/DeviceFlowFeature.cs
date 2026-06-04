@@ -39,7 +39,6 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_400;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (string.IsNullOrWhiteSpace(o.DeviceVerificationUri)) {
@@ -57,7 +56,7 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryDeviceFlow>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeGrantPermission<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeScopeValidation<TApp, TScope>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeScopeValidation<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceCodeExchangeAdvisor<TApp, TToken>, AdviceDeviceCodeExchangeValidation<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceDeviceCodePolling<TApp>>());
     }

@@ -47,15 +47,6 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
 {
     private const string UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    /// <summary>
-    ///     Processes a device authorization request: authenticates the client,
-    ///     runs the <see cref="IDeviceAuthorizeAdvisor{TApp}" /> pipeline,
-    ///     creates both a device code and a user code token,
-    ///     and returns the <see cref="DeviceAuthorizationResponse" />.
-    /// </summary>
-    /// <param name="request">Device authorization request from the client.</param>
-    /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> DeviceAuthorizeAsync(
         DeviceAuthorizeRequest             request,
         Dictionary<string, List<string?>>? headers,
@@ -92,7 +83,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new TToken {
-            ApplicationName = application.Name,
+            Application = application.Name,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
             ReferenceId     = GenerateDeviceCode(),
@@ -106,7 +97,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         await tokens.CreateAsync(dc, ct);
 
         var uc = new TToken {
-            ApplicationName = application.Name,
+            Application = application.Name,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,
             ReferenceId     = GenerateUserCode(),

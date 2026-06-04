@@ -31,12 +31,17 @@ public class Stringizing : ExpressionVisitor
     private readonly StringBuilder                           _builder = new();
 
     /// <summary>Converts <paramref name="expression" /> to its deterministic string representation.</summary>
+    /// <remarks>
+    ///     Captured local variables and other closed sub-expressions are folded to constants
+    ///     via <see cref="PartialEvaluator.Eval" /> before serialization, so different
+    ///     values of a captured variable produce different keys.
+    /// </remarks>
     /// <param name="expression">The expression to serialize.</param>
-    /// <returns>The deterministic string, or <see langword="null" /> if serialization fails.</returns>
+    /// <returns>The deterministic string representation.</returns>
     public static string ToString(Expression expression) {
         var stringizing = new Stringizing();
 
-        stringizing.Visit(expression);
+        stringizing.Visit(PartialEvaluator.Eval(expression));
 
         return stringizing.ToString();
     }
@@ -76,7 +81,9 @@ public class Stringizing : ExpressionVisitor
                 _builder.Append("null");
                 return node;
             case string str:
-                _builder.Append('"').Append(str).Append('"');
+                _builder.Append('"')
+                        .Append(str.Replace("\\", "\\\\").Replace("\"", "\\\""))
+                        .Append('"');
                 return node;
             case IFormattable formattable:
                 _builder.Append(formattable.ToString(null, CultureInfo.InvariantCulture));
@@ -131,8 +138,7 @@ public class Stringizing : ExpressionVisitor
 
     protected override Expression VisitMethodCall(MethodCallExpression node) {
         var method = node.Method;
-        var arity  = method.GetParameters().Length;
-        // Extension methods are detected by [ExtensionAttribute] on a static method.
+        var arity       = method.GetParameters().Length;
         var isExtension = method.IsStatic && method.IsDefined(typeof(ExtensionAttribute), false);
 
         if (isExtension) {
@@ -176,7 +182,6 @@ public class Stringizing : ExpressionVisitor
                 Visit(node.Operand);
                 return node;
             default:
-                // Trailing ':' prevents node-type token from visually merging with the operand.
                 _builder.Append(node.NodeType.ToString()).Append(':');
                 Visit(node.Operand);
                 return node;
@@ -283,7 +288,6 @@ public class Stringizing : ExpressionVisitor
         return node;
     }
 
-    /// <summary>Returns the accumulated deterministic string.</summary>
     public override string ToString() { return _builder.ToString(); }
 
     private void AppendMethodHead(string name, int arity) {

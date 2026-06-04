@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Expressions.Aip;
 using Schemata.Resource.Foundation.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -22,15 +23,10 @@ namespace Schemata.Resource.Foundation.Features;
 [DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
-    /// <summary>
-    ///     The default priority for this feature.
-    /// </summary>
     public const int DefaultPriority = Orders.Extension + 70_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -39,6 +35,7 @@ public sealed class SchemataResourceFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddScoped(typeof(ResourceOperationHandler<,,,>));
+        services.AddAipExpressions();
 
         services.AddHttpContextAccessor();
 
@@ -90,7 +87,20 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceCreateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
 
         services.Configure<SchemataResourceOptions>(options => {
-            options.Resources.TryAdd(resource.Entity.TypeHandle, resource);
+            if (!options.Resources.TryGetValue(resource.Entity.TypeHandle, out var existing)) {
+                options.Resources[resource.Entity.TypeHandle] = resource;
+                return;
+            }
+
+            if (existing.Endpoints is null || resource.Endpoints is null) {
+                existing.Endpoints = null;
+            } else {
+                foreach (var ep in resource.Endpoints) {
+                    if (!existing.Endpoints.Contains(ep)) {
+                        existing.Endpoints.Add(ep);
+                    }
+                }
+            }
         });
     }
 }

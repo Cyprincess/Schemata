@@ -1,10 +1,12 @@
 using System;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("students/{student}")]
+[PrimaryKey(nameof(Uid))]
 public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IValidation, IUpdateMask
 {
     public string? FullName { get; set; }
@@ -31,8 +33,7 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IV
     #endregion
 
     #region IIdentifier Members
-
-    public long Id { get; set; }
+    public Guid Uid { get; set; }
 
     #endregion
 

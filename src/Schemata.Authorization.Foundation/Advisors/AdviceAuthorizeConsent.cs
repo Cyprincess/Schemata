@@ -47,7 +47,6 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeConsent.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
@@ -73,11 +72,29 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                 }
 
                 var granted = ScopeParser.Parse(a.Scopes);
-
-                if (scopes.IsSubsetOf(granted)) {
-                    authorized = true;
-                    break;
+                if (!scopes.IsSubsetOf(granted)) {
+                    continue;
                 }
+
+                if (authz.Request?.RedirectUri != a.RedirectUri) {
+                    continue;
+                }
+
+                if (!ScopeParser.IsSubset(authz.Request?.ResponseType, a.ResponseType)) {
+                    continue;
+                }
+
+                if (authz.Request?.CodeChallengeMethod != a.CodeChallengeMethod) {
+                    continue;
+                }
+
+                if (!ScopeParser.IsSubset(authz.Request?.AcrValues, a.AcrValues)) {
+                    continue;
+                }
+
+                authorized = true;
+
+                break;
             }
         }
 

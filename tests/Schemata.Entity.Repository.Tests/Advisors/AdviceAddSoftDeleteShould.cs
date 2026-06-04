@@ -51,13 +51,4 @@ public class AdviceAddSoftDeleteShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal(existing, entity.DeleteTime);
     }
-
-    #region Nested type: PlainEntity
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    #endregion
 }

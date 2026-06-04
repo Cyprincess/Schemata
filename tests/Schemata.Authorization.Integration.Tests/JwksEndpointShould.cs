@@ -37,10 +37,8 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
 
         foreach (var key in keys.EnumerateArray()) {
             foreach (var field in privateFields) {
-                Assert.False(
-                    key.TryGetProperty(field, out var _),
-                    $"JWK should not contain private key field '{field}'"
-                );
+                Assert.False(key.TryGetProperty(field, out var _),
+                             $"JWK should not contain private key field '{field}'");
             }
         }
     }

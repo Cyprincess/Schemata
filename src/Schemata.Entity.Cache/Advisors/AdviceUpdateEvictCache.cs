@@ -19,8 +19,9 @@ public static class AdviceUpdateEvictCache
 }
 
 /// <summary>
-///     Update advisor that evicts every cache key associated with the entity's primary key from the reverse
-///     index before the entity is persisted.
+///     Update advisor that schedules cache eviction to run after the commit boundary
+///     succeeds, evicting every cache key associated with the entity's primary key from
+///     the reverse index.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <remarks>
@@ -29,7 +30,12 @@ public static class AdviceUpdateEvictCache
 ///         Registered by
 ///         <see cref="Microsoft.AspNetCore.Builder.SchemataRepositoryBuilderExtensions.UseQueryCache" />.
 ///     </para>
-///     <para>Eviction runs inside the advisor, before <see cref="IRepository{TEntity}.CommitAsync" />.</para>
+///     <para>
+///         Eviction is deferred via
+///         <see cref="IRepository{TEntity}.EnqueueAfterCommit" /> so it observes a
+///         successful commit boundary — concurrent readers cannot repopulate the cache
+///         with pre-update state in the window between eviction and write.
+///     </para>
 ///     <para>
 ///         Suppressed when <see cref="QueryCacheEvictionSuppressed" /> is present in the advice context or when
 ///         <see cref="SchemataQueryCacheOptions.EvictionEnabled" /> is <see langword="false" />.
@@ -53,22 +59,21 @@ public sealed class AdviceUpdateEvictCache<TEntity> : IRepositoryUpdateAdvisor<T
 
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateEvictCache.DefaultOrder;
 
-    /// <inheritdoc />
-    public async Task<AdviseResult> AdviseAsync(
+    public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
         CancellationToken    ct = default
     ) {
         if (!_options.Value.EvictionEnabled || ctx.Has<QueryCacheEvictionSuppressed>()) {
-            return AdviseResult.Continue;
+            return Task.FromResult(AdviseResult.Continue);
         }
 
-        await EvictAsync(_cache, typeof(TEntity), entity, ct);
-        return AdviseResult.Continue;
+        var cache = _cache;
+        repository.EnqueueAfterCommit(token => EvictAsync(cache, typeof(TEntity), entity, token));
+        return Task.FromResult(AdviseResult.Continue);
     }
 
     #endregion

@@ -28,7 +28,6 @@ public sealed class UserInfoFeature : IAuthorizationFlowFeature
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 3_000;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<UserInfoEndpoint, UserInfoHandler>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IUserInfoAdvisor, AdviceUserInfoOpenIdRequirement>());

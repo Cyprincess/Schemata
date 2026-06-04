@@ -1,9 +1,11 @@
 using System;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 [CanonicalName("students/{student}")]
+[PrimaryKey(nameof(Uid))]
 public class Student : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, ITimestamp
 {
     public string? FullName { get; set; }
@@ -24,8 +26,7 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, I
     #endregion
 
     #region IIdentifier Members
-
-    public long Id { get; set; }
+    public Guid Uid { get; set; }
 
     #endregion
 

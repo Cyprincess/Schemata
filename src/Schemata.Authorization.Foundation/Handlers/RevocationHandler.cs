@@ -36,21 +36,6 @@ public sealed class RevocationHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    /// <summary>
-    ///     Revokes a token per
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2">
-    ///         RFC 7009: OAuth 2.0 Token Revocation
-    ///         §2.2: Revocation Response
-    ///     </seealso>
-    ///     .
-    ///     Returns silently when the client is not authenticated
-    ///     or the token is not found. Runs the
-    ///     <see cref="IRevocationAdvisor{TApp,TToken}" /> pipeline before committing
-    ///     the revocation.
-    /// </summary>
-    /// <param name="request">Revocation request containing the token to revoke.</param>
-    /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task HandleAsync(
         RevokeRequest                      request,
         Dictionary<string, List<string?>>? headers,
@@ -68,15 +53,11 @@ public sealed class RevocationHandler<TApp, TToken>(
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            // do not reveal token validity to unauthenticated callers.
-            // See RFC 7009 §2.2.
             return;
         }
 
         var entity = await tokens.FindByReferenceIdAsync(request.Token, ct);
         if (entity is null) {
-            // do not reveal token validity for unknown tokens.
-            // See RFC 7009 §2.2.
             return;
         }
 

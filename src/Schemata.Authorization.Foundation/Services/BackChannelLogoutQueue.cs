@@ -23,7 +23,6 @@ public sealed class BackChannelLogoutQueue(IServiceProvider sp, ILogger<BackChan
     /// <summary>Enqueues an asynchronous logout task for background execution.</summary>
     public void Enqueue(Func<IServiceProvider, CancellationToken, Task> task) { _channel.Writer.TryWrite(task); }
 
-    /// <summary>Drains the channel, executing each task in a new DI scope.  Logs failures without stopping.</summary>
     protected override async Task ExecuteAsync(CancellationToken ct) {
         await foreach (var task in _channel.Reader.ReadAllAsync(ct)) {
             try {

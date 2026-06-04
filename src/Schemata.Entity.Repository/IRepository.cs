@@ -34,9 +34,14 @@ public interface IRepository
     IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
 
     /// <summary>
-    ///     Searches entities through the build-query advisor pipeline, using provider-specific
-    ///     full-text search when available. Falls back to <see cref="ListAsync{T}" /> otherwise.
+    ///     Searches entities through provider-specific full-text search.
     /// </summary>
+    /// <remarks>
+    ///     Built-in EF Core and LINQ to DB providers do not implement full-text search; callers
+    ///     should use <see cref="ListAsync{T}" /> with a filter expression instead. Custom
+    ///     providers may override <see cref="IRepository{TEntity}.SearchAsync{TResult}" /> to
+    ///     opt into provider-native search semantics.
+    /// </remarks>
     /// <typeparam name="T">The entity type to search.</typeparam>
     /// <param name="predicate">An optional filter expression.</param>
     /// <param name="ct">A cancellation token.</param>
@@ -127,6 +132,18 @@ public interface IRepository
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The number of rows affected.</returns>
     ValueTask<int> CommitAsync(CancellationToken ct = default);
+
+    /// <summary>
+    ///     Enqueues an action to run after the next successful commit boundary —
+    ///     <see cref="IUnitOfWork.CommitAsync" /> if a unit of work is active, otherwise
+    ///     <see cref="CommitAsync" /> on this repository.
+    /// </summary>
+    /// <remarks>
+    ///     Used by advisors (e.g., cache eviction) that must observe a successful persistence
+    ///     boundary before acting. Discarded on rollback or dispose.
+    /// </remarks>
+    /// <param name="action">The action to execute.</param>
+    void EnqueueAfterCommit(Func<CancellationToken, Task> action);
 
     /// <summary>
     ///     Detaches an entity from the change tracker so subsequent mutations are not persisted.

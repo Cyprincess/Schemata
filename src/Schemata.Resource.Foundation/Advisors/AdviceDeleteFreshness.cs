@@ -23,22 +23,30 @@ public static class AdviceDeleteFreshness
 /// <summary>
 ///     Enforces optimistic concurrency for delete operations
 ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso> by comparing the
-///     request
-///     ETag with the entity's concurrency timestamp.
-///     Skipped when <see cref="DeleteRequest.Force" /> is <see langword="true" />.
-///     Throws <see cref="ConcurrencyException" /> on mismatch.
-///     Suppressed when <see cref="FreshnessSuppressed" /> is present.
+///     request ETag with the entity's concurrency timestamp.
 /// </summary>
+/// <remarks>
+///     <para>
+///         The check fires only when <see cref="DeleteRequest.Force" /> is <see langword="false" />
+///         and the supplied <see cref="DeleteRequest.Etag" /> begins with <c>W/</c> (weak validator).
+///         Missing, empty, or non-<c>W/</c> tags are treated as opt-out — the delete proceeds
+///         without concurrency validation. Hosts that need stronger guarantees should require
+///         <c>etag</c> earlier in the chain (e.g., via a validation advisor) or layer a stricter
+///         freshness advisor.
+///     </para>
+///     <para>
+///         Throws <see cref="ConcurrencyException" /> on mismatch. Suppressed when
+///         <see cref="FreshnessSuppressed" /> is present.
+///     </para>
+/// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
     #region IResourceDeleteAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceDeleteFreshness.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity           entity,

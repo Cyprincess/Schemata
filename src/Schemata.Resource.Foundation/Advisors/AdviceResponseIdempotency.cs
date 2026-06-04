@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -43,10 +44,8 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
 
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
-    /// <inheritdoc />
     public int Order => AdviceResponseIdempotency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity?          entity,
@@ -62,7 +61,11 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
             return AdviseResult.Continue;
         }
 
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(detail);
+        // Persist the full CreateResultBase wrapper so the read side in
+        // AdviceCreateRequestIdempotency can deserialize symmetrically and replay
+        // both the detail payload and the allow/block gate from OperationResultBase.
+        var result = new CreateResultBase<TDetail> { Detail = detail };
+        var bytes  = JsonSerializer.SerializeToUtf8Bytes(result);
 
         var key = $"idempotency\x1e{pending.RequestId}".ToCacheKey(Keys.Resource);
         await _cache.SetAsync(key, bytes, new() {

@@ -179,8 +179,6 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 break;
         }
 
-        // For reference tokens, store the full JWT as the payload so it can be
-        // introspected later without requiring live JWT validation on every call.
         var payload = format == TokenFormats.Reference ? token.CreateToken(claims, lifetime) : value;
 
         var now = DateTime.UtcNow;
@@ -192,9 +190,8 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             Payload           = payload,
             Subject           = subject,
             ExpireTime        = now + lifetime,
-            CreateTime        = now,
-            ApplicationName   = application,
-            AuthorizationName = authorization,
+            Application       = application,
+            Authorization     = authorization,
             SessionId         = session,
         };
         await tokens.CreateAsync(entity, ct);
@@ -202,18 +199,12 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return value;
     }
 
-    /// <summary>
-    ///     Validates a Bearer token from the <c>Authorization</c> header.
-    ///     Looks up the token entity by reference, verifies its type is
-    ///     <see cref="TokenTypes.AccessToken" /> and status is
-    ///     <see cref="TokenStatuses.Valid" />, then validates the JWT/JWE
-    ///     payload and returns the claims principal.
-    /// </summary>
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
         var ct = Context.RequestAborted;
 
         var header = Request.Headers.Authorization.ToString();
-        if (string.IsNullOrWhiteSpace(header) || !header.StartsWith(Schemes.Bearer + " ", StringComparison.OrdinalIgnoreCase)) {
+        if (string.IsNullOrWhiteSpace(header)
+         || !header.StartsWith(Schemes.Bearer + " ", StringComparison.OrdinalIgnoreCase)) {
             return AuthenticateResult.NoResult();
         }
 
@@ -223,15 +214,15 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         }
 
         var entity = await tokens.FindByReferenceIdAsync(token, ct);
-        if (string.IsNullOrWhiteSpace(entity?.ApplicationName)
+        if (string.IsNullOrWhiteSpace(entity?.Application)
          || entity.Type != TokenTypes.AccessToken
          || entity.Status != TokenStatuses.Valid) {
             return AuthenticateResult.NoResult();
         }
 
         var principal = entity.Format switch {
-            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await issuer.Validate(entity.Payload, entity.ApplicationName),
-            TokenFormats.Jwt or TokenFormats.Jwe => await issuer.Validate(token, entity.ApplicationName),
+            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await issuer.Validate(entity.Payload, entity.Application),
+            TokenFormats.Jwt or TokenFormats.Jwe => await issuer.Validate(token, entity.Application),
             var _                                => null,
         };
 
@@ -239,8 +230,6 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             return AuthenticateResult.NoResult();
         }
 
-        // Replace the subject claim with the one from the token entity to support
-        // pairwise subject identifiers stored at issuance time.
         var id = principal.Identity as ClaimsIdentity;
         var claims = id!.Claims.Where(c => c.Type != Claims.Subject)
                         .Append(new(Claims.Subject, entity.Subject ?? string.Empty))
@@ -250,29 +239,31 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
 
-    /// <inheritdoc />
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) { return Task.CompletedTask; }
 
-    /// <summary>
-    ///     Issues tokens in response to a successful authentication.
-    ///     Runs claim resolution via <see cref="IClaimsAdvisor" />, filters
-    ///     claims by destination via <see cref="IDestinationAdvisor" />,
-    ///     creates the access token, optionally a refresh token and an ID token,
-    ///     and writes the JSON <see cref="TokenResponse" /> to the HTTP response body.
-    /// </summary>
     protected override async Task HandleSignInAsync(ClaimsPrincipal principal, AuthenticationProperties? properties) {
         var ct    = Context.RequestAborted;
         var items = properties?.Items ?? new Dictionary<string, string?>();
         var ctx   = new AdviceContext(Context.RequestServices);
 
+        if (principal.Identity is not ClaimsIdentity identity) {
+            return;
+        }
+
         items.TryGetValue(Properties.Scope, out var scope);
         items.TryGetValue(Properties.AuthorizationName, out var authorizationName);
         items.TryGetValue(Properties.SessionId, out var sid);
 
-        var claims = new List<Claim>();
-        foreach (var identity in principal.Identities) {
-            claims.AddRange(identity.Claims);
+        if (!string.IsNullOrWhiteSpace(scope)) {
+            identity.AddClaim(new(Claims.Scope, scope));
         }
+
+        if (!string.IsNullOrWhiteSpace(sid)) {
+            identity.AddClaim(new(Claims.SessionId, sid));
+        }
+
+        var claims = new List<Claim>();
+        claims.AddRange(identity.Claims);
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
@@ -280,7 +271,8 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             : null;
         var @internal = principal.FindFirstValue(Claims.Subject);
 
-        switch (await Advisor.For<IClaimsAdvisor>().RunAsync(ctx, claims, ct)) {
+        switch (await Advisor.For<IClaimsAdvisor>()
+                             .RunAsync(ctx, claims, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TokenResponse>(out var handled):
@@ -296,42 +288,30 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 );
         }
 
-        // Filter claims to their registered destinations and annotate each
-        // claim with a destination marker so downstream logic can split them
-        // into access-token and identity-token claim sets.
-        for (var i = claims.Count - 1; i >= 0; i--) {
+        foreach (var claim in claims) {
             var destinations = new HashSet<string>();
 
-            switch (await Advisor.For<IDestinationAdvisor>().RunAsync(ctx, claims[i], destinations, principal, ct)) {
+            switch (await Advisor.For<IDestinationAdvisor>()
+                                 .RunAsync(ctx, claim, destinations, principal, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                     break;
                 case AdviseResult.Block:
                 default:
-                    claims.RemoveAt(i);
                     continue;
             }
 
             if (destinations.Count == 0) {
-                claims.RemoveAt(i);
-            } else {
-                foreach (var d in destinations) {
-                    claims[i].Properties[d] = Parameters.Token;
-                }
+                continue;
+            }
+
+            foreach (var d in destinations) {
+                claim.Properties[d] = Parameters.Token;
             }
         }
 
         var access = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.AccessToken)).ToList();
         var id     = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.IdentityToken)).ToList();
-
-        if (!string.IsNullOrWhiteSpace(scope)) {
-            access.Add(new(Claims.Scope, scope));
-        }
-
-        if (!string.IsNullOrWhiteSpace(sid)) {
-            access.Add(new(Claims.SessionId, sid));
-            id.Add(new(Claims.SessionId, sid));
-        }
 
         var at = await CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, @internal, app, authorizationName, sid, ct);
 

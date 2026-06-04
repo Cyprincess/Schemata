@@ -25,7 +25,6 @@ public sealed class OAuthQueryBinder<T> : IModelBinder
 
     #region IModelBinder Members
 
-    /// <inheritdoc />
     public Task BindModelAsync(ModelBindingContext bindingContext) {
         var request = bindingContext.HttpContext.Request;
         var model   = new T();

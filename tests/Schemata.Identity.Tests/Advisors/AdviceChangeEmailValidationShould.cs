@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,25 +24,15 @@ public class AdviceChangeEmailValidationShould
     private static readonly ClaimsPrincipal Anonymous = new();
 
     private static readonly ClaimsPrincipal Alice = new(
-        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test")
-    );
+        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
     private static SchemataUserManager<SchemataUser> MockUserManager(string? email = "alice@example.com") {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice", Email = email });
+             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice", Email = email });
         var sp = new ServiceCollection().BuildServiceProvider();
-        return new(
-            sp,
-            store.Object,
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<SchemataUser>(),
-            [],
-            [],
-            new UpperInvariantLookupNormalizer(),
-            new(),
-            NullLogger<SchemataUserManager<SchemataUser>>.Instance
-        );
+        return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [],
+                   new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
     }
 
     [Fact]
@@ -51,12 +42,7 @@ public class AdviceChangeEmailValidationShould
         var request = new ProfileRequest { EmailAddress = "new@example.com" };
 
         await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
-                                                        ctx,
-                                                        request,
-                                                        IdentityOperation.ChangeEmail,
-                                                        Anonymous
-                                                    )
-        );
+                                                        ctx, request, IdentityOperation.ChangeEmail, Anonymous));
     }
 
     [Fact]
@@ -66,12 +52,7 @@ public class AdviceChangeEmailValidationShould
         var request = new ProfileRequest { EmailAddress = "" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx,
-                                                          request,
-                                                          IdentityOperation.ChangeEmail,
-                                                          Alice
-                                                      )
-        );
+                                                          ctx, request, IdentityOperation.ChangeEmail, Alice));
     }
 
     [Fact]
@@ -81,12 +62,7 @@ public class AdviceChangeEmailValidationShould
         var request = new ProfileRequest { EmailAddress = "ALICE@EXAMPLE.COM" };
 
         await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(
-                                                         ctx,
-                                                         request,
-                                                         IdentityOperation.ChangeEmail,
-                                                         Alice
-                                                     )
-        );
+                                                         ctx, request, IdentityOperation.ChangeEmail, Alice));
     }
 
     [Fact]

@@ -209,8 +209,8 @@ public class StringizingShould
 
     [Fact]
     public void ToString_NewExpression_IncludesConstructedTypeName() {
-        Expression<Func<long, Grade>>   grade   = id => new(id, 1);
-        Expression<Func<long, Student>> student = id => new() { Id = id };
+        Expression<Func<Guid, Grade>>   grade   = uid => new(uid, 1);
+        Expression<Func<Guid, Student>> student = uid => new() { Uid = uid };
 
         var left  = Stringizing.ToString(grade);
         var right = Stringizing.ToString(student);
@@ -222,7 +222,7 @@ public class StringizingShould
 
     [Fact]
     public void ToString_MemberInit_DistinguishesBindingsByName() {
-        Expression<Func<Student, Student>> byId   = s => new() { Id       = s.Id };
+        Expression<Func<Student, Student>> byId   = s => new() { Uid      = s.Uid };
         Expression<Func<Student, Student>> byName = s => new() { FullName = s.FullName };
 
         var left  = Stringizing.ToString(byId);

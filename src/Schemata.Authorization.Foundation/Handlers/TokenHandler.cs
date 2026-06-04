@@ -25,13 +25,6 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// </summary>
 public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
 {
-    /// <summary>
-    ///     Resolves a keyed <see cref="IGrantHandler" /> by <see cref="TokenRequest.GrantType" />
-    ///     and delegates token issuance to it.
-    /// </summary>
-    /// <param name="request">The parsed token request.</param>
-    /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,

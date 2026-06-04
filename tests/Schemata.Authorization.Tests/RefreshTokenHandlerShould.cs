@@ -36,38 +36,30 @@ public class RefreshTokenHandlerShould
         var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
-            Id                = 1,
+            Uid               = Guid.NewGuid(),
             Type              = TokenTypes.RefreshToken,
             Status            = TokenStatuses.Valid,
             ReferenceId       = "rt-ref",
             Payload           = jwt,
             Subject           = "user-1",
-            AuthorizationName = authName,
+            Authorization     = authName,
             SessionId         = sessionId,
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>())).ReturnsAsync(refreshToken);
 
-        var app        = new SchemataApplication { Id = 1, ClientId = "test" };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<CancellationToken>()
-                         )
-                   )
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
         var sp = new ServiceCollection().BuildServiceProvider();
         var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object,
-            tokens.Object,
-            tokenService,
-            refreshOpts,
-            sp
-        );
+            clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
 
         return new(handler, tokens, refreshToken);
     }
@@ -89,11 +81,8 @@ public class RefreshTokenHandlerShould
         var f = CreateFixture();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              CreateRequest(refresh: refreshToken),
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              CreateRequest(refresh: refreshToken), null,
+                                                              CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
     }

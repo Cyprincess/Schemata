@@ -1,10 +1,12 @@
 using System;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -17,9 +19,11 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceCreateRequestIdempotency
 {
     /// <summary>
-    ///     Default order: runs after <see cref="AdviceCreateRequestSanitize{TEntity,TRequest}" />.
+    ///     Default order: runs after <see cref="AdviceCreateRequestValidation{TEntity,TRequest}" /> —
+    ///     idempotency is the last link in the documented create request chain so authorization,
+    ///     sanitization, and validation are evaluated even on a cache hit's first arrival.
     /// </summary>
-    public const int DefaultOrder = AdviceCreateRequestSanitize.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceCreateRequestValidation.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -41,7 +45,10 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName
 {
-    private readonly ICacheProvider _cache;
+    private static readonly byte[] PendingSentinelBytes = Encoding.ASCII.GetBytes("__pending__");
+
+    private static readonly TimeSpan       PendingTtl = TimeSpan.FromMinutes(5);
+    private readonly        ICacheProvider _cache;
 
     /// <summary>
     ///     Initializes a new instance with the cache provider.
@@ -51,10 +58,8 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
 
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceCreateRequestIdempotency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,
@@ -72,14 +77,23 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
 
         var key   = $"idempotency\x1e{requestId}".ToCacheKey(Keys.Resource);
         var bytes = await _cache.GetAsync(key, ct);
-        if (bytes is null) {
-            return default;
+        if (bytes is not null && !IsPendingSentinel(bytes)) {
+            var cached = JsonSerializer.Deserialize<CreateResultBase<TDetail>>(bytes);
+            if (cached is not null) {
+                ctx.Set(cached);
+                return AdviseResult.Handle;
+            }
         }
 
-        var cached = JsonSerializer.Deserialize<CreateResult<TDetail>>(bytes);
-        if (cached is not null) {
-            ctx.Set(cached);
-            return AdviseResult.Handle;
+        // Atomically reserve the key with a short-lived pending sentinel. Two concurrent requests
+        // sharing the same RequestId cannot both pass this gate; the loser is reported as a
+        // conflict so the client retries (and observes the stored result if the winner persisted).
+        var reserved = await _cache.TryAddAsync(key, PendingSentinelBytes, new() {
+            AbsoluteExpirationRelativeToNow = PendingTtl,
+        }, ct);
+
+        if (!reserved) {
+            throw new ConcurrencyException();
         }
 
         ctx.Set(new PendingIdempotencyKey(requestId));
@@ -87,4 +101,18 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
     }
 
     #endregion
+
+    private static bool IsPendingSentinel(byte[] bytes) {
+        if (bytes.Length != PendingSentinelBytes.Length) {
+            return false;
+        }
+
+        for (var i = 0; i < bytes.Length; i++) {
+            if (bytes[i] != PendingSentinelBytes[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using ProtoBuf.Grpc;
@@ -43,10 +44,8 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
 
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
-    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.ListAsync" />
-    public virtual async ValueTask<ListResult<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
-        var result = await Handler.ListAsync(request, Http?.User, Http?.RequestAborted);
-        // Return empty list on denied rather than throwing — AIP-132 lists may legitimately be empty.
+    public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
+        var result = await Handler.ListAsync(request, Http?.User, CancellationFor(context));
         if (!result.IsAllowed()) {
             return new();
         }
@@ -54,10 +53,8 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result;
     }
 
-    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.GetAsync" />
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, Http?.RequestAborted);
-        // Throw NoContentException on denied to avoid confirming resource existence — AIP-193.
+        var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, CancellationFor(context));
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -65,11 +62,8 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.CreateAsync" />
     public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
-        var ct = Http?.RequestAborted;
-
-        var result = await Handler.CreateAsync(request, Http?.User, ct);
+        var result = await Handler.CreateAsync(request, Http?.User, CancellationFor(context));
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -77,11 +71,8 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.UpdateAsync" />
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
-        var ct = Http?.RequestAborted;
-
-        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, ct);
+        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, CancellationFor(context));
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -89,12 +80,18 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
         return result.Detail!;
     }
 
-    /// <inheritdoc cref="IResourceService{TEntity,TRequest,TDetail,TSummary}.DeleteAsync" />
     public virtual async ValueTask DeleteAsync(DeleteRequest request, CallContext context = default) {
-        var ct = Http?.RequestAborted;
-
-        await Handler.DeleteAsync(request.CanonicalName!, request.Etag, request.Force, Http?.User, ct);
+        var allowed = await Handler.DeleteAsync(
+            request.CanonicalName!, request.Etag, request.Force, Http?.User, CancellationFor(context));
+        if (!allowed) {
+            throw new NoContentException();
+        }
     }
 
     #endregion
+
+    private CancellationToken CancellationFor(CallContext context) {
+        var token = context.CancellationToken;
+        return token.CanBeCanceled ? token : Http?.RequestAborted ?? default;
+    }
 }

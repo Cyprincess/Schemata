@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,12 +23,12 @@ public sealed class AdviceStatusAuthorize : IStatusAdvisor
 {
     public const int DefaultOrder = AdviceStatusAnonymous.DefaultOrder + 10_000_000;
 
-    private readonly IAccessProvider<SchemataWorkflow, long>      _access;
-    private readonly IEntitlementProvider<SchemataWorkflow, long> _entitlement;
+    private readonly IAccessProvider<SchemataWorkflow, Guid>      _access;
+    private readonly IEntitlementProvider<SchemataWorkflow, Guid> _entitlement;
 
     public AdviceStatusAuthorize(
-        IAccessProvider<SchemataWorkflow, long>      access,
-        IEntitlementProvider<SchemataWorkflow, long> entitlement
+        IAccessProvider<SchemataWorkflow, Guid>      access,
+        IEntitlementProvider<SchemataWorkflow, Guid> entitlement
     ) {
         _access      = access;
         _entitlement = entitlement;
@@ -45,7 +46,7 @@ public sealed class AdviceStatusAuthorize : IStatusAdvisor
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {
-        var context = new AccessContext<long> { Operation = nameof(WorkflowController.Status), Request = workflow.Id };
+        var context = new AccessContext<Guid> { Operation = nameof(WorkflowController.Status), Request = workflow.Uid };
 
         var expression = await _entitlement.GenerateEntitlementExpressionAsync(context, principal, ct);
         if (expression is not null && !expression.Compile()(workflow)) {

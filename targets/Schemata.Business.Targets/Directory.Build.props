@@ -3,7 +3,7 @@
   <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.props" />
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,10 +38,6 @@
 
   <ItemGroup Condition=" '$(UseSecurity)' == 'true' ">
     <ProjectReference Include="..\..\src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(UseWorkflow)' == 'true' ">
-    <ProjectReference Include="..\..\src\Schemata.Workflow.Skeleton\Schemata.Workflow.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

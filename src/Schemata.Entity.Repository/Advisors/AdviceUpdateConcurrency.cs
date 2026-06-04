@@ -11,7 +11,7 @@ namespace Schemata.Entity.Repository.Advisors;
 /// <summary>Order constants for <see cref="AdviceUpdateConcurrency{TEntity}" />.</summary>
 public static class AdviceUpdateConcurrency
 {
-    /// <summary>Default execution order: 2,147,483,647.</summary>
+    /// <summary>Default execution order: <see cref="Orders.Max" /> (900_000_000).</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
@@ -32,10 +32,8 @@ public sealed class AdviceUpdateConcurrency<TEntity> : IRepositoryUpdateAdvisor<
 {
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateConcurrency.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

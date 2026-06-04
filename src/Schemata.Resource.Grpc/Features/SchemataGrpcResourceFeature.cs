@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using Grpc.AspNetCore.Server;
 using Grpc.AspNetCore.Server.Model;
+using Grpc.Core;
 using Grpc.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -38,10 +40,8 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                                                                    IsGenericMethodDefinition: true,
                                                                } && m.GetParameters().Length == 1);
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -55,13 +55,8 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
         services.TryAddSingleton<ExceptionMappingInterceptor>();
 
-        // Open generic registration so DI can resolve ResourceService<A,B,C,D> for any
-        // resource type combination.
         services.TryAddScoped(typeof(ResourceService<,,,>));
 
-        // Build ResourceBinderConfiguration lazily — isolates RuntimeTypeModel and
-        // BinderConfiguration from the global DI container so user-registered
-        // protobuf-net.Grpc services are not affected.
         services.TryAddSingleton(sp => {
             var options    = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
             var model      = RuntimeTypeModelConfigurator.Configure(options.Value);
@@ -70,73 +65,98 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
             return new ResourceBinderConfiguration(model, binder);
         });
 
-        // Forward BinderConfiguration for client-side usage (e.g. test factories).
         services.TryAddSingleton(sp => sp.GetRequiredService<ResourceBinderConfiguration>().Binder);
 
-        // Open generic IServiceMethodProvider<> — grpc-dotnet discovers all registered
-        // providers via IEnumerable, and ResourceServiceMethodProvider<> is a no-op
-        // for TService types that are not closed ResourceService<,,,>.
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ResourceServiceMethodProvider<>)));
 
-        // Pre-register ReflectionServiceImpl via TryAdd so our code-first descriptor
-        // factory wins over the default proto-first factory registered by AddGrpcReflection().
-        services.TryAddSingleton(sp => {
-            var descriptors = BuildCodeFirstDescriptors(sp);
-            return new ReflectionServiceImpl(descriptors);
-        });
-
-        services.AddGrpcReflection();
+        services.TryAddSingleton(sp => new ReflectionServiceImpl(MergeDescriptors(sp)));
+        services.TryAddSingleton(sp => new ReflectionV1ServiceImpl(MergeDescriptors(sp)));
     }
 
-    /// <inheritdoc />
-    public override void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
+    public override void ConfigureEndpoints(
+        IApplicationBuilder   app,
+        IEndpointRouteBuilder endpoints,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment
     ) {
         var sp      = app.ApplicationServices;
         var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
-        app.UseEndpoints(endpoints => {
-            var hasGrpcResources = false;
+        var hasGrpcResources = false;
 
-            foreach (var (_, resource) in options.Value.Resources) {
-                if (resource.Endpoints is not null
-                 && resource.Endpoints.Count != 0
-                 && resource.Endpoints.All(e => e != GrpcResourceAttribute.Name)) {
-                    continue;
-                }
-
-                hasGrpcResources = true;
-
-                var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
-
-                var result = MapGrpcService(endpoints, service);
-
-                if (result is not IEndpointConventionBuilder builder) {
-                    continue;
-                }
-
-                var quota = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
-                if (quota is not null) {
-                    builder.RequireRateLimiting(quota.PolicyName);
-                }
-
-                // If an authentication scheme is configured, require authentication
-                // but do NOT demand a specific authorization policy — policy evaluation
-                // is deferred to the advisor pipeline (AIP-211).
-                if (!string.IsNullOrWhiteSpace(options.Value.AuthenticationScheme)) {
-                    var policy = new AuthorizationPolicyBuilder(options.Value.AuthenticationScheme)
-                                .RequireAssertion(_ => true)
-                                .Build();
-                    builder.RequireAuthorization(policy);
-                }
+        foreach (var (_, resource) in options.Value.Resources) {
+            if (resource.Endpoints is not null
+             && resource.Endpoints.Count != 0
+             && resource.Endpoints.All(e => e != GrpcResourceAttribute.Name)) {
+                continue;
             }
 
-            if (hasGrpcResources) {
-                endpoints.MapGrpcReflectionService();
+            hasGrpcResources = true;
+
+            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
+
+            var result = MapGrpcService(endpoints, service);
+
+            if (result is not IEndpointConventionBuilder builder) {
+                continue;
             }
-        });
+
+            var quota = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
+            if (quota is not null) {
+                builder.RequireRateLimiting(quota.PolicyName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.Value.AuthenticationScheme)) {
+                var policy = new AuthorizationPolicyBuilder(options.Value.AuthenticationScheme)
+                            .RequireAssertion(_ => true)
+                            .Build();
+                builder.RequireAuthorization(policy);
+            }
+        }
+
+        if (hasGrpcResources) {
+            endpoints.MapGrpcService<ReflectionServiceImpl>();
+            endpoints.MapGrpcService<ReflectionV1ServiceImpl>();
+        }
+    }
+
+    private static Google.Protobuf.Reflection.ServiceDescriptor[] MergeDescriptors(IServiceProvider sp) {
+        var codeFirst = BuildCodeFirstDescriptors(sp);
+        var epd       = sp.GetRequiredService<EndpointDataSource>();
+        var protoFirst = ResolveProtoFirstDescriptors(epd);
+        return codeFirst.Concat(protoFirst).ToArray();
+    }
+
+    private static Google.Protobuf.Reflection.ServiceDescriptor[] ResolveProtoFirstDescriptors(
+        EndpointDataSource epd
+    ) {
+        return epd.Endpoints
+                  .Select(e => e.Metadata.GetMetadata<GrpcMethodMetadata>())
+                  .Where(m => m is not null)
+                  .Select(m => m!.ServiceType)
+                  .Distinct()
+                  .Select(GetServiceDescriptor)
+                  .Where(d => d is not null)
+                  .Cast<Google.Protobuf.Reflection.ServiceDescriptor>()
+                  .ToArray();
+    }
+
+    private static Google.Protobuf.Reflection.ServiceDescriptor? GetServiceDescriptor(Type serviceType) {
+        if (serviceType.IsConstructedGenericType
+            && serviceType.GetGenericTypeDefinition() == typeof(ResourceService<,,,>)) {
+            return null;
+        }
+
+        for (var t = serviceType; t is not null && t != typeof(object); t = t.BaseType) {
+            var attr = t.GetCustomAttribute<BindServiceMethodAttribute>();
+            if (attr is not null) {
+                return attr.BindType
+                           .GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)
+                           ?.GetValue(null) as Google.Protobuf.Reflection.ServiceDescriptor;
+            }
+        }
+
+        return null;
     }
 
     private static Google.Protobuf.Reflection.ServiceDescriptor[] BuildCodeFirstDescriptors(IServiceProvider sp) {

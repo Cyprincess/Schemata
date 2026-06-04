@@ -18,12 +18,10 @@ public sealed class SchemataExtensionPart<T> : ApplicationPart, IApplicationPart
     /// </summary>
     public Assembly Assembly { get; } = typeof(T).Assembly;
 
-    /// <inheritdoc />
     public override string Name => Assembly.GetName().Name!;
 
     #region IApplicationPartTypeProvider Members
 
-    /// <inheritdoc />
     public IEnumerable<TypeInfo> Types => Assembly.DefinedTypes;
 
     #endregion

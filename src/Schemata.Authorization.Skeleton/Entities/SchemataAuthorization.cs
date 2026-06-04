@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -11,10 +12,11 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [DisplayName("Authorization")]
 [Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    /// <summary>The application that received this authorization.</summary>
-    public virtual string? ApplicationName { get; set; }
+    /// <summary>Canonical name of the application that received this authorization.</summary>
+    public virtual string? Application { get; set; }
 
     /// <summary>Identifier of the resource owner who granted this authorization.</summary>
     public virtual string? Subject { get; set; }
@@ -34,6 +36,18 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     /// <summary>Space-delimited scopes granted in this authorization.</summary>
     public virtual string? Scopes { get; set; }
 
+    /// <summary>The redirect URI associated with this authorization.</summary>
+    public virtual string? RedirectUri { get; set; }
+
+    /// <summary>The response type associated with this authorization.</summary>
+    public virtual string? ResponseType { get; set; }
+
+    /// <summary>The PKCE code challenge method associated with this authorization.</summary>
+    public virtual string? CodeChallengeMethod { get; set; }
+
+    /// <summary>The requested Authentication Context Class References associated with this authorization.</summary>
+    public virtual string? AcrValues { get; set; }
+
     #region ICanonicalName Members
 
     public string? Name          { get; set; }
@@ -48,8 +62,7 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     #endregion
 
     #region IIdentifier Members
-
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

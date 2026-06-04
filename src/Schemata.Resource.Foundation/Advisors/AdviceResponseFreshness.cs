@@ -35,10 +35,8 @@ public class AdviceResponseFreshness<TEntity, TDetail> : IResourceResponseAdviso
 {
     #region IResourceResponseAdvisor<TEntity,TDetail> Members
 
-    /// <inheritdoc />
     public int Order => AdviceResponseFreshness.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TEntity?          entity,

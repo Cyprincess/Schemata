@@ -161,8 +161,17 @@ public class TokenService
     // See OpenID Connect Core 1.0 §3.1.3.8.
     private static string ComputeHash(string value, string algorithm) {
         var       bytes  = Encoding.ASCII.GetBytes(value);
-        using var hash   = CryptoProviderFactory.Default.CreateHashAlgorithm(algorithm);
+        using var hash   = CryptoProviderFactory.Default.CreateHashAlgorithm(GetHashAlgorithm(algorithm));
         var       hashed = hash.ComputeHash(bytes);
         return Base64UrlEncoder.Encode(hashed, 0, hashed.Length / 2);
+    }
+
+    private static string GetHashAlgorithm(string algorithm) {
+        return algorithm switch {
+            SigningAlgorithms.RsaSha256 or SigningAlgorithms.EcdsaSha256 or SigningAlgorithms.RsaPssSha256 or SigningAlgorithms.HmacSha256 => "SHA256",
+            SigningAlgorithms.RsaSha384 or SigningAlgorithms.EcdsaSha384 or SigningAlgorithms.RsaPssSha384 or SigningAlgorithms.HmacSha384 => "SHA384",
+            SigningAlgorithms.RsaSha512 or SigningAlgorithms.EcdsaSha512 or SigningAlgorithms.RsaPssSha512 or SigningAlgorithms.HmacSha512 => "SHA512",
+            _ => throw new NotSupportedException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm)),
+        };
     }
 }

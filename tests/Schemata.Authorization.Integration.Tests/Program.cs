@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,28 +15,23 @@ var builder = WebApplication.CreateBuilder(options);
 // Mock all four managers to avoid real IRepository<T> dependencies.
 
 var testApp = new SchemataApplication {
-    Id           = 1,
+    Uid          = Guid.NewGuid(),
     ClientId     = "test-client",
     ClientSecret = "test-secret",
     ClientType   = "confidential",
-    Permissions  = new List<string> { "e:token", "g:client_credentials" },
+    Permissions  = new List<string> { "e:/Connect/Token", "g:client_credentials" },
 };
 
 var appMock = new Mock<IApplicationManager<SchemataApplication>>();
 appMock.Setup(m => m.FindByClientIdAsync("test-client", It.IsAny<CancellationToken>())).ReturnsAsync(testApp);
 appMock.Setup(m => m.ValidateClientSecretAsync(testApp, "test-secret", It.IsAny<CancellationToken>()))
        .ReturnsAsync(true);
-appMock.Setup(m => m.ValidateClientSecretAsync(
-                  testApp,
-                  It.Is<string>(s => s != "test-secret"),
-                  It.IsAny<CancellationToken>()
-              )
-        )
+appMock.Setup(m => m.ValidateClientSecretAsync(testApp, It.Is<string>(s => s != "test-secret"),
+                                               It.IsAny<CancellationToken>()))
        .ReturnsAsync(false);
 appMock.Setup(m => m.HasPermissionAsync(testApp, It.IsAny<string>(), It.IsAny<CancellationToken>()))
        .Returns((SchemataApplication app, string perm, CancellationToken _)
-                    => Task.FromResult(app.Permissions!.Contains(perm))
-        );
+                    => Task.FromResult(app.Permissions!.Contains(perm)));
 
 var scopeMock = new Mock<IScopeManager<SchemataScope>>();
 scopeMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
@@ -55,18 +51,15 @@ builder.Services.AddSingleton(authzMock.Object);
 builder.Services.AddSingleton(tokenMock.Object);
 
 builder.UseSchemata(schema => {
-        schema.UseWellKnown();
-        schema.UseAuthorization(o => {
-                       o.Issuer = "https://localhost";
-                       o.AddEphemeralSigningKey();
-                       o.AddEphemeralEncryptionKey();
-                       o.AllowedClientAuthMethods.Add("client_secret_post");
-                       o.PermitResponseType("code");
-                   }
-               )
-              .UseClientCredentialsFlow();
-    }
-);
+    schema.UseWellKnown();
+    schema.UseAuthorization(o => {
+               o.Issuer = "https://localhost";
+               o.AddEphemeralSigningKey();
+               o.AddEphemeralEncryptionKey();
+               o.PermitResponseType("code");
+           })
+          .UseClientCredentialsFlow();
+});
 
 var app = builder.Build();
 

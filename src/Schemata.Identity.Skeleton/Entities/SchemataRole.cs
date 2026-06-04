@@ -1,18 +1,26 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
 [DisplayName("Role")]
 [Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
-public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
+[PrimaryKey(nameof(Uid))]
+public class SchemataRole : IdentityRole<Guid>, IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
+    [NotMapped]
+    public override Guid Id
+    {
+        get => Uid;
+        set => Uid = value;
+    }
+
     /// <summary>Bridges Identity's string-based ConcurrencyStamp to the Guid-based Timestamp.</summary>
     [NotMapped]
     public override string? ConcurrencyStamp
@@ -23,48 +31,37 @@ public class SchemataRole : IdentityRole<long>, IIdentifier, ICanonicalName, IDe
 
     #region ICanonicalName Members
 
-    /// <inheritdoc />
     public virtual string? CanonicalName { get; set; }
 
     #endregion
 
     #region IConcurrency Members
 
-    /// <inheritdoc />
     public virtual Guid? Timestamp { get; set; }
 
     #endregion
 
     #region IDescriptive Members
 
-    /// <inheritdoc />
     public virtual string? DisplayName { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? DisplayNames { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Description { get; set; }
 
-    /// <inheritdoc />
     public virtual Dictionary<string, string>? Descriptions { get; set; }
 
     #endregion
 
     #region IIdentifier Members
-
-    /// <inheritdoc />
-    [Key]
-    public override long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

@@ -27,13 +27,5 @@ public class NoContentException : SchemataException
         string? message = null
     ) : base(status, code, message) { }
 
-    /// <summary>
-    ///     Returns <see langword="null" /> to suppress response body serialization.
-    /// </summary>
-    /// <remarks>
-    ///     HTTP 204 responses must carry no body; the pipeline skips serialization
-    ///     when a <see langword="null" /> value is returned.
-    /// </remarks>
-    /// <param name="details">Ignored — no body is produced regardless.</param>
     public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) { return null; }
 }

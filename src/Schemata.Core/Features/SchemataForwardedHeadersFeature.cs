@@ -14,15 +14,10 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataForwardedHeadersFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = Orders.Base;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

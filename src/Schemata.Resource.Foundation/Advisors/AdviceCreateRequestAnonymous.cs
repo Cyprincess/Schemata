@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Security.Skeleton;
@@ -13,9 +14,11 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceCreateRequestAnonymous
 {
     /// <summary>
-    ///     Default order: runs after <see cref="AdviceCreateRequestIdempotency{TEntity,TRequest,TDetail}" />.
+    ///     Default order at <see cref="Schemata.Abstractions.SchemataConstants.Orders.Base" /> — first
+    ///     in the documented create request chain
+    ///     (<c>anonymous → authorize → sanitize → validation → idempotency</c>).
     /// </summary>
-    public const int DefaultOrder = AdviceCreateRequestIdempotency.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
 }
 
 /// <summary>
@@ -31,10 +34,8 @@ public sealed class AdviceCreateRequestAnonymous<TEntity, TRequest> : IResourceC
 {
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceCreateRequestAnonymous.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,

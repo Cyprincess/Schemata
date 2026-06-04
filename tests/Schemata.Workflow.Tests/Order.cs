@@ -21,7 +21,7 @@ public class Order : IConcurrency, IFreshness, IStatefulEntity
 
     #region IStatefulEntity Members
 
-    public long Id { get; set; }
+    public Guid Uid { get; set; }
 
     public string? State { get; set; }
 

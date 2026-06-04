@@ -69,6 +69,10 @@ public sealed partial class IdentityHandler<TUser>
                 throw new AuthorizationException();
         }
 
+        if (_users.Options.SignIn.RequireConfirmedAccount) {
+            await SendConfirmationCodeAsync(user, request.EmailAddress, request.PhoneNumber);
+        }
+
         var claims = await _sign.CreateUserPrincipalAsync(user);
 
         return IdentityResult<ClaimsPrincipal>.Success(claims);
@@ -94,7 +98,7 @@ public sealed partial class IdentityHandler<TUser>
 
         var found = await _users.FindByNameAsync(request.Username);
         if (found is null) {
-            throw new InvalidArgumentException();
+            throw new UnauthenticatedException();
         }
 
         var check = await _sign.CheckPasswordSignInAsync(found, request.Password, true);
@@ -104,12 +108,12 @@ public sealed partial class IdentityHandler<TUser>
                 var valid = await _users.VerifyTwoFactorTokenAsync(
                     found, _sign.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode);
                 if (!valid) {
-                    throw new InvalidArgumentException();
+                    throw new UnauthenticatedException();
                 }
             } else if (!string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
                 var redeem = await _users.RedeemTwoFactorRecoveryCodeAsync(found, request.TwoFactorRecoveryCode);
                 if (!redeem.Succeeded) {
-                    throw new InvalidArgumentException();
+                    throw new UnauthenticatedException();
                 }
             } else {
                 return IdentityResult<ClaimsPrincipal>.Challenge();
@@ -117,7 +121,7 @@ public sealed partial class IdentityHandler<TUser>
 
             await _users.ResetAccessFailedCountAsync(found);
         } else if (!check.Succeeded) {
-            throw new InvalidArgumentException(message: check.ToString());
+            throw new UnauthenticatedException();
         }
 
         switch (await Advisor.For<IIdentityLoginAdvisor>()

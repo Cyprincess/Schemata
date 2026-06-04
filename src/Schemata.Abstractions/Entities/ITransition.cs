@@ -19,12 +19,7 @@ public interface ITransition
     string? Note { get; set; }
 
     /// <summary>
-    ///     The numeric identifier of the principal who triggered the event.
+    ///     The canonical resource name of the principal who triggered the event.
     /// </summary>
-    long? UpdatedById { get; set; }
-
-    /// <summary>
-    ///     The display name of the principal who triggered the event.
-    /// </summary>
-    string? UpdatedBy { get; set; }
+    string? UpdatedByName { get; set; }
 }

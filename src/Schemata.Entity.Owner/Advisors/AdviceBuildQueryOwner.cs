@@ -1,8 +1,10 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -23,17 +25,29 @@ public static class AdviceBuildQueryOwner
 /// <remarks>
 ///     <para>Only activates when <typeparamref name="TEntity" /> implements <see cref="IOwnable" />.</para>
 ///     <para>Suppressed when <see cref="QueryOwnerSuppressed" /> is present in the advice context.</para>
-///     <para>No filter is applied when the resolver returns <see langword="null" /> or empty.</para>
+///     <para>
+///         When the resolver returns <see langword="null" />, behavior is governed by
+///         <see cref="SchemataOwnerOptions.OnNullOwner" /> (default: reject).
+///     </para>
 /// </remarks>
-public sealed class AdviceBuildQueryOwner<TEntity>(IOwnerResolver<TEntity> resolver) : IRepositoryBuildQueryAdvisor<TEntity>
+public sealed class AdviceBuildQueryOwner<TEntity> : IRepositoryBuildQueryAdvisor<TEntity>
     where TEntity : class
 {
+    private readonly IOptions<SchemataOwnerOptions> _options;
+    private readonly IOwnerResolver<TEntity>        _resolver;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="AdviceBuildQueryOwner{TEntity}" /> class.
+    /// </summary>
+    public AdviceBuildQueryOwner(IOwnerResolver<TEntity> resolver, IOptions<SchemataOwnerOptions> options) {
+        _resolver = resolver;
+        _options  = options;
+    }
+
     #region IRepositoryBuildQueryAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceBuildQueryOwner.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext           ctx,
         QueryContainer<TEntity> container,
@@ -47,16 +61,22 @@ public sealed class AdviceBuildQueryOwner<TEntity>(IOwnerResolver<TEntity> resol
             return AdviseResult.Continue;
         }
 
-        var owner = await resolver.ResolveAsync(ct);
-        if (string.IsNullOrEmpty(owner)) {
+        var owner = await _resolver.ResolveAsync(ct);
+        if (!string.IsNullOrEmpty(owner)) {
+            container.ApplyModification(q => q.OfType<IOwnable>().Where(e => e.Owner == owner).OfType<TEntity>());
             return AdviseResult.Continue;
         }
 
-        container.ApplyModification(q => {
-            return q.OfType<IOwnable>().Where(e => e.Owner == owner).OfType<TEntity>();
-        });
-
-        return AdviseResult.Continue;
+        switch (_options.Value.OnNullOwner) {
+            case OnNullOwnerPolicy.Reject:
+                throw new AuthorizationException();
+            case OnNullOwnerPolicy.EmptyResult:
+                container.ApplyModification(q => q.Where(_ => false));
+                return AdviseResult.Continue;
+            case OnNullOwnerPolicy.AllowAll:
+            default:
+                return AdviseResult.Continue;
+        }
     }
 
     #endregion

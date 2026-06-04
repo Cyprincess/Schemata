@@ -14,7 +14,6 @@ public sealed class DefaultPermissionMatcher(IOptions<SchemataSecurityOptions> o
 {
     #region IPermissionMatcher Members
 
-    /// <inheritdoc />
     public bool IsMatch(ClaimsPrincipal principal, string permission) {
         var type   = options.Value.PermissionClaimType;
         var claims = principal.FindAll(type).Select(c => c.Value).ToList();

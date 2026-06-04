@@ -1,20 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.Extensions.Options;
 
 namespace Schemata.Tenancy.Skeleton.Services;
 
 /// <summary>
 ///     LRU <see cref="ITenantProviderCache" /> with capacity-bound synchronous eviction
-///     and sliding expiration. Disposes evicted providers deterministically.
+///     and sliding expiration. Disposal of retired providers is deferred until every
+///     outstanding lease has been released so active tenant scopes are never disposed
+///     out from under their callers.
 /// </summary>
 public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisposable
 {
+    private readonly int                                       _capacity;
     private readonly object                                    _gate = new();
     private readonly Dictionary<string, LinkedListNode<Entry>> _index;
-    private readonly int                                       _capacity;
     private readonly LinkedList<Entry>                         _order = new();
     private readonly TimeSpan                                  _ttl;
+    private          bool                                      _disposed;
 
     /// <summary>
     ///     Initializes a new instance with capacity and sliding expiration sourced from <see cref="SchemataTenancyOptions" />.
@@ -27,15 +31,28 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     #region IDisposable Members
 
-    /// <inheritdoc />
     public void Dispose() {
+        List<Entry> orphaned;
         lock (_gate) {
+            if (_disposed) {
+                return;
+            }
+
+            _disposed = true;
+            orphaned  = new(_order.Count);
             foreach (var entry in _order) {
-                (entry.Provider as IDisposable)?.Dispose();
+                entry.Retired = true;
+                if (entry.ActiveLeases == 0) {
+                    orphaned.Add(entry);
+                }
             }
 
             _order.Clear();
             _index.Clear();
+        }
+
+        foreach (var entry in orphaned) {
+            DisposeProvider(entry);
         }
     }
 
@@ -43,61 +60,130 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     #region ITenantProviderCache Members
 
-    /// <inheritdoc />
-    public IServiceProvider GetOrAdd(string id, Func<IServiceProvider> factory) {
-        lock (_gate) {
-            EvictExpired();
-
-            if (_index.TryGetValue(id, out var hit)) {
-                _order.Remove(hit);
-                hit.Value.LastAccess = DateTime.UtcNow;
-                _order.AddFirst(hit);
-                return hit.Value.Provider;
-            }
-
-            while (_index.Count >= _capacity) {
-                var victim = _order.Last;
-                if (victim is null) {
-                    break;
+    public ITenantProviderLease Lease(string id, Func<IServiceProvider> factory) {
+        Entry?       entry   = null;
+        List<Entry>? evicted = null;
+        try {
+            lock (_gate) {
+                if (_disposed) {
+                    throw new ObjectDisposedException(nameof(MemoryCacheTenantProviderCache));
                 }
 
-                _order.RemoveLast();
-                _index.Remove(victim.Value.Id);
-                (victim.Value.Provider as IDisposable)?.Dispose();
+                evicted = EvictExpiredLocked();
+
+                if (_index.TryGetValue(id, out var hit)) {
+                    _order.Remove(hit);
+                    hit.Value.LastAccess = DateTime.UtcNow;
+                    _order.AddFirst(hit);
+                    hit.Value.ActiveLeases++;
+                    entry = hit.Value;
+                } else {
+                    while (_index.Count >= _capacity) {
+                        if (!TryEvictOldestLocked(out var victim)) {
+                            break;
+                        }
+
+                        (evicted ??= []).Add(victim!);
+                    }
+
+                    var provider = factory();
+                    var fresh    = new Entry(id, provider, DateTime.UtcNow);
+                    var node     = new LinkedListNode<Entry>(fresh);
+                    _order.AddFirst(node);
+                    _index[id] = node;
+                    fresh.ActiveLeases++;
+                    entry = fresh;
+                }
             }
 
-            var provider = factory();
-            var node     = new LinkedListNode<Entry>(new(id, provider, DateTime.UtcNow));
-            _order.AddFirst(node);
-            _index[id] = node;
-            return provider;
+            return new LeaseHandle(this, entry);
+        } finally {
+            if (evicted is not null) {
+                foreach (var victim in evicted) {
+                    DisposeIfZero(victim);
+                }
+            }
         }
     }
 
-    /// <inheritdoc />
     public void Remove(string id) {
+        Entry? entry = null;
         lock (_gate) {
+            if (_disposed) {
+                return;
+            }
+
             if (!_index.TryGetValue(id, out var node)) {
                 return;
             }
 
             _index.Remove(id);
             _order.Remove(node);
-            (node.Value.Provider as IDisposable)?.Dispose();
+            node.Value.Retired = true;
+            entry              = node.Value;
         }
+
+        DisposeIfZero(entry);
     }
 
     #endregion
 
-    private void EvictExpired() {
-        var threshold = DateTime.UtcNow - _ttl;
-        var node      = _order.Last;
+    private List<Entry>? EvictExpiredLocked() {
+        var          threshold = DateTime.UtcNow - _ttl;
+        List<Entry>? expired   = null;
+        var          node      = _order.Last;
         while (node is not null && node.Value.LastAccess < threshold) {
             var prev = node.Previous;
             _order.Remove(node);
             _index.Remove(node.Value.Id);
-            (node.Value.Provider as IDisposable)?.Dispose();
+            node.Value.Retired = true;
+            (expired ??= []).Add(node.Value);
             node = prev;
+        }
+
+        return expired;
+    }
+
+    private bool TryEvictOldestLocked(out Entry? victim) {
+        var node = _order.Last;
+        if (node is null) {
+            victim = null;
+            return false;
+        }
+
+        _order.Remove(node);
+        _index.Remove(node.Value.Id);
+        node.Value.Retired = true;
+        victim             = node.Value;
+        return true;
+    }
+
+    private void Release(Entry entry) {
+        bool dispose;
+        lock (_gate) {
+            entry.ActiveLeases--;
+            dispose = entry.Retired && entry.ActiveLeases == 0;
+        }
+
+        if (dispose) {
+            DisposeProvider(entry);
+        }
+    }
+
+    private void DisposeIfZero(Entry entry) {
+        bool dispose;
+        lock (_gate) {
+            dispose = entry.ActiveLeases == 0;
+        }
+
+        if (dispose) {
+            DisposeProvider(entry);
+        }
+    }
+
+    private static void DisposeProvider(Entry entry) {
+        if (entry.Provider is IDisposable disposable) {
+            disposable.Dispose();
         }
     }
 
@@ -111,9 +197,41 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             LastAccess = lastAccess;
         }
 
-        public string           Id         { get; }
-        public DateTime         LastAccess { get; set; }
-        public IServiceProvider Provider   { get; }
+        public string           Id           { get; }
+        public DateTime         LastAccess   { get; set; }
+        public IServiceProvider Provider     { get; }
+        public int              ActiveLeases { get; set; }
+        public bool             Retired      { get; set; }
+    }
+
+    #endregion
+
+    #region Nested type: LeaseHandle
+
+    private sealed class LeaseHandle : ITenantProviderLease
+    {
+        private readonly MemoryCacheTenantProviderCache _cache;
+        private readonly Entry                          _entry;
+        private          int                            _released;
+
+        public LeaseHandle(MemoryCacheTenantProviderCache cache, Entry entry) {
+            _cache = cache;
+            _entry = entry;
+        }
+
+        #region ITenantProviderLease Members
+
+        public IServiceProvider Provider => _entry.Provider;
+
+        public void Dispose() {
+            if (Interlocked.Exchange(ref _released, 1) != 0) {
+                return;
+            }
+
+            _cache.Release(_entry);
+        }
+
+        #endregion
     }
 
     #endregion

@@ -3,22 +3,24 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Humanizer;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-/// <summary>Order constants and system-managed wire fields for <see cref="AdviceUpdateRequestSanitize{TEntity, TRequest}" />.</summary>
+/// <summary>
+///     Order constants and system-managed wire fields for
+///     <see cref="AdviceUpdateRequestSanitize{TEntity, TRequest}" />.
+/// </summary>
 public static class AdviceUpdateRequestSanitize
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" />.
+    ///     Default order: runs after <see cref="AdviceUpdateRequestAuthorize{TEntity,TRequest}" />
+    ///     so authorization decisions are made against the unaltered client payload.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceUpdateRequestAuthorize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -35,10 +37,8 @@ public sealed class AdviceUpdateRequestSanitize<TEntity, TRequest> : IResourceUp
 {
     #region IResourceUpdateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceUpdateRequestSanitize.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,
@@ -46,23 +46,12 @@ public sealed class AdviceUpdateRequestSanitize<TEntity, TRequest> : IResourceUp
         ClaimsPrincipal?                  principal,
         CancellationToken                 ct = default
     ) {
-        var properties = AppDomainTypeCache.GetProperties(typeof(TRequest));
-
-        foreach (var field in AdviceCreateRequestSanitize.SystemFields) {
-            if (!properties.TryGetValue(field, out var property) || !property.CanWrite) {
-                continue;
-            }
-
-            var @default = property.PropertyType.IsValueType
-                ? Activator.CreateInstance(property.PropertyType)
-                : null;
-            property.SetValue(request, @default);
-        }
+        AdviceCreateRequestSanitize.ClearSystemFields(request);
 
         if (request is IUpdateMask { UpdateMask: { } mask } mut) {
             var remaining = mask.Split(',')
                                 .Select(f => f.Trim())
-                                .Where(f => f.Length != 0 && !AdviceCreateRequestSanitize.SystemFields.Contains(f.Pascalize()));
+                                .Where(f => f.Length != 0 && !AdviceCreateRequestSanitize.SystemFields.Contains(SchemataNaming.ToClrMemberName(f)));
 
             mut.UpdateMask = string.Join(",", remaining);
         }

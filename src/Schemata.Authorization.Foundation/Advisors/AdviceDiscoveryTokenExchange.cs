@@ -32,7 +32,6 @@ public sealed class AdviceDiscoveryTokenExchange<TApp>(IEnumerable<ITokenExchang
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDiscoveryTokenExchange.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         DiscoveryContext  discovery,

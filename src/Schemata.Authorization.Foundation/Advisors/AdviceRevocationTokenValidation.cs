@@ -40,7 +40,6 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRevocationTokenValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,
@@ -48,7 +47,7 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
         TToken            token,
         CancellationToken ct = default
     ) {
-        if (string.IsNullOrWhiteSpace(token.ApplicationName) || token.ApplicationName != application.Name) {
+        if (string.IsNullOrWhiteSpace(token.Application) || token.Application != application.Name) {
             return Task.FromResult(AdviseResult.Block);
         }
 

@@ -31,10 +31,8 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntit
 {
     #region IRepositoryAddAdvisor<TEntity> Members
 
-    /// <inheritdoc />
     public int Order => AdviceAddConcurrency.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

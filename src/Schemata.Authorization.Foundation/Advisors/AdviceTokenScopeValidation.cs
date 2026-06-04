@@ -12,7 +12,7 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceTokenScopeValidation{TApp, TScope}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceTokenScopeValidation{TApp}" />.</summary>
 public static class AdviceTokenScopeValidation
 {
     public const int DefaultOrder = AdviceDeviceCodePolling.DefaultOrder + 10_000_000;
@@ -28,21 +28,15 @@ public static class AdviceTokenScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <seealso cref="AdviceAuthorizeScopeValidation{TApp, TScope}" />
-public sealed class AdviceTokenScopeValidation<TApp, TScope>(
-    IApplicationManager<TApp> apps,
-    IScopeManager<TScope>     scopes
-) : ITokenRequestAdvisor<TApp>
+/// <seealso cref="AdviceAuthorizeScopeValidation{TApp}" />
+public sealed class AdviceTokenScopeValidation<TApp>(IApplicationManager<TApp> apps) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
-    where TScope : SchemataScope
 {
     #region ITokenRequestAdvisor<TApp> Members
 
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenScopeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,
@@ -59,15 +53,6 @@ public sealed class AdviceTokenScopeValidation<TApp, TScope>(
         }
 
         foreach (var s in requested) {
-            var scope = await scopes.FindByNameAsync(s, ct);
-
-            if (string.IsNullOrWhiteSpace(scope?.Name)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
-                );
-            }
-
             if (!await apps.HasPermissionAsync(application, PermissionPrefixes.Scope + s, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,

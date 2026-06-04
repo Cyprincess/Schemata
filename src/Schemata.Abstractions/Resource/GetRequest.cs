@@ -10,10 +10,8 @@ public class GetRequest : ICanonicalName
 {
     #region ICanonicalName Members
 
-    /// <inheritdoc />
     public string? Name { get; set; }
 
-    /// <inheritdoc />
     public string? CanonicalName { get; set; }
 
     #endregion

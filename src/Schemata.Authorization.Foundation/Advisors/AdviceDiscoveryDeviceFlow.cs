@@ -27,7 +27,6 @@ public sealed class AdviceDiscoveryDeviceFlow : IDiscoveryAdvisor
     /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         DiscoveryContext  discovery,

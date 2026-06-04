@@ -74,7 +74,7 @@ public static class ResponseModeService
             ResponseModes.Query    => CreateQueryRedirect(redirectUri, parameters),
             ResponseModes.Fragment => CreateFragmentRedirect(redirectUri, parameters),
             ResponseModes.FormPost => CreateFormPost(redirectUri, parameters),
-            var _                  => CreateQueryRedirect(redirectUri, parameters),
+            _                      => CreateQueryRedirect(redirectUri, parameters),
         };
     }
 
@@ -99,12 +99,6 @@ public static class ResponseModeService
         return new RedirectResult($"{redirectUri}#{fragment}");
     }
 
-    /// <summary>
-    ///     Creates an HTML page with a self-submitting form that POSTs the
-    ///     authorization response parameters to the redirect URI.
-    ///     Safer than query/fragment modes because the response data is not
-    ///     exposed in the Referer header or browser history.
-    /// </summary>
     private static IActionResult CreateFormPost(string redirectUri, Dictionary<string, string?> parameters) {
         var fields = string.Join(
             "\n",

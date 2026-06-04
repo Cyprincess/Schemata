@@ -5,11 +5,10 @@ namespace Schemata.Entity.Repository;
 
 /// <summary>
 ///     Extension methods for <see cref="IRepository" /> and <see cref="IRepository{TEntity}" />
-///     providing cache suppression.
+///     providing per-call suppression of the ownership advisors.
 /// </summary>
 public static class RepositoryExtensions
 {
-   
     /// <summary>
     ///     Suppresses automatic owner assignment on add for this repository instance.
     /// </summary>

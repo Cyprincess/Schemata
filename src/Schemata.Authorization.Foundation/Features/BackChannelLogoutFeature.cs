@@ -31,7 +31,6 @@ public sealed class BackChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowF
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 60_200;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.AddHttpClient(nameof(BackChannelLogoutService<,>));
         services.TryAddSingleton<BackChannelLogoutQueue>();

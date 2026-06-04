@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -11,6 +10,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
+using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
 
@@ -19,7 +19,7 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
-    public async Task<IdentityResult<IEnumerable<Claim>>> ProfileAsync(
+    public async Task<IdentityResult<ClaimsStore>> ProfileAsync(
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {
@@ -29,7 +29,7 @@ public sealed partial class IdentityHandler<TUser>
                              .RunAsync(ctx, Unit.Value, IdentityOperation.Profile, principal, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<IEnumerable<Claim>>>(out var response):
+            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsStore>>(out var response):
                 return response!;
             case AdviseResult.Block:
             default:
@@ -40,20 +40,24 @@ public sealed partial class IdentityHandler<TUser>
             throw new NotFoundException();
         }
 
-        var claims = await _claims.GetClaimsAsync(found, ct);
+        var claims = new ClaimsStore();
+
+        foreach (var claim in principal.Claims) {
+            claims.AddClaim(claim.Type, claim.Value);
+        }
 
         switch (await Advisor.For<IIdentityProfileResponseAdvisor<TUser>>()
                              .RunAsync(ctx, found, claims, principal, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<IEnumerable<Claim>>>(out var response):
+            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsStore>>(out var response):
                 return response!;
             case AdviseResult.Block:
             default:
                 throw new AuthorizationException();
         }
 
-        return IdentityResult<IEnumerable<Claim>>.Success(claims);
+        return IdentityResult<ClaimsStore>.Success(claims);
     }
 
     public async Task<IdentityResult<Unit>> ChangeEmailAsync(

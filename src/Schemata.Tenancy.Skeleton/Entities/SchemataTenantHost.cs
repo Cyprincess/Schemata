@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Tenancy.Skeleton.Entities;
 
@@ -12,29 +13,42 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 ///     Replaces the JSON-serialized <c>SchemataTenant.Hosts</c> string with a proper
 ///     one-to-many association so that host look-ups can be indexed at the database level.
 /// </remarks>
-[DisplayName("TenantHost")]
+[DisplayName("Host")]
 [Table("SchemataTenantHosts")]
-public class SchemataTenantHost : IIdentifier, ITimestamp
+[CanonicalName("tenants/{tenant}/hosts/{host}")]
+[PrimaryKey(nameof(Uid))]
+public class SchemataTenantHost : IIdentifier, ICanonicalName, ITimestamp
 {
-    /// <summary>Gets or sets the primary-key identifier of the owning tenant (<see cref="IIdentifier.Id" />).</summary>
-    public virtual long SchemataTenantId { get; set; }
+    /// <summary>The parent tenant's <see cref="ICanonicalName.Name" />.</summary>
+    public virtual string? Tenant { get; set; }
 
-    /// <summary>Gets or sets the host name (case-insensitive match source).</summary>
+    /// <summary>
+    ///     Stored normalized (trimmed, lower-case invariant) for case-insensitive matching.
+    /// </summary>
     public virtual string? Host { get; set; }
 
-    #region IIdentifier Members
+    #region ICanonicalName Members
 
-    /// <inheritdoc />
-    public virtual long Id { get; set; }
+    [NotMapped]
+    public virtual string? Name
+    {
+        get => Host;
+        set => Host = value;
+    }
+
+    public virtual string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IIdentifier Members
+    public virtual Guid Uid { get; set; }
 
     #endregion
 
     #region ITimestamp Members
 
-    /// <inheritdoc />
     public virtual DateTime? CreateTime { get; set; }
 
-    /// <inheritdoc />
     public virtual DateTime? UpdateTime { get; set; }
 
     #endregion

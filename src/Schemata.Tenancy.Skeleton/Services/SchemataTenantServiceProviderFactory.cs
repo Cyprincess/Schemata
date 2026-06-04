@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
@@ -7,84 +8,88 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Schemata.Tenancy.Skeleton.Services;
 
 /// <summary>
-///     Creates and caches isolated <see cref="IServiceProvider" /> instances for each tenant.
+///     Per-tenant <see cref="IServiceProvider" /> factory that caches one provider per tenant
+///     holding tenant-specific singletons (tenant entity, accessor, registered overrides).
+///     Non-overridden services resolve from the host root via
+///     <see cref="TenantCompositeServiceProvider" />.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <typeparam name="TKey">The tenant identifier type.</typeparam>
 /// <remarks>
-///     The root <see cref="IServiceCollection" /> is copied once per tenant (with the
-///     <see cref="ITenantContextAccessor{TTenant,TKey}" /> bound to the tenant-scoped
-///     accessor instance). Tenant-specific and dynamic overrides from
-///     <see cref="SchemataTenancyOptions" /> are then applied before the provider is built.
-///     AllOverrides are applied at registration time by the builder, so they are already
-///     present in the copied root services.
+///     Tenant overrides must be Singleton; Scoped/Transient are rejected at build time.
+///     Overrides win at top-level resolution only — services injected into host-scoped
+///     constructors still see the host's view of their dependencies. Tenant-aware services
+///     that must participate in injection chains should consult
+///     <see cref="ITenantContextAccessor{TTenant}" /> at call time.
 /// </remarks>
-public class SchemataTenantServiceProviderFactory<TTenant, TKey> : ITenantServiceProviderFactory<TTenant, TKey>
-    where TTenant : SchemataTenant<TKey>
-    where TKey : struct, IEquatable<TKey>
+public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProviderFactory<TTenant>
+    where TTenant : SchemataTenant
 {
     private readonly ITenantProviderCache   _cache;
     private readonly SchemataTenancyOptions _options;
     private readonly IServiceProvider       _root;
-    private readonly IServiceCollection     _services;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantServiceProviderFactory{TTenant, TKey}" /> class.
+    ///     Initializes a new instance of the <see cref="SchemataTenantServiceProviderFactory{TTenant}" /> class.
     /// </summary>
     public SchemataTenantServiceProviderFactory(
-        IServiceCollection               services,
         IServiceProvider                 root,
         ITenantProviderCache             cache,
         IOptions<SchemataTenancyOptions> options
     ) {
-        _services = services;
-        _root     = root;
-        _cache    = cache;
-        _options  = options.Value;
+        _root    = root;
+        _cache   = cache;
+        _options = options.Value;
     }
 
-    #region ITenantServiceProviderFactory<TTenant,TKey> Members
+    #region ITenantServiceProviderFactory<TTenant> Members
 
-    /// <inheritdoc />
-    public IServiceProvider CreateServiceProvider(ITenantContextAccessor<TTenant, TKey> accessor) {
-        if (accessor.Tenant?.TenantId is not { } tenantKey) {
+    public ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<TTenant> accessor) {
+        if (accessor.Tenant is not { } tenant) {
             throw new TenantResolveException();
         }
 
-        var id = tenantKey.ToString()!;
+        var id = tenant.Uid.ToString();
 
-        return _cache.GetOrAdd(id, () => Build(id, accessor));
+        return _cache.Lease(id, () => Build(id, tenant));
     }
 
     #endregion
 
-    private IServiceProvider Build(string id, ITenantContextAccessor<TTenant, TKey> accessor) {
-        IServiceCollection container = new ServiceCollection();
+    private IServiceProvider Build(string id, TTenant tenant) {
+        IServiceCollection overrides = new ServiceCollection();
 
-        foreach (var service in _services) {
-            if (service.ServiceType == typeof(ITenantContextAccessor<TTenant, TKey>)) {
-                container.Add(ServiceDescriptor.Singleton(typeof(ITenantContextAccessor<TTenant, TKey>), accessor));
-
-                continue;
-            }
-
-            if (typeof(ITenantContextAccessor<TTenant, TKey>).IsAssignableFrom(service.ServiceType)) {
-                continue;
-            }
-
-            container.Add(service);
-        }
+        overrides.AddSingleton(tenant);
+        overrides.AddSingleton<ITenantContextAccessor<TTenant>>(_ => new TenantBoundContextAccessor<TTenant>(_root, tenant));
 
         if (_options.TenantOverrides.TryGetValue(id, out var tenantOverrides)) {
-            foreach (var o in tenantOverrides) {
-                o(container);
+            foreach (var apply in tenantOverrides) {
+                var snapshot = overrides.Count;
+                apply(overrides);
+                EnforceSingletonOverride(id, overrides, snapshot);
             }
         }
 
-        foreach (var o in _options.DynamicOverrides) {
-            o(id, container, _root);
+        foreach (var apply in _options.DynamicOverrides) {
+            var snapshot = overrides.Count;
+            apply(id, overrides, _root);
+            EnforceSingletonOverride(id, overrides, snapshot);
         }
 
-        return container.BuildServiceProvider();
+        var container = overrides.BuildServiceProvider();
+        return new TenantCompositeServiceProvider(container, _root);
+    }
+
+    private static void EnforceSingletonOverride(string id, IServiceCollection container, int snapshot) {
+        for (var i = snapshot; i < container.Count; i++) {
+            var descriptor = container[i];
+            if (descriptor.Lifetime == ServiceLifetime.Singleton) {
+                continue;
+            }
+
+            throw new InvalidOperationException(
+                $"Tenant override for '{id}' registered '{descriptor.ServiceType}' as {descriptor.Lifetime}; "
+              + "tenant-specific registrations must be Singleton. Resolve Scoped/Transient services "
+              + "from the host scope instead.");
+        }
     }
 }

@@ -67,20 +67,20 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return GetInstanceTypeAsync(type, ct);
     }
 
-    async Task<SchemataWorkflow?> IWorkflowManager.FindAsync(long id, CancellationToken ct) {
-        return await FindAsync(id, ct);
+    async Task<SchemataWorkflow?> IWorkflowManager.FindAsync(Guid uid, CancellationToken ct) {
+        return await FindAsync(uid, ct);
     }
 
-    Task<IStatefulEntity?> IWorkflowManager.FindInstanceAsync(long id, CancellationToken ct) {
-        return FindInstanceAsync(id, ct);
+    Task<IStatefulEntity?> IWorkflowManager.FindInstanceAsync(Guid uid, CancellationToken ct) {
+        return FindInstanceAsync(uid, ct);
     }
 
     Task<IStatefulEntity?> IWorkflowManager.GetInstanceAsync(SchemataWorkflow workflow, CancellationToken ct) {
         return GetInstanceAsync((TWorkflow)workflow, ct);
     }
 
-    IAsyncEnumerable<SchemataFlowTransition> IWorkflowManager.ListTransitionsAsync(long id, CancellationToken ct) {
-        return ListTransitionsAsync(id, ct);
+    IAsyncEnumerable<SchemataFlowTransition> IWorkflowManager.ListTransitionsAsync(Guid uid, CancellationToken ct) {
+        return ListTransitionsAsync(uid, ct);
     }
 
     async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(
@@ -91,8 +91,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return await CreateAsync(instance, principal, ct);
     }
 
-    async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(Type instance, long id, CancellationToken ct) {
-        return await CreateAsync(instance, id, ct);
+    async Task<SchemataWorkflow?> IWorkflowManager.CreateAsync(Type instance, Guid uid, CancellationToken ct) {
+        return await CreateAsync(instance, uid, ct);
     }
 
     Task IWorkflowManager.RaiseAsync<TEvent>(
@@ -104,8 +104,8 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         return RaiseAsync((TWorkflow?)workflow, @event, principal, ct);
     }
 
-    Task IWorkflowManager.RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct) {
-        return RaiseAsync(id, @event, ct);
+    Task IWorkflowManager.RaiseAsync<TEvent>(Guid uid, TEvent @event, CancellationToken ct) {
+        return RaiseAsync(uid, @event, ct);
     }
 
     async Task<object?> IWorkflowManager.MapAsync(
@@ -131,13 +131,13 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     /// <inheritdoc />
-    public virtual async Task<TWorkflow?> FindAsync(long id, CancellationToken ct = default) {
-        return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Id == id), ct);
+    public virtual async Task<TWorkflow?> FindAsync(Guid uid, CancellationToken ct = default) {
+        return await _workflows.SingleOrDefaultAsync(q => q.Where(w => w.Uid == uid), ct);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IStatefulEntity?> FindInstanceAsync(long id, CancellationToken ct = default) {
-        var workflow = await FindAsync(id, ct);
+    public virtual async Task<IStatefulEntity?> FindInstanceAsync(Guid uid, CancellationToken ct = default) {
+        var workflow = await FindAsync(uid, ct);
         if (workflow is null) {
             return null;
         }
@@ -156,14 +156,14 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             return null;
         }
 
-        var instance = await repository.SingleOrDefaultAsync<IStatefulEntity>(e => e.Id == workflow.InstanceId, ct);
+        var instance = await repository.SingleOrDefaultAsync<IStatefulEntity>(e => e.Uid == workflow.InstanceUid, ct);
 
         return (IStatefulEntity?)instance;
     }
 
     /// <inheritdoc />
-    public virtual IAsyncEnumerable<TTransition> ListTransitionsAsync(long id, CancellationToken ct = default) {
-        return _transitions.ListAsync(q => q.Where(p => p.WorkflowId == id), ct);
+    public virtual IAsyncEnumerable<TTransition> ListTransitionsAsync(Guid uid, CancellationToken ct = default) {
+        return _transitions.ListAsync(q => q.Where(p => p.WorkflowUid == uid), ct);
     }
 
     /// <inheritdoc />
@@ -186,12 +186,12 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
         await repository.AddAsync(instance, ct);
         await repository.CommitAsync(ct);
 
-        return await CreateAsync(type, instance.Id, ct);
+        return await CreateAsync(type, instance.Uid, ct);
     }
 
     /// <inheritdoc />
-    public virtual async Task<TWorkflow?> CreateAsync(Type instance, long id, CancellationToken ct = default) {
-        var workflow = new TWorkflow { InstanceId = id, InstanceType = instance.FullName! };
+    public virtual async Task<TWorkflow?> CreateAsync(Type instance, Guid uid, CancellationToken ct = default) {
+        var workflow = new TWorkflow { InstanceUid = uid, InstanceType = instance.FullName! };
 
         await _workflows.AddAsync(workflow, ct);
         await _workflows.CommitAsync(ct);
@@ -200,9 +200,9 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
     }
 
     /// <inheritdoc />
-    public virtual async Task RaiseAsync<TEvent>(long id, TEvent @event, CancellationToken ct = default)
+    public virtual async Task RaiseAsync<TEvent>(Guid uid, TEvent @event, CancellationToken ct = default)
         where TEvent : class, ITransition {
-        var workflow = await FindAsync(id, ct);
+        var workflow = await FindAsync(uid, ct);
 
         await RaiseAsync(workflow, @event, null, ct);
     }
@@ -219,8 +219,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             throw new ArgumentNullException(nameof(workflow));
         }
 
-        @event.UpdatedById ??= principal?.GetUserId();
-        @event.UpdatedBy   ??= principal?.GetDisplayName();
+        @event.UpdatedByName ??= principal?.Identity?.Name;
 
         var instance = await GetInstanceAsync(workflow, ct);
         if (instance is null) {
@@ -252,7 +251,7 @@ public class SchemataWorkflowManager<TWorkflow, TTransition, TResponse> : IWorkf
             throw new ArgumentNullException(nameof(workflow));
         }
 
-        var history = await ListTransitionsAsync(workflow.Id, ct).ToListAsync(ct);
+        var history = await ListTransitionsAsync(workflow.Uid, ct).ToListAsync(ct);
 
         var instance = await GetInstanceAsync(workflow, ct);
         if (instance is null) {

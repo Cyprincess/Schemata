@@ -41,7 +41,6 @@ public sealed class AdviceAuthorizeNonce<TApp>(IOptions<CodeFlowOptions> options
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeNonce.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,

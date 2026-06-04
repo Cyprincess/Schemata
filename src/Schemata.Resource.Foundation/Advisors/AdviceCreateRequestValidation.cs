@@ -12,9 +12,10 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceCreateRequestValidation
 {
     /// <summary>
-    ///     Default order: runs after <see cref="AdviceCreateRequestAuthorize{TEntity,TRequest}" />.
+    ///     Default order: runs after <see cref="AdviceCreateRequestSanitize{TEntity,TRequest}" />
+    ///     so validation sees the sanitized payload without server-managed fields.
     /// </summary>
-    public const int DefaultOrder = AdviceCreateRequestAuthorize.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceCreateRequestSanitize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -34,10 +35,8 @@ public sealed class AdviceCreateRequestValidation<TEntity, TRequest> : IResource
 {
     #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
 
-    /// <inheritdoc />
     public int Order => AdviceCreateRequestValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,

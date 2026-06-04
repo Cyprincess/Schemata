@@ -38,7 +38,6 @@ public sealed class AdviceRevocationEndpointPermission<TApp, TToken>(IApplicatio
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRevocationEndpointPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TApp              application,
@@ -46,7 +45,7 @@ public sealed class AdviceRevocationEndpointPermission<TApp, TToken>(IApplicatio
         TToken            token,
         CancellationToken ct = default
     ) {
-        if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + "revocation", ct)) {
+        if (!await manager.HasPermissionAsync(application, PermissionPrefixes.Endpoint + Endpoints.Revoke, ct)) {
             throw new OAuthException(
                 OAuthErrors.UnauthorizedClient,
                 SchemataResources.GetResourceString(SchemataResources.ST4007),

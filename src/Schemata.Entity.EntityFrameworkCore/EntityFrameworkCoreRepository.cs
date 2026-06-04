@@ -33,23 +33,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         _context = context;
     }
 
-    /// <summary>
-    ///     Gets the underlying <typeparamref name="TContext" />.
-    /// </summary>
     protected virtual TContext Context => _context;
 
-    /// <summary>
-    ///     Gets the <see cref="DbSet{TEntity}" /> for the managed entity type.
-    /// </summary>
     protected virtual DbSet<TEntity> DbSet => _context.Set<TEntity>();
 
-    /// <inheritdoc />
     public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() { return DbSet.AsAsyncEnumerable(); }
 
-    /// <inheritdoc />
     public override IQueryable<TEntity> AsQueryable() { return DbSet.AsQueryable(); }
 
-    /// <inheritdoc />
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default
@@ -64,7 +55,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         }
     }
 
-    /// <inheritdoc />
     public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -72,7 +62,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         throw new NotImplementedException();
     }
 
-    /// <inheritdoc />
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -108,7 +97,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
-    /// <inheritdoc />
     public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -144,7 +132,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
-    /// <inheritdoc />
     public override async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -179,7 +166,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
-    /// <inheritdoc />
     public override async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -214,7 +200,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
-    /// <inheritdoc />
     public override async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
@@ -249,7 +234,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         return context.Result;
     }
 
-    /// <inheritdoc />
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -266,7 +250,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         await Context.AddAsync(entity, ct);
     }
 
-    /// <inheritdoc />
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -285,7 +268,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Context.Update(entity);
     }
 
-    /// <inheritdoc />
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -302,16 +284,18 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         Context.Remove(entity);
     }
 
-    /// <inheritdoc />
     public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
         if (UnitOfWork?.IsActive == true) {
             throw new InvalidOperationException("Commit is not allowed within a unit of work.");
         }
 
-        return await _context.SaveChangesAsync(ct);
+        var rows = await _context.SaveChangesAsync(ct);
+
+        await DrainAfterCommitAsync(ct);
+
+        return rows;
     }
 
-    /// <inheritdoc />
     public override void Detach(TEntity entity) { Context.Entry(entity).State = EntityState.Detached; }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
@@ -322,14 +306,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
 
         var container = AsQueryContainer();
 
-        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, container, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
+        _ = await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
+                         .RunAsync(AdviceContext, container, ct);
 
         return BuildQuery(container.Query, predicate);
     }

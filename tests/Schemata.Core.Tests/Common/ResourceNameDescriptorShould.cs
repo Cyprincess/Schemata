@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Schemata.Common;
 using Schemata.Core.Tests.Fixtures;
 using Xunit;
@@ -15,6 +16,29 @@ public class ResourceNameDescriptorShould
         Assert.NotNull(result);
         Assert.Equal("les-miserables", result.Value.LeafName);
         Assert.Equal("acme", result.Value.ParentValues["publisher"]);
+    }
+
+    [Fact]
+    public void Resolve_UseBareTitleCaseForParentProperty() {
+        var descriptor = ResourceNameDescriptor.ForType<Book>();
+        var book       = new Book { Name = "les-miserables", Publisher = "acme" };
+
+        var resolved = descriptor.Resolve(book);
+
+        Assert.Equal("publishers/acme/books/les-miserables", resolved);
+    }
+
+    [Fact]
+    public void BuildParentPredicate_ReferenceBareTitleCaseProperty() {
+        var descriptor = ResourceNameDescriptor.ForType<Book>();
+        var values     = new Dictionary<string, string> { ["publisher"] = "acme" };
+
+        var predicate = descriptor.BuildParentPredicate<Book>(values);
+
+        Assert.NotNull(predicate);
+        var compiled = predicate!.Compile();
+        Assert.True(compiled(new Book { Publisher = "acme" }));
+        Assert.False(compiled(new Book { Publisher = "other" }));
     }
 
     [Fact]

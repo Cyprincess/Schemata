@@ -420,7 +420,7 @@ public static class Parser
                                               // Valid typed-field continuation chars: [, {, =
                                               // These unambiguously confirm the second identifier is the
                                               // field name, not the start of the next field.
-                                              result = c == '[' || c == '{' || c == '=';
+                                              result = c is '[' or '{' or '=';
                                           }
 
                                           // Restore cursor position (we were just peeking)

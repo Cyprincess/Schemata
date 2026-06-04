@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,13 @@ public class AdviceRemoveEvictCacheShould
         return Options.Create(new SchemataQueryCacheOptions());
     }
 
+    private static IRepository<Student> InlineCommitRepo() {
+        var mock = new Mock<IRepository<Student>>();
+        mock.Setup(r => r.EnqueueAfterCommit(It.IsAny<Func<CancellationToken, Task>>()))
+            .Callback<Func<CancellationToken, Task>>(action => action(CancellationToken.None).GetAwaiter().GetResult());
+        return mock.Object;
+    }
+
     [Fact]
     public void Order_EqualsOrdersMax() {
         var mock    = new Mock<ICacheProvider>();
@@ -29,7 +37,8 @@ public class AdviceRemoveEvictCacheShould
     [Fact]
     public async Task AdviseAsync_WhenEntityRemoved_RemovesAllKeysInCollection() {
         var cacheKey = "remove-key";
-        var indexKey = ReverseIndex.BuildKey(typeof(Student), new Student { Id = 9 });
+        var uid      = Guid.NewGuid();
+        var indexKey = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
         var mock = new Mock<ICacheProvider>();
@@ -37,8 +46,8 @@ public class AdviceRemoveEvictCacheShould
 
         var advisor = new AdviceRemoveEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Id = 9 };
+        var repo    = InlineCommitRepo();
+        var entity  = new Student { Uid = uid };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -54,7 +63,7 @@ public class AdviceRemoveEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new QueryCacheEvictionSuppressed());
         var repo   = new Mock<IRepository<Student>>().Object;
-        var entity = new Student { Id = 11 };
+        var entity = new Student { Uid = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 
@@ -71,7 +80,7 @@ public class AdviceRemoveEvictCacheShould
         var advisor = new AdviceRemoveEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Id = 11 };
+        var entity  = new Student { Uid = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
 

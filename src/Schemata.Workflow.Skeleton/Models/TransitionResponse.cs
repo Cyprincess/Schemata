@@ -11,7 +11,7 @@ public class TransitionResponse : IIdentifier, ITransition, ITimestamp
     /// <summary>
     ///     The identifier of the parent workflow.
     /// </summary>
-    public virtual long WorkflowId { get; set; }
+    public virtual Guid WorkflowUid { get; set; }
 
     /// <summary>
     ///     The state before this transition.
@@ -26,7 +26,7 @@ public class TransitionResponse : IIdentifier, ITransition, ITimestamp
     #region IIdentifier Members
 
     /// <inheritdoc />
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 
@@ -49,10 +49,7 @@ public class TransitionResponse : IIdentifier, ITransition, ITimestamp
     public virtual string? Note { get; set; }
 
     /// <inheritdoc />
-    public virtual long? UpdatedById { get; set; }
-
-    /// <inheritdoc />
-    public virtual string? UpdatedBy { get; set; }
+    public virtual string? UpdatedByName { get; set; }
 
     #endregion
 }

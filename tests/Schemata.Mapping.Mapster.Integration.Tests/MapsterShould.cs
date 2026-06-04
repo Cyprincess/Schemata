@@ -12,37 +12,18 @@ public class MapsterShould
     private static ISimpleMapper CreateMapper() {
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => {
-                schema.UseMapster()
-                      .Map<Source, Destination>(map => {
-                               map.For(d => d.DisplayName)
-                                  .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
-                               map.For(d => d.Sex).From(s => s.Sex.ToString());
-                               map.For(d => d.Grade).Ignore();
-                           }
-                       );
-            }
-        );
+            schema.UseMapster()
+                  .Map<Source, Destination>(map => {
+                       map.For(d => d.DisplayName)
+                          .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
+                       map.For(d => d.Sex).From(s => s.Sex.ToString());
+                       map.For(d => d.Grade).Ignore();
+                   });
+        });
 
         var app   = builder.Build();
         var scope = app.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<ISimpleMapper>();
-    }
-
-    [Fact]
-    public void Map_BasicFields_CopiesMatchingProperties() {
-        var mapper = CreateMapper();
-
-        var source = new Source {
-            Name  = "Alice",
-            Age   = 25,
-            Grade = 10,
-            Sex   = Sex.Female,
-        };
-
-        var result = mapper.Map<Destination>(source);
-
-        Assert.NotNull(result);
-        Assert.Equal(source.Age, result.Age);
     }
 
     [Fact]

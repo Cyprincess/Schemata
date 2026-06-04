@@ -12,15 +12,10 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataCorsFeature : FeatureBase
 {
-    /// <summary>
-    ///     Priority for ordering the middleware registration in the application pipeline.
-    /// </summary>
     public const int DefaultPriority = SchemataQuotaFeature.DefaultPriority + 10_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -32,7 +27,6 @@ public sealed class SchemataCorsFeature : FeatureBase
         services.AddCors(configure);
     }
 
-    /// <inheritdoc />
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,

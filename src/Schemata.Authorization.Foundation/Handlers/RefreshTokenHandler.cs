@@ -49,7 +49,6 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.RefreshToken;
 
     /// <summary>
@@ -116,8 +115,6 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             );
         }
 
-        // Validate without lifetime enforcement so expired refresh tokens
-        // can still be inspected for subject and scope extraction.
         var principal = await issuer.Validate(token.Payload, lifetime: false);
         if (principal is null) {
             throw new OAuthException(
@@ -158,9 +155,6 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             }
         }
 
-        // Reject if the subject referenced by the refresh token no longer exists
-        // (e.g. de-provisioned account).  The ISubjectProvider is resolved
-        // via DI and is optional — when absent, the check is skipped.
         if (!string.IsNullOrWhiteSpace(token.Subject)) {
             var provider = sp.GetService<ISubjectProvider>();
             if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {
@@ -183,11 +177,13 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             claims.Add(new(Claims.Subject, token.Subject));
         }
 
+        var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;
+
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
         return AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType]         = GrantTypes.RefreshToken,
-            [Properties.Scope]             = request.Scope,
-            [Properties.AuthorizationName] = token.AuthorizationName,
+            [Properties.Scope]             = issuedScope,
+            [Properties.AuthorizationName] = token.Authorization,
             [Properties.SessionId]         = token.SessionId,
         });
     }

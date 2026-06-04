@@ -47,7 +47,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 {
     #region ILogoutNotifier Members
 
-    /// <inheritdoc />
     public Task<List<string>>
         GetFrontChannelUrisAsync(string? subject, string? session, CancellationToken ct = default) {
         return Task.FromResult<List<string>>([]);
@@ -74,7 +73,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
                 continue;
             }
 
-            // Resolve per-RP subject: pairwise clients receive a pairwise sub in the logout token.
             var sub = !string.IsNullOrWhiteSpace(subject) ? identifier.Resolve(subject, app) : null;
 
             var claims = new List<Claim> {
@@ -101,9 +99,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             var uri = app.BackChannelLogoutUri;
             var jwt = issuer.CreateToken(claims, TimeSpan.FromMinutes(2));
 
-            // Enqueue a self-contained HTTP POST task.  All domain work (DB queries,
-            // JWT signing) is done here in the request scope; the task only needs
-            // IHttpClientFactory from the background scope.
             queue.Enqueue(async (sp, token) => {
                 try {
                     var factory = sp.GetRequiredService<IHttpClientFactory>();

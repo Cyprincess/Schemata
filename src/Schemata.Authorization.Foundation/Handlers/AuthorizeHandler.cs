@@ -45,14 +45,6 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    /// <summary>
-    ///     Processes an authorization request by running the advisor pipeline and,
-    ///     when interaction is required, creating a reference-based interaction token
-    ///     that carries the serialized <see cref="AuthorizeRequest" /> to the consent/login SPA.
-    /// </summary>
-    /// <param name="request">The validated OAuth 2.0 authorization request.</param>
-    /// <param name="principal">The current authenticated principal, or empty if anonymous.</param>
-    /// <param name="ct">Cancellation token.</param>
     public override async Task<AuthorizationResult> AuthorizeAsync(
         AuthorizeRequest  request,
         ClaimsPrincipal   principal,
@@ -109,7 +101,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
-            ApplicationName = authz.Application.Name,
+            Application     = authz.Application.Name,
             Type            = TokenTypes.Interaction,
             Status          = TokenStatuses.Valid,
             ReferenceId     = reference,

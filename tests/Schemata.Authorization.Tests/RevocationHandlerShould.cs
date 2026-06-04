@@ -32,39 +32,29 @@ public class RevocationHandlerShould
     private static readonly RsaSecurityKey SigningKey = new(Rsa);
 
     private static Fixture CreateFixture() {
-        var opts = Options.Create(
-            new SchemataAuthorizationOptions {
-                Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
-            }
-        );
+        var opts = Options.Create(new SchemataAuthorizationOptions {
+            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
+        });
 
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app        = new SchemataApplication { Id = 1, ClientId = "test-app" };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-app" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
-        clientAuth.Setup(c => c.AuthenticateAsync(
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<Dictionary<string, List<string?>>?>(),
-                             It.IsAny<CancellationToken>()
-                         )
-                   )
+        clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                  It.IsAny<CancellationToken>()))
                   .ReturnsAsync(app);
 
         var services = new ServiceCollection();
-        services.TryAddEnumerable(
-            ServiceDescriptor
-               .Scoped<IRevocationAdvisor<SchemataApplication, SchemataToken>,
-                    AdviceRevocationTokenValidation<SchemataApplication, SchemataToken>>()
-        );
+        services.TryAddEnumerable(ServiceDescriptor
+                                     .Scoped<IRevocationAdvisor<SchemataApplication, SchemataToken>,
+                                          AdviceRevocationTokenValidation<SchemataApplication, SchemataToken>>());
         var sp = services.BuildServiceProvider();
 
         var handler = new RevocationHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object,
-            tokensMock.Object,
-            sp
-        );
+            clientAuth.Object, tokensMock.Object, sp);
         return new(handler, tokensMock, tokenService);
     }
 
@@ -77,9 +67,9 @@ public class RevocationHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Id              = 1,
+            Uid             = Guid.NewGuid(),
             Type            = type,
-            ApplicationName = appName,
+            Application     = appName,
             ReferenceId     = referenceId,
             Format          = format,
             Status          = status,
@@ -94,11 +84,7 @@ public class RevocationHandlerShould
         var request = new RevokeRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }
@@ -109,11 +95,7 @@ public class RevocationHandlerShould
         var request = new RevokeRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
-                                                              request,
-                                                              null,
-                                                              CancellationToken.None
-                                                          )
-        );
+                                                              request, null, CancellationToken.None));
 
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
     }

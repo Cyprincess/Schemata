@@ -30,25 +30,18 @@ public sealed class Mapping<TSource, TDestination> : IMapping
 
     #region IMapping Members
 
-    /// <inheritdoc />
     public Type SourceType { get; } = typeof(TSource);
 
-    /// <inheritdoc />
     public Type DestinationType { get; } = typeof(TDestination);
 
-    /// <inheritdoc />
     public bool IsConverter => WithExpression is not null;
 
-    /// <inheritdoc />
     public bool IsIgnored { get; set; }
 
-    /// <inheritdoc />
     public bool HasSourceField => SourceField is not null;
 
-    /// <inheritdoc />
     public string DestinationFieldName => DestinationField!.ToString();
 
-    /// <inheritdoc />
     public void Invoke(Action<Expression?, Expression?, Expression?, Expression?, bool> action) {
         action.Invoke(WithExpression, DestinationField, SourceField, IgnoreCondition, IsIgnored);
     }

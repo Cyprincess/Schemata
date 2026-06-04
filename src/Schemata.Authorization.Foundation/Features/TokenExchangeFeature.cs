@@ -29,7 +29,6 @@ public sealed class TokenExchangeFeature<TApp> : IAuthorizationFlowFeature
     /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_500;
 
-    /// <inheritdoc />
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddKeyedScoped<IGrantHandler, TokenExchangeHandler<TApp>>(GrantTypes.TokenExchange);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryTokenExchange<TApp>>());

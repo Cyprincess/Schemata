@@ -25,22 +25,20 @@ public class UnitOfWorkShould : IAsyncLifetime
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 using var work = repo.BeginWork();
-                await repo.AddAsync(
-                    new() {
-                        FullName = "UoW-Alice",
-                        Age      = 18,
-                        Grade    = 1,
-                        Name     = "uow-alice",
-                    }
-                );
-                await repo.AddAsync(
-                    new() {
-                        FullName = "UoW-Bob",
-                        Age      = 19,
-                        Grade    = 2,
-                        Name     = "uow-bob",
-                    }
-                );
+                await repo.AddAsync(new() {
+                                        Uid      = Guid.NewGuid(),
+                                        FullName = "UoW-Alice",
+                                        Age      = 18,
+                                        Grade    = 1,
+                                        Name     = "uow-alice",
+                                    });
+                await repo.AddAsync(new() {
+                                        Uid      = Guid.NewGuid(),
+                                        FullName = "UoW-Bob",
+                                        Age      = 19,
+                                        Grade    = 2,
+                                        Name     = "uow-bob",
+                                    });
                 await work.CommitAsync();
             }
         }
@@ -60,14 +58,13 @@ public class UnitOfWorkShould : IAsyncLifetime
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 using var work = repo.BeginWork();
-                await repo.AddAsync(
-                    new() {
-                        FullName = "Rollback-Alice",
-                        Age      = 18,
-                        Grade    = 1,
-                        Name     = "rollback-alice",
-                    }
-                );
+                await repo.AddAsync(new() {
+                                        Uid      = Guid.NewGuid(),
+                                        FullName = "Rollback-Alice",
+                                        Age      = 18,
+                                        Grade    = 1,
+                                        Name     = "rollback-alice",
+                                    });
                 await work.RollbackAsync();
             }
         }
@@ -87,14 +84,13 @@ public class UnitOfWorkShould : IAsyncLifetime
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 using var work = repo.BeginWork();
-                await repo.AddAsync(
-                    new() {
-                        FullName = "Dispose-Alice",
-                        Age      = 18,
-                        Grade    = 1,
-                        Name     = "dispose-alice",
-                    }
-                );
+                await repo.AddAsync(new() {
+                                        Uid      = Guid.NewGuid(),
+                                        FullName = "Dispose-Alice",
+                                        Age      = 18,
+                                        Grade    = 1,
+                                        Name     = "dispose-alice",
+                                    });
                 // intentionally no commit/rollback
             }
         }
@@ -113,14 +109,13 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             using var work = repo.BeginWork();
-            await repo.AddAsync(
-                new() {
-                    FullName = "Throw-Alice",
-                    Age      = 18,
-                    Grade    = 1,
-                    Name     = "throw-alice",
-                }
-            );
+            await repo.AddAsync(new() {
+                                    Uid      = Guid.NewGuid(),
+                                    FullName = "Throw-Alice",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "throw-alice",
+                                });
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => repo.CommitAsync().AsTask());
         }
@@ -132,21 +127,19 @@ public class UnitOfWorkShould : IAsyncLifetime
             var (studentRepo, courseRepo, uow, scope) = _fixture.CreateScopeWithUoW();
             using (scope) {
                 uow.Begin();
-                await studentRepo.AddAsync(
-                    new() {
-                        FullName = "Cross-Alice",
-                        Age      = 18,
-                        Grade    = 1,
-                        Name     = "cross-alice",
-                    }
-                );
-                await courseRepo.AddAsync(
-                    new() {
-                        Title   = "Cross-Course",
-                        Credits = 3,
-                        Name    = "cross-course",
-                    }
-                );
+                await studentRepo.AddAsync(new() {
+                                               Uid      = Guid.NewGuid(),
+                                               FullName = "Cross-Alice",
+                                               Age      = 18,
+                                               Grade    = 1,
+                                               Name     = "cross-alice",
+                                           });
+                await courseRepo.AddAsync(new() {
+                                              Uid     = Guid.NewGuid(),
+                                              Title   = "Cross-Course",
+                                              Credits = 3,
+                                              Name    = "cross-course",
+                                          });
                 await uow.CommitAsync();
             }
         }
@@ -172,14 +165,12 @@ public class UnitOfWorkShould : IAsyncLifetime
     public async Task DeferredExecution_WithoutUoW_PendingUntilCommit() {
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
-            await repo.AddAsync(
-                new() {
-                    FullName = "Deferred-Alice",
-                    Age      = 18,
-                    Grade    = 1,
-                    Name     = "deferred-alice",
-                }
-            );
+            await repo.AddAsync(new() {
+                                    FullName = "Deferred-Alice",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "deferred-alice",
+                                });
 
             // Before CommitAsync, entity should NOT be in the database
             var foundBefore = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "deferred-alice"));
@@ -200,14 +191,12 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             using var work = repo.BeginWork();
-            await repo.AddAsync(
-                new() {
-                    FullName = "Immediate-Alice",
-                    Age      = 18,
-                    Grade    = 1,
-                    Name     = "immediate-alice",
-                }
-            );
+            await repo.AddAsync(new() {
+                                    FullName = "Immediate-Alice",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "immediate-alice",
+                                });
 
             // Inside UoW, operations execute immediately (not deferred)
             // Entity should be visible in the same transaction

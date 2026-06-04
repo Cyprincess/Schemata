@@ -9,24 +9,26 @@ using Schemata.Entity.Repository.Advisors;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to enable query caching
-///     together with immediate eviction on update and remove.
+///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to enable the
+///     ownership advisor pipeline.
 /// </summary>
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
-    ///     Registers the ownirsnop.
+    ///     Registers the ownership advisors.
+    ///     Hosts should also register a real
+    ///     <see cref="IOwnerResolver{TEntity}" /> or configure
+    ///     <see cref="SchemataOwnerOptions.OnNullOwner" /> away from
+    ///     <see cref="OnNullOwnerPolicy.Reject" />.
     /// </summary>
     /// <param name="builder">The repository builder.</param>
     /// <returns>The same builder for chaining.</returns>
-    public static SchemataRepositoryBuilder UseOwner(
-        this SchemataRepositoryBuilder     builder
-    ) {
-        builder.Services.TryAdd(ServiceDescriptor.Scoped(typeof(IOwnerResolver<>), typeof(NullOwnerResolver<>)));
+    public static SchemataRepositoryBuilder UseOwner(this SchemataRepositoryBuilder builder) {
+        builder.Services.AddOptions<SchemataOwnerOptions>();
 
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQueryOwner<>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddOwner<>)));
-        
+
         return builder;
     }
 }

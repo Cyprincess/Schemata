@@ -12,7 +12,6 @@ public sealed class DefaultPermissionResolver : IPermissionResolver
 {
     #region IPermissionResolver Members
 
-    /// <inheritdoc />
     public string Resolve(string operation, Type entity) {
         return $"{entity.Name.Kebaberize()}.{operation.Kebaberize()}";
     }

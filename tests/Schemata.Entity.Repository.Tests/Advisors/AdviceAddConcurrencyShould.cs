@@ -51,13 +51,4 @@ public class AdviceAddConcurrencyShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(entity.Timestamp);
     }
-
-    #region Nested type: PlainEntity
-
-    public class PlainEntity
-    {
-        public long Id { get; set; }
-    }
-
-    #endregion
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,25 +24,15 @@ public class AdviceChangePhoneValidationShould
     private static readonly ClaimsPrincipal Anonymous = new();
 
     private static readonly ClaimsPrincipal Alice = new(
-        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test")
-    );
+        new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
     private static SchemataUserManager<SchemataUser> MockUserManager(string? phone = "+15551234567") {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Id = 42, UserName = "alice", PhoneNumber = phone });
+             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice", PhoneNumber = phone });
         var sp = new ServiceCollection().BuildServiceProvider();
-        return new(
-            sp,
-            store.Object,
-            Options.Create(new IdentityOptions()),
-            new PasswordHasher<SchemataUser>(),
-            [],
-            [],
-            new UpperInvariantLookupNormalizer(),
-            new(),
-            NullLogger<SchemataUserManager<SchemataUser>>.Instance
-        );
+        return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [],
+                   new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
     }
 
     [Fact]
@@ -51,12 +42,7 @@ public class AdviceChangePhoneValidationShould
         var request = new ProfileRequest { PhoneNumber = "+15559999999" };
 
         await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
-                                                        ctx,
-                                                        request,
-                                                        IdentityOperation.ChangePhone,
-                                                        Anonymous
-                                                    )
-        );
+                                                        ctx, request, IdentityOperation.ChangePhone, Anonymous));
     }
 
     [Fact]
@@ -66,12 +52,7 @@ public class AdviceChangePhoneValidationShould
         var request = new ProfileRequest { PhoneNumber = "" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx,
-                                                          request,
-                                                          IdentityOperation.ChangePhone,
-                                                          Alice
-                                                      )
-        );
+                                                          ctx, request, IdentityOperation.ChangePhone, Alice));
     }
 
     [Fact]
@@ -81,12 +62,7 @@ public class AdviceChangePhoneValidationShould
         var request = new ProfileRequest { PhoneNumber = "+15551234567" };
 
         await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(
-                                                         ctx,
-                                                         request,
-                                                         IdentityOperation.ChangePhone,
-                                                         Alice
-                                                     )
-        );
+                                                         ctx, request, IdentityOperation.ChangePhone, Alice));
     }
 
     [Fact]

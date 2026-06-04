@@ -16,7 +16,6 @@ namespace Schemata.Authorization.Foundation.Services;
 public class TokenCleanupService<TToken>(IServiceProvider sp) : BackgroundService
     where TToken : SchemataToken
 {
-    /// <summary>Executes the token pruning loop: waits one hour, then prunes.</summary>
     protected override async Task ExecuteAsync(CancellationToken ct) {
         while (!ct.IsCancellationRequested) {
             try {

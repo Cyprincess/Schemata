@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -11,13 +12,14 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [DisplayName("Token")]
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
-    /// <summary>The application this token was issued to.</summary>
-    public virtual string? ApplicationName { get; set; }
+    /// <summary>Canonical name of the application this token was issued to.</summary>
+    public virtual string? Application { get; set; }
 
-    /// <summary>The authorization record this token was derived from.</summary>
-    public virtual string? AuthorizationName { get; set; }
+    /// <summary>Canonical name of the authorization record this token was derived from.</summary>
+    public virtual string? Authorization { get; set; }
 
     /// <summary>Identifier of the resource owner this token represents.</summary>
     public virtual string? Subject { get; set; }
@@ -71,8 +73,7 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     #endregion
 
     #region IIdentifier Members
-
-    public virtual long Id { get; set; }
+    public virtual Guid Uid { get; set; }
 
     #endregion
 

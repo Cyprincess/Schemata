@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using Schemata.Abstractions;
 using Schemata.Entity.Repository;
@@ -34,8 +35,7 @@ public static class ReverseIndex
 
     private static string? FormatKey(IReadOnlyList<PropertyInfo> properties, object entity) {
         if (properties.Count == 1) {
-            var value = properties[0].GetValue(entity);
-            return value?.ToString();
+            return FormatValue(properties[0].GetValue(entity));
         }
 
         var parts = new string[properties.Count];
@@ -45,10 +45,17 @@ public static class ReverseIndex
                 return null;
             }
 
-            parts[i] = value.ToString() ?? string.Empty;
+            parts[i] = FormatValue(value) ?? string.Empty;
         }
 
         // \x1f (ASCII Unit Separator) separates multi-column composite key values.
         return string.Join("\x1f", parts);
+    }
+    private static string? FormatValue(object? value) {
+        return value switch {
+            null              => null,
+            IFormattable f    => f.ToString(null, CultureInfo.InvariantCulture),
+            var _             => value.ToString(),
+        };
     }
 }

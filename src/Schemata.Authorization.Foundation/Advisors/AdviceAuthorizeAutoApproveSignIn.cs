@@ -45,7 +45,6 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeAutoApproveSignIn.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
@@ -86,11 +85,15 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
 
         var authorization = new TAuth {
-            ApplicationName = authz.Application.Name,
-            Subject         = subject,
-            Type            = AuthorizationTypes.AdHoc,
-            Status          = TokenStatuses.Valid,
-            Scopes          = authz.Request?.Scope,
+            Application         = authz.Application.Name,
+            Subject             = subject,
+            Type                = AuthorizationTypes.AdHoc,
+            Status              = TokenStatuses.Valid,
+            Scopes              = authz.Request?.Scope,
+            RedirectUri         = authz.Request?.RedirectUri,
+            ResponseType        = authz.Request?.ResponseType,
+            CodeChallengeMethod = authz.Request?.CodeChallengeMethod,
+            AcrValues           = authz.Request?.AcrValues,
         };
 
         await authorizations.CreateAsync(authorization, ct);

@@ -31,13 +31,12 @@ public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeEndpointPermission.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        if (!await manager.HasPermissionAsync(authz.Application, PermissionPrefixes.Endpoint + "authorization", ct)) {
+        if (!await manager.HasPermissionAsync(authz.Application, PermissionPrefixes.Endpoint + Endpoints.Authorize, ct)) {
             throw new OAuthException(
                 OAuthErrors.UnauthorizedClient,
                 SchemataResources.GetResourceString(SchemataResources.ST4007),

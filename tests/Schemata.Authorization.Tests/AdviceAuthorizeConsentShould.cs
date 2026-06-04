@@ -27,8 +27,8 @@ public class AdviceAuthorizeConsentShould
         var advisor = new AdviceAuthorizeConsent<SchemataApplication, SchemataAuthorization>(authzMgr.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { ClientId  = "test-app", ConsentType = ConsentTypes.Explicit },
-            Request     = new() { Scope = "openid profile" },
+            Application = new() { ClientId = "test-app", ConsentType = ConsentTypes.Explicit },
+            Request     = new() { Scope    = "openid profile" },
             Principal   = CreatePrincipal("user-1"),
         };
 

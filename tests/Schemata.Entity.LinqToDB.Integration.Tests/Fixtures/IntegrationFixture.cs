@@ -29,10 +29,9 @@ public class IntegrationFixture : IAsyncLifetime
         var connectionString = $"Data Source={_dbPath}";
 
         services.TryAddScoped(_ => {
-                var options = new DataOptions().UseSQLite(connectionString);
-                return new TestDataConnection(options);
-            }
-        );
+            var options = new DataOptions().UseSQLite(connectionString);
+            return new TestDataConnection(options);
+        });
 
         services.AddRepository<Student, LinQ2DbRepository<TestDataConnection, Student>>();
         services.AddRepository<Course, LinQ2DbRepository<TestDataConnection, Course>>();
@@ -76,7 +75,8 @@ public class IntegrationFixture : IAsyncLifetime
         return (repository, scope);
     }
 
-    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDataConnection> Uow, IServiceScope Scope) CreateScopeWithUoW() {
+    public (IRepository<Student> StudentRepo, IRepository<Course> CourseRepo, IUnitOfWork<TestDataConnection> Uow,
+        IServiceScope Scope) CreateScopeWithUoW() {
         var scope       = _root!.CreateScope();
         var studentRepo = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         var courseRepo  = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();

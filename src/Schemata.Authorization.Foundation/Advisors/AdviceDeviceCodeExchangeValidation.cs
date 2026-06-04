@@ -47,7 +47,6 @@ public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken> : IDeviceCo
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodeExchangeValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                           ctx,
         DeviceCodeExchangeContext<TApp, TToken> exchange,
@@ -60,7 +59,7 @@ public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken> : IDeviceCo
             );
         }
 
-        if (exchange.Token.ApplicationName != exchange.Application?.Name) {
+        if (exchange.Token.Application != exchange.Application?.Name) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.ST4004)

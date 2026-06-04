@@ -40,8 +40,6 @@ internal static class ResourceJsonOptions
 
         json.TypeInfoResolver = json.TypeInfoResolver?.WithAddedModifier(info => {
             if (typeof(ICanonicalName).IsAssignableFrom(info.Type)) {
-                // Remove ICanonicalName.Name from serialization — it is the full resource name pattern and
-                // not a proto field that should be serialized independently.
                 var np = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(ICanonicalName.Name),
                 });
@@ -49,17 +47,15 @@ internal static class ResourceJsonOptions
                     info.Properties.Remove(np);
                 }
 
-                // Map CanonicalName to "name" for AIP-122 wire compatibility.
                 var cp = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(ICanonicalName.CanonicalName),
                 });
                 cp?.Name = Parameters.Name;
             }
 
-            // Rename "entities" to the pluralized resource name per AIP-132.
-            if (info.Type is { IsGenericType: true } && info.Type.GetGenericTypeDefinition() == typeof(ListResult<>)) {
+            if (info.Type is { IsGenericType: true } && info.Type.GetGenericTypeDefinition() == typeof(ListResultBase<>)) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(ListResult<>.Entities),
+                    Name: nameof(ListResultBase<>.Entities),
                 });
 
                 if (property is not null) {
@@ -74,7 +70,6 @@ internal static class ResourceJsonOptions
                 }
             }
 
-            // Map EntityTag to "etag" per AIP-154 concurrency token naming.
             if (typeof(IFreshness).IsAssignableFrom(info.Type)) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
                     Name: nameof(IFreshness.EntityTag),

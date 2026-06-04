@@ -12,7 +12,6 @@ public sealed class DefaultEntitlementProvider<T, TRequest> : IEntitlementProvid
 {
     #region IEntitlementProvider<T,TRequest> Members
 
-    /// <inheritdoc />
     public Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
         AccessContext<TRequest> context,
         ClaimsPrincipal?        principal,

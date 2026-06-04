@@ -1,12 +1,14 @@
+using System;
+
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Provides a unique numeric identifier suitable for use as a primary key.
+///     Provides a unique identifier suitable for use as a primary key.
 /// </summary>
 public interface IIdentifier
 {
     /// <summary>
-    ///     The unique numeric identifier.
+    ///     The unique identifier.
     /// </summary>
-    long Id { get; set; }
+    Guid Uid { get; set; }
 }

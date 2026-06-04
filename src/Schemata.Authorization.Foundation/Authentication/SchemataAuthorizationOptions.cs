@@ -148,16 +148,16 @@ public class SchemataAuthorizationOptions
     public HashSet<string> AllowedResponseTypes { get; } = [];
 
     /// <summary>Client authentication methods the server supports (e.g., "client_secret_post").</summary>
-    public HashSet<string> AllowedClientAuthMethods { get; } = [];
+    public HashSet<string> AllowedClientAuthMethods { get; } = [
+        ClientAuthMethods.ClientSecretBasic,
+        ClientAuthMethods.ClientSecretPost
+    ];
 
     /// <summary>Response modes the server accepts (e.g., "query", "fragment", "form_post").</summary>
     public HashSet<string> AllowedResponseModes { get; } = [];
 
     /// <summary>Claim types advertised in the discovery document's claims_supported.</summary>
-    public HashSet<string> SupportedClaims { get; } = [];
-
-    /// <summary>Scope values the server is willing to grant; scopes not in this set are rejected.</summary>
-    public HashSet<string> AllowedScopes { get; } = [];
+    public HashSet<string> SupportedClaims { get; } = [Claims.Subject];
 
     /// <summary>Permits a single response_type value (e.g., "code").</summary>
     public SchemataAuthorizationOptions PermitResponseType(string type) {

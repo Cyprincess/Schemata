@@ -38,7 +38,6 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAd
     /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRefreshTokenValidation.DefaultOrder;
 
-    /// <inheritdoc />
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         RefreshTokenContext<TApp, TToken> exchange,
@@ -51,7 +50,7 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAd
             );
         }
 
-        if (exchange.Token.ApplicationName != exchange.Application?.Name) {
+        if (exchange.Token.Application != exchange.Application?.Name) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.ST4004)
