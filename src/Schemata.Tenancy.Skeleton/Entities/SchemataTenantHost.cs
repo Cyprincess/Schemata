@@ -8,11 +8,9 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 
 /// <summary>
 ///     Associates a host name with a tenant for host-based tenant resolution.
+///     Stored as a one-to-many association so host look-ups can be indexed at
+///     the database level.
 /// </summary>
-/// <remarks>
-///     Replaces the JSON-serialized <c>SchemataTenant.Hosts</c> string with a proper
-///     one-to-many association so that host look-ups can be indexed at the database level.
-/// </remarks>
 [DisplayName("Host")]
 [Table("SchemataTenantHosts")]
 [CanonicalName("tenants/{tenant}/hosts/{host}")]

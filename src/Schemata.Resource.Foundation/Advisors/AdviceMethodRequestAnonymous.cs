@@ -14,9 +14,9 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceMethodRequestAnonymous
 {
     /// <summary>
-    ///     Default order at <see cref="SchemataConstants.Orders.Base" /> ── first
+    ///     Default order at <see cref="SchemataConstants.Orders.Base" /> -- first
     ///     in the documented custom-method request chain
-    ///     (<c>anonymous → authorize → idempotency</c>).
+    ///     (<c>anonymous -> authorize -> idempotency</c>).
     /// </summary>
     public const int DefaultOrder = SchemataConstants.Orders.Base;
 }

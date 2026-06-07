@@ -14,10 +14,10 @@ namespace Schemata.Resource.Foundation;
 /// <summary>
 ///     Coordinates the advisor pipeline for an AIP-136 custom method invocation:
 ///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate
-///         → <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
-///         → <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
-///         → registered <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />
-///         → <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
+///         -> <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
+///         -> <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
+///         -> registered <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />
+///         -> <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
 ///     Each stage may short-circuit by stashing a <typeparamref name="TResponse" />
 ///     in the <see cref="AdviceContext" /> and returning
 ///     <see cref="AdviseResult.Handle" />.

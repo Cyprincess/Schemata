@@ -74,7 +74,7 @@ public static class ResponseModeService
             ResponseModes.Query    => CreateQueryRedirect(redirectUri, parameters),
             ResponseModes.Fragment => CreateFragmentRedirect(redirectUri, parameters),
             ResponseModes.FormPost => CreateFormPost(redirectUri, parameters),
-            _                      => CreateQueryRedirect(redirectUri, parameters),
+            var _                  => CreateQueryRedirect(redirectUri, parameters),
         };
     }
 

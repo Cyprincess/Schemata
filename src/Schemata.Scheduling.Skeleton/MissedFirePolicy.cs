@@ -1,4 +1,4 @@
-﻿namespace Schemata.Scheduling.Skeleton;
+namespace Schemata.Scheduling.Skeleton;
 
 /// <summary>
 ///     Determines how the scheduler reacts to a missed fire window.

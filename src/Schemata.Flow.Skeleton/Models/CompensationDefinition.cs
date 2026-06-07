@@ -1,7 +1,7 @@
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Compensation event definition — triggers or throws compensation
+///     A BPMN Compensation event definition - triggers or throws compensation
 ///     for the activity referenced by <see cref="ActivityRef" />.
 /// </summary>
 public sealed class CompensationDefinition : IEventDefinition

@@ -13,9 +13,10 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataTenancyBuilderOverrideExtensions
 {
     /// <summary>
-    ///     Applies <paramref name="configure" /> to the root <see cref="IServiceCollection" />
-    ///     so the registrations flow into every tenant container via the standard copy step
-    ///     in <see cref="SchemataTenancyOptions" /> tenant container construction.
+    ///     Applies <paramref name="configure" /> to the root <see cref="IServiceCollection" />.
+    ///     Registrations placed there are visible to every tenant through
+    ///     <c>TenantCompositeServiceProvider</c>'s host-root fallback, so this is the path
+    ///     for services that look identical across all tenants.
     /// </summary>
     public static SchemataTenancyBuilder<TTenant> ForAll<TTenant>(
         this SchemataTenancyBuilder<TTenant> builder,

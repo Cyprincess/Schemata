@@ -1,4 +1,4 @@
-﻿namespace Schemata.Scheduling.Skeleton;
+namespace Schemata.Scheduling.Skeleton;
 
 /// <summary>
 ///     Outcome of <see cref="IJobLifecycleObserver.OnTriggeredAsync" />.  Most

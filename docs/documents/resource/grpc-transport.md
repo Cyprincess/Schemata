@@ -1,178 +1,126 @@
 # gRPC Transport
 
-The gRPC transport exposes resources as code-first gRPC services using protobuf-net (ProtoBuf.Grpc). It is activated by calling `MapGrpc()` on the resource builder.
+The gRPC transport exposes resources as code-first gRPC services using protobuf-net (ProtoBuf.Grpc). Calling `MapGrpc()` on `SchemataResourceBuilder` registers `SchemataGrpcResourceFeature` (Priority `SchemataResourceFeature.DefaultPriority + 200_000` = 490,200,000), which synthesizes a `ResourceService<TEntity, TRequest, TDetail, TSummary>` for each registered resource and maps it as a gRPC endpoint at application startup.
+
+## Where the code lives
+
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Grpc` | `SchemataGrpcResourceBuilder.cs` |
+| `Schemata.Resource.Grpc` | `Features/SchemataGrpcResourceFeature.cs` |
+| `Schemata.Resource.Grpc` | `Extensions/SchemataResourceBuilderExtensions.cs` |
+| `Schemata.Resource.Grpc` | `Extensions/SchemataGrpcResourceBuilderExtensions.cs` |
+| `Schemata.Resource.Grpc` | `IResourceService.cs` |
+| `Schemata.Resource.Grpc` | `ResourceService.cs` |
+| `Schemata.Resource.Grpc` | `ResourceServiceBinder.cs` |
+| `Schemata.Resource.Grpc` | `ResourceServiceMethodProvider.cs` |
+| `Schemata.Resource.Grpc` | `ResourceCustomMethod.cs` |
+| `Schemata.Resource.Grpc` | `ResourceMethodNaming.cs` |
 
 ## Setup
 
 ```csharp
 builder.UseSchemata(schema => {
+    schema.UseLogging();
+    schema.UseRouting();
+    schema.UseControllers();
     schema.UseResource()
           .MapGrpc()
-          .Use<Book, BookRequest, BookDetail, BookSummary>();
+          .Use<Student>();
 });
 ```
 
-`MapGrpc()` adds the `SchemataGrpcResourceFeature`, which depends on `SchemataResourceFeature`.
+`MapGrpc()` is an extension on `SchemataResourceBuilder` that adds `SchemataGrpcResourceFeature` and returns a `SchemataGrpcResourceBuilder`. Subsequent `Use<...>()` calls on the gRPC builder register resources tagged with `GrpcResourceAttribute.Name`.
 
-## IResourceService
+## `SchemataGrpcResourceFeature`
 
-`IResourceService<TEntity, TRequest, TDetail, TSummary>` is the service contract interface. It is decorated with `[Service]` and each method with `[Operation]` (from `ProtoBuf.Grpc.Configuration`).
+`SchemataGrpcResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportGrpcFeature` via `[DependsOn<T>]`. The transport feature supplies `AddCodeFirstGrpc`, the `ExceptionMappingInterceptor`, gRPC server reflection, and `RuntimeTypeModel.Default` configuration shared with `Schemata.Flow.Grpc`.
 
-| Method        | Request Type    | Return Type                       |
-| ------------- | --------------- | --------------------------------- |
-| `ListAsync`   | `ListRequest`   | `ValueTask<ListResult<TSummary>>` |
-| `GetAsync`    | `GetRequest`    | `ValueTask<TDetail>`              |
-| `CreateAsync` | `TRequest`      | `ValueTask<TDetail>`              |
-| `UpdateAsync` | `TRequest`      | `ValueTask<TDetail>`              |
-| `DeleteAsync` | `DeleteRequest` | `ValueTask`                       |
+`ConfigureServices` registers:
 
-All methods accept an optional `CallContext` parameter from ProtoBuf.Grpc.
+- `ResourceService<,,,>` as an open-generic scoped service.
+- A singleton `ResourceBinderConfiguration` that holds the `RuntimeTypeModel` (built from `SchemataResourceOptions`) and a `BinderConfiguration` produced from `ResourceServiceBinder`.
+- `ResourceServiceMethodProvider<TService>` as an open-generic `IServiceMethodProvider<TService>` singleton — the hook gRPC ASP.NET Core uses to discover service methods.
+- `ResourceGrpcServiceDescriptorContributor` as `IGrpcServiceDescriptorContributor`, contributing the resource service descriptors into the shared gRPC reflection set.
 
-## ResourceService
-
-`ResourceService<TEntity, TRequest, TDetail, TSummary>` implements `IResourceService` and delegates to `ResourceOperationHandler`. It is registered as a scoped open generic.
-
-Key differences from the HTTP controller:
-
-- **Entity resolution uses canonical names**: `GetAsync`, `UpdateAsync`, and `DeleteAsync` resolve entities via `Handler.GetByCanonicalNameAsync(request.CanonicalName, ct)`, parsing the full resource path. HTTP uses route-based resolution instead.
-- **Blocked results throw**: When an operation is blocked, the gRPC service throws `NoContentException` (for Get, Create, Update), returns an empty `ListResult` (for List), or completes silently (for Delete). The `ExceptionMappingInterceptor` translates exceptions to gRPC status codes.
-- **No Location header**: Unlike HTTP, there is no equivalent of the 201 Created + Location header pattern.
-
-## Service Naming
-
-`ResourceServiceBinder` (a custom `ServiceBinder` from ProtoBuf.Grpc) controls how gRPC services and methods are named:
-
-### Service Name
-
-For `IResourceService<Book, BookRequest, BookDetail, BookSummary>`:
-
-1. Reads `Package` from `ResourceNameDescriptor` (set via `[ResourcePackage]`). Falls back to the entity's namespace.
-2. Combines with the singular name: `{package}.{Singular}Service`.
-
-Examples:
-
-- `[ResourcePackage("library.v1")]` on `Book` produces `library.v1.BookService`.
-- No package, namespace `MyApp.Models` produces `MyApp.Models.BookService`.
-
-### Method Names
-
-The binder strips the `Async` suffix and adjusts the method name:
-
-| Interface Method | gRPC Method Name                        |
-| ---------------- | --------------------------------------- |
-| `ListAsync`      | `List{Plural}` (e.g., `ListBooks`)      |
-| `GetAsync`       | `Get{Singular}` (e.g., `GetBook`)       |
-| `CreateAsync`    | `Create{Singular}` (e.g., `CreateBook`) |
-| `UpdateAsync`    | `Update{Singular}` (e.g., `UpdateBook`) |
-| `DeleteAsync`    | `Delete{Singular}` (e.g., `DeleteBook`) |
-
-## ProtoBuf Serialization
-
-`RuntimeTypeModelConfigurator` creates a `RuntimeTypeModel` at `CompatibilityLevel.Level300` and auto-configures all resource types:
-
-1. Configures `ListRequest`, `GetRequest`, and `DeleteRequest` as base types.
-2. For each registered gRPC resource, configures `TRequest`, `TDetail`, `TSummary`, and `ListResult<TSummary>`.
-3. For each type, discovers writable properties via `AppDomainTypeCache.GetWritableProperties` and adds them as protobuf fields with sequential field numbers starting at 1.
-4. Property names are converted to snake_case via Humanizer's `Underscore()`.
-
-Special property name mappings:
-
-| Property                       | Serialized As | Notes                                                                                            |
-| ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------ |
-| `ICanonicalName.Name`          | (skipped)     | Not serialized. gRPC uses only the full resource path.                                           |
-| `ICanonicalName.CanonicalName` | `name`        | The fully-qualified path (e.g. `publishers/acme/books/les-miserables`) becomes the `name` field. |
-| `IFreshness.EntityTag`         | `etag`        | Per AIP conventions.                                                                             |
-
-For `ListResult<TSummary>`, the `entities` field is renamed to the pluralized entity name in snake_case (e.g., `books` for `ListResult<BookSummary>`).
-
-### Comparison with HTTP
-
-The HTTP transport applies its own equivalent mappings via `ResourceJsonOptions` (see [HTTP Transport § JSON Serialization](http-transport.md#json-serialization)). The two transports intentionally diverge on how resource names are exposed:
-
-| C# Property                    | HTTP (JSON)               | gRPC (ProtoBuf)           |
-| ------------------------------ | ------------------------- | ------------------------- |
-| `ICanonicalName.Name`          | `name` (kept)             | (skipped)                 |
-| `ICanonicalName.CanonicalName` | (removed)                 | `name`                    |
-| `IFreshness.EntityTag`         | `etag`                    | `etag`                    |
-| `ListResult<T>.Entities`       | `{plural}` (e.g. `books`) | `{plural}` (e.g. `books`) |
-
-HTTP exposes the short resource ID as `name` because the canonical path is already implicit in the URL. gRPC exposes the fully-qualified `CanonicalName` as `name`.
-
-## ExceptionMappingInterceptor
-
-`ExceptionMappingInterceptor` is a gRPC `Interceptor` registered via `AddCodeFirstGrpc`. It wraps all unary server calls and translates exceptions to structured gRPC errors:
-
-### Exception to Status Code Mapping
-
-| SchemataException Code | gRPC StatusCode          |
-| ---------------------- | ------------------------ |
-| `InvalidArgument`      | `InvalidArgument` (3)    |
-| `NotFound`             | `NotFound` (5)           |
-| `PermissionDenied`     | `PermissionDenied` (7)   |
-| `Aborted`              | `Aborted` (10)           |
-| `AlreadyExists`        | `AlreadyExists` (6)      |
-| `FailedPrecondition`   | `FailedPrecondition` (9) |
-| `Unauthenticated`      | `Unauthenticated` (16)   |
-| `ResourceExhausted`    | `ResourceExhausted` (8)  |
-| (any other)            | `Internal` (13)          |
-
-Non-`SchemataException` exceptions are mapped to `Internal` (13).
-
-### Structured Error Details
-
-The interceptor builds a `Google.Rpc.Status` protobuf message with:
-
-1. The numeric status code.
-2. The exception message.
-3. Typed detail messages packed as `google.protobuf.Any`:
-   - `BadRequest` with `FieldViolation` entries from `BadRequestDetail`.
-   - `ErrorInfo` from `ErrorInfoDetail`.
-   - `ResourceInfo` from `ResourceInfoDetail`.
-   - `PreconditionFailure` from `PreconditionFailureDetail`.
-   - `QuotaFailure` from `QuotaFailureDetail`.
-   - `RequestInfo` with the `TraceIdentifier` as the request ID.
-
-The status is serialized and attached as `grpc-status-details-bin` trailing metadata on the `RpcException`, following the standard gRPC richer error model.
-
-## Reflection Service
-
-`SchemataGrpcResourceFeature` registers a gRPC reflection service (`ProtoBuf.Grpc.Reflection.ReflectionService`) when at least one gRPC resource is registered.
-
-`ReflectionServiceFactory` generates the schema:
-
-1. Uses `SchemaGenerator` from ProtoBuf.Grpc to produce a proto schema for all service interfaces.
-2. Adds well-known Google RPC proto definitions (`code.proto`, `status.proto`, `error_details.proto`) including messages for `ErrorInfo`, `BadRequest`, `ResourceInfo`, `PreconditionFailure`, `QuotaFailure`, `RequestInfo`, `RetryInfo`, `DebugInfo`, `Help`, and `LocalizedMessage`.
-3. Assembles everything into a `FileDescriptorSet` and creates the reflection service.
-
-This enables tools like `grpcurl` and gRPC UI to discover and invoke resource services.
-
-## Rate Limiting
-
-If the entity type has a `[RateLimitPolicy]` attribute, `SchemataGrpcResourceFeature` calls `RequireRateLimiting(policyName)` on the `GrpcServiceEndpointConventionBuilder` for that service.
-
-## Restricting to gRPC Only
-
-To register a resource for gRPC only (not HTTP), use the `MapGrpc()` builder chain:
+`ConfigureEndpoints` iterates `SchemataResourceOptions.Resources` and, for each resource whose `Endpoints` list includes `GrpcResourceAttribute.Name` (or is `null`), calls:
 
 ```csharp
-schema.UseResource()
-      .MapGrpc()
-      .Use<Book, BookRequest, BookDetail, BookSummary>();
+var service = typeof(ResourceService<,,,>)
+    .MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
+MapGrpcService(endpoints, service);
 ```
 
-This passes `["gRPC"]` as the `Endpoints` list, so `SchemataHttpResourceFeature` skips this resource. Alternatively, apply `[GrpcResource]` on the entity class for attribute-based registration.
+`MapGrpcService` is resolved via reflection on `GrpcEndpointRouteBuilderExtensions` to avoid a hard compile-time dependency on `Grpc.AspNetCore.Server`.
 
-## Dual Transport
+## `IResourceService<TEntity, TRequest, TDetail, TSummary>`
 
-To expose a resource on both HTTP and gRPC:
+The service contract defines five operations:
 
 ```csharp
-schema.UseResource()
-      .MapHttp()
-      .Use<Book, BookRequest, BookDetail, BookSummary>()
-      .Builder
-      .MapGrpc()
-      .Use<Book, BookRequest, BookDetail, BookSummary>();
+public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
+    where TEntity : class, ICanonicalName
+    where TRequest : class, ICanonicalName
+    where TDetail : class, ICanonicalName
+    where TSummary : class, ICanonicalName
+{
+    [Operation] ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default);
+    [Operation] ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default);
+    [Operation] ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default);
+    [Operation] ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default);
+    [Operation] ValueTask DeleteAsync(DeleteRequest request, CallContext context = default);
+}
 ```
 
-Or use attribute-based registration with both `[HttpResource]` and `[GrpcResource]` on the entity, or simply use `[ResourceAttribute]` without specifying endpoints (all active transports are used).
+`IResourceService<,,,>` carries `[Operation]` on each method but no `[Service]` attribute: the service name is derived from the entity's `ResourceNameDescriptor` at runtime, so binding goes through `ResourceServiceBinder` and `ResourceServiceMethodProvider` and bypasses protobuf-net's attribute-driven discovery.
+
+## `ResourceServiceBinder`
+
+`ResourceServiceBinder` extends ProtoBuf.Grpc's `ServiceBinder` to override service and operation naming for `IResourceService<,,,>` contracts:
+
+- **Service name**: `{package}.{Singular}Service` when a package is configured, or `{Singular}Service` otherwise. A `Book` entity with package `"library"` gets service name `"library.BookService"`.
+- **Operation names**: `List{Plural}` for list (e.g., `"ListBooks"`), `{Verb}{Singular}` for all others (e.g., `"GetBook"`, `"CreateBook"`, `"UpdateBook"`, `"DeleteBook"`).
+
+## `ResourceServiceMethodProvider<TService>`
+
+`ResourceServiceMethodProvider<TService>` implements `IServiceMethodProvider<TService>`. When `TService` is a closed `ResourceService<,,,>`, it uses reflection to call `RegisterAll<TEntity, TRequest, TDetail, TSummary>`, which registers five unary gRPC methods via `context.AddUnaryMethod`. Each method:
+
+1. Casts the service instance to `IResourceService<TEntity, TRequest, TDetail, TSummary>`.
+2. Calls the corresponding method on the interface.
+3. Uses protobuf-net marshallers built from the `RuntimeTypeModel` for serialization.
+
+The `Delete` method uses a custom `EmptyMarshaller` for the response since gRPC requires a response message even for void operations.
+
+## Custom methods
+
+Each `[ResourceMethod(verb, handler, scope)]` on the entity adds one unary RPC to the resource's existing service. `ResourceCustomMethod.Register` runs inside `ResourceServiceMethodProvider` for each closed `ResourceService<,,,>`, reads `SchemataResourceOptions.Methods` by entity, and calls `context.AddUnaryMethod` with:
+
+- **Service name**: identical to the CRUD service (`{package}.{Singular}Service` or `{Singular}Service`). All verbs share the resource's existing service; no per-verb service is created.
+- **RPC name**: `ResourceMethodNaming.GetRpcName(verb, singular)` = `{PascalVerb}{Singular}` (`run` + `Job` -> `RunJob`).
+
+The marshallers are built from the shared `RuntimeTypeModel`, so request and response types are serialized with the same conventions as CRUD payloads. The unary handler resolves the matching `IResourceMethodHandler<TEntity, TRequest, TResponse>` through DI and dispatches via `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>`. A null pipeline result surfaces as `NoContentException`, which `ExceptionMappingInterceptor` translates to gRPC `NotFound`.
+
+See [Custom Methods](custom-methods.md) for the verb-scoped advisor pipeline and HTTP route equivalence through `google.api.http`.
+
+## gRPC server reflection
+
+`SchemataTransportGrpcFeature` maps `ReflectionServiceImpl` (v1alpha) and `ReflectionV1ServiceImpl` (v1) once for the whole application and merges descriptors from every `IGrpcServiceDescriptorContributor`. `ResourceGrpcServiceDescriptorContributor` contributes the closed `ResourceService<,,,>` types built from `SchemataResourceOptions.Resources`; `FlowProtoTypeContributor` (in `Schemata.Flow.Grpc`) does the same for `ProcessService`. grpcurl, Postman, and other reflection-capable clients see the full schema.
+
+## Extension points
+
+- Subclass `ResourceService<TEntity, TRequest, TDetail, TSummary>` and override individual methods. Register the subclass explicitly via `services.AddScoped<ResourceService<...>, MyService>()`.
+- Implement `IResourceService<TEntity, TRequest, TDetail, TSummary>` directly for full control. Register it as a scoped service and map it via `endpoints.MapGrpcService<MyService>()`.
+- Add `[ResourcePackage("myapi")]` to the entity type to control the gRPC service name prefix.
+
+## Caveats
+
+- `MapGrpcService` is resolved via reflection on `GrpcEndpointRouteBuilderExtensions` so `Schemata.Resource.Grpc` does not need a hard compile-time dependency on `Grpc.AspNetCore.Server`. If that method's signature changes in a future gRPC ASP.NET Core release, the call returns `null` and registration silently no-ops.
+- `ExceptionMappingInterceptor` (registered by `SchemataTransportGrpcFeature`) translates `SchemataException` subtypes to the matching gRPC `StatusCode`. Without it, every exception surfaces as `INTERNAL`.
+
+## See also
+
+- [Resource Overview](overview.md)
+- [Custom Methods](custom-methods.md)
+- [HTTP Transport](http-transport.md)
+- [Resource Naming](resource-naming.md)
+- [Advice Pipeline](../core/advice-pipeline.md)

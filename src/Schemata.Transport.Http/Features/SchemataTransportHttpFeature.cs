@@ -17,9 +17,9 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Transport.Http.Features;
 
 /// <summary>
-///     Shared HTTP transport stack: AIP-193 exception-handler middleware (merged in
-///     from the deleted <c>SchemataExceptionHandlerFeature</c>) and the Schemata JSON
-///     wire-name rewrites in <see cref="SchemataJsonTraits" />.
+///     Shared HTTP transport stack: AIP-193 exception-handler middleware that maps
+///     <see cref="SchemataException" /> subtypes into structured error responses, and
+///     the Schemata JSON wire-name rewrites in <see cref="SchemataJsonTraits" />.
 /// </summary>
 [DependsOn<SchemataDeveloperExceptionPageFeature>]
 [DependsOn<SchemataControllersFeature>]

@@ -1,22 +1,34 @@
 # Traits
 
-Traits are reusable field groups. They provide a mechanism for composing common field sets across multiple entities.
+Traits are reusable field groups. The generator emits each trait as a `public interface` whose name is prefixed with `I`. Entities and other traits compose them via `Use` declarations or base lists.
 
 ## Syntax
 
-```
+```text
 Trait <Name> [: <bases>] {
+    [Note ...]
     [Use <trait-names>]
-    [Notes]
     [Fields]
 }
 ```
 
+## Allowed members
+
+Trait bodies may contain three kinds of members, in any order:
+
+| Member | Description                          |
+| ------ | ------------------------------------ |
+| `Note` | Documentation string (AST only)      |
+| `Use`  | Incorporate fields from other traits |
+| Field  | Property declaration                 |
+
+Traits cannot contain `Object` blocks, `Index` declarations, or `Enum` declarations. Those are entity-only constructs.
+
 ## Composition with Use
 
-Traits can incorporate fields from other traits using `Use` declarations:
+`Use` resolves names against traits defined in the same document. If a name matches a known trait, the generator prefixes it with `I` in the base list of the emitted interface.
 
-```
+```text
 Trait Timestamp {
     timestamp? create_time
     timestamp? update_time
@@ -29,13 +41,11 @@ Trait Auditable {
 }
 ```
 
-`Use` resolves trait names against traits defined in the same document.
+## Base lists
 
-## Base Lists
+Base lists are semantically equivalent to `Use` declarations. Both are processed by `EntityGenerator.GenerateUses`, which collects all names from `Uses` and `Bases`, resolves trait names to their `I`-prefixed interface form, and deduplicates.
 
-Base lists are semantically equivalent to `Use` declarations:
-
-```
+```text
 // These are equivalent:
 Trait Entity : Identifier, Timestamp { }
 
@@ -44,21 +54,51 @@ Trait Entity {
 }
 ```
 
-## Allowed Members
+## What the generator emits
 
-Trait bodies may contain:
+`TraitGenerator.Generate` emits a `public interface` for each trait:
 
-| Member | Description                          |
-| ------ | ------------------------------------ |
-| `Note` | Documentation string                 |
-| `Use`  | Incorporate fields from other traits |
-| Field  | Property declaration                 |
+- The interface name is `I` + the trait name.
+- Each field becomes a `public <CLRType> <PascalCaseName> { get; set; }` property.
+- Field options and field properties are **not consumed** — they are parsed but not emitted.
+- `Note` members are **not emitted**.
+- `Use` and base-list names that resolve to known traits appear as base interfaces on the emitted interface.
 
-Traits cannot contain `Object` blocks, `Index` declarations, or `Enum` declarations. Those are entity-only constructs.
+Given:
+
+```text
+Namespace My.Models
+
+Trait Identifier {
+    long id [primary key]
+}
+
+Trait Timestamp {
+    timestamp? create_time
+    timestamp? update_time
+}
+```
+
+The generator produces:
+
+```csharp
+namespace My.Models {
+    public interface IIdentifier {
+        public System.Int64 Id { get; set; }
+    }
+}
+
+namespace My.Models {
+    public interface ITimestamp {
+        public System.DateTimeOffset? CreateTime { get; set; }
+        public System.DateTimeOffset? UpdateTime { get; set; }
+    }
+}
+```
 
 ## Example
 
-```
+```text
 Trait Identifier {
     Note 'Int64 primary key'
     long id [primary key]
@@ -78,3 +118,11 @@ Trait Entity : Identifier, Timestamp {
     Note 'Combines identifier and timestamp'
 }
 ```
+
+## See also
+
+- [Fields](fields.md) — field syntax and name conversion
+- [Types](types.md) — built-in type token table
+- [Entities](entities.md) — how entities compose traits
+- [Grammar](grammar.md) — trait production rule
+- [Documents: Entity Traits](../documents/entity/traits.md) — runtime trait interfaces the generator can implement

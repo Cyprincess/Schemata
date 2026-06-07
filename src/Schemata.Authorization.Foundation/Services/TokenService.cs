@@ -171,7 +171,7 @@ public class TokenService
             SigningAlgorithms.RsaSha256 or SigningAlgorithms.EcdsaSha256 or SigningAlgorithms.RsaPssSha256 or SigningAlgorithms.HmacSha256 => "SHA256",
             SigningAlgorithms.RsaSha384 or SigningAlgorithms.EcdsaSha384 or SigningAlgorithms.RsaPssSha384 or SigningAlgorithms.HmacSha384 => "SHA384",
             SigningAlgorithms.RsaSha512 or SigningAlgorithms.EcdsaSha512 or SigningAlgorithms.RsaPssSha512 or SigningAlgorithms.HmacSha512 => "SHA512",
-            _ => throw new NotSupportedException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm)),
+            var _ => throw new NotSupportedException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1014), algorithm)),
         };
     }
 }

@@ -1,147 +1,118 @@
 # Security
 
-Schemata provides a pluggable security model with two provider interfaces: one for entity-level access control and one for query-level row filtering. Default allow-all implementations are registered automatically, and domain-specific providers ship with the resource and workflow subsystems.
+`Schemata.Security.Foundation` provides a pluggable security model built on two provider interfaces: `IAccessProvider<T, TRequest>` for entity-level access decisions and `IEntitlementProvider<T, TRequest>` for row-level query filtering. Calling `UseSecurity()` on `SchemataBuilder` registers the feature at priority 400,000,000 and installs allow-all default implementations via `TryAddScoped`, so any custom providers registered earlier take precedence.
 
-## Packages
+## Where the code lives
 
-| Package                        | Role                                                   |
-| ------------------------------ | ------------------------------------------------------ |
-| `Schemata.Security.Skeleton`   | Core interfaces, defaults, and registration extensions |
-| `Schemata.Security.Foundation` | Feature registration via `UseSecurity()`               |
-| `Schemata.Resource.Foundation` | `ResourceAccessProvider` for resource CRUD             |
-| `Schemata.Workflow.Skeleton`   | `WorkflowAccessProvider` for workflow operations       |
+| Package | Key files |
+| --- | --- |
+| `Schemata.Security.Skeleton` | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs` |
+| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` — `UseSecurity()` |
+| `Schemata.Security.Foundation` | `Features/SchemataSecurityFeature.cs` — priority 400,000,000 |
+| `Schemata.Security.Foundation` | `DefaultAccessProvider.cs`, `DefaultEntitlementProvider.cs`, `DefaultPermissionResolver.cs`, `DefaultPermissionMatcher.cs` |
 
-## IAccessProvider\<T, TContext\>
+## Mechanism walkthrough
 
-Determines whether a principal has access to a specific entity within a given context:
+### 1. Enable the feature
 
 ```csharp
-public interface IAccessProvider<T, TContext>
+builder.UseSchemata(schema => {
+    schema.UseSecurity();
+    // or with options:
+    schema.UseSecurity(o => o.SomeOption = value);
+});
+```
+
+`UseSecurity` stores the optional `Action<SchemataSecurityOptions>` in `Configurators` and calls `builder.AddFeature<SchemataSecurityFeature>()`.
+
+### 2. What the feature registers
+
+`SchemataSecurityFeature.ConfigureServices` calls `TryAddScoped` for four services:
+
+```csharp
+services.TryAddScoped<IPermissionResolver, DefaultPermissionResolver>();
+services.TryAddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,>));
+services.TryAddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
+```
+
+Because all four use `TryAdd`, any implementation registered before `UseSecurity()` is called wins.
+
+### 3. Access check flow
+
+The resource authorization advisors (e.g., `AdviceCreateRequestAuthorize`, `AdviceUpdateRequestAuthorize`) run at Order = 100,000,000 and resolve `IAccessProvider<TEntity, TRequest>` from DI to call `HasAccessAsync`. The signature:
+
+```csharp
+public interface IAccessProvider<T, TRequest>
 {
     Task<bool> HasAccessAsync(
-        T?                entity,
-        TContext?         context,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct = default
+        T?                      entity,
+        AccessContext<TRequest> context,
+        ClaimsPrincipal?        principal,
+        CancellationToken       ct = default
     );
 }
 ```
 
-- `entity` -- the entity being accessed, or `null` for collection-level checks
-- `context` -- carries additional authorization state (e.g. the operation type, the request DTO)
-- `principal` -- the authenticated user's claims
+`entity` is `null` for collection-level checks (List). `context` carries the operation kind and the request DTO. Returning `false` causes the advisor to return `AdviseResult.Block`, which short-circuits to a `Blocked` result before the entity is touched.
 
-Returns `true` to grant access, `false` to deny.
+### 4. Row-level filtering
 
-## IEntitlementProvider\<T, TContext\>
-
-Generates LINQ filter expressions that restrict data visibility at the query level:
+`IEntitlementProvider<T, TRequest>` generates a LINQ predicate that is composed into repository queries:
 
 ```csharp
-public interface IEntitlementProvider<T, TContext>
+public interface IEntitlementProvider<T, TRequest>
 {
     Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
-        TContext?         context,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct = default
+        AccessContext<TRequest> context,
+        ClaimsPrincipal?        principal,
+        CancellationToken       ct = default
     );
 }
 ```
 
-Returns a predicate expression that is composed into repository queries, ensuring unauthorized entities are excluded at the data layer rather than being filtered after retrieval. Returning `null` applies no additional filtering.
+Returning `null` applies no additional filtering. Returning a predicate means unauthorized rows are excluded at the data layer, not after retrieval.
 
-## Built-in implementations
+### 5. Permission resolution
 
-### DefaultAccessProvider\<T, TContext\>
-
-The fallback access provider. Always returns `true`, granting access to all entities unconditionally. Registered as an open-generic fallback so that custom providers registered before `UseSecurity()` take precedence.
-
-### DefaultEntitlementProvider\<T, TContext\>
-
-The fallback entitlement provider. Returns `_ => true`, granting visibility to all rows. Replace with a custom implementation to enforce row-level security.
-
-### ResourceAccessProvider\<T, TRequest\>
-
-Located in `Schemata.Resource.Foundation.Security`. Checks the principal's role claims for resource operations using the format:
-
-```
-resource-{operation}-{entity}
-```
-
-Where:
-
-- `{operation}` is the CRUD operation, kebab-cased via Humanizer (e.g. `create`, `update`, `delete`, `list`)
-- `{entity}` is the entity type name, kebab-cased (e.g. `product`, `order-item`)
-
-Supports wildcards:
-
-- `resource-*-product` -- grants all operations on `Product`
-- `resource-create-*` -- grants create on all entity types
-
-Requires a non-null `ClaimsPrincipal`; returns `false` when the principal is `null`.
-
-The context type is `ResourceRequestContext<TRequest>`, which carries the `Operation` value.
-
-### WorkflowAccessProvider\<T, TRequest\>
-
-Located in `Schemata.Workflow.Skeleton.Security`. Uses the same pattern as the resource provider but with a different prefix:
-
-```
-workflow-{operation}-{entity}
-```
-
-Where `{operation}` corresponds to workflow operations (e.g. `get`, `submit`, `raise`), kebab-cased.
-
-Supports the same wildcard patterns:
-
-- `workflow-*-approval` -- grants all operations on `Approval` workflows
-- `workflow-get-*` -- grants read access to all workflow types
-
-The context type is `WorkflowRequestContext<TRequest>`, which carries the `Operation` string and the associated `SchemataWorkflow`.
-
-## Registration
-
-### UseSecurity()
-
-Registers the `SchemataSecurityFeature` on the builder:
+`IPermissionResolver` converts an operation name and entity type to a permission string:
 
 ```csharp
-builder.UseSecurity();
+public interface IPermissionResolver
+{
+    string Resolve(string operation, Type entity);
+}
 ```
 
-This registers `DefaultAccessProvider<,>` and `DefaultEntitlementProvider<,>` as open-generic scoped services using `TryAddScoped`, meaning any providers registered earlier are not overwritten.
+`DefaultPermissionResolver` produces strings in the format `{operation}:{entity}` (kebab-cased). `IPermissionMatcher` then checks whether the principal holds that permission.
 
-### AddAccessProvider
+## Extension points
 
-Register a custom access provider using the generic extension method:
+| Interface | Purpose |
+| --- | --- |
+| `IAccessProvider<T, TRequest>` | Entity-level access gate. Register via `services.TryAddScoped` before `UseSecurity()`. |
+| `IEntitlementProvider<T, TRequest>` | Row-level query filter. Same registration pattern. |
+| `IPermissionResolver` | Converts operation + entity type to a permission string. |
+| `IPermissionMatcher` | Checks whether a principal holds a resolved permission. |
 
-```csharp
-services.AddAccessProvider<Product, ResourceRequestContext<CreateProductRequest>, ProductAccessProvider>();
-```
+## Design motivation
 
-Or using runtime types:
+Separating `IAccessProvider` (entity-level) from `IEntitlementProvider` (query-level) lets you enforce access at two independent points. The access provider gates individual operations; the entitlement provider ensures that even bulk queries only return rows the principal is allowed to see. Both are open-generic so a single implementation can cover all entity types, while specific implementations for particular entities take precedence via `TryAdd` ordering.
 
-```csharp
-services.AddAccessProvider(entityType, contextType, providerType);
-```
+`IPermissionResolver` and `IPermissionMatcher` are split so the string format (resolver) and the claim-matching logic (matcher) can be replaced independently.
 
-Both use `TryAddScoped` internally, so the first registration for a given `IAccessProvider<T, TContext>` wins.
+## Caveats
 
-### AddEntitlementProvider
+- `SchemataSecurityFeature` has `Priority = Orders.Extension = 400_000_000`. See [Built-in Features](core/built-in-features.md) for the full priority table.
+- All four registrations use `TryAddScoped`. Register custom providers before calling `UseSecurity()` to ensure they take precedence over the defaults.
+- `DefaultAccessProvider<,>` always returns `true`. Without a custom provider, all principals have access to all entities.
+- `DefaultEntitlementProvider<,>` returns `null` (no filtering). Without a custom provider, all rows are visible to all principals.
+- The resource advisor pipeline calls `IAccessProvider` at Order = 100,000,000. Advisors at lower Order values run before the access check.
 
-Register a custom entitlement provider:
+## See also
 
-```csharp
-services.AddEntitlementProvider(typeof(ProductEntitlementProvider));
-```
-
-Uses `TryAddScoped` with the open-generic `IEntitlementProvider<,>` service type.
-
-## Try-Add pattern
-
-All registrations use the `TryAdd` family of methods. This means:
-
-1. Register your custom providers first (in `ConfigureServices` or before calling `UseSecurity()`)
-2. The framework's default providers only fill gaps where no custom provider exists
-3. For a given `IAccessProvider<T, TContext>`, only the first registered implementation is used
-4. The open-generic defaults (`DefaultAccessProvider<,>` and `DefaultEntitlementProvider<,>`) serve as catch-all fallbacks for any `T`/`TContext` combination that does not have an explicit registration
+- [Built-in Features](core/built-in-features.md) — feature priority table
+- [Advice Pipeline](core/advice-pipeline.md) — how advisors short-circuit
+- [Create Pipeline](resource/create-pipeline.md) — authorization lane in the resource pipeline
+- [Identity](identity.md) — ASP.NET Core Identity integration
+- [Authorization](authorization.md) — OAuth 2.0 / OIDC server

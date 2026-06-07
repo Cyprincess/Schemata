@@ -18,7 +18,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceCreateRequestIdempotency
 {
     /// <summary>
-    ///     Default order: runs after <see cref="AdviceCreateRequestValidation{TEntity,TRequest}" /> —
+    ///     Default order: runs after <see cref="AdviceCreateRequestValidation{TEntity,TRequest}" /> -
     ///     idempotency is the last link in the documented create request chain so authorization,
     ///     sanitization, and validation are evaluated even on a cache hit's first arrival.
     /// </summary>

@@ -12,8 +12,6 @@ var options = new WebApplicationOptions { Args = args };
 
 var builder = WebApplication.CreateBuilder(options);
 
-// Mock all four managers to avoid real IRepository<T> dependencies.
-
 var testApp = new SchemataApplication {
     Uid          = Guid.NewGuid(),
     ClientId     = "test-client",

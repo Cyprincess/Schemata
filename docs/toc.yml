@@ -1,5 +1,7 @@
 - name: Guides
   href: guides/toc.yml
+- name: Cookbook
+  href: cookbook/toc.yml
 - name: Documents
   href: documents/toc.yml
 - name: Modeling

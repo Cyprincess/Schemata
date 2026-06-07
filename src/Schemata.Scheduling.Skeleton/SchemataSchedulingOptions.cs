@@ -13,7 +13,7 @@ public class SchemataSchedulingOptions
     /// <summary>
     ///     Policy applied when a job's <c>NextRunTime</c> is in the past at the
     ///     moment the scheduler observes it (typically right after a restart or
-    ///     a paused→active transition).  Defaults to
+    ///     a paused->active transition).  Defaults to
     ///     <see cref="MissedFirePolicy.FireOnce" />.
     /// </summary>
     public MissedFirePolicy MissedFirePolicy { get; set; } = MissedFirePolicy.FireOnce;

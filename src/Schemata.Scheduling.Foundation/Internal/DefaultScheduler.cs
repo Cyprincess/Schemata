@@ -70,7 +70,7 @@ public sealed class DefaultScheduler : IScheduler
     }
 
     public Task ScheduleAsync(SchemataJob job, CancellationToken ct) {
-        return ScheduleAsync(job, preparedContext: null, ct);
+        return ScheduleAsync(job, null, ct);
     }
 
     public async Task UnscheduleAsync(string job, CancellationToken ct) {

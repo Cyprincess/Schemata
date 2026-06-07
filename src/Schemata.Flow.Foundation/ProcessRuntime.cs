@@ -75,7 +75,7 @@ public sealed class ProcessRuntime : IProcessRuntime
         await NotifyTransitionedAsync(process, transition, ct);
 
         if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out _);
+            _instances.TryRemove(process.CanonicalName!, out var _);
             await NotifyTerminatedAsync(process, ct);
         }
 
@@ -100,7 +100,7 @@ public sealed class ProcessRuntime : IProcessRuntime
         await NotifyTransitionedAsync(process, transition, ct);
 
         if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out _);
+            _instances.TryRemove(process.CanonicalName!, out var _);
             await NotifyTerminatedAsync(process, ct);
         }
 
@@ -136,7 +136,7 @@ public sealed class ProcessRuntime : IProcessRuntime
             await NotifyTransitionedAsync(process, transition, ct);
 
             if (instance.IsComplete) {
-                _instances.TryRemove(process.CanonicalName!, out _);
+                _instances.TryRemove(process.CanonicalName!, out var _);
                 await NotifyTerminatedAsync(process, ct);
             }
         }
@@ -157,7 +157,7 @@ public sealed class ProcessRuntime : IProcessRuntime
         await NotifyTransitionedAsync(process, transition, ct);
 
         if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out _);
+            _instances.TryRemove(process.CanonicalName!, out var _);
             await NotifyTerminatedAsync(process, ct);
         }
 
@@ -185,7 +185,7 @@ public sealed class ProcessRuntime : IProcessRuntime
                                                               : VariableSerializer.Deserialize(process.Variables!),
                                                       }), ct);
 
-        _instances.TryRemove(instanceName, out _);
+        _instances.TryRemove(instanceName, out var _);
 
         await NotifyTransitionedAsync(process, transition, ct);
         await NotifyTerminatedAsync(process, ct);
@@ -219,7 +219,7 @@ public sealed class ProcessRuntime : IProcessRuntime
 
     /// <summary>Removes a process from the cache without raising lifecycle events.</summary>
     public bool Evict(string canonicalName) {
-        return _instances.TryRemove(canonicalName, out _);
+        return _instances.TryRemove(canonicalName, out var _);
     }
 
     private async ValueTask<SchemataProcess> StartProcessInstanceCoreAsync(
@@ -256,7 +256,7 @@ public sealed class ProcessRuntime : IProcessRuntime
             (_, transition) = await ApplyAsync(process, reg.Definition, "Start", null, principal,
                                                c => runtime.StartAsync(reg.Definition, process, c), ct);
         } catch {
-            _instances.TryRemove(process.CanonicalName, out _);
+            _instances.TryRemove(process.CanonicalName, out var _);
             throw;
         }
 

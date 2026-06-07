@@ -1,6 +1,6 @@
-# Overview
+# Guides
 
-The Guides section is a progressive tutorial that builds a complete Student CRUD application from scratch. Each guide adds one Schemata capability to the same project, so you can follow along step by step.
+The Guides section is a progressive tutorial that builds a complete Student CRUD application from scratch. Each guide adds one Schemata capability to the same project, so you can follow along step by step or jump to the guide that covers what you need.
 
 ## Prerequisites
 
@@ -10,19 +10,33 @@ The Guides section is a progressive tutorial that builds a complete Student CRUD
 
 ## Guide Sequence
 
-Start with [Getting Started](getting-started.md) and work through the guides in order. Each guide builds on the code from the previous one.
+Start with [Getting Started](getting-started.md) and work through the guides in order. Each guide builds on the code from the previous one. The `Student` entity defined in Getting Started is the running example throughout the series.
 
-| #   | Guide                                                     | What You Add                                                  |
-| --- | --------------------------------------------------------- | ------------------------------------------------------------- |
-| 1   | [Getting Started](getting-started.md)                     | Minimal Student HTTP CRUD API with timestamps and soft-delete |
-| 2   | [Object Mapping](object-mapping.md)                       | Separate request/response DTOs with Mapster                   |
-| 3   | [Concurrency and Freshness](concurrency-and-freshness.md) | Optimistic concurrency, ETags, partial updates                |
-| 4   | [Filtering and Pagination](filtering-and-pagination.md)   | List filtering, sorting, and cursor pagination                |
-| 5   | [Validation](validation.md)                               | Input validation with FluentValidation                        |
-| 6   | [Identity](identity.md)                                   | User management with ASP.NET Core Identity                    |
-| 7   | [Access Control](access-control.md)                       | Role-based authorization and row-level security               |
-| 8   | [Authorization](authorization.md)                         | OAuth 2.0 / OpenID Connect server                             |
-| 9   | [gRPC Transport](grpc-transport.md)                       | gRPC endpoints alongside HTTP                                 |
-| 10  | [Multi-Tenancy](multi-tenancy.md)                         | Tenant resolution and data isolation                          |
-| 11  | [Workflow](workflow.md)                                   | Enrollment state machine                                      |
-| 12  | [Module System](module-system.md)                         | Modular architecture                                          |
+| # | Guide | What you add |
+| --- | --- | --- |
+| 1 | [Getting Started](getting-started.md) | Minimal Student HTTP CRUD API with timestamps and soft-delete |
+| 2 | [Unit of Work](unit-of-work.md) | Explicit transaction control for batch mutations |
+| 3 | [Object Mapping](object-mapping.md) | Separate request/response DTOs with Mapster |
+| 4 | [Concurrency and Freshness](concurrency-and-freshness.md) | Optimistic concurrency, ETags, partial updates |
+| 5 | [Filtering and Pagination](filtering-and-pagination.md) | AIP-160 filter, AIP-132 order, cursor pagination |
+| 6 | [Query Caching](query-caching.md) | Transparent query result caching with auto-eviction |
+| 7 | [Validation](validation.md) | Input validation with FluentValidation |
+| 8 | [Identity](identity.md) | User management with ASP.NET Core Identity |
+| 9 | [Access Control](access-control.md) | Role-based authorization and row-level security |
+| 10 | [Authorization](authorization.md) | OAuth 2.0 / OpenID Connect server |
+| 11 | [gRPC Transport](grpc-transport.md) | gRPC endpoints alongside HTTP |
+| 12 | [Multi-Tenancy](multi-tenancy.md) | Tenant resolution and data isolation |
+| 13 | [Flow](flow.md) | BPMN process engine with typed DSL |
+| 14 | [Event Bus](event-bus.md) | In-process event publishing and handling |
+| 15 | [Scheduling](scheduling.md) | Cron and periodic background jobs |
+| 16 | [Modular](modular.md) | Module discovery and assembly loading |
+
+## What the guides don't cover
+
+Advanced scenarios — RabbitMQ event bus, flow timer integration, OIDC server setup, custom advisors, and more — live in the [Cookbook](../cookbook/overview.md). Deep mechanism explanations and design rationale live in [Documents](../documents/overview.md).
+
+## See also
+
+- [Cookbook](../cookbook/overview.md) — scenario-driven recipes for advanced use cases
+- [Documents](../documents/overview.md) — technical reference for framework internals
+- [Getting Started](getting-started.md) — start here

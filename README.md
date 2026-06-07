@@ -6,8 +6,6 @@ A .NET application framework for building modular, extensible business applicati
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Schemata&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Schemata)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Schemata&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Schemata)
 [![license](https://img.shields.io/github/license/Cyprincess/Schemata.svg)](https://github.com/Cyprincess/Schemata/blob/master/LICENSE)
-![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)
-![netstandard2.1](https://img.shields.io/badge/netstandard-2.1-brightgreen.svg)
 ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg)
 ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg)
 
@@ -40,19 +38,19 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 
 ## Feature Domains
 
-- [DSL](https://nuget.org/packages/Schemata.Modeling.Generator)
-- [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets)
-- Audit
-- [Authorization](https://nuget.org/packages/Schemata.Authorization.Foundation)
-- Datasource
-- Event
-- [Identity](https://nuget.org/packages/Schemata.Identity.Foundation)
-- [Mapping](https://nuget.org/packages/Schemata.Mapping.Foundation)
-- [Repository](https://nuget.org/packages/Schemata.Entity.Repository)
-- Task
-- [Tenant](https://nuget.org/packages/Schemata.Tenancy.Foundation)
-- [Validation](https://nuget.org/packages/Schemata.Validation.FluentValidation)
-- [Workflow](https://nuget.org/packages/Schemata.Workflow.Foundation)
+- [Authorization](https://nuget.org/packages/Schemata.Authorization.Foundation) — OAuth 2.0 / OpenID Connect server
+- [Caching](https://nuget.org/packages/Schemata.Caching.Skeleton) — distributed cache abstraction; Redis and `IDistributedCache` adapters
+- [DSL](https://nuget.org/packages/Schemata.Modeling.Generator) — `.skm` source generator
+- [Event](https://nuget.org/packages/Schemata.Event.Foundation) — in-process / RabbitMQ event bus
+- [Flow](https://nuget.org/packages/Schemata.Flow.Foundation) — BPMN process engine, HTTP/gRPC transports, event/scheduling bridges
+- [Identity](https://nuget.org/packages/Schemata.Identity.Foundation) — ASP.NET Core Identity integration
+- [Mapping](https://nuget.org/packages/Schemata.Mapping.Foundation) — unified object-mapper abstraction (AutoMapper / Mapster)
+- [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets) — module discovery and loading
+- [Repository](https://nuget.org/packages/Schemata.Entity.Repository) — EF Core / LinqToDB providers with advisor pipeline, unit of work, ownership, query caching
+- [Resource](https://nuget.org/packages/Schemata.Resource.Foundation) — Google AIP-compliant CRUD service over HTTP and gRPC
+- [Scheduling](https://nuget.org/packages/Schemata.Scheduling.Foundation) — persistent cron / periodic / one-time job scheduler
+- [Tenancy](https://nuget.org/packages/Schemata.Tenancy.Foundation) — multi-tenant resolution and per-tenant DI
+- [Validation](https://nuget.org/packages/Schemata.Validation.FluentValidation) — FluentValidation integration
 
 ## Features
 
@@ -70,55 +68,55 @@ A built-in feature can be activated by calling the `UseXXX` method on the `Schem
 | ----------- | ---------------------- | ------------------------------------------------------------------------------------ |
 | 100_000_000 | ForwardedHeaders       | ASP.NET Forwarded Headers Middleware                                                 |
 | 110_000_000 | DeveloperExceptionPage | ASP.NET Developer Exception Page Middleware                                          |
-| 120_000_000 | ExceptionHandler       | ASP.NET Exception Handler Middleware                                                 |
-| 130_000_000 | Logging                | ASP.NET Logging Middleware                                                           |
-| 140_000_000 | HttpLogging            | ASP.NET HTTP Logging Middleware                                                      |
-| 150_000_000 | W3CLogging             | ASP.NET W3C Logging Middleware                                                       |
-| 160_000_000 | Https                  | ASP.NET HTTPS & HTTPS Redirection Middlewares                                        |
-| 170_000_000 | Tenancy                | Multi-tenant isolation middleware (Order: 900_000_000)                               |
-| 180_000_000 | CookiePolicy           | ASP.NET Cookie Policy Middleware                                                     |
-| 190_000_000 | Routing                | ASP.NET Routing Middleware                                                           |
-| 200_000_000 | Quota                  | ASP.NET Rate Limiter Middleware                                                      |
-| 210_000_000 | Cors                   | ASP.NET CORS Middleware                                                              |
-| 220_000_000 | Authentication         | ASP.NET Authentication & Authorization Middlewares                                   |
-| 230_000_000 | Session                | ASP.NET Session Middleware                                                           |
-| 240_000_000 | Controllers            | ASP.NET MVC Middlewares, without Views                                               |
-| 250_000_000 | JsonSerializer         | Configure System.Text.Json to use snake_case and handle JavaScript's 53-bit integers |
+| 120_000_000 | Logging                | ASP.NET Logging Middleware                                                           |
+| 130_000_000 | HttpLogging            | ASP.NET HTTP Logging Middleware                                                      |
+| 140_000_000 | W3CLogging             | ASP.NET W3C Logging Middleware                                                       |
+| 150_000_000 | Https                  | ASP.NET HTTPS & HTTPS Redirection Middlewares                                        |
+| 160_000_000 | Tenancy                | Multi-tenant isolation middleware (Order: 900_000_000)                               |
+| 170_000_000 | CookiePolicy           | ASP.NET Cookie Policy Middleware                                                     |
+| 180_000_000 | Routing                | ASP.NET Routing Middleware                                                           |
+| 185_000_000 | WellKnown              | `/.well-known/*` routes (+5M sub-feature of Routing)                                 |
+| 190_000_000 | Quota                  | ASP.NET Rate Limiter Middleware                                                      |
+| 200_000_000 | Cors                   | ASP.NET CORS Middleware                                                              |
+| 210_000_000 | Authentication         | ASP.NET Authentication & Authorization Middlewares                                   |
+| 220_000_000 | Session                | ASP.NET Session Middleware                                                           |
+| 230_000_000 | Controllers            | ASP.NET MVC Middlewares, without Views                                               |
+| 240_000_000 | JsonSerializer         | Configure System.Text.Json to use snake_case and handle JavaScript's 53-bit integers |
 
 ### Extension Features
 
 An extension feature can be activated in the same way as a built-in feature.
 
-| Priority    | Package                           | Feature              | Description                           |
-| ----------- | --------------------------------- | -------------------- | ------------------------------------- |
-| 400_000_000 | Schemata.Security.Foundation      | Security             | RBAC/ABAC security policies           |
-| 410_000_000 | Schemata.Identity.Foundation      | Identity             | ASP.NET Core Identity integration     |
-| 420_000_000 | Schemata.Authorization.Foundation | Authorization        | OAuth 2.0 / OpenID Connect server     |
-| 430_000_000 | Schemata.Mapping.Foundation       | Mapping              | Unified object mapper abstraction     |
-| 440_000_000 | Schemata.Workflow.Foundation      | Workflow             | Stateful workflow / state machine     |
-| 450_000_000 | Schemata.Resource.Foundation      | Resource             | Google AIP-compliant resource service |
-| 460_000_000 | Schemata.Resource.Http            | Resource (`MapHttp`) | HTTP/REST endpoint                    |
-| 470_000_000 | Schemata.Resource.Grpc            | Resource (`MapGrpc`) | gRPC endpoint                         |
-| 480_000_000 | Schemata.Modular                  | Modular              | Module discovery and loading          |
+| Priority    | Package                            | Feature                  | Description                                                        |
+| ----------- | ---------------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| 400_000_000 | Schemata.Security.Foundation       | Security                 | RBAC/ABAC security policies                                        |
+| 410_000_000 | Schemata.Transport.Http            | Transport.Http           | Shared HTTP plumbing: exception handler, JSON wire-name traits     |
+| 420_000_000 | Schemata.Transport.Grpc            | Transport.Grpc           | Shared gRPC plumbing: `AddCodeFirstGrpc`, interceptor, reflection  |
+| 430_000_000 | Schemata.Identity.Foundation       | Identity                 | ASP.NET Core Identity integration                                  |
+| 440_000_000 | Schemata.Event.Foundation          | Event                    | Pub/sub bus, type registry, publish/consume advisor pipeline       |
+| 450_000_000 | Schemata.Authorization.Foundation  | Authorization            | OAuth 2.0 / OpenID Connect server                                  |
+| 460_000_000 | Schemata.Mapping.Foundation        | Mapping                  | Unified object mapper abstraction                                  |
+| 470_000_000 | Schemata.Scheduling.Foundation     | Scheduling               | Persistent cron / periodic / one-time job scheduler                |
+| 470_100_000 | Schemata.Scheduling.Event          | Scheduling.Event         | Lifecycle event publisher bridging the scheduler to the event bus  |
+| 480_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
+| 480_100_000 | Schemata.Flow.Http                 | Flow (`UseFlowHttp`)     | `ProcessController` HTTP surface                                   |
+| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`UseFlowGrpc`)     | `ProcessService` gRPC surface                                      |
+| 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
+| 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
+| 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
+| 490_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
+| 490_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
+| 520_000_000 | Schemata.Modular                   | Modular                  | Module discovery and loading                                       |
 
 ## Compliance
 
-Schemata is designed to be compatible with .NET Standard 2.0, .NET Standard 2.1, the latest .NET Long-Term Support (LTS) version, and the most recent .NET release.
+Schemata targets the latest .NET Long-Term Support (LTS) version and the most recent .NET release. All runtime packages target `net8.0;net10.0`. Source generators target `netstandard2.0` so Roslyn can load them.
 
-Some packages may have additional compliance requirements, which are documented below.
-
-| Package                           | Compliance                                                                                                                        |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Schemata.Modeling.Generator       | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                   |
-| Schemata.Core                     | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Modular                  | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Authorization.Foundation | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Identity.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Mapping.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Resource.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Security.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Tenancy.Foundation       | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
-| Schemata.Workflow.Foundation      | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
+| Package                     | Compliance                                                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Schemata.Advice.Generator   | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                   |
+| Schemata.Modeling.Generator | ![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)                                                   |
+| All other packages | ![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg) ![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg) |
 
 ### Schemata.Authorization.Foundation
 
@@ -138,6 +136,10 @@ It provides a unified interface for these libraries, enabling developers to swit
 
 The Schemata Resource Foundation complies with the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals.
 
-### Schemata.Workflow.Foundation
+### Schemata.Flow.Foundation
 
-Unfortunately, the Schemata Workflow Foundation is not yet compliant with enterprise standards such as [BPMN 2.0](https://www.omg.org/spec/BPMN/2.0.2/).
+The default `StateMachineEngine` in `Schemata.Flow.StateMachine` runs a subset of [BPMN 2.0.2](https://www.omg.org/spec/BPMN/2.0.2/): one start event, at least one end event, plain activities (no `SubProcess` / `CallActivity` / loop characteristics), `ExclusiveGateway`, `EventBasedGateway` (exclusive mode only), interrupting boundary events, and intermediate catch events reachable from an `EventBasedGateway`. The full BPMN AST in `Schemata.Flow.Skeleton` covers more (parallel / inclusive / complex gateways, subprocesses, multi-instance loops) and is intended for alternate engines plugged in via a keyed `IFlowRuntime`.
+
+Intermediate catch events bridge to runtime infrastructure: `Schemata.Flow.Event` correlates `Message` and `Signal` catches with the event bus, and `Schemata.Flow.Scheduling` fires `Timer` catches through the scheduler.
+
+The process graph is built with a strongly-typed C# DSL in `Schemata.Flow.Skeleton.Builders` (`ProcessBuilder`, `ActivityBehavior`, `BoundaryCatch`, `EventBranch`, `FlowBranch`, `InclusiveBranch`, `InclusiveMerge`, `ParallelFork`, `ParallelJoin`, `StartFlow`).

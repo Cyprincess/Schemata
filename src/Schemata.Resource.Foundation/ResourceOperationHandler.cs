@@ -34,7 +34,7 @@ namespace Schemata.Resource.Foundation;
 ///     <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>, and
 ///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> by running an advisor
 ///     pipeline around each
-///     step: general request check → operation-specific request advisor → entity advisor → persistence → response advisor.
+///     step: general request check -> operation-specific request advisor -> entity advisor -> persistence -> response advisor.
 /// </summary>
 /// <typeparam name="TEntity">
 ///     The persistent entity type implementing <see cref="ICanonicalName" />.
@@ -57,7 +57,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
     /// </summary>
     /// <param name="sp">The <see cref="IServiceProvider" /> for resolving advisors and options.</param>
     /// <param name="repository">The entity repository.</param>
-    /// <param name="mapper">The mapper for entity–DTO conversion.</param>
+    /// <param name="mapper">The mapper for entity-DTO conversion.</param>
     public ResourceOperationHandler(IServiceProvider sp, IRepository<TEntity> repository, ISimpleMapper mapper) {
         _sp         = sp;
         _repository = repository;

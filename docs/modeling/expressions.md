@@ -1,23 +1,16 @@
 # Expressions
 
-Expressions appear in field property values, enum value assignments, and Object field computed values.
+Expressions appear in field property values (`{ Default 'Draft' }`), Object block ViewField assignments (`= category.id`), and enum value assignments (`Draft = 1`). The expression grammar has three forms: literal, function call, and reference. There are no operators and no precedence rules.
 
-## Expression Types
+## Expression forms
 
-| Type            | Syntax                       | Example              |
-| --------------- | ---------------------------- | -------------------- |
-| String literal  | `'value'` or `"value"`       | `Default 'Draft'`    |
-| Number literal  | Digits with optional decimal | `Length 500`         |
-| Boolean literal | `true` or `false`            | `Default: true`      |
-| Null literal    | `null`                       | `Default: null`      |
-| Function call   | `name(args)`                 | `= obfuscate(email)` |
-| Reference       | Qualified name               | `= category.id`      |
+```text
+expression = literal | function call | reference
+```
 
-## Disambiguation
+The parser tests in this order:
 
-When parsing an expression, the parser tests in this order:
-
-1. **Literals** — string, boolean, `null`, number
+1. **Literal** — string, boolean, `null`, or number
 2. **Function call** — a qualified name followed by `(`
 3. **Reference** — any other qualified name
 
@@ -25,9 +18,9 @@ When parsing an expression, the parser tests in this order:
 
 ### Strings
 
-Four string formats are supported:
+Four string forms are supported. Triple-quoted forms are tried before standard quoted forms:
 
-```
+```text
 'single-quoted string'
 "double-quoted string"
 '''triple single-quoted
@@ -36,50 +29,69 @@ multi-line string'''
 multi-line string"""
 ```
 
+Standard single- and double-quoted strings delegate to Parlot's `Terms.String()`.
+
 ### Numbers
 
-Numbers support an optional decimal point:
+Number parsing delegates to Parlot's `Terms.Decimal()`:
 
-```
+```text
 42
 3.14
 0.5
 ```
 
-### Boolean and Null
+### Boolean
 
-```
+```text
 true
 false
+```
+
+Boolean keywords are matched case-insensitively.
+
+### Null
+
+```text
 null
 ```
 
-## Function Calls
+`null` is matched case-insensitively.
 
-Function calls specify a function name and zero or more argument expressions:
+## Function calls
 
-```
+A function call is a qualified name followed by `(`, zero or more comma-separated expressions, and `)`. Arguments can be any expression form, including nested function calls:
+
+```text
 = obfuscate(email_address)
 = now()
 = format(first_name, last_name)
+= coalesce(display_name, full_name)
 ```
 
 ## References
 
-References are dot-separated qualified names that resolve to another field or type:
+A reference is a dot-separated qualified name that does not match a literal and is not followed by `(`:
 
-```
+```text
 = category.id
 = Status.Draft
 = parent.name
 ```
 
-In Object field assignments, references generate property access in the DTO constructor or factory method.
+## Usage contexts
 
-## Usage Contexts
+| Context                  | Accepted forms          | Notes                                      |
+| ------------------------ | ----------------------- | ------------------------------------------ |
+| Field property value     | All                     | `{ Default 'Draft' }`, `{ Length 500 }`    |
+| Enum value assignment    | Literal only            | Parser uses `Literal`, not full expression |
+| Object ViewField `=`     | All                     | `= obfuscate(email)`, `= category.id`      |
 
-| Context                 | Allowed Expressions | Example               |
-| ----------------------- | ------------------- | --------------------- |
-| Field property value    | All                 | `{ Default 'Draft' }` |
-| Enum value assignment   | Literal             | `Draft = 1`           |
-| Object field assignment | All                 | `= obfuscate(email)`  |
+Enum value assignments accept only literals. The parser uses the `Literal` sub-parser (not the full `Expression` parser) for the right-hand side of `=` in enum values. Function calls and references are not valid there.
+
+## See also
+
+- [Fields](fields.md) — field property syntax
+- [Enums](enums.md) — literal-only constraint on enum value assignments
+- [Objects](objects.md) — ViewField assignment expressions
+- [Grammar](grammar.md) — expression and literal production rules

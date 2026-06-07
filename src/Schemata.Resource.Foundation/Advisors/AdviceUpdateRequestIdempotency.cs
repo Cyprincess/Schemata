@@ -19,7 +19,7 @@ public static class AdviceUpdateRequestIdempotency
 {
     /// <summary>
     ///     Default order: runs after
-    ///     <see cref="AdviceUpdateRequestValidation{TEntity, TRequest}" /> ──
+    ///     <see cref="AdviceUpdateRequestValidation{TEntity, TRequest}" /> --
     ///     symmetric with <see cref="AdviceCreateRequestIdempotency" /> so the
     ///     idempotency gate evaluates last in the documented update request chain.
     /// </summary>

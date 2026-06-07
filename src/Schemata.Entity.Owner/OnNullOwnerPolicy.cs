@@ -1,4 +1,4 @@
-﻿namespace Schemata.Entity.Owner;
+namespace Schemata.Entity.Owner;
 
 /// <summary>
 ///     Determines how the owner advisors react when no owner can be resolved.

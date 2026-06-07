@@ -1,129 +1,123 @@
 # Create Pipeline
 
-The create operation is handled by `ResourceOperationHandler.CreateAsync`. It takes a `TRequest` DTO and produces a `CreateResult<TDetail>`. The method runs through the full [advisor pipeline](../core/advice-pipeline.md) with five stages before returning the created resource.
+`ResourceOperationHandler.CreateAsync` accepts a `TRequest` DTO and a `ClaimsPrincipal?`, runs it through a fixed sequence of advisor stages, persists the new entity, and returns a `CreateResultBase<TDetail>`. The pipeline is stage-locked: advisor `Order` controls sequencing within a stage, but the stages themselves always run in the order described here.
 
-## Pipeline Steps
+## Where the code lives
 
-### 1. General Request Advisor
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 329-407) |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestValidation.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseIdempotency.cs` |
+
+## Pipeline walkthrough
+
+### Stage 1: Gate check
 
 ```
-IResourceRequestAdvisor<TEntity> -- Operations.Create
+IResourceRequestAdvisor<TEntity>
 ```
 
-The first gate runs for every operation type. It receives the `HttpContext` and the `Operations.Create` enum value. Returns `Continue` to proceed, `Handle` to short-circuit with a `CreateResult<TDetail>` stored in the context, or `Block` to silently deny.
+The gate runs before any operation-specific logic. It receives the `ClaimsPrincipal?` and the operation token `nameof(Operations.Create)`. A `Block` result returns `CreateResultBase<TDetail>.Blocked` immediately. A `Handle` result returns a cached result from `AdviceContext`.
 
-### 2. Request Sanitization
+Authorization advisors (`AdviceCreateRequestAnonymous`, `AdviceCreateRequestAuthorize`) live in this stage when `WithAuthorization()` is called on `SchemataResourceBuilder`.
 
-Before the create-specific advisors run, the handler clears identity fields that clients must not set:
-
-- `request.Name` is set to `null`.
-- `request.CanonicalName` is set to `null`.
-- If the request implements `IIdentifier`, `request.Id` is reset to `default` (0).
-
-This ensures that server-generated identifiers and names are never influenced by client input.
-
-### 3. Create Request Advisors
+### Stage 2: Create request advisors
 
 ```
 IResourceCreateRequestAdvisor<TEntity, TRequest>
 ```
 
-Multiple advisors run in order. The built-in ones, from lowest to highest order:
+Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Built-in advisors run in this order:
 
-| Order       | Advisor                          | Behavior                                                         |
-| ----------- | -------------------------------- | ---------------------------------------------------------------- |
-| 100,000,000 | `AdviceCreateRequestIdempotency` | Checks idempotency store for a cached result.                    |
-| 110,000,000 | `AdviceCreateRequestAuthorize`   | Checks authorization (only if `WithAuthorization()` was called). |
-| 120,000,000 | `AdviceCreateRequestValidation`  | Validates the request through `IValidationAdvisor<TRequest>`.    |
+| Order | Advisor | What it does |
+|---|---|---|
+| `AdviceCreateRequestAnonymous.DefaultOrder` (80M) | `AdviceCreateRequestAnonymous` | Honors `[Anonymous(Operations.Create)]`; bypasses authorize |
+| `AdviceCreateRequestAuthorize.DefaultOrder` (100M) | `AdviceCreateRequestAuthorize` | Calls `IAccessProvider`; throws `AuthorizationException` on denial |
+| `AdviceCreateRequestSanitize.DefaultOrder` (110M) | `AdviceCreateRequestSanitize` | Clears server-managed fields: `Name`, `Uid`, `Timestamp`, `Owner`, `State`, `CreateTime`, `UpdateTime`, `DeleteTime`, `PurgeTime` |
+| `AdviceCreateRequestValidation.DefaultOrder` (120M) | `AdviceCreateRequestValidation` | Runs all `IValidationAdvisor<TRequest>` implementations; throws `ValidationException` on failure |
+| `AdviceCreateRequestIdempotency.DefaultOrder` (130M) | `AdviceCreateRequestIdempotency` | Checks cache for a prior result keyed by `IRequestIdentification.RequestId` under operation token `nameof(Operations.Create)`; returns `Handle` on hit, reserves the key on miss |
 
-#### Idempotency (AIP-155)
+The sanitize advisor clears fields using `AdviceCreateRequestSanitize.SystemFields`, which is a static array of property names matched against `TRequest` by reflection. Properties not present on `TRequest` are silently skipped.
 
-When the request implements `IRequestIdentification` and provides a non-null `RequestId`:
+### Stage 3: Mapping
 
-1. `AdviceCreateRequestIdempotency` looks up the `RequestId` in the `IIdempotencyStore`.
-2. If a cached `CreateResult<TDetail>` exists, it is placed in the `AdviceContext` and the advisor returns `Handle`, short-circuiting the entire pipeline. The client receives the same response as the original request.
-3. If no cached result exists, a `PendingIdempotencyKey` is stored in the `AdviceContext` for later use by `AdviceResponseIdempotency`.
+```
+_mapper.Map<TRequest, TEntity>(request)
+```
 
-The idempotency check can be suppressed by placing a `SuppressCreateIdempotency` marker in the `AdviceContext`.
+The mapper converts the sanitized, validated request DTO to an entity instance. If the result is `null`, a `ValidationException` is thrown with reason `FieldReasons.InvalidPayload`.
 
-The default `IdempotencyStore` is backed by `IDistributedCache` with a 24-hour absolute expiration. It serializes results to JSON via `System.Text.Json`.
-
-#### Authorization
-
-`AdviceCreateRequestAuthorize` is only registered when `WithAuthorization()` is called on the builder. It:
-
-1. Checks if the entity type has `[Anonymous(Operations.Create)]` -- if so, skips authorization.
-2. Otherwise calls `IAccessProvider<TEntity, ResourceRequestContext<TRequest>>.HasAccessAsync` with the current `ClaimsPrincipal`.
-3. Throws `AuthorizationException` if access is denied.
-
-#### Validation
-
-`AdviceCreateRequestValidation` delegates to `IValidationAdvisor<TRequest>` implementations. If validation fails, it throws `ValidationException` with field violations.
-
-When the request implements `IValidation` and `ValidateOnly` is `true`, the advisor throws `NoContentException` after validation to signal a dry-run -- no entity is created.
-
-Validation can be suppressed globally via `WithoutCreateValidation()` on the builder, or by placing a `SuppressCreateRequestValidation` marker in the context. Even when suppressed, a `ValidateOnly` request still throws `NoContentException`.
-
-### 4. Entity Mapping and Parent Resolution
-
-After the request advisors pass:
-
-1. The handler maps `TRequest` to `TEntity` via `ISimpleMapper.Map<TRequest, TEntity>`. If mapping returns null, it throws `InvalidArgumentException`.
-2. If an `HttpContext` is available, parent properties are set on the entity from route values using `ResourceNameDescriptor.SetParentFromRouteValues`. This populates parent foreign keys (e.g., `PublisherName`) from the URL path segments.
-
-### 5. Create Entity Advisor
+### Stage 4: Create entity advisors
 
 ```
 IResourceCreateAdvisor<TEntity, TRequest>
 ```
 
-This advisor has access to both the original request and the mapped entity. It runs after parent properties have been set. Custom advisors can inspect or modify the entity before persistence.
+Receives the original `TRequest` and the newly mapped `TEntity`. This is where traits fire:
 
-### 6. Persistence
+- `AdviceAddTimestamp<TEntity>` sets `CreateTime` and `UpdateTime` if the entity implements `ITimestamp`.
+- `AdviceAddConcurrency<TEntity>` mints a new `Guid` for `Timestamp` if the entity implements `IConcurrency`.
+- `AdviceAddCanonicalName<TEntity>` resolves and sets `Name` and `CanonicalName` if the entity implements `ICanonicalName` with a pattern.
+- `AdviceAddSoftDelete<TEntity>` sets `DeleteTime = null` if the entity implements `ISoftDelete`.
 
-The entity is added to the repository and committed:
+### Stage 5: Persistence
 
-```csharp
-await _repository.AddAsync(entity, ct);
-await _repository.CommitAsync(ct);
+```
+await _repository.AddAsync(entity, ct)
+await _repository.CommitAsync(ct)
 ```
 
-### 7. Response Mapping and Advisors
+The entity is added to the repository and committed. If a unit of work is active, the commit is deferred to the UoW boundary. After-commit callbacks enqueued during the advisor stages drain here.
 
-The persisted entity is mapped to `TDetail` via `ISimpleMapper.Map<TEntity, TDetail>`.
+### Stage 6: Response mapping
+
+```
+_mapper.Map<TEntity, TDetail>(entity)
+```
+
+The persisted entity (with server-assigned fields populated) is mapped to the detail DTO.
+
+### Stage 7: Response advisors
 
 ```
 IResourceResponseAdvisor<TEntity, TDetail>
 ```
 
-Two built-in response advisors run:
+| Order | Advisor | What it does |
+|---|---|---|
+| `Orders.Base` (100M) | `AdviceResponseFreshness` | Writes a weak ETag (`W/"..."`) onto `TDetail.EntityTag` if the detail implements `IFreshness` |
+| after freshness | `AdviceResponseIdempotency` | Persists the `CreateResultBase<TDetail>` to cache under the `RequestId` key for future idempotent replays |
 
-| Order       | Advisor                     | Behavior                                                                                                           |
-| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 100,000,000 | `AdviceResponseFreshness`   | Sets the ETag on the detail if the entity implements `IConcurrency` and the detail implements `IFreshness`.        |
-| 900,000,000 | `AdviceResponseIdempotency` | If a `PendingIdempotencyKey` exists in the context, stores the `CreateResult<TDetail>` in the `IIdempotencyStore`. |
+### Idempotency key cleanup on failure
 
-### 8. Result
+If any stage throws after the idempotency key was reserved (stage 2), the `catch` block in `CreateAsync` calls `TryReleaseIdempotencyKeyAsync` to remove the pending sentinel from cache. This prevents the key from being permanently locked by a failed request.
 
-A `CreateResult<TDetail>` is returned with the `Detail` property populated. In the [HTTP transport](./http-transport.md), this becomes a 201 Created response with a `Location` header pointing to the new resource.
+## Extension points
 
-## Implementing a Custom Create Advisor
+- Implement `IResourceCreateRequestAdvisor<TEntity, TRequest>` to add pre-persistence logic (e.g., quota checks, enrichment).
+- Implement `IResourceCreateAdvisor<TEntity, TRequest>` to add entity-level logic after mapping (e.g., setting computed fields).
+- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the detail DTO.
+- Register advisors as `Scoped` via `services.TryAddEnumerable(ServiceDescriptor.Scoped(...))`.
 
-To add custom logic, implement one of the advisor interfaces and register it:
+## Design motivation
 
-```csharp
-public class SetCreateTimestamp<TEntity, TRequest> : IResourceCreateAdvisor<TEntity, TRequest>
-    where TEntity : class, ICanonicalName, ITimestamp
-    where TRequest : class, ICanonicalName
-{
-    public int Order => 150_000_000;
+Sanitization runs before validation so that validators never see server-managed fields that clients should not supply. Idempotency runs last in the request chain so that authorization, sanitization, and validation are evaluated even on a cache hit's first arrival — a cached result is only returned if the request would have been valid anyway.
 
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext ctx, TRequest request, TEntity entity,
-        ClaimsPrincipal? principal, CancellationToken ct = default)
-    {
-        entity.CreateTime = DateTime.UtcNow;
-        return Task.FromResult(AdviseResult.Continue);
-    }
-}
-```
+## Caveats
+
+- `AdviceCreateRequestIdempotency` requires `ICacheProvider` to be registered. If no cache is configured, the advisor is still registered but throws at runtime when a request carries `IRequestIdentification.RequestId`.
+- The idempotency key uses a 5-minute pending TTL (`PendingTtl = TimeSpan.FromMinutes(5)`). Two concurrent requests with the same `RequestId` produce a `ConcurrencyException` for the loser.
+- The cache key format is `idempotency\x1e{Operation}\x1e{RequestId}`, where `Operation` is `nameof(Operations.Create)` here. Update and AIP-136 custom methods write under different `Operation` tokens, so a single `RequestId` may legitimately appear in multiple cache entries.
+- Suppression flags (`CreateRequestValidationSuppressed`, `CreateIdempotencySuppressed`) are set on `AdviceContext` by `SchemataResourceOptions` at the start of each request. They affect only the current request scope.
+
+## See also
+
+- [Resource Overview](overview.md)
+- [Update Pipeline](update-pipeline.md)
+- [Advice Pipeline](../core/advice-pipeline.md)
+- [Entity Traits](../entity/traits.md)
+- [Repository Mutation Pipeline](../repository/mutation-pipeline.md)

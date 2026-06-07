@@ -1,8 +1,10 @@
 # Multi-Tenancy
 
-This guide adds tenant resolution and per-tenant data isolation to the Student API. After completing it, each request will be scoped to a specific tenant and downstream services will resolve from a tenant-isolated DI container.
+Scope each request to a specific tenant and resolve downstream services from a tenant-isolated DI container. This guide builds on [Getting Started](getting-started.md).
 
-## Add the tenancy package
+## Add the package
+
+`Schemata.Application.Complex.Targets` already includes `Schemata.Tenancy.Foundation`. If you are composing packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Tenancy.Foundation
@@ -10,101 +12,98 @@ dotnet add package --prerelease Schemata.Tenancy.Foundation
 
 ## Enable tenancy
 
-Add `UseTenancy()` to the Schemata builder in `Program.cs` and chain a resolver. The header resolver reads the tenant identifier from the `x-tenant-id` HTTP request header:
+Add `UseTenancy()` and pick a resolver. `SchemataTenancyFeature` has `Priority = 160_000_000` (middleware position between `Https` at 150M and `CookiePolicy` at 170M) and `Order = Orders.Max = 900_000_000` so DI registration runs after every other feature.
 
 ```csharp
 schema.UseTenancy()
       .UseHeaderResolver();
 ```
 
-`UseTenancy()` registers the default `SchemataTenant<Guid>` entity type with `Guid` keys. It adds two pieces of middleware to the request pipeline automatically:
-
-1. `SchemataTenantContextAccessorInitializer` -- calls `ITenantResolver<TKey>.ResolveAsync` to find the tenant identifier, then loads the `SchemataTenant` from the `ITenantManager` and stores it in `ITenantContextAccessor`.
-2. `SchemataTenantServiceProviderReplacer` -- swaps the request `IServiceProvider` with a tenant-scoped container so all downstream services resolve in tenant isolation.
+`UseTenancy()` uses `SchemataTenant` as the default tenant entity. `SchemataTenancyMiddleware` resolves the tenant on each request, initializes `ITenantContextAccessor<SchemataTenant>`, and swaps `HttpContext.Features.Get<IServiceProvidersFeature>()` with a tenant-scoped provider for the duration of the request.
 
 ## Choose a resolver
 
-Schemata ships five built-in resolver strategies. Register exactly one:
+Five built-in resolver strategies ship with the foundation:
 
-| Method                   | Source                                          | Header / Parameter |
-| ------------------------ | ----------------------------------------------- | ------------------ |
-| `UseHeaderResolver()`    | HTTP request header                             | `x-tenant-id`      |
-| `UseHostResolver()`      | `Host` header matched against tenant host names | --                 |
-| `UsePathResolver()`      | Route parameter                                 | `{Tenant}`         |
-| `UsePrincipalResolver()` | Authenticated user claim                        | `Tenant`           |
-| `UseQueryResolver()`     | Query string parameter                          | `Tenant`           |
+| Method | Source | Header / Parameter |
+| ------ | ------ | ------------------ |
+| `UseHeaderResolver()` | HTTP request header | `x-tenant-id` |
+| `UseHostResolver()` | `Host` header matched against tenant host names | (none) |
+| `UsePathResolver()` | Route parameter | `{Tenant}` |
+| `UsePrincipalResolver()` | Authenticated user claim | `Tenant` |
+| `UseQueryResolver()` | Query string parameter | `Tenant` |
 
-Each resolver implements `ITenantResolver<TKey>`, which has a single method:
+Each `UseXxxResolver()` calls `services.TryAddScoped<ITenantResolver, X>()`. Only the first one wins — the accessor takes a single `ITenantResolver` and asks it once per request. For "header overrides path" semantics, implement a composite `ITenantResolver` and register it directly.
 
-```csharp
-Task<TKey?> ResolveAsync(CancellationToken ct);
-```
+## Custom tenant entity
 
-## Define a custom tenant entity
-
-The default `SchemataTenant<Guid>` provides `TenantId`, `Hosts`, `Name`, `CanonicalName`, `DisplayName`, and timestamp fields. To add tenant-specific data, subclass it:
+`SchemataTenant` carries `Uid` (Guid primary key), `Name`, `CanonicalName`, `DisplayName` / `DisplayNames`, `Description` / `Descriptions`, `Timestamp`, `CreateTime`, `UpdateTime`, and a `Hosts` navigation to `SchemataTenantHost`. Add tenant-specific data by subclassing:
 
 ```csharp
-using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Tenancy.Skeleton.Entities;
 
-[Table("Tenants")]
-public class Tenant : SchemataTenant<Guid>
+public class Tenant : SchemataTenant
 {
     public string? Plan { get; set; }
 }
 ```
 
-Then pass the custom type when enabling tenancy:
+Pass the custom type when enabling tenancy:
 
 ```csharp
-schema.UseTenancy<Tenant, Guid>()
+schema.UseTenancy<Tenant>()
       .UseHeaderResolver();
 ```
 
-## Add tenant to the DbContext
+## Per-tenant data isolation
 
-Register the tenant entity in your `AppDbContext`:
+`ForAll` and `ForTenant` on the builder register services that participate in tenant resolution. They have very different lifetime contracts:
+
+| Method | Where the registrations land | Allowed lifetimes |
+| --- | --- | --- |
+| `ForAll(configure)` | Root `IServiceCollection` | Any (Singleton / Scoped / Transient) — these become normal host services that every tenant sees through the composite provider's root fallback |
+| `ForTenant(tenantId, configure)` | Per-tenant override container, applied at provider build time | **Singleton only** |
+| `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | **Singleton only** |
+
+Scoped or transient registrations in either `ForTenant` overload throw `InvalidOperationException` at provider-build time. Per-tenant services that need to participate in the request-scope lifecycle (`AddDbContext`, repositories, etc.) belong in `ForAll`; they pick up the right tenant by consulting `ITenantContextAccessor<TTenant>` at construction time.
 
 ```csharp
-public DbSet<Tenant> Tenants => Set<Tenant>();
-```
-
-## Configure per-tenant data isolation
-
-The `UseTenancy` call accepts a configure delegate that runs once per tenant when its isolated DI container is first built. Use this to register tenant-specific service overrides -- for example, pointing each tenant at a separate database:
-
-```csharp
-schema.UseTenancy<Tenant, Guid>((services, tenant) => {
-          services.AddDbContext<AppDbContext>(options => {
-              options.UseSqlite($"Data Source=tenant_{tenant?.TenantId}.db");
+schema.UseTenancy<Tenant>()
+      .ForAll(services => {
+          services.AddDbContext<AppDbContext>((sp, opts) => {
+              var tenant = sp.GetRequiredService<ITenantContextAccessor<Tenant>>().Tenant;
+              var conn   = tenant?.Plan == "premium"
+                  ? "Data Source=premium.db"
+                  : "Data Source=shared.db";
+              opts.UseSqlite(conn);
           });
+      })
+      .ForTenant("00000000-0000-0000-0000-000000000001", overrides => {
+          overrides.AddSingleton<IFeatureGate, AcmeFeatureGate>();
       })
       .UseHeaderResolver();
 ```
 
-The `SchemataTenantServiceProviderFactory` copies the root service collection and applies the configure delegate for each tenant. The resulting `IServiceProvider` is cached per tenant for the application lifetime.
+`SchemataTenantServiceProviderFactory` builds a small Singleton-only override container per tenant and wraps it in `TenantCompositeServiceProvider`. Lookups hit the tenant overrides first, then fall through to the host root. The composite is cached by tenant id; the cache is bounded by `SchemataTenancyOptions.ProviderMaxCapacity` (1000) and sliding-expired by `ProviderSlidingExpiration` (30 minutes).
 
 ## Access the current tenant
 
-Inject `ITenantContextAccessor` (or the generic `ITenantContextAccessor<TTenant, TKey>`) anywhere in your application to read the resolved tenant:
+Inject the generic accessor anywhere to read the resolved tenant:
 
 ```csharp
-public class StudentService(ITenantContextAccessor accessor)
+public sealed class StudentService(ITenantContextAccessor<Tenant> accessor)
 {
     public string? GetTenantName() => accessor.Tenant?.DisplayName;
 }
 ```
 
-The `Tenant` property is `null` until middleware initialization completes, so it is only available after the tenant context accessor initializer runs in the request pipeline.
+The `Tenant` property is `null` until middleware initialization completes for the current request.
 
 ## Verify
 
 ```shell
 dotnet run
 ```
-
-Create a tenant record in your database, then pass its `TenantId` in the header:
 
 ```shell
 # Create a student under a specific tenant
@@ -113,14 +112,16 @@ curl -X POST http://localhost:5000/students \
      -H "x-tenant-id: 00000000-0000-0000-0000-000000000001" \
      -d '{"full_name":"Alice","age":20}'
 
-# List students -- only returns students for this tenant
+# List students — only returns students for this tenant
 curl http://localhost:5000/students \
      -H "x-tenant-id: 00000000-0000-0000-0000-000000000001"
 ```
 
-Requests without the `x-tenant-id` header skip tenant resolution (the accessor's `Tenant` property remains `null`). Requests with an invalid or unparseable tenant identifier cause a `TenantResolveException`.
+Requests without the `x-tenant-id` header skip tenant resolution; `accessor.Tenant` stays `null` and the request runs against the host root provider.
 
-## Next steps
+## See also
 
-- [Workflow](workflow.md) -- add an enrollment state machine to the Student entity
-- For the full API surface and architecture details, see [Tenancy](../documents/tenancy.md)
+- [gRPC Transport](grpc-transport.md) — previous in the series: gRPC endpoints alongside HTTP
+- [Flow](flow.md) — next in the series: add a BPMN process to the Student entity
+- [Tenancy](../documents/tenancy.md) — per-tenant DI, resolver architecture, `ITenantContextAccessor`
+- [Multi-Tenant Setup](../cookbook/multi-tenant-cookbook.md) — combined resolvers and per-tenant DI overrides

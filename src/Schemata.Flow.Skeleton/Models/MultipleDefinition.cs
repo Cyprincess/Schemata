@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Multiple event definition — for catch events: fires when <em>any</em>
+///     A BPMN Multiple event definition - for catch events: fires when <em>any</em>
 ///     of the contained definitions triggers (XOR semantics).
 ///     For throw events: all definitions fire (AND semantics).
 /// </summary>

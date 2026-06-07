@@ -3,7 +3,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// <summary>
 ///     The position of a <see cref="FlowEvent" /> within a BPMN process,
 ///     determining its runtime behavior.
-///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> §10.3.
+///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> Section 10.3.
 /// </summary>
 public enum EventPosition
 {

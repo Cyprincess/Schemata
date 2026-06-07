@@ -17,7 +17,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceResponseIdempotency
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Max" /> — runs last among response advisors.
+    ///     Default order at <see cref="Orders.Max" /> - runs last among response advisors.
     /// </summary>
     public const int DefaultOrder = Orders.Max;
 }

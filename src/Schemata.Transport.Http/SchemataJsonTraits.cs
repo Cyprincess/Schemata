@@ -10,7 +10,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Transport.Http;
 
 /// <summary>
-///     Schemata trait → JSON wire-name rewrites shared by every HTTP Schemata
+///     Schemata trait -> JSON wire-name rewrites shared by every HTTP Schemata
 ///     surface. Hides <see cref="ICanonicalName.Name" />, surfaces
 ///     <see cref="ICanonicalName.CanonicalName" /> as <c>name</c> (AIP-122),
 ///     <see cref="IFreshness.EntityTag" /> as <c>etag</c> (AIP-154), and

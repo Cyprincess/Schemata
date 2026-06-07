@@ -29,7 +29,7 @@ public static class AdviceDeleteFreshness
 ///     <para>
 ///         The check fires only when <see cref="DeleteRequest.Force" /> is <see langword="false" />
 ///         and the supplied <see cref="DeleteRequest.Etag" /> begins with <c>W/</c> (weak validator).
-///         Missing, empty, or non-<c>W/</c> tags are treated as opt-out — the delete proceeds
+///         Missing, empty, or non-<c>W/</c> tags are treated as opt-out - the delete proceeds
 ///         without concurrency validation. Hosts that need stronger guarantees should require
 ///         <c>etag</c> earlier in the chain (e.g., via a validation advisor) or layer a stricter
 ///         freshness advisor.

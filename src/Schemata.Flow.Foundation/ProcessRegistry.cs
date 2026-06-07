@@ -43,7 +43,7 @@ public sealed class ProcessRegistry : IProcessRegistry
     }
 
     public ValueTask UnregisterAsync(string processName, CancellationToken ct = default) {
-        _registrations.TryRemove(processName, out _);
+        _registrations.TryRemove(processName, out var _);
         return default;
     }
 
