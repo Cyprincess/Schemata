@@ -9,6 +9,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
+using Schemata.Transport.Http.Features;
 
 namespace Schemata.Resource.Http.Features;
 
@@ -16,12 +17,14 @@ namespace Schemata.Resource.Http.Features;
 ///     Feature that sets up the MVC infrastructure for dynamically generated
 ///     <see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" /> instances
 ///     per <seealso href="https://google.aip.dev/127">AIP-127: HTTP and gRPC Transcoding</seealso>.
+///     Shared HTTP plumbing (AIP-122 / AIP-154 wire-name rewrites) is supplied by
+///     <see cref="SchemataTransportHttpFeature" />.
 /// </summary>
-[DependsOn<SchemataControllersFeature>]
 [DependsOn<SchemataResourceFeature>]
+[DependsOn<SchemataTransportHttpFeature>]
 public sealed class SchemataHttpResourceFeature : FeatureBase
 {
-    public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 10_000_000;
+    public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
 

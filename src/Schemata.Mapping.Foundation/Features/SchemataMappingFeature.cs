@@ -11,7 +11,7 @@ namespace Schemata.Mapping.Foundation.Features;
 
 public static class SchemataMappingFeature
 {
-    public const int DefaultPriority = Orders.Extension + 40_000_000;
+    public const int DefaultPriority = Orders.Extension + 60_000_000;
 }
 
 /// <summary>

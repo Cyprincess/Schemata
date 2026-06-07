@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -19,27 +20,18 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Transport.Http.Features;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
 /// <summary>
-///     Configures the core Schemata Authorization server: options validation, token services,
-///     managers, authentication schemes, claim advisors, the discovery handler, the OAuth
-///     model binder, the well-known endpoint mappings, and delegates to all registered
-///     <see cref="IAuthorizationFlowFeature" /> implementations.
+///     Configures the Schemata Authorization server: options validation, managers,
+///     authentication schemes, claim advisors, the discovery handler, the OAuth
+///     model binder, and delegates to registered <see cref="IAuthorizationFlowFeature" />s.
 /// </summary>
-/// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TAuth">The authorization entity type.</typeparam>
-/// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
-/// <remarks>
-///     Installed via <c>UseAuthorization()</c> on <see cref="SchemataBuilder" />.
-///     Depends on <see cref="SchemataAuthenticationFeature" />, <see cref="SchemataControllersFeature" />,
-///     and <see cref="SchemataWellKnownFeature" />.
-/// </remarks>
 [DependsOn<SchemataAuthenticationFeature>]
-[DependsOn<SchemataControllersFeature>]
+[DependsOn<SchemataTransportHttpFeature>]
 [DependsOn<SchemataWellKnownFeature>]
 public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : FeatureBase
     where TApp : SchemataApplication
@@ -47,7 +39,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
     where TScope : SchemataScope
     where TToken : SchemataToken, new()
 {
-    public const int DefaultPriority = Orders.Extension + 30_000_000;
+    public const int DefaultPriority = Orders.Extension + 50_000_000;
 
     public override int Priority => DefaultPriority;
 
@@ -91,12 +83,9 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
             flow.ConfigureServices(services, schemata, configurators);
         }
 
-        var part = new SchemataExtensionPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
+        services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
         services.AddMvcCore(mvc => {
                      mvc.ModelBinderProviders.Insert(0, new OAuthRequestBinderProvider());
-                 })
-                .ConfigureApplicationPartManager(manager => {
-                     manager.ApplicationParts.Add(part);
                  });
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());

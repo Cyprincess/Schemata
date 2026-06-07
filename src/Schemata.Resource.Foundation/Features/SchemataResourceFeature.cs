@@ -23,7 +23,7 @@ namespace Schemata.Resource.Foundation.Features;
 [DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
-    public const int DefaultPriority = Orders.Extension + 70_000_000;
+    public const int DefaultPriority = Orders.Extension + 90_000_000;
 
     public override int Priority => DefaultPriority;
 

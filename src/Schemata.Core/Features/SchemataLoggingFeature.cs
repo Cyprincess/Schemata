@@ -5,13 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Core.Features;
 
-/// <summary>
-///     Configures ASP.NET Core logging via the deferred <see cref="ILoggingBuilder" />
-///     configurator.
-/// </summary>
+/// <summary>Configures ASP.NET Core logging via the deferred <see cref="ILoggingBuilder" />.</summary>
 public sealed class SchemataLoggingFeature : FeatureBase
 {
-    public const int DefaultPriority = SchemataExceptionHandlerFeature.DefaultPriority + 10_000_000;
+    public const int DefaultPriority = SchemataDeveloperExceptionPageFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;
 

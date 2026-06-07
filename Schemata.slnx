@@ -44,10 +44,15 @@
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />
     <Project Path="src/Schemata.Tenancy.Foundation/Schemata.Tenancy.Foundation.csproj" />
     <Project Path="src/Schemata.Tenancy.Skeleton/Schemata.Tenancy.Skeleton.csproj" />
+    <Project Path="src/Schemata.Flow.Foundation/Schemata.Flow.Foundation.csproj" />
+    <Project Path="src/Schemata.Flow.Grpc/Schemata.Flow.Grpc.csproj" />
+    <Project Path="src/Schemata.Flow.Http/Schemata.Flow.Http.csproj" />
+    <Project Path="src/Schemata.Flow.Skeleton/Schemata.Flow.Skeleton.csproj" />
+    <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
+    <Project Path="src/Schemata.Transport.Grpc/Schemata.Transport.Grpc.csproj" />
+    <Project Path="src/Schemata.Transport.Http/Schemata.Transport.Http.csproj" />
     <Project Path="src/Schemata.Validation.FluentValidation/Schemata.Validation.FluentValidation.csproj" />
     <Project Path="src/Schemata.Validation.Skeleton/Schemata.Validation.Skeleton.csproj" />
-    <Project Path="src/Schemata.Workflow.Foundation/Schemata.Workflow.Foundation.csproj" />
-    <Project Path="src/Schemata.Workflow.Skeleton/Schemata.Workflow.Skeleton.csproj" />
   </Folder>
   <Folder Name="/targets/">
     <Project Path="targets/Schemata.Application.Targets/Schemata.Application.Complex.Targets.csproj" />
@@ -81,7 +86,7 @@
     <Project Path="tests/Schemata.Resource.Http.Integration.Tests/Schemata.Resource.Http.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Tests/Schemata.Resource.Tests.csproj" />
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />
+    <Project Path="tests/Schemata.Flow.Tests/Schemata.Flow.Tests.csproj" />
     <Project Path="tests/Schemata.Tenancy.Tests/Schemata.Tenancy.Tests.csproj" />
-    <Project Path="tests/Schemata.Workflow.Tests/Schemata.Workflow.Tests.csproj" />
   </Folder>
 </Solution>

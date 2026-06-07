@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
   </ItemGroup>
 
 </Project>

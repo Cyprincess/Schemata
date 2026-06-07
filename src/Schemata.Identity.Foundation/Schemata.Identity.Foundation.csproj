@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
   </ItemGroup>
 
 </Project>
