@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;

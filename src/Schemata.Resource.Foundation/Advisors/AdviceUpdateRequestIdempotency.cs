@@ -13,33 +13,34 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceCreateRequestIdempotency{TEntity,TRequest,TDetail}" />.
+///     Default order constants for <see cref="AdviceUpdateRequestIdempotency{TEntity, TRequest, TDetail}" />.
 /// </summary>
-public static class AdviceCreateRequestIdempotency
+public static class AdviceUpdateRequestIdempotency
 {
     /// <summary>
-    ///     Default order: runs after <see cref="AdviceCreateRequestValidation{TEntity,TRequest}" /> —
-    ///     idempotency is the last link in the documented create request chain so authorization,
-    ///     sanitization, and validation are evaluated even on a cache hit's first arrival.
+    ///     Default order: runs after
+    ///     <see cref="AdviceUpdateRequestValidation{TEntity, TRequest}" /> ──
+    ///     symmetric with <see cref="AdviceCreateRequestIdempotency" /> so the
+    ///     idempotency gate evaluates last in the documented update request chain.
     /// </summary>
-    public const int DefaultOrder = AdviceCreateRequestValidation.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceUpdateRequestValidation.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Provides create-request idempotency
+///     Provides update-request idempotency
 ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso> by checking the
-///     <see cref="ICacheProvider" /> for a cached result keyed by the
-///     client-supplied <c>RequestId</c>.
+///     <see cref="ICacheProvider" /> for a cached result keyed by
+///     <c>idempotency\x1e{nameof(Operations.Update)}\x1e{RequestId}</c>.
 ///     If found, returns <see cref="AdviseResult.Handle" /> with the cached result.
 ///     Otherwise, stores a <see cref="PendingIdempotencyKey" /> in the context for
-///     <see cref="AdviceResponseIdempotency{TEntity,TDetail}" /> to persist the result
-///     after a successful create.
-///     Suppressed when <see cref="CreateIdempotencySuppressed" /> is present.
+///     <see cref="AdviceResponseIdempotency{TEntity, TDetail}" /> to persist the result
+///     after a successful update.
+///     Suppressed when <see cref="UpdateIdempotencySuppressed" /> is present.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
 /// <typeparam name="TDetail">The detail DTO type.</typeparam>
-public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> : IResourceCreateRequestAdvisor<TEntity, TRequest>
+public sealed class AdviceUpdateRequestIdempotency<TEntity, TRequest, TDetail> : IResourceUpdateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName
@@ -53,11 +54,11 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
     ///     Initializes a new instance with the cache provider.
     /// </summary>
     /// <param name="cache">The <see cref="ICacheProvider" />.</param>
-    public AdviceCreateRequestIdempotency(ICacheProvider cache) { _cache = cache; }
+    public AdviceUpdateRequestIdempotency(ICacheProvider cache) { _cache = cache; }
 
-    #region IResourceCreateRequestAdvisor<TEntity,TRequest> Members
+    #region IResourceUpdateRequestAdvisor<TEntity,TRequest> Members
 
-    public int Order => AdviceCreateRequestIdempotency.DefaultOrder;
+    public int Order => AdviceUpdateRequestIdempotency.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
@@ -70,17 +71,17 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
             return AdviseResult.Continue;
         }
 
-        if (ctx.Has<CreateIdempotencySuppressed>()) {
+        if (ctx.Has<UpdateIdempotencySuppressed>()) {
             return AdviseResult.Continue;
         }
 
-        var operation = nameof(Operations.Create);
+        var operation = nameof(Operations.Update);
         var key       = $"idempotency\x1e{operation}\x1e{requestId}".ToCacheKey(Keys.Resource);
         var bytes     = await _cache.GetAsync(key, ct);
         if (bytes is not null && !IsPendingSentinel(bytes)) {
             var cached = JsonSerializer.Deserialize<CreateResultBase<TDetail>>(bytes);
-            if (cached is not null) {
-                ctx.Set(cached);
+            if (cached?.Detail is not null) {
+                ctx.Set(new UpdateResultBase<TDetail> { Detail = cached.Detail });
                 return AdviseResult.Handle;
             }
         }

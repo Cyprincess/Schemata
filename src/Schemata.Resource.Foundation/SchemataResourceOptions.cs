@@ -16,6 +16,13 @@ public sealed class SchemataResourceOptions
     public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; } = [];
 
     /// <summary>
+    ///     Gets the AIP-136 custom methods declared by each resource, keyed by
+    ///     entity type handle. Each value list is deduplicated by
+    ///     <see cref="ResourceMethodAttribute.Verb" />.
+    /// </summary>
+    public Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> Methods { get; } = [];
+
+    /// <summary>
     ///     Gets or sets whether create-request validation is globally suppressed.
     /// </summary>
     public bool SuppressCreateValidation { get; set; }

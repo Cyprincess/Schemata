@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ProtoBuf;
 using ProtoBuf.Meta;
@@ -19,9 +20,7 @@ internal static class RuntimeTypeModelConfigurator
         SchemataProtoModelConfigurator.ConfigureType(model, typeof(DeleteRequest));
 
         foreach (var (_, resource) in options.Resources) {
-            if (resource.Endpoints is not null
-             && resource.Endpoints.Count != 0
-             && resource.Endpoints.All(e => e != GrpcResourceAttribute.Name)) {
+            if (!IsGrpcEnabled(resource)) {
                 continue;
             }
 
@@ -31,6 +30,38 @@ internal static class RuntimeTypeModelConfigurator
             SchemataProtoModelConfigurator.ConfigureListResultType(model, resource.Summary!);
         }
 
+        foreach (var (handle, methods) in options.Methods) {
+            if (!options.Resources.TryGetValue(handle, out var resource) || !IsGrpcEnabled(resource)) {
+                continue;
+            }
+
+            foreach (var method in methods) {
+                var iface = FindHandlerInterface(method.Handler);
+                if (iface is null) {
+                    continue;
+                }
+
+                var arguments = iface.GetGenericArguments();
+                SchemataProtoModelConfigurator.ConfigureType(model, arguments[1]);
+                SchemataProtoModelConfigurator.ConfigureType(model, arguments[2]);
+            }
+        }
+
         return model;
+    }
+
+    private static bool IsGrpcEnabled(ResourceAttribute resource) {
+        return resource.Endpoints is null
+            || resource.Endpoints.Count == 0
+            || resource.Endpoints.Any(e => e == GrpcResourceAttribute.Name);
+    }
+
+    private static Type? FindHandlerInterface(Type handler) {
+        foreach (var iface in handler.GetInterfaces()) {
+            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
+                return iface;
+            }
+        }
+        return null;
     }
 }

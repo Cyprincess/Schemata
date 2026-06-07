@@ -15,7 +15,6 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
-using Schemata.Caching.Skeleton;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Aip;
@@ -112,7 +111,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         var ctx = CreateAdviceContext();
 
         switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, Operations.List, ct.Value)) {
+                             .RunAsync(ctx, principal, nameof(Operations.List), ct.Value)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<ListResultBase<TSummary>>(out var result):
@@ -272,7 +271,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         var ctx = CreateAdviceContext();
 
         switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, Operations.Get, ct.Value)) {
+                             .RunAsync(ctx, principal, nameof(Operations.Get), ct.Value)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<GetResultBase<TDetail>>(out var result):
@@ -335,87 +334,67 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
 
         var ctx = CreateAdviceContext();
 
-        try {
-            switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                                 .RunAsync(ctx, principal, Operations.Create, ct.Value)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
-                    return result!;
-                case AdviseResult.Block:
-                default:
-                    return CreateResultBase<TDetail>.Blocked;
-            }
-
-            var container = new ResourceRequestContainer<TEntity>();
-
-            switch (await Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
-                                 .RunAsync(ctx, request, container, principal, ct.Value)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
-                    return result!;
-                case AdviseResult.Block:
-                default:
-                    return CreateResultBase<TDetail>.Blocked;
-            }
-
-            var entity = _mapper.Map<TRequest, TEntity>(request);
-            if (entity is null) {
-                throw new ValidationException([new() {
-                    Field       = "request",
-                    Description = SchemataResources.GetResourceString(SchemataResources.ST2001),
-                    Reason      = FieldReasons.InvalidPayload,
-                }]);
-            }
-
-            switch (await Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
-                                 .RunAsync(ctx, request, entity, principal, ct.Value)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
-                    return result!;
-                case AdviseResult.Block:
-                default:
-                    return CreateResultBase<TDetail>.Blocked;
-            }
-
-            await _repository.AddAsync(entity, ct.Value);
-            await _repository.CommitAsync(ct.Value);
-
-            var detail = _mapper.Map<TEntity, TDetail>(entity);
-
-            switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
-                                 .RunAsync(ctx, entity, detail, principal, ct.Value)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
-                    return result!;
-                case AdviseResult.Block:
-                default:
-                    return CreateResultBase<TDetail>.Blocked;
-            }
-
-            return new() { Detail = detail };
-        } catch {
-            if (ctx.TryGet<PendingIdempotencyKey>(out var pending) && pending is not null) {
-                await TryReleaseIdempotencyKeyAsync(pending.RequestId, ct.Value);
-            }
-
-            throw;
-        }
-    }
-
-    private async Task TryReleaseIdempotencyKeyAsync(string requestId, CancellationToken ct) {
-        var cache = _sp.GetService<ICacheProvider>();
-        if (cache is null) {
-            return;
+        switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
+                             .RunAsync(ctx, principal, nameof(Operations.Create), ct.Value)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                return CreateResultBase<TDetail>.Blocked;
         }
 
-        var key = $"idempotency\x1e{requestId}".ToCacheKey(Keys.Resource);
-        try {
-            await cache.RemoveAsync(key, ct);
-        } catch { }
+        var container = new ResourceRequestContainer<TEntity>();
+
+        switch (await Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
+                             .RunAsync(ctx, request, container, principal, ct.Value)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                return CreateResultBase<TDetail>.Blocked;
+        }
+
+        var entity = _mapper.Map<TRequest, TEntity>(request);
+        if (entity is null) {
+            throw new ValidationException([new() {
+                Field       = "request",
+                Description = SchemataResources.GetResourceString(SchemataResources.ST2001),
+                Reason      = FieldReasons.InvalidPayload,
+            }]);
+        }
+
+        switch (await Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
+                             .RunAsync(ctx, request, entity, principal, ct.Value)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                return CreateResultBase<TDetail>.Blocked;
+        }
+
+        await _repository.AddAsync(entity, ct.Value);
+        await _repository.CommitAsync(ct.Value);
+
+        var detail = _mapper.Map<TEntity, TDetail>(entity);
+
+        switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
+                             .RunAsync(ctx, entity, detail, principal, ct.Value)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<CreateResultBase<TDetail>>(out var result):
+                return result!;
+            case AdviseResult.Block:
+            default:
+                return CreateResultBase<TDetail>.Blocked;
+        }
+
+        return new() { Detail = detail };
     }
 
     /// <summary>
@@ -444,7 +423,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         var ctx = CreateAdviceContext();
 
         switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, Operations.Update, ct.Value)) {
+                             .RunAsync(ctx, principal, nameof(Operations.Update), ct.Value)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<UpdateResultBase<TDetail>>(out var result):
@@ -543,7 +522,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         var ctx = CreateAdviceContext();
 
         switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, Operations.Delete, ct.Value)) {
+                             .RunAsync(ctx, principal, nameof(Operations.Delete), ct.Value)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
@@ -577,7 +556,7 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                   ?? throw ResourceNotFound(name);
 
         switch (await Advisor.For<IResourceDeleteAdvisor<TEntity>>()
-                             .RunAsync(ctx, entity, req, principal, ct.Value)) {
+                             .RunAsync(ctx, req, entity, principal, ct.Value)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
@@ -593,14 +572,14 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         return true;
     }
 
-    private static NotFoundException ResourceNotFound(string? name) {
+    internal static NotFoundException ResourceNotFound(string? name) {
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
         return new(message: string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Resource", name)) {
             Details = [new ResourceInfoDetail { ResourceType = descriptor.Singular, ResourceName = name }],
         };
     }
 
-    private AdviceContext CreateAdviceContext() {
+    internal AdviceContext CreateAdviceContext() {
         var ctx = new AdviceContext(_sp);
 
         var options = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;

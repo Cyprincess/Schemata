@@ -35,18 +35,22 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var provider = new ResourceControllerFeatureProvider();
+        var provider       = new ResourceControllerFeatureProvider();
+        var methodProvider = new ResourceMethodControllerFeatureProvider();
         services.AddSingleton(provider);
+        services.AddSingleton(methodProvider);
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
         services.AddOptions<MvcOptions>()
                 .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
                      mvc.Conventions.Add(new ResourceControllerConvention(opts.Value.AuthenticationScheme));
+                     mvc.Conventions.Add(new ResourceMethodControllerConvention(opts.Value.Methods, opts.Value.AuthenticationScheme));
                  });
 
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {
                      manager.FeatureProviders.Add(provider);
+                     manager.FeatureProviders.Add(methodProvider);
                  });
     }
 
@@ -57,12 +61,17 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
     ) {
         var sp = app.ApplicationServices;
 
-        var provider = sp.GetRequiredService<ResourceControllerFeatureProvider>();
-        var options  = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
+        var provider       = sp.GetRequiredService<ResourceControllerFeatureProvider>();
+        var methodProvider = sp.GetRequiredService<ResourceMethodControllerFeatureProvider>();
+        var options        = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
-        provider.Resources = options.Value.Resources;
-        // Notify MVC that controllers have been added so action descriptors
-        // are refreshed before the first request is served.
+        provider.Resources       = options.Value.Resources;
+        methodProvider.Resources = options.Value.Resources;
+        methodProvider.Methods   = options.Value.Methods;
+
+        // The CRUD provider is the IActionDescriptorChangeProvider; its Commit()
+        // signals MVC to repopulate ALL controller feature providers, including
+        // the method provider just configured above.
         provider.Commit();
     }
 }

@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using ProtoBuf.Grpc;
@@ -45,7 +44,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
     public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
-        var result = await Handler.ListAsync(request, Http?.User, CancellationFor(context));
+        var result = await Handler.ListAsync(request, Http?.User, context.CancellationToken);
         if (!result.IsAllowed()) {
             return new();
         }
@@ -54,7 +53,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     }
 
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, CancellationFor(context));
+        var result = await Handler.GetAsync(request.CanonicalName!, Http?.User, context.CancellationToken);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -63,7 +62,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     }
 
     public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
-        var result = await Handler.CreateAsync(request, Http?.User, CancellationFor(context));
+        var result = await Handler.CreateAsync(request, Http?.User, context.CancellationToken);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -72,7 +71,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
     }
 
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
-        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, CancellationFor(context));
+        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, context.CancellationToken);
         if (!result.IsAllowed()) {
             throw new NoContentException();
         }
@@ -82,16 +81,11 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary> : IResourceSe
 
     public virtual async ValueTask DeleteAsync(DeleteRequest request, CallContext context = default) {
         var allowed = await Handler.DeleteAsync(
-            request.CanonicalName!, request.Etag, request.Force, Http?.User, CancellationFor(context));
+            request.CanonicalName!, request.Etag, request.Force, Http?.User, context.CancellationToken);
         if (!allowed) {
             throw new NoContentException();
         }
     }
 
     #endregion
-
-    private CancellationToken CancellationFor(CallContext context) {
-        var token = context.CancellationToken;
-        return token.CanBeCanceled ? token : Http?.RequestAborted ?? default;
-    }
 }

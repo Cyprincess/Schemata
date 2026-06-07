@@ -17,9 +17,9 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
     public ResourceHttpFilterIntegrationShould(WebAppFactory factory) { _factory = factory; }
 
     private static async Task SeedAsync(HttpClient client) {
-        await client.PostAsJsonAsync("/students", new Student { FullName = "Alice", Age = 18 });
-        await client.PostAsJsonAsync("/students", new Student { FullName = "Bob", Age   = 25 });
-        await client.PostAsJsonAsync("/students", new Student { FullName = "Carol", Age = 9 });
+        await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Alice", Age = 18 });
+        await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Bob", Age   = 25 });
+        await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Carol", Age = 9 });
     }
 
     private static List<JsonElement> GetStudents(JsonElement body) {
@@ -42,7 +42,7 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
         await SeedAsync(client);
 
         // filter=age < 20 (URL encoded; field names are snake_case)
-        var response = await client.GetAsync("/students?filter=age%20%3C%2020");
+        var response = await client.GetAsync("/v1/students?filter=age%20%3C%2020");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body     = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -61,7 +61,7 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
         var client = _factory.CreateClient();
         await SeedAsync(client);
 
-        var response = await client.GetAsync("/students?PageSize=2");
+        var response = await client.GetAsync("/v1/students?PageSize=2");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body     = await response.Content.ReadFromJsonAsync<JsonElement>();

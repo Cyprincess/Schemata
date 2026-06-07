@@ -13,6 +13,8 @@
     <ProjectReference Include="..\..\src\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
   </ItemGroup>
 
 </Project>

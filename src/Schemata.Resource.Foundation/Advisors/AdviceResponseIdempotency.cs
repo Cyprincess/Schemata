@@ -67,7 +67,7 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
         var result = new CreateResultBase<TDetail> { Detail = detail };
         var bytes  = JsonSerializer.SerializeToUtf8Bytes(result);
 
-        var key = $"idempotency\x1e{pending.RequestId}".ToCacheKey(Keys.Resource);
+        var key = $"idempotency\x1e{pending.Operation}\x1e{pending.RequestId}".ToCacheKey(Keys.Resource);
         await _cache.SetAsync(key, bytes, new() {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24),
         }, ct);

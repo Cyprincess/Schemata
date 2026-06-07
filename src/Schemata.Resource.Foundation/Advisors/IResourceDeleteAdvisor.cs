@@ -13,5 +13,5 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-public interface IResourceDeleteAdvisor<TEntity> : IAdvisor<TEntity, DeleteRequest, ClaimsPrincipal?>
+public interface IResourceDeleteAdvisor<TEntity> : IAdvisor<DeleteRequest, TEntity, ClaimsPrincipal?>
     where TEntity : class, ICanonicalName;

@@ -17,21 +17,21 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
     [Fact]
     public async Task Get_AllStudents_Returns200WithList() {
         var client   = _factory.CreateClient();
-        var response = await client.GetAsync("/students");
+        var response = await client.GetAsync("/v1/students");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task Post_NewStudent_Returns201() {
         var client   = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/students", new Student { FullName = "Test" });
+        var response = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Test" });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
     public async Task Post_NewStudent_ResponseBodyContainsStudent() {
         var client   = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/students", new Student { FullName = "Returned" });
+        var response = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Returned" });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -45,7 +45,7 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
     [Fact]
     public async Task Delete_ExistingStudent_Returns204() {
         var client  = _factory.CreateClient();
-        var created = await client.PostAsJsonAsync("/students", new Student { FullName = "ToDelete" });
+        var created = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "ToDelete" });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         var body    = await created.Content.ReadFromJsonAsync<JsonElement>();
@@ -53,7 +53,7 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(gotName);
 
         var name     = nameProp.GetString()!;
-        var response = await client.DeleteAsync($"/{name}");
+        var response = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 }
