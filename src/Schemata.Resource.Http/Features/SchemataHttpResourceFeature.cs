@@ -43,7 +43,7 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
 
         services.AddOptions<MvcOptions>()
                 .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
-                     mvc.Conventions.Add(new ResourceControllerConvention(opts.Value.AuthenticationScheme));
+                     mvc.Conventions.Add(new ResourceControllerConvention(opts.Value.Resources, opts.Value.AuthenticationScheme));
                      mvc.Conventions.Add(new ResourceMethodControllerConvention(opts.Value.Methods, opts.Value.AuthenticationScheme));
                  });
 

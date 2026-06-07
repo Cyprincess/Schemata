@@ -15,7 +15,7 @@ namespace Schemata.Resource.Grpc;
 internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodProvider<TService>
     where TService : class
 {
-    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>? Registrar;
+    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>? Registrar;
 
     private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
@@ -31,7 +31,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var args   = t.GetGenericArguments();
         var method = typeof(ResourceServiceMethodProvider<TService>).GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(args[0], args[1], args[2], args[3]);
 
-        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>), method);
+        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>), method);
     }
 
     public ResourceServiceMethodProvider(
@@ -45,7 +45,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
     #region IServiceMethodProvider<TService> Members
 
     void IServiceMethodProvider<TService>.OnServiceMethodDiscovery(ServiceMethodProviderContext<TService> context) {
-        Registrar?.Invoke(context, _config);
+        Registrar?.Invoke(context, _config, _options.Value);
         ResourceCustomMethod.Register(context, _config, _options.Value);
     }
 
@@ -53,54 +53,73 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
     private static void RegisterAll<TEntity, TRequest, TDetail, TSummary>(
         ServiceMethodProviderContext<TService> context,
-        ResourceBinderConfiguration            config
+        ResourceBinderConfiguration            config,
+        SchemataResourceOptions                options
     )
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
         where TDetail : class, ICanonicalName
         where TSummary : class, ICanonicalName {
-        var model = config.Model;
+        var model      = config.Model;
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        var package = descriptor.Package ?? typeof(TEntity).Namespace;
-        var service = package is not null ? $"{package}.{descriptor.Singular}Service" : $"{descriptor.Singular}Service";
+        var package    = descriptor.Package ?? typeof(TEntity).Namespace;
+        var service    = package is not null ? $"{package}.{descriptor.Singular}Service" : $"{descriptor.Singular}Service";
+
+        var allowed = options.Resources.TryGetValue(typeof(TEntity).TypeHandle, out var resource)
+                          ? resource.Operations
+                          : null;
+
+        bool IsAllowed(Operations verb) {
+            return allowed is null || Array.IndexOf(allowed, verb) >= 0;
+        }
 
         var metadata = Array.Empty<object>();
 
-        context.AddUnaryMethod(
-            new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResultBase<TSummary>>(model)), metadata,
-            async (svc, req, ctx) => {
-                var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.ListAsync(req, new(svc, ctx));
-            });
+        if (IsAllowed(Operations.List)) {
+            context.AddUnaryMethod(
+                new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, $"List{descriptor.Plural}", CreateMarshaller<ListRequest>(model), CreateMarshaller<ListResultBase<TSummary>>(model)), metadata,
+                async (svc, req, ctx) => {
+                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                    return await rs.ListAsync(req, new(svc, ctx));
+                });
+        }
 
-        context.AddUnaryMethod(
-            new Method<GetRequest, TDetail>(MethodType.Unary, service, $"Get{descriptor.Singular}", CreateMarshaller<GetRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, ctx) => {
-                var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.GetAsync(req, new(svc, ctx));
-            });
+        if (IsAllowed(Operations.Get)) {
+            context.AddUnaryMethod(
+                new Method<GetRequest, TDetail>(MethodType.Unary, service, $"Get{descriptor.Singular}", CreateMarshaller<GetRequest>(model), CreateMarshaller<TDetail>(model)),
+                metadata, async (svc, req, ctx) => {
+                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                    return await rs.GetAsync(req, new(svc, ctx));
+                });
+        }
 
-        context.AddUnaryMethod(
-            new Method<TRequest, TDetail>(MethodType.Unary, service, $"Create{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, ctx) => {
-                var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.CreateAsync(req, new(svc, ctx));
-            });
+        if (IsAllowed(Operations.Create)) {
+            context.AddUnaryMethod(
+                new Method<TRequest, TDetail>(MethodType.Unary, service, $"Create{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
+                metadata, async (svc, req, ctx) => {
+                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                    return await rs.CreateAsync(req, new(svc, ctx));
+                });
+        }
 
-        context.AddUnaryMethod(
-            new Method<TRequest, TDetail>(MethodType.Unary, service, $"Update{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
-            metadata, async (svc, req, ctx) => {
-                var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                return await rs.UpdateAsync(req, new(svc, ctx));
-            });
+        if (IsAllowed(Operations.Update)) {
+            context.AddUnaryMethod(
+                new Method<TRequest, TDetail>(MethodType.Unary, service, $"Update{descriptor.Singular}", CreateMarshaller<TRequest>(model), CreateMarshaller<TDetail>(model)),
+                metadata, async (svc, req, ctx) => {
+                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                    return await rs.UpdateAsync(req, new(svc, ctx));
+                });
+        }
 
-        context.AddUnaryMethod(
-            new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
-            async (svc, req, ctx) => {
-                var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                await rs.DeleteAsync(req, new(svc, ctx));
-                return new();
-            });
+        if (IsAllowed(Operations.Delete)) {
+            context.AddUnaryMethod(
+                new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
+                async (svc, req, ctx) => {
+                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                    await rs.DeleteAsync(req, new(svc, ctx));
+                    return new();
+                });
+        }
     }
 
     private static Marshaller<T> CreateMarshaller<T>(RuntimeTypeModel model) {

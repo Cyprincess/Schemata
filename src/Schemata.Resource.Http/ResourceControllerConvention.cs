@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
@@ -12,9 +16,24 @@ namespace Schemata.Resource.Http;
 ///     MVC convention that configures route templates, rate limiting, and optional authentication
 ///     for generic <see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" /> instances
 ///     per <seealso href="https://google.aip.dev/127">AIP-127: HTTP and gRPC Transcoding</seealso>.
+///     Also drops controller actions for verbs that the entity's
+///     <see cref="ResourceAttribute.Operations" /> whitelist excludes.
 /// </summary>
-public sealed class ResourceControllerConvention(string? scheme = null) : IControllerModelConvention
+public sealed class ResourceControllerConvention(
+    IReadOnlyDictionary<RuntimeTypeHandle, ResourceAttribute> resources,
+    string?                                                   scheme = null
+) : IControllerModelConvention
 {
+    // Custom methods are handled by ResourceMethodControllerConvention and are unaffected.
+    private static readonly IReadOnlyDictionary<string, Operations> VerbByAction =
+        new Dictionary<string, Operations>(StringComparer.Ordinal) {
+            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.ListAsync)]   = Operations.List,
+            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.GetAsync)]    = Operations.Get,
+            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.CreateAsync)] = Operations.Create,
+            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.UpdateAsync)] = Operations.Update,
+            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.DeleteAsync)] = Operations.Delete,
+        };
+
     #region IControllerModelConvention Members
 
     public void Apply(ControllerModel controller) {
@@ -38,6 +57,17 @@ public sealed class ResourceControllerConvention(string? scheme = null) : IContr
 
         foreach (var selector in controller.Selectors) {
             selector.AttributeRouteModel?.Template = route;
+        }
+
+        if (resources.TryGetValue(entityType.TypeHandle, out var resource)
+         && resource.Operations is { } allowed) {
+            var allowedSet = new HashSet<Operations>(allowed);
+            for (var i = controller.Actions.Count - 1; i >= 0; i--) {
+                if (VerbByAction.TryGetValue(controller.Actions[i].ActionName, out var verb)
+                 && !allowedSet.Contains(verb)) {
+                    controller.Actions.RemoveAt(i);
+                }
+            }
         }
 
         var quota = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
