@@ -2,6 +2,11 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>
+///     Fluent builder for a boundary catch attached to an
+///     <see cref="Activity" /> via <see cref="ActivityBehavior.OnError{T}" /> /
+///     <see cref="ActivityBehavior.OnTimer" /> / similar.
+/// </summary>
 public sealed class BoundaryCatch
 {
     private readonly Activity          _activity;
@@ -22,6 +27,7 @@ public sealed class BoundaryCatch
         _eventDefinition = eventDefinition;
     }
 
+    /// <summary>Routes the catch to <paramref name="target" /> and returns control to the host activity builder.</summary>
     public ActivityBehavior Go(FlowElement target) {
         var boundaryEvent = new FlowEvent {
             Id           = $"boundary_{ProcessDefinition.GenerateId()}",
@@ -40,10 +46,13 @@ public sealed class BoundaryCatch
         return _behavior;
     }
 
+    /// <summary>Routes the catch to <paramref name="target" />.</summary>
     public ActivityBehavior Go(Activity target) { return Go((FlowElement)target); }
 
+    /// <summary>Routes the catch to <paramref name="target" />.</summary>
     public ActivityBehavior Go(EndEvent target) { return Go((FlowElement)target); }
 
+    /// <summary>Marks the catch as non-interrupting (the host activity continues running).</summary>
     public BoundaryCatch NonInterrupting() {
         _nonInterrupting = true;
         return this;

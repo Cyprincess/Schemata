@@ -31,7 +31,7 @@ public interface IProcessRegistry
     ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default);
 
     /// <summary>
-    ///     Removes a previously registered process definition.
+    ///     Removes a registered process definition by name.
     /// </summary>
     ValueTask UnregisterAsync(string processName, CancellationToken ct = default);
 

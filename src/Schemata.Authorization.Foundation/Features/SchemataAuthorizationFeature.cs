@@ -20,6 +20,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Scheduling.Skeleton;
 using Schemata.Transport.Http.Features;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -122,6 +123,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
                 .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthenticationHandler<TApp, TToken>>(options.BearerScheme, null)
                 .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthorizationCodeHandler<TApp, TToken>>(options.CodeScheme, null);
 
-        services.AddHostedService<TokenCleanupService<TToken>>();
+        services.TryAddTransient<TokenCleanupJob<TToken>>();
+        services.Configure<SchemataSchedulingOptions>(o => o.Jobs.Add(new(typeof(TokenCleanupJob<TToken>), new CronSchedule("0 * * * *"))));
     }
 }

@@ -6,6 +6,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>Extension entry points for fluent <see cref="ProcessDefinition" /> construction.</summary>
 public static class ProcessBuilder
 {
     public static StartFlow Start(this ProcessDefinition definition) { return new(definition); }
@@ -69,7 +70,7 @@ public static class ProcessBuilder
                            var entity = value switch {
                                T t              => t,
                                JsonElement json => JsonSerializer.Deserialize<T>(json.GetRawText(), options),
-                               var _            => default,
+                               var _            => null,
                            };
 
                            return new(entity is not null && predicate(entity));

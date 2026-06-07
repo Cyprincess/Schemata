@@ -2,10 +2,11 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Models;
 
-/// <remarks>
-///     Source and Target hold direct object references rather than string IDs,
-///     enabling reference-based matching during engine traversal.
-/// </remarks>
+/// <summary>
+///     A BPMN Sequence Flow connecting two <see cref="FlowElement" />s.
+///     <see cref="Source" /> and <see cref="Target" /> hold direct object
+///     references so the engine matches by identity during graph traversal.
+/// </summary>
 public sealed class SequenceFlow
 {
     public string Id { get; set; } = null!;

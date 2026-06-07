@@ -17,7 +17,7 @@ namespace Schemata.Flow.Http.Controllers;
 
 /// <summary>HTTP controller exposing process flow operations.</summary>
 [ApiController]
-[Route("~/processes")]
+[Route("~/v1/processes")]
 public class ProcessController : ControllerBase
 {
     private readonly IRepository<SchemataProcess>           _processes;

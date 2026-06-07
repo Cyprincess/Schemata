@@ -2,6 +2,7 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>Fluent continuation of <see cref="ProcessBuilder.Start(ProcessDefinition)" /> placing the initial event.</summary>
 public sealed class StartFlow
 {
     private readonly ProcessDefinition _definition;
@@ -12,6 +13,7 @@ public sealed class StartFlow
         _eventDefinition = eventDefinition;
     }
 
+    /// <summary>Wires the start event to <paramref name="activity" /> and continues from there.</summary>
     public ActivityBehavior Go(Activity activity) {
         var startEvent = new FlowEvent {
             Id         = $"start_{ProcessDefinition.GenerateId()}",
@@ -28,6 +30,7 @@ public sealed class StartFlow
         return new(_definition, activity);
     }
 
+    /// <summary>Wires the start event into an event-based gateway waiting on the supplied <paramref name="branches" />.</summary>
     public ProcessDefinition Await(params EventBranch[] branches) {
         var startEvent = new FlowEvent {
             Id         = $"start_{ProcessDefinition.GenerateId()}",
