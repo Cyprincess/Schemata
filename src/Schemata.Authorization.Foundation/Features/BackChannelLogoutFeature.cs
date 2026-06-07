@@ -33,11 +33,10 @@ public sealed class BackChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowF
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.AddHttpClient(nameof(BackChannelLogoutService<,>));
-        services.TryAddSingleton<BackChannelLogoutQueue>();
-        services.AddHostedService<BackChannelLogoutQueue>(sp => sp.GetRequiredService<BackChannelLogoutQueue>());
         services.TryAddScoped<BackChannelLogoutService<TApp, TToken>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, BackChannelLogoutService<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBackChannelLogout>());
+        services.TryAddTransient<BackChannelLogoutJob>();
     }
 
     #endregion

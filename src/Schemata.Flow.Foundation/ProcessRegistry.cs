@@ -12,6 +12,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>In-memory <see cref="IProcessRegistry"/> backed by a thread-safe dictionary.</summary>
 public sealed class ProcessRegistry : IProcessRegistry
 {
     private readonly ConcurrentDictionary<string, ProcessRegistration> _registrations
@@ -19,6 +20,7 @@ public sealed class ProcessRegistry : IProcessRegistry
 
     private readonly IServiceProvider _services;
 
+    /// <summary>Creates a new <see cref="ProcessRegistry"/> resolving dependencies from <paramref name="services"/>.</summary>
     public ProcessRegistry(IServiceProvider services) { _services = services; }
 
     #region IProcessRegistry Members

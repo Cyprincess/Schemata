@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Flow Scheduling Bridge</Description>
+    <PackageTags>application;business;framework;flow;workflow;schedule;job;timer</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Scheduling.Event\Schemata.Scheduling.Event.csproj" />
+    <ProjectReference Include="..\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

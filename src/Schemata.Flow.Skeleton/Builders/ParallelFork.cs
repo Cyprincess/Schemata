@@ -3,6 +3,7 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>Fluent continuation of <see cref="ActivityBehavior.Fork" /> handing off to a parallel join.</summary>
 public sealed class ParallelFork
 {
     private readonly FlowBranch[]      _branches;
@@ -15,6 +16,7 @@ public sealed class ParallelFork
         _branches   = branches;
     }
 
+    /// <summary>Inserts a parallel join gateway joining <paramref name="exits" /> (or the fork's branch exits when empty).</summary>
     public ParallelJoin Join(params Activity[] exits) {
         var joinGateway = new ParallelGateway {
             Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Join_{_gateway.Name}",

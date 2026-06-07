@@ -31,7 +31,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2">
 ///         RFC 9700: The OAuth 2.0 Authorization
-///         Framework: Best Current Practice §2.1.2
+///         Framework: Best Current Practice Section 2.1.2
 ///     </seealso>
 ///     .
 /// </summary>
@@ -148,10 +148,8 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             granted = request.Scope;
         }
 
-        // authorization codes are single-use; mark as redeemed
-        // to prevent replay attacks when RequireCodeSingleUse is enabled.
-        // See RFC 9700 §2.1.2.
-        if (options.Value.RequireCodeSingleUse) {
+        // Read from the exchange so ICodeExchangeAdvisor can toggle the policy per request.
+        if (exchange.RequireSingleUse) {
             token.Status = TokenStatuses.Redeemed;
             await tokens.UpdateAsync(token, ct);
         }

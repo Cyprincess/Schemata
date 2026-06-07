@@ -3,6 +3,13 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>
+///     Fluent builder for the outgoing path of an <see cref="Activity" /> and
+///     the boundary catches attached to it.  Each <c>Go</c>/<c>Decide</c>/
+///     <c>Include</c>/<c>Fork</c>/<c>Await</c>/<c>End</c>/<c>Terminate</c>
+///     call defines exactly one outgoing path; calling another path-defining
+///     method on the same activity throws.
+/// </summary>
 public sealed class ActivityBehavior
 {
     private readonly ProcessDefinition _definition;

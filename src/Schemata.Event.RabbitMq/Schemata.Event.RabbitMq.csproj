@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Event RabbitMQ Provider</Description>
+    <PackageTags>application;business;framework;event;messaging;rabbitmq</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Event.Foundation\Schemata.Event.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

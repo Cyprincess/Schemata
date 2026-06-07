@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -26,13 +26,13 @@ public static class BackChannelLogoutService
 
 /// <summary>
 ///     Performs OIDC Back-Channel Logout per
-///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>
-///     .
+///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>.
 ///     Discovers session clients from stored tokens, resolves per-RP subject
-///     identifiers (including pairwise), builds a logout token JWT, and enqueues
-///     an out-of-band HTTP POST to each RP's <c>backchannel_logout_uri</c>.
-///     All heavy work (DB queries, JWT signing) runs in the request scope;
-///     only the HTTP call is deferred to the background queue.
+///     identifiers (including pairwise), builds a logout token JWT, and triggers
+///     one <see cref="BackChannelLogoutJob" /> per relying party through
+///     <see cref="IScheduler" />. <c>UseScheduling()</c> must be configured at
+///     host bootstrap; when the scheduler is absent, <c>EnqueueBackChannelAsync</c>
+///     raises <c>FAILED_PRECONDITION</c> before any notification is attempted.
 /// </summary>
 public sealed class BackChannelLogoutService<TApp, TToken>(
     IApplicationManager<TApp>              apps,
@@ -40,11 +40,19 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
     TokenService                           issuer,
     ISubjectIdentifierService              identifier,
     IOptions<SchemataAuthorizationOptions> options,
-    BackChannelLogoutQueue                 queue
+    IServiceProvider                       services
 ) : ILogoutNotifier
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
+    private static Guid NextJobId() {
+#if NET10_0_OR_GREATER
+        return Guid.CreateVersion7();
+#else
+        return Guid.NewGuid();
+#endif
+    }
+
     #region ILogoutNotifier Members
 
     public Task<List<string>>
@@ -52,12 +60,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
         return Task.FromResult<List<string>>([]);
     }
 
-    /// <summary>
-    ///     Enqueues back-channel logout requests for all RPs that have active
-    ///     sessions for the given subject or session.
-    ///     Each RP receives a signed logout token containing the subject (or
-    ///     pairwise identifier), session ID, and the logout event type.
-    /// </summary>
     public async Task EnqueueBackChannelAsync(string? subject, string? session, CancellationToken ct = default) {
         if (string.IsNullOrWhiteSpace(subject) && string.IsNullOrWhiteSpace(session)) {
             return;
@@ -65,10 +67,17 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 
         var clients = await LogoutSessionHelper.GetSessionClientsAsync(tokens, subject, session, ct);
 
-        await foreach (var app in apps.ListAsync(
-                           q => q.Where(a => a.BackChannelLogoutUri != null
-                                          && a.Name != null
-                                          && clients.Contains(a.Name)), ct)) {
+         var scheduler = services.GetService<IScheduler>();
+         if (scheduler == null) {
+             throw new FailedPreconditionException(
+                 message: "Back-channel logout requires Scheduling; call UseScheduling() at host bootstrap."
+             );
+         }
+
+         await foreach (var app in apps.ListAsync(
+                            q => q.Where(a => a.BackChannelLogoutUri != null
+                                           && a.Name != null
+                                           && clients.Contains(a.Name)), ct)) {
             if (app.BackChannelLogoutSessionRequired && string.IsNullOrWhiteSpace(session)) {
                 continue;
             }
@@ -99,23 +108,13 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             var uri = app.BackChannelLogoutUri;
             var jwt = issuer.CreateToken(claims, TimeSpan.FromMinutes(2));
 
-            queue.Enqueue(async (sp, token) => {
-                try {
-                    var factory = sp.GetRequiredService<IHttpClientFactory>();
-                    var client  = factory.CreateClient(nameof(BackChannelLogoutService<,>));
-                    client.Timeout = BackChannelLogoutService.Timeout;
-                    var content  = new FormUrlEncodedContent([new(Parameters.LogoutToken, jwt)]);
-                    var response = await client.PostAsync(uri, content, token);
-
-                    if (!response.IsSuccessStatusCode) {
-                        var log = sp.GetRequiredService<ILogger<BackChannelLogoutService<TApp, TToken>>>();
-                        log.LogWarning("Back-channel logout to {Uri} returned {StatusCode}.", uri, (int)response.StatusCode);
-                    }
-                } catch (Exception ex) when (ex is not OperationCanceledException) {
-                    var log = sp.GetRequiredService<ILogger<BackChannelLogoutService<TApp, TToken>>>();
-                    log.LogWarning(ex, "Back-channel logout to {Uri} failed.", uri);
-                }
-            });
+            await scheduler.TriggerAsync<BackChannelLogoutJob>(new() {
+                Job = $"authorization/back-channel-logout/{NextJobId():N}",
+                Variables = new Dictionary<string, object?> {
+                    [BackChannelLogoutJob.VariableKeys.Uri]         = uri,
+                    [BackChannelLogoutJob.VariableKeys.LogoutToken] = jwt,
+                },
+            }, ct);
         }
     }
 

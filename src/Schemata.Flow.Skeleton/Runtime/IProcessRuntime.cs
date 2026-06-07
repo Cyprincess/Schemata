@@ -7,7 +7,7 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
 
-/// <summary>High-level façade for starting and interacting with process instances.</summary>
+/// <summary>High-level facade for starting and interacting with process instances.</summary>
 public interface IProcessRuntime
 {
     /// <summary>Starts a new process instance from the registered definition.</summary>

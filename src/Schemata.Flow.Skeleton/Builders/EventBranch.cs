@@ -3,6 +3,7 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
+/// <summary>One arm of <see cref="ActivityBehavior.Await" /> waiting on an event definition.</summary>
 public sealed class EventBranch
 {
     private readonly IEventDefinition _eventDefinition;
@@ -11,6 +12,7 @@ public sealed class EventBranch
 
     internal EventBranch(IEventDefinition eventDefinition) { _eventDefinition = eventDefinition; }
 
+    /// <summary>Routes the branch to <paramref name="target" /> when the event fires.</summary>
     public EventBranch Go(FlowElement target) {
         if (_decisionBranches is not null) {
             throw new InvalidOperationException($"Cannot set target on event branch '{
@@ -22,10 +24,13 @@ public sealed class EventBranch
         return this;
     }
 
+    /// <summary>Routes the branch to <paramref name="target" />.</summary>
     public EventBranch Go(Activity target) { return Go((FlowElement)target); }
 
+    /// <summary>Routes the branch to <paramref name="target" />.</summary>
     public EventBranch Go(EndEvent target) { return Go((FlowElement)target); }
 
+    /// <summary>Inserts an exclusive gateway after the catch event with the supplied <paramref name="branches" />.</summary>
     public EventBranch Decide(params Branch[] branches) {
         if (_target is not null) {
             throw new InvalidOperationException($"Cannot call Decide on event branch '{

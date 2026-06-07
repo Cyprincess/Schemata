@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Flow.Skeleton.Entities;
 
-/// <summary>A persisted process instance derived from a registered <see cref="Models.ProcessDefinition" />.</summary>
+/// <summary>Persisted process instance derived from a registered <see cref="Models.ProcessDefinition" />.</summary>
 [DisplayName("Process")]
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
