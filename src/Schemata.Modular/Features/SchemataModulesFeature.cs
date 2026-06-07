@@ -20,7 +20,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
 {
-    public const int DefaultPriority = Orders.Extension + 100_000_000;
+    public const int DefaultPriority = Orders.Extension + 120_000_000;
 
     public override int Priority => DefaultPriority;
 

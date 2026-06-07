@@ -12,13 +12,11 @@ namespace Schemata.Core.Features;
 
 /// <summary>
 ///     Registers MVC controllers with endpoint routing, applies deferred
-///     <see cref="MvcOptions" /> and <see cref="IMvcBuilder" /> configurators, and
+///     <see cref="MvcOptions" /> / <see cref="IMvcBuilder" /> configurators, and
 ///     strips <c>Schemata.*</c> assemblies from the
-///     <see cref="ApplicationPartManager" /> to prevent duplicate controller
-///     discovery.
+///     <see cref="ApplicationPartManager" /> to prevent duplicate controller discovery.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
-[DependsOn<SchemataExceptionHandlerFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
 {
     public const int DefaultPriority = SchemataSessionFeature<ISessionStore>.DefaultPriority + 10_000_000;

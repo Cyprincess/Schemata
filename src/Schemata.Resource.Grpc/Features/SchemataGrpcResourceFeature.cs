@@ -1,10 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using Grpc.AspNetCore.Server;
 using Grpc.AspNetCore.Server.Model;
-using Grpc.Core;
-using Grpc.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -19,19 +16,24 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
-using Schemata.Resource.Grpc.Interceptors;
+using Schemata.Transport.Grpc;
+using Schemata.Transport.Grpc.Features;
 
 namespace Schemata.Resource.Grpc.Features;
 
 /// <summary>
 ///     Feature that registers gRPC transport for resources: code-first protobuf-net
-///     serialization, per-resource service routing, exception→status mapping,
-///     and gRPC server reflection for tooling.
+///     serialization, per-resource service routing, and a code-first reflection
+///     contributor. Shared gRPC plumbing (<c>AddCodeFirstGrpc</c>,
+///     <see cref="Schemata.Transport.Grpc.Interceptors.ExceptionMappingInterceptor" />,
+///     and gRPC server reflection) is supplied by
+///     <see cref="SchemataTransportGrpcFeature" />.
 /// </summary>
 [DependsOn<SchemataResourceFeature>]
+[DependsOn<SchemataTransportGrpcFeature>]
 public sealed class SchemataGrpcResourceFeature : FeatureBase
 {
-    public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 20_000_000;
+    public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 200_000;
 
     private static readonly MethodInfo? MapGrpcServiceMethod = typeof(GrpcEndpointRouteBuilderExtensions)
                                                               .GetMethods(BindingFlags.Public | BindingFlags.Static)
@@ -49,12 +51,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.AddHttpContextAccessor();
-
-        services.AddCodeFirstGrpc(options => { options.Interceptors.Add<ExceptionMappingInterceptor>(); });
-
-        services.TryAddSingleton<ExceptionMappingInterceptor>();
-
         services.TryAddScoped(typeof(ResourceService<,,,>));
 
         services.TryAddSingleton(sp => {
@@ -69,8 +65,8 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ResourceServiceMethodProvider<>)));
 
-        services.TryAddSingleton(sp => new ReflectionServiceImpl(MergeDescriptors(sp)));
-        services.TryAddSingleton(sp => new ReflectionV1ServiceImpl(MergeDescriptors(sp)));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, ResourceGrpcServiceDescriptorContributor>());
     }
 
     public override void ConfigureEndpoints(
@@ -82,16 +78,12 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         var sp      = app.ApplicationServices;
         var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
-        var hasGrpcResources = false;
-
         foreach (var (_, resource) in options.Value.Resources) {
             if (resource.Endpoints is not null
              && resource.Endpoints.Count != 0
              && resource.Endpoints.All(e => e != GrpcResourceAttribute.Name)) {
                 continue;
             }
-
-            hasGrpcResources = true;
 
             var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
 
@@ -113,68 +105,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
                 builder.RequireAuthorization(policy);
             }
         }
-
-        if (hasGrpcResources) {
-            endpoints.MapGrpcService<ReflectionServiceImpl>();
-            endpoints.MapGrpcService<ReflectionV1ServiceImpl>();
-        }
-    }
-
-    private static Google.Protobuf.Reflection.ServiceDescriptor[] MergeDescriptors(IServiceProvider sp) {
-        var codeFirst = BuildCodeFirstDescriptors(sp);
-        var epd       = sp.GetRequiredService<EndpointDataSource>();
-        var protoFirst = ResolveProtoFirstDescriptors(epd);
-        return codeFirst.Concat(protoFirst).ToArray();
-    }
-
-    private static Google.Protobuf.Reflection.ServiceDescriptor[] ResolveProtoFirstDescriptors(
-        EndpointDataSource epd
-    ) {
-        return epd.Endpoints
-                  .Select(e => e.Metadata.GetMetadata<GrpcMethodMetadata>())
-                  .Where(m => m is not null)
-                  .Select(m => m!.ServiceType)
-                  .Distinct()
-                  .Select(GetServiceDescriptor)
-                  .Where(d => d is not null)
-                  .Cast<Google.Protobuf.Reflection.ServiceDescriptor>()
-                  .ToArray();
-    }
-
-    private static Google.Protobuf.Reflection.ServiceDescriptor? GetServiceDescriptor(Type serviceType) {
-        if (serviceType.IsConstructedGenericType
-            && serviceType.GetGenericTypeDefinition() == typeof(ResourceService<,,,>)) {
-            return null;
-        }
-
-        for (var t = serviceType; t is not null && t != typeof(object); t = t.BaseType) {
-            var attr = t.GetCustomAttribute<BindServiceMethodAttribute>();
-            if (attr is not null) {
-                return attr.BindType
-                           .GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)
-                           ?.GetValue(null) as Google.Protobuf.Reflection.ServiceDescriptor;
-            }
-        }
-
-        return null;
-    }
-
-    private static Google.Protobuf.Reflection.ServiceDescriptor[] BuildCodeFirstDescriptors(IServiceProvider sp) {
-        var config  = sp.GetRequiredService<ResourceBinderConfiguration>();
-        var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
-
-        var types = options.Value.Resources
-                           .Where(r => r.Value.Endpoints is null
-                                    || r.Value.Endpoints.Count == 0
-                                    || r.Value.Endpoints.Any(e => e == GrpcResourceAttribute.Name))
-                           .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
-                           .ToArray();
-
-        if (types.Length == 0) {
-            return [];
-        }
-
-        return FileDescriptorBridge.BuildServiceDescriptors(config.Model, types).ToArray();
     }
 
     private static object? MapGrpcService(IEndpointRouteBuilder endpoints, Type serviceType) {

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - HTTP Transport</Description>
+    <PackageTags>application;business;framework;transport;http;rest;restful</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
+    <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+  </ItemGroup>
+
+</Project>

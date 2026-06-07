@@ -21,7 +21,7 @@ namespace Schemata.Authorization.Identity.Features;
 [DependsOn("Schemata.Identity.Foundation.Features.SchemataIdentityFeature`4")]
 public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
 {
-    public const int DefaultPriority = Orders.Extension + 30_100_000;
+    public const int DefaultPriority = Orders.Extension + 50_100_000;
 
     public override int Priority => DefaultPriority;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -20,19 +21,23 @@ using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
+using Schemata.Transport.Http.Features;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Features;
 
+/// <summary>
+///     Wires Schemata's Identity-backed API endpoints, controllers, and request advisors.
+/// </summary>
 [DependsOn<SchemataAuthenticationFeature>]
-[DependsOn<SchemataControllersFeature>]
+[DependsOn<SchemataTransportHttpFeature>]
 public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
     where TUser : SchemataUser, new()
     where TRole : SchemataRole
     where TUserStore : class, IUserStore<TUser>
     where TRoleStore : class, IRoleStore<TRole>
 {
-    public const int DefaultPriority = Orders.Extension + 10_000_000;
+    public const int DefaultPriority = Orders.Extension + 30_000_000;
 
     public override int Priority => DefaultPriority;
 
@@ -57,11 +62,10 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
             options.JsonSerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
-        
-        var part = new SchemataExtensionPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
+
+        services.AddSchemataApplicationPart<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {
-                     manager.ApplicationParts.Add(part);
                      manager.FeatureProviders.Add(new IdentityControllerFeatureProvider(typeof(AuthenticateController<TUser>)));
                  });
 
