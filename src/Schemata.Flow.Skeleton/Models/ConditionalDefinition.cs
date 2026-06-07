@@ -3,7 +3,7 @@ using Schemata.Flow.Skeleton.Runtime;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Conditional event definition — triggers when <see cref="Condition" />
+///     A BPMN Conditional event definition - triggers when <see cref="Condition" />
 ///     evaluates to <c>true</c>.
 /// </summary>
 public sealed class ConditionalDefinition : IEventDefinition

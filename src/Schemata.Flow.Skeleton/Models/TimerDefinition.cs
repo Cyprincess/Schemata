@@ -12,7 +12,7 @@ public sealed class TimerDefinition : IEventDefinition
     public TimerType TimerType { get; set; }
 
     /// <summary>
-    ///     The time expression string — ISO 8601 datetime/duration, or cron.
+    ///     The time expression string - ISO 8601 datetime/duration, or cron.
     /// </summary>
     public string TimeExpression { get; set; } = null!;
 

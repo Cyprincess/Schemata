@@ -1,39 +1,91 @@
 # Entities
 
-Entities are the primary declaration type in SKM.
+Entities are the primary declaration type in SKM. The generator emits each entity as a `public record` with auto-properties for every declared field. Trait interfaces from `Use` declarations and base lists appear in the record's base list.
 
 ## Syntax
 
-```
+```text
 Entity <Name> [: <bases>] {
+    [Note ...]
     [Use <trait-names>]
     [Enum declarations]
     [Trait declarations]
-    [Field declarations]
-    [Index declarations]
     [Object blocks]
+    [Index declarations]
+    [Field declarations]
 }
 ```
 
 Members may appear in any order and can be freely intermixed.
 
+## Allowed members
+
+| Member          | Description                                          | Emitted? |
+| --------------- | ---------------------------------------------------- | -------- |
+| `Note`          | Documentation string                                 | No       |
+| `Use`           | Incorporate trait interfaces into the base list      | Yes (base list only) |
+| `Enum`          | Nested enum declaration                              | Yes      |
+| `Trait`         | Nested trait declaration                             | No       |
+| `Object`        | DTO projection block (parsed as `View` AST node)     | No       |
+| `Index`         | Index declaration (parsed as `Pointer` AST node)     | No       |
+| Field           | Property declaration                                 | Yes      |
+
+Nested `Trait` declarations, `Object` blocks, and `Index` declarations are parsed and stored in the AST but **not emitted as C# today**. See [Objects](objects.md) for the Object block story.
+
 ## Composition
 
-Entities use the same `Use` and base-list syntax as traits:
+Entities use the same `Use` and base-list syntax as traits. `EntityGenerator.GenerateUses` collects names from both `Uses` and `Bases`, resolves any name that matches a known trait to its `I`-prefixed interface form, deduplicates, and writes them as the record's base list.
 
-```
+```text
 Entity Student : Entity, SoftDelete {
     // equivalent to: Use Entity, SoftDelete
 }
 ```
 
-Base lists and `Use` declarations are semantically equivalent. See [Traits](traits.md) for details.
+## What the generator emits
 
-## Nested Enums
+`EntityGenerator.Generate` emits a `public record` for each entity:
 
-Enums can be declared inside an entity body:
+- The record name matches the entity name exactly.
+- Each field becomes a `public <CLRType> <PascalCaseName> { get; set; } = <default>;` property.
+- Non-nullable `string` fields default to `string.Empty`. All other non-nullable fields default to `default`. Nullable fields default to `null`.
+- Field options and field properties are **not consumed** — parsed but not emitted.
+- `Note` members are **not emitted**.
+- Nested `Trait`, `Object`, and `Index` members are **not emitted**.
+- Nested `Enum` declarations are emitted inline via `EnumGenerator`.
 
+Given:
+
+```text
+Namespace My.Models
+
+Trait Identifier {
+    long id [primary key]
+}
+
+Entity Student : Identifier {
+    string full_name [not null]
+    int age
+}
 ```
+
+The generator produces:
+
+```csharp
+namespace My.Models {
+    public record Student : IIdentifier {
+        public System.Int64 Id { get; set; } = default;
+        public System.String FullName { get; set; } = string.Empty;
+        public System.Int32 Age { get; set; } = default;
+    }
+}
+```
+
+## Nested enums
+
+Enums declared inside an entity body are emitted by `EnumGenerator` and appear before the entity's own fields in the generated source:
+
+```text
 Entity Post {
     Enum Status {
         Draft
@@ -42,77 +94,31 @@ Entity Post {
     }
 
     Status status { Default 'Draft' }
+    string title [not null]
 }
 ```
 
-See [Enums](enums.md) for the full enum syntax.
+## Index declarations
 
-## Nested Traits
+Index declarations (`Index col1 col2 [options]`) are parsed as `Pointer` AST nodes and stored on the entity. They are **not emitted as C# today** and are reserved for future EF Core fluent-API generation.
 
-Traits can also be declared inside an entity body. They follow the same syntax as top-level traits.
-
-## Index Declarations
-
-Index declarations define database indexes on one or more columns:
-
-```
-Index <column> [<additional-columns>...] [<options>] [{ <notes> }]
-```
-
-The index name is derived automatically: `IX_{Entity}_{Col1}_{Col2}_...`
-
-**Index options:**
-
-| Option   | Aliases  | Description             |
-| -------- | -------- | ----------------------- |
-| `unique` | `Unique` | Unique index constraint |
-| `b tree` | `BTree`  | B-tree index            |
-| `hash`   | `Hash`   | Hash index              |
-
-Examples:
-
-```
+```text
 Entity Post {
     long user_id [b tree]
     long category_id
-    string title [not null]
 
     Index user_id [b tree]
     Index user_id category_id [unique]
-    Index title [b tree] {
-        Note 'Full-text search index'
-    }
 }
 ```
 
-## Object Blocks
+## Object blocks
 
-Object blocks declare DTO projections of the entity. See [Objects](objects.md) for the complete syntax.
+Object blocks (`Object name { ... }`) are parsed as `View` AST nodes and stored on the entity. They are **not emitted as C# today**. See [Objects](objects.md).
 
-```
-Entity Student {
-    Use Entity
-    string full_name
-    int age
+## Complete example
 
-    Object detail {
-        id
-        full_name
-        age
-        create_time
-        update_time
-    }
-
-    Object summary {
-        id
-        full_name
-    }
-}
-```
-
-## Complete Example
-
-```
+```text
 Entity Post {
     Use Entity, SoftDelete
 
@@ -147,3 +153,12 @@ Entity Post {
     }
 }
 ```
+
+## See also
+
+- [Fields](fields.md) — field syntax and name conversion
+- [Types](types.md) — built-in type token table
+- [Traits](traits.md) — trait body and interface emission
+- [Enums](enums.md) — enum syntax and emission rules
+- [Objects](objects.md) — Object block syntax (parsed, not emitted today)
+- [Grammar](grammar.md) — entity production rule

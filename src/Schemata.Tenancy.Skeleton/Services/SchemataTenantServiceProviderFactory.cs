@@ -15,7 +15,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
 ///     Tenant overrides must be Singleton; Scoped/Transient are rejected at build time.
-///     Overrides win at top-level resolution only — services injected into host-scoped
+///     Overrides win at top-level resolution only - services injected into host-scoped
 ///     constructors still see the host's view of their dependencies. Tenant-aware services
 ///     that must participate in injection chains should consult
 ///     <see cref="ITenantContextAccessor{TTenant}" /> at call time.

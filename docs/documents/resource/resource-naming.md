@@ -1,10 +1,17 @@
 # Resource Naming
 
-The resource system follows AIP-122 resource name patterns for identifying entities. Resource names are hierarchical paths like `publishers/acme/books/les-miserables` that encode both the resource's identity and its parent relationships.
+`ResourceNameDescriptor` parses and caches AIP-122 resource name patterns, providing methods for resolving, parsing, and building canonical names. Every entity that participates in the resource system must implement `ICanonicalName` and, for hierarchical names, carry a `[CanonicalName("...")]` attribute that declares the pattern.
 
-## ICanonicalName
+## Where the code lives
 
-Every type used in the resource system must implement `ICanonicalName`:
+| Package | Key files |
+|---|---|
+| `Schemata.Common` | `ResourceNameDescriptor.cs` |
+| `Schemata.Common` | `SchemataNaming.cs` |
+| `Schemata.Abstractions` | `Entities/ICanonicalName.cs` |
+| `Schemata.Abstractions` | `Entities/CanonicalNameAttribute.cs` |
+
+## `ICanonicalName`
 
 ```csharp
 public interface ICanonicalName
@@ -14,137 +21,107 @@ public interface ICanonicalName
 }
 ```
 
-| Property        | Description                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| `Name`          | The short resource name -- the leaf segment of the canonical name (e.g., `les-miserables`). |
-| `CanonicalName` | The fully-qualified resource name (e.g., `publishers/acme/books/les-miserables`).           |
+`Name` holds the leaf segment (e.g., `"les-miserables"`). `CanonicalName` holds the full path (e.g., `"publishers/acme/books/les-miserables"`). Both are set by `AdviceAddCanonicalName<TEntity>` at create time using `ResourceNameDescriptor.Resolve`.
 
-The `Name` property is used for entity lookups in the database. The `CanonicalName` is a computed value used primarily by the gRPC transport for entity resolution.
-
-## CanonicalNameAttribute
-
-The `[CanonicalName]` attribute declares the AIP-122 resource name pattern for an entity type:
+## `[CanonicalName]` attribute
 
 ```csharp
 [CanonicalName("publishers/{publisher}/books/{book}")]
 public class Book : ICanonicalName { ... }
 ```
 
-The pattern consists of alternating collection segments (literal strings) and placeholder segments (in curly braces). The pattern is parsed by `ResourceNameDescriptor` at startup.
+The pattern uses `{placeholder}` segments for variable parts. The last placeholder maps to `Name`; earlier placeholders map to parent properties by name (after Pascalizing the placeholder). The special placeholder `{parent}` maps to a `Parent` property.
 
-### Pattern Rules
+If no `[CanonicalName]` attribute is present, the descriptor derives `Collection` and `CollectionPath` from the type name (pluralized, lowercased) and treats the resource as flat (no parent segments).
 
-| Segment     | Example                 | Description                                                    |
-| ----------- | ----------------------- | -------------------------------------------------------------- |
-| Collection  | `publishers`, `books`   | A literal lowercase plural noun identifying the resource type. |
-| Placeholder | `{publisher}`, `{book}` | A variable that maps to an entity property.                    |
+## `ResourceNameDescriptor`
 
-Placeholder-to-property mapping follows these rules:
+Descriptors are cached per `RuntimeTypeHandle` in a `ConcurrentDictionary`. Call `ResourceNameDescriptor.ForType<T>()` or `ResourceNameDescriptor.ForType(type)` to get the cached instance.
 
-1. If the PascalCase form of the placeholder equals `"Parent"`, it maps to the `Parent` property.
-2. If the PascalCase form matches the entity's singular name (derived from `DisplayNameAttribute`, `TableAttribute`, or the type name), it maps to the `Name` property.
-3. Otherwise, it maps to `{PascalCase}Name` (e.g., `{publisher}` maps to `PublisherName`).
+### Key properties
 
-### Examples
+| Property | Description |
+|---|---|
+| `Pattern` | The full pattern string, e.g., `"publishers/{publisher}/books/{book}"`. `null` when no attribute is present. |
+| `Singular` | PascalCase singular form, derived from `[DisplayName]`, `[Table]`, or the type name. |
+| `Plural` | PascalCase plural form (Humanizer `Pluralize()`). |
+| `Collection` | Last collection segment, e.g., `"books"`. Used as the HTTP route collection segment. |
+| `CollectionPath` | Everything up to and including the last collection segment, e.g., `"publishers/{publisher}/books"`. Used as the HTTP route template. |
+| `Package` | API package from `[ResourcePackage]`, used as route prefix and gRPC service name prefix. |
+| `HasParent` | `true` when the pattern has parent placeholder segments. |
+| `SupportsReadAcross` | `true` when the entity has `[ReadAcross]` (AIP-159 wildcard parent opt-in). |
 
-| Pattern                                    | Leaf maps to | Parent maps to        |
-| ------------------------------------------ | ------------ | --------------------- |
-| `books/{book}`                             | `Name`       | (none)                |
-| `publishers/{publisher}/books/{book}`      | `Name`       | `PublisherName`       |
-| `orgs/{org}/teams/{team}/members/{member}` | `Name`       | `OrgName`, `TeamName` |
+### Key methods
 
-## ResourceNameDescriptor
+| Method | Description |
+|---|---|
+| `Resolve(entity)` | Builds the full canonical name from an entity instance by substituting placeholder values. |
+| `ParseCanonicalName(name)` | Splits a full canonical name into parent values and leaf name. Returns `null` on mismatch. |
+| `ParseParent(parent)` | Parses a parent path string into a placeholder-to-value dictionary. |
+| `BuildParentPredicate<T>(parentValues)` | Builds a `Where` predicate expression from parent values. Skips `"-"` wildcards (AIP-159). |
+| `ResolveParent(routeValues)` | Builds a parent path string from ASP.NET route values. |
+| `SetParentFromRouteValues(target, routeValues)` | Sets parent properties on a DTO from route values. |
+| `ClearParentProperties(target)` | Sets all parent-segment properties to `null` (used by `UpdateAsync`). |
 
-`ResourceNameDescriptor` is the runtime representation of a parsed `[CanonicalName]` pattern. It is cached per entity type via `ResourceNameDescriptor.ForType<T>()` or `ResourceNameDescriptor.ForType(type)`.
+## Placeholder resolution
 
-### Key Properties
+Placeholder names are Pascalized via `SchemataNaming.ToClrMemberName` (which calls Humanizer's `Pascalize()`). The special cases are:
 
-| Property             | Type      | Description                                                                                                               |
-| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `Pattern`            | `string?` | The raw pattern from `[CanonicalName]`, or null if no attribute.                                                          |
-| `Singular`           | `string`  | PascalCase singular name (from `DisplayNameAttribute`, `TableAttribute`, or type name).                                   |
-| `Plural`             | `string`  | PascalCase plural (via Humanizer).                                                                                        |
-| `Collection`         | `string`  | The last collection segment from the pattern (e.g., `books`).                                                             |
-| `CollectionPath`     | `string`  | Everything up to and including the last collection segment. Used for HTTP routing (e.g., `publishers/{publisher}/books`). |
-| `Package`            | `string?` | The API package prefix from `[ResourcePackage]`.                                                                          |
-| `HasParent`          | `bool`    | `true` when the pattern has parent placeholder segments.                                                                  |
-| `SupportsReadAcross` | `bool`    | `true` when `[ReadAcross]` is present on the entity type.                                                                 |
-
-### Key Methods
-
-| Method                                          | Description                                                                        |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `Resolve(entity)`                               | Resolves an entity instance to its full canonical name by reading property values. |
-| `ParseCanonicalName(name)`                      | Parses a full canonical name into parent values and the leaf name.                 |
-| `ParseParent(parent)`                           | Parses a parent string into placeholder-to-value mappings.                         |
-| `ResolveParent(routeValues)`                    | Builds a parent string from ASP.NET route values.                                  |
-| `ExtractParentValues(routeValues)`              | Extracts parent placeholder values from route values as a dictionary.              |
-| `BuildParentPredicate<T>(parentValues)`         | Builds a LINQ `Where` expression from parent values, skipping `"-"` wildcards.     |
-| `SetParentFromRouteValues(target, routeValues)` | Sets parent properties on an object from route values.                             |
-| `ClearParentProperties(target)`                 | Sets all parent properties to null (used during update to prevent overwriting).    |
-
-## ResourcePackageAttribute
-
-`[ResourcePackage]` specifies an API package prefix for a resource:
+- A placeholder whose Pascalized form equals the entity's `Singular` name maps to the `Name` property.
+- A placeholder named `parent` maps to the `Parent` property.
+- All other placeholders map to a property with the same Pascalized name.
 
 ```csharp
-[ResourcePackage("api/v1")]
-[CanonicalName("books/{book}")]
-public class Book : ICanonicalName { ... }
+// Pattern: "publishers/{publisher}/books/{book}"
+// Entity: Book (Singular = "Book")
+// Placeholders:
+//   {publisher} -> Pascalize("publisher") = "Publisher" -> property "Publisher"
+//   {book}      -> Pascalize("book") = "Book" = Singular -> property "Name"
 ```
 
-The package affects both transports:
-
-- **HTTP**: The route becomes `~/api/v1/books` instead of `~/books`.
-- **gRPC**: The service name becomes `api.v1.BookService` instead of `BookService`.
-
-When no `[ResourcePackage]` is present, `Package` is null and no prefix is applied.
-
-## ReadAcrossAttribute
-
-`[ReadAcross]` opts a resource into AIP-159 read-across behavior:
+## `SchemataNaming`
 
 ```csharp
-[ReadAcross]
-[CanonicalName("publishers/{publisher}/books/{book}")]
-public class Book : ICanonicalName { ... }
+public static string ToWireName(string clrName)    => clrName.Underscore();
+public static string ToClrMemberName(string wire)  => wire.Pascalize();
 ```
 
-When present, clients can use the wildcard parent `"-"` to list resources across parent boundaries:
+Wire names are snake_case (e.g., `"display_name"`). CLR member names are PascalCase (e.g., `"DisplayName"`). These conversions are used throughout the resource system for field mask parsing, filter member resolution, and error field names.
 
+## Flat resources
+
+An entity without `[CanonicalName]` is treated as a flat resource. Its `CollectionPath` is the pluralized, lowercased type name. Routes are `/{collection}` and `/{collection}/{name}`. There are no parent segments.
+
+```csharp
+// No [CanonicalName] attribute
+public class Student : ICanonicalName { ... }
+// CollectionPath = "students"
+// Route: GET /students, GET /students/{name}
 ```
-GET /publishers/-/books?filter=genre="fiction"
-```
 
-Without `[ReadAcross]`, a parent value of `"-"` throws an `InvalidArgumentException` with the reason `CrossParentUnsupported`.
+## AIP-159: Reading across collections
 
-When `"-"` is used for a parent segment, `BuildParentPredicate` skips that segment, effectively removing the parent scoping from the query.
+If the entity has `[ReadAcross]`, a parent segment value of `"-"` is allowed in `ListAsync`. The `BuildParentPredicate` method skips `"-"` values, so the query is not scoped to a specific parent. Without `[ReadAcross]`, a `"-"` parent throws `ValidationException` with reason `FieldReasons.CrossParentUnsupported`.
 
-## How Names Flow Through Operations
+## Extension points
 
-### Create
+- Add `[ResourcePackage("myapi")]` to set the route prefix and gRPC service name prefix.
+- Add `[DisplayName("MyEntity")]` or `[Table("my_entities")]` to control the singular/plural names.
+- Add `[ReadAcross]` to opt into AIP-159 wildcard parent support.
 
-1. `request.Name` and `request.CanonicalName` are cleared (set to null).
-2. If `IIdentifier` is implemented, `request.Id` is reset to 0.
-3. The request is mapped to an entity.
-4. Parent properties are populated from HTTP route values via `SetParentFromRouteValues`.
-5. The canonical name is computed after persistence by `AdviceAddCanonicalName` (an `IRepositoryAddAdvisor<TEntity>` implementation) using `ResourceNameDescriptor.Resolve`.
+## Design motivation
 
-### Update
+Caching descriptors per `RuntimeTypeHandle` avoids repeated reflection on hot paths. The pattern-based approach means the naming contract is declared once on the entity type and automatically enforced by all operations — no per-operation name-building logic is needed.
 
-1. The entity is resolved by name before the update pipeline starts.
-2. After advisors run, `request.Name`, `request.CanonicalName`, and parent properties are all cleared.
-3. If `IIdentifier` is implemented, `request.Id` is reset.
-4. The request is mapped onto the entity with cleared identity/parent fields, so existing values are preserved.
+## Caveats
 
-### Get (HTTP)
+- `Resolve` throws `ValidationException` if any placeholder property is null or empty. Ensure all parent properties are set before calling `Resolve` (the `AdviceAddCanonicalName` advisor handles this automatically).
+- `ParseCanonicalName` returns `null` if the input does not match the pattern. The handler treats this as an invalid name and throws `ValidationException`.
+- The `Singular` and `Plural` forms are derived at descriptor construction time. If the type name does not pluralize correctly with Humanizer, use `[DisplayName]` to override.
 
-The entity is resolved via `GetByNameAsync(name, http, ct)`, which extracts parent values from the HTTP route and queries by both name and parent predicates.
+## See also
 
-### Get (gRPC)
-
-The entity is resolved via `GetByCanonicalNameAsync(request.CanonicalName, ct)`, which parses the full canonical name into parent values and leaf name, then queries.
-
-### Delete
-
-The entity is resolved by name the same way as Get.
+- [Resource Overview](overview.md)
+- [HTTP Transport](http-transport.md)
+- [gRPC Transport](grpc-transport.md)
+- [Entity Traits](../entity/traits.md)

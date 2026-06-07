@@ -1,75 +1,20 @@
 # Feature System
 
-The Feature System is the foundation of how Schemata organizes startup behavior. Every capability in the framework -- routing, authentication, CORS, JSON serialization, and so on -- is packaged as a **feature**: a class that hooks into three lifecycle phases (service registration, middleware pipeline, endpoint mapping) and is executed in a deterministic order.
+Every capability in Schemata is packaged as a **feature**: a class that hooks into three lifecycle phases (service registration, middleware pipeline, endpoint mapping) and executes in a deterministic order controlled by two integer properties. The feature system is the mechanism that turns a flat list of `Use*` calls into a correctly-ordered ASP.NET Core pipeline.
 
-## SchemataBuilder
+## Where the code lives
 
-`SchemataBuilder` is the fluent entry point for configuring Schemata. It is created internally when you call `UseSchemata` on a `WebApplicationBuilder`:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-builder.UseSchemata(schema => {
-    schema.UseLogging();
-    schema.UseRouting();
-    schema.UseCors();
-    schema.UseAuthentication(auth => auth.AddCookie());
-    schema.UseControllers();
-    schema.UseJsonSerializer();
-});
-```
-
-### How UseSchemata works
-
-`UseSchemata` is an extension method on `WebApplicationBuilder`. It delegates to `AddSchemata` on `IServiceCollection`, which:
-
-1. Creates a new `SchemataBuilder` with the app's `IConfiguration` and `IWebHostEnvironment`.
-2. Registers a `SchemataStartup` as an `IStartupFilter` so that middleware and endpoints are wired automatically.
-3. Registers the builder's `SchemataOptions` as a singleton in the DI container.
-4. Invokes the user's configuration lambda (the `Action<SchemataBuilder>` parameter).
-5. Calls `builder.Invoke(services)`, which flushes all staged services and features into the host service collection.
-
-There is also an overload that accepts a second lambda for direct `SchemataOptions` configuration:
-
-```csharp
-builder.UseSchemata(
-    schema => { /* configure features */ },
-    options => { /* configure SchemataOptions directly */ }
-);
-```
-
-### UseXxx extension methods
-
-Each `UseXxx` method on `SchemataBuilder` follows the same pattern:
-
-1. Accept an optional `Action<TOptions>` for the feature's options.
-2. Store the options action in the `Configurators` registry via `builder.Configure<TOptions>(...)`.
-3. Register the feature type via `builder.AddFeature<TFeature>()`.
-4. Return the builder for chaining.
-
-For example, `UseRouting` registers `SchemataRoutingFeature`. `UseCors` stores a `CorsOptions` configurator and registers `SchemataCorsFeature`. The feature later retrieves its options from the `Configurators` during `ConfigureServices`.
-
-### ConfigureServices on SchemataBuilder
-
-`SchemataBuilder` exposes a `ConfigureServices` method for ad-hoc service registration that does not belong to any feature:
-
-```csharp
-builder.UseSchemata(schema => {
-    schema.UseRouting();
-
-    schema.ConfigureServices(services => {
-        services.AddSingleton<IMyService, MyService>();
-    });
-});
-```
-
-The lambda receives a staging `IServiceCollection`. These services are flushed into the host container **before** any feature's `ConfigureServices` runs. This is useful for registering services that features may depend on during their own configuration.
+| Package | Key files |
+| --- | --- |
+| `Schemata.Core` | `Features/ISimpleFeature.cs`, `Features/FeatureBase.cs` |
+| `Schemata.Core` | `Features/DependsOnAttribute.cs`, `Features/DependsOnAttribute\`1.cs`, `Features/InformationAttribute.cs` |
+| `Schemata.Core` | `SchemataBuilder.cs`, `Configurators.cs`, `SchemataOptions.cs` |
+| `Schemata.Core` | `Extensions/SchemataBuilderExtensions.cs` |
+| `Schemata.Abstractions` | `SchemataConstants.cs` (Orders class) |
 
 ## ISimpleFeature and FeatureBase
 
-### ISimpleFeature
-
-`ISimpleFeature` extends `IFeature` (from `Schemata.Abstractions`) and defines the three lifecycle hooks that the framework calls:
+`ISimpleFeature` (in `Schemata.Core.Features`) extends `IFeature` (from `Schemata.Abstractions`) and defines three lifecycle hooks:
 
 ```csharp
 public interface ISimpleFeature : IFeature
@@ -97,21 +42,17 @@ public interface ISimpleFeature : IFeature
 }
 ```
 
-### IFeature
-
-The base `IFeature` interface (in `Schemata.Abstractions`) declares the two ordering properties:
+`IFeature` (from `Schemata.Abstractions`) declares the two ordering properties:
 
 ```csharp
 public interface IFeature
 {
-    int Order { get; }
+    int Order    { get; }
     int Priority { get; }
 }
 ```
 
-### FeatureBase
-
-`FeatureBase` is the abstract base class that provides default no-op implementations of all three lifecycle methods. Most features extend this class and override only the hooks they need:
+`FeatureBase` is the abstract base class providing no-op implementations of all three hooks. Most features extend it and override only what they need:
 
 ```csharp
 public abstract class FeatureBase : ISimpleFeature
@@ -125,53 +66,112 @@ public abstract class FeatureBase : ISimpleFeature
 }
 ```
 
-By default, `Order` returns the same value as `Priority`, and `Priority` defaults to `int.MaxValue` (placing unordered features at the end). Features override `Priority` to control their position in all phases. Features that need different ordering during service registration versus middleware/endpoint configuration override `Order` independently.
+`Order` defaults to `Priority`. Features that need different ordering for service registration versus middleware activation override `Order` independently.
 
-## Order and Priority
+## Order vs Priority
 
-`Order` and `Priority` control execution sequence across two different phases:
+These two properties control execution sequence across two different phases:
 
-| Property   | Used during                                                                | Sorted in                                                                              |
-| ---------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `Order`    | `ConfigureServices` (service registration)                                 | `SchemataBuilder.Invoke`                                                               |
-| `Priority` | `ConfigureApplication` and `ConfigureEndpoints` (middleware and endpoints) | `ApplicationBuilderExtensions.UseSchemata` and `EndpointBuilderExtensions.UseSchemata` |
+| Property | Controls | Sorted in |
+| --- | --- | --- |
+| `Order` | `ConfigureServices` sequence | `SchemataBuilder.Invoke` |
+| `Priority` | `ConfigureApplication` and `ConfigureEndpoints` sequence | `SchemataStartup.Configure` |
 
-Lower values execute first. Both sorts use `CompareTo` in ascending order.
+Both sorts are ascending. Lower values execute first. Most built-in features set only `Priority` and let `Order` inherit the same value via the `FeatureBase` default.
 
-Most built-in features set only `Priority` and let `Order` inherit the same value (via the `FeatureBase` default). The tenancy feature is a notable exception -- it sets `Order` to `SchemataConstants.Orders.Max` (900,000,000) so its services are registered last, while its `Priority` places its middleware earlier in the pipeline.
+`SchemataConstants.Orders` defines three anchor constants:
 
-### Reserved ranges
+| Constant | Value | Purpose |
+| --- | --- | --- |
+| `Base` | 100,000,000 | Anchor for built-in core features |
+| `Extension` | 400,000,000 | Anchor for extension feature chains |
+| `Max` | 900,000,000 | Terminal anchor for features that must run last |
 
-The framework defines three anchor constants in `SchemataConstants.Orders`:
+The range `[100_000_000, 900_000_000]` is reserved for built-in and extension features. User features pick values outside that range. See [Built-in Features](built-in-features.md) for the complete priority table.
 
-| Constant    | Value       | Purpose                                                            |
-| ----------- | ----------- | ------------------------------------------------------------------ |
-| `Base`      | 100,000,000 | Anchor for built-in core features                                  |
-| `Extension` | 400,000,000 | Anchor for extension features (identity, security, resource, etc.) |
-| `Max`       | 900,000,000 | Terminal anchor for features that must run near the end            |
+## Feature lifecycle
 
-Built-in core features form a chain starting at `Base`, each adding 10,000,000 or 20,000,000 to the previous feature's `DefaultPriority`. The chain runs in this order:
+Features participate in three phases during application startup:
 
-**ForwardedHeaders** (100M) -> **DeveloperExceptionPage** (+10M) -> **ExceptionHandler** (+10M) -> **Logging** (+10M) -> **HttpLogging** (+10M) -> **W3CLogging** (+10M) -> **Https** (+10M) -> **CookiePolicy** (+20M) -> **Routing** (+10M) -> **Quota** (+10M) -> **Cors** (+10M) -> **Authentication** (+10M) -> **Session** (+10M) -> **Controllers** (+10M) -> **JsonSerializer** (+10M)
+### 1. ConfigureServices
 
-Extension features start at `Extension` (400M) with their own offsets:
+Called during `SchemataBuilder.Invoke`, which runs inside `AddSchemata` at `UseSchemata` time. Features are sorted by `Order` (ascending). Each feature receives:
 
-- Identity: Extension + 10M
-- Authorization: Extension + 20M
-- Mapping: Extension + 30M
-- Resource: Extension + 50M
-- Modules: Extension + 80M
+- `IServiceCollection services` — the host service collection.
+- `SchemataOptions schemata` — the shared options container.
+- `Configurators configurators` — the deferred configurator registry. Features call `configurators.PopOrDefault<TOptions>()` to retrieve and consume user-provided option delegates.
+- `IConfiguration configuration` — the application configuration.
+- `IWebHostEnvironment environment` — the hosting environment.
 
-Custom features should use values above the last built-in chain value but below `Extension` for core-level features, or above the last extension value for extension-level features.
+After all features run, `Configurators.Invoke(services)` flushes any remaining (unconsumed) configurators as `IConfigureOptions<T>` singletons into the DI container.
+
+### 2. ConfigureApplication
+
+Called by `SchemataStartup` (an `IStartupFilter`) before the rest of the middleware pipeline. Features are sorted by `Priority` (ascending). This is where features add middleware via `app.Use*(...)`.
+
+### 3. ConfigureEndpoints
+
+Called by `SchemataStartup` inside `app.UseEndpoints(...)`, but only if an `EndpointDataSource` is registered. Features are sorted by `Priority` (ascending). This is where features map routes via `IEndpointRouteBuilder`.
+
+After both phases complete, `app.CleanSchemata()` removes the features dictionary from `SchemataOptions` to free memory.
+
+## Use* extension methods
+
+Each `Use*` method on `SchemataBuilder` follows the same pattern:
+
+1. Accept an optional `Action<TOptions>` for the feature's options.
+2. Store the options delegate in `Configurators` via `builder.Configure<TOptions>(...)`.
+3. Register the feature type via `builder.AddFeature<TFeature>()`.
+4. Return the builder for chaining.
+
+`UseRouting` registers `SchemataRoutingFeature` directly. `UseCors` stores a `CorsOptions` delegate first and then registers `SchemataCorsFeature`; the feature retrieves the delegate from `Configurators` during `ConfigureServices`.
+
+Because features are sorted by `Priority` at startup, the call order of `Use*` methods is irrelevant. The pipeline is always deterministic.
+
+For service registrations that do not belong to any feature, `SchemataBuilder.ConfigureServices(Action<IServiceCollection>)` exposes a staging collection that is flushed into the host container before any feature's `ConfigureServices` runs:
+
+```csharp
+builder.UseSchemata(schema => {
+    schema.UseRouting();
+    schema.ConfigureServices(services => {
+        services.AddSingleton<IMyService, MyService>();
+    });
+});
+```
+
+## Configurators
+
+`Configurators` is a `Type`-keyed dictionary of deferred `Action<T>` delegates. `Set<T>(action)` merges: if a delegate for `T` already exists, the new one is chained after it (post-write composes after pre-write). Features consume entries via `Pop<T>()` (throws if absent) or `PopOrDefault<T>()` (returns a no-op if absent).
+
+A two-parameter variant keyed by `(T1, T2)` value-tuple handles callbacks like `AuthenticationBuilder` that require two arguments.
+
+After all features have run `ConfigureServices`, `Configurators.Invoke(services)` converts any remaining unconsumed delegates into `IConfigureOptions<T>` registrations via `ConfigureNamedOptions<T>` and `Activator.CreateInstance`.
+
+## DependsOn
+
+Features declare dependencies using two attribute forms:
+
+**`[DependsOn<T>]`** (generic, `DependsOnAttribute<T>`) — typed dependency. The dependency is automatically registered before the declaring feature during `SchemataOptionsExtensions.AddFeature`. The recursion is automatic, so `UseControllers()` pulls in `SchemataRoutingFeature` without the user naming it.
+
+**`[DependsOn("Fully.Qualified.Name")]`** (string, `DependsOnAttribute`) — for cross-assembly dependencies where the type cannot be directly referenced. Resolved via `AppDomainTypeCache.GetType`. The string form does **not** auto-register the dependency; it only checks `HasFeature(dependency)` after resolving the name. Setting `Optional = true` downgrades a missing dependency from `LogLevel.Error` to `LogLevel.Information`.
+
+**`[Information("message", args...)]`** — attaches a log line that the framework emits when the feature is registered, provided `SchemataLoggingFeature` is active. `Level` controls the severity (default `Information`). `SchemataHttpLoggingFeature` carries one warning about PII logging.
+
+Key dependency chains in the built-in and extension features:
+
+| Feature | Depends on |
+| --- | --- |
+| `SchemataTransportHttpFeature` | `SchemataDeveloperExceptionPageFeature`, `SchemataControllersFeature`, `SchemataJsonSerializerFeature` |
+| `SchemataTransportGrpcFeature` | `SchemataRoutingFeature` |
+| `SchemataSessionFeature<T>` | `SchemataCookiePolicyFeature` |
+| `SchemataControllersFeature` | `SchemataRoutingFeature` |
 
 ## SchemataOptions
 
-`SchemataOptions` is a named key-value store shared across all features. It holds arbitrary objects keyed by string name, plus a logger factory for creating loggers.
-
-### Storage methods
+`SchemataOptions` is a `string`-keyed `object` bag plus an `ILoggerFactory`. It is registered as a singleton and shared across all features.
 
 ```csharp
-// Store a value (passing null removes the key)
+// Store a value (null removes the key)
 schemata.Set<MyConfig>("MyFeature:Config", config);
 
 // Retrieve without removing
@@ -181,162 +181,30 @@ var config = schemata.Get<MyConfig>("MyFeature:Config");
 var config = schemata.Pop<MyConfig>("MyFeature:Config");
 ```
 
-All three methods use a `where TOptions : class` constraint.
+The registered features dictionary is stored inside `SchemataOptions` under the key `"Features"`. Extension methods on `SchemataOptions` manage it: `AddFeature<T>()`, `HasFeature<T>()`, `GetFeatures()`. `AddFeature` deduplicates by `RuntimeTypeHandle`, so calling `UseControllers()` twice registers the feature only once.
 
-### Feature storage
+`HasFeature(typeof(SchemataSessionFeature<>))` is the open-generic existence check — it matches any closed instantiation of the generic feature.
 
-The registered features dictionary is stored inside `SchemataOptions` itself under the key `"Features"` (defined as `SchemataConstants.Options.Features`). Extension methods on `SchemataOptions` manage this:
+## Extension points
 
-- `GetFeatures()` -- retrieves the `Dictionary<RuntimeTypeHandle, ISimpleFeature>`.
-- `SetFeatures(...)` -- stores the dictionary.
-- `AddFeature<T>()` / `AddFeature(Type)` -- creates a feature instance and adds it to the dictionary. If the feature is already registered, it is skipped.
-- `HasFeature<T>()` / `HasFeature(Type)` -- checks for registration, including open generic type definitions.
+- Implement `ISimpleFeature` (or extend `FeatureBase`) and call `builder.AddFeature<T>()`.
+- Add a `Use*` extension method on `SchemataBuilder` in the `Microsoft.AspNetCore.Builder` namespace (with `// ReSharper disable once CheckNamespace`) so it appears alongside the built-in methods.
+- Declare `[DependsOn<T>]` on your feature class to pull in prerequisites automatically.
 
-### Logging
+## Design motivation
 
-`SchemataOptions` creates and owns an `ILoggerFactory`. Features and builder methods use `CreateLogger<T>()` to obtain loggers. The factory can be replaced via `ReplaceLoggerFactory`, which the `UseLogging` extension does.
+Sorting by `Order` and `Priority` independently lets a feature register its services at one position in the DI graph while inserting its middleware at a different position in the pipeline. The tenancy feature uses this: its `Order` is `900_000_000` (services register last, after all other features have set up their stores) while its `Priority` is `160_000_000` (middleware runs early, before routing).
 
-## Feature lifecycle
+The `Configurators` dictionary decouples the user-facing fluent API from the DI container. Multiple `Use*` calls can compose their options delegates without knowing about each other, and features can take ownership of a delegate via `Pop` to prevent double-application.
 
-Features participate in three phases, executed in this order during application startup:
+## Caveats
 
-### 1. ConfigureServices
+- Features added during another feature's `ConfigureServices` are picked up by `ConfigureApplication` and `ConfigureEndpoints` only if they were already in the sorted list when `Invoke` ran. Late additions miss `ConfigureServices`.
+- `SchemataControllersFeature` strips every `Schemata.*` `AssemblyPart` from MVC's `ApplicationPartManager`. To expose a controller from a `Schemata.*` assembly, register a `SchemataExtensionPart<T>` for it.
+- `AddFeature` deduplicates by `RuntimeTypeHandle`. `SchemataSessionFeature<MyStore>` and `SchemataSessionFeature<OtherStore>` are two different features and both will be registered.
 
-Called during `SchemataBuilder.Invoke`, which runs inside `AddSchemata` (i.e., at `UseSchemata` time). Features are **sorted by `Order`** (ascending). Each feature receives:
+## See also
 
-- `IServiceCollection services` -- the host service collection.
-- `SchemataOptions schemata` -- the shared options container.
-- `Configurators configurators` -- the deferred configurator registry. Features call `configurators.PopOrDefault<TOptions>()` to retrieve and consume user-provided option actions.
-- `IConfiguration configuration` -- the app configuration.
-- `IWebHostEnvironment environment` -- the hosting environment.
-
-After all features run, `Configurators.Invoke(services)` flushes any remaining configurators as `IConfigureOptions<T>` registrations into the DI container.
-
-### 2. ConfigureApplication
-
-Called by the `SchemataStartup` startup filter before the rest of the middleware pipeline. Features are **sorted by `Priority`** (ascending). This is where features add middleware via `app.UseXxx(...)`.
-
-### 3. ConfigureEndpoints
-
-Called by `SchemataStartup` inside `app.UseEndpoints(...)`, but only if an `EndpointDataSource` is registered. Features are **sorted by `Priority`** (ascending). This is where features map routes via the `IEndpointRouteBuilder`.
-
-After both `ConfigureApplication` and `ConfigureEndpoints` complete, `CleanSchemata` removes the features dictionary from `SchemataOptions` (via `Pop`) to free memory.
-
-## Feature dependencies
-
-Features can declare dependencies using two attributes:
-
-### DependsOn&lt;T&gt;
-
-The generic attribute takes a feature type. When the dependent feature is registered, the framework checks whether the dependency is already present. If not, it is **automatically registered**:
-
-```csharp
-[DependsOn<SchemataRoutingFeature>]
-[DependsOn<SchemataExceptionHandlerFeature>]
-public sealed class SchemataControllersFeature : FeatureBase { ... }
-```
-
-### DependsOn (string name)
-
-The non-generic attribute takes a fully-qualified type name. This is used for cross-assembly dependencies where the type may not be directly referenceable. It logs a warning or error but does **not** auto-register:
-
-```csharp
-[DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
-[DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
-public sealed class SchemataResourceFeature : FeatureBase { ... }
-```
-
-The `Optional` property controls severity: when `true`, a missing dependency logs at `Information` level; when `false` (the default), it logs at `Error` level.
-
-### Information
-
-The `[Information]` attribute attaches a log message that is emitted when the feature is registered (only if the logging feature is active):
-
-```csharp
-[Information("My feature initialized with mode {Mode}", "default", Level = LogLevel.Debug)]
-```
-
-## How to create a custom feature
-
-### 1. Define the feature class
-
-Extend `FeatureBase` and override `Priority` (and optionally `Order`). Override only the lifecycle methods you need:
-
-```csharp
-public sealed class MyCustomFeature : FeatureBase
-{
-    public override int Priority => SchemataControllersFeature.DefaultPriority + 5_000_000;
-
-    public override void ConfigureServices(
-        IServiceCollection  services,
-        SchemataOptions     schemata,
-        Configurators       configurators,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
-    ) {
-        var configure = configurators.PopOrDefault<MyOptions>();
-
-        services.AddSingleton<IMyService, MyService>();
-        services.Configure<MyOptions>(configure);
-    }
-
-    public override void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
-    ) {
-        app.UseMiddleware<MyMiddleware>();
-    }
-}
-```
-
-### 2. Create an extension method
-
-Follow the `UseXxx` pattern to expose the feature on `SchemataBuilder`:
-
-```csharp
-public static class SchemataBuilderExtensions
-{
-    public static SchemataBuilder UseMyFeature(
-        this SchemataBuilder builder,
-        Action<MyOptions>?   configure = null
-    ) {
-        configure ??= _ => { };
-        builder.Configure(configure);
-        builder.AddFeature<MyCustomFeature>();
-        return builder;
-    }
-}
-```
-
-### 3. Register it
-
-```csharp
-builder.UseSchemata(schema => {
-    schema.UseRouting();
-    schema.UseMyFeature(options => {
-        options.Setting = "value";
-    });
-});
-```
-
-### 4. Declare dependencies (optional)
-
-If your feature requires other features, annotate the class:
-
-```csharp
-[DependsOn<SchemataRoutingFeature>]
-public sealed class MyCustomFeature : FeatureBase { ... }
-```
-
-Missing generic dependencies are auto-registered. This means the user does not need to explicitly call `UseRouting` if your feature depends on it -- but the auto-registered feature will use default options.
-
-## Configurators
-
-The `Configurators` class is a type-keyed registry that accumulates configuration actions during builder setup and provides them to features at registration time. Each `UseXxx` call stores an `Action<TOptions>` via `builder.Configure<TOptions>(...)`, and the corresponding feature retrieves it with `configurators.PopOrDefault<TOptions>()`.
-
-If multiple calls configure the same type, the actions are **chained** -- each new action wraps the previous one so they execute in registration order.
-
-After all features have run their `ConfigureServices`, `Configurators.Invoke(services)` converts any remaining (unconsumed) configurators into `IConfigureOptions<T>` registrations in the DI container.
-
-See [advice-pipeline.md](advice-pipeline.md) for how `IFeature` ordering relates to the advice pipeline. See [built-in-features.md](built-in-features.md) for a reference of all features shipped with the framework.
+- [Core Overview](overview.md) — startup sequence and three-bucket model
+- [Built-in Features](built-in-features.md) — authoritative priority table
+- [Advice Pipeline](advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`

@@ -19,7 +19,7 @@ public static class AdviceMethodRequestIdempotency
 {
     /// <summary>
     ///     Default order: runs after
-    ///     <see cref="AdviceMethodRequestAuthorize{TEntity, TRequest}" /> ──
+    ///     <see cref="AdviceMethodRequestAuthorize{TEntity, TRequest}" /> --
     ///     idempotency is the last link in the custom-method request chain.
     /// </summary>
     public const int DefaultOrder = AdviceMethodRequestAuthorize.DefaultOrder + 10_000_000;

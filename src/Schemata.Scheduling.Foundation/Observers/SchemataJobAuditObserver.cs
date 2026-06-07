@@ -79,7 +79,7 @@ public sealed class SchemataJobAuditObserver(
 
     public async Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
         await UpdateJobAsync(job, ct);
-        await UpdateExecutionAsync(context, ExecutionState.Succeeded, recentError: null, ct);
+        await UpdateExecutionAsync(context, ExecutionState.Succeeded, null, ct);
     }
 
     public async Task OnFailedAsync(

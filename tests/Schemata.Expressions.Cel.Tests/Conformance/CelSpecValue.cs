@@ -18,5 +18,3 @@ public sealed record CelSpecValue(object? Value)
 
     public static CelSpecValue Null() { return new((object?)null); }
 }
-
-public sealed record CelSpecError(string Message);

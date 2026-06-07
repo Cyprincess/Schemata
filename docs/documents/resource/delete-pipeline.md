@@ -1,129 +1,111 @@
 # Delete Pipeline
 
-The delete operation is handled by `ResourceOperationHandler.DeleteAsync`. It takes an existing `TEntity`, an optional ETag, and a force flag, runs the [advisor pipeline](../core/advice-pipeline.md), and returns a boolean indicating success.
+`ResourceOperationHandler.DeleteAsync` accepts a canonical name string, an optional ETag, a force flag, and a `ClaimsPrincipal?`. It loads the existing entity, runs it through a fixed sequence of advisor stages, removes it from the repository, and returns a `bool` indicating success. Authorization is checked before the entity is loaded, per AIP-211.
 
-## Method Signature
+## Where the code lives
 
-```csharp
-public async Task<bool> DeleteAsync(
-    string name, string? etag, bool force,
-    ClaimsPrincipal? principal, CancellationToken? ct)
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 534-594) |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceDeleteFreshness.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceDeleteRequestAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceDeleteAdvisor.cs` |
+| `Schemata.Abstractions` | `Entities/ISoftDelete.cs` |
+
+## Pipeline walkthrough
+
+### Stage 1: Gate check
+
+```
+IResourceRequestAdvisor<TEntity>
 ```
 
-The return value is `true` when the entity is deleted (or the operation is handled by an advisor), and `false` when the operation is blocked.
+Receives the principal and the operation token `nameof(Operations.Delete)`. A `Block` returns `false`. A `Handle` returns `true` (the advisor handled the deletion itself).
 
-## Pipeline Steps
+### Stage 2: Name parsing
 
-### 1. General Request Advisor
+`ApplyIdentifierPredicates` parses the canonical name and applies leaf and parent predicates to the `ResourceRequestContainer<TEntity>`.
 
-```
-IResourceRequestAdvisor<TEntity> -- Operations.Delete
-```
-
-The first gate. Returns `Continue` to proceed, `Handle` to indicate success without deleting, or `Block` to silently deny (returns `false`).
-
-### 2. Delete Request Advisor
+### Stage 3: Delete request advisors
 
 ```
 IResourceDeleteRequestAdvisor<TEntity>
 ```
 
-Receives a `DeleteRequest` containing:
+Receives a `DeleteRequest { Name, Etag, Force }`, the container, and the principal. Authorization advisors run here when `WithAuthorization()` is configured.
 
-| Property | Type      | Description                            |
-| -------- | --------- | -------------------------------------- |
-| `Name`   | `string?` | The entity's name.                     |
-| `Etag`   | `string?` | The ETag for concurrency checking.     |
-| `Force`  | `bool`    | Whether to bypass the freshness check. |
+| Order | Advisor | What it does |
+|---|---|---|
+| `AdviceDeleteRequestAnonymous.DefaultOrder` (80M) | `AdviceDeleteRequestAnonymous` | Honors `[Anonymous(Operations.Delete)]` |
+| `AdviceDeleteRequestAuthorize.DefaultOrder` (100M) | `AdviceDeleteRequestAuthorize` | Calls `IAccessProvider`; throws `AuthorizationException` on denial |
 
-When `WithAuthorization()` is enabled, `AdviceDeleteRequestAuthorize` runs at order 100,000,000:
+### Stage 4: Entity load
 
-1. Checks if the entity type has `[Anonymous(Operations.Delete)]` -- if so, skips authorization.
-2. Calls `IAccessProvider<TEntity, ResourceRequestContext<DeleteRequest>>.HasAccessAsync` with the current `ClaimsPrincipal`.
-3. Throws `AuthorizationException` if access is denied.
+```csharp
+var entity = await _repository.Once()
+                              .SuppressQuerySoftDelete()
+                              .SingleOrDefaultAsync(q => container.Query(q), ct)
+          ?? throw ResourceNotFound(name);
+```
 
-### 3. Delete Entity Advisor
+Soft-delete is suppressed so already-tombstoned entities can be hard-deleted. If no entity matches, `NotFoundException` is thrown.
+
+### Stage 5: Delete entity advisors
 
 ```
 IResourceDeleteAdvisor<TEntity>
 ```
 
-This advisor has access to both the entity and the `DeleteRequest`. The built-in advisor:
+| Order | Advisor | What it does |
+|---|---|---|
+| `Orders.Base` (100M) | `AdviceDeleteFreshness` | Compares the request ETag against the entity's `IConcurrency.Timestamp`; throws `ConcurrencyException` on mismatch |
 
-| Order       | Advisor                 | Behavior                                             |
-| ----------- | ----------------------- | ---------------------------------------------------- |
-| 100,000,000 | `AdviceDeleteFreshness` | Enforces optimistic concurrency via ETag comparison. |
+`AdviceDeleteFreshness` fires only when the `DeleteRequest.Etag` starts with `W/` and `DeleteRequest.Force` is `false`. Passing `force = true` bypasses the freshness check.
 
-#### Freshness Validation
+### Soft-delete interception
 
-`AdviceDeleteFreshness` enforces concurrency checking with these rules:
+If the entity implements `ISoftDelete`, the repository-layer advisor `AdviceRemoveSoftDelete<TEntity>` intercepts `RemoveAsync` and converts it to an update that sets `DeleteTime = DateTimeOffset.UtcNow`. It returns `AdviseResult.Handle` to prevent the physical delete. The entity is not removed from the database; it is tombstoned.
 
-1. If `DeleteRequest.Force` is `true`, the freshness check is skipped entirely.
-2. If a `SuppressFreshness` marker is present in the `AdviceContext`, the check is skipped.
-3. If the entity does not implement `IConcurrency` or has no `Timestamp`, the check is skipped.
-4. If `DeleteRequest.Etag` is null, empty, or does not start with `W/`, the check is skipped.
-5. Otherwise, the advisor computes the expected ETag from the entity's `IConcurrency.Timestamp` and compares it with the request's `Etag`. A mismatch throws `ConcurrencyException`.
+To physically delete a soft-deleted entity, call `repository.SuppressRemoveSoftDelete()` before `RemoveAsync`, or use a separate administrative endpoint.
 
-### 4. Persistence
-
-The entity is removed from the repository and committed:
+### Stage 6: Persistence
 
 ```csharp
-await _repository.RemoveAsync(entity, ct);
-await _repository.CommitAsync(ct);
+await _repository.RemoveAsync(entity, ct)
+await _repository.CommitAsync(ct)
 ```
 
-Whether this performs a physical delete or a soft delete depends on the repository implementation and whether the entity implements `ISoftDelete`. The `RemoveAsync` method on the repository handles this distinction -- entities that implement `ISoftDelete` get their `DeleteTime` set and are marked as deleted rather than physically removed.
+If `AdviceRemoveSoftDelete` returns `Handle`, the repository skips the physical delete and commits the tombstone update instead.
 
-### 5. Result
+## Soft-delete vs. physical delete
 
-Returns `true` on success. In the [HTTP transport](./http-transport.md), this becomes a 204 No Content response.
+| Scenario | Behavior |
+|---|---|
+| Entity implements `ISoftDelete`, no suppression | `RemoveAsync` sets `DeleteTime`; entity remains in DB |
+| Entity implements `ISoftDelete`, `SuppressRemoveSoftDelete()` called | Physical delete |
+| Entity does not implement `ISoftDelete` | Physical delete |
+| `force = true` on `DeleteRequest` | Bypasses ETag check; soft-delete behavior unchanged |
 
-## Soft Delete Integration
+## Extension points
 
-The resource system integrates with the `ISoftDelete` interface from `Schemata.Abstractions.Entities`:
+- Implement `IResourceDeleteRequestAdvisor<TEntity>` to add pre-load logic (e.g., dependency checks).
+- Implement `IResourceDeleteAdvisor<TEntity>` to add entity-level logic after load (e.g., cascade soft-delete of children).
+- The delete pipeline does not have a response advisor stage. Post-delete side effects should use `EnqueueAfterCommit` on `AdviceContext` or the repository.
 
-```csharp
-public interface ISoftDelete
-{
-    DateTime? DeleteTime { get; set; }
-    DateTime? PurgeTime { get; set; }
-}
-```
+## Design motivation
 
-When an entity implements `ISoftDelete`:
+The delete pipeline returns `bool`. A successful delete has no body to return; the HTTP transport maps `true` to `204 No Content`, `false` (blocked) to an empty result; the gRPC transport throws `NoContentException` on `false`.
 
-- **Delete**: The repository's `RemoveAsync` sets `DeleteTime` rather than physically deleting the row.
-- **List**: By default, soft-deleted entities are excluded from query results. Set `showDeleted=true` on the `ListRequest` to include them.
-- **Get/Find**: The handler calls `SuppressQuerySoftDelete()` when resolving entities by name, so soft-deleted entities can be found for get, update, and delete operations.
+## Caveats
 
-The `Force` flag on `DeleteRequest` bypasses the freshness check but does not change the soft-delete behavior. Whether the delete is soft or physical is determined solely by the entity's implementation of `ISoftDelete` and the repository's handling.
+- `AdviceDeleteFreshness` requires the ETag to start with `W/`. A plain ETag without the `W/` prefix is treated as opt-out, not as a mismatch.
+- The `force` flag bypasses only the freshness check. It does not bypass authorization or other delete advisors.
+- After a soft-delete, `GetAsync` still returns the entity (it suppresses soft-delete filtering). The caller can inspect `DeleteTime` to determine whether the resource is tombstoned.
 
-## Implementing a Custom Delete Advisor
+## See also
 
-To add custom logic before deletion:
-
-```csharp
-public class ProtectActiveOrders<TEntity> : IResourceDeleteAdvisor<TEntity>
-    where TEntity : class, ICanonicalName
-{
-    public int Order => 50_000_000;
-
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext ctx, TEntity entity, DeleteRequest request,
-        ClaimsPrincipal? principal, CancellationToken ct = default)
-    {
-        // Custom business logic to prevent deletion
-        if (entity is Order { Status: "active" })
-        {
-            throw new FailedPreconditionException("Cannot delete active orders.");
-        }
-
-        return Task.FromResult(AdviseResult.Continue);
-    }
-}
-```
-
-## No Response Advisors
-
-Unlike Create, Update, and Get, the delete pipeline does not run `IResourceResponseAdvisor<TEntity, TDetail>`. Delete operations return a simple boolean and do not produce a detail DTO.
+- [Resource Overview](overview.md)
+- [Update Pipeline](update-pipeline.md)
+- [Advice Pipeline](../core/advice-pipeline.md)
+- [Entity Traits](../entity/traits.md)
+- [Repository Mutation Pipeline](../repository/mutation-pipeline.md)

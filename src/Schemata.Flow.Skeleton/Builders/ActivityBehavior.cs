@@ -24,6 +24,8 @@ public sealed class ActivityBehavior
 
     internal Activity LastTarget { get; private set; }
 
+    /// <summary>Routes the current activity to another <see cref="Activity" />.</summary>
+    /// <param name="target">The next activity to transition to.</param>
     public ActivityBehavior Go(Activity target) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
@@ -34,6 +36,8 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Routes the current activity to a <see cref="FlowEvent" />.</summary>
+    /// <param name="target">The intermediate or end event to transition to.</param>
     public ActivityBehavior Go(FlowEvent target) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
@@ -43,6 +47,7 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Connects the current activity to a synthesized anonymous end event.</summary>
     public ActivityBehavior End() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
@@ -56,6 +61,8 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Connects the current activity to an existing <see cref="EndEvent" />.</summary>
+    /// <param name="endEvent">The end event to route to.</param>
     public ActivityBehavior End(EndEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
@@ -65,6 +72,8 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Connects the current activity to an existing <see cref="FlowEvent" /> acting as an end event.</summary>
+    /// <param name="endEvent">The flow event to route to.</param>
     public ActivityBehavior End(FlowEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
@@ -74,6 +83,7 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Connects the current activity to a synthesized terminate end event, stopping all tokens in the process.</summary>
     public ActivityBehavior Terminate() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
@@ -90,6 +100,8 @@ public sealed class ActivityBehavior
         return this;
     }
 
+    /// <summary>Routes the current activity through an exclusive gateway, taking the first branch whose condition is true.</summary>
+    /// <param name="branches">The candidate branches evaluated in order; the first matching branch is taken.</param>
     public ActivityBehavior Decide(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new ExclusiveGateway {
@@ -168,6 +180,8 @@ public sealed class ActivityBehavior
         return new(_definition, gateway, branches);
     }
 
+    /// <summary>Routes the current activity through an event-based gateway, waiting for the first matching event branch.</summary>
+    /// <param name="branches">The event branches the gateway listens on; the first to fire is taken.</param>
     public ActivityBehavior Await(params EventBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new EventBasedGateway {
@@ -201,8 +215,12 @@ public sealed class ActivityBehavior
                    new ErrorDefinition { Name = typeof(TException).Name, ExceptionType = typeof(TException) });
     }
 
+    /// <summary>Attaches a boundary error catch using an explicit <see cref="ErrorDefinition" />.</summary>
+    /// <param name="error">The error definition to match against.</param>
     public BoundaryCatch OnError(ErrorDefinition error) { return new(this, _definition, Activity, error); }
 
+    /// <summary>Attaches a boundary timer catch that fires after <paramref name="duration" />.</summary>
+    /// <param name="duration">The elapsed time before the boundary event triggers.</param>
     public BoundaryCatch OnTimer(TimeSpan duration) {
         return new(this, _definition, Activity,
                    new TimerDefinition {
@@ -210,14 +228,22 @@ public sealed class ActivityBehavior
                    });
     }
 
+    /// <summary>Attaches a boundary message catch for the given <paramref name="message" /> definition.</summary>
+    /// <param name="message">The message definition to listen for.</param>
     public BoundaryCatch OnMessage(Message message) { return new(this, _definition, Activity, message); }
 
+    /// <summary>Attaches a boundary signal catch for the given <paramref name="signal" /> definition.</summary>
+    /// <param name="signal">The signal definition to listen for.</param>
     public BoundaryCatch OnSignal(Signal signal) { return new(this, _definition, Activity, signal); }
 
+    /// <summary>Attaches a boundary conditional catch that triggers when <paramref name="condition" /> becomes true.</summary>
+    /// <param name="condition">The conditional definition to evaluate.</param>
     public BoundaryCatch OnCondition(ConditionalDefinition condition) {
         return new(this, _definition, Activity, condition);
     }
 
+    /// <summary>Attaches a boundary escalation catch for the given <paramref name="escalation" /> definition.</summary>
+    /// <param name="escalation">The escalation definition to listen for.</param>
     public BoundaryCatch OnEscalation(EscalationDefinition escalation) {
         return new(this, _definition, Activity, escalation);
     }

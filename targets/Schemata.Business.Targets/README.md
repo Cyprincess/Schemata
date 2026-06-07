@@ -4,8 +4,8 @@
 [![Codecov](https://img.shields.io/codecov/c/github/Cyprincess/Schemata.svg)](https://codecov.io/gh/Cyprincess/Schemata)
 [![license](https://img.shields.io/github/license/Cyprincess/Schemata.svg)](https://github.com/Cyprincess/Schemata/blob/master/LICENSE)
 
-![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)
-![netstandard2.1](https://img.shields.io/badge/netstandard-2.1-brightgreen.svg)
+![net8.0](https://img.shields.io/badge/Net-8.0-brightgreen.svg)
+![net10.0](https://img.shields.io/badge/Net-10.0-brightgreen.svg)
 
 A Schemata Business project is a class library that defines domain models, repository contracts, and business logic for a single domain area. It has no dependency on ASP.NET Core — only on the framework's portable abstractions — so it can be shared across application projects and modules.
 
@@ -17,7 +17,7 @@ Pick the variant that matches the capabilities you need:
 | -------------------------------------- | --------------------------------------------------------------------------- |
 | `Schemata.Business.Targets`            | Base: Abstractions                                                          |
 | `Schemata.Business.Persisting.Targets` | Base + Repository pattern                                                   |
-| `Schemata.Business.Complex.Targets`    | Persisting + DSL + Mapping + Authorization + Identity + Security + Workflow |
+| `Schemata.Business.Complex.Targets`    | Persisting + DSL + Mapping + Authorization + Identity + Security           |
 
 ## Quick Start
 
@@ -30,7 +30,7 @@ dotnet add package --prerelease Schemata.Business.Targets
 # With data persistence
 dotnet add package --prerelease Schemata.Business.Persisting.Targets
 
-# Full suite (DSL, mapping, auth, workflow)
+# Full suite (DSL, mapping, identity, authorization, security)
 dotnet add package --prerelease Schemata.Business.Complex.Targets
 ```
 

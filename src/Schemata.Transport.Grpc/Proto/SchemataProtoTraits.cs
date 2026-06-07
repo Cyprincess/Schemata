@@ -7,8 +7,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Transport.Grpc.Proto;
 
 /// <summary>
-///     Schemata trait → protobuf wire-name resolver shared by every code-first
-///     gRPC surface (Resource, Flow, …). Mirrors the JSON wire-name rewrites
+///     Schemata trait -> protobuf wire-name resolver shared by every code-first
+///     gRPC surface (Resource, Flow, ...). Mirrors the JSON wire-name rewrites
 ///     performed by <c>Schemata.Transport.Http.SchemataJsonTraits</c>:
 ///     <list type="bullet">
 ///         <item><c>ICanonicalName.Name</c> is suppressed (it is a pattern, not a wire field).</item>

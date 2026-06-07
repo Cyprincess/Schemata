@@ -1,7 +1,7 @@
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Call Activity — an activity that invokes another reusable
+///     A BPMN Call Activity - an activity that invokes another reusable
 ///     <see cref="ProcessDefinition" /> identified by <see cref="CalledElement" />.
 ///     The called process runs in its own context.
 /// </summary>

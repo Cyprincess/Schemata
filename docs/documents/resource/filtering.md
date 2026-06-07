@@ -1,246 +1,126 @@
 # Filtering
 
-The resource system implements the AIP-160 filtering specification. Filter expressions are parsed at request time into an AST and then compiled to LINQ `Expression<Func<T, bool>>` predicates applied to the entity query.
+`ResourceOperationHandler.ListAsync` supports AIP-160 filter expressions and AIP-132 order-by expressions. Both are compiled to LINQ expressions at request time and applied to the entity query via `ResourceRequestContainer`. The filter and order compilers are resolved as keyed services from DI; the keys are hard-wired to `AipLanguage.Name` ("aip").
 
-## Filter Parameter
+## Where the code lives
 
-Filters are passed via the `filter` query parameter on list requests:
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 193-220) |
+| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs` |
+| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipOrderCompiler.cs`, `AipLanguage.cs` |
+| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs` |
 
-```
-GET /books?filter=status="published" AND price<20
-```
+## Filter parameter
 
-In gRPC, the `Filter` property on `ListRequest` serves the same purpose.
-
-## Grammar
-
-The filter parser is built with the Parlot parsing library. The grammar follows the AIP-160 EBNF with these productions:
-
-```
-expression  = sequence { AND sequence }
-sequence    = factor { factor }         -- implicit AND between adjacent factors
-factor      = term { OR term }
-term        = [NOT | "-"] simple
-simple      = restriction | composite
-composite   = "(" expression ")"
-restriction = comparable [comparator arg]
-comparable  = function | member
-function    = path "(" [argList] ")"
-path        = name { "." name }
-member      = value { "." field }
-field       = value | keyword
-argList     = arg { "," arg }
-arg         = comparable | composite
-comparator  = "<=" | "<" | ">=" | ">" | "!=" | "=" | ":"
-value       = INTEGER | NUMBER | TRUE | FALSE | NULL | TEXT | STRING
-```
-
-Keywords `AND`, `OR`, `NOT`, `TRUE`, `FALSE`, and `NULL` are case-insensitive and checked with word boundary detection (the next character must not be an identifier character).
-
-## Comparison Operators
-
-| Operator              | Symbol | Expression Type                     | Notes      |
-| --------------------- | ------ | ----------------------------------- | ---------- |
-| Equal                 | `=`    | `ExpressionType.Equal`              |            |
-| Not Equal             | `!=`   | `ExpressionType.NotEqual`           |            |
-| Less Than             | `<`    | `ExpressionType.LessThan`           |            |
-| Less Than or Equal    | `<=`   | `ExpressionType.LessThanOrEqual`    |            |
-| Greater Than          | `>`    | `ExpressionType.GreaterThan`        |            |
-| Greater Than or Equal | `>=`   | `ExpressionType.GreaterThanOrEqual` |            |
-| Has                   | `:`    | (special)                           | See below. |
-
-For all operators except Has, if the right operand type does not match the left, it is automatically converted via `Expression.Convert`.
-
-## The Has Operator
-
-The `:` (has/contains) operator has special behavior depending on the left-hand type:
-
-| Left-Hand Type             | Right-Hand Value | Behavior                                                                           |
-| -------------------------- | ---------------- | ---------------------------------------------------------------------------------- |
-| Any                        | `*` (wildcard)   | Presence check -- non-null for reference types, non-null-or-empty for collections. |
-| `IDictionary`              | any              | Calls `ContainsKey` on the dictionary.                                             |
-| `IEnumerable` (not string) | any              | Calls `Enumerable.Contains` on the collection.                                     |
-| `string`                   | any              | Calls `string.Contains` for substring matching.                                    |
-| Other                      | any              | Falls back to equality comparison.                                                 |
-
-### Presence Check (`field:*`)
-
-- For collections: `field != null && field.Any()`.
-- For nullable types: `field != null`.
-- For value types: always `true`.
-
-## Logical Operators
-
-| Operator | Syntax                                            | Behavior                                                                                        |
-| -------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| AND      | `AND` keyword or implicit (space between factors) | Both conditions must be true. Adjacent terms without an explicit operator are implicitly ANDed. |
-| OR       | `OR` keyword                                      | Either condition must be true.                                                                  |
-| NOT      | `NOT` keyword or `-` prefix                       | Negates the following term.                                                                     |
-
-Precedence (highest to lowest):
-
-1. NOT / `-`
-2. OR
-3. Implicit AND (adjacent factors in a sequence)
-4. Explicit AND
-
-Parentheses `()` can override precedence.
-
-## Value Types
-
-| Type          | Syntax                              | Examples                  |
-| ------------- | ----------------------------------- | ------------------------- |
-| Integer       | Decimal digits (no dot following)   | `42`, `0`, `-1`           |
-| Number        | Decimal with dot                    | `3.14`, `0.5`             |
-| Boolean       | `TRUE` / `FALSE` (case-insensitive) | `true`, `FALSE`           |
-| Null          | `NULL` (case-insensitive)           | `null`                    |
-| Unquoted text | Identifier characters               | `active`, `hello_world`   |
-| Quoted string | Double-quoted                       | `"hello world"`, `"it's"` |
-
-The integer parser uses a look-ahead to distinguish integers from numbers: if a dot followed by a digit appears after the integer, it falls through to the number parser.
-
-## Member Access
-
-Members reference entity properties. They support dot-separated paths:
+The `filter` query parameter accepts an AIP-160 filter expression. The expression is compiled to an `Expression<Func<TEntity, bool>>` and applied as a `Where` clause on the entity query.
 
 ```
-author.name = "Tolkien"
-metadata.tags : "fiction"
+GET /students?filter=grade>3 AND name:"alice"
 ```
 
-Property names are resolved by converting to snake_case via Humanizer's `Underscore()` method. When the filter container is built, all writable properties of the entity type are bound with their snake_case names. The entity itself is bound as a parameter with the singularized, underscored type name.
+## Order-by parameter
 
-For example, for a `BookReview` entity:
-
-- `book_review` is the parameter name.
-- `title` resolves to `BookReview.Title`.
-- `create_time` resolves to `BookReview.CreateTime`.
-
-## Custom Functions
-
-The filter grammar supports function call syntax:
+The `order_by` query parameter accepts a comma-separated list of field names with optional `ASC` or `DESC` suffixes (default is ascending).
 
 ```
-contains(title, "adventure")
-time.now()
+GET /students?order_by=grade DESC, name ASC
 ```
 
-Functions must be registered on the `Container` before expression building. The `ResourceRequestContainer<T>.FilterConfigure` property provides a hook:
+## How compilation works
 
 ```csharp
-container.FilterConfigure = c => {
-    c.RegisterFunction("contains", (args, ctx) =>
-        Expression.Call(args[0], "Contains", null, args[1]));
+// Filter
+var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
+var tree = compiler.Parse(request.Filter);
+var filter = compiler.Compile<TEntity, bool>(tree);
+container.ApplyFiltering(filter);
 
-    c.RegisterFunction("startsWith", (args, ctx) =>
-        Expression.Call(args[0], "StartsWith", null, args[1]));
-};
+// Order
+var compiler = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name);
+var order = compiler.CompileOrder<TEntity>(request.OrderBy);
+container.ApplyOrdering(order);
 ```
 
-Function resolution follows two strategies:
+Both compilers are registered as keyed singletons under `AipLanguage.Name` by `services.AddAipExpressions()`, which `SchemataResourceFeature` calls automatically.
 
-1. **Full name lookup**: The full dotted path (e.g., `time.now`) is looked up in the registered functions dictionary.
-2. **Instance-style fallback**: If the path has multiple segments, the last segment is tried as the function name with the preceding path treated as the first argument. For example, `msg.endsWith("!")` looks up `endsWith` and passes the `msg` member expression as the first argument.
+## Hard-wired to AIP (caveat #4)
 
-If no registered function matches, a `ParseException` is thrown.
+`ListAsync` resolves `IExpressionCompiler` and `IOrderCompiler` by the key `AipLanguage.Name` ("aip"). This key is hard-coded in the handler. Registering a different `IExpressionCompiler` under a custom key (e.g., `"cel"`) does not affect `ListAsync` — the resource system will still use the AIP compiler for filtering and ordering.
 
-## Ordering
-
-The `orderBy` parameter specifies how results should be sorted:
-
-```
-GET /books?orderBy=create_time desc, title
-```
-
-### Grammar
-
-```
-order = member [ASC | DESC] { "," member [ASC | DESC] }
-```
-
-Each member is parsed the same way as filter members. The direction keyword is case-insensitive:
-
-| Direction  | Keyword            | Enum Value            |
-| ---------- | ------------------ | --------------------- |
-| Ascending  | `ASC` (or omitted) | `Ordering.Ascending`  |
-| Descending | `DESC`             | `Ordering.Descending` |
-
-Multiple order clauses are comma-separated. They are applied in order, with the first becoming `OrderBy` and subsequent ones becoming `ThenBy`.
-
-Property resolution works the same as for filters -- snake_case names are mapped to entity properties.
-
-### Application
-
-`QueryableExtensions.WithOrdering` applies each ordering to the query:
-
-- If the source is not yet ordered, uses `OrderBy` / `OrderByDescending`.
-- If the source is already ordered (`IOrderedQueryable`), chains with `ThenBy` / `ThenByDescending`.
+If you need CEL or a custom language for filtering, you must call the compiler directly in your own code (e.g., in a custom advisor or a non-resource endpoint). See [Custom Language](../expressions/custom-language.md) for how to register a custom compiler.
 
 ## Pagination
 
-Pagination uses two complementary mechanisms:
+Pagination uses a cursor-based page token. The `page_token` parameter is a base64-encoded JSON object containing `parent`, `filter`, `order_by`, `show_deleted`, `page_size`, and `skip`. The token is validated against the current request parameters — if any of `parent`, `filter`, `order_by`, or `show_deleted` differ from the token, a `ValidationException` is thrown.
 
-### Page Size and Skip
+| Parameter | Default | Max |
+|---|---|---|
+| `page_size` | 25 | 100 |
+| `skip` | 0 | unbounded |
 
-| Parameter  | Default | Range  | Description                                                             |
-| ---------- | ------- | ------ | ----------------------------------------------------------------------- |
-| `pageSize` | 25      | 1--100 | Maximum items per page. Values <= 0 become 25; values > 100 become 100. |
-| `skip`     | 0       | >= 0   | Number of items to skip. Added to the page token's accumulated offset.  |
+The next page token is included in the response when the number of returned summaries equals the page size. When the last page is reached, `next_page_token` is absent from the response.
 
-### Page Token
+## `ResourceRequestContainer`
 
-The `pageToken` is a Brotli-compressed, Base64 URL-safe encoded JSON object containing:
+`ResourceRequestContainer<T>` accumulates query modifications as a composable `Func<IQueryable<T>, IQueryable<T>>`:
 
-| Field         | Description                                      |
-| ------------- | ------------------------------------------------ |
-| `Parent`      | The parent value from the original request.      |
-| `Filter`      | The filter from the original request.            |
-| `OrderBy`     | The ordering from the original request.          |
-| `ShowDeleted` | The show-deleted flag from the original request. |
-| `PageSize`    | The page size.                                   |
-| `Skip`        | The accumulated skip offset.                     |
+| Method | Effect |
+|---|---|
+| `ApplyFiltering(predicate)` | Appends a `Where(predicate)` clause |
+| `ApplyOrdering(order)` | Applies the order function |
+| `ApplyPaginating(token)` | Appends `Skip` and `Take` |
+| `ApplyModification(predicate)` | Appends an arbitrary `Where` clause (used for parent scoping and entitlement filtering) |
 
-On each page, the handler validates that the token's `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` match the current request. A mismatch throws `InvalidArgumentException` with field `"page_token"` -- this prevents clients from changing query parameters while paging.
+All modifications compose in the order they are applied. The final `Query` function is passed to `repository.CountAsync` and `repository.ListAsync`.
 
-The `nextPageToken` is generated when the result count is greater than or equal to the page size (indicating more results may exist). The skip offset is advanced by `PageSize` and the token is re-serialized.
+## Supported AIP-160 operators
 
-### Query Execution
+| Operator | Syntax | Example |
+|---|---|---|
+| Equality | `=` | `name = "alice"` |
+| Inequality | `!=` | `grade != 3` |
+| Less than | `<` | `grade < 3` |
+| Less than or equal | `<=` | `grade <= 3` |
+| Greater than | `>` | `grade > 3` |
+| Greater than or equal | `>=` | `grade >= 3` |
+| Has (substring/membership) | `:` | `name:"ali"` |
+| Wildcard | `*` | `name:*` (presence check) |
+| Logical AND | `AND` | `grade > 2 AND name:"ali"` |
+| Logical OR | `OR` | `grade = 1 OR grade = 2` |
+| Logical NOT | `NOT` | `NOT grade = 3` |
+| Negation | `-` | `-grade = 3` |
+| Grouping | `(...)` | `(grade > 2 OR name:"ali")` |
 
-The handler counts total matching entities first (before pagination), then applies skip/take:
+For the full grammar and built-in functions (`timestamp(...)`, `duration(...)`), see [AIP Expressions](../expressions/aip.md).
 
-```csharp
-var totalSize = await repository.CountAsync(q => container.Query(q), ct);
-container.ApplyPaginating(token);
-var entities = repository.ListAsync(q => container.Query(q), ct);
-```
+## Error handling
 
-The `TotalSize` field in `ListResult` reflects the count before pagination, allowing clients to know how many total results match the query.
+If the filter or order expression fails to parse, `ListAsync` catches `ParseException` and `ArgumentException` and throws a `ValidationException` with:
 
-## Filter Examples
+- `Field`: `"filter"` or `"order_by"` (wire name)
+- `Reason`: `FieldReasons.InvalidFilter` or `FieldReasons.InvalidOrderBy`
 
-```
-// Simple equality
-status = "active"
+## Extension points
 
-// Numeric comparison
-price >= 10 AND price < 50
+- Implement `IResourceListRequestAdvisor<TEntity>` to add additional predicates via `container.ApplyModification(predicate)` (e.g., entitlement filtering, tenant scoping).
+- The `ResourceRequestContainer` is passed to all list request advisors, so any advisor can add predicates before the query executes.
 
-// String containment
-title : "adventure"
+## Design motivation
 
-// Presence check
-description : *
+Compiling filter expressions to LINQ at request time (rather than evaluating them in memory) lets the database engine apply the filter efficiently. The `ExpressionCache` (see [Expressions Overview](../expressions/overview.md)) caches compiled expressions by a SHA-256 key so repeated identical filters don't re-compile.
 
-// Collection contains
-tags : "fiction"
+## Caveats
 
-// Negation
-NOT status = "archived"
--status = "archived"
+- The filter and order compilers are hard-wired to `AipLanguage.Name`. Registering a CEL or custom compiler does not affect `ListAsync`.
+- The `has` operator (`:`) compiles to a `Contains` call on strings and a membership check on collections. Its behavior on non-string, non-collection properties is undefined and may throw at runtime.
+- Wildcard `*` in a `has` expression compiles to a presence check (not-null, not-empty). It does not support glob patterns.
+- `CountAsync` runs before pagination. On large tables, consider caching the count or using approximate counts.
 
-// Complex expression with grouping
-(status = "active" OR status = "pending") AND create_time >= "2024-01-01"
+## See also
 
-// Ordering with filter
-GET /books?filter=status="active"&orderBy=create_time desc, title
-```
+- [Resource Overview](overview.md)
+- [Read Pipeline](read-pipeline.md)
+- [AIP Expressions](../expressions/aip.md)
+- [Expressions Overview](../expressions/overview.md)
+- [Custom Language](../expressions/custom-language.md)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
@@ -37,7 +36,7 @@ public sealed class ResourceControllerConvention(
     #region IControllerModelConvention Members
 
     public void Apply(ControllerModel controller) {
-        // Only rewrite routes for the generic resource controller — non-generic
+        // Only rewrite routes for the generic resource controller - non-generic
         // controllers are regular user-defined controllers that should be left alone.
         if (!controller.ControllerType.IsGenericType
          || controller.ControllerType.GetGenericTypeDefinition() != typeof(ResourceController<,,,>)) {
@@ -79,7 +78,7 @@ public sealed class ResourceControllerConvention(
 
         // Apply a scheme-specific authorization policy when a non-default
         // authentication scheme is configured for resource endpoints.
-        // The always-pass assertion is intentional — we only need to set the
+        // The always-pass assertion is intentional - we only need to set the
         // scheme, not evaluate claims; actual authorization happens in the
         // advisor pipeline.
         if (!string.IsNullOrWhiteSpace(scheme)) {

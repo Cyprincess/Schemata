@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Scheduling.Skeleton;
 
 namespace Schemata.Scheduling.Skeleton.Entities;
 

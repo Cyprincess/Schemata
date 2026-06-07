@@ -8,7 +8,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     Advises on an AIP-136 custom method request before the registered
 ///     <see cref="Schemata.Abstractions.Resource.IResourceMethodHandler{TEntity, TRequest, TResponse}" />
 ///     is invoked. Parallels
-///     <see cref="IResourceCreateRequestAdvisor{TEntity, TRequest}" /> ── used by
+///     <see cref="IResourceCreateRequestAdvisor{TEntity, TRequest}" /> -- used by
 ///     sanitize, authorize, validation, and idempotency advisors per
 ///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>.
 /// </summary>

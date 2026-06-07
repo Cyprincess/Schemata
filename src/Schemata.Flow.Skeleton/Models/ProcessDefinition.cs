@@ -6,34 +6,51 @@ using System.Reflection;
 
 namespace Schemata.Flow.Skeleton.Models;
 
+/// <summary>
+///     Strongly-typed BPMN process definition. Derived classes expose flow
+///     elements as auto-properties; the base constructor instantiates the
+///     null-valued ones via reflection.
+/// </summary>
 /// <remarks>
-///     Magic-property discovery is adapted from Automatonymous:
-///     null-valued auto-properties of known types (Activity, StartEvent,
-///     EndEvent, FlowEvent, Message, Signal, ErrorDefinition, EscalationDefinition)
-///     are instantiated via reflection in the base constructor.
+///     Magic-property discovery is adapted from Automatonymous: null-valued
+///     auto-properties of known types (<see cref="Activity"/>,
+///     <see cref="StartEvent"/>, <see cref="EndEvent"/>, <see cref="FlowEvent"/>,
+///     <see cref="Message"/>, <see cref="Signal"/>, <see cref="ErrorDefinition"/>,
+///     <see cref="EscalationDefinition"/>) are instantiated via reflection in
+///     the base constructor.
 /// </remarks>
 public class ProcessDefinition
 {
+    /// <summary>Initializes a new <see cref="ProcessDefinition"/> and seeds known auto-properties via reflection.</summary>
     public ProcessDefinition() { InitializeProperties(); }
 
+    /// <summary>Stable identifier of the process definition; serves as the lookup key in the registry.</summary>
     public string Name { get; set; } = null!;
 
+    /// <summary>Human-readable label surfaced in tooling and audit rows.</summary>
     public string? DisplayName { get; set; }
 
+    /// <summary>Free-form description of the process intent.</summary>
     public string? Description { get; set; }
 
+    /// <summary>Every BPMN element discovered on the definition (activities, events, gateways).</summary>
     public List<FlowElement> Elements { get; } = [];
 
+    /// <summary>Sequence flows connecting <see cref="Elements"/>.</summary>
     public List<SequenceFlow> Flows { get; } = [];
 
     internal HashSet<Activity> ActivitiesWithOutgoing { get; } = [];
 
+    /// <summary>Message definitions referenced by message events and tasks.</summary>
     public List<Message> Messages { get; } = [];
 
+    /// <summary>Signal definitions referenced by signal events.</summary>
     public List<Signal> Signals { get; } = [];
 
+    /// <summary>Error definitions referenced by error boundary events and end events.</summary>
     public List<ErrorDefinition> Errors { get; } = [];
 
+    /// <summary>Escalation definitions referenced by escalation events.</summary>
     public List<EscalationDefinition> Escalations { get; } = [];
 
     private static void SetPropertyValue(object target, PropertyInfo prop, object? value) {

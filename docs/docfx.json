@@ -27,6 +27,9 @@
         "files": ["guides/**.md", "guides/toc.yml"]
       },
       {
+        "files": ["cookbook/**.md", "cookbook/toc.yml"]
+      },
+      {
         "files": [
           "documents/**.md",
           "documents/**/**.md",

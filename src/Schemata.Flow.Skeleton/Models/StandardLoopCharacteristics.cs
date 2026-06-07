@@ -3,9 +3,9 @@ using Schemata.Flow.Skeleton.Runtime;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A standard loop — the activity executes repeatedly while (or until)
+///     A standard loop - the activity executes repeatedly while (or until)
 ///     <see cref="LoopCondition" /> evaluates in the expected direction.
-///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> §10.2.5.
+///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> Section 10.2.5.
 /// </summary>
 public sealed class StandardLoopCharacteristics : LoopCharacteristics
 {

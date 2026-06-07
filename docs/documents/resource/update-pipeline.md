@@ -1,156 +1,141 @@
 # Update Pipeline
 
-The update operation is handled by `ResourceOperationHandler.UpdateAsync`. It takes a `TRequest` DTO and an existing `TEntity`, applies changes through the [advisor pipeline](../core/advice-pipeline.md), and returns an `UpdateResult<TDetail>`.
+`ResourceOperationHandler.UpdateAsync` accepts a canonical name string, a `TRequest` DTO, and a `ClaimsPrincipal?`. It loads the existing entity, runs it through a fixed sequence of advisor stages, applies the changes, persists, and returns an `UpdateResultBase<TDetail>`. Authorization is checked before the entity is loaded, per AIP-211.
 
-## Pipeline Steps
+## Where the code lives
 
-### 1. General Request Advisor
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 436-514) |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestValidation.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateFreshness.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs` |
+
+## Pipeline walkthrough
+
+### Stage 1: Gate check
 
 ```
-IResourceRequestAdvisor<TEntity> -- Operations.Update
+IResourceRequestAdvisor<TEntity>
 ```
 
-The first gate. Returns `Continue` to proceed, `Handle` to short-circuit with an `UpdateResult<TDetail>` from the context, or `Block` to silently deny.
+Receives the principal and the operation token `nameof(Operations.Update)`. A `Block` returns `UpdateResultBase<TDetail>.Blocked`.
 
-### 2. Update Request Advisors
+### Stage 2: Parent property clearing
+
+Before the request advisors run, `ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request)` sets all parent-segment properties on the request to `null`. This prevents clients from changing the parent of a resource via an update.
+
+### Stage 3: Name parsing
+
+`ApplyIdentifierPredicates` parses the canonical name and applies leaf and parent predicates to the `ResourceRequestContainer<TEntity>`.
+
+### Stage 4: Update request advisors
 
 ```
 IResourceUpdateRequestAdvisor<TEntity, TRequest>
 ```
 
-Multiple advisors run in order:
+Built-in advisors run in this order:
 
-| Order       | Advisor                         | Behavior                                                         |
-| ----------- | ------------------------------- | ---------------------------------------------------------------- |
-| 100,000,000 | `AdviceUpdateRequestAuthorize`  | Checks authorization (only if `WithAuthorization()` was called). |
-| 110,000,000 | `AdviceUpdateRequestValidation` | Validates the request through `IValidationAdvisor<TRequest>`.    |
+| Order | Advisor | What it does |
+|---|---|---|
+| `AdviceUpdateRequestAnonymous.DefaultOrder` (80M) | `AdviceUpdateRequestAnonymous` | Honors `[Anonymous(Operations.Update)]` |
+| `AdviceUpdateRequestAuthorize.DefaultOrder` (100M) | `AdviceUpdateRequestAuthorize` | Calls `IAccessProvider`; throws `AuthorizationException` on denial |
+| `AdviceUpdateRequestSanitize.DefaultOrder` (110M) | `AdviceUpdateRequestSanitize` | Clears server-managed fields on the request (same `SystemFields` list as Create) |
+| `AdviceUpdateRequestValidation.DefaultOrder` (120M) | `AdviceUpdateRequestValidation` | Runs all `IValidationAdvisor<TRequest>` implementations |
+| `AdviceUpdateRequestIdempotency.DefaultOrder` (130M) | `AdviceUpdateRequestIdempotency` | Checks cache for a prior result keyed by `IRequestIdentification.RequestId` under operation token `nameof(Operations.Update)`; returns `Handle` on hit, reserves the key on miss |
 
-#### Authorization
+### Stage 5: Entity load
 
-`AdviceUpdateRequestAuthorize` is only registered when `WithAuthorization()` is called. It:
+```csharp
+var entity = await _repository.Once()
+                              .SuppressQuerySoftDelete()
+                              .SingleOrDefaultAsync(q => container.Query(q), ct)
+          ?? throw ResourceNotFound(name);
+```
 
-1. Checks if the entity type has `[Anonymous(Operations.Update)]` -- if so, skips authorization.
-2. Calls `IAccessProvider<TEntity, ResourceRequestContext<TRequest>>.HasAccessAsync` with the current `ClaimsPrincipal`.
-3. Throws `AuthorizationException` if access is denied.
+The entity is loaded with soft-delete suppressed so tombstoned resources can be updated (e.g., to restore them). If no entity matches, `NotFoundException` is thrown.
 
-#### Validation
-
-`AdviceUpdateRequestValidation` delegates to `IValidationAdvisor<TRequest>` implementations. If validation fails, it throws `ValidationException` with field violations.
-
-When the request implements `IValidation` and `ValidateOnly` is `true`, the advisor throws `NoContentException` after validation to signal a dry-run -- no update is performed.
-
-Validation can be suppressed globally via `WithoutUpdateValidation()` on the builder, or by placing a `SuppressUpdateRequestValidation` marker in the context.
-
-### 3. Update Entity Advisor
+### Stage 6: Update entity advisors
 
 ```
 IResourceUpdateAdvisor<TEntity, TRequest>
 ```
 
-This advisor has access to both the request and the existing entity. It runs before the request fields are mapped onto the entity.
+| Order | Advisor | What it does |
+|---|---|---|
+| `Orders.Base` (100M) | `AdviceUpdateFreshness` | Compares the request ETag (`W/"..."`) against the entity's `IConcurrency.Timestamp`; throws `ConcurrencyException` on mismatch |
 
-The built-in advisor at this stage:
+`AdviceUpdateFreshness` only fires when the request implements `IFreshness` and the supplied ETag starts with `W/`. Missing or non-`W/` tags are treated as opt-out.
 
-| Order       | Advisor                 | Behavior                                             |
-| ----------- | ----------------------- | ---------------------------------------------------- |
-| 100,000,000 | `AdviceUpdateFreshness` | Enforces optimistic concurrency via ETag comparison. |
-
-#### Freshness Validation
-
-`AdviceUpdateFreshness` enforces optimistic concurrency when both conditions are met:
-
-1. The entity implements `IConcurrency` and has a non-empty `Timestamp`.
-2. The request implements `IFreshness` and provides an `EntityTag` that starts with `W/`.
-
-When both are present, the advisor computes the expected ETag from the entity's `IConcurrency.Timestamp` (a `Guid` converted to a Base64 URL-safe weak ETag: `W/"<base64>"`) and compares it with the request's `EntityTag`. A mismatch throws `ConcurrencyException`.
-
-When the request does not carry an ETag, the check is silently skipped -- this allows clients that do not care about concurrency to omit it.
-
-Freshness can be suppressed globally via `WithoutFreshness()` on the builder, which places a `SuppressFreshness` marker in the `AdviceContext`.
-
-### 4. Request Sanitization
-
-After the entity advisor runs, the handler clears identity and parent fields on the request to prevent them from overwriting the entity's values during mapping:
-
-- `request.Name` is set to `null`.
-- `request.CanonicalName` is set to `null`.
-- Parent properties are cleared via `ResourceNameDescriptor.ClearParentProperties`.
-- If the request implements `IIdentifier`, `request.Id` is reset to `default` (0).
-
-### 5. Field Mask Mapping
-
-The handler applies the request fields to the entity using one of two strategies:
-
-#### With Update Mask (IUpdateMask)
-
-When the request implements `IUpdateMask` and `UpdateMask` is non-null, only the specified fields are mapped. The mask is a comma-separated list of snake_case field paths (following the AIP field mask convention). The handler:
-
-1. Splits the mask on commas and trims whitespace.
-2. Converts each field name from snake_case to PascalCase using `Pascalize()`.
-3. Filters to only fields that exist as properties on `TEntity`.
-4. Calls `ISimpleMapper.Map(request, entity, fields)` to update only those properties.
-
-This enables partial updates where only the fields listed in the mask are touched.
-
-#### Without Update Mask
-
-When no update mask is provided, the handler calls `ISimpleMapper.Map(request, entity)` which maps all non-null properties from the request onto the entity. Since identity fields and parent fields were already cleared in the previous step, they will not overwrite the entity.
-
-### 6. Persistence
-
-The entity is updated in the repository and committed:
+### Stage 7: Mapping
 
 ```csharp
-await _repository.UpdateAsync(entity, ct);
-await _repository.CommitAsync(ct);
-```
-
-### 7. Response Mapping and Advisors
-
-The updated entity is mapped to `TDetail` via `ISimpleMapper.Map<TEntity, TDetail>`.
-
-```
-IResourceResponseAdvisor<TEntity, TDetail>
-```
-
-Built-in response advisors:
-
-| Order       | Advisor                     | Behavior                                                                                                            |
-| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 100,000,000 | `AdviceResponseFreshness`   | Sets the updated ETag on the detail if the entity implements `IConcurrency` and the detail implements `IFreshness`. |
-| 900,000,000 | `AdviceResponseIdempotency` | Only stores results for create operations (no-op for update).                                                       |
-
-### 8. Result
-
-An `UpdateResult<TDetail>` is returned with the `Detail` property populated. In the [HTTP transport](./http-transport.md), this becomes a 200 OK response with the updated detail as JSON.
-
-## Concurrency Flow Summary
-
-The typical concurrency-safe update flow:
-
-1. Client fetches the resource via GET and receives an ETag in the response.
-2. Client sends a PATCH request with the ETag (either in the request body via `IFreshness.EntityTag`, the `etag` query parameter, or the `If-Match` HTTP header).
-3. The handler resolves the entity by name.
-4. `AdviceUpdateFreshness` compares the request ETag with the current entity timestamp.
-5. If they match, the update proceeds. If not, a `ConcurrencyException` is thrown (HTTP 409 Conflict).
-
-## Implementing a Custom Update Advisor
-
-To add custom logic before the entity is modified:
-
-```csharp
-public class AuditUpdate<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
-    where TEntity : class, ICanonicalName, ITimestamp
-    where TRequest : class, ICanonicalName
-{
-    public int Order => 150_000_000;
-
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext ctx, TRequest request, TEntity entity,
-        ClaimsPrincipal? principal, CancellationToken ct = default)
-    {
-        entity.UpdateTime = DateTime.UtcNow;
-        return Task.FromResult(AdviseResult.Continue);
-    }
+if (request is IUpdateMask { UpdateMask: { } mask }) {
+    var fields = mask.Split(',')
+                     .Select(f => SchemataNaming.ToClrMemberName(f.Trim()))
+                     .Where(f => properties.ContainsKey(f));
+    _mapper.Map(request, entity, fields);
+} else {
+    _mapper.Map(request, entity);
 }
 ```
+
+If the request implements `IUpdateMask` and `UpdateMask` is non-null, only the listed fields are copied from the request to the entity. Field names are converted from wire format (snake_case) to CLR member names via `SchemataNaming.ToClrMemberName`. Fields not present on the entity are silently skipped.
+
+### Stage 8: Persistence
+
+```csharp
+await _repository.UpdateAsync(entity, ct)
+await _repository.CommitAsync(ct)
+```
+
+The entity is updated in the repository and committed. `EntityFrameworkCoreRepository.UpdateAsync` calls `Detach(entity)` before `Context.Update(entity)` to clear any tracker entry left by an earlier load — the resource pipeline itself loaded the row at stage 5, a repository-layer advisor may have queried it again, and other code in the same scope may have touched it. See [Detach before Update](../repository/providers.md#detach-before-update).
+
+### Stage 9: Response mapping and advisors
+
+The updated entity is mapped to `TDetail`, then `IResourceResponseAdvisor<TEntity, TDetail>` runs. `AdviceResponseFreshness` writes the new ETag onto the detail.
+
+## Field masks
+
+Field masks follow AIP-161. The `UpdateMask` property on the request is a comma-separated list of field paths in wire format (snake_case). Only the listed fields are applied; all others retain their current values on the entity.
+
+```csharp
+// Request with a field mask
+public class StudentRequest : ICanonicalName, IUpdateMask {
+    public string? Name { get; set; }
+    public string? CanonicalName { get; set; }
+    public string? DisplayName { get; set; }
+    public string? UpdateMask { get; set; }
+}
+
+// PATCH /students/alice
+// Body: { "display_name": "Alice Smith", "update_mask": "display_name" }
+```
+
+## Extension points
+
+- Implement `IResourceUpdateRequestAdvisor<TEntity, TRequest>` to add pre-load logic.
+- Implement `IResourceUpdateAdvisor<TEntity, TRequest>` to add entity-level logic after load (e.g., state machine transitions).
+- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the detail DTO.
+
+## Design motivation
+
+Authorization runs before the entity is loaded (stage 4, not stage 5) per AIP-211. This prevents timing attacks where an attacker probes entity existence by observing whether authorization or not-found errors are returned. The entity is loaded only after the request has been authorized.
+
+## Caveats
+
+- `AdviceUpdateFreshness` requires the request to implement `IFreshness` and a `W/`-prefixed ETag. Requests without an ETag bypass the freshness check. To enforce mandatory ETags, add a validation advisor that rejects requests with an empty `EntityTag`.
+- `UpdateMask` is excluded from `SystemFields`, so `AdviceUpdateRequestSanitize` leaves it on the request and the mask reaches the mapping step.
+- `SuppressFreshness = true` on `SchemataResourceOptions` sets `FreshnessSuppressed` in `AdviceContext`, which causes `AdviceUpdateFreshness` to skip the ETag check for all requests.
+- `AdviceUpdateRequestIdempotency` only runs when the request implements `IRequestIdentification` and `UpdateIdempotencySuppressed` is not present on `AdviceContext`. Set `ctx.Set(new UpdateIdempotencySuppressed())` from an upstream advisor to bypass the idempotency lane for that request. The cache key format mirrors Create: `idempotency\x1e{Operation}\x1e{RequestId}` with `Operation = nameof(Operations.Update)`.
+
+## See also
+
+- [Resource Overview](overview.md)
+- [Create Pipeline](create-pipeline.md)
+- [Advice Pipeline](../core/advice-pipeline.md)
+- [Entity Traits](../entity/traits.md)
+- [Repository Mutation Pipeline](../repository/mutation-pipeline.md)

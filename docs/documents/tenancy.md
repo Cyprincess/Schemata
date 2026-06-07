@@ -1,168 +1,160 @@
 # Tenancy
 
-Schemata provides a multi-tenant architecture with pluggable tenant resolution, per-tenant DI containers, and request-scoped tenant context.
+`Schemata.Tenancy.Foundation` provides multi-tenant isolation through pluggable tenant resolution, per-tenant DI containers, and a request-scoped tenant context. The feature runs at `Priority` 160,000,000 (middleware position between `Https` at 150M and `CookiePolicy` at 170M) but its `Order` is overridden to `Orders.Max` so DI registration happens after every other feature. `SchemataTenancyMiddleware` then swaps the request's `IServiceProvidersFeature` with a tenant-scoped provider for the duration of each request.
 
-## Packages
+Service implementations live in `Schemata.Tenancy.Skeleton/Services/` so contracts and runtime are usable from any host that pulls in the Skeleton package. `Schemata.Tenancy.Foundation` provides only the feature wiring, request-pipeline middleware, resolvers, and the fluent builder.
 
-| Package                       | Role                                       |
-| ----------------------------- | ------------------------------------------ |
-| `Schemata.Tenancy.Skeleton`   | Interfaces, entity type, services, manager |
-| `Schemata.Tenancy.Foundation` | Feature, middleware, resolvers, builder    |
+## Where the code lives
 
-## SchemataTenant\<TKey\>
+| Package | Key files |
+| --- | --- |
+| `Schemata.Tenancy.Skeleton` | `Entities/SchemataTenant.cs`, `Entities/SchemataTenantHost.cs` |
+| `Schemata.Tenancy.Skeleton` | `ITenantResolver.cs`, `ITenantContextAccessor.cs`, `ITenantManager.cs`, `ITenantServiceScopeFactory.cs`, `ITenantServiceProviderFactory.cs`, `ITenantProviderCache.cs`, `ITenantProviderLease.cs` |
+| `Schemata.Tenancy.Skeleton` | `SchemataTenancyOptions.cs` |
+| `Schemata.Tenancy.Skeleton` | `Services/SchemataTenantContextAccessor.cs`, `Services/SchemataTenantManager.cs`, `Services/SchemataTenantServiceProviderFactory.cs`, `Services/SchemataTenantServiceScopeFactory.cs`, `Services/MemoryCacheTenantProviderCache.cs` |
+| `Schemata.Tenancy.Skeleton` | `Services/TenantCompositeServiceProvider.cs`, `Services/CompositeScope.cs`, `Services/CompositeScopeFactory.cs`, `Services/TenantBoundContextAccessor.cs` |
+| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs` (Priority 160M, Order `Orders.Max`) |
+| `Schemata.Tenancy.Foundation` | `Middlewares/SchemataTenancyMiddleware.cs` |
+| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolver registrations) |
+| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (per-tenant DI overrides) |
+| `Schemata.Tenancy.Foundation` | `SchemataTenancyBuilder.cs` |
+| `Schemata.Tenancy.Foundation` | `Resolvers/RequestHeaderResolver.cs`, `RequestHostResolver.cs`, `RequestPathResolver.cs`, `RequestPrincipalResolver.cs`, `RequestQueryResolver.cs` |
 
-The base tenant entity, parameterized by key type (typically `Guid` or `long`):
+## Mechanism walkthrough
 
-```csharp
-public class SchemataTenant<TKey> : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
-    where TKey : struct, IEquatable<TKey>
-```
-
-Table: `SchemataTenants`. Canonical name: `tenants/{tenant}`.
-
-Key properties:
-
-- `TenantId` -- the tenant-specific identifier used for resolution (type `TKey?`)
-- `Hosts` -- JSON-serialized list of host names for host-based resolution
-- `Id` -- the `long` primary key (from `IIdentifier`)
-- `DisplayName`, `DisplayNames` -- display name with localization support
-
-## Core interfaces
-
-### ITenantResolver\<TKey\>
-
-Resolves the current tenant identifier from the request context:
+### 1. Enable the feature
 
 ```csharp
-public interface ITenantResolver<TKey>
-    where TKey : struct, IEquatable<TKey>
-{
-    Task<TKey?> ResolveAsync(CancellationToken ct);
-}
-```
-
-Returns `null` when no tenant can be determined from the request.
-
-### ITenantContextAccessor\<TTenant, TKey\>
-
-Provides access to the resolved tenant within a request scope:
-
-```csharp
-public interface ITenantContextAccessor<TTenant, TKey>
-{
-    TTenant? Tenant { get; }
-    Task InitializeAsync(CancellationToken ct);
-    Task InitializeAsync(TTenant tenant, CancellationToken ct);
-    Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct);
-}
-```
-
-The non-generic `ITenantContextAccessor` is a convenience alias for `ITenantContextAccessor<SchemataTenant<Guid>, Guid>`.
-
-### ITenantManager\<TTenant, TKey\>
-
-CRUD operations and lookup methods for tenant entities:
-
-- `FindByIdAsync(long id, ct)` -- by primary key
-- `FindByTenantId(TKey identifier, ct)` -- by tenant-specific identifier
-- `FindByHost(string host, ct)` -- by host name (matches against JSON `Hosts` field)
-- `GetHostsAsync(tenant, ct)` -- deserializes host names with in-memory caching
-- `SetTenantId`, `SetDisplayNameAsync`, `SetDisplayNamesAsync`, `SetHostsAsync` -- property setters
-- `CreateAsync`, `DeleteAsync`, `UpdateAsync` -- persistence operations via the repository
-
-The non-generic `ITenantManager` is a convenience alias for `ITenantManager<SchemataTenant<Guid>, Guid>`.
-
-### ITenantServiceProviderFactory\<TTenant, TKey\>
-
-Creates isolated `IServiceProvider` instances scoped to a specific tenant. Each tenant gets its own DI container built from the root service collection with tenant-specific overrides. Service providers are cached per tenant.
-
-### ITenantServiceScopeFactory\<TTenant, TKey\>
-
-Extends `IServiceScopeFactory`. When a tenant is resolved, scopes are created from the tenant's isolated container. When no tenant is resolved, scopes fall back to the root provider.
-
-## UseTenancy()
-
-```csharp
-builder.UseTenancy(configure: (services, tenant) => {
-    // Register per-tenant service overrides here
+builder.UseSchemata(schema => {
+    var tenancy = schema.UseTenancy();        // SchemataTenant + default manager
+    tenancy.UseHeaderResolver();              // x-tenant-id
 });
+
+schema.UseTenancy<MyTenant>();                       // custom entity, default manager
+schema.UseTenancy<MyTenantManager, MyTenant>();      // custom manager + entity
 ```
 
-### Overloads
+Every overload returns a `SchemataTenancyBuilder<TTenant>` for chaining resolver and override registrations.
 
-- `UseTenancy()` -- uses `SchemataTenant<Guid>` with `Guid` keys and the default manager
-- `UseTenancy<TTenant, TKey>()` -- uses a custom tenant type with the default `SchemataTenantManager<TTenant, TKey>`
-- `UseTenancy<TManager, TTenant, TKey>()` -- uses a custom manager and tenant type
+### 2. What the feature registers
 
-Returns a `SchemataTenancyBuilder<TTenant, TKey>` for configuring resolvers.
-
-### Feature behavior
-
-`SchemataTenancyFeature` registers:
-
-- `ITenantManager<TTenant, TKey>` (scoped)
-- `SchemataTenantContextAccessor<TTenant, TKey>` (scoped) and `ITenantContextAccessor<TTenant, TKey>` (transient, forwarding)
-- `SchemataTenantServiceScopeFactory<TTenant, TKey>` (scoped) and `ITenantServiceScopeFactory<TTenant, TKey>` (transient, forwarding)
-- `SchemataTenantServiceProviderFactory<TTenant, TKey>` (singleton)
-- When using the default `SchemataTenant<Guid>`, also registers the non-generic `ITenantContextAccessor` and `ITenantManager` aliases
-
-The `configure` delegate passed to `UseTenancy()` is invoked by `SchemataTenantServiceProviderFactory` when building per-tenant containers. This is where you register services that should differ between tenants (e.g., different database connections).
-
-## Middleware
-
-Two middleware components are added to the pipeline in order:
-
-### SchemataTenantContextAccessorInitializer
-
-Runs early in the pipeline. Calls `ITenantContextAccessor.InitializeAsync()`, which uses the registered `ITenantResolver<TKey>` to resolve the tenant identifier and look up the tenant entity via `ITenantManager`.
-
-### SchemataTenantServiceProviderReplacer
-
-Runs after initialization. Replaces the `IServiceProvidersFeature` on the HTTP context so that all downstream middleware and controllers resolve services from the tenant-scoped container. Restores the original provider in a `finally` block.
-
-## Tenant resolvers
-
-Register a resolver via the `SchemataTenancyBuilder`:
-
-### Header resolver
+`SchemataTenancyFeature<TManager, TTenant>` (Priority 160,000,000, Order `Orders.Max`):
 
 ```csharp
-builder.UseTenancy()
-       .UseHeaderResolver<SchemataTenant<Guid>, Guid>();
+services.AddOptions<SchemataTenancyOptions>();
+
+services.TryAddScoped<ITenantManager<TTenant>, TManager>();
+
+services.TryAddScoped<SchemataTenantContextAccessor<TTenant>>();
+services.TryAddTransient<ITenantContextAccessor<TTenant>>(sp =>
+    sp.GetRequiredService<SchemataTenantContextAccessor<TTenant>>());
+
+services.TryAddScoped<SchemataTenantServiceScopeFactory<TTenant>>();
+services.TryAddTransient<ITenantServiceScopeFactory<TTenant>>(sp =>
+    sp.GetRequiredService<SchemataTenantServiceScopeFactory<TTenant>>());
+
+services.TryAddSingleton<ITenantProviderCache, MemoryCacheTenantProviderCache>();
+services.TryAddSingleton<ITenantServiceProviderFactory<TTenant>>(sp =>
+    new SchemataTenantServiceProviderFactory<TTenant>(
+        sp,
+        sp.GetRequiredService<ITenantProviderCache>(),
+        sp.GetRequiredService<IOptions<SchemataTenancyOptions>>()));
 ```
 
-Reads the `x-tenant-id` HTTP header. Returns `null` if the header is absent. Throws `TenantResolveException` if the header is present but the value cannot be parsed. Requires `TKey : IParsable<TKey>`.
+`ConfigureApplication` plugs `SchemataTenancyMiddleware<TTenant>` into the pipeline.
 
-### Host resolver
+### 3. Tenant entity
+
+`SchemataTenant` implements `IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, and `ITimestamp`, keyed by `Guid Uid`. Canonical name pattern `tenants/{tenant}`, table `SchemataTenants`. `Hosts` is a navigation to `SchemataTenantHost` (`tenants/{tenant}/hosts/{host}`); host look-ups can be indexed at the database level.
+
+### 4. Tenant resolution
+
+`SchemataTenancyMiddleware` calls `ITenantContextAccessor<TTenant>.InitializeAsync(ct)` on every request. `SchemataTenantContextAccessor<TTenant>` takes a single injected `ITenantResolver`, calls `ResolveAsync`, and — if the resolver yields a tenant id — looks it up via `ITenantManager<TTenant>.FindByTenantId`. A non-null id whose tenant is missing from the manager raises `TenantResolveException`.
+
+The fluent builder exposes five concrete resolvers:
+
+| Method | Resolver | Source |
+| --- | --- | --- |
+| `UseHeaderResolver()` | `RequestHeaderResolver` | `x-tenant-id` HTTP header |
+| `UseHostResolver()` | `RequestHostResolver<TTenant>` | `Host` header matched against `SchemataTenantHost.Host` |
+| `UsePathResolver()` | `RequestPathResolver` | `{Tenant}` route parameter |
+| `UsePrincipalResolver()` | `RequestPrincipalResolver` | `Tenant` claim on the authenticated principal |
+| `UseQueryResolver()` | `RequestQueryResolver` | `Tenant` query string parameter |
+
+Each extension calls `services.TryAddScoped<ITenantResolver, X>()`. Only **one** `ITenantResolver` is active per host — the first `UseXxxResolver()` call wins, and every subsequent call is a no-op. To combine multiple sources (for example, "header overrides path"), implement a custom composite `ITenantResolver` and register it directly.
+
+### 5. Per-tenant DI container
+
+`SchemataTenantServiceProviderFactory<TTenant>.CreateServiceProvider(accessor)` returns an `ITenantProviderLease`. The factory keys the cached container by `tenant.Uid.ToString()`. Building a new container does the following:
+
+1. Start with an empty `IServiceCollection`.
+2. Register the resolved `TTenant` instance as a Singleton.
+3. Register `TenantBoundContextAccessor<TTenant>` as the `ITenantContextAccessor<TTenant>` Singleton for the tenant scope; the accessor pins the tenant at construction so no HTTP-based resolution is needed.
+4. Apply `SchemataTenancyOptions.TenantOverrides[id]` (per-tenant `Action<IServiceCollection>` delegates) in order.
+5. Apply `SchemataTenancyOptions.DynamicOverrides` (`Action<string, IServiceCollection, IServiceProvider>`) in order.
+6. Validate every newly added descriptor: only `ServiceLifetime.Singleton` is accepted; Scoped or Transient registrations throw `InvalidOperationException` at build time.
+7. Build the overrides container and wrap it in a `TenantCompositeServiceProvider(overrides, root)`.
+
+`TenantCompositeServiceProvider.GetService` resolves a service by checking the tenant overrides first and falling back to the host root, with three explicit exceptions: `IServiceScopeFactory` returns a `CompositeScopeFactory`, `IServiceProvider` returns the composite itself, and `IEnumerable<>` lookups go directly to the host root so collection registrations stay coherent.
+
+### 6. Provider lease lifecycle
+
+`ITenantProviderLease` is a refcounted handle over a cached provider:
 
 ```csharp
-.UseHostResolver<SchemataTenant<Guid>, Guid>()
+public interface ITenantProviderLease : IDisposable
+{
+    IServiceProvider Provider { get; }
+}
 ```
 
-Matches the request `Host` header against tenant host names stored in the database. Uses `ITenantManager.FindByHost()`. Throws `TenantResolveException` if no matching tenant is found.
+`MemoryCacheTenantProviderCache.Lease(id, factory)` either returns a fresh lease over the existing entry (and refreshes LRU position) or builds a new provider via `factory()`. The cache holds at most `SchemataTenancyOptions.ProviderMaxCapacity` entries (default 1000); entries whose `LastAccess` is older than `SchemataTenancyOptions.ProviderSlidingExpiration` (default 30 minutes) are evicted on the next access. Eviction and explicit `Remove(id)` mark the entry as retired; the actual disposal of the underlying provider is deferred until every outstanding lease for that entry has been released. This makes it safe for the cache to retire an entry while another request is still using a scope built from it.
 
-### Path resolver
+### 7. Tenant service scopes
+
+`SchemataTenantServiceScopeFactory<TTenant>.CreateScope()`:
 
 ```csharp
-.UsePathResolver<SchemataTenant<Guid>, Guid>()
+if (_accessor.Tenant is null) {
+    return _root is IServiceScope existing ? existing : _root.CreateScope();
+}
+
+var lease = _factory.CreateServiceProvider(_accessor);
+try {
+    var inner = lease.Provider.CreateScope();   // CompositeScope over a fresh host scope
+    return new LeasedTenantScope(inner, lease); // disposes inner then releases the lease
+} catch {
+    lease.Dispose();
+    throw;
+}
 ```
 
-Extracts the tenant identifier from the `{Tenant}` route parameter. Requires `TKey : IParsable<TKey>`.
+`CompositeScope` delegates Scoped and Transient resolution to a host `IServiceScope`, while keeping the tenant overrides container visible at the top of the lookup chain. The disposal sequence is fixed: the inner host scope is disposed first (so its scoped services release any resources), then the lease is released (so the cached singleton container can be retired when no lease remains).
 
-### Principal resolver
+## Per-tenant DI overrides
 
-```csharp
-.UsePrincipalResolver<SchemataTenant<Guid>, Guid>()
-```
+`SchemataTenancyOptions.TenantOverrides` and `DynamicOverrides` are populated through `SchemataTenancyBuilderOverrideExtensions`. Both produce Singleton-only registrations that are layered into the per-tenant container at build time. Scoped or Transient registrations are rejected — tenant-aware services that need to participate in the per-request injection chain must consult `ITenantContextAccessor<TTenant>` at call time instead.
 
-Extracts the tenant identifier from the authenticated user's `Tenant` claim. Requires `TKey : IParsable<TKey>`.
+## Extension points
 
-### Query resolver
+| Interface | Purpose |
+| --- | --- |
+| `ITenantResolver` | Add a custom resolution strategy. Register via `services.TryAddEnumerable`. |
+| `ITenantManager<TTenant>` | Replace the default Repository-backed manager (e.g. cache, remote service). |
+| `ITenantServiceProviderFactory<TTenant>` | Replace the lease-based factory entirely. |
+| `ITenantProviderCache` | Plug in a distributed or out-of-process cache; preserve lease semantics. |
+| `SchemataTenancyOptions` | Tune capacity, sliding expiration, and per-tenant overrides. |
 
-```csharp
-.UseQueryResolver<SchemataTenant<Guid>, Guid>()
-```
+## Caveats
 
-Extracts the tenant identifier from the `Tenant` query string parameter. Requires `TKey : IParsable<TKey>`.
+- `SchemataTenancyFeature` has `Priority = 160,000,000` and `Order = Orders.Max`. The unusual split is intentional: middleware ordering stays low while DI registration runs last.
+- Tenant overrides must be Singleton. Scoped or Transient registrations throw `InvalidOperationException` at provider-build time with the offending service type in the message.
+- `ITenantContextAccessor<TTenant>` inside a per-tenant scope is bound by `TenantBoundContextAccessor<TTenant>`; calling `InitializeAsync` on it is a no-op because the tenant is fixed for the lifetime of the scope.
+- Cache eviction is deferred until the last outstanding lease is released. A tenant whose container is removed mid-request keeps serving that request until the scope completes.
+- `IEnumerable<>` resolutions on the composite provider always go to the host root. Per-tenant overrides cannot replace a host-provided collection registration wholesale; they can only add new bindings for the same service type via `TryAddEnumerable` inside the override delegate, which the host root will not see.
 
-All resolver registrations use `TryAddScoped`, so only the first registered resolver for a given `TKey` is used.
+## See also
+
+- [Built-in Features](core/built-in-features.md) — feature priority table
+- [Entity Traits](entity/traits.md) — `IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, `ITimestamp`
+- [Multi-Tenant Setup](../cookbook/multi-tenant-cookbook.md) — combined resolvers and per-tenant DI overrides

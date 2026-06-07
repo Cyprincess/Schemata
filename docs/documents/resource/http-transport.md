@@ -1,148 +1,128 @@
 # HTTP Transport
 
-The HTTP transport exposes resources as REST endpoints via dynamically generated MVC controllers. It is activated by calling `MapHttp()` on the resource builder.
+The HTTP transport exposes resources as REST endpoints via dynamically generated MVC controllers. Calling `MapHttp()` on `SchemataResourceBuilder` registers `SchemataHttpResourceFeature` (Priority `SchemataResourceFeature.DefaultPriority + 100_000` = 490,100,000), which synthesizes a `ResourceController<TEntity, TRequest, TDetail, TSummary>` instance for each registered resource at application startup.
+
+## Where the code lives
+
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Http` | `SchemataHttpResourceBuilder.cs` |
+| `Schemata.Resource.Http` | `Features/SchemataHttpResourceFeature.cs` |
+| `Schemata.Resource.Http` | `Extensions/SchemataResourceBuilderExtensions.cs` |
+| `Schemata.Resource.Http` | `Extensions/SchemataHttpResourceBuilderExtensions.cs` |
+| `Schemata.Resource.Http` | `ResourceController.cs` |
+| `Schemata.Resource.Http` | `ResourceControllerConvention.cs` |
+| `Schemata.Resource.Http` | `ResourceControllerFeatureProvider.cs` |
+| `Schemata.Resource.Http` | `ResourceMethodController.cs` |
+| `Schemata.Resource.Http` | `ResourceMethodControllerConvention.cs` |
+| `Schemata.Resource.Http` | `ResourceMethodControllerFeatureProvider.cs` |
 
 ## Setup
 
 ```csharp
 builder.UseSchemata(schema => {
+    schema.UseLogging();
+    schema.UseRouting();
+    schema.UseControllers();
     schema.UseResource()
           .MapHttp()
-          .Use<Book, BookRequest, BookDetail, BookSummary>();
+          .Use<Student>();
 });
 ```
 
-`MapHttp()` adds the `SchemataHttpResourceFeature`, which depends on:
+`MapHttp()` is an extension on `SchemataResourceBuilder` that adds `SchemataHttpResourceFeature` and returns a `SchemataHttpResourceBuilder`. Subsequent `Use<...>()` calls on the HTTP builder register resources tagged with `HttpResourceAttribute.Name` so the HTTP feature provider knows to synthesize controllers for them.
 
-- `SchemataControllersFeature` -- MVC controller infrastructure.
-- `SchemataJsonSerializerFeature` -- JSON serialization configuration.
-- `SchemataResourceFeature` -- the core resource system.
+## `SchemataHttpResourceFeature`
 
-## ResourceController
+`SchemataHttpResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportHttpFeature` via `[DependsOn<T>]`. The transport feature carries the MVC exception handler, the JSON wire-name traits (`SchemataJsonTraits`), and `SchemataControllersFeature` (transitively); the resource HTTP feature focuses on dynamic controller synthesis on top of it.
 
-`ResourceController<TEntity, TRequest, TDetail, TSummary>` is a generic `ControllerBase` subclass decorated with `[ApiController]`. One controller instance is created per registered resource type.
+`ConfigureServices` registers:
 
-### Endpoint Mapping
+- `ResourceControllerFeatureProvider` as a singleton `IApplicationFeatureProvider<ControllerFeature>` and `IActionDescriptorChangeProvider`.
+- `ResourceControllerConvention` via `MvcOptions.Conventions`, passing the configured authentication scheme.
 
-| HTTP Method | Route                  | Action        | Request Source                                        | Response                                       |
-| ----------- | ---------------------- | ------------- | ----------------------------------------------------- | ---------------------------------------------- |
-| `GET`       | `/{collection}`        | `ListAsync`   | `[FromQuery] ListRequest`                             | JSON `ListResult<TSummary>`                    |
-| `GET`       | `/{collection}/{name}` | `GetAsync`    | Route `name`                                          | JSON `TDetail`                                 |
-| `POST`      | `/{collection}`        | `CreateAsync` | `[FromBody] TRequest`                                 | 201 Created, JSON `TDetail`, `Location` header |
-| `PATCH`     | `/{collection}/{name}` | `UpdateAsync` | Route `name`, `[FromBody] TRequest`                   | JSON `TDetail`                                 |
-| `DELETE`    | `/{collection}/{name}` | `DeleteAsync` | Route `name`, `[FromQuery] etag`, `[FromQuery] force` | 204 No Content                                 |
+`ConfigureApplication` reads `SchemataResourceOptions.Resources`, assigns it to `ResourceControllerFeatureProvider.Resources`, and calls `provider.Commit()` to signal MVC that the controller set has changed. MVC rebuilds its action descriptor cache before the first request is served.
 
-For hierarchical resources with a `[CanonicalName]` pattern, the route includes parent segments. For example, `[CanonicalName("publishers/{publisher}/books/{book}")]` produces routes like:
+## Controller synthesis
 
-- `GET /publishers/{publisher}/books`
-- `GET /publishers/{publisher}/books/{name}`
-- `POST /publishers/{publisher}/books`
-- `PATCH /publishers/{publisher}/books/{name}`
-- `DELETE /publishers/{publisher}/books/{name}`
-
-When `[ResourcePackage("api/v1")]` is applied, the package prefixes the route: `GET /api/v1/publishers/{publisher}/books`.
-
-### List Endpoint Details
-
-The `ListAsync` action binds all `ListRequest` parameters from the query string:
-
-- `?filter=status="active"` -- AIP-160 filter expression.
-- `?orderBy=create_time desc` -- ordering clause.
-- `?pageSize=10` -- items per page.
-- `?skip=5` -- items to skip.
-- `?pageToken=...` -- continuation token.
-- `?showDeleted=true` -- include soft-deleted resources.
-- `?parent=publishers/acme` -- explicit parent (auto-resolved from route if not provided).
-
-If the `Parent` parameter is not explicitly provided, the controller resolves it automatically from HTTP route values using `ResourceNameDescriptor.ResolveParent`.
-
-When the operation is blocked, an empty result is returned. Otherwise, a `JsonResult` with the `ListResult<TSummary>` is returned.
-
-### Update Endpoint Details
-
-The `UpdateAsync` action reads the ETag for freshness validation from multiple sources, in order:
-
-1. The `IFreshness.EntityTag` property on the request body.
-2. The `etag` query parameter.
-3. The `If-Match` HTTP header.
-
-The first non-empty value is used.
-
-### Delete Endpoint Details
-
-The `DeleteAsync` action accepts:
-
-- `name` from the route.
-- `etag` as an optional query parameter. Falls back to the `If-Match` header if not provided.
-- `force` as an optional boolean query parameter (defaults to `false`).
-
-## Dynamic Controller Registration
-
-`ResourceControllerFeatureProvider` implements both `IApplicationFeatureProvider<ControllerFeature>` and `IActionDescriptorChangeProvider`. During startup, it:
-
-1. Iterates all registered resources from `SchemataResourceOptions`.
-2. Skips resources whose `Endpoints` list does not include `"HTTP"`.
-3. Skips resources that already have a manually-created controller (matched by plural name or `{Entity}Controller` name).
-4. Constructs a closed generic `ResourceController<TEntity, TRequest, TDetail, TSummary>` and adds it to the MVC controller feature.
-
-The `Commit()` method signals MVC to refresh action descriptors via a `CancellationChangeToken`, which is called during `ConfigureApplication`.
-
-## Route Convention
-
-`ResourceControllerConvention` is an `IControllerModelConvention` that customizes routing for generated controllers:
-
-1. Sets `ControllerName` to the pluralized entity name (e.g., `Books`).
-2. Replaces the route template with the `CollectionPath` from `ResourceNameDescriptor`.
-3. If `[ResourcePackage]` is present, prepends the package prefix.
-4. If `[RateLimitPolicy]` is present on the entity type, adds an `EnableRateLimitingAttribute` to endpoint metadata.
-
-## JSON Serialization
-
-`ResourceJsonOptions` creates a customized `JsonSerializerOptions` instance with these modifications:
-
-1. **CanonicalName removal.** The `CanonicalName` property is removed from serialization output for types implementing `ICanonicalName`. HTTP clients see only the short `Name` (the resource ID).
-
-2. **Collection name in ListResult.** The `Entities` property in `ListResult<TSummary>` is renamed to the pluralized entity name (per AIP-132). The pluralized name is obtained from a `ResourceNameDescriptor` for the entity type and is then run through the active `PropertyNamingPolicy` (normally `SnakeCaseLower`). For example, `ListResult<BookSummary>` serializes the collection as `"books"` instead of `"entities"`.
-
-3. **EntityTag renaming.** The `IFreshness.EntityTag` property is serialized as `"etag"`. Under the default snake_case naming policy the C# property would serialize as `entity_tag`; this modifier overrides that to produce the conventional `etag` field name.
-
-The gRPC transport applies equivalent but different mappings -- see [gRPC Transport § Comparison with HTTP](grpc-transport.md#comparison-with-http) for a side-by-side table.
-
-## AnonymousAttribute
-
-`[Anonymous]` marks a resource as allowing unauthenticated access:
+`ResourceControllerFeatureProvider.PopulateFeature` iterates `Resources` and, for each resource whose `Endpoints` list includes `HttpResourceAttribute.Name` (or is `null`, meaning all transports), calls:
 
 ```csharp
-[Anonymous]                           // All operations anonymous
-[Anonymous(Operations.List, Operations.Get)]  // Only read operations anonymous
-public class PublicBook : ICanonicalName { ... }
+var controller = typeof(ResourceController<,,,>)
+    .MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
+    .GetTypeInfo();
+feature.Controllers.Add(controller);
 ```
 
-When no operations are specified, all operations are anonymous. When specific operations are listed, only those operations skip authorization.
+A controller is skipped if a controller with the same name (the resource's `Plural` form) or the entity's `{Name}Controller` already exists in the feature — this lets you provide a hand-written controller that overrides the generated one.
 
-The authorization advisors check this attribute via `AnonymousAccessHelper.IsAnonymous<TEntity>(operation)` and skip the `IAccessProvider` call when the operation is anonymous.
+`Commit()` cancels the current `CancellationTokenSource` and creates a new one, which triggers `IActionDescriptorChangeProvider.GetChangeToken()` to fire and causes MVC to refresh its route table.
 
-## RateLimitPolicyAttribute
+## Route conventions
 
-`[RateLimitPolicy]` associates a named rate-limiting policy with a resource:
+`ResourceControllerConvention` implements `IControllerModelConvention` and rewrites routes only for `ResourceController<,,,>` instances. For each such controller:
 
-```csharp
-[RateLimitPolicy("api-standard")]
-public class Book : ICanonicalName { ... }
-```
+1. `controller.ControllerName` is set to `descriptor.Plural` (e.g., `"Students"`).
+2. The route template is set to `~/{package}/{collectionPath}` when a package is configured, or `~/{collectionPath}` otherwise. A `Book` entity with pattern `"publishers/{publisher}/books/{book}"` and package `"library"` gets route `~/library/publishers/{publisher}/books`.
+3. If the entity has `[RateLimitPolicy]`, `EnableRateLimitingAttribute` is added to the controller's selectors.
+4. If an authentication scheme is configured via `WithAuthorization(scheme)`, an `AuthorizeFilter` with an always-pass assertion policy is added. This forces ASP.NET Core to run the authentication middleware for the scheme before the controller action executes; actual authorization decisions happen in the advisor pipeline.
 
-`ResourceControllerConvention` reads this attribute and adds an `EnableRateLimitingAttribute` to every endpoint of the controller. The policy name must correspond to a policy registered with ASP.NET Core's rate limiting middleware.
+## `ResourceController<TEntity, TRequest, TDetail, TSummary>`
 
-The same attribute is also respected by the [gRPC transport](./grpc-transport.md), which calls `RequireRateLimiting` on the gRPC endpoint convention builder.
+The generated controller exposes five actions:
 
-## Restricting to HTTP Only
+| HTTP method | Route | Action | Returns |
+|---|---|---|---|
+| `GET` | `/{collection}` | `ListAsync([FromQuery] ListRequest)` | `JsonResult(ListResultBase<TSummary>)` or `EmptyResult` |
+| `GET` | `/{collection}/{name}` | `GetAsync(string name)` | `JsonResult(TDetail)` or `EmptyResult` |
+| `POST` | `/{collection}` | `CreateAsync([FromBody] TRequest)` | `JsonResult(TDetail)` with `201 Created` or `EmptyResult` |
+| `PATCH` | `/{collection}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | `JsonResult(TDetail)` or `EmptyResult` |
+| `DELETE` | `/{collection}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery] bool? force)` | `204 No Content` or `EmptyResult` |
 
-To register a resource for HTTP only (not gRPC), use the `MapHttp()` builder chain:
+All actions delegate to `ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>`, passing `HttpContext.User` as the principal and `HttpContext.RequestAborted` as the cancellation token.
 
-```csharp
-schema.UseResource()
-      .MapHttp()
-      .Use<Book, BookRequest, BookDetail, BookSummary>();
-```
+`ListAsync` auto-populates `request.Parent` from route values so nested resources (`/publishers/{publisher}/books`) are scoped to the parent without the client supplying it.
 
-This passes `["HTTP"]` as the `Endpoints` list, so `SchemataGrpcResourceFeature` skips this resource. Alternatively, apply `[HttpResource]` on the entity class for attribute-based registration.
+`CreateAsync` calls `ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(request, routeValues)` to populate parent properties on the request from the route.
+
+`UpdateAsync` reads the ETag from `request.EntityTag`, then falls back to the `etag` query parameter, then to the `If-Match` request header.
+
+`DeleteAsync` reads the ETag from the `etag` query parameter, then falls back to the `If-Match` header.
+
+## Custom methods
+
+Each `[ResourceMethod(verb, handler, scope)]` on the entity yields one synthesized closed `ResourceMethodController<TEntity, TRequest, TResponse, THandler>` through `ResourceMethodControllerFeatureProvider`. `ResourceMethodControllerConvention` rewrites its route to `~/v1/{package}/{collectionPath}` and the action template to `{name}:{verb}` for `ResourceMethodScope.Instance` or `:{verb}` for `ResourceMethodScope.Collection`. All custom methods are `POST` and dispatch through `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>` before reaching the registered `IResourceMethodHandler<TEntity, TRequest, TResponse>`.
+
+| Scope | HTTP method | Route |
+|---|---|---|
+| `Instance` | `POST` | `~/v1/{package}/{collectionPath}/{name}:{verb}` |
+| `Collection` | `POST` | `~/v1/{package}/{collectionPath}:{verb}` |
+
+The `{package}/` segment is dropped when the entity has no `[ResourcePackage]`. `[RateLimitPolicy]` and `WithAuthorization(scheme)` propagate to custom-method controllers identically to the CRUD controller.
+
+See [Custom Methods](custom-methods.md) for the verb-scoped advisor pipeline.
+
+## JSON serialization
+
+The wire-format conventions (snake_case property naming, `long`-as-string, AIP `@type` discriminator) live in `Schemata.Transport.Http`'s `SchemataJsonTraits` and are applied to `JsonSerializerOptions`, `Microsoft.AspNetCore.Http.Json.JsonOptions`, and `Microsoft.AspNetCore.Mvc.JsonOptions` by `SchemataTransportHttpFeature`. `ResourceController` and `ResourceMethodController` both serialize responses through MVC's `JsonResult`, which picks up the configured options.
+
+## Extension points
+
+- Subclass `ResourceController<TEntity, TRequest, TDetail, TSummary>` and override individual action methods. Register the subclass as a regular MVC controller; the feature provider skips synthesizing a duplicate when a matching controller name or `{Entity}Controller` already exists.
+- Implement `IControllerModelConvention` and add it to `MvcOptions.Conventions` to further customize route templates or filters.
+- Use `[RateLimitPolicy("my-policy")]` on the entity type to apply rate limiting to all HTTP endpoints for that resource.
+
+## Caveats
+
+- `ResourceControllerFeatureProvider` adds the synthesized closed-generic controller types directly to `ControllerFeature.Controllers`, which is how they escape the `Schemata.*` assembly-part stripping performed by `SchemataControllersFeature`.
+- The HTTP transport is unary. For streaming use cases, use the gRPC transport.
+- When an advisor returns `Block` without throwing, the controller returns `EmptyResult`. Advisors that want a specific HTTP status throw the matching `SchemataException` subtype instead.
+
+## See also
+
+- [Resource Overview](overview.md)
+- [Custom Methods](custom-methods.md)
+- [gRPC Transport](grpc-transport.md)
+- [Resource Naming](resource-naming.md)
+- [Filtering](filtering.md)
+- [Advice Pipeline](../core/advice-pipeline.md)

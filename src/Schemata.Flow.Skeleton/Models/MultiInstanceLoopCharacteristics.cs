@@ -3,10 +3,10 @@ using Schemata.Flow.Skeleton.Runtime;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A multi-instance activity — the activity is instantiated multiple times,
+///     A multi-instance activity - the activity is instantiated multiple times,
 ///     either sequentially or in parallel. The number of instances is determined
 ///     by <see cref="LoopCardinality" />.
-///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> §10.2.5.
+///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> Section 10.2.5.
 /// </summary>
 public sealed class MultiInstanceLoopCharacteristics : LoopCharacteristics
 {

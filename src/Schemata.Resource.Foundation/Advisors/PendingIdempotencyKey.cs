@@ -11,7 +11,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     <c>idempotency\x1e{Operation}\x1e{RequestId}</c>.
 /// </summary>
 /// <param name="RequestId">The client-supplied request identifier.</param>
-/// <param name="Operation">The operation token ──
+/// <param name="Operation">The operation token --
 ///     <c>nameof(Operations.Create)</c> / <c>nameof(Operations.Update)</c> for
 ///     CRUD, the lowerCamelCase verb (e.g. <c>"run"</c>, <c>"archive"</c>) for
 ///     AIP-136 custom methods.</param>

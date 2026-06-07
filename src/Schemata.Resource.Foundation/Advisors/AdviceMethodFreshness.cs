@@ -15,7 +15,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceMethodFreshness
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" /> ── parallel to
+    ///     Default order at <see cref="Orders.Base" /> -- parallel to
     ///     <see cref="AdviceUpdateFreshness{TEntity, TRequest}" />.
     /// </summary>
     public const int DefaultOrder = Orders.Base;

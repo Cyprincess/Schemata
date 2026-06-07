@@ -1,148 +1,143 @@
 # Read Pipeline
 
-The resource system provides two read operations: **List** and **Get**. Both run through the [advisor pipeline](../core/advice-pipeline.md) and share the `IResourceRequestAdvisor<TEntity>` gate.
+The resource system provides two read operations: **List** and **Get**. Both run through the advisor pipeline and share the `IResourceRequestAdvisor<TEntity>` gate. Neither operation writes to the repository; both use `_repository.Once()` to get a fresh, isolated repository instance that doesn't pollute the request-scoped state.
 
-## List Operation
+## Where the code lives
 
-`ResourceOperationHandler.ListAsync` accepts a `ListRequest` and returns a `ListResult<TSummary>`.
+| Package | Key files |
+|---|---|
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 105-318) |
+| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceGetRequestAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceListResponseAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceResponseAdvisor.cs` |
 
-### ListRequest Parameters
+## List operation
 
-| Parameter     | Type      | Description                                                           |
-| ------------- | --------- | --------------------------------------------------------------------- |
-| `Parent`      | `string?` | Parent resource name for scoped listings (e.g., `publishers/acme`).   |
-| `Filter`      | `string?` | AIP-160 filter expression. See [Filtering](./filtering.md).           |
-| `OrderBy`     | `string?` | Comma-separated ordering clause (e.g., `create_time desc`).           |
-| `ShowDeleted` | `bool?`   | When `true`, includes soft-deleted entities in results.               |
-| `PageSize`    | `int?`    | Maximum items per page. Clamped to 1--100; defaults to 25.            |
-| `Skip`        | `int?`    | Number of items to skip (added to the page token's accumulated skip). |
-| `PageToken`   | `string?` | Opaque continuation token for the next page.                          |
+`ListAsync` accepts a `ListRequest` and returns a `ListResultBase<TSummary>`.
 
-### Pipeline Steps
-
-#### 1. General Request Advisor
+### Stage 1: Gate check
 
 ```
-IResourceRequestAdvisor<TEntity> -- Operations.List
+IResourceRequestAdvisor<TEntity>
 ```
 
-The first gate. Returns `Continue`, `Handle` (with `ListResult<TSummary>` in context), or `Block` (returns `ListResult<TSummary>.Blocked`).
+Receives the principal and the operation token `nameof(Operations.List)`. A `Block` returns `ListResultBase<TSummary>.Blocked`.
 
-#### 2. List Request Advisor
+### Stage 2: List request advisors
 
 ```
 IResourceListRequestAdvisor<TEntity>
 ```
 
-Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the `ClaimsPrincipal`. Advisors can inspect the request and add query modifications to the container.
+Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run here when `WithAuthorization()` is configured.
 
-When `WithAuthorization()` is enabled, `AdviceListRequestAuthorize` runs at order 100,000,000:
+### Stage 3: Parent scoping
 
-1. Checks `[Anonymous(Operations.List)]` on the entity type.
-2. Calls `IAccessProvider.HasAccessAsync` -- throws `AuthorizationException` if denied.
-3. Calls `IEntitlementProvider.GenerateEntitlementExpressionAsync` and applies the returned predicate to the container. This scopes query results to what the current user is allowed to see.
+If `request.Parent` is non-empty, `ResourceNameDescriptor.ParseParent` parses it against the entity's pattern and calls `container.ApplyModification(predicate)` to scope the query to that parent. If any parent segment is `"-"` (AIP-159 wildcard) and the entity does not have `[ReadAcross]`, a `ValidationException` is thrown.
 
-#### 3. Parent Resolution
+### Stage 4: Page token validation
 
-If `ListRequest.Parent` is non-empty, the handler parses it against the resource's `CanonicalName` pattern to extract parent placeholder values (e.g., `publishers/acme` yields `{ "publisher": "acme" }`).
+The page token is decoded from `request.PageToken` (base64 JSON). If a token is present, its `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` fields must match the current request — mismatches throw `ValidationException` with reason `FieldReasons.InvalidPageToken`. Page size is clamped to `[1, 100]` with a default of 25.
 
-If any parent value is the wildcard `"-"`, the handler checks `ResourceNameDescriptor.SupportsReadAcross`. Resources must opt in to cross-parent listing via the `[ReadAcross]` attribute; otherwise an `InvalidArgumentException` is thrown.
+### Stage 5: Filter compilation
 
-Valid parent values produce a `Where` predicate that is applied to the query container, scoping results to that parent.
+If `request.Filter` is non-empty, `ListAsync` resolves `IExpressionCompiler` keyed by `AipLanguage.Name` ("aip") and compiles the filter string to an `Expression<Func<TEntity, bool>>`. The compiled predicate is applied via `container.ApplyFiltering(filter)`.
 
-#### 4. Page Token Handling
+This key is hard-wired to `AipLanguage.Name`. Registering a different `IExpressionCompiler` under a custom key does not affect `ListAsync`. See [Filtering](filtering.md) for details.
 
-If `PageToken` is provided, it is decoded from a Brotli-compressed Base64 URL-safe string back into a `PageToken` object. The token carries the original `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` values. If any of these differ from the current request, an `InvalidArgumentException` is thrown -- page tokens are bound to their originating query.
+### Stage 6: Order compilation
 
-If no `PageToken` is provided, a fresh `PageToken` is created from the request parameters.
+If `request.OrderBy` is non-empty, `ListAsync` resolves `IOrderCompiler` keyed by `AipLanguage.Name` and compiles the order expression to a `Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>`. Applied via `container.ApplyOrdering(order)`.
 
-The `PageSize` is clamped: values <= 0 become 25, values > 100 become 100.
+### Stage 7: Soft-delete suppression
 
-`Skip` from the request is added to the token's accumulated skip offset (which starts at 0 and grows by `PageSize` on each page).
+If `request.ShowDeleted` is `true`, the repository instance is wrapped with `SuppressQuerySoftDelete()` so tombstoned rows are included.
 
-#### 5. Filter Parsing
+### Stage 8: Count and fetch
 
-If `Filter` is non-empty, it is parsed using the AIP-160 grammar parser. A `ParseException` results in an `InvalidArgumentException` with field `"filter"`. The parsed filter is applied to the container via `ApplyFiltering`. See [Filtering](./filtering.md) for grammar details.
+```csharp
+var totalSize = await repository.CountAsync(q => container.Query(q), ct);
+container.ApplyPaginating(token);
+var entities = repository.ListAsync(q => container.Query(q), ct);
+var summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct).ToListAsync(ct);
+```
 
-#### 6. Order Parsing
+The total count is fetched before pagination is applied. Pagination (skip/take) is then added to the container and the entity stream is mapped to summaries.
 
-If `OrderBy` is non-empty, it is parsed using the order grammar (`member [ASC|DESC]`, comma-separated). A `ParseException` results in an `InvalidArgumentException` with field `"order_by"`. Parsed orderings are applied via `ApplyOrdering`.
+### Stage 9: Next page token
 
-#### 7. Soft Delete Handling
+If the number of returned summaries equals the page size, a next page token is produced by advancing `token.Skip` by `token.PageSize` and serializing.
 
-When `ShowDeleted` is `true`, the repository is configured with `SuppressQuerySoftDelete()`, which disables the automatic soft-delete filter so deleted entities appear in results.
-
-#### 8. Query Execution
-
-1. A `COUNT` query runs first to determine `TotalSize`.
-2. Pagination (skip/take) is applied to the container.
-3. The repository's `ListAsync` streams entities, which are mapped to `TSummary` via `ISimpleMapper.EachAsync`.
-
-#### 9. Next Page Token
-
-If the result count is greater than or equal to `PageSize`, a next page token is generated. The current token's skip is advanced by `PageSize`, then serialized back to a Brotli-compressed Base64 URL-safe string.
-
-#### 10. List Response Advisor
+### Stage 10: List response advisors
 
 ```
 IResourceListResponseAdvisor<TSummary>
 ```
 
-Receives the immutable array of summaries. Can inspect, filter, or replace the result.
+Receives the immutable summary array and the principal. Use this stage to post-process the list (e.g., redact fields, add computed properties).
 
-#### 11. Result
+## Get operation
 
-A `ListResult<TSummary>` is returned with:
+`GetAsync` accepts a canonical name string and returns a `GetResultBase<TDetail>`.
 
-- `Entities` -- the immutable array of summary DTOs.
-- `TotalSize` -- total count before pagination.
-- `NextPageToken` -- the continuation token, or `null` if this is the last page.
-
-## Get Operation
-
-`ResourceOperationHandler.GetAsync` accepts a resource name and a `ClaimsPrincipal`, resolves the entity, and returns a `GetResult<TDetail>`.
-
-All of these call `FindByNameAsync` internally, which queries with `SuppressQuerySoftDelete()` so that soft-deleted entities can be found (useful for undelete scenarios). If no entity matches, a `NotFoundException` is thrown with the resource type and name in the error details.
-
-### Pipeline Steps
-
-#### 1. General Request Advisor
+### Stage 1: Gate check
 
 ```
-IResourceRequestAdvisor<TEntity> -- Operations.Get
+IResourceRequestAdvisor<TEntity>
 ```
 
-#### 2. Get Request Advisor
+Receives the principal and the operation token `nameof(Operations.Get)`.
+
+### Stage 2: Name parsing
+
+`ApplyIdentifierPredicates` calls `ResourceNameDescriptor.ForType<TEntity>().ParseCanonicalName(name)` to split the name into parent values and a leaf name. Both are applied as `Where` predicates on the container. An empty or unparseable name throws `ValidationException`.
+
+### Stage 3: Get request advisors
 
 ```
 IResourceGetRequestAdvisor<TEntity>
 ```
 
-Receives a `GetRequest` with `Name` set to the entity's name.
+Receives a `GetRequest { Name = name }`, the container, and the principal.
 
-When `WithAuthorization()` is enabled, `AdviceGetRequestAuthorize` runs and checks `[Anonymous(Operations.Get)]` before calling `IAccessProvider.HasAccessAsync`.
+### Stage 4: Entity load
 
-#### 3. Response Mapping and Advisor
-
-The entity is mapped to `TDetail` via `ISimpleMapper.Map<TEntity, TDetail>`.
-
+```csharp
+var entity = await _repository.Once()
+                              .SuppressQuerySoftDelete()
+                              .SingleOrDefaultAsync(q => container.Query(q), ct)
+          ?? throw ResourceNotFound(name);
 ```
-IResourceResponseAdvisor<TEntity, TDetail>
-```
 
-`AdviceResponseFreshness` sets the ETag on the detail if applicable.
+Get always suppresses soft-delete filtering so it can return tombstoned rows (the caller can inspect `DeleteTime`). If no entity matches, a `NotFoundException` is thrown with a `ResourceInfoDetail` payload.
 
-#### 4. Result
+### Stage 5: Response mapping and advisors
 
-A `GetResult<TDetail>` is returned. In the [HTTP transport](./http-transport.md), the detail is returned directly as a JSON response.
+The entity is mapped to `TDetail`, then `IResourceResponseAdvisor<TEntity, TDetail>` runs. `AdviceResponseFreshness` writes the ETag onto the detail if it implements `IFreshness`.
 
-## ResourceRequestContainer
+## Extension points
 
-The `ResourceRequestContainer<T>` accumulates query modifications throughout the list pipeline:
+- Implement `IResourceListRequestAdvisor<TEntity>` to add pre-query logic (e.g., entitlement filtering via `container.ApplyModification`).
+- Implement `IResourceGetRequestAdvisor<TEntity>` to add per-get logic (e.g., audit logging).
+- Implement `IResourceListResponseAdvisor<TSummary>` to post-process the list.
+- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process individual detail DTOs.
 
-- `ApplyFiltering(filter)` -- composes a parsed filter expression into the query.
-- `ApplyOrdering(order)` -- composes ordering specifications.
-- `ApplyPaginating(token)` -- applies skip/take from the page token.
-- `ApplyModification(predicate)` -- adds an arbitrary `Where` predicate (used for parent scoping and entitlement filtering).
+## Design motivation
 
-The `FilterConfigure` property allows customizing the filter grammar container before expression building, which is how custom functions can be registered for specific resources.
+`_repository.Once()` creates a fresh repository instance with a fresh `AdviceContext` for each read. This prevents read-side state (e.g., `SuppressQuerySoftDelete`) from leaking into the request-scoped repository used by write operations. Get always suppresses soft-delete so callers can inspect tombstoned resources; List only suppresses it when `ShowDeleted = true`.
+
+## Caveats
+
+- The filter and order compilers are resolved as keyed singletons. They are registered by `SchemataResourceFeature` via `services.AddAipExpressions()`. If the AIP package is not referenced, `ListAsync` will throw `InvalidOperationException` on any request with a non-empty filter or order.
+- `ListAsync` does not support server-side cursors beyond skip/take. For large datasets, use `PageSize` and `PageToken` to paginate.
+- `CountAsync` runs a separate query before pagination. On large tables this can be expensive; consider caching the count or using approximate counts.
+
+## See also
+
+- [Resource Overview](overview.md)
+- [Filtering](filtering.md)
+- [Resource Naming](resource-naming.md)
+- [Advice Pipeline](../core/advice-pipeline.md)
+- [Repository Query Pipeline](../repository/query-pipeline.md)

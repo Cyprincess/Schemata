@@ -1,4 +1,4 @@
-﻿namespace Schemata.Expressions.Cel.Expressions;
+namespace Schemata.Expressions.Cel.Expressions;
 
 public sealed class CelUnary : CelNode
 {

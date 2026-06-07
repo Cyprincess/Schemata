@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Event.Foundation.Internal;

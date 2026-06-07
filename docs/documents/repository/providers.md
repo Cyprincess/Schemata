@@ -1,167 +1,124 @@
-# Providers
+# Repository Providers
 
 A repository provider is the concrete `RepositoryBase<TEntity>` implementation that translates the repository abstraction into actual database operations. Schemata ships two providers: one backed by Entity Framework Core and one backed by LINQ to DB. Both implement the same `IRepository<TEntity>` interface and participate in the same advisor pipelines, so application code is provider-agnostic.
 
-## Registering a provider
+## Where the code lives
 
-Provider registration is a two-step process: register the repository implementation type with `AddRepository`, then configure the underlying data access library with a `UseXxx` call on the returned builder.
+| Item | Path |
+|---|---|
+| `EntityFrameworkCoreRepository<TContext,TEntity>` | `src/Schemata.Entity.EntityFrameworkCore/EntityFrameworkCoreRepository.cs` |
+| `LinQ2DbRepository<TContext,TEntity>` | `src/Schemata.Entity.LinqToDB/LinQ2DbRepository.cs` |
+| `AddRepository` extension | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
+
+## Registration
+
+Provider registration is a two-step process: register the repository implementation type with `AddRepository`, then configure the underlying data access library.
 
 ```csharp
 // Entity Framework Core
 services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
-    .UseEntityFrameworkCore<AppDbContext>((sp, options) => {
-        options.UseSqlServer(connectionString);
-    });
+        .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlServer(connectionString));
 
 // LINQ to DB
 services.AddRepository(typeof(LinQ2DbRepository<,>))
-    .UseLinqToDb((sp, options) => {
-        return options.UseSQLite(connectionString);
-    });
+        .UseLinqToDb<AppDataConnection>((sp, opts) => opts.UseSQLite(connectionString));
 ```
 
-### AddRepository
-
-`AddRepository` is an extension method on `IServiceCollection` defined in `Schemata.Entity.Repository`. It accepts the open generic repository implementation type and:
-
-1. Validates that the type implements both `IRepository` and `IRepository<>`.
-2. Registers the open generic `IRepository<>` with the provided implementation type as a scoped service.
-3. Registers all built-in advisors: timestamp tracking, concurrency, validation, soft-delete filtering, canonical name generation.
-4. Returns a `SchemataRepositoryBuilder` for fluent configuration of the provider and additional advisors (such as query caching).
-
-The built-in advisors registered automatically are:
-
-| Advisor                        | Interface                        | Purpose                                    |
-| ------------------------------ | -------------------------------- | ------------------------------------------ |
-| `AdviceBuildQuerySoftDelete<>` | `IRepositoryBuildQueryAdvisor<>` | Filters soft-deleted entities from queries |
-| `AdviceAddCanonicalName<>`     | `IRepositoryAddAdvisor<>`        | Sets canonical name on insert              |
-| `AdviceAddConcurrency<>`       | `IRepositoryAddAdvisor<>`        | Sets concurrency token on insert           |
-| `AdviceAddSoftDelete<>`        | `IRepositoryAddAdvisor<>`        | Initializes soft-delete state on insert    |
-| `AdviceAddTimestamp<>`         | `IRepositoryAddAdvisor<>`        | Sets created/modified timestamps on insert |
-| `AdviceAddValidation<>`        | `IRepositoryAddAdvisor<>`        | Validates entity on insert                 |
-| `AdviceRemoveSoftDelete<>`     | `IRepositoryRemoveAdvisor<>`     | Converts hard delete to soft delete        |
-| `AdviceUpdateConcurrency<>`    | `IRepositoryUpdateAdvisor<>`     | Updates concurrency token on update        |
-| `AdviceUpdateTimestamp<>`      | `IRepositoryUpdateAdvisor<>`     | Updates modified timestamp on update       |
-| `AdviceUpdateValidation<>`     | `IRepositoryUpdateAdvisor<>`     | Validates entity on update                 |
+`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic scoped, and registers all built-in advisors via `TryAddEnumerable`.
 
 ## Entity Framework Core provider
 
-| Package                               | Dependency                                                               | Targets                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------- |
-| `Schemata.Entity.EntityFrameworkCore` | `Schemata.Entity.Repository`, `Microsoft.EntityFrameworkCore.Relational` | `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0` |
+**Package:** `Schemata.Entity.EntityFrameworkCore`
 
-### Repository class
+`EntityFrameworkCoreRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DbContext`.
 
-`EntityFrameworkCoreRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext` is a `DbContext`. It exposes the underlying `DbContext` as the `Context` property and the `DbSet<TEntity>` as the `DbSet` property.
+### Query methods
 
-**Query methods** (`ListAsync`, `FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, `LongCountAsync`) build the query through the `BuildQueryAsync` pipeline, run query advisors, execute via EF Core's async LINQ methods, then run result advisors.
+`ListAsync`, `FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, and `LongCountAsync` all call `BuildQueryAsync` internally, which:
 
-**Mutation methods** (`AddAsync`, `UpdateAsync`, `RemoveAsync`) run their respective advisor pipelines and then delegate to EF Core's `AddAsync`, `Update`, and `Remove` methods on the context.
+1. Creates a `QueryContainer` from `AsQueryable()`.
+2. Runs `IRepositoryBuildQueryAdvisor<TEntity>` pipeline on the container.
+3. Applies the caller's predicate via `BuildQuery(container.Query, predicate)`.
+4. Returns the composed `IQueryable<TResult>`.
 
-**CommitAsync** calls `Context.SaveChangesAsync`, which persists all tracked changes in a single database transaction managed by EF Core.
+Scalar methods then run `IRepositoryQueryAdvisor` (cache hit check), execute the query, and run `IRepositoryResultAdvisor` (cache store).
 
-**Detach** sets the entity's `EntityState` to `Detached`. The `UpdateAsync` method calls `Detach` before `Context.Update` to avoid tracking conflicts.
+### Mutation methods
 
-**SearchAsync** is not implemented and throws `NotImplementedException`.
+`AddAsync` runs `IRepositoryAddAdvisor<TEntity>`, then calls `Context.AddAsync(entity)`.
 
-### UseEntityFrameworkCore
+`UpdateAsync` runs `IRepositoryUpdateAdvisor<TEntity>`, then calls `Detach(entity)` followed by `Context.Update(entity)`.
 
-`UseEntityFrameworkCore` is an extension method on `SchemataRepositoryBuilder`. It registers the `DbContext` into the DI container using `AddDbContext`.
+`RemoveAsync` runs `IRepositoryRemoveAdvisor<TEntity>`, then calls `Context.Remove(entity)`.
 
-```csharp
-// Single type (service and implementation are the same)
-.UseEntityFrameworkCore<AppDbContext>((sp, options) => {
-    options.UseSqlServer(connectionString);
-})
+### Detach before Update
 
-// Separate service and implementation types
-.UseEntityFrameworkCore<IAppDbContext, AppDbContext>((sp, options) => {
-    options.UseNpgsql(connectionString);
-})
-```
+`UpdateAsync` clears the change tracker entry for `entity` before calling `Context.Update`. EF Core enforces a single tracked instance per key in the `DbContext`; whenever any other code in the same scope has already materialised the same row, `Context.Update(entity)` would throw "The instance of entity type 'X' cannot be tracked because another instance with the same key value is already being tracked."
 
-**Parameters:**
+Several routine paths produce a tracked instance:
 
-| Parameter         | Type                                                 | Default  | Description                                                                   |
-| ----------------- | ---------------------------------------------------- | -------- | ----------------------------------------------------------------------------- |
-| `configure`       | `Action<IServiceProvider, DbContextOptionsBuilder>?` | --       | Configures the DbContext options (database provider, connection string, etc.) |
-| `contextLifetime` | `ServiceLifetime`                                    | `Scoped` | Lifetime for the DbContext registration                                       |
-| `optionsLifetime` | `ServiceLifetime`                                    | `Scoped` | Lifetime for the DbContextOptions registration                                |
+- A repository-layer advisor that calls back into `IRepository<TEntity>.GetAsync` or `SingleOrDefaultAsync` to read the stored row (for example a concurrency stamp check, an ownership check, or a custom audit).
+- A mapper that constructs an entity by loading and copying from a tracked source.
+- An earlier handler stage that loaded the same row (the resource update pipeline first loads, then runs advisors, then writes).
+- Application code that issued a side query inside the same scope.
 
-The `configure` callback receives the `IServiceProvider`, allowing resolution of other services (such as configuration or tenant context) when building options.
+Detaching is the smallest correct response to any of these. The call is not specific to one advisor; it keeps `UpdateAsync` safe under every combination of advisors and call sites that may have populated the tracker.
+
+### CommitAsync
+
+Calls `Context.SaveChangesAsync(ct)`, then `DrainAfterCommitAsync(ct)`. Throws `InvalidOperationException` if called while a unit of work is active.
+
+### SearchAsync
+
+Not implemented; throws `NotImplementedException`. Use `ListAsync` with a filter expression instead.
 
 ## LINQ to DB provider
 
-| Package                    | Dependency                              | Targets                                                 |
-| -------------------------- | --------------------------------------- | ------------------------------------------------------- |
-| `Schemata.Entity.LinqToDB` | `Schemata.Entity.Repository`, `linq2db` | `netstandard2.0`, `netstandard2.1`, `net8.0`, `net10.0` |
+**Package:** `Schemata.Entity.LinqToDB`
 
-### Repository class
+`LinQ2DbRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DataConnection`.
 
-`LinQ2DbRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext` is a `DataConnection`. It exposes the underlying `DataConnection` as the `Context` property and the `ITable<TEntity>` as the `Table` property.
+### Table name resolution
 
-**Table name resolution.** The table name is determined in the constructor: it first checks for a `System.ComponentModel.DataAnnotations.Schema.TableAttribute` on the entity type, and falls back to the pluralized entity type name (using Humanizer).
+Determined in the constructor: checks for `[Table]` attribute on the entity type, falls back to the pluralized entity type name via Humanizer.
 
-**Query methods** follow the same advisor pipeline pattern as the EF Core provider: build query, run query advisors, execute via LINQ to DB's async methods, run result advisors.
+### Mutation methods
 
-**Mutation methods** (`AddAsync`, `UpdateAsync`, `RemoveAsync`) each begin a transaction automatically if one is not already active, run their advisor pipelines, then execute `InsertAsync`, `UpdateAsync`, or `DeleteAsync` on the `DataConnection`. Each operation accumulates the number of affected rows in `RowsAffected`.
+When a unit of work is active, mutations execute SQL immediately (`Context.InsertAsync`, `Context.UpdateAsync`, `Context.DeleteAsync`). Without a unit of work, mutations are queued as `PendingOperation` structs and executed in `CommitAsync` wrapped in a local transaction to keep the commit atomic.
 
-**CommitAsync** commits the active transaction and returns the cumulative `RowsAffected` count. If the commit fails, it rolls back the transaction and throws a `TransactionAbortedException`. After commit, the transaction and row counter are reset.
+`Detach` is a no-op because LINQ to DB does not track entity state.
 
-**Detach** is a no-op because LINQ to DB does not track entity state.
+### CommitAsync
 
-**SearchAsync** is not implemented and throws `NotImplementedException`.
+When no unit of work is active and there are pending operations, wraps them in a local transaction: begins, executes each pending operation, commits. On failure, rolls back and rethrows. After commit, drains the after-commit queue.
 
-### DataAnnotations metadata reader
+### SearchAsync
 
-LINQ to DB uses its own mapping attribute system. The `SystemComponentModelDataAnnotationsSchemaAttributeReader` bridges the gap by translating standard `System.ComponentModel.DataAnnotations` and `System.ComponentModel.DataAnnotations.Schema` attributes into LINQ to DB equivalents:
+Not implemented; throws `NotImplementedException`.
 
-| DataAnnotations attribute               | LINQ to DB mapping                       |
-| --------------------------------------- | ---------------------------------------- |
-| `TableAttribute`                        | `TableAttribute` (with Name and Schema)  |
-| `ColumnAttribute`                       | `ColumnAttribute` (with Name and DbType) |
-| `NotMappedAttribute`                    | `NotColumnAttribute`                     |
-| `KeyAttribute`                          | `PrimaryKeyAttribute`                    |
-| `DatabaseGeneratedAttribute` (Identity) | `IdentityAttribute`                      |
+## Provider comparison
 
-This reader is registered on `MappingSchema.Default` when `UseLinqToDb` is called, so entities can use standard DataAnnotations attributes without adding LINQ to DB-specific annotations.
+| Aspect | EF Core | LINQ to DB |
+|---|---|---|
+| Context type | `DbContext` | `DataConnection` |
+| Change tracking | Full EF Core tracker | None; `Detach` is a no-op |
+| Mutation style | Staged in tracker, flushed by `SaveChangesAsync` | Immediate SQL or queued pending ops |
+| `UpdateAsync` | `Detach(entity)` then `Context.Update(entity)` | `Context.UpdateAsync(entity)` directly |
+| `CommitAsync` | `SaveChangesAsync` + drain | Local transaction over pending ops + drain |
+| `SearchAsync` | `NotImplementedException` | `NotImplementedException` |
 
-### UseLinqToDb
+## Extension points
 
-`UseLinqToDb` is an extension method on `SchemataRepositoryBuilder` with three overloads:
+To implement a custom provider, inherit from `RepositoryBase<TEntity>` and implement the abstract members. The non-generic `IRepository` surface comes for free via the base class delegation.
 
-```csharp
-// Default DataConnection
-.UseLinqToDb((sp, options) => options.UseSQLite(connectionString))
+## Caveats
 
-// Custom DataConnection type (single type)
-.UseLinqToDb<MyDataConnection>((sp, options) => options.UseSQLite(connectionString))
+- **EF Core `UpdateAsync` detach**: required whenever the change tracker has already seen the same row in the current scope. See [Detach before Update](#detach-before-update).
+- **`SearchAsync`**: both providers throw `NotImplementedException`. Use `ListAsync` with a filter expression.
 
-// Separate service and implementation types
-.UseLinqToDb<IMyDataConnection, MyDataConnection>((sp, options) => options.UseSQLite(connectionString))
-```
+## See also
 
-**Parameters:**
-
-| Parameter         | Type                                               | Default  | Description                                                             |
-| ----------------- | -------------------------------------------------- | -------- | ----------------------------------------------------------------------- |
-| `configure`       | `Func<IServiceProvider, DataOptions, DataOptions>` | --       | Configures the DataOptions (database provider, connection string, etc.) |
-| `contextLifetime` | `ServiceLifetime`                                  | `Scoped` | Lifetime for the DataConnection registration                            |
-| `optionsLifetime` | `ServiceLifetime`                                  | `Scoped` | Lifetime for the DataOptions registration                               |
-
-The three-type-parameter overload performs constructor detection on the implementation type. It looks for a constructor accepting `DataOptions<TContextImplementation>`, then `DataOptions<TContext>`, then plain `DataOptions`, and registers the appropriate options type in DI. If no matching constructor is found, it throws an `ArgumentException`.
-
-## Differences between providers
-
-| Aspect                       | EntityFrameworkCore                                                              | LinqToDB                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Underlying library**       | `Microsoft.EntityFrameworkCore.Relational`                                       | `linq2db`                                                                                                             |
-| **Context type**             | `DbContext`                                                                      | `DataConnection`                                                                                                      |
-| **Change tracking**          | Full EF Core change tracking; `Detach` sets state to `EntityState.Detached`      | No change tracking; `Detach` is a no-op                                                                               |
-| **Transaction management**   | Implicit via `SaveChangesAsync` -- all pending changes are committed together    | Explicit per-repository: a transaction is started on the first mutation and committed in `CommitAsync`                |
-| **CommitAsync return value** | Number of state entries written (from `SaveChangesAsync`)                        | Cumulative rows affected across all mutations since the last commit                                                   |
-| **Table name resolution**    | Driven by EF Core model configuration                                            | `TableAttribute` or pluralized entity type name                                                                       |
-| **DataAnnotations support**  | Native                                                                           | Via `SystemComponentModelDataAnnotationsSchemaAttributeReader` metadata bridge                                        |
-| **Mutation style**           | Tracked: `AddAsync` / `Update` / `Remove` on DbContext, flushed on `SaveChanges` | Immediate: `InsertAsync` / `UpdateAsync` / `DeleteAsync` execute SQL within a transaction, committed on `CommitAsync` |
-| **UpdateAsync behavior**     | Calls `Detach` then `Context.Update` to avoid tracking conflicts                 | Calls `Context.UpdateAsync` directly                                                                                  |
-| **Configure callback**       | `Action<IServiceProvider, DbContextOptionsBuilder>?` (void)                      | `Func<IServiceProvider, DataOptions, DataOptions>` (returns options)                                                  |
+- [overview.md](overview.md) — `IRepository<TEntity>` API and `Once()` / `Suppress*()` reference
+- [mutation-pipeline.md](mutation-pipeline.md) — advisor chains for add, update, remove
+- [unit-of-work.md](unit-of-work.md) — `BeginWork`, `CommitAsync`, and the after-commit queue
+- [entity/traits.md](../entity/traits.md) — `IConcurrency` and the concurrency advisor

@@ -8,7 +8,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     Advises on an AIP-136 custom method dispatch after request-stage advisors
 ///     have run but before the registered
 ///     <see cref="Schemata.Abstractions.Resource.IResourceMethodHandler{TEntity, TRequest, TResponse}" />
-///     is invoked. Parallels <see cref="IResourceCreateAdvisor{TEntity, TRequest}" /> ──
+///     is invoked. Parallels <see cref="IResourceCreateAdvisor{TEntity, TRequest}" /> --
 ///     advisors can stash a pre-computed response in the
 ///     <see cref="AdviceContext" /> and return <see cref="AdviseResult.Handle" />
 ///     to short-circuit the handler invocation entirely.

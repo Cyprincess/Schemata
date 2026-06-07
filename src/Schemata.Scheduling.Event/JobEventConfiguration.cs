@@ -1,4 +1,4 @@
-﻿using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Scheduling.Event;
 
