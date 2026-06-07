@@ -2,10 +2,12 @@ using System;
 using System.Reflection;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
+using Microsoft.Extensions.Options;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Foundation;
 using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
 namespace Schemata.Resource.Grpc;
@@ -17,7 +19,8 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
     private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
-    private readonly ResourceBinderConfiguration _config;
+    private readonly ResourceBinderConfiguration       _config;
+    private readonly IOptions<SchemataResourceOptions> _options;
 
     static ResourceServiceMethodProvider() {
         var t = typeof(TService);
@@ -31,12 +34,19 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration>), method);
     }
 
-    public ResourceServiceMethodProvider(ResourceBinderConfiguration config) { _config = config; }
+    public ResourceServiceMethodProvider(
+        ResourceBinderConfiguration       config,
+        IOptions<SchemataResourceOptions> options
+    ) {
+        _config  = config;
+        _options = options;
+    }
 
     #region IServiceMethodProvider<TService> Members
 
     void IServiceMethodProvider<TService>.OnServiceMethodDiscovery(ServiceMethodProviderContext<TService> context) {
         Registrar?.Invoke(context, _config);
+        ResourceCustomMethod.Register(context, _config, _options.Value);
     }
 
     #endregion

@@ -49,8 +49,8 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
-        TEntity           entity,
         DeleteRequest     request,
+        TEntity           entity,
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {

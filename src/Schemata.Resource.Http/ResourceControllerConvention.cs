@@ -33,8 +33,8 @@ public sealed class ResourceControllerConvention(string? scheme = null) : IContr
 
         var collectionPath = descriptor.CollectionPath;
         var route = descriptor.Package is not null
-            ? $"~/{descriptor.Package.ToLowerInvariant()}/{collectionPath}"
-            : $"~/{collectionPath}";
+            ? $"~/v1/{descriptor.Package.ToLowerInvariant()}/{collectionPath}"
+            : $"~/v1/{collectionPath}";
 
         foreach (var selector in controller.Selectors) {
             selector.AttributeRouteModel?.Template = route;

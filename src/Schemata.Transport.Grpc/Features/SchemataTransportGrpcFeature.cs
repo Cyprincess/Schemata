@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Grpc.AspNetCore.Server;
-using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
 using Grpc.Reflection;
 using Microsoft.AspNetCore.Builder;
