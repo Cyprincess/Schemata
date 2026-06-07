@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Abstractions.Resource;
 
@@ -56,4 +57,12 @@ public class ResourceAttribute : Attribute
     ///     If <see langword="null" />, all registered endpoints generate routes.
     /// </summary>
     public IList<string>? Endpoints { get; set; }
+
+    /// <summary>
+    ///     When set, restricts which standard CRUD verbs the transport layer
+    ///     synthesizes for this resource. Custom methods declared via
+    ///     <see cref="ResourceMethodAttribute" /> are unaffected. If <see langword="null" />,
+    ///     all five standard verbs are exposed.
+    /// </summary>
+    public Operations[]? Operations { get; set; }
 }
