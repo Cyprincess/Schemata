@@ -73,11 +73,11 @@ ValueTask<int> CommitAsync(CancellationToken ct = default);
 
 Each mutation runs the corresponding advisor pipeline before touching the backing store. If any advisor returns `Block` or `Handle`, the mutation short-circuits and the store operation is skipped. `AddRangeAsync` and `RemoveRangeAsync` fan out to individual calls so every entity gets its own full pipeline pass.
 
-`CommitAsync` flushes all pending changes to the database and drains the after-commit queue. See [unit-of-work.md](unit-of-work.md) for transaction semantics.
+`CommitAsync` flushes pending changes to the database and then dispatches `IRepositoryCommittedAdvisor<TEntity>` with a `CommitChanges<TEntity>` snapshot. See [unit-of-work.md](unit-of-work.md) for transaction semantics.
 
 ## Once() and Suppress*()
 
-`Once()` creates a new repository instance with a fresh `AdviceContext` by calling `ActivatorUtilities.CreateInstance(ServiceProvider, GetType())`. The new instance shares the same underlying provider context (same `DbContext` or `DataConnection`) but has its own suppression state.
+`Once()` creates a new repository instance with a fresh `AdviceContext` by calling `ActivatorUtilities.CreateInstance(ServiceProvider, GetType())`. The new instance has its own `AdviceContext` and provider context.
 
 ```csharp
 // Suppress for one call only — the original instance is unaffected
@@ -113,7 +113,7 @@ services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
-`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic scoped, and registers all built-in advisors via `TryAddEnumerable`. See [providers.md](providers.md) for provider-specific setup.
+`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic transient, and registers all built-in advisors via `TryAddEnumerable`. See [providers.md](providers.md) for provider-specific setup.
 
 ## Extension points
 
@@ -128,7 +128,7 @@ The two-interface design (`IRepository` + `IRepository<TEntity>`) lets the Resou
 
 - [mutation-pipeline.md](mutation-pipeline.md) — add/update/remove advisor chains
 - [query-pipeline.md](query-pipeline.md) — build-query/query/result advisor chains
-- [unit-of-work.md](unit-of-work.md) — `BeginWork`, `CommitAsync`, `EnqueueAfterCommit`
+- [unit-of-work.md](unit-of-work.md) — explicit enlistment, `CommitAsync`, committed advisors
 - [providers.md](providers.md) — EF Core and LinqToDB implementations
 - [ownership.md](ownership.md) — `UseOwner()` and `IOwnerResolver`
 - [caching.md](caching.md) — `UseQueryCache()` and cache eviction

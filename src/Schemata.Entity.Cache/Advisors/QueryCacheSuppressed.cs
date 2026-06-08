@@ -7,9 +7,8 @@ namespace Schemata.Entity.Cache.Advisors;
 /// </summary>
 /// <remarks>
 ///     Set via
-///     <see cref="Schemata.Entity.Repository.RepositoryExtensions.SuppressQueryCache(Schemata.Entity.Repository.IRepository)" />
-///     on <see cref="Schemata.Entity.Repository.IRepository" /> or
-///     <see cref="Schemata.Entity.Repository.IRepository{TEntity}" />.
+///     <see cref="Schemata.Entity.Repository.RepositoryExtensions.SuppressQueryCache" />
+///     on <see cref="Schemata.Entity.Repository.IRepository{TEntity}" />.
 ///     When present in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
 ///     the query advisor will not return cached results and the result advisor will not store them.
 /// </remarks>

@@ -188,7 +188,7 @@ public class AdminStudentService(IRepository<Student> repository)
 ```
 
 `Once()` creates a fresh repository instance with a fresh `AdviceContext` so
-the suppression doesn't leak into the request-scoped repository. The
+the suppression doesn't leak into the caller's repository instance. The
 `QueryOwnerSuppressed` marker is set on the new instance's context.
 `AdviceBuildQueryOwner` checks `ctx.Has<QueryOwnerSuppressed>()` and skips
 the filter when it's present.

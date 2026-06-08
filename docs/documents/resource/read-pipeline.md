@@ -1,6 +1,6 @@
 # Read Pipeline
 
-The resource system provides two read operations: **List** and **Get**. Both run through the advisor pipeline and share the `IResourceRequestAdvisor<TEntity>` gate. Neither operation writes to the repository; both use `_repository.Once()` to get a fresh, isolated repository instance that doesn't pollute the request-scoped state.
+The resource system provides two read operations: **List** and **Get**. Both run through the advisor pipeline and share the `IResourceRequestAdvisor<TEntity>` gate. Neither operation writes to the repository; both use `_repository.Once()` to get a fresh, isolated repository instance that doesn't pollute the caller's repository state.
 
 ## Where the code lives
 
@@ -126,7 +126,7 @@ The entity is mapped to `TDetail`, then `IResourceResponseAdvisor<TEntity, TDeta
 
 ## Design motivation
 
-`_repository.Once()` creates a fresh repository instance with a fresh `AdviceContext` for each read. This prevents read-side state (e.g., `SuppressQuerySoftDelete`) from leaking into the request-scoped repository used by write operations. Get always suppresses soft-delete so callers can inspect tombstoned resources; List only suppresses it when `ShowDeleted = true`.
+`_repository.Once()` creates a fresh repository instance with a fresh `AdviceContext` for each read. This prevents read-side state (e.g., `SuppressQuerySoftDelete`) from leaking into the repository instance used by write operations. Get always suppresses soft-delete so callers can inspect tombstoned resources; List only suppresses it when `ShowDeleted = true`.
 
 ## Caveats
 

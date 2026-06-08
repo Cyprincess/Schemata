@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
+using Schemata.Entity.Repository;
 using Xunit;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
@@ -24,7 +26,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDbContext>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         FullName = "UoW-Alice",
                                         Age      = 18,
@@ -37,7 +40,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                                         Grade    = 2,
                                         Name     = "uow-bob",
                                     });
-                await work.CommitAsync();
+                await uow.CommitAsync();
             }
         }
 
@@ -55,14 +58,15 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDbContext>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         FullName = "Rollback-Alice",
                                         Age      = 18,
                                         Grade    = 1,
                                         Name     = "rollback-alice",
                                     });
-                await work.RollbackAsync();
+                await uow.RollbackAsync();
             }
         }
 
@@ -80,7 +84,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDbContext>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         FullName = "Dispose-Alice",
                                         Age      = 18,
@@ -101,18 +106,18 @@ public class UnitOfWorkShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CommitAsync_InsideUoW_ThrowsInvalidOperation() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
+    public async Task CommitAsync_ThrowsWhenRepositoryIsEnlisted() {
+        var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
-            using var work = repo.BeginWork();
+            repo.Join(uow);
             await repo.AddAsync(new() {
-                                    FullName = "Throw-Alice",
+                                    FullName = "Enlisted",
                                     Age      = 18,
                                     Grade    = 1,
-                                    Name     = "throw-alice",
+                                    Name     = "enlisted",
                                 });
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => repo.CommitAsync().AsTask());
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.CommitAsync());
+            await uow.CommitAsync();
         }
     }
 
@@ -121,7 +126,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (studentRepo, courseRepo, uow, scope) = _fixture.CreateScopeWithUoW();
             using (scope) {
-                uow.Begin();
+                studentRepo.Join(uow);
+                courseRepo.Join(uow);
                 await studentRepo.AddAsync(new() {
                                                FullName = "Cross-Alice",
                                                Age      = 18,
@@ -153,11 +159,29 @@ public class UnitOfWorkShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task BeginWork_WhenAlreadyActive_ThrowsInvalidOperation() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
+    public async Task Join_AfterUncommittedWork_ThrowsInvalidOperation() {
+        var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
-            using var work = repo.BeginWork();
-            Assert.Throws<InvalidOperationException>(() => repo.BeginWork());
+            await repo.AddAsync(new() {
+                                    FullName = "Uncommitted",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "uncommitted-join",
+                                });
+
+            Assert.Throws<InvalidOperationException>(() => repo.Join(uow));
+
+            // Repository still owns its context; standalone commit should still work.
+            await repo.CommitAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CommitAsync_AfterCompleted_ThrowsInvalidOperation() {
+        var (_, _, uow, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            await uow.CommitAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await uow.CommitAsync());
         }
     }
 }

@@ -51,7 +51,8 @@ public sealed class InProcessEventBus : IEventBus
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
-        switch (await Advisor.For<IEventPublishAdvisor>().RunAsync(adviceCtx, ctx, ct)) {
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, ctx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
@@ -102,7 +103,8 @@ public sealed class InProcessEventBus : IEventBus
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
-        switch (await Advisor.For<IEventPublishAdvisor>().RunAsync(adviceCtx, eventCtx, ct)) {
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, eventCtx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when adviceCtx.TryGet<TResponse>(out var r) && r is not null:
@@ -127,7 +129,8 @@ public sealed class InProcessEventBus : IEventBus
             // Same contract as PublishAsync: consume advisors are observational; the
             // handler has either returned or thrown, so all three results converge.
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
-            switch (await Advisor.For<IEventConsumeAdvisor>().RunAsync(consumeAdviceCtx, eventCtx, ct)) {
+            switch (await Advisor.For<IEventConsumeAdvisor>()
+                                 .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                 case AdviseResult.Block:

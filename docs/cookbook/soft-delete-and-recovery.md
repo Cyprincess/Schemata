@@ -131,8 +131,8 @@ public class StudentRestoreController(IRepository<Student> repository) : Control
 Key points:
 
 - `Once()` creates a fresh repository instance with a fresh `AdviceContext`.
-  This prevents the suppression from leaking into the request-scoped
-  repository used by other operations in the same request.
+  This prevents the suppression from leaking into the repository instance
+  used by later operations.
 - `SuppressQuerySoftDelete()` sets `QuerySoftDeleteSuppressed` on the new
   instance's `AdviceContext`. `AdviceBuildQuerySoftDelete` checks
   `ctx.Has<QuerySoftDeleteSuppressed>()` and skips the filter when it's
@@ -198,10 +198,9 @@ runs after `AdviceRemoveSoftDelete` (Order > 900M), it will not be called
 because the pipeline short-circuits on `Handle`. Place custom remove advisors
 at a lower `Order` value.
 
-**`SuppressQuerySoftDelete` must be called on `Once()`.** Calling it on the
-request-scoped repository instance would suppress the filter for all
-subsequent queries in that request, including those made by other services.
-Always use `Once()` to get an isolated instance.
+**`SuppressQuerySoftDelete` must be called on `Once()`.** Calling it on a
+reused repository instance would suppress the filter for later queries made
+through that instance. Always use `Once()` to get an isolated instance.
 
 **`AdviceAddSoftDelete` clears `DeleteTime` on insert.** If you try to seed
 data with a pre-set `DeleteTime` (e.g., to import archived records), the

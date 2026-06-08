@@ -317,7 +317,8 @@ public sealed class DefaultScheduler : IScheduler
             var adviceCtx = new AdviceContext(scope.ServiceProvider);
             adviceCtx.Set(job);
 
-            switch (await Advisor.For<IJobExecutionAdvisor>().RunAsync(adviceCtx, context, ct)) {
+            switch (await Advisor.For<IJobExecutionAdvisor>()
+                                 .RunAsync(adviceCtx, context, ct)) {
                 case AdviseResult.Continue:
                     break;
                 case AdviseResult.Handle:

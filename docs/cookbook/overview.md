@@ -9,7 +9,7 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 | Recipe | What it covers |
 | --- | --- |
 | [RabbitMQ Event Bus](rabbitmq-event-bus.md) | Producer, consumer, DLX, request/reply with RabbitMQ |
-| [Domain Events](domain-events.md) | Publish from an advisor inside EnqueueAfterCommit |
+| [Domain Events](domain-events.md) | Publish from a committed repository advisor |
 
 ## Scheduling and Flow Integration
 

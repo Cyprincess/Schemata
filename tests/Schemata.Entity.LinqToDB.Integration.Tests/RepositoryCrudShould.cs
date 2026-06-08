@@ -32,8 +32,7 @@ public class RepositoryCrudShould : IAsyncLifetime
                     Name     = "alice",
                 };
                 await repository.AddAsync(entity);
-                var rows = await repository.CommitAsync();
-                Assert.True(rows > 0);
+                await repository.CommitAsync();
             }
         }
 

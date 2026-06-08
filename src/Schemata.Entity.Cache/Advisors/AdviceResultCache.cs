@@ -37,8 +37,8 @@ public static class AdviceResultCache
 ///     <para>
 ///         Singular queries (where <typeparamref name="T" /> is a reference type that equals
 ///         <typeparamref name="TEntity" />) additionally record their cache key in the
-///         <see cref="ReverseIndex" /> so <see cref="AdviceUpdateEvictCache{TEntity}" />
-///         and <see cref="AdviceRemoveEvictCache{TEntity}" /> can evict by entity primary key.
+///         <see cref="ReverseIndex" /> so <see cref="AdviceCommittedEvictCache{TEntity}" />
+///         can evict by entity primary key.
 ///     </para>
 ///     <para>Suppressed when <see cref="QueryCacheSuppressed" /> is present in the advice context.</para>
 /// </remarks>

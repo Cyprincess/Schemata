@@ -77,4 +77,39 @@ public class AdviceContext
     ///     <see langword="true" /> if a key for type <typeparamref name="T" /> exists.
     /// </returns>
     public bool Has<T>() { return _options.ContainsKey(typeof(T).TypeHandle); }
+
+    /// <summary>
+    ///     Sets the marker keyed by type <typeparamref name="T" /> and returns a disposable
+    ///     that restores the prior state on <see cref="IDisposable.Dispose" />.
+    /// </summary>
+    /// <remarks>
+    ///     Nested scopes preserve the outer value: <c>Dispose</c> restores the value present
+    ///     before this <c>Use</c> call (or removes the key when none was present), rather than
+    ///     unconditionally removing the key.
+    /// </remarks>
+    /// <typeparam name="T">The key type.</typeparam>
+    /// <param name="value">The value to set; may be <see langword="null" />.</param>
+    /// <returns>A disposable that restores the prior state.</returns>
+    public IDisposable Use<T>(T? value = default) {
+        var handle  = typeof(T).TypeHandle;
+        var hadPrev = _options.TryGetValue(handle, out var prev);
+        _options[handle] = value;
+        return new Restore(this, handle, hadPrev, prev);
+    }
+
+    private sealed class Restore(AdviceContext context, RuntimeTypeHandle key, bool hadPrevious, object? previous) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose() {
+            if (_disposed) return;
+            _disposed = true;
+
+            if (hadPrevious) {
+                context._options[key] = previous;
+            } else {
+                context._options.Remove(key);
+            }
+        }
+    }
 }

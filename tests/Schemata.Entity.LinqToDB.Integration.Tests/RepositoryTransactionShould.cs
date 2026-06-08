@@ -31,8 +31,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
                                               Grade    = 1,
                                               Name     = "tx-alice",
                                           });
-                var rows = await repository.CommitAsync();
-                Assert.True(rows > 0);
+                await repository.CommitAsync();
             }
         }
 
@@ -72,11 +71,13 @@ public class RepositoryTransactionShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CommitAsync_NoOperations_ReturnsZero() {
+    public async Task CommitAsync_NoOperations_IsNoOp() {
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
-            var rows = await repository.CommitAsync();
-            Assert.Equal(0, rows);
+            // No mutation means no transaction was opened; commit must complete without throwing.
+            var exception = await Record.ExceptionAsync(() => repository.CommitAsync());
+
+            Assert.Null(exception);
         }
     }
 }

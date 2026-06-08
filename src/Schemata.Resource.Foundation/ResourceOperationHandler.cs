@@ -187,8 +187,6 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
             token.Skip = 0;
         }
 
-        var repository = _repository.Once();
-
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
             try {
                 var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
@@ -218,15 +216,15 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
             }
         }
 
-        if (request.ShowDeleted is true) {
-            repository = repository.SuppressQuerySoftDelete();
-        }
+        using var suppression = request.ShowDeleted is true
+            ? _repository.SuppressQuerySoftDelete()
+            : null;
 
-        var totalSize = await repository.CountAsync(q => container.Query(q), ct.Value);
+        var totalSize = await _repository.CountAsync(q => container.Query(q), ct.Value);
 
         container.ApplyPaginating(token);
 
-        var entities  = repository.ListAsync(q => container.Query(q), ct.Value);
+        var entities  = _repository.ListAsync(q => container.Query(q), ct.Value);
         var summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct.Value).ToListAsync(ct.Value);
 
         token.Skip += token.PageSize;
@@ -250,7 +248,9 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
         }
 
         return new() {
-            TotalSize = totalSize, Entities = immutable, NextPageToken = nextPageToken,
+            TotalSize = totalSize,
+            Entities = immutable,
+            NextPageToken = nextPageToken,
         };
     }
 
@@ -295,10 +295,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return GetResultBase<TDetail>.Blocked;
         }
 
-        var entity = await _repository.Once()
-                                      .SuppressQuerySoftDelete()
-                                      .SingleOrDefaultAsync(q => container.Query(q), ct.Value)
-                  ?? throw ResourceNotFound(name);
+        TEntity? entity;
+        using (_repository.SuppressQuerySoftDelete()) {
+            entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
+        }
+        if (entity == null) {
+            throw ResourceNotFound(name);
+        }
 
         var detail = _mapper.Map<TEntity, TDetail>(entity);
 
@@ -449,10 +452,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return UpdateResultBase<TDetail>.Blocked;
         }
 
-        var entity = await _repository.Once()
-                                      .SuppressQuerySoftDelete()
-                                      .SingleOrDefaultAsync(q => container.Query(q), ct.Value)
-                  ?? throw ResourceNotFound(name);
+        TEntity? entity;
+        using (_repository.SuppressQuerySoftDelete()) {
+            entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
+        }
+        if (entity == null) {
+            throw ResourceNotFound(name);
+        }
 
         switch (await Advisor.For<IResourceUpdateAdvisor<TEntity, TRequest>>()
                              .RunAsync(ctx, request, entity, principal, ct.Value)) {
@@ -550,10 +556,13 @@ public sealed class ResourceOperationHandler<TEntity, TRequest, TDetail, TSummar
                 return false;
         }
 
-        var entity = await _repository.Once()
-                                      .SuppressQuerySoftDelete()
-                                      .SingleOrDefaultAsync(q => container.Query(q), ct.Value)
-                  ?? throw ResourceNotFound(name);
+        TEntity? entity;
+        using (_repository.SuppressQuerySoftDelete()) {
+            entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
+        }
+        if (entity == null) {
+            throw ResourceNotFound(name);
+        }
 
         switch (await Advisor.For<IResourceDeleteAdvisor<TEntity>>()
                              .RunAsync(ctx, req, entity, principal, ct.Value)) {

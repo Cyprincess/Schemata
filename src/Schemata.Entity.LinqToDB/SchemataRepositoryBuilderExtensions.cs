@@ -27,22 +27,12 @@ public static class SchemataRepositoryBuilderExtensions
     /// </summary>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
-    /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb(
         this SchemataRepositoryBuilder                   builder,
-        Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+        Func<IServiceProvider, DataOptions, DataOptions> configure
     ) {
-        return builder.UseLinqToDb<DataConnection, DataConnection>(configure, contextLifetime, optionsLifetime);
+        return builder.UseLinqToDb<DataConnection, DataConnection>(configure);
     }
 
     /// <summary>
@@ -51,23 +41,13 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContext">The <see cref="DataConnection" /> type (used as both service and implementation type).</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
-    /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext>(
         this SchemataRepositoryBuilder                   builder,
-        Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+        Func<IServiceProvider, DataOptions, DataOptions> configure
     )
         where TContext : DataConnection {
-        return builder.UseLinqToDb<TContext, TContext>(configure, contextLifetime, optionsLifetime);
+        return builder.UseLinqToDb<TContext, TContext>(configure);
     }
 
     /// <summary>
@@ -77,14 +57,6 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContextImplementation">The implementation type for the data connection.</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
-    /// <param name="contextLifetime">
-    ///     The service lifetime for the data connection (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
-    /// <param name="optionsLifetime">
-    ///     The service lifetime for the data options (defaults to
-    ///     <see cref="ServiceLifetime.Scoped" />).
-    /// </param>
     /// <returns>The same builder for chaining.</returns>
     /// <exception cref="ArgumentException">
     ///     Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor
@@ -92,9 +64,7 @@ public static class SchemataRepositoryBuilderExtensions
     /// </exception>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
-        Func<IServiceProvider, DataOptions, DataOptions> configure,
-        ServiceLifetime                                  contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Scoped
+        Func<IServiceProvider, DataOptions, DataOptions> configure
     )
         where TContextImplementation : TContext
         where TContext : DataConnection {
@@ -104,33 +74,17 @@ public static class SchemataRepositoryBuilderExtensions
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
-        builder.Services.TryAdd(
-            new ServiceDescriptor(typeof(TContext), typeof(TContextImplementation), contextLifetime)
-        );
+        builder.Services.TryAddSingleton(typeof(Func<TContext>), sp => ActivatorUtilities.CreateInstance<TContextImplementation>(sp));
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:
-                builder.Services.TryAdd(
-                    new ServiceDescriptor(
-                        typeof(DataOptions<TContextImplementation>),
-                        sp => new DataOptions<TContextImplementation>(configure(sp, new())),
-                        optionsLifetime
-                    )
-                );
+                builder.Services.TryAddSingleton(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())));
                 break;
             case OptionsParameterType.DataOptionsTContext:
-                builder.Services.TryAdd(
-                    new ServiceDescriptor(
-                        typeof(DataOptions<TContext>),
-                        sp => new DataOptions<TContext>(configure(sp, new())),
-                        optionsLifetime
-                    )
-                );
+                builder.Services.TryAddSingleton(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())));
                 break;
             case OptionsParameterType.DataOptions:
-                builder.Services.TryAdd(
-                    new ServiceDescriptor(typeof(DataOptions), sp => configure(sp, new()), optionsLifetime)
-                );
+                builder.Services.TryAddSingleton(typeof(DataOptions), sp => configure(sp, new()));
                 break;
         }
 

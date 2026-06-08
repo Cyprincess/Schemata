@@ -22,7 +22,7 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
     ) : base(roles, roleClaims, userRole, describer) { }
 }
 
-public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleStore<TRole>, IRoleClaimStore<TRole>
+public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<TRole>
     where TRole : SchemataRole
     where TRoleClaim : SchemataRoleClaim, new()
     where TUserRole : SchemataUserRole, new()
@@ -50,7 +50,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     /// <summary>Provides localized error messages for identity operations.</summary>
     public IdentityErrorDescriber ErrorDescriber { get; set; }
 
-    #region IQueryableRoleStore<TRole> Members
+    #region IRoleClaimStore<TRole> Members
 
     public virtual async Task<IdentityResult> CreateAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
@@ -122,7 +122,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult<string?>(role.DisplayName);
+        return Task.FromResult(role.DisplayName);
     }
 
     public virtual Task SetRoleNameAsync(TRole role, string? roleName, CancellationToken ct = default) {
@@ -143,7 +143,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
             throw new ArgumentNullException(nameof(role));
         }
 
-        return Task.FromResult<string?>(role.NormalizedName);
+        return Task.FromResult(role.NormalizedName);
     }
 
     public virtual Task SetNormalizedRoleNameAsync(TRole role, string? normalizedName, CancellationToken ct = default) {
@@ -158,12 +158,6 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IQueryableRoleSto
     }
 
     public virtual void Dispose() { _disposed = true; }
-
-    public virtual IQueryable<TRole> Roles => RolesRepository.AsQueryable();
-
-    #endregion
-
-    #region IRoleClaimStore<TRole> Members
 
     public virtual async Task<IList<Claim>> GetClaimsAsync(TRole role, CancellationToken ct = default) {
         ThrowIfDisposed();

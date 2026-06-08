@@ -68,16 +68,15 @@ schema.Services.AddRedisCache();   // registers RedisCacheProvider as ICacheProv
 
 ## Step 4: Understand the eviction strategy
 
-`UseQueryCache` registers four advisors:
+`UseQueryCache` registers three advisors:
 
 | Advisor | Interface | What it does |
 | --- | --- | --- |
 | `AdviceQueryCache` | `IRepositoryQueryAdvisor` | Returns cached result on hit; `AdviseResult.Handle` short-circuits DB |
 | `AdviceResultCache` | `IRepositoryResultAdvisor` | Writes query result to cache after DB execution |
-| `AdviceUpdateEvictCache` | `IRepositoryUpdateAdvisor` | Evicts cache entries for the updated entity after commit |
-| `AdviceRemoveEvictCache` | `IRepositoryRemoveAdvisor` | Evicts cache entries for the removed entity after commit |
+| `AdviceCommittedEvictCache` | `IRepositoryCommittedAdvisor` | Evicts cache entries for updated and removed entities after commit |
 
-Eviction happens in the after-commit queue. If the transaction rolls back, the eviction is discarded and the cache retains the pre-update value. This is correct behavior: a rolled-back write should not invalidate a valid cached read.
+Eviction happens in the committed advisor pipeline. If the transaction rolls back, committed advisors do not run and the cache retains the pre-update value. A rolled-back write should not invalidate a valid cached read.
 
 **Assertion:** Update a student and immediately query. The response reflects the updated data because the eviction ran after the successful commit.
 
@@ -100,7 +99,7 @@ var fresh = await repository.SuppressQueryCache()
 - **`AddDistributedCache` and `AddRedisCache` both use `TryAddSingleton`.** Calling both registers only the first one. Pick one per application.
 - **`DistributedCacheProvider` is single-process safe only for collection operations.** The distributed adapter uses a reverse index to track which cache keys belong to an entity. That index is stored in the same `IDistributedCache` instance. In a multi-process deployment with an in-memory cache, each process has its own index and eviction in one process does not affect the other. Use Redis for multi-process deployments.
 - **Redis is cluster-safe.** `RedisCacheProvider` uses atomic Lua scripts for index updates, making it safe across Redis cluster nodes.
-- **Rollback discards eviction.** If `CommitAsync` throws and the transaction rolls back, the after-commit eviction queue is discarded. The cache may serve stale data until the TTL expires. Design TTL values with this in mind for high-consistency scenarios.
+- **Rollback skips eviction.** If `CommitAsync` throws and the transaction rolls back, committed advisors do not run. The cache may serve stale data until the TTL expires. Design TTL values with this in mind for high-consistency scenarios.
 
 ## See also
 

@@ -37,7 +37,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         ct.ThrowIfCancellationRequested();
 
         if (names is null) {
-            return _scopes.AsAsyncEnumerable();
+            return _scopes.ListAsync<TScope>(null, ct);
         }
 
         return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name)), ct);

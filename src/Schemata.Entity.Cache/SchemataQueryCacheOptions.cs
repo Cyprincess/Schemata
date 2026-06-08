@@ -12,7 +12,7 @@ public class SchemataQueryCacheOptions
     public TimeSpan Ttl { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    ///     When <see langword="false" />, the update and remove advisors skip cache eviction.
+    ///     When <see langword="false" />, the committed cache-eviction advisor skips eviction.
     ///     The query and result advisors remain active; entries live until TTL expires.
     /// </summary>
     public bool EvictionEnabled { get; set; } = true;

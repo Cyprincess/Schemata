@@ -6,43 +6,45 @@ namespace Schemata.Entity.Repository;
 
 /// <summary>
 ///     Represents a unit of work that coordinates multiple repository operations
-///     within a single database transaction.
+///     within a single database transaction. Repositories opt in via
+///     <see cref="IRepository{TEntity}.Join" />.
 /// </summary>
-public interface IUnitOfWork : IDisposable
+/// <remarks>
+///     The transaction is opened lazily on first access to
+///     <see cref="IUnitOfWork{TContext}.Context" /> (which the first
+///     <see cref="IRepository{TEntity}.Join" /> triggers). A unit of work is one-shot:
+///     after <see cref="CommitAsync" /> or <see cref="RollbackAsync" /> resolve a new
+///     instance from DI to start another transaction.
+/// </remarks>
+public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
     /// <summary>
-    ///     Gets a value indicating whether the unit of work has an active transaction.
-    /// </summary>
-    bool IsActive { get; }
-
-    /// <summary>
-    ///     Begins a new database transaction.
-    /// </summary>
-    void Begin();
-
-    /// <summary>
-    ///     Commits all pending changes and the database transaction.
+    ///     Commits all pending changes and the database transaction, then notifies
+    ///     enlisted repositories to dispatch their
+    ///     <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipelines.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task CommitAsync(CancellationToken ct = default);
 
     /// <summary>
-    ///     Rolls back the database transaction without committing changes.
+    ///     Rolls back the database transaction and resets the tracking lists on every
+    ///     enlisted repository.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task RollbackAsync(CancellationToken ct = default);
-
-    /// <summary>
-    ///     Enqueues an action to run after the unit of work commits successfully.
-    ///     Used by advisors (e.g., cache eviction) that must observe a successful
-    ///     persistence boundary before acting. The queue is cleared on rollback or dispose.
-    /// </summary>
-    void EnqueueAfterCommit(Func<CancellationToken, Task> action);
 }
 
 /// <summary>
-///     Typed unit of work associated with a specific data context type,
-///     allowing multiple different repository providers to coexist in the same DI container.
+///     Typed unit of work associated with a specific data context type.
 /// </summary>
 /// <typeparam name="TContext">The data context type (e.g., <c>DbContext</c> or <c>DataConnection</c>).</typeparam>
-public interface IUnitOfWork<TContext> : IUnitOfWork;
+public interface IUnitOfWork<TContext> : IUnitOfWork
+{
+    /// <summary>
+    ///     The data context owned by this unit of work. The first access opens the
+    ///     underlying connection and a fresh transaction; subsequent accesses return the
+    ///     same instance until <see cref="IUnitOfWork.CommitAsync" /> /
+    ///     <see cref="IUnitOfWork.RollbackAsync" /> / disposal.
+    /// </summary>
+    TContext Context { get; }
+}

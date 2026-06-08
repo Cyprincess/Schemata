@@ -21,25 +21,22 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
     where TContext : DbContext
     where TEntity : class
 {
-    private readonly TContext _context;
+    private TContext _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="EntityFrameworkCoreRepository{TContext, TEntity}" /> class.
     /// </summary>
     /// <param name="sp">The service provider.</param>
-    /// <param name="context">The EF Core database context.</param>
-    /// <param name="uow">An optional unit of work for coordinating cross-repository transactions.</param>
-    public EntityFrameworkCoreRepository(IServiceProvider sp, TContext context, IUnitOfWork<TContext>? uow = null) : base(sp, uow) {
-        _context = context;
+    /// <param name="factory">The factory used to create a dedicated EF Core database context.</param>
+    public EntityFrameworkCoreRepository(IServiceProvider sp, IDbContextFactory<TContext> factory) : base(sp) {
+        _context = factory.CreateDbContext();
     }
 
     protected virtual TContext Context => _context;
 
     protected virtual DbSet<TEntity> DbSet => _context.Set<TEntity>();
 
-    public override IAsyncEnumerable<TEntity> AsAsyncEnumerable() { return DbSet.AsAsyncEnumerable(); }
-
-    public override IQueryable<TEntity> AsQueryable() { return DbSet.AsQueryable(); }
+    protected override IQueryable<TEntity> AsQueryable() { return DbSet.AsQueryable(); }
 
     public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -53,13 +50,6 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
             ct.ThrowIfCancellationRequested();
             yield return entity;
         }
-    }
-
-    public override IAsyncEnumerable<TResult> SearchAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    ) {
-        throw new NotImplementedException();
     }
 
     public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
@@ -247,6 +237,8 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
                 break;
         }
 
+        TrackAdd(entity);
+
         await Context.AddAsync(entity, ct);
     }
 
@@ -263,7 +255,9 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
                 break;
         }
 
-        Detach(entity);
+        TrackUpdate(entity);
+
+        Context.Entry(entity).State = EntityState.Detached;
 
         Context.Update(entity);
     }
@@ -281,22 +275,44 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
                 break;
         }
 
+        TrackRemove(entity);
+
         Context.Remove(entity);
     }
 
-    public override async ValueTask<int> CommitAsync(CancellationToken ct = default) {
-        if (UnitOfWork?.IsActive == true) {
-            throw new InvalidOperationException("Commit is not allowed within a unit of work.");
+    public override async Task CommitAsync(CancellationToken ct = default) {
+        if (!OwnsContext) {
+            throw new InvalidOperationException(
+                "Repository is enlisted in a unit of work. Call IUnitOfWork.CommitAsync instead.");
         }
 
-        var rows = await _context.SaveChangesAsync(ct);
-
-        await DrainAfterCommitAsync(ct);
-
-        return rows;
+        await _context.SaveChangesAsync(ct);
+        var snapshot = SnapshotChanges();
+        await DispatchCommittedAsync(snapshot, ct);
     }
 
-    public override void Detach(TEntity entity) { Context.Entry(entity).State = EntityState.Detached; }
+    protected override void AttachContext(IUnitOfWork uow) {
+        if (uow is not EfCoreUnitOfWork<TContext> ef) {
+            throw new InvalidOperationException($"UoW of type {
+                uow.GetType()
+            } is not compatible with repository expecting {
+                typeof(TContext)
+            }.");
+        }
+
+        // base.Join has already verified _added/_updated/_removed are empty before calling
+        // this; nothing to roll back on this side.
+        _context.Dispose();
+        _context = ef.Context;
+
+        ef.AddCommitSink(async ct => { await DispatchCommittedAsync(SnapshotChanges(), ct); });
+
+        ef.AddRollbackSink(ResetTracking);
+    }
+
+    protected override void DisposeContext() { _context.Dispose(); }
+
+    protected override ValueTask DisposeContextAsync() { return _context.DisposeAsync(); }
 
     private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -306,8 +322,17 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
 
         var container = AsQueryContainer();
 
-        _ = await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
-                         .RunAsync(AdviceContext, container, ct);
+        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, container, ct)) {
+            case AdviseResult.Continue:
+            case AdviseResult.Handle:
+            default:
+                break;
+            case AdviseResult.Block:
+                container = AsQueryContainer();
+                container.ApplyModification(q => q.Where(_ => false));
+                break;
+        }
 
         return BuildQuery(container.Query, predicate);
     }
