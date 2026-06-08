@@ -1,6 +1,6 @@
 # Query Cache
 
-The `Schemata.Entity.Cache` package adds transparent query caching and automatic eviction to the repository layer via four advisors. Results are serialized to JSON and stored in `ICacheProvider`. Cache keys are derived deterministically from the LINQ expression tree. Eviction is deferred to after the database transaction commits.
+The `Schemata.Entity.Cache` package adds transparent query caching and automatic eviction to the repository layer. Results are serialized to JSON and stored in `ICacheProvider`. Cache keys are derived deterministically from the LINQ expression tree. Eviction runs after a successful repository commit through the committed advisor pipeline.
 
 ## Where the code lives
 
@@ -8,15 +8,14 @@ The `Schemata.Entity.Cache` package adds transparent query caching and automatic
 |---|---|
 | `AdviceQueryCache<,,>` | `src/Schemata.Entity.Cache/Advisors/AdviceQueryCache.cs` |
 | `AdviceResultCache<,,>` | `src/Schemata.Entity.Cache/Advisors/AdviceResultCache.cs` |
-| `AdviceUpdateEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceUpdateEvictCache.cs` |
-| `AdviceRemoveEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceRemoveEvictCache.cs` |
+| `AdviceCommittedEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceCommittedEvictCache.cs` |
 | `ReverseIndex` | `src/Schemata.Entity.Cache/ReverseIndex.cs` |
 | `Stringizing` | `src/Schemata.Entity.Cache/Stringizing.cs` |
 | `PartialEvaluator` | `src/Schemata.Entity.Cache/PartialEvaluator.cs` |
 | `SchemataQueryCacheOptions` | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs` |
 | `UseQueryCache` extension | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
 
-## The four advisors
+## The cache advisors
 
 ### AdviceQueryCache
 
@@ -51,27 +50,20 @@ Runs after the query executes and `context.Result` is populated. Stores the resu
 
 Only single-entity results (where `T == TEntity`) are reverse-indexed. Aggregate queries (`AnyAsync`, `CountAsync`, `LongCountAsync`) and projections (`Select` into a DTO) are cached but not reverse-indexed.
 
-### AdviceUpdateEvictCache
+### AdviceCommittedEvictCache
 
-**Interface:** `IRepositoryUpdateAdvisor<TEntity>`
+**Interface:** `IRepositoryCommittedAdvisor<TEntity>`
 **Order:** 900,000,000 (`SchemataConstants.Orders.Max`)
 
-Runs during the update mutation pipeline. Enqueues cache eviction to run after the commit boundary.
+Runs after a standalone repository commit or unit-of-work commit succeeds. It receives a `CommitChanges<TEntity>` snapshot and evicts cache entries for updated and removed entities. Added entities are ignored.
 
 **Steps:**
 
-1. If `SchemataQueryCacheOptions.EvictionEnabled` is `false`, or if `QueryCacheEvictionSuppressed` is in the advice context, returns `Continue` without enqueuing.
-2. Calls `repository.EnqueueAfterCommit(token => EvictAsync(cache, typeof(TEntity), entity, token))`.
-3. Returns `Continue`.
-
-`EvictAsync` reads all cache keys from the reverse index set via `ICacheProvider.CollectionMembersAsync`, calls `ICacheProvider.RemoveAsync` for each, then clears the reverse index set via `ICacheProvider.CollectionClearAsync`.
-
-### AdviceRemoveEvictCache
-
-**Interface:** `IRepositoryRemoveAdvisor<TEntity>`
-**Order:** 900,000,000 (`SchemataConstants.Orders.Max`)
-
-Mirrors `AdviceUpdateEvictCache` for remove operations. The eviction logic is identical. On soft-delete (where `AdviceRemoveSoftDelete` handles the remove and returns `Handle`), the remove advisor pipeline still runs before `Handle` is returned, so eviction is still enqueued.
+1. If `SchemataQueryCacheOptions.EvictionEnabled` is `false`, or if `QueryCacheEvictionSuppressed` is in the advice context, returns `Continue`.
+2. Iterates `changes.Updated` and `changes.Removed`.
+3. For each entity, calls `ReverseIndex.BuildKey(typeof(TEntity), entity)`.
+4. Reads all cache keys from the reverse index set via `ICacheProvider.CollectionMembersAsync`, calls `ICacheProvider.RemoveAsync` for each, then clears the reverse index set via `ICacheProvider.CollectionClearAsync`.
+5. Returns `Continue`.
 
 ## Reverse index
 
@@ -88,23 +80,17 @@ For single-column primary keys, the key value is formatted via `IFormattable.ToS
 Cache keys for queries are derived from the LINQ expression tree:
 
 1. `PartialEvaluator.Eval` folds captured local variables and other closed sub-expressions to constants, so different values of a captured variable produce different keys.
-2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string:
-   - Lambda parameters are normalized to `_p0`, `_p1`, ... in discovery order.
-   - `IFormattable` values use `InvariantCulture`.
-   - Method calls include `:arity` suffixes to disambiguate overloads.
-   - Static non-extension calls are qualified with their declaring type.
+2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string.
 3. The return type name (`typeof(T).Name`) is appended, separated by `\x1e`.
 4. The combined string is hashed and prefixed with the Schemata domain marker via `ToCacheKey`.
 
 Two queries that produce the same LINQ expression tree and target the same return type share a cache key.
 
-## After-commit eviction
+## Commit-time eviction
 
-`AdviceUpdateEvictCache` and `AdviceRemoveEvictCache` do not evict immediately. They call `repository.EnqueueAfterCommit(...)` so eviction runs only after the database transaction commits successfully.
+Eviction runs after the database commit succeeds. This ordering closes the window where concurrent readers could repopulate the cache with pre-update data after an early eviction but before the database commit.
 
-This ordering matters: if eviction ran before commit and the commit failed, the cache would be empty but the database would still have the old data. Subsequent reads would repopulate the cache with the old data, which is correct. But if eviction ran before commit and the commit succeeded, there is a window where concurrent readers could repopulate the cache with pre-update data. Deferring eviction to after-commit closes this window.
-
-If the transaction rolls back, the after-commit queue is discarded and eviction never runs. The cache retains the pre-mutation entries until TTL expires.
+If the transaction rolls back, committed advisors do not run. The cache retains the pre-mutation entries until TTL expires.
 
 ## Options
 
@@ -113,19 +99,18 @@ If the transaction rolls back, the after-commit queue is discarded and eviction 
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `Ttl` | `TimeSpan` | 5 minutes | Sliding expiration for cached results and reverse-index entries. |
-| `EvictionEnabled` | `bool` | `true` | When `false`, update and remove advisors skip eviction. Query and result advisors remain active; entries live until TTL expires. |
+| `EvictionEnabled` | `bool` | `true` | When `false`, committed eviction is skipped. Query and result advisors remain active; entries live until TTL expires. |
 
 ## Suppression
 
 | Method | Marker | Effect |
 |---|---|---|
 | `repository.SuppressQueryCache()` | `QueryCacheSuppressed` | Skips `AdviceQueryCache` and `AdviceResultCache`. |
-| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceUpdateEvictCache` and `AdviceRemoveEvictCache`. |
+| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache`. |
 
 Use `Once()` to scope suppression to a single call:
 
 ```csharp
-// Bypass cache for a single query
 var fresh = await repository.Once()
     .SuppressQueryCache()
     .FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id), ct);
@@ -138,20 +123,20 @@ services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
-`UseQueryCache` registers all four advisors as open-generic scoped services and registers `SchemataQueryCacheOptions`. A concrete `ICacheProvider` must be registered separately.
+`UseQueryCache` registers query, result, and committed eviction advisors as open-generic scoped services and registers `SchemataQueryCacheOptions`. A concrete `ICacheProvider` must be registered separately.
 
 ## Caveats
 
-- Rollback discards eviction. If the database transaction rolls back, the after-commit queue is discarded and stale cache entries remain until TTL expires.
+- Rollback skips eviction. If the database transaction rolls back, committed advisors do not run and stale cache entries remain until TTL expires.
 - Aggregate queries and projections are cached but not reverse-indexed. They expire only via TTL, not via entity-level eviction.
 - `DistributedCacheProvider` collection operations are single-process safe only. For multi-process deployments, use `RedisCacheProvider`.
 - Cache and database are not atomic together. A crash between database commit and cache eviction leaves stale entries until TTL expires.
 
 ## See also
 
-- [overview.md](overview.md) — `ICacheProvider` abstraction and provider selection
-- [distributed.md](distributed.md) — `DistributedCacheProvider` (single-process safe collection ops)
-- [redis.md](redis.md) — `RedisCacheProvider` (cluster-safe collection ops)
-- [repository/caching.md](../repository/caching.md) — `UseQueryCache()` registration and options
-- [repository/unit-of-work.md](../repository/unit-of-work.md) — `EnqueueAfterCommit` and the after-commit queue
-- [core/advice-pipeline.md](../core/advice-pipeline.md) — `AdviseResult.Handle` semantics
+- [overview.md](overview.md) - `ICacheProvider` abstraction and provider selection
+- [distributed.md](distributed.md) - `DistributedCacheProvider` (single-process safe collection ops)
+- [redis.md](redis.md) - `RedisCacheProvider` (cluster-safe collection ops)
+- [repository/caching.md](../repository/caching.md) - `UseQueryCache()` registration and options
+- [repository/unit-of-work.md](../repository/unit-of-work.md) - explicit enlistment and committed advisors
+- [core/advice-pipeline.md](../core/advice-pipeline.md) - `AdviseResult.Handle` semantics

@@ -18,8 +18,8 @@ public class SchemataJobAuditObserverShould
                     Mock<IRepository<SchemataJobExecution>> executions) Build() {
         var jobs       = new Mock<IRepository<SchemataJob>>();
         var executions = new Mock<IRepository<SchemataJobExecution>>();
-        jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(new ValueTask<int>(0));
-        executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(new ValueTask<int>(0));
+        jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         return (new(jobs.Object, executions.Object), jobs, executions);
     }
 

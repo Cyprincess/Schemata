@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -16,68 +17,117 @@ namespace Schemata.Entity.EntityFrameworkCore;
 public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
     where TContext : DbContext
 {
-    private readonly List<Func<CancellationToken, Task>> _afterCommit = [];
-    private readonly TContext                            _context;
-    private          bool                                _disposed;
+    private readonly IDbContextFactory<TContext>         _factory;
+    private readonly List<Func<CancellationToken, Task>> _committed = [];
+    private readonly List<Action>                        _rollback  = [];
+    private          TContext?                           _context;
     private          IDbContextTransaction?              _transaction;
+    private          bool                                _completed;
+    private          bool                                _disposed;
 
     /// <summary>
     ///     Initializes a new instance of <see cref="EfCoreUnitOfWork{TContext}" />.
     /// </summary>
-    /// <param name="context">The database context.</param>
-    public EfCoreUnitOfWork(TContext context) { _context = context; }
+    /// <param name="factory">The database context factory.</param>
+    public EfCoreUnitOfWork(IDbContextFactory<TContext> factory) { _factory = factory; }
 
     #region IUnitOfWork<TContext> Members
 
-    public bool IsActive => _transaction is not null;
+    public TContext Context
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_completed) {
+                throw new InvalidOperationException("Unit of work already completed. Resolve a new IUnitOfWork instance from a fresh scope to start another transaction.");
+            }
 
-    public void Begin() {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_context is not null) {
+                return _context;
+            }
 
-        if (_transaction is not null) {
-            throw new InvalidOperationException("Unit of work already active.");
+            _context     = _factory.CreateDbContext();
+            _transaction = _context.Database.BeginTransaction();
+
+            return _context;
         }
-
-        _transaction = _context.Database.BeginTransaction();
     }
 
     public async Task CommitAsync(CancellationToken ct = default) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (_transaction is null) {
-            throw new InvalidOperationException("Unit of work not started.");
+        if (_completed) {
+            throw new InvalidOperationException("Unit of work already completed.");
         }
 
-        await _context.SaveChangesAsync(ct);
-        await _transaction.CommitAsync(ct);
-        await _transaction.DisposeAsync();
-        _transaction = null;
+        if (_context is null) {
+            // No repository ever joined / mutated; degenerate commit is a no-op.
+            _completed = true;
+            return;
+        }
 
-        await DrainAfterCommitAsync(ct);
+        try {
+            await _context.SaveChangesAsync(ct);
+            await _transaction!.CommitAsync(ct);
+        } catch {
+            foreach (var reset in _rollback) reset();
+            if (_transaction is not null) {
+                try {
+                    await _transaction.RollbackAsync(CancellationToken.None);
+                } catch {
+                    // Transaction may already be completed; rollback during cleanup must not throw.
+                }
+
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
+
+            _completed = true;
+            _committed.Clear();
+            _rollback.Clear();
+
+            throw;
+        }
+
+        await _transaction!.DisposeAsync();
+        _transaction = null;
+        _completed   = true;
+
+        List<Exception>? errors = null;
+        foreach (var sink in _committed) {
+            try {
+                await sink(ct);
+            } catch (Exception ex) {
+                (errors ??= []).Add(ex);
+            }
+        }
+
+        _committed.Clear();
+        _rollback.Clear();
+
+        if (errors is not null) {
+            throw errors.Count == 1 ? errors.First() : new AggregateException(errors);
+        }
     }
 
     public async Task RollbackAsync(CancellationToken ct = default) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-
-        _afterCommit.Clear();
-
-        if (_transaction is null) {
+        if (_completed) {
             return;
         }
 
-        await _transaction.RollbackAsync(ct);
-        await _transaction.DisposeAsync();
-        _transaction = null;
-    }
-
-    public void EnqueueAfterCommit(Func<CancellationToken, Task> action) {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (action is null) {
-            throw new ArgumentNullException(nameof(action));
+        foreach (var reset in _rollback) {
+            reset();
         }
 
-        _afterCommit.Add(action);
+        if (_transaction is not null) {
+            await _transaction.RollbackAsync(ct);
+            await _transaction.DisposeAsync();
+            _transaction = null;
+        }
+
+        _committed.Clear();
+        _rollback.Clear();
+        _completed = true;
     }
 
     public void Dispose() {
@@ -85,45 +135,68 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
             return;
         }
 
-        _disposed = true;
-        _afterCommit.Clear();
+        if (!_completed) {
+            foreach (var reset in _rollback) reset();
+            if (_transaction is not null) {
+                try {
+                    _transaction.Rollback();
+                } catch {
+                    // Transaction may already be completed; rollback during cleanup must not throw.
+                }
 
-        if (_transaction is not null) {
-            try {
-                _transaction.Rollback();
-            } catch {
-                // Suppress rollback failures during Dispose; the transaction may already be
-                // completed (committed or rolled back) elsewhere. Dispose must not throw.
+                _transaction.Dispose();
+                _transaction = null;
             }
 
-            _transaction.Dispose();
-            _transaction = null;
+            _completed = true;
         }
 
+        _committed.Clear();
+        _rollback.Clear();
+
+        _context?.Dispose();
+        _context = null;
+
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync() {
+        if (_disposed) {
+            return;
+        }
+
+        if (!_completed) {
+            foreach (var reset in _rollback) reset();
+            if (_transaction is not null) {
+                try {
+                    await _transaction.RollbackAsync();
+                } catch {
+                    // Transaction may already be completed; rollback during cleanup must not throw.
+                }
+
+                await _transaction.DisposeAsync();
+                _transaction = null;
+            }
+
+            _completed = true;
+        }
+
+        _committed.Clear();
+        _rollback.Clear();
+
+        if (_context is not null) {
+            await _context.DisposeAsync();
+            _context = null;
+        }
+
+        _disposed = true;
         GC.SuppressFinalize(this);
     }
 
     #endregion
 
-    private async Task DrainAfterCommitAsync(CancellationToken ct) {
-        if (_afterCommit.Count == 0) {
-            return;
-        }
+    internal void AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
 
-        var pending = _afterCommit.ToArray();
-        _afterCommit.Clear();
-
-        List<Exception>? errors = null;
-        foreach (var action in pending) {
-            try {
-                await action(ct);
-            } catch (Exception ex) {
-                (errors ??= []).Add(ex);
-            }
-        }
-
-        if (errors is not null) {
-            throw errors.Count == 1 ? errors[0] : new AggregateException(errors);
-        }
-    }
+    internal void AddRollbackSink(Action reset) { _rollback.Add(reset); }
 }

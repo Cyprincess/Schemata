@@ -65,7 +65,7 @@ Application code / ResourceOperationHandler
 IRepository<TEntity>
         |
 AdviceQueryCache / AdviceResultCache        (query pipeline)
-AdviceUpdateEvictCache / AdviceRemoveEvictCache  (mutation pipeline)
+AdviceCommittedEvictCache                 (committed pipeline)
         |
 ICacheProvider
         |
@@ -89,5 +89,5 @@ The collection surface exists because the reverse index (mapping entity primary 
 
 - [distributed.md](distributed.md) — `DistributedCacheProvider` and `IndexLocks` details
 - [redis.md](redis.md) — `RedisCacheProvider` and sliding expiration via metadata key
-- [query-cache.md](query-cache.md) — four query cache advisors, reverse index, and after-commit eviction
+- [query-cache.md](query-cache.md) — query cache advisors, reverse index, and committed eviction
 - [repository/caching.md](../repository/caching.md) — `UseQueryCache()` registration and options

@@ -21,7 +21,8 @@ public class IntegrationFixture : IAsyncLifetime
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
 
-        services.AddDbContext<TestDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath}"));
+        services.AddDbContextFactory<TestDbContext>(
+            opts => opts.UseSqlite($"Data Source={_dbPath}"));
 
         services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
         services.AddRepository<Course, EntityFrameworkCoreRepository<TestDbContext, Course>>();

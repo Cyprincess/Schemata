@@ -5,14 +5,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
 
@@ -36,12 +35,12 @@ public abstract class RepositoryBase
     public static IReadOnlyList<PropertyInfo> ResolveKeyProperties(Type type) {
         var properties = TypePropertiesCache(type);
 
-        var classKey = type.GetCustomAttribute<PrimaryKeyAttribute>(true);
-        if (classKey is not null) {
-            var byName   = properties.ToDictionary(p => p.Name, StringComparer.Ordinal);
+        var primary = type.GetCustomAttribute<PrimaryKeyAttribute>(true);
+        if (primary is not null) {
+            var map      = properties.ToDictionary(p => p.Name, StringComparer.Ordinal);
             var resolved = new List<PropertyInfo>();
-            foreach (var name in classKey.PropertyNames) {
-                if (byName.TryGetValue(name, out var prop)) {
+            foreach (var name in primary.PropertyNames) {
+                if (map.TryGetValue(name, out var prop)) {
                     resolved.Add(prop);
                 } else {
                     resolved.Clear();
@@ -105,163 +104,29 @@ public abstract class RepositoryBase
 ///     to abstract/virtual methods that concrete providers must implement.
 /// </summary>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
-public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>, IRepository
+public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEntity>
     where TEntity : class
 {
-    private readonly List<Func<CancellationToken, Task>> _afterCommit = [];
+    private readonly List<TEntity> _added   = [];
+    private readonly List<TEntity> _removed = [];
+    private readonly List<TEntity> _updated = [];
+    private          bool          _disposed;
 
-    protected RepositoryBase(IServiceProvider sp, IUnitOfWork? uow = null) {
+    protected RepositoryBase(IServiceProvider sp) {
         ServiceProvider = sp;
-        UnitOfWork      = uow;
         AdviceContext   = new(sp);
     }
 
     protected virtual IServiceProvider ServiceProvider { get; }
 
-    protected virtual IUnitOfWork? UnitOfWork { get; }
-
-    protected async Task DrainAfterCommitAsync(CancellationToken ct) {
-        if (_afterCommit.Count == 0) {
-            return;
-        }
-
-        var pending = _afterCommit.ToArray();
-        _afterCommit.Clear();
-
-        List<Exception>? errors = null;
-        foreach (var action in pending) {
-            try {
-                await action(ct);
-            } catch (Exception ex) {
-                (errors ??= []).Add(ex);
-            }
-        }
-
-        if (errors is not null) {
-            throw errors.Count == 1 ? errors[0] : new AggregateException(errors);
-        }
-    }
-
-    #region IRepository Members
-
-    AdviceContext IRepository.AdviceContext => AdviceContext;
-
-    IUnitOfWork IRepository.BeginWork() { return BeginWork(); }
-
-    async IAsyncEnumerable<object> IRepository.ListAsync<T>(
-        Expression<Func<T, bool>>?                 predicate,
-        [EnumeratorCancellation] CancellationToken ct
-    ) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        await foreach (var item in ListAsync(expression).WithCancellation(ct)) {
-            ct.ThrowIfCancellationRequested();
-            yield return item;
-        }
-    }
-
-    async IAsyncEnumerable<object> IRepository.SearchAsync<T>(
-        Expression<Func<T, bool>>?                 predicate,
-        [EnumeratorCancellation] CancellationToken ct
-    ) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        await foreach (var item in SearchAsync(expression).WithCancellation(ct)) {
-            ct.ThrowIfCancellationRequested();
-            yield return item;
-        }
-    }
-
-    async ValueTask<object?> IRepository.FirstOrDefaultAsync<T>(
-        Expression<Func<T, bool>>? predicate,
-        CancellationToken          ct
-    ) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        return await FirstOrDefaultAsync(expression, ct);
-    }
-
-    async ValueTask<object?> IRepository.SingleOrDefaultAsync<T>(
-        Expression<Func<T, bool>>? predicate,
-        CancellationToken          ct
-    ) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        return await SingleOrDefaultAsync(expression, ct);
-    }
-
-    ValueTask<bool> IRepository.AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        return AnyAsync(expression, ct);
-    }
-
-    ValueTask<int> IRepository.CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        return CountAsync(expression, ct);
-    }
-
-    ValueTask<long> IRepository.LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct) {
-        var query = Predicate.Cast<T, TEntity>(predicate);
-
-        Func<IQueryable<TEntity>, IQueryable<TEntity>> expression = query is not null ? q => q.Where(query) : q => q;
-
-        return LongCountAsync(expression, ct);
-    }
-
-    Task IRepository.AddAsync(object entity, CancellationToken ct) { return AddAsync(Cast(entity), ct); }
-
-    Task IRepository.UpdateAsync(object entity, CancellationToken ct) { return UpdateAsync(Cast(entity), ct); }
-
-    Task IRepository.RemoveAsync(object entity, CancellationToken ct) { return RemoveAsync(Cast(entity), ct); }
-
-    void IRepository.Detach(object entity) { Detach(Cast(entity)); }
-
-    void IRepository.EnqueueAfterCommit(Func<CancellationToken, Task> action) { EnqueueAfterCommit(action); }
-
-    IRepository IRepository.Once() { return (IRepository)Once(); }
-
-    IRepository IRepository.SuppressAddValidation() { return (IRepository)SuppressAddValidation(); }
-
-    IRepository IRepository.SuppressUpdateValidation() { return (IRepository)SuppressUpdateValidation(); }
-
-    IRepository IRepository.SuppressConcurrency() { return (IRepository)SuppressConcurrency(); }
-
-    IRepository IRepository.SuppressQuerySoftDelete() { return (IRepository)SuppressQuerySoftDelete(); }
-
-    IRepository IRepository.SuppressSoftDelete() { return (IRepository)SuppressSoftDelete(); }
-
-    IRepository IRepository.SuppressTimestamp() { return (IRepository)SuppressTimestamp(); }
-
-    #endregion
+    /// <summary><see langword="true" /> when the repository owns its context's lifetime.</summary>
+    protected bool OwnsContext { get; set; } = true;
 
     #region IRepository<TEntity> Members
 
     public virtual AdviceContext AdviceContext { get; }
 
-    public abstract IAsyncEnumerable<TEntity> AsAsyncEnumerable();
-
-    public abstract IQueryable<TEntity> AsQueryable();
-
     public abstract IAsyncEnumerable<TResult> ListAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    );
-
-    public abstract IAsyncEnumerable<TResult> SearchAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     );
@@ -373,80 +238,108 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     }
 
     /// <inheritdoc cref="IRepository{TEntity}.CommitAsync" />
-    public abstract ValueTask<int> CommitAsync(CancellationToken ct = default);
+    public abstract Task CommitAsync(CancellationToken ct = default);
 
-    /// <inheritdoc cref="IRepository{TEntity}.EnqueueAfterCommit" />
-    public virtual void EnqueueAfterCommit(Func<CancellationToken, Task> action) {
-        if (action is null) {
-            throw new ArgumentNullException(nameof(action));
+    public virtual IDisposable SuppressAddValidation()    { return AdviceContext.Use<AddValidationSuppressed>(); }
+    public virtual IDisposable SuppressUpdateValidation() { return AdviceContext.Use<UpdateValidationSuppressed>(); }
+    public virtual IDisposable SuppressConcurrency()      { return AdviceContext.Use<ConcurrencySuppressed>(); }
+    public virtual IDisposable SuppressQuerySoftDelete()  { return AdviceContext.Use<QuerySoftDeleteSuppressed>(); }
+    public virtual IDisposable SuppressSoftDelete()       { return AdviceContext.Use<SoftDeleteSuppressed>(); }
+    public virtual IDisposable SuppressTimestamp()        { return AdviceContext.Use<TimestampSuppressed>(); }
+
+    /// <inheritdoc cref="IRepository{TEntity}.Join" />
+    public virtual void Join(IUnitOfWork uow) {
+        ArgumentNullException.ThrowIfNull(uow);
+        if (!OwnsContext) {
+            throw new InvalidOperationException("Repository is already enlisted in a unit of work.");
         }
 
-        if (UnitOfWork is { IsActive: true }) {
-            UnitOfWork.EnqueueAfterCommit(action);
-            return;
-        }
-
-        _afterCommit.Add(action);
-    }
-
-    public abstract void Detach(TEntity entity);
-
-    public virtual IRepository<TEntity> Once() {
-        var type = GetType();
-        return (IRepository<TEntity>)ActivatorUtilities.CreateInstance(ServiceProvider, type);
-    }
-
-    public virtual IRepository<TEntity> SuppressAddValidation() {
-        AdviceContext.Set<AddValidationSuppressed>(null);
-        return this;
-    }
-
-    public virtual IRepository<TEntity> SuppressUpdateValidation() {
-        AdviceContext.Set<UpdateValidationSuppressed>(null);
-        return this;
-    }
-
-    public virtual IRepository<TEntity> SuppressConcurrency() {
-        AdviceContext.Set<ConcurrencySuppressed>(null);
-        return this;
-    }
-
-    public virtual IRepository<TEntity> SuppressQuerySoftDelete() {
-        AdviceContext.Set<QuerySoftDeleteSuppressed>(null);
-        return this;
-    }
-
-    public virtual IRepository<TEntity> SuppressSoftDelete() {
-        AdviceContext.Set<SoftDeleteSuppressed>(null);
-        return this;
-    }
-
-    public virtual IRepository<TEntity> SuppressTimestamp() {
-        AdviceContext.Set<TimestampSuppressed>(null);
-        return this;
-    }
-
-    public virtual IUnitOfWork BeginWork() {
-        if (UnitOfWork is null) {
+        if (_added.Count > 0 || _updated.Count > 0 || _removed.Count > 0) {
             throw new InvalidOperationException(
-                "IUnitOfWork not registered. Call `.WithUnitOfWork<TContext>()` during configuration.");
+                "Cannot enlist a repository with uncommitted work. "
+              + "Call CommitAsync before Join, or resolve a fresh IRepository<T> instance.");
         }
 
-        UnitOfWork.Begin();
-        return UnitOfWork;
+        AttachContext(uow);
+        OwnsContext = false;
+    }
+
+    public void Dispose() {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (OwnsContext) DisposeContext();
+
+        _added.Clear();
+        _updated.Clear();
+        _removed.Clear();
+
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync() {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (OwnsContext) await DisposeContextAsync();
+
+        _added.Clear();
+        _updated.Clear();
+        _removed.Clear();
+
+        GC.SuppressFinalize(this);
     }
 
     #endregion
 
-    private static TEntity Cast(object entity) {
-        if (entity is not TEntity typed) {
-            throw new ArgumentException(
-                $"Entity of type '{entity.GetType()}' cannot be operated on by IRepository<{typeof(TEntity)}>.",
-                nameof(entity));
-        }
+    /// <summary>
+    ///     Captures the current add/update/remove tracking lists into a snapshot and then clears
+    ///     them so the next commit starts with empty lists.
+    /// </summary>
+    protected CommitChanges<TEntity> SnapshotChanges() {
+        var snapshot = new CommitChanges<TEntity> {
+            Added = _added.ToArray(), Updated = _updated.ToArray(), Removed = _removed.ToArray(),
+        };
 
-        return typed;
+        _added.Clear();
+        _updated.Clear();
+        _removed.Clear();
+
+        return snapshot;
     }
+
+    /// <summary>
+    ///     Runs the <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipeline against the
+    ///     given change snapshot.
+    /// </summary>
+    protected async Task DispatchCommittedAsync(CommitChanges<TEntity> changes, CancellationToken ct) {
+        await Advisor.For<IRepositoryCommittedAdvisor<TEntity>>()
+                     .RunAsync(AdviceContext, this, changes, ct);
+    }
+
+    /// <summary>
+    ///     Clears the add/update/remove tracking lists without dispatching. Called on rollback.
+    /// </summary>
+    protected void ResetTracking() {
+        _added.Clear();
+        _updated.Clear();
+        _removed.Clear();
+    }
+
+    protected void TrackAdd(TEntity entity) { _added.Add(entity); }
+
+    protected void TrackUpdate(TEntity entity) { _updated.Add(entity); }
+
+    protected void TrackRemove(TEntity entity) { _removed.Add(entity); }
+
+    protected abstract IQueryable<TEntity> AsQueryable();
+
+    /// <summary>
+    ///     Replaces the repository's owned context with the UoW's context. The base
+    ///     <see cref="Join" /> sets <see cref="OwnsContext" /> to <see langword="false" />
+    ///     after this call returns.
+    /// </summary>
+    protected abstract void AttachContext(IUnitOfWork uow);
 
     protected virtual QueryContainer<TEntity> AsQueryContainer() {
         var query = AsQueryable();
@@ -465,5 +358,12 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         }
 
         return query.OfType<TResult>();
+    }
+
+    protected abstract void DisposeContext();
+
+    protected virtual ValueTask DisposeContextAsync() {
+        DisposeContext();
+        return ValueTask.CompletedTask;
     }
 }

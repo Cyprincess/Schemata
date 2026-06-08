@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
@@ -9,10 +9,22 @@ using Schemata.Entity.Repository.Advisors;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Type-erased repository interface providing a common service type for dependency
-///     injection. Members mirror <see cref="IRepository{TEntity}" /> with untyped signatures.
+///     Generic repository interface providing strongly-typed CRUD operations with an
+///     advisor pipeline. All query methods route through build-query advisors
+///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />); mutation methods
+///     route through add, update, or remove advisors respectively.
 /// </summary>
-public interface IRepository
+/// <remarks>
+///     Provider-specific behavior for pre-commit reads: EF Core does not surface
+///     uncommitted writes through LINQ queries because mutations are buffered in the
+///     change tracker until <see cref="CommitAsync" /> flushes them. LinqToDB does
+///     surface uncommitted writes within the active transaction (read-your-own-writes).
+///     Both providers behave identically after <see cref="CommitAsync" />.
+/// </remarks>
+/// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
+public interface IRepository<TEntity>
+    : IAsyncDisposable, IDisposable
+    where TEntity : class
 {
     /// <summary>
     ///     Carries the advice context that gates advisor execution and holds suppression
@@ -22,75 +34,115 @@ public interface IRepository
 
     /// <summary>
     ///     Enumerates entities through the build-query advisor pipeline
-    ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />), returning results
-    ///     as untyped objects.
+    ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />), projected by the
+    ///     predicate.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">
-    ///     An optional filter expression. When <see langword="null" />, all entities of type
-    ///     <typeparamref name="T" /> are returned.
+    ///     An optional query transformation. When <see langword="null" />, this is equivalent
+    ///     to calling <see cref="Queryable.OfType{TResult}" /> on the advisor-processed queryable.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
-    IAsyncEnumerable<object> ListAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    IAsyncEnumerable<TResult> ListAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
 
     /// <summary>
-    ///     Searches entities through provider-specific full-text search.
+    ///     Retrieves an entity by matching its key property values against the provided
+    ///     entity instance.
     /// </summary>
-    /// <remarks>
-    ///     Built-in EF Core and LINQ to DB providers do not implement full-text search; callers
-    ///     should use <see cref="ListAsync{T}" /> with a filter expression instead. Custom
-    ///     providers may override <see cref="IRepository{TEntity}.SearchAsync{TResult}" /> to
-    ///     opt into provider-native search semantics.
-    /// </remarks>
-    /// <typeparam name="T">The entity type to search.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <param name="entity">
+    ///     An entity whose key properties are used to build the lookup. Only key values
+    ///     are considered; other fields are ignored.
+    /// </param>
     /// <param name="ct">A cancellation token.</param>
-    IAsyncEnumerable<object> SearchAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    /// <returns>The matching entity or <see langword="null" />.</returns>
+    ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the first matching entity or <see langword="null" />, applying build-query
-    ///     advisors.
+    ///     Retrieves an entity by its keys and projects it to <typeparamref name="TResult" />.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="entity">An entity whose key properties are used to build the lookup.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<object?> FirstOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the single matching entity or <see langword="null" />, applying build-query
-    ///     advisors.
+    ///     Finds an entity by its primary key values.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <param name="keys">The primary key values in property declaration order.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<object?> SingleOrDefaultAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns <see langword="true" /> if any entity matches the predicate, after build-query
+    ///     Finds an entity by its primary key values and projects it to
+    ///     <typeparamref name="TResult" />.
+    /// </summary>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="keys">The primary key values in property declaration order.</param>
+    /// <param name="ct">A cancellation token.</param>
+    ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Returns the first matching result or <see langword="null" />, after build-query
     ///     advisors are applied.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<bool> AnyAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
+
+    /// <summary>
+    ///     Returns the single matching result or <see langword="null" />, after build-query
+    ///     advisors are applied.
+    /// </summary>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
+    /// <param name="ct">A cancellation token.</param>
+    ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
+
+    /// <summary>
+    ///     Returns <see langword="true" /> if any entity matches the predicate, after
+    ///     build-query advisors are applied.
+    /// </summary>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
+    /// <param name="ct">A cancellation token.</param>
+    ValueTask<bool> AnyAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
 
     /// <summary>
     ///     Returns the count of entities matching the predicate, after build-query advisors
     ///     are applied.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<int> CountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<int> CountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
 
     /// <summary>
     ///     Returns the long count of entities matching the predicate, after build-query
     ///     advisors are applied.
     /// </summary>
-    /// <typeparam name="T">The entity type to query.</typeparam>
-    /// <param name="predicate">An optional filter expression.</param>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<long> LongCountAsync<T>(Expression<Func<T, bool>>? predicate, CancellationToken ct = default);
+    ValueTask<long> LongCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    );
 
     /// <summary>
     ///     Drives the entity through the add advisor pipeline
@@ -98,15 +150,22 @@ public interface IRepository
     /// </summary>
     /// <param name="entity">The entity to persist.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddAsync(object entity, CancellationToken ct = default);
+    Task AddAsync(TEntity entity, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Drives each entity through the add advisor pipeline before persistence.
+    /// </summary>
+    /// <param name="entities">The entities to persist.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 
     /// <summary>
     ///     Drives the entity through the update advisor pipeline
     ///     (see <see cref="IRepositoryUpdateAdvisor{TEntity}" />) before persistence.
     /// </summary>
-    /// <param name="entity">The entity to persist.</param>
+    /// <param name="entity">The entity to persist with updated values.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task UpdateAsync(object entity, CancellationToken ct = default);
+    Task UpdateAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Drives the entity through the remove advisor pipeline
@@ -117,56 +176,67 @@ public interface IRepository
     /// </summary>
     /// <param name="entity">The entity to remove.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RemoveAsync(object entity, CancellationToken ct = default);
+    Task RemoveAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
-    ///     Begins a new unit of work for this repository, creating a database transaction
-    ///     that coordinates all subsequent operations on this and related repositories.
+    ///     Drives each entity through the remove advisor pipeline.
     /// </summary>
-    /// <returns>A disposable unit of work that must be committed or rolled back.</returns>
-    IUnitOfWork BeginWork();
+    /// <param name="entities">The entities to remove.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Enlists this repository in a unit of work.
+    /// </summary>
+    /// <remarks>
+    ///     The unit of work's transaction opens lazily on the first access of its data
+    ///     context; <see cref="Join" /> triggers that access. Subsequent enlistments
+    ///     of additional repositories share the same context and transaction. Throws
+    ///     <see cref="InvalidOperationException" /> when this repository is already
+    ///     enlisted or carries uncommitted standalone work.
+    /// </remarks>
+    /// <param name="uow">The unit of work to join.</param>
+    void Join(IUnitOfWork uow);
 
     /// <summary>
     ///     Persists all pending changes to the underlying data store.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The number of rows affected.</returns>
-    ValueTask<int> CommitAsync(CancellationToken ct = default);
+    Task CommitAsync(CancellationToken ct = default);
 
     /// <summary>
-    ///     Enqueues an action to run after the next successful commit boundary —
-    ///     <see cref="IUnitOfWork.CommitAsync" /> if a unit of work is active, otherwise
-    ///     <see cref="CommitAsync" /> on this repository.
+    ///     Suppresses the add-side validation advisor for the duration of the returned
+    ///     scope. Disposing the returned handle restores the previous state.
     /// </summary>
-    /// <remarks>
-    ///     Used by advisors (e.g., cache eviction) that must observe a successful persistence
-    ///     boundary before acting. Discarded on rollback or dispose.
-    /// </remarks>
-    /// <param name="action">The action to execute.</param>
-    void EnqueueAfterCommit(Func<CancellationToken, Task> action);
+    IDisposable SuppressAddValidation();
 
     /// <summary>
-    ///     Detaches an entity from the change tracker so subsequent mutations are not persisted.
+    ///     Suppresses the update-side validation advisor for the duration of the returned
+    ///     scope. Disposing the returned handle restores the previous state.
     /// </summary>
-    /// <param name="entity">The entity to detach.</param>
-    void Detach(object entity);
+    IDisposable SuppressUpdateValidation();
 
     /// <summary>
-    ///     Creates a new repository instance with a fresh <see cref="AdviceContext" />,
-    ///     isolating any subsequent <c>Suppress*</c> calls.
+    ///     Suppresses the concurrency-token advisors (add and update) for the duration of
+    ///     the returned scope. Disposing the returned handle restores the previous state.
     /// </summary>
-    /// <returns>A new <see cref="IRepository" /> instance.</returns>
-    IRepository Once();
+    IDisposable SuppressConcurrency();
 
-    IRepository SuppressAddValidation();
+    /// <summary>
+    ///     Suppresses the soft-delete filter on build-query for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressQuerySoftDelete();
 
-    IRepository SuppressUpdateValidation();
+    /// <summary>
+    ///     Suppresses the soft-delete behavior on add and remove for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressSoftDelete();
 
-    IRepository SuppressConcurrency();
-
-    IRepository SuppressQuerySoftDelete();
-
-    IRepository SuppressSoftDelete();
-
-    IRepository SuppressTimestamp();
+    /// <summary>
+    ///     Suppresses the timestamp advisors (add and update) for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressTimestamp();
 }

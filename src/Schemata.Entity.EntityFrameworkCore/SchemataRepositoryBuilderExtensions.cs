@@ -22,17 +22,15 @@ public static class SchemataRepositoryBuilderExtensions
     /// </typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">Optional callback to configure <see cref="DbContextOptionsBuilder" /> per service provider.</param>
-    /// <param name="contextLifetime">The service lifetime for the context (defaults to <see cref="ServiceLifetime.Scoped" />).</param>
-    /// <param name="optionsLifetime">The service lifetime for the options (defaults to <see cref="ServiceLifetime.Scoped" />).</param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseEntityFrameworkCore<TContext>(
         this SchemataRepositoryBuilder                     builder,
-        Action<IServiceProvider, DbContextOptionsBuilder>? configure,
-        ServiceLifetime                                    contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped
+        Action<IServiceProvider, DbContextOptionsBuilder>? configure
     )
         where TContext : DbContext {
-        builder.Services.AddDbContext<TContext, TContext>(configure, contextLifetime, optionsLifetime);
+        configure ??= (_, _) => { };
+
+        builder.Services.AddDbContextFactory<TContext>(configure);
 
         return builder;
     }
@@ -45,21 +43,15 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContextImplementation">The implementation type for the context.</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">Optional callback to configure <see cref="DbContextOptionsBuilder" /> per service provider.</param>
-    /// <param name="contextLifetime">The service lifetime for the context (defaults to <see cref="ServiceLifetime.Scoped" />).</param>
-    /// <param name="optionsLifetime">The service lifetime for the options (defaults to <see cref="ServiceLifetime.Scoped" />).</param>
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseEntityFrameworkCore<TContextService, TContextImplementation>(
         this SchemataRepositoryBuilder                     builder,
-        Action<IServiceProvider, DbContextOptionsBuilder>? configure,
-        ServiceLifetime                                    contextLifetime = ServiceLifetime.Scoped,
-        ServiceLifetime                                    optionsLifetime = ServiceLifetime.Scoped
+        Action<IServiceProvider, DbContextOptionsBuilder>? configure
     )
         where TContextImplementation : DbContext, TContextService {
-        builder.Services.AddDbContext<TContextService, TContextImplementation>(
-            configure,
-            contextLifetime,
-            optionsLifetime
-        );
+        configure ??= (_, _) => { };
+
+        builder.Services.AddDbContextFactory<TContextImplementation>(configure);
 
         return builder;
     }

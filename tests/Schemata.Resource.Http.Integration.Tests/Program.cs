@@ -23,7 +23,8 @@ builder.UseSchemata(schema => {
     schema.Services.AddDistributedCache();
 
     var dbName = "integration-" + Guid.NewGuid();
-    schema.Services.AddDbContext<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
+    schema.Services.AddDbContextFactory<TestDbContext>(
+        opts => opts.UseInMemoryDatabase(dbName));
 
     schema.Services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
 

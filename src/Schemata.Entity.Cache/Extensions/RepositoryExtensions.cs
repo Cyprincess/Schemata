@@ -1,62 +1,43 @@
+using System;
 using Schemata.Entity.Cache.Advisors;
 
 // ReSharper disable once CheckNamespace
 namespace Schemata.Entity.Repository;
 
 /// <summary>
-///     Extension methods for <see cref="IRepository" /> and <see cref="IRepository{TEntity}" />
-///     providing cache suppression.
+///     Extension methods for <see cref="IRepository{TEntity}" /> providing scoped
+///     suppression of the query-cache advisors.
 /// </summary>
 public static class RepositoryExtensions
 {
     /// <summary>
-    ///     Suppresses query-level caching for this repository instance.
-    ///     Sets <see cref="QueryCacheSuppressed" /> in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" />,
-    ///     which causes <see cref="AdviceQueryCache{TEntity,TResult,T}" /> and
-    ///     <see cref="AdviceResultCache{TEntity,TResult,T}" /> to skip their cache operations.
-    /// </summary>
-    /// <param name="repository">The repository instance.</param>
-    /// <returns>The same repository instance for chaining.</returns>
-    public static IRepository SuppressQueryCache(this IRepository repository) {
-        repository.AdviceContext.Set<QueryCacheSuppressed>(null);
-        return repository;
-    }
-
-    /// <summary>
-    ///     Suppresses query-level caching for this repository instance.
-    /// </summary>
-    /// <typeparam name="TEntity">The entity type.</typeparam>
-    /// <param name="repository">The repository instance.</param>
-    /// <returns>The same repository instance for chaining.</returns>
-    public static IRepository<TEntity> SuppressQueryCache<TEntity>(this IRepository<TEntity> repository)
-        where TEntity : class {
-        repository.AdviceContext.Set<QueryCacheSuppressed>(null);
-        return repository;
-    }
-
-    /// <summary>
-    ///     Suppresses cache eviction during update and remove on this repository instance.
-    ///     Sets <see cref="QueryCacheEvictionSuppressed" /> in the
+    ///     Suppresses query-level caching for the duration of the returned scope.
+    ///     Sets <see cref="QueryCacheSuppressed" /> in the
     ///     <see cref="Schemata.Abstractions.Advisors.AdviceContext" />, which causes
-    ///     <see cref="AdviceUpdateEvictCache{TEntity}" /> and
-    ///     <see cref="AdviceRemoveEvictCache{TEntity}" /> to skip eviction.
-    /// </summary>
-    /// <param name="repository">The repository instance.</param>
-    /// <returns>The same repository instance for chaining.</returns>
-    public static IRepository SuppressQueryCacheEviction(this IRepository repository) {
-        repository.AdviceContext.Set<QueryCacheEvictionSuppressed>(null);
-        return repository;
-    }
-
-    /// <summary>
-    ///     Suppresses cache eviction during update and remove on this repository instance.
+    ///     <see cref="AdviceQueryCache{TEntity,TResult,T}" /> and
+    ///     <see cref="AdviceResultCache{TEntity,TResult,T}" /> to skip their cache
+    ///     operations. Disposing the returned handle restores the previous state.
     /// </summary>
     /// <typeparam name="TEntity">The entity type.</typeparam>
     /// <param name="repository">The repository instance.</param>
-    /// <returns>The same repository instance for chaining.</returns>
-    public static IRepository<TEntity> SuppressQueryCacheEviction<TEntity>(this IRepository<TEntity> repository)
+    /// <returns>A disposable that restores the prior state.</returns>
+    public static IDisposable SuppressQueryCache<TEntity>(this IRepository<TEntity> repository)
         where TEntity : class {
-        repository.AdviceContext.Set<QueryCacheEvictionSuppressed>(null);
-        return repository;
+        return repository.AdviceContext.Use<QueryCacheSuppressed>();
+    }
+
+    /// <summary>
+    ///     Suppresses cache eviction during the committed-advisor pipeline for the duration
+    ///     of the returned scope. Sets <see cref="QueryCacheEvictionSuppressed" /> in the
+    ///     <see cref="Schemata.Abstractions.Advisors.AdviceContext" />, which causes
+    ///     <see cref="AdviceCommittedEvictCache{TEntity}" /> to skip eviction.
+    ///     Disposing the returned handle restores the previous state.
+    /// </summary>
+    /// <typeparam name="TEntity">The entity type.</typeparam>
+    /// <param name="repository">The repository instance.</param>
+    /// <returns>A disposable that restores the prior state.</returns>
+    public static IDisposable SuppressQueryCacheEviction<TEntity>(this IRepository<TEntity> repository)
+        where TEntity : class {
+        return repository.AdviceContext.Use<QueryCacheEvictionSuppressed>();
     }
 }

@@ -71,8 +71,7 @@ public sealed class AdviceBuildQueryOwner<TEntity> : IRepositoryBuildQueryAdviso
             case OnNullOwnerPolicy.Reject:
                 throw new AuthorizationException();
             case OnNullOwnerPolicy.EmptyResult:
-                container.ApplyModification(q => q.Where(_ => false));
-                return AdviseResult.Continue;
+                return AdviseResult.Block;
             case OnNullOwnerPolicy.AllowAll:
             default:
                 return AdviseResult.Continue;

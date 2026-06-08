@@ -45,7 +45,7 @@ The data access layer.
 | [Overview](repository/overview.md) | IRepository surfaces, Once(), Suppress*() methods |
 | [Mutation Pipeline](repository/mutation-pipeline.md) | Add/Update/Remove advisor chains |
 | [Query Pipeline](repository/query-pipeline.md) | BuildQuery/Query/Result advisor chains |
-| [Unit of Work](repository/unit-of-work.md) | BeginWork semantics, EnqueueAfterCommit |
+| [Unit of Work](repository/unit-of-work.md) | Explicit enlistment and committed advisors |
 | [Caching](repository/caching.md) | Query result caching, cross-link to caching section |
 | [Ownership](repository/ownership.md) | Schemata.Entity.Owner, IOwnable |
 | [Providers](repository/providers.md) | EF Core and LinqToDB setup, Detach before Update, search-path gaps |
@@ -59,7 +59,7 @@ The distributed cache layer.
 | [Overview](caching/overview.md) | ICacheProvider, key format, layer stack |
 | [Distributed](caching/distributed.md) | DistributedCacheProvider, index locks |
 | [Redis](caching/redis.md) | RedisCacheProvider, meta key TTL refresh |
-| [Query Cache](caching/query-cache.md) | Four advisors, reverse index, after-commit eviction |
+| [Query Cache](caching/query-cache.md) | Query/result advisors, reverse index, committed eviction |
 
 ### Resource
 

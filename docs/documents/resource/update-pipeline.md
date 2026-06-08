@@ -92,7 +92,7 @@ await _repository.UpdateAsync(entity, ct)
 await _repository.CommitAsync(ct)
 ```
 
-The entity is updated in the repository and committed. `EntityFrameworkCoreRepository.UpdateAsync` calls `Detach(entity)` before `Context.Update(entity)` to clear any tracker entry left by an earlier load — the resource pipeline itself loaded the row at stage 5, a repository-layer advisor may have queried it again, and other code in the same scope may have touched it. See [Detach before Update](../repository/providers.md#detach-before-update).
+The entity is updated in the repository and committed. `EntityFrameworkCoreRepository.UpdateAsync` calls `Detach(entity)` before `Context.Update(entity)` to clear any tracker entry left by an earlier load in the same provider context. See [Detach before Update](../repository/providers.md#detach-before-update).
 
 ### Stage 9: Response mapping and advisors
 

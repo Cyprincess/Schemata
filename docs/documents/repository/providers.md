@@ -7,7 +7,7 @@ A repository provider is the concrete `RepositoryBase<TEntity>` implementation t
 | Item | Path |
 |---|---|
 | `EntityFrameworkCoreRepository<TContext,TEntity>` | `src/Schemata.Entity.EntityFrameworkCore/EntityFrameworkCoreRepository.cs` |
-| `LinQ2DbRepository<TContext,TEntity>` | `src/Schemata.Entity.LinqToDB/LinQ2DbRepository.cs` |
+| `LinqToDbRepository<TContext,TEntity>` | `src/Schemata.Entity.LinqToDB/LinqToDbRepository.cs` |
 | `AddRepository` extension | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
 
 ## Registration
@@ -15,22 +15,20 @@ A repository provider is the concrete `RepositoryBase<TEntity>` implementation t
 Provider registration is a two-step process: register the repository implementation type with `AddRepository`, then configure the underlying data access library.
 
 ```csharp
-// Entity Framework Core
 services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
         .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlServer(connectionString));
 
-// LINQ to DB
-services.AddRepository(typeof(LinQ2DbRepository<,>))
+services.AddRepository(typeof(LinqToDbRepository<,>))
         .UseLinqToDb<AppDataConnection>((sp, opts) => opts.UseSQLite(connectionString));
 ```
 
-`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic scoped, and registers all built-in advisors via `TryAddEnumerable`.
+`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic transient, and registers all built-in advisors via `TryAddEnumerable`.
 
 ## Entity Framework Core provider
 
 **Package:** `Schemata.Entity.EntityFrameworkCore`
 
-`EntityFrameworkCoreRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DbContext`.
+`EntityFrameworkCoreRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DbContext`. Each repository owns a context from `IDbContextFactory<TContext>` until it is enlisted into a unit of work.
 
 ### Query methods
 
@@ -45,28 +43,21 @@ Scalar methods then run `IRepositoryQueryAdvisor` (cache hit check), execute the
 
 ### Mutation methods
 
-`AddAsync` runs `IRepositoryAddAdvisor<TEntity>`, then calls `Context.AddAsync(entity)`.
+`AddAsync` runs `IRepositoryAddAdvisor<TEntity>`, tracks the entity in the commit snapshot, then calls `Context.AddAsync(entity)`.
 
-`UpdateAsync` runs `IRepositoryUpdateAdvisor<TEntity>`, then calls `Detach(entity)` followed by `Context.Update(entity)`.
+`UpdateAsync` runs `IRepositoryUpdateAdvisor<TEntity>`, tracks the entity in the commit snapshot, then calls `Detach(entity)` followed by `Context.Update(entity)`.
 
-`RemoveAsync` runs `IRepositoryRemoveAdvisor<TEntity>`, then calls `Context.Remove(entity)`.
+`RemoveAsync` runs `IRepositoryRemoveAdvisor<TEntity>`, tracks the entity in the commit snapshot, then calls `Context.Remove(entity)`.
 
 ### Detach before Update
 
-`UpdateAsync` clears the change tracker entry for `entity` before calling `Context.Update`. EF Core enforces a single tracked instance per key in the `DbContext`; whenever any other code in the same scope has already materialised the same row, `Context.Update(entity)` would throw "The instance of entity type 'X' cannot be tracked because another instance with the same key value is already being tracked."
-
-Several routine paths produce a tracked instance:
-
-- A repository-layer advisor that calls back into `IRepository<TEntity>.GetAsync` or `SingleOrDefaultAsync` to read the stored row (for example a concurrency stamp check, an ownership check, or a custom audit).
-- A mapper that constructs an entity by loading and copying from a tracked source.
-- An earlier handler stage that loaded the same row (the resource update pipeline first loads, then runs advisors, then writes).
-- Application code that issued a side query inside the same scope.
-
-Detaching is the smallest correct response to any of these. The call is not specific to one advisor; it keeps `UpdateAsync` safe under every combination of advisors and call sites that may have populated the tracker.
+`UpdateAsync` clears the change tracker entry for `entity` before calling `Context.Update`. EF Core enforces a single tracked instance per key in the `DbContext`; whenever any other code in the same context has already materialised the same row, `Context.Update(entity)` would throw "The instance of entity type 'X' cannot be tracked because another instance with the same key value is already being tracked."
 
 ### CommitAsync
 
-Calls `Context.SaveChangesAsync(ct)`, then `DrainAfterCommitAsync(ct)`. Throws `InvalidOperationException` if called while a unit of work is active.
+Standalone `CommitAsync` snapshots tracked changes, calls `Context.SaveChangesAsync(ct)`, then dispatches `IRepositoryCommittedAdvisor<TEntity>` with the snapshot. It throws `InvalidOperationException` if the repository is enlisted in a unit of work.
+
+When enlisted, the repository adopts the unit of work's context and registers committed/rollback sinks. The unit of work calls the committed sink after the transaction commits and the rollback sink when the transaction rolls back or is disposed.
 
 ### SearchAsync
 
@@ -76,7 +67,7 @@ Not implemented; throws `NotImplementedException`. Use `ListAsync` with a filter
 
 **Package:** `Schemata.Entity.LinqToDB`
 
-`LinQ2DbRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DataConnection`.
+`LinqToDbRepository<TContext, TEntity>` extends `RepositoryBase<TEntity>` where `TContext : DataConnection`. Each repository owns a `DataConnection` from a registered `Func<TContext>` until it is enlisted into a unit of work.
 
 ### Table name resolution
 
@@ -84,13 +75,13 @@ Determined in the constructor: checks for `[Table]` attribute on the entity type
 
 ### Mutation methods
 
-When a unit of work is active, mutations execute SQL immediately (`Context.InsertAsync`, `Context.UpdateAsync`, `Context.DeleteAsync`). Without a unit of work, mutations are queued as `PendingOperation` structs and executed in `CommitAsync` wrapped in a local transaction to keep the commit atomic.
+When enlisted in a unit of work, mutations add pending operations to the unit of work. Without a unit of work, mutations are queued as `PendingOperation` values on the repository and executed in `CommitAsync` wrapped in a local transaction.
 
 `Detach` is a no-op because LINQ to DB does not track entity state.
 
 ### CommitAsync
 
-When no unit of work is active and there are pending operations, wraps them in a local transaction: begins, executes each pending operation, commits. On failure, rolls back and rethrows. After commit, drains the after-commit queue.
+Standalone `CommitAsync` snapshots tracked changes, executes pending operations in a local transaction, commits, then dispatches `IRepositoryCommittedAdvisor<TEntity>`. On failure, it rolls back and rethrows. It throws `InvalidOperationException` if the repository is enlisted in a unit of work.
 
 ### SearchAsync
 
@@ -101,10 +92,11 @@ Not implemented; throws `NotImplementedException`.
 | Aspect | EF Core | LINQ to DB |
 |---|---|---|
 | Context type | `DbContext` | `DataConnection` |
+| Context ownership | Factory-created per repository; UoW-owned after enlistment | Factory-created per repository; UoW-owned after enlistment |
 | Change tracking | Full EF Core tracker | None; `Detach` is a no-op |
-| Mutation style | Staged in tracker, flushed by `SaveChangesAsync` | Immediate SQL or queued pending ops |
-| `UpdateAsync` | `Detach(entity)` then `Context.Update(entity)` | `Context.UpdateAsync(entity)` directly |
-| `CommitAsync` | `SaveChangesAsync` + drain | Local transaction over pending ops + drain |
+| Mutation style | Staged in tracker, flushed by `SaveChangesAsync` | Queued pending ops, executed by commit boundary |
+| `UpdateAsync` | `Detach(entity)` then `Context.Update(entity)` | Queues `Context.UpdateAsync(entity)` |
+| `CommitAsync` | `SaveChangesAsync` + committed advisor dispatch | Local transaction over pending ops + committed advisor dispatch |
 | `SearchAsync` | `NotImplementedException` | `NotImplementedException` |
 
 ## Extension points
@@ -113,12 +105,12 @@ To implement a custom provider, inherit from `RepositoryBase<TEntity>` and imple
 
 ## Caveats
 
-- **EF Core `UpdateAsync` detach**: required whenever the change tracker has already seen the same row in the current scope. See [Detach before Update](#detach-before-update).
+- **EF Core `UpdateAsync` detach**: required whenever the change tracker has already seen the same row in the current context. See [Detach before Update](#detach-before-update).
 - **`SearchAsync`**: both providers throw `NotImplementedException`. Use `ListAsync` with a filter expression.
 
 ## See also
 
-- [overview.md](overview.md) — `IRepository<TEntity>` API and `Once()` / `Suppress*()` reference
-- [mutation-pipeline.md](mutation-pipeline.md) — advisor chains for add, update, remove
-- [unit-of-work.md](unit-of-work.md) — `BeginWork`, `CommitAsync`, and the after-commit queue
-- [entity/traits.md](../entity/traits.md) — `IConcurrency` and the concurrency advisor
+- [overview.md](overview.md) - `IRepository<TEntity>` API and `Once()` / `Suppress*()` reference
+- [mutation-pipeline.md](mutation-pipeline.md) - advisor chains for add, update, remove, and commit
+- [unit-of-work.md](unit-of-work.md) - explicit enlistment and committed advisors
+- [entity/traits.md](../entity/traits.md) - `IConcurrency` and the concurrency advisor

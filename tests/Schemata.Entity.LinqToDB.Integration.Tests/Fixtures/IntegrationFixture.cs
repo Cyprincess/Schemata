@@ -33,8 +33,13 @@ public class IntegrationFixture : IAsyncLifetime
             return new TestDataConnection(options);
         });
 
-        services.AddRepository<Student, LinQ2DbRepository<TestDataConnection, Student>>();
-        services.AddRepository<Course, LinQ2DbRepository<TestDataConnection, Course>>();
+        services.TryAddSingleton<Func<TestDataConnection>>(sp => () => {
+            var options = new DataOptions().UseSQLite(connectionString);
+            return new TestDataConnection(options);
+        });
+
+        services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();
+        services.AddRepository<Course, LinqToDbRepository<TestDataConnection, Course>>();
 
         services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
 

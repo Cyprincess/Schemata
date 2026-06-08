@@ -43,8 +43,7 @@ public class HandlerFixture
                    }
                });
 
-        Repository.Setup(r => r.Once()).Returns(Repository.Object);
-        Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Repository.Object);
+        Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
 
         Repository
            .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
@@ -88,7 +87,7 @@ public class HandlerFixture
                        return Task.CompletedTask;
                    });
 
-        Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult(0));
+        Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
     }
 
     public Mock<IRepository<Student>> Repository { get; } = new();

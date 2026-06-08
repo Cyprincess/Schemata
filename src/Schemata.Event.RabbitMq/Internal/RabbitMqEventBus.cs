@@ -90,7 +90,8 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
-        switch (await Advisor.For<IEventPublishAdvisor>().RunAsync(adviceCtx, eventCtx, ct)) {
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, eventCtx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
@@ -138,7 +139,8 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
-        switch (await Advisor.For<IEventPublishAdvisor>().RunAsync(adviceCtx, eventCtx, ct)) {
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, eventCtx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when adviceCtx.TryGet<TResponse>(out var r) && r is not null:

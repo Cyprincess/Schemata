@@ -13,13 +13,13 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
     public string? FullName { get; set; }
     public int     Age      { get; set; }
 
-    public Guid      Uid          { get; set; }
-    public string?   Name         { get; set; }
+    public Guid      Uid           { get; set; }
+    public string?   Name          { get; set; }
     public string?   CanonicalName { get; set; }
-    public DateTime? CreateTime   { get; set; }
-    public DateTime? UpdateTime   { get; set; }
-    public DateTime? DeleteTime   { get; set; }
-    public DateTime? PurgeTime    { get; set; }
+    public DateTime? CreateTime    { get; set; }
+    public DateTime? UpdateTime    { get; set; }
+    public DateTime? DeleteTime    { get; set; }
+    public DateTime? PurgeTime     { get; set; }
 }
 ```
 
@@ -39,20 +39,23 @@ schema.ConfigureServices(services => {
 });
 ```
 
-Without `.WithUnitOfWork<TContext>()`, calling `repository.BeginWork()` throws `InvalidOperationException`.
+Repositories are registered as transient. Each resolved `IRepository<Student>` owns a separate data context until it is enlisted into a unit of work.
 
 ## Use a transaction in a service
 
-Inject `IRepository<Student>` and call `BeginWork()` to open a transaction. The returned `IUnitOfWork` is `IDisposable` — use it in a `using` block so the transaction rolls back automatically if you don't commit:
+Inject repositories and the typed unit of work. Begin the transaction, enlist every repository that should participate, then commit through the unit of work:
 
 ```csharp
 using Schemata.Entity.Repository;
 
-public sealed class EnrollmentService(IRepository<Student> students)
+public sealed class EnrollmentService(
+    IRepository<Student>      students,
+    IUnitOfWork<AppDbContext> uow)
 {
     public async Task EnrollBatchAsync(string[] names, CancellationToken ct = default)
     {
-        using var uow = students.BeginWork();
+        uow.Begin();
+        students.Enlist(uow);
 
         foreach (var name in names)
         {
@@ -65,14 +68,16 @@ public sealed class EnrollmentService(IRepository<Student> students)
 }
 ```
 
-`BeginWork()` calls `IUnitOfWork.Begin()` on the underlying unit of work and returns it. All repositories resolved from the same DI scope share the same `IUnitOfWork<TContext>` instance, so they participate in the same transaction automatically.
+After enlistment, calling `students.CommitAsync()` throws `InvalidOperationException`. Use `uow.CommitAsync()` for the transaction boundary.
 
 ## Rollback on failure
 
-If `CommitAsync` is never called and the `using` block exits (normally or via exception), `Dispose()` rolls back the transaction. You can also roll back explicitly:
+If `CommitAsync` is never called and the unit of work is disposed, the transaction rolls back. You can also roll back explicitly:
 
 ```csharp
-using var uow = students.BeginWork();
+uow.Begin();
+students.Enlist(uow);
+
 try
 {
     await students.AddAsync(student, ct);
@@ -87,48 +92,42 @@ catch
 
 `RollbackAsync` and `Dispose` are both safe to call after a rollback has already occurred.
 
-## After-commit actions
+## Multiple repositories
 
-Advisors and services can enqueue work that must only run after a successful commit — cache eviction, outbox writes, notifications. Use `EnqueueAfterCommit` on either the repository or the unit of work:
-
-```csharp
-students.EnqueueAfterCommit(async ct => {
-    // runs only after CommitAsync succeeds
-    await cache.RemoveAsync("students:list", ct);
-});
-
-await uow.CommitAsync(ct);
-// cache.RemoveAsync runs here, after the transaction commits
-```
-
-When a `IUnitOfWork` is active, `repository.EnqueueAfterCommit(action)` routes the action to the unit of work's queue. The queue drains once at `uow.CommitAsync`. On rollback or `Dispose`, the queue is discarded — the action never runs.
-
-If no unit of work is active, the repository drains its own queue immediately after `CommitAsync`.
-
-## Typed unit of work
-
-When multiple database providers coexist in the same DI container, use `IUnitOfWork<TContext>` to target a specific context:
+Repositories do not share a context by default. Enlist each repository that should join the same transaction:
 
 ```csharp
 public sealed class EnrollmentService(
-    IRepository<Student>     students,
+    IRepository<Student>      students,
+    IRepository<Course>       courses,
     IUnitOfWork<AppDbContext> uow)
 {
-    public async Task EnrollAsync(Student student, CancellationToken ct)
+    public async Task EnrollAsync(Student student, Course course, CancellationToken ct)
     {
         uow.Begin();
+        students.Enlist(uow);
+        courses.Enlist(uow);
+
         await students.AddAsync(student, ct);
+        await courses.AddAsync(course, ct);
+
         await uow.CommitAsync(ct);
     }
 }
 ```
 
-`IUnitOfWork<TContext>` extends `IUnitOfWork` — all the same methods apply.
+`IUnitOfWork<TContext>` extends `IUnitOfWork` and targets one concrete context type, such as an EF Core `DbContext` or a LinqToDB `DataConnection`.
+
+## Committed advisors
+
+After a successful standalone repository commit or unit-of-work commit, Schemata invokes registered `IRepositoryCommittedAdvisor<TEntity>` implementations. Each advisor receives a `CommitChanges<TEntity>` snapshot containing added, updated, and removed entities.
+
+Query cache eviction uses this committed pipeline. Updated and removed entities evict reverse-indexed cache entries after the database commit succeeds; added entities are ignored.
 
 ## See also
 
-- [Getting Started](getting-started.md) — the `Student` entity and startup configuration
-- [Object Mapping](object-mapping.md) — next in the series: separate request/response DTOs
-- [Query Caching](query-caching.md) — after-commit cache eviction in practice
-- [Unit of Work](../documents/repository/unit-of-work.md) — `BeginWork` semantics and `EnqueueAfterCommit` design
-- [Mutation Pipeline](../documents/repository/mutation-pipeline.md) — advisor execution order around commits
+- [Getting Started](getting-started.md) - the `Student` entity and startup configuration
+- [Object Mapping](object-mapping.md) - next in the series: separate request/response DTOs
+- [Query Caching](query-caching.md) - committed cache eviction in practice
+- [Unit of Work](../documents/repository/unit-of-work.md) - explicit enlistment and committed advisors
+- [Mutation Pipeline](../documents/repository/mutation-pipeline.md) - advisor execution order around commits

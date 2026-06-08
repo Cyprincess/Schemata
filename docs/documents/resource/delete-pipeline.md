@@ -90,7 +90,7 @@ If `AdviceRemoveSoftDelete` returns `Handle`, the repository skips the physical 
 
 - Implement `IResourceDeleteRequestAdvisor<TEntity>` to add pre-load logic (e.g., dependency checks).
 - Implement `IResourceDeleteAdvisor<TEntity>` to add entity-level logic after load (e.g., cascade soft-delete of children).
-- The delete pipeline does not have a response advisor stage. Post-delete side effects should use `EnqueueAfterCommit` on `AdviceContext` or the repository.
+- The delete pipeline does not have a response advisor stage. Post-delete repository side effects should use `IRepositoryCommittedAdvisor<TEntity>` when they need the committed delete snapshot.
 
 ## Design motivation
 

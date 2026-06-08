@@ -181,7 +181,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             throw;
         } finally {
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
-            switch (await Advisor.For<IEventConsumeAdvisor>().RunAsync(consumeAdviceCtx, eventCtx, ct)) {
+            switch (await Advisor.For<IEventConsumeAdvisor>()
+                                 .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                 case AdviseResult.Block:

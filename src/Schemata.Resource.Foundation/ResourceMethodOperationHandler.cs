@@ -97,10 +97,13 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
                 return null;
         }
 
-        var entity = await _repository.Once()
-                                      .SuppressQuerySoftDelete()
-                                      .SingleOrDefaultAsync(q => container.Query(q), ct.Value)
-                  ?? throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
+        TEntity? entity;
+        using (_repository.SuppressQuerySoftDelete()) {
+            entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
+        }
+        if (entity == null) {
+            throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
+        }
 
         switch (await Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
                              .RunAsync(ctx, request, entity, principal, ct.Value)) {

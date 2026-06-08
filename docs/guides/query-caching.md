@@ -4,16 +4,15 @@ Add transparent query result caching to the `Student` repository with automatic 
 
 ## How it works
 
-Four advisors intercept the repository pipeline:
+Three advisors intercept the repository pipeline:
 
 | Advisor | When | Behavior |
 | ------- | ---- | -------- |
 | `AdviceQueryCache` | Before query execution | Returns cached result on hit, skips the database |
 | `AdviceResultCache` | After successful query | Stores result in cache and updates the reverse index |
-| `AdviceUpdateEvictCache` | During entity update | Evicts all cached queries that contain the updated entity |
-| `AdviceRemoveEvictCache` | During entity remove | Same eviction for deletes |
+| `AdviceCommittedEvictCache` | After successful commit | Evicts cached queries that contain updated or removed entities |
 
-Caching uses `ICacheProvider` — a pluggable abstraction with in-memory and Redis backends. The cache is opt-in: you must register a provider and call `UseQueryCache()`.
+Caching uses `ICacheProvider` - a pluggable abstraction with in-memory and Redis backends. The cache is opt-in: you must register a provider and call `UseQueryCache()`.
 
 ## Add the packages
 
@@ -48,7 +47,7 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`AddDistributedMemoryCache()` registers ASP.NET's in-memory `IDistributedCache`. `UseQueryCache()` registers the four advisors and `SchemataQueryCacheOptions`.
+`AddDistributedMemoryCache()` registers ASP.NET's in-memory `IDistributedCache`. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`.
 
 ## Configure TTL and eviction
 
@@ -61,7 +60,7 @@ Pass an optional delegate to `UseQueryCache` to customize behavior:
 })
 ```
 
-`EvictionEnabled = false` disables `AdviceUpdateEvictCache` and `AdviceRemoveEvictCache`. The query and result advisors remain active; entries live until TTL expires.
+`EvictionEnabled = false` disables `AdviceCommittedEvictCache`. The query and result advisors remain active; entries live until TTL expires.
 
 ## Suppress caching for a single query
 
@@ -71,11 +70,11 @@ var fresh = await repository.Once()
     .FirstOrDefaultAsync(q => q.Where(s => s.Uid == id), ct);
 ```
 
-`SuppressQueryCache()` sets `QueryCacheSuppressed` in the `AdviceContext`. `Once()` creates a fresh repository instance so the suppression doesn't affect other operations in the same scope.
+`SuppressQueryCache()` sets `QueryCacheSuppressed` in the `AdviceContext`. `Once()` creates a fresh repository instance so the suppression doesn't affect later operations on the caller's repository.
 
-## After-commit eviction
+## Commit-time eviction
 
-When a unit of work is active, eviction actions are enqueued via `EnqueueAfterCommit` and drain only after `CommitAsync` succeeds. On rollback or `Dispose`, the eviction queue is discarded — cached entries remain valid until TTL expires.
+Eviction runs through `IRepositoryCommittedAdvisor<TEntity>` after `CommitAsync` succeeds. The advisor receives a `CommitChanges<TEntity>` snapshot and evicts reverse-indexed entries for updated and removed entities. If a unit of work rolls back, committed advisors do not run and cached entries remain valid until TTL expires.
 
 ## Production: Redis
 
@@ -106,7 +105,7 @@ curl http://localhost:5000/students
 # Second identical query returns from cache
 curl http://localhost:5000/students
 
-# Update a student — evicts cached queries containing that student
+# Update a student - evicts cached queries containing that student
 curl -X PATCH "http://localhost:5000/students/<name>" \
      -H "Content-Type: application/json" \
      -d '{"age":22}'
@@ -117,8 +116,8 @@ curl http://localhost:5000/students
 
 ## See also
 
-- [Filtering and Pagination](filtering-and-pagination.md) — previous in the series: AIP-160 filter and AIP-132 order
-- [Validation](validation.md) — next in the series: input validation with FluentValidation
-- [Unit of Work](unit-of-work.md) — after-commit eviction semantics
-- [Query Cache](../documents/caching/query-cache.md) — four advisors, reverse index, eviction design
-- [Distributed Cache](../documents/caching/distributed.md) — `ICacheProvider`, `IndexLocks`
+- [Filtering and Pagination](filtering-and-pagination.md) - previous in the series: AIP-160 filter and AIP-132 order
+- [Validation](validation.md) - next in the series: input validation with FluentValidation
+- [Unit of Work](unit-of-work.md) - explicit enlistment and committed advisors
+- [Query Cache](../documents/caching/query-cache.md) - cache advisors, reverse index, eviction design
+- [Distributed Cache](../documents/caching/distributed.md) - `ICacheProvider`, `IndexLocks`

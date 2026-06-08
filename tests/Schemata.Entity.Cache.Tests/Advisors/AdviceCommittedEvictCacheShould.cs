@@ -15,28 +15,21 @@ using Xunit;
 
 namespace Schemata.Entity.Cache.Tests.Advisors;
 
-public class AdviceUpdateEvictCacheShould
+public class AdviceCommittedEvictCacheShould
 {
     private static IOptions<SchemataQueryCacheOptions> DefaultOptions() {
         return Options.Create(new SchemataQueryCacheOptions());
     }
 
-    private static IRepository<Student> InlineCommitRepo() {
-        var mock = new Mock<IRepository<Student>>();
-        mock.Setup(r => r.EnqueueAfterCommit(It.IsAny<Func<CancellationToken, Task>>()))
-            .Callback<Func<CancellationToken, Task>>(action => action(CancellationToken.None).GetAwaiter().GetResult());
-        return mock.Object;
-    }
-
     [Fact]
     public void Order_EqualsOrdersMax() {
         var mock    = new Mock<ICacheProvider>();
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         Assert.Equal(SchemataConstants.Orders.Max, advisor.Order);
     }
 
     [Fact]
-    public async Task AdviseAsync_WhenEntityUpdated_RemovesAllKeysInCollection() {
+    public async Task AdviseAsync_WhenEntitiesUpdated_RemovesAllKeysInCollection() {
         var cacheKey1 = "first-key";
         var cacheKey2 = "second-key";
         var uid       = Guid.NewGuid();
@@ -47,12 +40,14 @@ public class AdviceUpdateEvictCacheShould
         mock.Setup(x => x.CollectionMembersAsync(indexKey!, It.IsAny<CancellationToken>()))
             .ReturnsAsync([cacheKey1, cacheKey2]);
 
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = InlineCommitRepo();
-        var entity  = new Student { Uid = uid, FullName = "Alice" };
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Updated = [new Student { Uid = uid, FullName = "Alice" }],
+        };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.RemoveAsync(cacheKey1, It.IsAny<CancellationToken>()), Times.Once);
@@ -61,15 +56,61 @@ public class AdviceUpdateEvictCacheShould
     }
 
     [Fact]
+    public async Task AdviseAsync_WhenEntitiesRemoved_RemovesAllKeysInCollection() {
+        var cacheKey = "remove-key";
+        var uid      = Guid.NewGuid();
+        var indexKey = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
+        Assert.NotNull(indexKey);
+
+        var mock = new Mock<ICacheProvider>();
+        mock.Setup(x => x.CollectionMembersAsync(indexKey!, It.IsAny<CancellationToken>())).ReturnsAsync([cacheKey]);
+
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Removed = [new Student { Uid = uid }],
+        };
+
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        mock.Verify(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(x => x.CollectionClearAsync(indexKey!, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AdviseAsync_WhenEntitiesAdded_DoesNotEvict() {
+        var mock = new Mock<ICacheProvider>();
+
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Added = [new Student { Uid = Guid.NewGuid() }],
+        };
+
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        mock.Verify(x => x.CollectionMembersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        mock.Verify(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        mock.Verify(x => x.CollectionClearAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task AdviseAsync_WhenSuppressed_LeavesCacheIntact() {
         var mock    = new Mock<ICacheProvider>();
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new QueryCacheEvictionSuppressed());
-        var repo   = new Mock<IRepository<Student>>().Object;
-        var entity = new Student { Uid = Guid.NewGuid() };
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Updated = [new Student { Uid = Guid.NewGuid() }],
+            Removed = [new Student { Uid = Guid.NewGuid() }],
+        };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.CollectionMembersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -81,12 +122,15 @@ public class AdviceUpdateEvictCacheShould
     public async Task AdviseAsync_WhenEvictionDisabled_LeavesCacheIntact() {
         var mock    = new Mock<ICacheProvider>();
         var options = Options.Create(new SchemataQueryCacheOptions { EvictionEnabled = false });
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, options);
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = new Mock<IRepository<Student>>().Object;
-        var entity  = new Student { Uid = Guid.NewGuid() };
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Updated = [new Student { Uid = Guid.NewGuid() }],
+            Removed = [new Student { Uid = Guid.NewGuid() }],
+        };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.CollectionMembersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -99,12 +143,14 @@ public class AdviceUpdateEvictCacheShould
         var mock = new Mock<ICacheProvider>();
         mock.Setup(x => x.CollectionMembersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = InlineCommitRepo();
-        var entity  = new Student { Uid = Guid.NewGuid() };
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Updated = [new Student { Uid = Guid.NewGuid() }],
+        };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -123,12 +169,14 @@ public class AdviceUpdateEvictCacheShould
         var mock = new Mock<ICacheProvider>();
         mock.Setup(x => x.CollectionMembersAsync(targetIndex!, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
-        var advisor = new AdviceUpdateEvictCache<Student>(mock.Object, DefaultOptions());
+        var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = InlineCommitRepo();
+        var repo    = Mock.Of<IRepository<Student>>();
+        var changes = new CommitChanges<Student> {
+            Updated = [new Student { Uid = targetUid }],
+        };
 
-        var target = new Student { Uid = targetUid };
-        var result = await advisor.AdviseAsync(ctx, repo, target, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.CollectionMembersAsync(otherIndex!, It.IsAny<CancellationToken>()), Times.Never);
@@ -142,14 +190,14 @@ public class AdviceUpdateEvictCacheShould
                                    It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(x => x.CollectionAddAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CacheEntryOptions>(),
-                                             It.IsAny<CancellationToken>()))
+                                              It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var options = DefaultOptions();
         var write   = new AdviceResultCache<Student, Student, Student>(mock.Object, options);
-        var evict   = new AdviceUpdateEvictCache<Student>(mock.Object, options);
+        var evict   = new AdviceCommittedEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = InlineCommitRepo();
+        var repo    = Mock.Of<IRepository<Student>>();
         var student = new Student { Uid = Guid.NewGuid(), FullName = "Zed" };
         var data    = new[] { student }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repo, data) { Result = student };
@@ -164,7 +212,11 @@ public class AdviceUpdateEvictCacheShould
         mock.Setup(x => x.CollectionClearAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        await evict.AdviseAsync(ctx, repo, student, CancellationToken.None);
+        var changes = new CommitChanges<Student> {
+            Updated = [student],
+        };
+
+        await evict.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         mock.Verify(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
     }

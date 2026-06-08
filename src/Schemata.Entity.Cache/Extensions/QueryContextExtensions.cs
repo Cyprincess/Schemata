@@ -24,7 +24,7 @@ public static class QueryContextExtensions
         where TEntity : class {
         var query = Stringizing.ToString(context.Query.Expression);
         return !string.IsNullOrWhiteSpace(query)
-            ? $"{query}\x1e{typeof(T).FullName ?? typeof(T).Name}".ToCacheKey(SchemataConstants.Keys.Entity)
+            ? $"{query}\x1e{typeof(T).FullName}".ToCacheKey(SchemataConstants.Keys.Entity)
             : null;
     }
 }

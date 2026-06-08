@@ -9,7 +9,7 @@ namespace Schemata.Entity.Cache;
 
 /// <summary>
 ///     Reverse index mapping <c>(entity type, primary key)</c> to the set of cache keys holding results for
-///     that entity, enabling immediate eviction on update and remove.
+///     that entity, enabling eviction of updated and removed entities after commit.
 /// </summary>
 public static class ReverseIndex
 {

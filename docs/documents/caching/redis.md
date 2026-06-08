@@ -52,7 +52,7 @@ Collection operations are cluster-safe because `SADD`, `SMEMBERS`, `SREM`, and `
 
 Key-value operations are also cluster-safe. `TryAddAsync` uses `SET NX`, which is atomic.
 
-However, cache and database are not atomic together. There is no distributed transaction spanning Redis and the application database. The after-commit eviction pattern (see [query-cache.md](query-cache.md)) mitigates this by deferring eviction until after the database transaction commits, but a process crash between commit and eviction can leave stale cache entries until TTL expires.
+However, cache and database are not atomic together. There is no distributed transaction spanning Redis and the application database. The committed eviction pattern (see [query-cache.md](query-cache.md)) mitigates this by deferring eviction until after the database transaction commits, but a process crash between commit and eviction can leave stale cache entries until TTL expires.
 
 ## Registration
 

@@ -11,12 +11,12 @@ namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
 ///     Extension methods for <see cref="SchemataRepositoryBuilder" /> to enable query caching
-///     together with immediate eviction on update and remove.
+///     together with commit-time eviction of updated and removed entities.
 /// </summary>
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
-    ///     Registers the query, result, update-evict, and remove-evict cache advisors together with
+    ///     Registers the query, result, and committed-evict cache advisors together with
     ///     <see cref="SchemataQueryCacheOptions" />.
     /// </summary>
     /// <param name="builder">The repository builder.</param>
@@ -33,8 +33,7 @@ public static class SchemataRepositoryBuilderExtensions
 
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryQueryAdvisor<,,>), typeof(AdviceQueryCache<,,>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryResultAdvisor<,,>), typeof(AdviceResultCache<,,>)));
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateEvictCache<>)));
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAdvisor<>), typeof(AdviceRemoveEvictCache<>)));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryCommittedAdvisor<>), typeof(AdviceCommittedEvictCache<>)));
 
         return builder;
     }

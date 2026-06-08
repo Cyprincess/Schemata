@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
+using Schemata.Entity.Repository;
 using Xunit;
 
 namespace Schemata.Entity.LinqToDB.Integration.Tests;
@@ -24,7 +26,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         Uid      = Guid.NewGuid(),
                                         FullName = "UoW-Alice",
@@ -39,7 +42,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                                         Grade    = 2,
                                         Name     = "uow-bob",
                                     });
-                await work.CommitAsync();
+                await uow.CommitAsync();
             }
         }
 
@@ -57,7 +60,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         Uid      = Guid.NewGuid(),
                                         FullName = "Rollback-Alice",
@@ -65,7 +69,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                                         Grade    = 1,
                                         Name     = "rollback-alice",
                                     });
-                await work.RollbackAsync();
+                await uow.RollbackAsync();
             }
         }
 
@@ -83,7 +87,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                using var work = repo.BeginWork();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
+                repo.Join(uow);
                 await repo.AddAsync(new() {
                                         Uid      = Guid.NewGuid(),
                                         FullName = "Dispose-Alice",
@@ -105,19 +110,19 @@ public class UnitOfWorkShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CommitAsync_InsideUoW_ThrowsInvalidOperation() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
+    public async Task CommitAsync_ThrowsWhenRepositoryIsEnlisted() {
+        var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
-            using var work = repo.BeginWork();
+            repo.Join(uow);
             await repo.AddAsync(new() {
                                     Uid      = Guid.NewGuid(),
-                                    FullName = "Throw-Alice",
+                                    FullName = "Enlisted",
                                     Age      = 18,
                                     Grade    = 1,
-                                    Name     = "throw-alice",
+                                    Name     = "enlisted",
                                 });
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => repo.CommitAsync().AsTask());
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.CommitAsync());
+            await uow.CommitAsync();
         }
     }
 
@@ -126,7 +131,8 @@ public class UnitOfWorkShould : IAsyncLifetime
         {
             var (studentRepo, courseRepo, uow, scope) = _fixture.CreateScopeWithUoW();
             using (scope) {
-                uow.Begin();
+                studentRepo.Join(uow);
+                courseRepo.Join(uow);
                 await studentRepo.AddAsync(new() {
                                                Uid      = Guid.NewGuid(),
                                                FullName = "Cross-Alice",
@@ -162,57 +168,54 @@ public class UnitOfWorkShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DeferredExecution_WithoutUoW_PendingUntilCommit() {
+    public async Task Standalone_ReadsSeeOwnUncommittedWrites() {
+        // LinqToDB's standalone path executes mutations immediately inside the lazy
+        // transaction, so subsequent reads on the same repository observe the
+        // not-yet-committed row (read-your-own-writes within the active transaction).
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
-                                    FullName = "Deferred-Alice",
+                                    Uid      = Guid.NewGuid(),
+                                    FullName = "Self-Read",
                                     Age      = 18,
                                     Grade    = 1,
-                                    Name     = "deferred-alice",
+                                    Name     = "self-read",
                                 });
 
-            // Before CommitAsync, entity should NOT be in the database
-            var foundBefore = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "deferred-alice"));
-            Assert.Null(foundBefore);
+            var foundBefore = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "self-read"));
+            Assert.NotNull(foundBefore);
 
-            // CommitAsync flushes pending operations
-            var rows = await repo.CommitAsync();
-            Assert.True(rows > 0);
+            await repo.CommitAsync();
 
-            // After CommitAsync, entity should be in the database
-            var foundAfter = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "deferred-alice"));
+            var foundAfter = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "self-read"));
             Assert.NotNull(foundAfter);
         }
     }
 
     [Fact]
-    public async Task ImmediateExecution_WithUoW_ExecutesDirectly() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
+    public async Task Join_AfterUncommittedWork_ThrowsInvalidOperation() {
+        var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
-            using var work = repo.BeginWork();
             await repo.AddAsync(new() {
-                                    FullName = "Immediate-Alice",
+                                    Uid      = Guid.NewGuid(),
+                                    FullName = "Uncommitted",
                                     Age      = 18,
                                     Grade    = 1,
-                                    Name     = "immediate-alice",
+                                    Name     = "uncommitted-join",
                                 });
 
-            // Inside UoW, operations execute immediately (not deferred)
-            // Entity should be visible in the same transaction
-            var found = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "immediate-alice"));
-            Assert.NotNull(found);
+            Assert.Throws<InvalidOperationException>(() => repo.Join(uow));
 
-            await work.CommitAsync();
+            await repo.CommitAsync();
         }
     }
 
     [Fact]
-    public async Task BeginWork_WhenAlreadyActive_ThrowsInvalidOperation() {
-        var (repo, scope) = _fixture.CreateScopeWithRepository();
+    public async Task CommitAsync_AfterCompleted_ThrowsInvalidOperation() {
+        var (_, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
-            using var work = repo.BeginWork();
-            Assert.Throws<InvalidOperationException>(() => repo.BeginWork());
+            await uow.CommitAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await uow.CommitAsync());
         }
     }
 }

@@ -24,31 +24,28 @@ public static class ServiceCollectionExtensions
     ///     validation, and canonical name resolution.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="implementationType">
-    ///     A type that implements both <see cref="IRepository" /> and
-    ///     <see cref="IRepository{TEntity}" />.
-    /// </param>
+    /// <param name="type">A type that implements <see cref="IRepository{TEntity}" />.</param>
     /// <returns>A <see cref="SchemataRepositoryBuilder" /> for fluent configuration.</returns>
     /// <exception cref="ArgumentException">
-    ///     Thrown when <paramref name="implementationType" /> does not implement the required
+    ///     Thrown when <paramref name="type" /> does not implement the required
     ///     repository interfaces.
     /// </exception>
-    public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type implementationType) {
-        var serviceType = typeof(IRepository<>);
+    public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type type) {
+        var service = typeof(IRepository<>);
 
-        var nonGenericInterface     = implementationType.GetInterface(nameof(IRepository));
-        var implementationInterface = implementationType.GetInterface(serviceType.Name);
-        if (nonGenericInterface is null || implementationInterface?.GetGenericTypeDefinition() != serviceType) {
+        var implementation = type.GetInterface(service.Name);
+        if (implementation?.GetGenericTypeDefinition() != service) {
             throw new ArgumentException(
                 string.Format(
                     SchemataResources.GetResourceString(SchemataResources.ST1029),
-                    implementationType,
-                    serviceType
+                    type,
+                    service
                 )
             );
         }
 
-        services.TryAddScoped(serviceType, implementationType);
+        services.TryAddTransient(service, implementation);
+
         RegisterAdvisors(services);
 
         return new(services);
@@ -65,7 +62,8 @@ public static class ServiceCollectionExtensions
     public static SchemataRepositoryBuilder AddRepository<TEntity, TImplementation>(this IServiceCollection services)
         where TEntity : class
         where TImplementation : class, IRepository<TEntity> {
-        services.AddScoped<IRepository<TEntity>, TImplementation>();
+        services.AddTransient<IRepository<TEntity>, TImplementation>();
+
         RegisterAdvisors(services);
 
         return new(services);

@@ -71,7 +71,7 @@ await _repository.AddAsync(entity, ct)
 await _repository.CommitAsync(ct)
 ```
 
-The entity is added to the repository and committed. If a unit of work is active, the commit is deferred to the UoW boundary. After-commit callbacks enqueued during the advisor stages drain here.
+The entity is added to the repository and committed. If the repository is enlisted in a unit of work, commit happens at the UoW boundary. Committed repository advisors run after the commit succeeds.
 
 ### Stage 6: Response mapping
 
