@@ -11,7 +11,7 @@ namespace Schemata.Scheduling.Skeleton;
 /// </summary>
 public interface IJobLifecycleObserver
 {
-    /// <summary>Fires after <see cref="IScheduler.ScheduleAsync" /> records or advances an entry.</summary>
+    /// <summary>Fires after <see cref="IScheduler.ScheduleAsync(Entities.SchemataJob, System.Threading.CancellationToken)" /> records or advances an entry.</summary>
     Task OnScheduledAsync(SchemataJob job, CancellationToken ct = default);
 
     /// <summary>Fires after <see cref="IScheduler.UnscheduleAsync" /> removes an entry.</summary>

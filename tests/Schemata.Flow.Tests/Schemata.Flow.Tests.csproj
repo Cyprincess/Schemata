@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Event\Schemata.Flow.Event.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Http\Schemata.Flow.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Grpc\Schemata.Flow.Grpc.csproj" />
   </ItemGroup>

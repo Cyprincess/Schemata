@@ -31,7 +31,8 @@ public class StateMachineValidatorShould
 
         var definition = new ProcessDefinition { Name = "test", Elements = { endEvent } };
 
-        Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("exactly one start", ex.Message);
     }
 
     [Fact]

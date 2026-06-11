@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
-    <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
   </ItemGroup>
 
 </Project>

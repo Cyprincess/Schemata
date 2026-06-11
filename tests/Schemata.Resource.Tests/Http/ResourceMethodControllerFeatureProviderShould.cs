@@ -14,7 +14,7 @@ public class ResourceMethodControllerFeatureProviderShould
     [Fact]
     public void AddNoControllers_WhenMethodsAreEmpty() {
         var provider = new ResourceMethodControllerFeatureProvider {
-            Resources = new() { [typeof(EntityA).TypeHandle] = new ResourceAttribute(typeof(EntityA)) },
+            Resources = new() { [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) },
             Methods   = [],
         };
         var feature = new ControllerFeature();
@@ -28,11 +28,11 @@ public class ResourceMethodControllerFeatureProviderShould
     public void SynthesizeClosedController_PerHttpMethod() {
         var provider = new ResourceMethodControllerFeatureProvider {
             Resources = new() {
-                [typeof(EntityA).TypeHandle] = new ResourceAttribute(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
+                [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
             },
             Methods = new() {
                 [typeof(EntityA).TypeHandle] = [
-                    new ResourceMethodAttribute("run", typeof(HandlerA)),
+                    new("run", typeof(HandlerA)),
                 ],
             },
         };
@@ -55,11 +55,11 @@ public class ResourceMethodControllerFeatureProviderShould
     public void SkipResources_WhenEndpointsExcludeHttp() {
         var provider = new ResourceMethodControllerFeatureProvider {
             Resources = new() {
-                [typeof(EntityA).TypeHandle] = new ResourceAttribute(typeof(EntityA)) { Endpoints = [GrpcResourceAttribute.Name] },
+                [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [GrpcResourceAttribute.Name] },
             },
             Methods = new() {
                 [typeof(EntityA).TypeHandle] = [
-                    new ResourceMethodAttribute("run", typeof(HandlerA)),
+                    new("run", typeof(HandlerA)),
                 ],
             },
         };
@@ -74,12 +74,12 @@ public class ResourceMethodControllerFeatureProviderShould
     public void SynthesizeMultipleControllers_ForMultipleMethodsOnSameEntity() {
         var provider = new ResourceMethodControllerFeatureProvider {
             Resources = new() {
-                [typeof(EntityA).TypeHandle] = new ResourceAttribute(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
+                [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
             },
             Methods = new() {
                 [typeof(EntityA).TypeHandle] = [
-                    new ResourceMethodAttribute("run",     typeof(HandlerA)),
-                    new ResourceMethodAttribute("archive", typeof(HandlerB)),
+                    new("run",     typeof(HandlerA)),
+                    new("archive", typeof(HandlerB)),
                 ],
             },
         };
@@ -98,7 +98,7 @@ public class ResourceMethodControllerFeatureProviderShould
             Resources = [],
             Methods   = new() {
                 [typeof(EntityA).TypeHandle] = [
-                    new ResourceMethodAttribute("run", typeof(HandlerA)),
+                    new("run", typeof(HandlerA)),
                 ],
             },
         };
@@ -132,7 +132,7 @@ public class ResourceMethodControllerFeatureProviderShould
         public ValueTask<ResponseA> InvokeAsync(
             string?           name,
             RequestA          request,
-            EntityA           entity,
+            EntityA?          entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
         ) => ValueTask.FromResult(new ResponseA());
@@ -143,7 +143,7 @@ public class ResourceMethodControllerFeatureProviderShould
         public ValueTask<ResponseA> InvokeAsync(
             string?           name,
             RequestA          request,
-            EntityA           entity,
+            EntityA?          entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
         ) => ValueTask.FromResult(new ResponseA());

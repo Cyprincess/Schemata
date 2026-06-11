@@ -120,11 +120,6 @@
         <target state="translated">엔터티에는 [TableKey]가 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1021">
-        <source>Entity key cannot be null.</source>
-        <target state="translated">엔터티 키는 null일 수 없습니다.</target>
-        <note />
-      </trans-unit>
       <trans-unit id="ST1022">
         <source>Entity key count mismatch.</source>
         <target state="translated">엔터티 키 수가 일치하지 않습니다.</target>
@@ -198,6 +193,11 @@
       <trans-unit id="ST2007">
         <source>Function '{0}' not registered.</source>
         <target state="translated">함수 '{0}'이(가) 등록되지 않았습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2008">
+        <source>The page_size must not be negative.</source>
+        <target state="new">The page_size must not be negative.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST3001">

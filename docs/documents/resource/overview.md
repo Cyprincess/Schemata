@@ -77,7 +77,9 @@ schema.UseResource().MapHttp().Use<Student, StudentRequest, StudentDetail, Stude
 
 **Declarative** — annotate the entity with `[Resource]`. `SchemataResourceFeature.ConfigureServices` scans every non-dynamic assembly in `AppDomain.CurrentDomain.GetAssemblies()` and calls `RegisterResource` for every type carrying `[ResourceAttribute]`. The same scan picks up any `[ResourceMethod]` attributes on the same class and stores them in `SchemataResourceOptions.Methods` keyed by `(entity.TypeHandle, verb)`.
 
-Both paths converge at `SchemataResourceFeature.RegisterResource`, which keys the `ResourceAttribute` on `entity.TypeHandle` and registers per-entity idempotency advisors for Create and Update.
+Programmatic registration can also carry custom methods without entity attributes: `Use<...>(endpoints, resource => resource.Methods = [new ResourceMethodAttribute("run", typeof(RunJobHandler))])` - the Scheduling bridge packages register the job and operation resources this way.
+
+Both paths converge at `SchemataResourceFeature.RegisterResource`, which keys the `ResourceAttribute` on `entity.TypeHandle`, registers per-entity idempotency advisors for Create and Update, and auto-adds the built-in `undelete`/`expunge`/`purge` methods for `ISoftDelete` entities (each skipped when the `Operations` whitelist excludes it or the entity declares the same verb).
 
 ## Handler stages
 
@@ -93,7 +95,7 @@ IResourceRequestAdvisor<TEntity>          (gate: all operations, second arg is t
             IResourceResponseAdvisor<TEntity, TDetail>
 ```
 
-The second argument to `IResourceRequestAdvisor<TEntity>` is a `string`: `nameof(Operations.List|Get|Create|Update|Delete)` for CRUD and the lowerCamelCase verb (`"run"`, `"archive"`, `"batchCreate"`) for AIP-136 custom methods. A `Block` result at any stage short-circuits to `XxxResultBase<T>.Blocked`. A `Handle` result means "I stashed the answer in `AdviceContext`; pull it and return." The handler checks `ctx.TryGet<XxxResultBase<T>>(out var result)` after every `Handle`.
+The second argument to `IResourceRequestAdvisor<TEntity>` is a `string`: `nameof(Operations.List|Get|Create|Update|Delete)` for CRUD and the lowerCamelCase verb (`"run"`, `"archive"`, `"batchCreate"`) for AIP-136 custom methods. A `Block` result at any stage throws `NotFoundException`, hiding the resource's existence per AIP-211. A `Handle` result means "I stashed the answer in `AdviceContext`; pull it and return." The handler checks `ctx.TryGet<XxxResultBase<T>>(out var result)` after every `Handle`.
 
 Custom methods run through `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>`, which mirrors the same stage sequence with verb-scoped sockets (`IResourceMethodRequestAdvisor`, `IResourceMethodAdvisor`, `IResourceResponseAdvisor`) and a verb-keyed idempotency lane. See [Custom Methods](custom-methods.md).
 

@@ -64,11 +64,15 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     /// <summary>
     ///     Deletes a resource by canonical name
     ///     per <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>.
+    ///     A soft delete resolves to the updated resource
+    ///     per <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>; a hard delete resolves
+    ///     to an empty message.
     /// </summary>
     /// <param name="request">
-    ///     The <see cref="DeleteRequest" /> containing the canonical name, ETag for concurrency, and force flag.
+    ///     The <see cref="DeleteRequest" /> containing the canonical name and ETag for concurrency.
     /// </param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
+    /// <returns>The soft-deleted resource detail, or <see langword="null" /> for a hard delete.</returns>
     [Operation]
-    ValueTask DeleteAsync(DeleteRequest request, CallContext context = default);
+    ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default);
 }

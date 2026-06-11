@@ -35,7 +35,7 @@ internal sealed class ResourceGrpcServiceDescriptorContributor : IGrpcServiceDes
             return [];
         }
 
-        return FileDescriptorBridge.BuildServiceDescriptors(config.Model, types);
+        return FileDescriptorBridge.BuildServiceDescriptors(config.Model, types, options.Value);
     }
 
     #endregion

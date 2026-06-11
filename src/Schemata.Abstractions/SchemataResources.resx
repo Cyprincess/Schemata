@@ -92,9 +92,6 @@
   <data name="ST1020" xml:space="preserve">
         <value>Entity must have at least one [TableKey].</value>
     </data>
-  <data name="ST1021" xml:space="preserve">
-        <value>Entity key cannot be null.</value>
-    </data>
   <data name="ST1022" xml:space="preserve">
         <value>Entity key count mismatch.</value>
     </data>
@@ -139,6 +136,9 @@
     </data>
   <data name="ST2007" xml:space="preserve">
         <value>Function '{0}' not registered.</value>
+    </data>
+  <data name="ST2008" xml:space="preserve">
+        <value>The page_size must not be negative.</value>
     </data>
   <data name="ST3001" xml:space="preserve">
         <value>The user manager must produce an authenticator key after reset.</value>

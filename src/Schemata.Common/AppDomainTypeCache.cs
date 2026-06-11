@@ -27,6 +27,8 @@ public static class AppDomainTypeCache
     /// </summary>
     public static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> Properties;
 
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> StaticProperties = new();
+
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, PropertyInfo[]> WritableProperties = [];
 
     static AppDomainTypeCache() {
@@ -149,6 +151,27 @@ public static class AppDomainTypeCache
     /// <returns>The property info, or <see langword="null" /> if not found.</returns>
     public static PropertyInfo? GetProperty(Type type, string name) {
         var properties = GetProperties(type);
+
+        if (properties.TryGetValue(name, out var value)) {
+            return value;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     Returns the cached public static property with the specified name, or
+    ///     <see langword="null" /> if not found.
+    /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <param name="name">The property name.</param>
+    /// <returns>The property info, or <see langword="null" /> if not found.</returns>
+    public static PropertyInfo? GetStaticProperty(Type type, string name) {
+        var properties = StaticProperties.GetOrAdd(
+            type.TypeHandle,
+            static (_, t) => t.GetProperties(BindingFlags.Public | BindingFlags.Static)
+                              .ToDictionary(p => p.Name, StringComparer.Ordinal),
+            type);
 
         if (properties.TryGetValue(name, out var value)) {
             return value;

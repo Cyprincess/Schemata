@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -332,6 +333,26 @@ public class StateMachineEngineShould
 
         Assert.Equal("Rejected", instance.State);
         Assert.False(instance.IsComplete);
+    }
+
+    [Fact]
+    public async SystemTask AdvanceAsync_UnsupportedGateway_UsesElementNameInMessage() {
+        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
+        var gateway    = new ParallelGateway { Id = "parallel-join", Name = "Parallel Join" };
+        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Name     = "unsupported-gateway",
+            Elements = { startEvent, gateway, endEvent },
+            Flows = {
+                new() { Id = "f1", Source = startEvent, Target = gateway },
+                new() { Id = "f2", Source = gateway, Target    = endEvent },
+            },
+        };
+
+        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(() => new StateMachineEngine().StartAsync(definition, new()).AsTask());
+
+        Assert.Contains("Gateway 'Parallel Join'", ex.Message);
+        Assert.DoesNotContain(nameof(ParallelGateway), ex.Message);
     }
 
     #endregion

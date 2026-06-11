@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
@@ -278,6 +279,14 @@ public class EntityFrameworkCoreRepository<TContext, TEntity> : RepositoryBase<T
         TrackRemove(entity);
 
         Context.Remove(entity);
+    }
+
+    public override IUnitOfWork Begin() {
+        var uow = ServiceProvider.GetRequiredService<IUnitOfWork<TContext>>();
+
+        Join(uow);
+
+        return uow;
     }
 
     public override async Task CommitAsync(CancellationToken ct = default) {

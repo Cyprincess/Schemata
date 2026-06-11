@@ -17,7 +17,7 @@ namespace Schemata.Scheduling.Skeleton;
 ///     <see cref="SchemataJobExecution" /> row synchronously so the response
 ///     carries an addressable <c>operations/{uid}</c>.
 /// </summary>
-public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRequest, SchemataJobExecution>
+public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRequest, SchemataOperation>
 {
     private static readonly MethodInfo TriggerOpenMethod =
         typeof(IScheduler).GetMethod(nameof(IScheduler.TriggerAsync))!;
@@ -30,18 +30,19 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
         _services  = services;
     }
 
-    #region IResourceMethodHandler<SchemataJob, RunJobRequest, SchemataJobExecution> Members
+    #region IResourceMethodHandler<SchemataJob, RunJobRequest, SchemataOperation> Members
 
-    public async ValueTask<SchemataJobExecution> InvokeAsync(
+    public async ValueTask<SchemataOperation> InvokeAsync(
         string?           name,
         RunJobRequest     request,
-        SchemataJob       entity,
+        SchemataJob?      entity,
         ClaimsPrincipal?  principal,
         CancellationToken ct
     ) {
+        ArgumentNullException.ThrowIfNull(entity);
+
         if (string.IsNullOrEmpty(entity.JobType)) {
-            throw new FailedPreconditionException(
-                message: $"Job '{entity.CanonicalName}' has no JobType bound.");
+            throw JobNotRunnable(entity);
         }
 
         // IScheduler.TriggerAsync<TJob> requires the concrete job type at compile time,
@@ -49,12 +50,11 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
         // open method instead of duplicating the dispatch path.
         var jobType = Type.GetType(entity.JobType);
         if (jobType == null) {
-            throw new FailedPreconditionException(message: $"Job type '{entity.JobType}' could not be loaded.");
+            throw JobNotRunnable(entity);
         }
 
         if (_services.GetService(jobType) is null) {
-            throw new FailedPreconditionException(
-                message: $"Job type '{entity.JobType}' is not registered in DI.");
+            throw JobNotRunnable(entity);
         }
 
         var context = new JobContext {
@@ -65,8 +65,16 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
 
         var trigger = TriggerOpenMethod.MakeGenericMethod(jobType);
         var task    = (Task<SchemataJobExecution>)trigger.Invoke(_scheduler, [context, ct])!;
-        return await task;
+        return SchemataOperation.FromExecution(await task);
     }
 
     #endregion
+
+    /// <summary>
+    ///     The technical reason (missing, unloadable, or unregistered job type) stays out
+    ///     of the client-visible message; the persisted job row carries the specifics.
+    /// </summary>
+    private static FailedPreconditionException JobNotRunnable(SchemataJob entity) {
+        return new(message: $"Job '{entity.CanonicalName}' cannot be run.");
+    }
 }

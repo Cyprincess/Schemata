@@ -73,11 +73,11 @@ The generated controller exposes five actions:
 
 | HTTP method | Route | Action | Returns |
 |---|---|---|---|
-| `GET` | `/{collection}` | `ListAsync([FromQuery] ListRequest)` | `JsonResult(ListResultBase<TSummary>)` or `EmptyResult` |
-| `GET` | `/{collection}/{name}` | `GetAsync(string name)` | `JsonResult(TDetail)` or `EmptyResult` |
-| `POST` | `/{collection}` | `CreateAsync([FromBody] TRequest)` | `JsonResult(TDetail)` with `201 Created` or `EmptyResult` |
-| `PATCH` | `/{collection}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | `JsonResult(TDetail)` or `EmptyResult` |
-| `DELETE` | `/{collection}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery] bool? force)` | `204 No Content` or `EmptyResult` |
+| `GET` | `/{collection}` | `ListAsync([FromQuery] ListRequest)` | `JsonResult(ListResultBase<TSummary>)` |
+| `GET` | `/{collection}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)` | `JsonResult(TDetail)` |
+| `POST` | `/{collection}` | `CreateAsync([FromBody] TRequest)` | `JsonResult(TDetail)` with `201 Created` |
+| `PATCH` | `/{collection}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | `JsonResult(TDetail)` |
+| `DELETE` | `/{collection}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag)` | `200` with the updated resource for soft deletes, `204 No Content` for hard deletes |
 
 All actions delegate to `ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>`, passing `HttpContext.User` as the principal and `HttpContext.RequestAborted` as the cancellation token.
 
@@ -116,7 +116,7 @@ The wire-format conventions (snake_case property naming, `long`-as-string, AIP `
 
 - `ResourceControllerFeatureProvider` adds the synthesized closed-generic controller types directly to `ControllerFeature.Controllers`, which is how they escape the `Schemata.*` assembly-part stripping performed by `SchemataControllersFeature`.
 - The HTTP transport is unary. For streaming use cases, use the gRPC transport.
-- When an advisor returns `Block` without throwing, the controller returns `EmptyResult`. Advisors that want a specific HTTP status throw the matching `SchemataException` subtype instead.
+- When an advisor returns `Block` without throwing, the operation handler throws `NotFoundException` (404), hiding the resource's existence per AIP-211. Advisors that want a different HTTP status throw the matching `SchemataException` subtype instead.
 
 ## See also
 

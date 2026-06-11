@@ -9,6 +9,7 @@ public interface IUpdateMask
 {
     /// <summary>
     ///     Comma-separated field paths denoting the fields to update.
+    ///     Dot paths traverse nested objects; collection element traversal is rejected.
     ///     A <c>*</c> wildcard means all fields.
     /// </summary>
     string? UpdateMask { get; set; }

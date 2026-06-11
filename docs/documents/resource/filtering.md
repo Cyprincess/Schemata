@@ -52,14 +52,14 @@ If you need CEL or a custom language for filtering, you must call the compiler d
 
 ## Pagination
 
-Pagination uses a cursor-based page token. The `page_token` parameter is a base64-encoded JSON object containing `parent`, `filter`, `order_by`, `show_deleted`, `page_size`, and `skip`. The token is validated against the current request parameters — if any of `parent`, `filter`, `order_by`, or `show_deleted` differ from the token, a `ValidationException` is thrown.
+Pagination uses a cursor-based page token. The `page_token` parameter is a Brotli-compressed JSON object containing `parent`, `filter`, `order_by`, `show_deleted`, `page_size`, and `skip`, sealed with ASP.NET Core Data Protection so clients can neither read nor alter it; tokens that fail to decode throw `ValidationException` (`invalid_page_token`). The decoded token is validated against the current request parameters — if any of `parent`, `filter`, `order_by`, or `show_deleted` differ from the token, a `ValidationException` is thrown.
 
 | Parameter | Default | Max |
 |---|---|---|
 | `page_size` | 25 | 100 |
 | `skip` | 0 | unbounded |
 
-The next page token is included in the response when the number of returned summaries equals the page size. When the last page is reached, `next_page_token` is absent from the response.
+The query fetches one look-ahead row beyond the page size, and `next_page_token` is included only when that extra row exists - an exactly-full last page omits it. A negative `page_size` throws `ValidationException` (`invalid_page_size`). `total_size` computation is configurable through `TotalSizeMode` (`Exact` by default, `Estimated` via `IRepository.EstimateCountAsync`, or `None` to omit the field and skip counting), set globally on `SchemataResourceOptions.TotalSize` or per resource on `ResourceAttribute.TotalSize`.
 
 ## `ResourceRequestContainer`
 

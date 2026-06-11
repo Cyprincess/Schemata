@@ -4,11 +4,15 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Aip;
+using Schemata.Mapping.Foundation;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
 
@@ -26,22 +30,12 @@ public class HandlerFixture
         Mapper.Setup(m => m.Map<Student>(It.IsAny<object>())).Returns<object>(src => src as Student ?? new Student());
         Mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>())).Returns<Student>(src => src);
 
-        // Field-selective mapper for UpdateMask: copies named properties from source to destination
         Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>(), It.IsAny<IEnumerable<string>>()))
-              .Callback<Student, Student, IEnumerable<string>>((src, dst, fields) => {
-                   foreach (var field in fields) {
-                       var prop = typeof(Student).GetProperty(field);
-                       prop?.SetValue(dst, prop.GetValue(src));
-                   }
-               });
+              .Callback<Student, Student, IEnumerable<string>>((src, dst, fields)
+                   => SimpleMapperHelper.MapWithMask(src, dst, fields, CopyAll));
 
-        // Full-object mapper (no fields): copy all public properties
         Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>()))
-              .Callback<Student, Student>((src, dst) => {
-                   foreach (var prop in typeof(Student).GetProperties()) {
-                       if (prop.CanWrite) prop.SetValue(dst, prop.GetValue(src));
-                   }
-               });
+              .Callback<Student, Student>(CopyAll);
 
         Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
 
@@ -90,6 +84,12 @@ public class HandlerFixture
         Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
     }
 
+    private static void CopyAll(Student src, Student dst) {
+        foreach (var prop in AppDomainTypeCache.GetWritableProperties(typeof(Student))) {
+            prop.SetValue(dst, prop.GetValue(src));
+        }
+    }
+
     public Mock<IRepository<Student>> Repository { get; } = new();
     public Mock<ISimpleMapper>        Mapper     { get; } = new();
 
@@ -120,6 +120,7 @@ public class HandlerFixture
         var services = new ServiceCollection();
         services.AddAipExpressions();
         services.AddSingleton(Options.Create(new SchemataResourceOptions()));
+        services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider(NullLoggerFactory.Instance));
         configure?.Invoke(services);
         var sp = services.BuildServiceProvider();
         return new(sp, Repository.Object, Mapper.Object);

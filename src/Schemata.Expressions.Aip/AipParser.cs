@@ -58,7 +58,7 @@ public static class AipParser
                                       && !string.Equals(s, "FALSE", StringComparison.OrdinalIgnoreCase)
                                       && !string.Equals(s, "NULL", StringComparison.OrdinalIgnoreCase);
                               });
-        var unquoted = @string.Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString(), false));
+        var unquoted = @string.Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
         var quoted = Parsers.Terms.String()
                             .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString(), true));
 

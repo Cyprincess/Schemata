@@ -23,7 +23,7 @@ The resource system provides two read operations: **List** and **Get**. Both run
 IResourceRequestAdvisor<TEntity>
 ```
 
-Receives the principal and the operation token `nameof(Operations.List)`. A `Block` returns `ListResultBase<TSummary>.Blocked`.
+Receives the principal and the operation token `nameof(Operations.List)`. A `Block` throws `NotFoundException`.
 
 ### Stage 2: List request advisors
 
@@ -39,7 +39,7 @@ If `request.Parent` is non-empty, `ResourceNameDescriptor.ParseParent` parses it
 
 ### Stage 4: Page token validation
 
-The page token is decoded from `request.PageToken` (base64 JSON). If a token is present, its `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` fields must match the current request — mismatches throw `ValidationException` with reason `FieldReasons.InvalidPageToken`. Page size is clamped to `[1, 100]` with a default of 25.
+The page token is decrypted from `request.PageToken` (Brotli-compressed JSON sealed with ASP.NET Core Data Protection, so clients can neither read nor alter it). A token that fails to decode throws `ValidationException` with reason `FieldReasons.InvalidPageToken`. If a token is present, its `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` fields must match the current request — mismatches throw `ValidationException` with reason `FieldReasons.InvalidPageToken`. A negative `page_size` throws `ValidationException` with reason `FieldReasons.InvalidPageSize`; zero or absent falls back to 25; values above 100 are capped at 100. A deterministic key ordering (primary key, falling back to `Uid`, then `Name`) is always appended after any `order_by`, keeping page boundaries stable.
 
 ### Stage 5: Filter compilation
 
@@ -58,7 +58,11 @@ If `request.ShowDeleted` is `true`, the repository instance is wrapped with `Sup
 ### Stage 8: Count and fetch
 
 ```csharp
-var totalSize = await repository.CountAsync(q => container.Query(q), ct);
+var totalSize = ResolveTotalSizeMode() switch {
+    TotalSizeMode.None      => (int?)null,
+    TotalSizeMode.Estimated => (int)Math.Min(await repository.EstimateCountAsync(q => container.Query(q), ct), int.MaxValue),
+    var _                   => await repository.CountAsync(q => container.Query(q), ct),
+};
 container.ApplyPaginating(token);
 var entities = repository.ListAsync(q => container.Query(q), ct);
 var summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct).ToListAsync(ct);
@@ -68,7 +72,7 @@ The total count is fetched before pagination is applied. Pagination (skip/take) 
 
 ### Stage 9: Next page token
 
-If the number of returned summaries equals the page size, a next page token is produced by advancing `token.Skip` by `token.PageSize` and serializing.
+The query fetches one look-ahead row beyond the page size; a next page token is produced only when that extra row exists, so the exactly-full last page omits `next_page_token` per AIP-158. The token advances `token.Skip` by `token.PageSize` before sealing.
 
 ### Stage 10: List response advisors
 

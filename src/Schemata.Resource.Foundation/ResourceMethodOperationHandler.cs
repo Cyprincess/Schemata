@@ -4,8 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Advisors;
 
@@ -16,7 +18,7 @@ namespace Schemata.Resource.Foundation;
 ///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate
 ///         -> <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
 ///         -> <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
-///         -> registered <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />
+///         -> registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />
 ///         -> <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
 ///     Each stage may short-circuit by stashing a <typeparamref name="TResponse" />
 ///     in the <see cref="AdviceContext" /> and returning
@@ -58,9 +60,11 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     /// <param name="principal">The authenticated caller, or
     ///     <see langword="null" /> for anonymous calls.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The method's response, or <see langword="null" /> when any
-    ///     advisor stage blocks.</returns>
-    public async Task<TResponse?> InvokeAsync(
+    /// <returns>The method's response.</returns>
+    /// <exception cref="NotFoundException">
+    ///     An advisor stage blocked the invocation.
+    /// </exception>
+    public async Task<TResponse> InvokeAsync(
         IResourceMethodHandler<TEntity, TRequest, TResponse> handler,
         string                                               verb,
         string?                                              name,
@@ -70,65 +74,90 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ) {
         ct ??= CancellationToken.None;
 
-        var ctx = new AdviceContext(_sp);
+        var ctx = ResourceAdviceContext.Create(_sp);
         ctx.Set(new ResourceMethodVerb(verb));
 
+        return await InvokeCoreAsync(ctx, handler, verb, name, request, principal, ct.Value);
+    }
+
+    private async Task<TResponse> InvokeCoreAsync(
+        AdviceContext                                        ctx,
+        IResourceMethodHandler<TEntity, TRequest, TResponse> handler,
+        string                                               verb,
+        string?                                              name,
+        TRequest                                             request,
+        ClaimsPrincipal?                                     principal,
+        CancellationToken                                    ct
+    ) {
         switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, verb, ct.Value)) {
+                             .RunAsync(ctx, principal, verb, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre;
+                return pre!;
             case AdviseResult.Block:
             default:
-                return null;
+                throw Blocked(name);
         }
 
         var container = new ResourceRequestContainer<TEntity>();
+        if (name is not null) {
+            ResourceIdentifiers.Apply(container, name);
+        }
 
         switch (await Advisor.For<IResourceMethodRequestAdvisor<TEntity, TRequest>>()
-                             .RunAsync(ctx, request, container, principal, ct.Value)) {
+                             .RunAsync(ctx, request, container, principal, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre;
+                return pre!;
             case AdviseResult.Block:
             default:
-                return null;
+                throw Blocked(name);
         }
 
-        TEntity? entity;
-        using (_repository.SuppressQuerySoftDelete()) {
-            entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
-        }
-        if (entity == null) {
-            throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
+        // Collection-scoped methods (name == null) act on the collection as a whole:
+        // there is no single entity to load, so the entity-stage advisors are skipped
+        // and the handler receives a null entity.
+        TEntity? entity = null;
+        if (name is not null) {
+            using (_repository.SuppressQuerySoftDelete()) {
+                entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
+            }
+            if (entity == null) {
+                throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
+            }
+
+            switch (await Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
+                                 .RunAsync(ctx, request, entity, principal, ct)) {
+                case AdviseResult.Continue:
+                    break;
+                case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
+                    return pre!;
+                case AdviseResult.Block:
+                default:
+                    throw Blocked(name);
+            }
         }
 
-        switch (await Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
-                             .RunAsync(ctx, request, entity, principal, ct.Value)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre;
-            case AdviseResult.Block:
-            default:
-                return null;
-        }
-
-        var response = await handler.InvokeAsync(name, request, entity, principal, ct.Value);
+        var response = await handler.InvokeAsync(name, request, entity, principal, ct);
 
         switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TResponse>>()
-                             .RunAsync(ctx, null, response, principal, ct.Value)) {
+                             .RunAsync(ctx, null, response, principal, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre;
+                return pre!;
             case AdviseResult.Block:
             default:
-                return null;
+                throw Blocked(name);
         }
 
         return response;
+    }
+
+    private static NotFoundException Blocked(string? name) {
+        return ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(
+            name ?? ResourceNameDescriptor.ForType<TEntity>().Collection);
     }
 }

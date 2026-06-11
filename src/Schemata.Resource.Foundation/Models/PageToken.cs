@@ -1,20 +1,34 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
+using Schemata.Common;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Models;
 
 /// <summary>
 ///     Encodes list query parameters (filter, order-by, parent, show-deleted, page size, skip)
-///     into a Brotli-compressed Base64 URL-safe token
-///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso>. Deserialization failures
-///     return <see langword="null" /> silently — the caller treats a null token as a fresh request.
+///     into a Brotli-compressed, data-protected, Base64 URL-safe token
+///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso>. Tokens are
+///     encrypted so clients cannot read or alter the continuation position; any token that
+///     fails to decode raises <c>INVALID_ARGUMENT</c>.
 /// </summary>
 public class PageToken
 {
+    /// <summary>
+    ///     The <see cref="IDataProtector" /> purpose string isolating page tokens
+    ///     from other protected payloads.
+    /// </summary>
+    public const string ProtectionPurpose = "Schemata.Resource.Foundation.PageToken";
+
     /// <summary>
     ///     Gets or sets the filter expression.
     /// </summary>
@@ -46,10 +60,11 @@ public class PageToken
     public virtual int Skip { get; set; }
 
     /// <summary>
-    ///     Serializes this token to a Brotli-compressed Base64 URL-safe string.
+    ///     Serializes this token to a Brotli-compressed, protected, Base64 URL-safe string.
     /// </summary>
+    /// <param name="protector">The <see cref="IDataProtector" /> sealing the token.</param>
     /// <returns>The encoded page token.</returns>
-    public async Task<string> ToStringAsync() {
+    public async Task<string> ToStringAsync(IDataProtector protector) {
         var json  = JsonSerializer.Serialize(this);
         var bytes = Encoding.UTF8.GetBytes(json);
 
@@ -58,29 +73,40 @@ public class PageToken
         gz.Write(bytes, 0, bytes.Length);
         gz.Close();
 
-        return ms.ToArray().ToBase64UrlString();
+        return protector.Protect(ms.ToArray()).ToBase64UrlString();
     }
 
     /// <summary>
-    ///     Deserializes a page token from its Brotli-compressed Base64 URL-safe representation.
-    ///     Returns <see langword="null" /> if the input is null, empty, or invalid.
+    ///     Decodes a page token from its protected representation.
+    ///     Returns <see langword="null" /> when the input is null or whitespace.
     /// </summary>
     /// <param name="token">The encoded token string, or <see langword="null" />.</param>
-    /// <returns>The deserialized token, or <see langword="null" />.</returns>
-    public static async Task<PageToken?> FromStringAsync(string? token) {
+    /// <param name="protector">The <see cref="IDataProtector" /> that sealed the token.</param>
+    /// <returns>The decoded token, or <see langword="null" /> when no token was supplied.</returns>
+    /// <exception cref="ValidationException">The token cannot be decoded.</exception>
+    public static async Task<PageToken?> FromStringAsync(string? token, IDataProtector protector) {
         if (string.IsNullOrWhiteSpace(token)) {
             return null;
         }
 
-        var bytes = token.FromBase64UrlString();
-
-        using var       ms = new MemoryStream(bytes);
-        await using var gz = new BrotliStream(ms, CompressionMode.Decompress);
-
         try {
-            return await JsonSerializer.DeserializeAsync<PageToken>(gz);
-        } catch {
-            return null;
+            var bytes = protector.Unprotect(token.FromBase64UrlString());
+
+            using var       ms = new MemoryStream(bytes);
+            await using var gz = new BrotliStream(ms, CompressionMode.Decompress);
+
+            var parsed = await JsonSerializer.DeserializeAsync<PageToken>(gz);
+            return parsed ?? throw new JsonException("Page token payload deserialized to null.");
+        } catch (Exception ex) when (ex is FormatException
+                                        or CryptographicException
+                                        or JsonException
+                                        or IOException
+                                        or InvalidDataException) {
+            throw new ValidationException([new() {
+                Field       = SchemataNaming.ToWireName(nameof(ListRequest.PageToken)),
+                Description = SchemataResources.GetResourceString(SchemataResources.ST2003),
+                Reason      = FieldReasons.InvalidPageToken,
+            }]);
         }
     }
 }

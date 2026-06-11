@@ -27,16 +27,13 @@ public static class AdviceDeleteFreshness
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The check fires only when <see cref="DeleteRequest.Force" /> is <see langword="false" />
-///         and the supplied <see cref="DeleteRequest.Etag" /> begins with <c>W/</c> (weak validator).
-///         Missing, empty, or non-<c>W/</c> tags are treated as opt-out - the delete proceeds
-///         without concurrency validation. Hosts that need stronger guarantees should require
-///         <c>etag</c> earlier in the chain (e.g., via a validation advisor) or layer a stricter
-///         freshness advisor.
+///         The check fires whenever <see cref="DeleteRequest.Etag" /> is non-empty: any value that
+///         differs from the entity's current weak tag — including strong-format or malformed tags —
+///         raises <see cref="ConcurrencyException" /> (AIP-154: a provided mismatching etag MUST
+///         abort). Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
-///         Throws <see cref="ConcurrencyException" /> on mismatch. Suppressed when
-///         <see cref="FreshnessSuppressed" /> is present.
+///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
@@ -54,17 +51,13 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
-        if (request.Force) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
         if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
         var tag = request.Etag;
 
-        if (string.IsNullOrWhiteSpace(tag) || !tag.StartsWith("W/")) {
+        if (string.IsNullOrWhiteSpace(tag)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

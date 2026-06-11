@@ -13,9 +13,10 @@ namespace Schemata.Transport.Http;
 ///     Schemata trait -> JSON wire-name rewrites shared by every HTTP Schemata
 ///     surface. Hides <see cref="ICanonicalName.Name" />, surfaces
 ///     <see cref="ICanonicalName.CanonicalName" /> as <c>name</c> (AIP-122),
-///     <see cref="IFreshness.EntityTag" /> as <c>etag</c> (AIP-154), and
-///     <see cref="ListResultBase{TSummary}.Entities" /> as the entity plural resolved
-///     through <see cref="ResourceNameDescriptor" /> (AIP-132).
+///     <see cref="IFreshness.EntityTag" /> as <c>etag</c> (AIP-154), and the
+///     <c>Entities</c> property of <see cref="IEntitiesResult{TItem}" /> implementors
+///     as the entity plural resolved through
+///     <see cref="ResourceNameDescriptor" /> (AIP-132 / AIP-231..235).
 /// </summary>
 internal static class SchemataJsonTraits
 {
@@ -44,15 +45,15 @@ internal static class SchemataJsonTraits
                 ep?.Name = Parameters.EntityTag;
             }
 
-            if (info.Type is { IsGenericType: true }
-             && info.Type.GetGenericTypeDefinition() == typeof(ListResultBase<>)) {
+            var carrier = info.Type.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
+            if (carrier is not null) {
                 var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(ListResultBase<>.Entities),
+                    Name: nameof(IEntitiesResult<>.Entities),
                 });
 
                 if (property is not null) {
-                    var summary = info.Type.GetGenericArguments()[0];
-                    var plural  = ResourceNameDescriptor.ForType(summary).Plural;
+                    var item   = carrier.GetGenericArguments()[0];
+                    var plural = ResourceNameDescriptor.ForType(item).Plural;
                     property.Name = options.PropertyNamingPolicy is not null
                         ? options.PropertyNamingPolicy.ConvertName(plural)
                         : plural;

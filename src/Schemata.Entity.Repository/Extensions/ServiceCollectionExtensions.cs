@@ -21,7 +21,8 @@ public static class ServiceCollectionExtensions
     ///     and <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>,
     ///     soft-delete on add/remove per AIP-164 and
     ///     <seealso href="https://google.aip.dev/214">AIP-214: Resource expiration</seealso>,
-    ///     validation, and canonical name resolution.
+    ///     validation, canonical name resolution, and optimistic duplicate protection per
+    ///     <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="type">A type that implements <see cref="IRepository{TEntity}" />.</param>
@@ -76,6 +77,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddSoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddTimestamp<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddValidation<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddUniqueness<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryRemoveAdvisor<>), typeof(AdviceRemoveSoftDelete<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateConcurrency<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceUpdateTimestamp<>)));

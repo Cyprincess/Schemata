@@ -5,7 +5,9 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Http;
@@ -18,7 +20,7 @@ public class ResourceMethodControllerConventionShould
     [Fact]
     public void DoNothing_ForUnrelatedControllerType() {
         var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new ResourceMethodAttribute("run", typeof(HandlerB))],
+            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
         };
         var convention = new ResourceMethodControllerConvention(methods);
 
@@ -32,9 +34,9 @@ public class ResourceMethodControllerConventionShould
     }
 
     [Fact]
-    public void RewriteInstanceScopeAction_To_NameColonVerb() {
+    public void RewriteInstanceScopeAction_To_AbsoluteNameColonVerb() {
         var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new ResourceMethodAttribute("run", typeof(HandlerB))],
+            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
         };
         var convention = new ResourceMethodControllerConvention(methods);
 
@@ -44,15 +46,15 @@ public class ResourceMethodControllerConventionShould
         convention.Apply(model);
 
         var actionTemplate = model.Actions[0].Selectors[0].AttributeRouteModel!.Template;
-        Assert.Equal("{name}:run", actionTemplate);
+        Assert.Equal("~/v1/entityBs/{name}:run", actionTemplate);
         Assert.Equal("Invoke_run", model.Actions[0].ActionName);
     }
 
     [Fact]
-    public void RewriteCollectionScopeAction_To_ColonVerb() {
+    public void RewriteCollectionScopeAction_To_AbsoluteColonVerb() {
         var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
             [typeof(EntityB).TypeHandle] = [
-                new ResourceMethodAttribute("batchCreate", typeof(HandlerB), ResourceMethodScope.Collection),
+                new("batchCreate", typeof(HandlerB), ResourceMethodScope.Collection),
             ],
         };
         var convention = new ResourceMethodControllerConvention(methods);
@@ -63,14 +65,14 @@ public class ResourceMethodControllerConventionShould
         convention.Apply(model);
 
         var actionTemplate = model.Actions[0].Selectors[0].AttributeRouteModel!.Template;
-        Assert.Equal(":batchCreate", actionTemplate);
+        Assert.Equal("~/v1/entityBs:batchCreate", actionTemplate);
         Assert.Equal("Invoke_batchCreate", model.Actions[0].ActionName);
     }
 
     [Fact]
-    public void RewriteControllerRoute_ToCollectionPath() {
+    public void NullControllerRoute_AndSetPluralName() {
         var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new ResourceMethodAttribute("run", typeof(HandlerB))],
+            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
         };
         var convention = new ResourceMethodControllerConvention(methods);
 
@@ -79,8 +81,7 @@ public class ResourceMethodControllerConventionShould
 
         convention.Apply(model);
 
-        var controllerTemplate = model.Selectors[0].AttributeRouteModel!.Template;
-        Assert.Equal("~/v1/entityBs", controllerTemplate);
+        Assert.Null(model.Selectors[0].AttributeRouteModel);
         Assert.Equal("EntityBs", model.ControllerName);
     }
 
@@ -99,12 +100,75 @@ public class ResourceMethodControllerConventionShould
         Assert.Equal(initialAction,   model.Actions[0].ActionName);
     }
 
+    [Fact]
+    public void RebindGetMethod_ToGetConstraintAndQueryBinding() {
+        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
+            [typeof(EntityB).TypeHandle] = [
+                new("preview", typeof(HandlerB)) { Method = ResourceHttpMethod.Get },
+            ],
+        };
+        var convention = new ResourceMethodControllerConvention(methods);
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType, withRequestParameter: true);
+        model.Actions[0].Selectors[0].ActionConstraints.Add(
+            new HttpMethodActionConstraint(["POST"]));
+
+        convention.Apply(model);
+
+        var constraint = Assert.IsType<HttpMethodActionConstraint>(
+            Assert.Single(model.Actions[0].Selectors[0].ActionConstraints));
+        Assert.Equal(["GET"], constraint.HttpMethods);
+
+        var parameter = Assert.Single(model.Actions[0].Parameters, p => p.ParameterName == "request");
+        Assert.Equal(
+            BindingSource.Query,
+            parameter.BindingInfo?.BindingSource);
+    }
+
+    [Fact]
+    public void KeepPostConstraint_ForDefaultMethod() {
+        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
+            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
+        };
+        var convention = new ResourceMethodControllerConvention(methods);
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType, withRequestParameter: true);
+        model.Actions[0].Selectors[0].ActionConstraints.Add(
+            new HttpMethodActionConstraint(["POST"]));
+
+        convention.Apply(model);
+
+        var constraint = Assert.IsType<HttpMethodActionConstraint>(
+            Assert.Single(model.Actions[0].Selectors[0].ActionConstraints));
+        Assert.Equal(["POST"], constraint.HttpMethods);
+
+        var parameter = Assert.Single(model.Actions[0].Parameters, p => p.ParameterName == "request");
+        Assert.Null(parameter.BindingInfo);
+    }
+
+    private static ControllerModel BuildController(TypeInfo controllerType, bool withRequestParameter) {
+        var model = BuildController(controllerType);
+
+        if (withRequestParameter) {
+            var actionMethod = controllerType.GetMethods().First(m => m.Name == "InvokeAsync");
+            var info         = actionMethod.GetParameters().First(p => p.Name == "request");
+            model.Actions[0].Parameters.Add(new(info, []) {
+                ParameterName = "request",
+                Action        = model.Actions[0],
+            });
+        }
+
+        return model;
+    }
+
     private static ControllerModel BuildController(TypeInfo controllerType) {
         var model = new ControllerModel(controllerType, []) {
             ControllerName = "PlaceholderName",
         };
-        model.Selectors.Add(new SelectorModel {
-            AttributeRouteModel = new AttributeRouteModel { Template = "~/Resource" },
+        model.Selectors.Add(new() {
+            AttributeRouteModel = new() { Template = "~/Resource" },
         });
 
         var actionMethod = controllerType.GetMethods()
@@ -113,8 +177,8 @@ public class ResourceMethodControllerConventionShould
             Controller = model,
             ActionName = controllerType == typeof(UnrelatedController) ? "Untouched" : "InvokeAsync",
         };
-        action.Selectors.Add(new SelectorModel {
-            AttributeRouteModel = new AttributeRouteModel(),
+        action.Selectors.Add(new() {
+            AttributeRouteModel = new(),
         });
         model.Actions.Add(action);
 
@@ -145,7 +209,7 @@ public class ResourceMethodControllerConventionShould
         public ValueTask<ResponseB> InvokeAsync(
             string?           name,
             RequestB          request,
-            EntityB           entity,
+            EntityB?          entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
         ) => ValueTask.FromResult(new ResponseB());

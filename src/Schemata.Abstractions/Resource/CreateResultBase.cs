@@ -6,7 +6,7 @@ namespace Schemata.Abstractions.Resource;
 ///     carrying the created resource detail.
 /// </summary>
 /// <typeparam name="TDetail">The resource detail type.</typeparam>
-public class CreateResultBase<TDetail> : OperationResultBase<CreateResultBase<TDetail>>
+public class CreateResultBase<TDetail>
 {
     /// <summary>
     ///     The created resource detail, or <see langword="null" /> for fire-and-forget operations.

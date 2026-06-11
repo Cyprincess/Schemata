@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -39,7 +40,7 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.PostConfigure<JsonSerializerOptions>(SchemataJsonTraits.Apply);
-        services.PostConfigure<Microsoft.AspNetCore.Http.Json.JsonOptions>(opts => SchemataJsonTraits.Apply(opts.SerializerOptions));
+        services.PostConfigure<JsonOptions>(opts => SchemataJsonTraits.Apply(opts.SerializerOptions));
         services.PostConfigure<Microsoft.AspNetCore.Mvc.JsonOptions>(opts => SchemataJsonTraits.Apply(opts.JsonSerializerOptions));
     }
 

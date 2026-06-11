@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Scheduling.Event.Events;
@@ -13,12 +14,12 @@ public sealed class JobFailed : IEvent
     /// <summary>Job name as registered with the scheduler.</summary>
     public string Job { get; init; } = null!;
 
-    /// <summary>Opaque variables payload carried by the job at failure time.</summary>
-    public string? Variables { get; init; }
+    /// <summary>Variables carried by the job at failure time.</summary>
+    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
 
     /// <summary>UTC timestamp when the job failed.</summary>
     public DateTime FailedAt { get; init; }
 
-    /// <summary>Exception summary (<see cref="object.ToString" /> output) for diagnostics.</summary>
+    /// <summary>Exception message for diagnostics.</summary>
     public string? Error { get; init; }
 }

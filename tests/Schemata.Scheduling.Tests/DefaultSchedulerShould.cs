@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -105,9 +107,9 @@ public class DefaultSchedulerShould
         try {
             await scheduler.StartAsync(CancellationToken.None);
 
-            await scheduler.TriggerAsync<NoopJob>(new JobContext {
+            await scheduler.TriggerAsync<NoopJob>(new() {
                 Job   = "authorization/back-channel-logout/abc123",
-                Variables = new System.Collections.Generic.Dictionary<string, object?> { ["uri"] = "https://rp" },
+                Variables = new Dictionary<string, object?> { ["uri"] = "https://rp" },
             }, CancellationToken.None);
 
             Assert.NotNull(captured);
@@ -116,6 +118,36 @@ public class DefaultSchedulerShould
             Assert.False(captured.Replay);
             Assert.Equal(JobState.Active, captured.State);
             Assert.NotNull(captured.NextRunTime);
+        } finally {
+            await scheduler.StopAsync(CancellationToken.None);
+            sp.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_WithTypedVariables_SerializesVariablesInsideScheduler() {
+        var (scheduler, observer, sp) = Build();
+        SchemataJob? captured = null;
+        observer.Setup(o => o.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
+                .Callback<SchemataJob, CancellationToken>((j, _) => captured = j)
+                .Returns(Task.CompletedTask);
+
+        try {
+            await scheduler.StartAsync(CancellationToken.None);
+
+            var job = new SchemataJob {
+                Name         = "test/typed-variables",
+                JobType      = typeof(NoopJob).AssemblyQualifiedName,
+                ScheduleType = ScheduleType.OneTime,
+                NextRunTime  = DateTime.UtcNow.AddMinutes(5),
+                State        = JobState.Active,
+            };
+
+            await scheduler.ScheduleAsync(job, new Dictionary<string, object?> { ["uri"] = "https://rp" }, CancellationToken.None);
+
+            Assert.NotNull(captured);
+            var variables = JsonSerializer.Deserialize<Dictionary<string, object?>>(captured!.Variables!);
+            Assert.Equal("https://rp", ((JsonElement)variables!["uri"]!).GetString());
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
             sp.Dispose();
@@ -167,6 +199,41 @@ public class DefaultSchedulerShould
                             Times.Exactly(2));
             observer.Verify(o => o.OnUnscheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()),
                             Times.Never);
+        } finally {
+            await scheduler.StopAsync(CancellationToken.None);
+            sp.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task FirePastDuePeriodicJob_FromPersistedNextRunTime() {
+        var (scheduler, observer, sp) = Build();
+        var fired = new TaskCompletionSource<SchemataJob>(TaskCreationOptions.RunContinuationsAsynchronously);
+        observer.Setup(o => o.OnSucceededAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                               It.IsAny<CancellationToken>()))
+                .Callback<SchemataJob, JobContext, CancellationToken>((j, _, _) => fired.TrySetResult(j))
+                .Returns(Task.CompletedTask);
+
+        try {
+            await scheduler.StartAsync(CancellationToken.None);
+
+            var persistedNextRunTime = DateTime.UtcNow.AddMilliseconds(-50);
+            var job = new SchemataJob {
+                Name          = "test/past-due-periodic",
+                JobType       = typeof(NoopJob).AssemblyQualifiedName,
+                ScheduleType  = ScheduleType.Periodic,
+                IntervalTicks = TimeSpan.FromMinutes(10).Ticks,
+                NextRunTime   = persistedNextRunTime,
+                State         = JobState.Active,
+            };
+
+            await scheduler.ScheduleAsync(job, CancellationToken.None);
+
+            var updated = await fired.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(JobState.Active, updated.State);
+            Assert.NotNull(updated.NextRunTime);
+            Assert.True(updated.NextRunTime > DateTime.UtcNow.AddMinutes(9));
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
             sp.Dispose();

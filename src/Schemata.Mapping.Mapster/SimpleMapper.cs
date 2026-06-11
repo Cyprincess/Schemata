@@ -33,7 +33,7 @@ public sealed class SimpleMapper : ISimpleMapper
     }
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination) {
-        _mapper.Map(source, destination);
+        SimpleMapperHelper.MapMerging(source, destination, (s, d) => _mapper.Map(s, d));
     }
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields) {
@@ -50,7 +50,12 @@ public sealed class SimpleMapper : ISimpleMapper
         Type   sourceType,
         Type   destinationType
     ) {
-        _mapper.Map(source, destination, sourceType, destinationType);
+        SimpleMapperHelper.MapMerging(
+            source,
+            destination,
+            sourceType,
+            destinationType,
+            () => _mapper.Map(source, destination, sourceType, destinationType));
     }
 
     #endregion

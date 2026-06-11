@@ -18,17 +18,19 @@ namespace Schemata.Scheduling.Skeleton;
 public sealed class CancelOperationHandler(
     IRepository<SchemataJobExecution> executions,
     IScheduler                        scheduler
-) : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataJobExecution>
+) : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataOperation>
 {
-    #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataJobExecution> Members
+    #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataOperation> Members
 
-    public async ValueTask<SchemataJobExecution> InvokeAsync(
-        string?              name,
-        EmptyResourceRequest request,
-        SchemataJobExecution entity,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+    public async ValueTask<SchemataOperation> InvokeAsync(
+        string?               name,
+        EmptyResourceRequest  request,
+        SchemataJobExecution? entity,
+        ClaimsPrincipal?      principal,
+        CancellationToken     ct
     ) {
+        ArgumentNullException.ThrowIfNull(entity);
+
         if (entity.State is ExecutionState.Succeeded
                          or ExecutionState.Failed
                          or ExecutionState.Cancelled) {
@@ -45,7 +47,7 @@ public sealed class CancelOperationHandler(
         await executions.UpdateAsync(entity, ct);
         await executions.CommitAsync(ct);
 
-        return entity;
+        return SchemataOperation.FromExecution(entity);
     }
 
     #endregion

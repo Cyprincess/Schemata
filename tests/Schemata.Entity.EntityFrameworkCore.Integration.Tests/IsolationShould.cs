@@ -10,7 +10,7 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
 [Trait("Category", "Integration")]
 public class IsolationShould : IAsyncLifetime
 {
-    private readonly Fixtures.IntegrationFixture _fixture = new();
+    private readonly IntegrationFixture _fixture = new();
     public           Task                        InitializeAsync() { return _fixture.InitializeAsync(); }
 
     public Task DisposeAsync() { return _fixture.DisposeAsync(); }

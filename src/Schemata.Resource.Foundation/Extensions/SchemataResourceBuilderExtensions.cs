@@ -5,8 +5,7 @@ using Schemata.Resource.Foundation;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Convenience overloads for <see cref="SchemataResourceBuilder.Use{TEntity,TRequest,TDetail,TSummary}" />
-///     with fewer type parameters.
+///     Convenience overloads for resource registration with fewer type parameters.
 /// </summary>
 public static class SchemataResourceBuilderExtensions
 {

@@ -14,9 +14,11 @@ var builder = WebApplication.CreateBuilder(options);
 
 builder.UseSchemata(schema => {
     schema.UseMapster().Map<Student, Student>();
+    schema.UseMapster().Map<Trash, Trash>();
 
     var resource = schema.UseResource();
     resource.MapHttp().Use<Student, Student, Student, Student>();
+    resource.MapHttp().Use<Trash, Trash, Trash, Trash>();
     resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
 
     schema.Services.AddDistributedMemoryCache();
@@ -27,9 +29,11 @@ builder.UseSchemata(schema => {
         opts => opts.UseInMemoryDatabase(dbName));
 
     schema.Services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+    schema.Services.AddRepository<Trash, EntityFrameworkCoreRepository<TestDbContext, Trash>>();
 
     // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, TrashNameAdvisor>());
 });
 
 var app = builder.Build();

@@ -1,4 +1,4 @@
-using System.Linq;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,12 +15,12 @@ namespace Schemata.Flow.Foundation;
 /// </summary>
 public sealed class ProcessInitializer : BackgroundService
 {
-    private readonly IProcessRuntime      _runtime;
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IProcessRuntime  _runtime;
+    private readonly IServiceProvider _services;
 
-    public ProcessInitializer(IProcessRuntime runtime, IServiceScopeFactory scopeFactory) {
-        _runtime      = runtime;
-        _scopeFactory = scopeFactory;
+    public ProcessInitializer(IProcessRuntime runtime, IServiceProvider services) {
+        _runtime  = runtime;
+        _services = services;
     }
 
     protected override async Task ExecuteAsync(CancellationToken st) {
@@ -28,12 +28,8 @@ public sealed class ProcessInitializer : BackgroundService
             return;
         }
 
-        await using var scope     = _scopeFactory.CreateAsyncScope();
-        var             processes = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
+        var processes = _services.GetRequiredService<IRepository<SchemataProcess>>();
 
-        await foreach (var process in processes.ListAsync<SchemataProcess>(
-                                                q => q.Where(p => p.WaitingAtId != null), st)) {
-            concrete.Hydrate(process);
-        }
+        await ProcessHydrator.HydrateWaitingAsync(concrete, processes, st);
     }
 }

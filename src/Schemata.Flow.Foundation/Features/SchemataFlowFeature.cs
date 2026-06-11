@@ -8,7 +8,6 @@ using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation.Builders;
-using Schemata.Flow.Foundation.Observers;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine;
@@ -35,7 +34,10 @@ public sealed class SchemataFlowFeature : FeatureBase
         configure(builder);
 
         var flows = builder.Build();
-        services.Configure<SchemataFlowOptions>(options => { options.Configurations.AddRange(flows); });
+
+        services.Configure<SchemataFlowOptions>(options => {
+            options.Configurations.AddRange(flows);
+        });
 
         services.TryAddSingleton<IProcessRegistry>(sp => {
             var registry = ActivatorUtilities.CreateInstance<ProcessRegistry>(sp);
@@ -52,7 +54,6 @@ public sealed class SchemataFlowFeature : FeatureBase
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, SchemataProcessAuditObserver>());
         services.AddHostedService<ProcessInitializer>();
     }
 }

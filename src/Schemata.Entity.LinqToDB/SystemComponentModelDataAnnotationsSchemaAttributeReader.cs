@@ -5,12 +5,15 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
-using Schemata.Abstractions;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
+using Schemata.Abstractions;
+using ColumnAttribute = System.ComponentModel.DataAnnotations.Schema.ColumnAttribute;
 using EfPrimaryKey = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
+using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
 namespace Schemata.Entity.LinqToDB;
 
@@ -42,9 +45,9 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     public MappingAttribute[] GetAttributes(Type type) {
         var attributes = new List<MappingAttribute>();
 
-        var t = type.GetAttribute<System.ComponentModel.DataAnnotations.Schema.TableAttribute>();
+        var t = type.GetAttribute<TableAttribute>();
         if (t is not null) {
-            var attr = new TableAttribute { IsColumnAttributeRequired = false };
+            var attr = new global::LinqToDB.Mapping.TableAttribute { IsColumnAttributeRequired = false };
 
             var name = t.Name;
 
@@ -86,7 +89,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     /// <param name="member">The member to inspect.</param>
     /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
-        if (member.HasAttribute<System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute>()) {
+        if (member.HasAttribute<NotMappedAttribute>()) {
             return [new NotColumnAttribute()];
         }
 
@@ -105,16 +108,16 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             }
         }
 
-        var g = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute>();
+        var g = member.GetAttribute<DatabaseGeneratedAttribute>();
         if (g is {
-            DatabaseGeneratedOption: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity,
+            DatabaseGeneratedOption: DatabaseGeneratedOption.Identity,
         }) {
             attributes.Add(new IdentityAttribute());
         }
 
-        var c = member.GetAttribute<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>();
+        var c = member.GetAttribute<ColumnAttribute>();
         if (c is not null) {
-            attributes.Add(new ColumnAttribute {
+            attributes.Add(new global::LinqToDB.Mapping.ColumnAttribute {
                 Name   = c.Name,
                 DbType = c.TypeName,
             });

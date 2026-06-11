@@ -1,9 +1,10 @@
 using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>A running instance of a <see cref="ProcessDefinition" />.</summary>
-public sealed class ProcessInstance
+public sealed class ProcessInstance : ICanonicalName
 {
     /// <summary>The <see cref="FlowElement.Id" /> of the current element the token is at.</summary>
     public string StateId { get; set; } = null!;
@@ -22,4 +23,12 @@ public sealed class ProcessInstance
 
     /// <summary>Process variables keyed by <c>snake_case</c> CLR type names.</summary>
     public Dictionary<string, object?> Variables { get; set; } = new();
+
+    #region ICanonicalName Members
+
+    public string? Name { get; set; }
+
+    public string? CanonicalName { get; set; }
+
+    #endregion
 }

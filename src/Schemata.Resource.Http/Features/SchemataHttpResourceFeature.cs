@@ -35,10 +35,10 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var provider       = new ResourceControllerFeatureProvider();
-        var methodProvider = new ResourceMethodControllerFeatureProvider();
+        var provider = new ResourceControllerFeatureProvider();
+        var method   = new ResourceMethodControllerFeatureProvider();
         services.AddSingleton(provider);
-        services.AddSingleton(methodProvider);
+        services.AddSingleton(method);
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
         services.AddOptions<MvcOptions>()
@@ -50,7 +50,7 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {
                      manager.FeatureProviders.Add(provider);
-                     manager.FeatureProviders.Add(methodProvider);
+                     manager.FeatureProviders.Add(method);
                  });
     }
 

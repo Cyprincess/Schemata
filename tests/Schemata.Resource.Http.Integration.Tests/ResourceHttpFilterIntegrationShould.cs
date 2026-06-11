@@ -75,4 +75,32 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(hasToken, "Response should contain a next_page_token");
         Assert.False(string.IsNullOrWhiteSpace(tokenProp.GetString()), "next_page_token should be non-empty");
     }
+    [Fact]
+    public async Task ReadMask_TrimsUnlistedFields() {
+        var client = _factory.CreateClient();
+        await SeedAsync(client);
+
+        var response = await client.GetAsync("/v1/students?ReadMask=age");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body     = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var students = GetStudents(body);
+
+        Assert.NotEmpty(students);
+        foreach (var student in students) {
+            Assert.True(student.TryGetProperty("age", out _));
+            var hasName = student.TryGetProperty("full_name", out var fullName)
+                       && fullName.ValueKind != JsonValueKind.Null;
+            Assert.False(hasName);
+        }
+    }
+
+    [Fact]
+    public async Task ReadMask_UnknownPath_Returns422() {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/v1/students?ReadMask=no_such_field");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
 }

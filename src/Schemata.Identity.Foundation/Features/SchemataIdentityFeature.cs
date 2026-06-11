@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -55,7 +56,7 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
             options.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
 
-        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options => {
+        services.Configure<JsonOptions>(options => {
             options.SerializerOptions.Converters.Add(ClaimStoreJsonConverter.Instance);
         });
 

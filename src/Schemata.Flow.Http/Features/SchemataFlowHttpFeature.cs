@@ -1,25 +1,22 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation.Features;
-using Schemata.Transport.Http.Features;
+using Schemata.Flow.Skeleton;
+using Schemata.Flow.Skeleton.Entities;
+using Schemata.Resource.Foundation;
+using Schemata.Resource.Http.Features;
 
 namespace Schemata.Flow.Http.Features;
 
-/// <summary>
-///     Exposes Flow process management endpoints over HTTP. The assembly containing
-///     <c>ProcessController</c> is registered as an MVC
-///     <see cref="Microsoft.AspNetCore.Mvc.ApplicationParts.ApplicationPart" /> by
-///     <c>SchemataBuilder.AddSchemataApplicationPart&lt;SchemataFlowHttpFeature&gt;()</c>
-///     when <c>UseFlowHttp()</c> is invoked, which avoids the opt-in stripping
-///     performed by <see cref="SchemataControllersFeature" /> for <c>Schemata.*</c>
-///     assemblies. Shared HTTP plumbing (AIP-122 / AIP-154 wire-name rewrites) is
-///     supplied by <see cref="SchemataTransportHttpFeature" />.
-/// </summary>
+/// <summary>Registers Flow resources for the HTTP resource transport.</summary>
 [DependsOn<SchemataFlowFeature>]
-[DependsOn<SchemataTransportHttpFeature>]
+[DependsOn<SchemataHttpResourceFeature>]
 public sealed class SchemataFlowHttpFeature : FeatureBase
 {
     public const int DefaultPriority = SchemataFlowFeature.DefaultPriority + 100_000;
@@ -32,5 +29,35 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) { }
+    ) {
+        RegisterHandlers(services);
+        RegisterResources(new(schemata, services), HttpResourceAttribute.Name);
+    }
+
+    private static void RegisterHandlers(IServiceCollection services) {
+        services.TryAddScoped<StartProcessHandler>();
+        services.TryAddScoped<CompleteActivityHandler>();
+        services.TryAddScoped<CorrelateMessageHandler>();
+        services.TryAddScoped<ThrowSignalHandler>();
+        services.TryAddScoped<TerminateProcessHandler>();
+    }
+
+    private static void RegisterResources(SchemataResourceBuilder resources, string endpoint) {
+        resources.Use<SchemataProcess, SchemataProcess, SchemataProcess, SchemataProcess>(
+            [endpoint],
+            resource => {
+                resource.Operations = [Operations.Get, Operations.List];
+                resource.Methods = [
+                    new("start",     typeof(StartProcessHandler), ResourceMethodScope.Collection),
+                    new("complete",  typeof(CompleteActivityHandler)),
+                    new("correlate", typeof(CorrelateMessageHandler)),
+                    new("signal",    typeof(ThrowSignalHandler), ResourceMethodScope.Collection),
+                    new("terminate", typeof(TerminateProcessHandler)),
+                ];
+            });
+
+        resources.Use<SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition>(
+            [endpoint],
+            resource => resource.Operations = [Operations.Get, Operations.List]);
+    }
 }

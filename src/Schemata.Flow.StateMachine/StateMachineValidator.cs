@@ -30,11 +30,7 @@ public static class StateMachineValidator
 
         foreach (var gateway in definition.Elements.OfType<Gateway>()) {
             if (gateway is not (ExclusiveGateway or EventBasedGateway)) {
-                throw new FailedPreconditionException(message: $"Gateway '{
-                    gateway.Name
-                }' of type '{
-                    gateway.GetType().Name
-                }' is not supported by the state machine engine. Only ExclusiveGateway and EventBasedGateway are supported.");
+                throw new FailedPreconditionException(message: $"Gateway '{gateway.Name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.");
             }
 
             if (gateway is EventBasedGateway eventBasedGateway) {
@@ -56,11 +52,7 @@ public static class StateMachineValidator
             ValidateActivity(definition, activity);
 
             if (activity is SubProcess or CallActivity) {
-                throw new FailedPreconditionException(message: $"Activity '{
-                    activity.Name
-                }' of type '{
-                    activity.GetType().Name
-                }' is not supported by the state machine engine.");
+                throw new FailedPreconditionException(message: $"Activity '{activity.Name}' is not supported by the state machine engine.");
             }
 
             if (activity.LoopCharacteristics is not null) {

@@ -58,7 +58,7 @@ public interface IRepository<TEntity>
     /// </param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The matching entity or <see langword="null" />.</returns>
-    ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default);
+    ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Retrieves an entity by its keys and projects it to <typeparamref name="TResult" />.
@@ -66,7 +66,7 @@ public interface IRepository<TEntity>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="entity">An entity whose key properties are used to build the lookup.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default);
+    ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Finds an entity by its primary key values.
@@ -145,6 +145,21 @@ public interface IRepository<TEntity>
     );
 
     /// <summary>
+    ///     Estimates the number of entities matching the predicate. Defaults to the exact
+    ///     <see cref="LongCountAsync{TResult}" />; providers with cheaper statistics
+    ///     (e.g. table cardinality estimates) can override.
+    /// </summary>
+    /// <typeparam name="TResult">The projected result type.</typeparam>
+    /// <param name="predicate">An optional query transformation.</param>
+    /// <param name="ct">A cancellation token.</param>
+    ValueTask<long> EstimateCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    ) {
+        return LongCountAsync(predicate, ct);
+    }
+
+    /// <summary>
     ///     Drives the entity through the add advisor pipeline
     ///     (see <see cref="IRepositoryAddAdvisor{TEntity}" />) before persistence.
     /// </summary>
@@ -186,15 +201,14 @@ public interface IRepository<TEntity>
     Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 
     /// <summary>
+    ///     Begins a unit of work with current context.
+    /// </summary>
+    /// <returns></returns>
+    IUnitOfWork Begin();
+
+    /// <summary>
     ///     Enlists this repository in a unit of work.
     /// </summary>
-    /// <remarks>
-    ///     The unit of work's transaction opens lazily on the first access of its data
-    ///     context; <see cref="Join" /> triggers that access. Subsequent enlistments
-    ///     of additional repositories share the same context and transaction. Throws
-    ///     <see cref="InvalidOperationException" /> when this repository is already
-    ///     enlisted or carries uncommitted standalone work.
-    /// </remarks>
     /// <param name="uow">The unit of work to join.</param>
     void Join(IUnitOfWork uow);
 

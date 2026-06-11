@@ -1,0 +1,36 @@
+using Schemata.Abstractions.Entities;
+
+namespace Schemata.Abstractions.Resource;
+
+/// <summary>
+///     Collection-scoped request for AIP-165 purge.
+/// </summary>
+/// <remarks>
+///     Purge is executed as a long-running operation. The Resource feature returns
+///     an <c>operations/{operation}</c> reference when a Scheduling HTTP or gRPC bridge
+///     supplies the operation dispatcher.
+/// </remarks>
+/// <seealso href="https://google.aip.dev/165">AIP-165: Purge</seealso>
+public sealed class PurgeRequest : ICanonicalName, IRequestIdentification
+{
+    /// <summary>
+    ///     AIP filter expression selecting resources to purge. The wildcard <c>*</c>
+    ///     selects the whole visible collection.
+    /// </summary>
+    public string? Filter { get; set; }
+
+    /// <summary>
+    ///     When <see langword="true" />, physically removes matching resources; otherwise
+    ///     the operation reports a preview count and sample.
+    /// </summary>
+    public bool Force { get; set; }
+
+    /// <inheritdoc cref="IRequestIdentification.RequestId" />
+    public string? RequestId { get; set; }
+
+    /// <inheritdoc cref="ICanonicalName.Name" />
+    public string? Name { get; set; }
+
+    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
+    public string? CanonicalName { get; set; }
+}

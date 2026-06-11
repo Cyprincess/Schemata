@@ -6,7 +6,7 @@ namespace Schemata.Abstractions.Resource;
 ///     carrying the updated resource detail.
 /// </summary>
 /// <typeparam name="TDetail">The resource detail type.</typeparam>
-public class UpdateResultBase<TDetail> : OperationResultBase<UpdateResultBase<TDetail>>
+public class UpdateResultBase<TDetail>
 {
     /// <summary>
     ///     The updated resource detail, or <see langword="null" /> for async operations.

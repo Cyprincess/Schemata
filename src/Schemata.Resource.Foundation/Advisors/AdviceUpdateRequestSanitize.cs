@@ -51,7 +51,7 @@ public sealed class AdviceUpdateRequestSanitize<TEntity, TRequest> : IResourceUp
         if (request is IUpdateMask { UpdateMask: { } mask } mut) {
             var remaining = mask.Split(',')
                                 .Select(f => f.Trim())
-                                .Where(f => f.Length != 0 && !AdviceCreateRequestSanitize.SystemFields.Contains(SchemataNaming.ToClrMemberName(f)));
+                                .Where(f => f.Length != 0 && !AdviceCreateRequestSanitize.SystemFields.Contains(SchemataNaming.ToClrMemberName(f.Split('.')[0])));
 
             mut.UpdateMask = string.Join(",", remaining);
         }

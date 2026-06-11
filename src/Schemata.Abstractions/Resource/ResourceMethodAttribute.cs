@@ -55,4 +55,11 @@ public sealed class ResourceMethodAttribute : Attribute
     ///     collection.
     /// </summary>
     public ResourceMethodScope Scope { get; }
+
+    /// <summary>
+    ///     The HTTP method per <seealso href="https://google.aip.dev/136">AIP-136</seealso>:
+    ///     <see cref="ResourceHttpMethod.Get" /> for read-only methods (request binds from the
+    ///     query string), <see cref="ResourceHttpMethod.Post" /> otherwise. gRPC is unaffected.
+    /// </summary>
+    public ResourceHttpMethod Method { get; set; }
 }

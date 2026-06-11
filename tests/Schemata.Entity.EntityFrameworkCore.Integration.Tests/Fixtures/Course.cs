@@ -1,6 +1,6 @@
 using System;
-using Schemata.Abstractions.Entities;
 using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 

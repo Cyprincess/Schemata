@@ -112,13 +112,24 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         }
 
         if (IsAllowed(Operations.Delete)) {
-            context.AddUnaryMethod(
-                new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
-                async (svc, req, ctx) => {
-                    var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                    await rs.DeleteAsync(req, new(svc, ctx));
-                    return new();
-                });
+            // Soft-deletable resources respond with the updated resource per AIP-164;
+            // hard-deletable resources respond with Empty per AIP-135.
+            if (typeof(ISoftDelete).IsAssignableFrom(typeof(TEntity))) {
+                context.AddUnaryMethod(
+                    new Method<DeleteRequest, TDetail>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), CreateMarshaller<TDetail>(model)), metadata,
+                    async (svc, req, ctx) => {
+                        var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                        return (await rs.DeleteAsync(req, new(svc, ctx)))!;
+                    });
+            } else {
+                context.AddUnaryMethod(
+                    new Method<DeleteRequest, Empty>(MethodType.Unary, service, $"Delete{descriptor.Singular}", CreateMarshaller<DeleteRequest>(model), EmptyMarshaller), metadata,
+                    async (svc, req, ctx) => {
+                        var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
+                        await rs.DeleteAsync(req, new(svc, ctx));
+                        return new();
+                    });
+            }
         }
     }
 

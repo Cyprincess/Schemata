@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -39,18 +41,28 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.AddAipExpressions();
 
         services.AddHttpContextAccessor();
+        services.AddDataProtection();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestSanitize<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestValidation<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestSanitize<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestValidation<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateSoftDeleted<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateFreshness<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvisor<>), typeof(AdviceDeleteFreshness<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseFreshness<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseReadMask<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListResponseAdvisor<>), typeof(AdviceListResponseReadMask<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseIdempotency<,>)));
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-            if (assembly.IsDynamic) continue;
+            if (assembly.IsDynamic) {
+                continue;
+            }
+
+            if (assembly.GetName().Name?.StartsWith(nameof(Schemata) + ".", StringComparison.Ordinal) is true) {
+                continue;
+            }
 
             Type[] types;
             try {
@@ -90,6 +102,11 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceUpdateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
 
         var methods = entity.GetCustomAttributes<ResourceMethodAttribute>().ToList();
+        if (resource.Methods is not null) {
+            methods.AddRange(resource.Methods);
+        }
+        AddBuiltInMethods(resource, methods, entity, detail);
+
         foreach (var method in methods) {
             var handlerInterface = FindResourceMethodHandlerInterface(method.Handler);
             if (handlerInterface is null) {
@@ -104,8 +121,6 @@ public sealed class SchemataResourceFeature : FeatureBase
             var methodRequest = arguments[1];
             var methodResponse = arguments[2];
 
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>).MakeGenericType(entity, methodRequest), typeof(AdviceMethodRequestAnonymous<,>).MakeGenericType(entity, methodRequest)));
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>).MakeGenericType(entity, methodRequest), typeof(AdviceMethodRequestAuthorize<,>).MakeGenericType(entity, methodRequest)));
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>).MakeGenericType(entity, methodRequest), typeof(AdviceMethodRequestIdempotency<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse), typeof(AdviceMethodFreshness<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
         }
@@ -148,5 +163,55 @@ public sealed class SchemataResourceFeature : FeatureBase
             }
         }
         return null;
+    }
+
+    private static void AddBuiltInMethods(
+        ResourceAttribute             resource,
+        List<ResourceMethodAttribute> methods,
+        Type                          entity,
+        Type                          detail
+    ) {
+        if (!typeof(ISoftDelete).IsAssignableFrom(entity)) {
+            return;
+        }
+
+        AddSoftDeleteMethod(
+            methods,
+            Verbs.Undelete,
+            Operations.Undelete,
+            typeof(UndeleteHandler<,>).MakeGenericType(entity, detail),
+            resource.Operations);
+        AddSoftDeleteMethod(
+            methods,
+            Verbs.Expunge,
+            Operations.Expunge,
+            typeof(ExpungeHandler<>).MakeGenericType(entity),
+            resource.Operations);
+        AddSoftDeleteMethod(
+            methods,
+            Verbs.Purge,
+            Operations.Purge,
+            typeof(PurgeHandler<>).MakeGenericType(entity),
+            resource.Operations,
+            ResourceMethodScope.Collection);
+    }
+
+    private static void AddSoftDeleteMethod(
+        List<ResourceMethodAttribute> methods,
+        string                        verb,
+        Operations                    operation,
+        Type                          handler,
+        Operations[]?                 allowed,
+        ResourceMethodScope           scope = ResourceMethodScope.Instance
+    ) {
+        if (allowed is not null && !allowed.Contains(operation)) {
+            return;
+        }
+
+        if (methods.Any(m => string.Equals(m.Verb, verb, StringComparison.Ordinal))) {
+            return;
+        }
+
+        methods.Add(new(verb, handler, scope));
     }
 }

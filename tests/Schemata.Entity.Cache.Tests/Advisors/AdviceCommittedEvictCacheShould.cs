@@ -44,7 +44,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new Student { Uid = uid, FullName = "Alice" }],
+            Updated = [new() { Uid = uid, FullName = "Alice" }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -69,7 +69,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Removed = [new Student { Uid = uid }],
+            Removed = [new() { Uid = uid }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -87,7 +87,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Added = [new Student { Uid = Guid.NewGuid() }],
+            Added = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -106,8 +106,8 @@ public class AdviceCommittedEvictCacheShould
         ctx.Set(new QueryCacheEvictionSuppressed());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new Student { Uid = Guid.NewGuid() }],
-            Removed = [new Student { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Guid.NewGuid() }],
+            Removed = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -126,8 +126,8 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new Student { Uid = Guid.NewGuid() }],
-            Removed = [new Student { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Guid.NewGuid() }],
+            Removed = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -147,7 +147,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new Student { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -173,7 +173,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new Student { Uid = targetUid }],
+            Updated = [new() { Uid = targetUid }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);

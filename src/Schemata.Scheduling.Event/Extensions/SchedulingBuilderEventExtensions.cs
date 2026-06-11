@@ -18,7 +18,7 @@ public static class SchedulingBuilderEventExtensions
     )
         where T : class, IScheduledJob {
         builder.Services.Configure<SchemataSchedulingEventOptions>(options => {
-            options.Jobs[typeof(T)] = new JobEventConfiguration {
+            options.Jobs[typeof(T)] = new() {
                 Result             = result,
                 InterceptExecution = interceptExecution,
             };

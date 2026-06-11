@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,13 +64,12 @@ public sealed class FlowTimerTransitionObserver : IFlowTransitionObserver
             Name      = jobName,
             JobType   = typeof(FlowTimerJob).AssemblyQualifiedName,
             State     = JobState.Active,
-            Variables = JsonSerializer.Serialize(variables),
         };
 
         var schedule = TimerDefinitionConverter.ToSchedule(timerDef);
         ScheduleDefinitionMapper.ApplyToJob(schedule, job);
 
-        await scheduler.ScheduleAsync(job, ct);
+        await scheduler.ScheduleAsync(job, variables, ct);
     }
 
     #endregion

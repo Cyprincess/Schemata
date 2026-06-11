@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Schemata.Common;
 
 namespace Schemata.Authorization.Foundation.Binding;
 
@@ -22,8 +23,8 @@ internal static class OAuthBinderHelpers
     /// <param name="type">The request model type.</param>
     /// <returns>An array of tuples pairing each property with its corresponding wire-format parameter name.</returns>
     public static (PropertyInfo Prop, string Param)[] BuildMap(Type type) {
-        return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                   .Where(p => p.PropertyType == typeof(string) && p.CanWrite)
+        return AppDomainTypeCache.GetWritableProperties(type)
+                   .Where(p => p.PropertyType == typeof(string))
                    .Select(p => (p, ToSnakeCase(p.Name)))
                    .ToArray();
     }

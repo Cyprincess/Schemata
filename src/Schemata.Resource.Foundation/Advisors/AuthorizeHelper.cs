@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -50,7 +52,7 @@ internal static class AuthorizeHelper
         };
 
         if (await access.HasAccessAsync(default, parent, principal, ct)) {
-            throw new AuthorizationException(message: string.Format(PermissionDeniedTemplate, $"{typeof(TEntity).Name}.{context.Operation}", resource));
+            throw new AuthorizationException(message: string.Format(PermissionDeniedTemplate, $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}", resource));
         }
 
         throw new NotFoundException();

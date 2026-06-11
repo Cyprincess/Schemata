@@ -7,6 +7,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Event.Skeleton;
 using Schemata.Scheduling.Event.Attributes;
 using Schemata.Scheduling.Event.Events;
+using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -41,8 +42,8 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         }
 
         await _eventBus.PublishAsync(new JobScheduled {
-            Job     = job.Name!,
-            Variables   = job.Variables,
+            Job         = job.Name!,
+            Variables   = JobVariableSerializer.Deserialize(job.Variables),
             ScheduledAt = DateTime.UtcNow,
         }, ct);
     }
@@ -73,7 +74,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         }
 
         await _eventBus.PublishAsync(new JobTriggered {
-            Job = context.Job, Variables = job.Variables,
+            Job = context.Job, Variables = context.Variables,
         }, ct);
 
         // InterceptExecution=true means an external system takes over the run: JobTriggered
@@ -90,7 +91,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
         await _eventBus.PublishAsync(new JobCompleted {
             Job     = context.Job,
-            Variables   = job.Variables,
+            Variables   = context.Variables,
             CompletedAt = DateTime.UtcNow,
         }, ct);
     }
@@ -108,9 +109,9 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
         await _eventBus.PublishAsync(new JobFailed {
             Job   = context.Job,
-            Variables = job.Variables,
+            Variables = context.Variables,
             FailedAt  = DateTime.UtcNow,
-            Error     = exception.ToString(),
+            Error     = exception.Message,
         }, ct);
     }
 

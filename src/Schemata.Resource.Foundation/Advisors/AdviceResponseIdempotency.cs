@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -61,13 +60,13 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
             return AdviseResult.Continue;
         }
 
-        // Persist the full CreateResultBase wrapper so the read side in
-        // AdviceCreateRequestIdempotency can deserialize symmetrically and replay
-        // both the detail payload and the allow/block gate from OperationResultBase.
-        var result = new CreateResultBase<TDetail> { Detail = detail };
-        var bytes  = JsonSerializer.SerializeToUtf8Bytes(result);
+        var envelope = new IdempotencyEnvelope<TDetail> {
+            Hash    = pending.PayloadHash,
+            Payload = detail,
+        };
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope);
 
-        var key = $"idempotency\x1e{pending.Operation}\x1e{pending.RequestId}".ToCacheKey(Keys.Resource);
+        var key = pending.ToCacheKey();
         await _cache.SetAsync(key, bytes, new() {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24),
         }, ct);

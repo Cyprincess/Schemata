@@ -18,7 +18,7 @@ public class ErrorInfoDetail : IErrorDetail
     public virtual string? Reason { get; set; }
 
     /// <summary>
-    ///     Logical service domain that produced the error (e.g. <c>"schemata.io"</c>).
+    ///     Logical service domain that produced the error.
     /// </summary>
     public virtual string? Domain { get; set; }
 

@@ -12,6 +12,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Event.Foundation;
 using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
@@ -232,7 +233,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         await task;
 
-        var response           = task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
+        var response           = AppDomainTypeCache.GetProperty(task.GetType(), nameof(Task<object>.Result))?.GetValue(task);
         var responseRoutingKey = registry.RequireName(responseType);
         var responseBody       = JsonSerializer.SerializeToUtf8Bytes(response, responseType, _json);
 

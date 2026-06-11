@@ -1,8 +1,8 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
-using Schemata.Abstractions.Entities;
 using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 

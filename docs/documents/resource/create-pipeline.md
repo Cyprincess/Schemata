@@ -21,7 +21,7 @@
 IResourceRequestAdvisor<TEntity>
 ```
 
-The gate runs before any operation-specific logic. It receives the `ClaimsPrincipal?` and the operation token `nameof(Operations.Create)`. A `Block` result returns `CreateResultBase<TDetail>.Blocked` immediately. A `Handle` result returns a cached result from `AdviceContext`.
+The gate runs before any operation-specific logic. It receives the `ClaimsPrincipal?` and the operation token `nameof(Operations.Create)`. A `Block` result throws `NotFoundException`. A `Handle` result returns a stashed result from `AdviceContext`.
 
 Authorization advisors (`AdviceCreateRequestAnonymous`, `AdviceCreateRequestAuthorize`) live in this stage when `WithAuthorization()` is called on `SchemataResourceBuilder`.
 

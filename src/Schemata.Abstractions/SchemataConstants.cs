@@ -514,6 +514,12 @@ public static class SchemataConstants
         /// <summary>The filter expression is invalid.</summary>
         public const string InvalidFilter = "invalid_filter";
 
+        /// <summary>The update_mask expression is invalid.</summary>
+        public const string InvalidUpdateMask = "invalid_update_mask";
+
+        /// <summary>The read_mask expression is invalid.</summary>
+        public const string InvalidReadMask = "invalid_read_mask";
+
         /// <summary>The resource name is invalid.</summary>
         public const string InvalidName = "invalid_name";
 
@@ -522,6 +528,9 @@ public static class SchemataConstants
 
         /// <summary>The page token is invalid or expired.</summary>
         public const string InvalidPageToken = "invalid_page_token";
+
+        /// <summary>The page_size is negative.</summary>
+        public const string InvalidPageSize = "invalid_page_size";
 
         /// <summary>Cross-parent operations are not supported.</summary>
         public const string CrossParentUnsupported = "cross_parent_unsupported";
@@ -1145,6 +1154,19 @@ public static class SchemataConstants
 
     #endregion
 
+    #region Nested type: Principals
+
+    /// <summary>
+    ///     Caller identifiers used where no authenticated principal is available.
+    /// </summary>
+    public static class Principals
+    {
+        /// <summary>The anonymous caller identifier.</summary>
+        public const string Anonymous = "anonymous";
+    }
+
+    #endregion
+
     #region Nested type: PromptValues
 
     /// <summary>
@@ -1625,6 +1647,49 @@ public static class SchemataConstants
 
         /// <summary>Schemata-internal token type URI for a logout interaction token.</summary>
         public const string Logout = "urn:schemata:authorization:token-type:logout";
+    }
+
+    #endregion
+
+    #region Nested type: Verbs
+
+    /// <summary>
+    ///     Custom-method verbs declared by Schemata packages, rendered as the
+    ///     <c>:{verb}</c> HTTP suffix and the <c>{Verb}{Singular}</c> gRPC RPC name per
+    ///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>.
+    /// </summary>
+    public static class Verbs
+    {
+        /// <summary>Cancels a long-running operation.</summary>
+        public const string Cancel = "cancel";
+
+        /// <summary>Physically removes a soft-deleted resource, per AIP-164.</summary>
+        public const string Expunge = "expunge";
+
+        /// <summary>Deletes resources matching a filter, per AIP-165.</summary>
+        public const string Purge = "purge";
+
+        /// <summary>Triggers a job, per AIP-152.</summary>
+        public const string Run = "run";
+
+        /// <summary>Restores a soft-deleted resource, per AIP-164.</summary>
+        public const string Undelete = "undelete";
+
+        /// <summary>Waits for a long-running operation to reach a terminal state, per AIP-151.</summary>
+        public const string Wait = "wait";
+    }
+
+    #endregion
+
+    #region Nested type: Wildcards
+
+    /// <summary>
+    ///     Wildcard tokens shared by field masks and filters.
+    /// </summary>
+    public static class Wildcards
+    {
+        /// <summary>Matches every field or every resource.</summary>
+        public const string Any = "*";
     }
 
     #endregion

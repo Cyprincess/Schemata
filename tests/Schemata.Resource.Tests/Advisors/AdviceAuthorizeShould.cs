@@ -68,7 +68,7 @@ public class AdviceAuthorizeShould
 
         var ex = await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
                                                                       ctx, request, container, null));
-        Assert.Equal("Permission 'Student.Create' denied on resource 'students/42' (or it might not exist).",
+        Assert.Equal("Permission 'student.Create' denied on resource 'students/42' (or it might not exist).",
                      ex.Message);
     }
 
@@ -232,7 +232,7 @@ public class AdviceAuthorizeShould
 
         var ex = await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
                                                                       ctx, request, container, null));
-        Assert.Equal("Permission 'Student.List' denied on resource 'schools/9' (or it might not exist).", ex.Message);
+        Assert.Equal("Permission 'student.List' denied on resource 'schools/9' (or it might not exist).", ex.Message);
     }
 
     [Fact]

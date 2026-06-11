@@ -19,7 +19,7 @@ public class OperationHandlerCreateShould
 
         var result = await handler.CreateAsync(request, null, null);
 
-        Assert.True(result.IsAllowed());
+        Assert.NotNull(result.Detail);
         Assert.Equal(before + 1, _fixture.Students.Count);
     }
 
