@@ -39,4 +39,22 @@ public enum Operations
     ///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso>.
     /// </summary>
     Delete,
+
+    /// <summary>
+    ///     Restore a soft-deleted resource, per
+    ///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>.
+    /// </summary>
+    Undelete,
+
+    /// <summary>
+    ///     Permanently remove a soft-deleted resource, per
+    ///     <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>.
+    /// </summary>
+    Expunge,
+
+    /// <summary>
+    ///     Purge resources matching a filter through a long-running operation, per
+    ///     <seealso href="https://google.aip.dev/165">AIP-165: Purge</seealso>.
+    /// </summary>
+    Purge,
 }

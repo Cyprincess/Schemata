@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Event.Skeleton;
@@ -22,14 +23,13 @@ public sealed class FlowEventHandler : IEventHandler<IEvent>
         var subs = _context.MatchedSubscriptions;
         if (subs == null || subs.Count == 0) return;
 
+        var signals = new HashSet<string>();
         foreach (var sub in subs) {
             if (string.IsNullOrEmpty(sub.Target)) continue;
 
             if (sub.CorrelationKey != null) {
-                // Message: one-to-one
                 await _runtime.CorrelateMessageAsync(sub.Target, sub.EventType, @event, ct: ct);
-            } else {
-                // Signal: broadcast
+            } else if (signals.Add(sub.EventType)) {
                 await _runtime.ThrowSignalAsync(sub.EventType, @event, ct: ct);
             }
         }

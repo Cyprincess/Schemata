@@ -59,10 +59,22 @@ public class ResourceAttribute : Attribute
     public IList<string>? Endpoints { get; set; }
 
     /// <summary>
+    ///     Custom methods registered for resources configured without class-level
+    ///     <see cref="ResourceMethodAttribute" /> declarations.
+    /// </summary>
+    public IList<ResourceMethodAttribute>? Methods { get; set; }
+
+    /// <summary>
     ///     When set, restricts which standard CRUD verbs the transport layer
     ///     synthesizes for this resource. Custom methods declared via
     ///     <see cref="ResourceMethodAttribute" /> are unaffected. If <see langword="null" />,
     ///     all five standard verbs are exposed.
     /// </summary>
     public Operations[]? Operations { get; set; }
+
+    /// <summary>
+    ///     How <c>total_size</c> is computed for this resource's list responses.
+    ///     <see cref="TotalSizeMode.Default" /> inherits the global option.
+    /// </summary>
+    public TotalSizeMode TotalSize { get; set; }
 }

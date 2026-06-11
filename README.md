@@ -98,9 +98,11 @@ An extension feature can be activated in the same way as a built-in feature.
 | 460_000_000 | Schemata.Mapping.Foundation        | Mapping                  | Unified object mapper abstraction                                  |
 | 470_000_000 | Schemata.Scheduling.Foundation     | Scheduling               | Persistent cron / periodic / one-time job scheduler                |
 | 470_100_000 | Schemata.Scheduling.Event          | Scheduling.Event         | Lifecycle event publisher bridging the scheduler to the event bus  |
+| 470_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
+| 470_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
 | 480_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
-| 480_100_000 | Schemata.Flow.Http                 | Flow (`UseFlowHttp`)     | `ProcessController` HTTP surface                                   |
-| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`UseFlowGrpc`)     | `ProcessService` gRPC surface                                      |
+| 480_100_000 | Schemata.Flow.Http                 | Flow (`UseFlowHttp`)     | HTTP resource bridge for process instances and transitions         |
+| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`UseFlowGrpc`)     | gRPC resource bridge for process instances and transitions         |
 | 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
 | 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
 | 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |

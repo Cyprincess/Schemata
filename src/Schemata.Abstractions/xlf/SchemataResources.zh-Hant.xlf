@@ -120,11 +120,6 @@
         <target state="translated">實體必須至少有一個 [TableKey]。</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1021">
-        <source>Entity key cannot be null.</source>
-        <target state="translated">實體金鑰不得為 null。</target>
-        <note />
-      </trans-unit>
       <trans-unit id="ST1022">
         <source>Entity key count mismatch.</source>
         <target state="translated">實體金鑰數量不符。</target>
@@ -198,6 +193,11 @@
       <trans-unit id="ST2007">
         <source>Function '{0}' not registered.</source>
         <target state="translated">函式「{0}」未註冊。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2008">
+        <source>The page_size must not be negative.</source>
+        <target state="new">The page_size must not be negative.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST3001">

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
@@ -6,7 +7,6 @@ using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
@@ -42,7 +42,7 @@ internal static class ResourceCustomMethod
 
         if (options.Resources.TryGetValue(entity.TypeHandle, out var resourceAttr)
          && resourceAttr.Endpoints is { Count: > 0 } endpoints
-         && System.Linq.Enumerable.All(endpoints, e => e != GrpcResourceAttribute.Name)) {
+         && Enumerable.All(endpoints, e => e != GrpcResourceAttribute.Name)) {
             return;
         }
 
@@ -107,12 +107,7 @@ internal static class ResourceCustomMethod
 
         var name = request.CanonicalName;
 
-        var response = await operation.InvokeAsync(handler, verb, name, request, http.User, ctx.CancellationToken);
-        if (response is null) {
-            throw new NoContentException();
-        }
-
-        return response;
+        return await operation.InvokeAsync(handler, verb, name, request, http.User, ctx.CancellationToken);
     }
 
     private static Type? FindHandlerInterface(Type handler) {

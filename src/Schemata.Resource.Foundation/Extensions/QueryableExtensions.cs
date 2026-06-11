@@ -16,10 +16,15 @@ public static class QueryableExtensions
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="query">The query function to extend.</param>
     /// <param name="token">The page token, or <see langword="null" />.</param>
+    /// <param name="lookahead">
+    ///     Extra rows fetched beyond the page size so the caller can detect a
+    ///     following page without counting the collection.
+    /// </param>
     /// <returns>The composed query function.</returns>
     public static Func<IQueryable<T>, IQueryable<T>> WithPaginating<T>(
         this Func<IQueryable<T>, IQueryable<T>> query,
-        PageToken?                              token
+        PageToken?                              token,
+        int                                     lookahead = 0
     ) {
         if (token is null) {
             return query;
@@ -27,7 +32,7 @@ public static class QueryableExtensions
 
         var build = query;
 
-        query = q => build(q).Skip(token.Skip).Take(token.PageSize);
+        query = q => build(q).Skip(token.Skip).Take(token.PageSize + lookahead);
 
         return query;
     }

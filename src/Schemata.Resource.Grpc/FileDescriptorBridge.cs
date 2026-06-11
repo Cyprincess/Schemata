@@ -4,8 +4,10 @@ using System.Linq;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using ProtoBuf.Meta;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Foundation;
 using WellKnownReflection = Google.Protobuf.WellKnownTypes;
 
 namespace Schemata.Resource.Grpc;
@@ -14,7 +16,8 @@ internal static class FileDescriptorBridge
 {
     public static IReadOnlyList<ServiceDescriptor> BuildServiceDescriptors(
         RuntimeTypeModel model,
-        Type[]           serviceTypes
+        Type[]           serviceTypes,
+        SchemataResourceOptions options
     ) {
         var results = new List<ServiceDescriptor>();
 
@@ -24,7 +27,8 @@ internal static class FileDescriptorBridge
             var descriptor = ResourceNameDescriptor.ForType(entityType);
             var package    = descriptor.Package ?? entityType.Namespace;
 
-            var file = BuildFileDescriptor(model, descriptor, package, args);
+            options.Methods.TryGetValue(entityType.TypeHandle, out var methods);
+            var file = BuildFileDescriptor(model, descriptor, package, args, methods ?? []);
             results.AddRange(file.Services);
         }
 
@@ -35,7 +39,8 @@ internal static class FileDescriptorBridge
         RuntimeTypeModel       model,
         ResourceNameDescriptor descriptor,
         string?                package,
-        Type[]                 entityArgs
+        Type[]                 entityArgs,
+        IReadOnlyList<ResourceMethodAttribute> methods
     ) {
         var requestType    = entityArgs[1];
         var detailType     = entityArgs[2];
@@ -61,6 +66,17 @@ internal static class FileDescriptorBridge
         messages.TryAdd(detailType, detailType.Name);
         messages.TryAdd(summaryType, summaryType.Name);
         messages[listResultType] = $"List{descriptor.Plural}Response";
+
+        foreach (var method in methods) {
+            var iface = FindHandlerInterface(method.Handler);
+            if (iface is null) {
+                continue;
+            }
+
+            var arguments = iface.GetGenericArguments();
+            messages.TryAdd(arguments[1], arguments[1].Name);
+            messages.TryAdd(arguments[2], arguments[2].Name);
+        }
 
         foreach (var (type, name) in messages) {
             proto.MessageType.Add(BuildMessage(model, type, name, messages, package));
@@ -90,11 +106,30 @@ internal static class FileDescriptorBridge
             InputType  = $"{fqPrefix}{messages[requestType]}",
             OutputType = $"{fqPrefix}{messages[detailType]}",
         });
+        // Soft-deletable resources respond with the updated resource per AIP-164;
+        // hard-deletable resources respond with Empty per AIP-135.
         service.Method.Add(new MethodDescriptorProto {
-            Name       = $"Delete{descriptor.Singular}",
-            InputType  = $"{fqPrefix}{nameof(DeleteRequest)}",
-            OutputType = ".google.protobuf.Empty",
+            Name      = $"Delete{descriptor.Singular}",
+            InputType = $"{fqPrefix}{nameof(DeleteRequest)}",
+            OutputType = typeof(ISoftDelete).IsAssignableFrom(entityArgs[0])
+                ? $"{fqPrefix}{messages[detailType]}"
+                : ".google.protobuf.Empty",
         });
+
+        foreach (var method in methods) {
+            var iface = FindHandlerInterface(method.Handler);
+            if (iface is null) {
+                continue;
+            }
+
+            var arguments = iface.GetGenericArguments();
+            service.Method.Add(new MethodDescriptorProto {
+                Name       = ResourceMethodNaming.GetRpcName(method.Verb, descriptor.Singular),
+                InputType  = $"{fqPrefix}{messages[arguments[1]]}",
+                OutputType = $"{fqPrefix}{messages[arguments[2]]}",
+            });
+        }
+
         proto.Service.Add(service);
 
         var deps = new List<FileDescriptor> {
@@ -104,6 +139,15 @@ internal static class FileDescriptorBridge
 
         return FileDescriptor.BuildFromByteStrings(deps.Select(d => d.SerializedData).Append(proto.ToByteString()))
                              .Last();
+    }
+
+    private static Type? FindHandlerInterface(Type handler) {
+        foreach (var iface in handler.GetInterfaces()) {
+            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
+                return iface;
+            }
+        }
+        return null;
     }
 
     private static DescriptorProto BuildMessage(

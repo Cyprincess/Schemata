@@ -35,8 +35,7 @@ public static class SchemataBuilderExtensions
     public static IServiceCollection AddSchemataApplicationPart<T>(this IServiceCollection services) {
         var configurator = new ApplicationPartConfigurator<T>();
 
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IApplicationPartConfigurator>(configurator));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IApplicationPartConfigurator>(configurator));
 
         services.AddMvcCore()
                 .ConfigureApplicationPartManager(manager => {

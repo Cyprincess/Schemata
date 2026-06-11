@@ -43,4 +43,11 @@ public sealed class SchemataResourceOptions
     ///     When <see langword="null" />, the application's default authentication scheme is used.
     /// </summary>
     public string? AuthenticationScheme { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the global <c>total_size</c> computation mode for list responses.
+    ///     <see cref="TotalSizeMode.Default" /> behaves as <see cref="TotalSizeMode.Exact" />.
+    ///     Overridable per resource via <see cref="ResourceAttribute.TotalSize" />.
+    /// </summary>
+    public TotalSizeMode TotalSize { get; set; }
 }

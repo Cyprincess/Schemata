@@ -23,7 +23,7 @@ public static class AdviceMethodRequestAuthorize
 /// <summary>
 ///     Authorizes AIP-136 custom method requests
 ///     per <seealso href="https://google.aip.dev/211">AIP-211: Authorization checks</seealso> via
-///     <see cref="IAccessProvider{TEntity, TRequest}" />, with the verb (stashed
+///     <see cref="IAccessProvider{TEntity,TRequest}" />, with the verb (stashed
 ///     in <see cref="ResourceMethodVerb" />) supplied as the
 ///     <see cref="AccessContext{TRequest}.Operation" /> -- enabling fine-grained
 ///     per-verb permission policies.

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -119,6 +120,34 @@ public class RepositoryCrudShould : IAsyncLifetime
             using (scope) {
                 var entity = await repository.FindAsync([uid]);
                 Assert.Null(entity);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Add_DuplicateKey_ThrowsAlreadyExists() {
+        var uid = Guid.NewGuid();
+        {
+            var (repository, scope) = _fixture.CreateScopeWithRepository();
+            using (scope) {
+                await repository.AddAsync(new() {
+                    Uid      = uid,
+                    FullName = "Original",
+                    Name     = "original",
+                });
+                await repository.CommitAsync();
+            }
+        }
+
+        {
+            var (repository, scope) = _fixture.CreateScopeWithRepository();
+            using (scope) {
+                await Assert.ThrowsAsync<AlreadyExistsException>(
+                    () => repository.AddAsync(new() {
+                        Uid      = uid,
+                        FullName = "Duplicate",
+                        Name     = "duplicate",
+                    }));
             }
         }
     }

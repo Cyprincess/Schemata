@@ -35,7 +35,7 @@ public sealed class RunJobHandler : IResourceMethodHandler<Job, RunJobRequest, R
 }
 ```
 
-`ResourceMethodAttribute` stores the (verb, handler type, scope) tuple. `SchemataResourceFeature.ConfigureServices` discovers it during assembly scanning and registers it in `SchemataResourceOptions.Methods` keyed by entity `RuntimeTypeHandle`. The handler's `IResourceMethodHandler<TEntity, TRequest, TResponse>` generic arguments are resolved from the handler type at registration time; request and response types for the method pipeline are inferred from those arguments.
+`ResourceMethodAttribute` stores the (verb, handler type, scope) tuple plus an optional `Method` (HTTP verb): `ResourceHttpMethod.Get` routes a read-only method as `GET` with the request bound from the query string, the default is `POST` per AIP-136. `SchemataResourceFeature.ConfigureServices` discovers it during assembly scanning and registers it in `SchemataResourceOptions.Methods` keyed by entity `RuntimeTypeHandle`. The handler's `IResourceMethodHandler<TEntity, TRequest, TResponse>` generic arguments are resolved from the handler type at registration time; request and response types for the method pipeline are inferred from those arguments.
 
 ### Scope
 
@@ -97,7 +97,9 @@ Add markers to `AdviceContext` from an upstream `IResourceMethodRequestAdvisor` 
 
 ## Extension points
 
-- **Custom verbs**: add additional `[ResourceMethod]` attributes on the same entity. Each verb gets its own synthesized controller (HTTP) or RPC binding (gRPC).
+- **Custom verbs**: add additional `[ResourceMethod]` attributes on the same entity, or supply `ResourceMethodAttribute` instances programmatically through `ResourceAttribute.Methods` when registering with `Use<...>()`. Each verb gets its own synthesized controller (HTTP) or RPC binding (gRPC).
+- **Built-in verbs**: `ISoftDelete` entities automatically gain `:undelete`, `:expunge`, and collection-scoped `:purge` (AIP-164/165); declaring the same verb on the entity overrides the built-in, and the `Operations` whitelist can exclude them.
+- **Collection scope**: collection-scoped methods skip the entity load entirely - the handler receives a `null` entity.
 - **Method advisors**: implement `IResourceMethodAdvisor<TEntity, TRequest, TResponse>` for verb-specific advisors that should fire after authorization. Register via `TryAddEnumerable` as scoped.
 - **Method request advisors**: implement `IResourceMethodRequestAdvisor<TEntity>` for cross-verb request-stage hooks (e.g., rate limits, allow-list checks). Register via `TryAddEnumerable` as scoped.
 - **Handlers**: implement `IResourceMethodHandler<TEntity, TRequest, TResponse>` for the verb body. The handler receives the resolved entity, the request payload, the `AdviceContext`, and the cancellation token.

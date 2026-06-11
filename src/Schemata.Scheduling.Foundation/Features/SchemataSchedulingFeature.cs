@@ -12,8 +12,6 @@ using Schemata.Scheduling.Skeleton;
 namespace Schemata.Scheduling.Foundation.Features;
 
 /// <summary>Registers the in-memory <see cref="IScheduler" /> and the audit lifecycle observer.</summary>
-[DependsOn("Schemata.Entity.EntityFrameworkCore.Features.SchemataEntityFeature", Optional = true)]
-[DependsOn("Schemata.Entity.LinqToDB.Features.SchemataEntityFeature", Optional = true)]
 public sealed class SchemataSchedulingFeature : FeatureBase
 {
     /// <summary>Default <see cref="FeatureBase.Priority" /> for the Scheduling feature.</summary>
@@ -31,9 +29,5 @@ public sealed class SchemataSchedulingFeature : FeatureBase
         services.TryAddSingleton<IScheduler, DefaultScheduler>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IJobLifecycleObserver, SchemataJobAuditObserver>());
         services.AddHostedService<SchedulingInitializer>();
-
-        services.TryAddScoped<RunJobHandler>();
-        services.TryAddScoped<CancelOperationHandler>();
-        services.TryAddScoped<WaitOperationHandler>();
     }
 }

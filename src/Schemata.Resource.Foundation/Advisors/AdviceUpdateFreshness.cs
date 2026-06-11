@@ -27,15 +27,13 @@ public static class AdviceUpdateFreshness
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The check fires only when the request implements <see cref="IFreshness" /> and the
-///         supplied ETag begins with <c>W/</c> (weak validator). Missing, empty, or non-<c>W/</c>
-///         tags are treated as opt-out — the request proceeds without concurrency validation.
-///         Hosts that need stronger guarantees should require <c>etag</c> earlier in the chain
-///         (e.g., via a validation advisor) or layer a stricter freshness advisor.
+///         The check fires whenever the request implements <see cref="IFreshness" /> and supplies a
+///         non-empty ETag: any value that differs from the entity's current weak tag — including
+///         strong-format or malformed tags — raises <see cref="ConcurrencyException" /> (AIP-154:
+///         a provided mismatching etag MUST abort). Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
-///         Throws <see cref="ConcurrencyException" /> on mismatch. Suppressed when
-///         <see cref="FreshnessSuppressed" /> is present.
+///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
@@ -61,7 +59,7 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
 
         var tag = request is IFreshness freshness ? freshness.EntityTag : null;
 
-        if (string.IsNullOrWhiteSpace(tag) || !tag.StartsWith("W/")) {
+        if (string.IsNullOrWhiteSpace(tag)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

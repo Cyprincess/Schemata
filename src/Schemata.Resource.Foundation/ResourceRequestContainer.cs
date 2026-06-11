@@ -42,7 +42,10 @@ public class ResourceRequestContainer<T>
     ///     Applies skip/take pagination from the page token.
     /// </summary>
     /// <param name="token">The <see cref="PageToken" />.</param>
-    public void ApplyPaginating(PageToken? token) { Query = Query.WithPaginating(token); }
+    /// <param name="lookahead">Extra rows fetched beyond the page size for next-page detection.</param>
+    public void ApplyPaginating(PageToken? token, int lookahead = 0) {
+        Query = Query.WithPaginating(token, lookahead);
+    }
 
     /// <summary>
     ///     Applies an arbitrary predicate (e.g. parent scoping or entitlement filter)

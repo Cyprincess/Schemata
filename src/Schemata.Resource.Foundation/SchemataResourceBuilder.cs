@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,12 +59,14 @@ public sealed class SchemataResourceBuilder
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAnonymous<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAnonymous<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAnonymous<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>), typeof(AdviceMethodRequestAnonymous<,>)));
 
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListRequestAdvisor<>), typeof(AdviceListRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceGetRequestAdvisor<>), typeof(AdviceGetRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestAuthorize<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAuthorize<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAuthorize<>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>), typeof(AdviceMethodRequestAuthorize<,>)));
 
         return this;
     }
@@ -113,6 +116,28 @@ public sealed class SchemataResourceBuilder
         where TRequest : class, ICanonicalName
         where TDetail : class, ICanonicalName
         where TSummary : class, ICanonicalName {
+        return Use<TEntity, TRequest, TDetail, TSummary>(endpoints, null);
+    }
+
+    /// <summary>
+    ///     Registers a resource with explicit type roles and allows callers to configure
+    ///     operations, endpoints, and custom methods programmatically.
+    /// </summary>
+    /// <typeparam name="TEntity">The persistent entity type.</typeparam>
+    /// <typeparam name="TRequest">The request DTO type.</typeparam>
+    /// <typeparam name="TDetail">The detail DTO type.</typeparam>
+    /// <typeparam name="TSummary">The summary DTO type.</typeparam>
+    /// <param name="endpoints">Optional endpoint names to restrict registration.</param>
+    /// <param name="configure">Optional resource metadata callback.</param>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
+        IList<string>?              endpoints,
+        Action<ResourceAttribute>? configure
+    )
+        where TEntity : class, ICanonicalName
+        where TRequest : class, ICanonicalName
+        where TDetail : class, ICanonicalName
+        where TSummary : class, ICanonicalName {
         var entity  = typeof(TEntity);
         var request = typeof(TRequest);
         var detail  = typeof(TDetail);
@@ -129,6 +154,8 @@ public sealed class SchemataResourceBuilder
                 resource.Endpoints.Add(endpoint);
             }
         }
+
+        configure?.Invoke(resource);
 
         SchemataResourceFeature.RegisterResource(Services, resource);
 

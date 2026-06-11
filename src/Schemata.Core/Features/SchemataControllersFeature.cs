@@ -37,7 +37,7 @@ public sealed class SchemataControllersFeature : FeatureBase
 
         builder.ConfigureApplicationPartManager(manager => {
             var parts = manager.ApplicationParts.OfType<AssemblyPart>()
-                               .Where(p => p.Name.StartsWith("Schemata."))
+                               .Where(p => p.Name.StartsWith(nameof(Schemata) + "."))
                                .ToArray();
 
             foreach (var part in parts) {

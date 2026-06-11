@@ -16,6 +16,6 @@ public class OperationHandlerGetShould
         var result = await handler.GetAsync(entity.CanonicalName!, null, null);
 
         Assert.NotNull(result);
-        Assert.True(result.IsAllowed());
+        Assert.NotNull(result.Detail);
     }
 }

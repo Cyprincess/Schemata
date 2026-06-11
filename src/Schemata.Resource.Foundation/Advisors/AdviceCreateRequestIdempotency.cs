@@ -8,7 +8,6 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -28,9 +27,10 @@ public static class AdviceCreateRequestIdempotency
 /// <summary>
 ///     Provides create-request idempotency
 ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso> by checking the
-///     <see cref="ICacheProvider" /> for a cached result keyed by the
-///     client-supplied <c>RequestId</c>.
-///     If found, returns <see cref="AdviseResult.Handle" /> with the cached result.
+///     <see cref="ICacheProvider" /> for a cached result keyed by
+///     <see cref="PendingIdempotencyKey" />.
+///     If found with a matching payload hash, returns <see cref="AdviseResult.Handle" /> with the
+///     cached result; a hash mismatch raises <see cref="ConcurrencyException" />.
 ///     Otherwise, stores a <see cref="PendingIdempotencyKey" /> in the context for
 ///     <see cref="AdviceResponseIdempotency{TEntity,TDetail}" /> to persist the result
 ///     after a successful create.
@@ -46,7 +46,7 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
 {
     private static readonly byte[] PendingSentinelBytes = "__pending__"u8.ToArray();
 
-    private static readonly TimeSpan       PendingTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan       PendingTtl = TimeSpan.FromSeconds(5);
     private readonly        ICacheProvider _cache;
 
     /// <summary>
@@ -66,7 +66,7 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
         ClaimsPrincipal?                  principal,
         CancellationToken                 ct = default
     ) {
-        if (request is not IRequestIdentification { RequestId: { } requestId }) {
+        if (request is not IRequestIdentification { RequestId: { Length: > 0 } requestId }) {
             return AdviseResult.Continue;
         }
 
@@ -74,14 +74,25 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
             return AdviseResult.Continue;
         }
 
-        var operation = nameof(Operations.Create);
-        var key       = $"idempotency\x1e{operation}\x1e{requestId}".ToCacheKey(Keys.Resource);
-        var bytes     = await _cache.GetAsync(key, ct);
-        if (bytes is not null && !IsPendingSentinel(bytes)) {
-            var cached = JsonSerializer.Deserialize<CreateResultBase<TDetail>>(bytes);
+        var pending = new PendingIdempotencyKey(
+            requestId,
+            nameof(Operations.Create),
+            typeof(TEntity).FullName!,
+            IdempotencyHelper.PrincipalId(principal),
+            IdempotencyHelper.HashPayload(request));
+        var key   = pending.ToCacheKey();
+        var bytes = await _cache.GetAsync(key, ct);
+        if (bytes is not null && !bytes.AsSpan().SequenceEqual(PendingSentinelBytes)) {
+            var cached = JsonSerializer.Deserialize<IdempotencyEnvelope<TDetail>>(bytes);
             if (cached is not null) {
-                ctx.Set(cached);
-                return AdviseResult.Handle;
+                if (cached.Hash != pending.PayloadHash) {
+                    throw new ConcurrencyException();
+                }
+
+                if (cached.Payload is not null) {
+                    ctx.Set(new CreateResultBase<TDetail> { Detail = cached.Payload });
+                    return AdviseResult.Handle;
+                }
             }
         }
 
@@ -96,23 +107,9 @@ public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail> :
             throw new ConcurrencyException();
         }
 
-        ctx.Set(new PendingIdempotencyKey(requestId, operation));
+        ctx.Set(pending);
         return AdviseResult.Continue;
     }
 
     #endregion
-
-    private static bool IsPendingSentinel(byte[] bytes) {
-        if (bytes.Length != PendingSentinelBytes.Length) {
-            return false;
-        }
-
-        for (var i = 0; i < bytes.Length; i++) {
-            if (bytes[i] != PendingSentinelBytes[i]) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
 using Schemata.Security.Skeleton;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Security.Foundation;
 
@@ -27,7 +28,7 @@ public sealed class DefaultPermissionMatcher(IOptions<SchemataSecurityOptions> o
             var cSegs = claim.Split('.');
             if (cSegs.Length != pSegs.Length) continue;
 
-            var starIdx = Array.IndexOf(cSegs, "*");
+            var starIdx = Array.IndexOf(cSegs, Wildcards.Any);
 
             if (starIdx < 0) {
                 continue; // no wildcard — already checked exact match
@@ -37,13 +38,13 @@ public sealed class DefaultPermissionMatcher(IOptions<SchemataSecurityOptions> o
                 continue; // namespace cannot be wildcard (3+ segments)
             }
 
-            if (Array.LastIndexOf(cSegs, "*") != starIdx) {
+            if (Array.LastIndexOf(cSegs, Wildcards.Any) != starIdx) {
                 continue; // only one wildcard supported
             }
 
             var match = true;
             for (var i = 0; i < cSegs.Length; i++) {
-                if (cSegs[i] == "*") {
+                if (cSegs[i] == Wildcards.Any) {
                     continue;
                 }
 

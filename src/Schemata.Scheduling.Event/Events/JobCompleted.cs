@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Scheduling.Event.Events;
@@ -13,8 +14,8 @@ public sealed class JobCompleted : IEvent
     /// <summary>Job name as registered with the scheduler.</summary>
     public string Job { get; init; } = null!;
 
-    /// <summary>Opaque variables payload carried by the job at completion time.</summary>
-    public string? Variables { get; init; }
+    /// <summary>Variables carried by the job at completion time.</summary>
+    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
 
     /// <summary>UTC timestamp when the job completed.</summary>
     public DateTime CompletedAt { get; init; }

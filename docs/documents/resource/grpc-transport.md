@@ -68,7 +68,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     [Operation] ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default);
-    [Operation] ValueTask DeleteAsync(DeleteRequest request, CallContext context = default);
+    [Operation] ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default);
 }
 ```
 
@@ -89,7 +89,7 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
 2. Calls the corresponding method on the interface.
 3. Uses protobuf-net marshallers built from the `RuntimeTypeModel` for serialization.
 
-The `Delete` method uses a custom `EmptyMarshaller` for the response since gRPC requires a response message even for void operations.
+The `Delete` RPC response type depends on the entity: `ISoftDelete` entities respond with the updated resource detail per AIP-164, while hard-deletable entities respond with `google.protobuf.Empty` through a custom `EmptyMarshaller`. The reflection descriptors in `FileDescriptorBridge` mirror the same split.
 
 ## Custom methods
 

@@ -9,4 +9,8 @@ public class Source
     public int Grade { get; set; }
 
     public Sex? Sex { get; set; }
+
+    public string? Nickname { get; set; }
+
+    public SourceProfile? Profile { get; set; }
 }

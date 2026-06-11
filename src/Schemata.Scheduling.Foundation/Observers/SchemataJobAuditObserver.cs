@@ -89,7 +89,7 @@ public sealed class SchemataJobAuditObserver(
         CancellationToken ct = default
     ) {
         await UpdateJobAsync(job, ct);
-        await UpdateExecutionAsync(context, ExecutionState.Failed, exception.ToString(), ct);
+        await UpdateExecutionAsync(context, ExecutionState.Failed, exception.Message, ct);
     }
 
     #endregion

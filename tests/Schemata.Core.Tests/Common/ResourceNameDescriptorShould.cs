@@ -37,8 +37,8 @@ public class ResourceNameDescriptorShould
 
         Assert.NotNull(predicate);
         var compiled = predicate!.Compile();
-        Assert.True(compiled(new Book { Publisher = "acme" }));
-        Assert.False(compiled(new Book { Publisher = "other" }));
+        Assert.True(compiled(new() { Publisher  = "acme" }));
+        Assert.False(compiled(new() { Publisher = "other" }));
     }
 
     [Fact]

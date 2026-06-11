@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
@@ -55,5 +57,67 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         var name     = nameProp.GetString()!;
         var response = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+    [Fact]
+    public async Task GetCustomMethod_Preview_Returns200WithBody() {
+        var client  = _factory.CreateClient();
+        var created = await client.PostAsync(
+            "/v1/students",
+            new StringContent("""{"full_name":"Previewable"}""", Encoding.UTF8, "application/json"));
+        var body = await created.Content.ReadFromJsonAsync<Student>();
+
+        var response = await client.GetAsync($"/v1/{body!.Name}:preview");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var preview = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Previewable", preview.GetProperty("full_name").GetString());
+    }
+
+    [Fact]
+    public async Task GetCustomMethod_PostVerb_IsRejected() {
+        var client  = _factory.CreateClient();
+        var created = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "PostRejected" });
+        var body    = await created.Content.ReadFromJsonAsync<Student>();
+
+        var response = await client.PostAsJsonAsync($"/v1/{body!.Name}:preview", new Student());
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SoftDeleteUndeleteAndExpunge_Lifecycle_ReturnsExpectedStates() {
+        var client = _factory.CreateClient();
+
+        var created = await client.PostAsync(
+            "/v1/trashes",
+            new StringContent("""{"full_name":"Disposable"}""", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var createBody = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var name       = createBody.GetProperty("name").GetString()!;
+
+        var deleted = await client.DeleteAsync($"/v1/{name}");
+        Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
+        var deleteBody = await deleted.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.String, deleteBody.GetProperty("delete_time").ValueKind);
+
+        var undeleted = await client.PostAsync(
+            $"/v1/{name}:undelete",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, undeleted.StatusCode);
+        var undeleteBody = await undeleted.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(
+            !undeleteBody.TryGetProperty("delete_time", out var restoredDeleteTime)
+         || restoredDeleteTime.ValueKind == JsonValueKind.Null);
+
+        var deletedAgain = await client.DeleteAsync($"/v1/{name}");
+        Assert.Equal(HttpStatusCode.OK, deletedAgain.StatusCode);
+
+        var expunged = await client.PostAsync(
+            $"/v1/{name}:expunge",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, expunged.StatusCode);
+
+        var fetched = await client.GetAsync($"/v1/{name}");
+        Assert.Equal(HttpStatusCode.NotFound, fetched.StatusCode);
     }
 }

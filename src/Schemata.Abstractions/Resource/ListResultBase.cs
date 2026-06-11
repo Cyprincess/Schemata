@@ -8,12 +8,12 @@ namespace Schemata.Abstractions.Resource;
 ///     carrying matched items, total count, and a continuation token.
 /// </summary>
 /// <typeparam name="TSummary">The type of each item in the list.</typeparam>
-public class ListResultBase<TSummary> : OperationResultBase<ListResultBase<TSummary>>
+public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
 {
     /// <summary>
     ///     The matched resource summaries for the current page.
     /// </summary>
-    public virtual IEnumerable<TSummary>? Entities { get; set; }
+    public virtual IList<TSummary>? Entities { get; set; }
 
     /// <summary>
     ///     Total number of matching resources across all pages.
@@ -26,6 +26,4 @@ public class ListResultBase<TSummary> : OperationResultBase<ListResultBase<TSumm
     ///     signals the last page.
     /// </summary>
     public virtual string? NextPageToken { get; set; }
-
-    protected override bool IsValid() { return Entities != null; }
 }

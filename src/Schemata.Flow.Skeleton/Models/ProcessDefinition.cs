@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
+using Schemata.Common;
 
 namespace Schemata.Flow.Skeleton.Models;
 
@@ -70,7 +71,7 @@ public class ProcessDefinition
 
     private void InitializeProperties() {
         var type       = GetType();
-        var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead);
+        var properties = AppDomainTypeCache.GetProperties(type).Values.Where(p => p.CanRead);
 
         foreach (var prop in properties) {
             if (prop.GetValue(this) is not null) continue;

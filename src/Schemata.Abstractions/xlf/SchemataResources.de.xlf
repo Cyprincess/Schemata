@@ -124,11 +124,6 @@
         <target state="translated">Die Entität muss mindestens einen [TableKey] haben.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1021">
-        <source>Entity key cannot be null.</source>
-        <target state="translated">Der Entitätsschlüssel darf nicht null sein.</target>
-        <note />
-      </trans-unit>
       <trans-unit id="ST1022">
         <source>Entity key count mismatch.</source>
         <target state="translated">Anzahl der Entitätsschlüssel stimmt nicht überein.</target>
@@ -204,6 +199,11 @@
       <trans-unit id="ST2007">
         <source>Function '{0}' not registered.</source>
         <target state="translated">Funktion '{0}' ist nicht registriert.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ST2008">
+        <source>The page_size must not be negative.</source>
+        <target state="new">The page_size must not be negative.</target>
         <note />
       </trans-unit>
       <trans-unit id="ST3001">

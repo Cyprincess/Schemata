@@ -10,10 +10,7 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    ///     Exposes Flow process management as a code-first gRPC service by enabling
-    ///     <see cref="SchemataFlowGrpcFeature" />, which explicitly maps
-    ///     <c>ProcessService</c> via
-    ///     <see cref="GrpcEndpointRouteBuilderExtensions.MapGrpcService{TService}" />.
+    ///     Registers Flow resources for gRPC and maps the definitions-only gRPC service.
     /// </summary>
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
     /// <returns>The builder for chaining.</returns>

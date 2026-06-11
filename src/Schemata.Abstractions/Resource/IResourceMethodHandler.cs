@@ -28,7 +28,12 @@ public interface IResourceMethodHandler<TEntity, in TRequest, TResponse>
     ///     <see cref="ResourceMethodScope.Collection" />-scoped method.
     /// </param>
     /// <param name="request">The incoming request payload.</param>
-    /// <param name="entity">The resource entity from repository.</param>
+    /// <param name="entity">
+    ///     The resource entity for an
+    ///     <see cref="ResourceMethodScope.Instance" />-scoped method,
+    ///     or <see langword="null" /> for a
+    ///     <see cref="ResourceMethodScope.Collection" />-scoped method.
+    /// </param>
     /// <param name="principal">
     ///     The authenticated caller, or <see langword="null" /> when the method
     ///     is invoked anonymously.
@@ -38,7 +43,7 @@ public interface IResourceMethodHandler<TEntity, in TRequest, TResponse>
     ValueTask<TResponse> InvokeAsync(
         string?           name,
         TRequest          request,
-        TEntity           entity,
+        TEntity?          entity,
         ClaimsPrincipal?  principal,
         CancellationToken ct
     );

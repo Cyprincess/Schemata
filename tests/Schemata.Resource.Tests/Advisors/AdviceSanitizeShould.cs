@@ -86,6 +86,20 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
+    public async Task Update_Sanitize_NestedMask_StripsOnlySystemFirstSegment() {
+        var request = new ManagedRequest {
+            UpdateMask = "owner.display_name,display_name.value,parent.child,name.value",
+        };
+
+        var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+
+        await advisor.AdviseAsync(ctx, request, new(), null);
+
+        Assert.Equal("display_name.value,parent.child", request.UpdateMask);
+    }
+
+    [Fact]
     public async Task Create_Sanitize_RequestWithoutSystemProperties_DoesNotThrow() {
         var request = new MinimalRequest { Name = "minimal/1", Label = "preserve" };
 

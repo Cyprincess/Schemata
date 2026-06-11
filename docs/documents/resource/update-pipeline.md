@@ -21,7 +21,7 @@
 IResourceRequestAdvisor<TEntity>
 ```
 
-Receives the principal and the operation token `nameof(Operations.Update)`. A `Block` returns `UpdateResultBase<TDetail>.Blocked`.
+Receives the principal and the operation token `nameof(Operations.Update)`. A `Block` throws `NotFoundException`.
 
 ### Stage 2: Parent property clearing
 
@@ -68,22 +68,21 @@ IResourceUpdateAdvisor<TEntity, TRequest>
 |---|---|---|
 | `Orders.Base` (100M) | `AdviceUpdateFreshness` | Compares the request ETag (`W/"..."`) against the entity's `IConcurrency.Timestamp`; throws `ConcurrencyException` on mismatch |
 
-`AdviceUpdateFreshness` only fires when the request implements `IFreshness` and the supplied ETag starts with `W/`. Missing or non-`W/` tags are treated as opt-out.
+`AdviceUpdateFreshness` fires whenever the request implements `IFreshness` and supplies a non-empty ETag: any value that differs from the entity's current weak tag - including strong-format or malformed tags - throws `ConcurrencyException` per AIP-154. Only an absent or whitespace tag opts out. `AdviceUpdateSoftDeleted` runs before it and rejects updates to soft-deleted entities with `FailedPreconditionException` (suppressed by the `SoftDeleteGuardSuppressed` context marker).
 
 ### Stage 7: Mapping
 
 ```csharp
 if (request is IUpdateMask { UpdateMask: { } mask }) {
-    var fields = mask.Split(',')
-                     .Select(f => SchemataNaming.ToClrMemberName(f.Trim()))
-                     .Where(f => properties.ContainsKey(f));
+    var fields = MaskTree.FromWire(typeof(TEntity), mask, allowCollectionTraversal: false)
+                         .LeafPaths();
     _mapper.Map(request, entity, fields);
 } else {
     _mapper.Map(request, entity);
 }
 ```
 
-If the request implements `IUpdateMask` and `UpdateMask` is non-null, only the listed fields are copied from the request to the entity. Field names are converted from wire format (snake_case) to CLR member names via `SchemataNaming.ToClrMemberName`. Fields not present on the entity are silently skipped.
+If the request implements `IUpdateMask` and `UpdateMask` is non-null, only the listed fields are copied from the request to the entity. Field paths are validated against the entity type, converted from wire format (snake_case) to CLR member dot paths via `MaskTree`, and rejected with `invalid_update_mask` when a segment is unknown or traverses a collection element.
 
 ### Stage 8: Persistence
 
@@ -100,7 +99,7 @@ The updated entity is mapped to `TDetail`, then `IResourceResponseAdvisor<TEntit
 
 ## Field masks
 
-Field masks follow AIP-161. The `UpdateMask` property on the request is a comma-separated list of field paths in wire format (snake_case). Only the listed fields are applied; all others retain their current values on the entity.
+Field masks follow AIP-161. The `UpdateMask` property on the request is a comma-separated list of field paths in wire format (snake_case). Dot paths update nested object fields, for example `profile.display_name`. Collection element traversal is not supported for updates. Only the listed fields are applied; all others retain their current values on the entity.
 
 ```csharp
 // Request with a field mask
@@ -108,11 +107,17 @@ public class StudentRequest : ICanonicalName, IUpdateMask {
     public string? Name { get; set; }
     public string? CanonicalName { get; set; }
     public string? DisplayName { get; set; }
+    public ProfileRequest? Profile { get; set; }
     public string? UpdateMask { get; set; }
 }
 
+public class ProfileRequest {
+    public string? DisplayName { get; set; }
+    public string? Locale { get; set; }
+}
+
 // PATCH /students/alice
-// Body: { "display_name": "Alice Smith", "update_mask": "display_name" }
+// Body: { "profile": { "display_name": "Alice Smith" }, "update_mask": "profile.display_name" }
 ```
 
 ## Extension points
@@ -127,7 +132,10 @@ Authorization runs before the entity is loaded (stage 4, not stage 5) per AIP-21
 
 ## Caveats
 
-- `AdviceUpdateFreshness` requires the request to implement `IFreshness` and a `W/`-prefixed ETag. Requests without an ETag bypass the freshness check. To enforce mandatory ETags, add a validation advisor that rejects requests with an empty `EntityTag`.
+- Requests without an ETag bypass the freshness check. To enforce mandatory ETags, add a validation advisor that rejects requests with an empty `EntityTag`.
+- An omitted `update_mask` behaves as an implicit mask of populated fields: the framework mappers ignore null and whitespace-only source members when merging onto an existing entity, while an explicit mask stays authoritative and can clear fields. `update_mask=*` performs full replacement.
+- `read_mask` supports the same AIP-161 dot syntax for nested response fields. Read masks may traverse collection elements, so `courses.title` keeps each course title and clears sibling course fields.
+- Requests implementing `IAllowMissing` with `AllowMissing = true` create the resource when the addressed name does not exist (AIP-134): create-stage advisors run, every field applies, the mask is ignored, and the name comes from the request URI. Without the flag a missing resource fails with `NotFoundException`.
 - `UpdateMask` is excluded from `SystemFields`, so `AdviceUpdateRequestSanitize` leaves it on the request and the mask reaches the mapping step.
 - `SuppressFreshness = true` on `SchemataResourceOptions` sets `FreshnessSuppressed` in `AdviceContext`, which causes `AdviceUpdateFreshness` to skip the ETag check for all requests.
 - `AdviceUpdateRequestIdempotency` only runs when the request implements `IRequestIdentification` and `UpdateIdempotencySuppressed` is not present on `AdviceContext`. Set `ctx.Set(new UpdateIdempotencySuppressed())` from an upstream advisor to bypass the idempotency lane for that request. The cache key format mirrors Create: `idempotency\x1e{Operation}\x1e{RequestId}` with `Operation = nameof(Operations.Update)`.

@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Transport.Grpc.Interceptors;
@@ -32,6 +33,10 @@ namespace Schemata.Transport.Grpc.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataTransportGrpcFeature : FeatureBase
 {
+    // protobuf-net code-first services expose their reflection descriptor through a
+    // generated static property with this fixed name.
+    private const string DescriptorProperty = "Descriptor";
+
     /// <summary>Second slot of the Extension priority range, adjacent to HTTP transport.</summary>
     public const int DefaultPriority = Orders.Extension + 20_000_000;
 
@@ -113,9 +118,8 @@ public sealed class SchemataTransportGrpcFeature : FeatureBase
         for (var t = serviceType; t is not null && t != typeof(object); t = t.BaseType) {
             var attr = t.GetCustomAttribute<BindServiceMethodAttribute>();
             if (attr is not null) {
-                return attr.BindType
-                           .GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)
-                           ?.GetValue(null) as ProtoServiceDescriptor;
+                return AppDomainTypeCache.GetStaticProperty(attr.BindType, DescriptorProperty)
+                                         ?.GetValue(null) as ProtoServiceDescriptor;
             }
         }
 

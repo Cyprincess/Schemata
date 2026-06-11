@@ -22,20 +22,18 @@ public static class AdviceMethodFreshness
 }
 
 /// <summary>
-///     Compares the inbound weak ETag on an AIP-136 custom method request
-///     against the entity's current tag per
-///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
+///     Enforces optimistic concurrency for instance-scoped AIP-136 custom methods
+///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso> by comparing the
+///     request ETag with the loaded entity's <see cref="IConcurrency.Timestamp" />.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         When the request implements <see cref="IFreshness" /> and supplies a
-///         <c>W/</c>-prefixed <c>EntityTag</c>, the value must match the tag
-///         computed from the loaded entity. Missing, empty, or non-<c>W/</c>
-///         tags are treated as opt-out: the request proceeds without
-///         freshness validation.
+///         The check fires whenever the request implements <see cref="IFreshness" /> and supplies a
+///         non-empty ETag: any value that differs from the entity's current weak tag — including
+///         strong-format or malformed tags — raises <see cref="ConcurrencyException" /> (AIP-154:
+///         a provided mismatching etag MUST abort). Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
-///         Throws <see cref="ConcurrencyException" /> on tag mismatch.
 ///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
 ///     </para>
 /// </remarks>
@@ -64,7 +62,7 @@ public sealed class AdviceMethodFreshness<TEntity, TRequest, TResponse> : IResou
 
         var tag = request is IFreshness freshness ? freshness.EntityTag : null;
 
-        if (string.IsNullOrWhiteSpace(tag) || !tag.StartsWith("W/")) {
+        if (string.IsNullOrWhiteSpace(tag)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

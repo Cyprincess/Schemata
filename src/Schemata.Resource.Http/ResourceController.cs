@@ -41,8 +41,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
 
     protected JsonSerializerOptions JsonOptions { get; }
 
-    protected virtual EmptyResult EmptyResult { get; } = new();
-
     private string BuildFullName(string name) {
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
         var parent     = descriptor.ResolveParent(HttpContext.Request.RouteValues);
@@ -60,9 +58,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
         var result = await Handler.ListAsync(request, HttpContext.User, HttpContext.RequestAborted);
-        if (!result.IsAllowed()) {
-            return EmptyResult;
-        }
 
         return new JsonResult(result, JsonOptions);
     }
@@ -71,12 +66,18 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     ///     Gets a single resource by name per <seealso href="https://google.aip.dev/131">AIP-131</seealso>.
     /// </summary>
     /// <param name="name">The resource's relative name segment.</param>
+    /// <param name="readMask">
+    ///     Optional field paths to include in the response
+    ///     per <seealso href="https://google.aip.dev/157">AIP-157</seealso>.
+    /// </param>
     [HttpGet("{name}")]
-    public virtual async Task<IActionResult> GetAsync(string name) {
-        var result = await Handler.GetAsync(BuildFullName(name), HttpContext.User, HttpContext.RequestAborted);
-        if (!result.IsAllowed()) {
-            return EmptyResult;
-        }
+    public virtual async Task<IActionResult> GetAsync(string name, [FromQuery] string? readMask = null) {
+        var request = new GetRequest {
+            CanonicalName = BuildFullName(name),
+            ReadMask      = readMask,
+        };
+
+        var result = await Handler.GetAsync(request, HttpContext.User, HttpContext.RequestAborted);
 
         return new JsonResult(result.Detail, JsonOptions);
     }
@@ -90,9 +91,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(request, HttpContext.Request.RouteValues);
 
         var result = await Handler.CreateAsync(request, HttpContext.User, HttpContext.RequestAborted);
-        if (!result.IsAllowed()) {
-            return EmptyResult;
-        }
 
         HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail!.Name });
 
@@ -124,9 +122,6 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             HttpContext.User,
             HttpContext.RequestAborted
         );
-        if (!result.IsAllowed()) {
-            return EmptyResult;
-        }
 
         return new JsonResult(result.Detail, JsonOptions);
     }
@@ -134,15 +129,15 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     /// <summary>
     ///     Deletes a resource per <seealso href="https://google.aip.dev/135">AIP-135</seealso>.
     ///     Falls back to the <c>If-Match</c> header for the freshness tag when <paramref name="etag" /> is empty.
+    ///     A soft delete responds 200 with the updated resource
+    ///     per <seealso href="https://google.aip.dev/164">AIP-164</seealso>; a hard delete responds 204.
     /// </summary>
     /// <param name="name">The resource's relative name segment.</param>
-    /// <param name="etag">Optional weak ETag for freshness validation.</param>
-    /// <param name="force">When <see langword="true" />, bypasses freshness validation.</param>
+    /// <param name="etag">Optional ETag for freshness validation.</param>
     [HttpDelete("{name}")]
     public virtual async Task<IActionResult> DeleteAsync(
         string              name,
-        [FromQuery] string? etag  = null,
-        [FromQuery] bool?   force = null
+        [FromQuery] string? etag = null
     ) {
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {
@@ -152,12 +147,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         var result = await Handler.DeleteAsync(
             BuildFullName(name),
             tag,
-            force ?? false,
             HttpContext.User,
             HttpContext.RequestAborted
         );
-        if (!result) {
-            return EmptyResult;
+
+        if (result.Detail is not null) {
+            return new JsonResult(result.Detail, JsonOptions);
         }
 
         return NoContent();

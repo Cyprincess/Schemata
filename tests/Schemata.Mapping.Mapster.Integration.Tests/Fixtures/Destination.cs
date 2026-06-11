@@ -9,4 +9,8 @@ public class Destination
     public int Grade { get; set; }
 
     public string? Sex { get; set; }
+
+    public string? Nickname { get; set; }
+
+    public DestinationProfile? Profile { get; set; }
 }

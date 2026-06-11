@@ -15,8 +15,10 @@ namespace Schemata.Transport.Grpc.Proto;
 ///         <item><c>ICanonicalName.CanonicalName</c> is surfaced as <c>"name"</c> (AIP-122).</item>
 ///         <item><c>IFreshness.EntityTag</c> is surfaced as <c>"etag"</c> (AIP-154).</item>
 ///         <item>
-///             <c>ListResultBase&lt;TSummary&gt;.Entities</c> is surfaced as
-///             <see cref="ResourceNameDescriptor.Plural" /> of <c>TSummary</c> (AIP-132).
+///             The <c>Entities</c> property of <see cref="IEntitiesResult{TItem}" />
+///             implementors is surfaced as
+///             <see cref="ResourceNameDescriptor.Plural" /> of <c>TItem</c>
+///             (AIP-132 / AIP-231..235).
 ///         </item>
 ///     </list>
 ///     Callers are still responsible for applying the global snake_case wire convention
@@ -35,15 +37,13 @@ public static class SchemataProtoTraits
     ///     be omitted from the wire entirely.
     /// </returns>
     public static string? ResolveWireName(Type owner, string propertyName) {
-        // ListResultBase<TSummary>.Entities surfaces as the entity plural per AIP-132.
-        // This branch comes first because ListResultBase<T> happens to implement
-        // ICanonicalName via OperationResultBase<TSelf>, and we want the AIP-132 rename
-        // to win for the Entities property specifically.
-        if (owner is { IsGenericType: true }
-         && owner.GetGenericTypeDefinition() == typeof(ListResultBase<>)
-         && propertyName == nameof(ListResultBase<>.Entities)) {
-            var summary = owner.GetGenericArguments()[0];
-            return ResourceNameDescriptor.ForType(summary).Plural;
+        // The plural rename must win over the trait branches below for the Entities
+        // property of result envelopes, so it is evaluated first.
+        if (propertyName == nameof(IEntitiesResult<>.Entities)) {
+            var carrier = Array.Find(owner.GetInterfaces(), static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
+            if (carrier is not null) {
+                return ResourceNameDescriptor.ForType(carrier.GetGenericArguments()[0]).Plural;
+            }
         }
 
         if (typeof(ICanonicalName).IsAssignableFrom(owner)) {

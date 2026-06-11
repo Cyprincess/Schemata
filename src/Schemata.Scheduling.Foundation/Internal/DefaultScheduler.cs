@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,7 +69,7 @@ public sealed class DefaultScheduler : IScheduler
     }
 
     public Task ScheduleAsync(SchemataJob job, CancellationToken ct) {
-        return ScheduleAsync(job, null, ct);
+        return ScheduleAsync(job, (JobContext?)null, ct);
     }
 
     public async Task UnscheduleAsync(string job, CancellationToken ct) {
@@ -105,7 +104,7 @@ public sealed class DefaultScheduler : IScheduler
             NextRunTime  = DateTime.UtcNow,
             Replay       = false,
             State        = JobState.Active,
-            Variables    = JsonSerializer.Serialize(context.Variables),
+            Variables    = JobVariableSerializer.Serialize(context.Variables),
         };
 
         context.ExecutionUid ??= Guid.NewGuid();
@@ -128,7 +127,7 @@ public sealed class DefaultScheduler : IScheduler
         var name       = uid.ToString("N");
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
 
-        return new SchemataJobExecution {
+        return new() {
             Uid           = uid,
             Name          = name,
             CanonicalName = $"{descriptor.Collection}/{name}",
@@ -175,7 +174,7 @@ public sealed class DefaultScheduler : IScheduler
                 return;
             }
 
-            entry              = new ScheduledEntry(job, new CancellationTokenSource(), preparedContext);
+            entry              = new(job, new(), preparedContext);
             _entries[job.Name] = entry;
         } finally {
             _lock.Release();
@@ -299,11 +298,9 @@ public sealed class DefaultScheduler : IScheduler
         } else {
             // Cron / periodic path: build the execution here so observers receive
             // a fully-populated ctx.Execution to persist.
-            var variables = string.IsNullOrEmpty(job.Variables)
-                ? new Dictionary<string, object?>()
-                : JsonSerializer.Deserialize<Dictionary<string, object?>>(job.Variables)!;
+            var variables = JobVariableSerializer.DeserializeOrEmpty(job.Variables);
 
-            context = new JobContext {
+            context = new() {
                 Job          = job.Name!,
                 Variables    = variables,
                 ExecutionUid = Guid.NewGuid(),
@@ -352,8 +349,7 @@ public sealed class DefaultScheduler : IScheduler
                     job.State       = JobState.Completed;
                     job.NextRunTime = null;
                 } else {
-                    var schedule = ScheduleDefinitionMapper.ToDefinition(job);
-                    job.NextRunTime = schedule.GetNextRunTime(DateTime.UtcNow);
+                    job.NextRunTime = GetNextRunTimeAfterFire(job);
                 }
 
                 if (job is { State: JobState.Active, NextRunTime: not null }) {
@@ -374,8 +370,7 @@ public sealed class DefaultScheduler : IScheduler
                 job.State       = JobState.Completed;
                 job.NextRunTime = null;
             } else {
-                var schedule = ScheduleDefinitionMapper.ToDefinition(job);
-                job.NextRunTime = schedule.GetNextRunTime(DateTime.UtcNow);
+                job.NextRunTime = GetNextRunTimeAfterFire(job);
             }
 
             foreach (var observer in observers) {
@@ -395,7 +390,7 @@ public sealed class DefaultScheduler : IScheduler
             _logger?.LogInformation("Job '{JobName}' execution cancelled.", job.Name);
         } catch (Exception ex) {
             job.RecentRunTime = DateTime.UtcNow;
-            job.RecentError   = ex.ToString();
+            job.RecentError   = ex.Message;
             job.State         = JobState.Failed;
 
             foreach (var observer in observers) {
@@ -421,6 +416,20 @@ public sealed class DefaultScheduler : IScheduler
                 _logger?.LogWarning(ex, "IJobLifecycleObserver.OnScheduledAsync threw for job '{JobName}'.", job.Name);
             }
         }
+    }
+
+    private static DateTime? GetNextRunTimeAfterFire(SchemataJob job) {
+        if (job.ScheduleType == ScheduleType.Periodic && job is { NextRunTime: not null, IntervalTicks: not null }) {
+            return job.NextRunTime.Value.AddTicks(job.IntervalTicks.Value);
+        }
+
+        var schedule = ScheduleDefinitionMapper.ToDefinition(job);
+        return schedule.GetNextRunTime(DateTime.UtcNow);
+    }
+
+    public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
+        job.Variables = JobVariableSerializer.Serialize(variables);
+        return ScheduleAsync(job, ct);
     }
 
     private async Task NotifyUnscheduledAsync(SchemataJob job, CancellationToken ct) {

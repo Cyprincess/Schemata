@@ -131,11 +131,15 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         CancellationToken                               ct = default
     );
 
-    public virtual ValueTask<TEntity?> GetAsync(TEntity entity, CancellationToken ct = default) {
+    public virtual ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default) {
         return GetAsync<TEntity>(entity, ct);
     }
 
-    public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity entity, CancellationToken ct = default) {
+    public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default) {
+        if (entity is null) {
+            return ValueTask.FromResult(default(TResult));
+        }
+
         var type = entity.GetType();
 
         var properties = KeyPropertiesCache(type);
@@ -147,7 +151,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         foreach (var property in properties) {
             var value = property.GetValue(entity);
             if (value is null) {
-                throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1021));
+                return ValueTask.FromResult(default(TResult));
             }
 
             keys.Add(value);
@@ -247,7 +251,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public virtual IDisposable SuppressSoftDelete()       { return AdviceContext.Use<SoftDeleteSuppressed>(); }
     public virtual IDisposable SuppressTimestamp()        { return AdviceContext.Use<TimestampSuppressed>(); }
 
-    /// <inheritdoc cref="IRepository{TEntity}.Join" />
+    public abstract IUnitOfWork Begin();
+
     public virtual void Join(IUnitOfWork uow) {
         ArgumentNullException.ThrowIfNull(uow);
         if (!OwnsContext) {

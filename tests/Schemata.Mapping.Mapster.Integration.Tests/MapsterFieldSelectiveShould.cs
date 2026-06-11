@@ -14,6 +14,11 @@ public class MapsterFieldSelectiveShould
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => {
             schema.UseMapster()
+                  .Map<SourceProfile, DestinationProfile>(map => {
+                       map.For(d => d.DisplayName).From(s => s.DisplayName);
+                       map.For(d => d.Bio).From(s => s.Bio);
+                       map.For(d => d.Locale).From(s => s.Locale);
+                   })
                   .Map<Source, Destination>(map => {
                        map.For(d => d.DisplayName)
                           .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
@@ -76,5 +81,48 @@ public class MapsterFieldSelectiveShould
         Assert.Equal(nameof(Sex.Male), destination.Sex);
         Assert.Equal(99, destination.Age);
         Assert.Equal(77, destination.Grade);
+    }
+
+    [Fact]
+    public void Map_WithNestedFieldList_CopiesOnlyNestedLeaf() {
+        var mapper = CreateMapper();
+
+        var source = new Source {
+            Age     = 30,
+            Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
+        };
+
+        var destination = new Destination {
+            Age     = 99,
+            Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
+        };
+
+        mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
+
+        Assert.Equal(99, destination.Age);
+        Assert.NotNull(destination.Profile);
+        Assert.Equal("New Name", destination.Profile.DisplayName);
+        Assert.Equal("Old Bio", destination.Profile.Bio);
+        Assert.Equal("en", destination.Profile.Locale);
+    }
+
+    [Fact]
+    public void Map_WithNestedFieldList_ClearsMaskedNullLeaf() {
+        var mapper = CreateMapper();
+
+        var source = new Source {
+            Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" },
+        };
+
+        var destination = new Destination {
+            Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
+        };
+
+        mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
+
+        Assert.NotNull(destination.Profile);
+        Assert.Null(destination.Profile.DisplayName);
+        Assert.Equal("Old Bio", destination.Profile.Bio);
+        Assert.Equal("en", destination.Profile.Locale);
     }
 }

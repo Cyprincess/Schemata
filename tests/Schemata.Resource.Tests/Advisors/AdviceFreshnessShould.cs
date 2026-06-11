@@ -61,4 +61,57 @@ public class AdviceFreshnessShould
 
         Assert.Equal(AdviseResult.Continue, result);
     }
+
+    [Fact]
+    public async Task UpdateFreshness_StrongFormatETag_ThrowsConcurrencyException() {
+        var advisor = new AdviceUpdateFreshness<Student, Student>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
+        var request = new Student { EntityTag = "\"strong-tag\"" };
+
+        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, entity, null));
+    }
+
+    [Fact]
+    public async Task UpdateFreshness_AbsentETag_Continues() {
+        var advisor = new AdviceUpdateFreshness<Student, Student>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
+        var request = new Student { EntityTag = null };
+
+        var result = await advisor.AdviseAsync(ctx, request, entity, null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+    }
+
+    [Fact]
+    public async Task DeleteFreshness_StrongFormatETag_ThrowsConcurrencyException() {
+        var advisor = new AdviceDeleteFreshness<Student>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
+
+        await Assert.ThrowsAsync<ConcurrencyException>(
+            () => advisor.AdviseAsync(ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
+    }
+
+    [Fact]
+    public async Task DeleteFreshness_AbsentETag_Continues() {
+        var advisor = new AdviceDeleteFreshness<Student>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
+
+        var result = await advisor.AdviseAsync(ctx, new() { Etag = null }, entity, null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+    }
+
+    [Fact]
+    public async Task MethodFreshness_StrongFormatETag_ThrowsConcurrencyException() {
+        var advisor = new AdviceMethodFreshness<Student, Student, Student>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
+        var request = new Student { EntityTag = "\"strong-tag\"" };
+
+        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, entity, null));
+    }
 }

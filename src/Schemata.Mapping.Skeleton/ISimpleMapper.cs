@@ -55,7 +55,7 @@ public interface ISimpleMapper
     /// <typeparam name="TDestination">The destination type.</typeparam>
     /// <param name="source">The source object.</param>
     /// <param name="destination">The destination object to populate.</param>
-    /// <param name="fields">The field names to map; all other fields retain their existing values.</param>
+    /// <param name="fields">The CLR field names or dot paths to map; all other fields retain their existing values.</param>
     void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields);
 
     /// <summary>

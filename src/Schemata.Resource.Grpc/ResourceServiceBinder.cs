@@ -7,10 +7,10 @@ namespace Schemata.Resource.Grpc;
 
 internal sealed class ResourceServiceBinder : ServiceBinder
 {
-    private static readonly Type OpenServiceInterface = typeof(IResourceService<,,,>);
+    private static readonly Type OpenServiceInterface      = typeof(IResourceService<,,,>);
 
     public override bool IsServiceContract(Type contractType, out string? name) {
-        if (!contractType.IsConstructedGenericType || contractType.GetGenericTypeDefinition() != OpenServiceInterface) {
+        if (!contractType.IsConstructedGenericType || !IsResourceContract(contractType.GetGenericTypeDefinition())) {
             return base.IsServiceContract(contractType, out name);
         }
 
@@ -25,7 +25,7 @@ internal sealed class ResourceServiceBinder : ServiceBinder
     public override bool IsOperationContract(MethodInfo method, out string? name) {
         var declaringType = method.DeclaringType;
         if (declaringType?.IsConstructedGenericType != true
-         || declaringType.GetGenericTypeDefinition() != OpenServiceInterface) {
+         || !IsResourceContract(declaringType.GetGenericTypeDefinition())) {
             return base.IsOperationContract(method, out name);
         }
 
@@ -43,5 +43,9 @@ internal sealed class ResourceServiceBinder : ServiceBinder
             var _  => $"{baseName}{descriptor.Singular}",
         };
         return true;
+    }
+
+    private static bool IsResourceContract(Type genericType) {
+        return genericType == OpenServiceInterface;
     }
 }

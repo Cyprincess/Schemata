@@ -1,9 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
 
 namespace Schemata.Scheduling.Skeleton.Entities;
 
@@ -11,8 +10,6 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [DisplayName("Job")]
 [Table("SchemataJobs")]
 [CanonicalName("jobs/{job}")]
-[Resource(typeof(SchemataJob))]
-[ResourceMethod("run", typeof(RunJobHandler))]
 [PrimaryKey(nameof(Uid))]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {

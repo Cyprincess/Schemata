@@ -8,8 +8,9 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation;
 
 /// <summary>
-///     Hands each <see cref="SchemataSchedulingOptions.Jobs" /> registration
-///     to <see cref="IScheduler.ScheduleAsync" /> on host startup.
+///     Starts the scheduler and hands each <see cref="SchemataSchedulingOptions.Jobs" /> registration
+///     to <see cref="IScheduler.ScheduleAsync(Schemata.Scheduling.Skeleton.Entities.SchemataJob, System.Threading.CancellationToken)" /> on host startup;
+///     stops the scheduler on host shutdown.
 /// </summary>
 public sealed class SchedulingInitializer : BackgroundService
 {
@@ -37,5 +38,10 @@ public sealed class SchedulingInitializer : BackgroundService
 
             await _scheduler.ScheduleAsync(job, st);
         }
+    }
+
+    public override async Task StopAsync(CancellationToken ct) {
+        await _scheduler.StopAsync(ct);
+        await base.StopAsync(ct);
     }
 }

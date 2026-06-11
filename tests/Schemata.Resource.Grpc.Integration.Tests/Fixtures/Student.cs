@@ -1,7 +1,7 @@
 using System;
+using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Microsoft.EntityFrameworkCore;
 
 namespace Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 

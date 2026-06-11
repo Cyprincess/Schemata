@@ -10,11 +10,8 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    ///     Exposes Flow process management endpoints over HTTP via the
-    ///     <c>ProcessController</c> in this assembly. Enables
-    ///     <see cref="SchemataFlowHttpFeature" /> and registers a
-    ///     <c>SchemataExtensionPart&lt;SchemataFlowHttpFeature&gt;</c> with MVC so
-    ///     that controllers from this assembly are discovered.
+    ///     Registers Flow resources for HTTP and adds the definitions-only
+    ///     controller from this assembly to MVC discovery.
     /// </summary>
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
     /// <returns>The builder for chaining.</returns>

@@ -35,7 +35,7 @@ public class IntegrationFixture : IAsyncLifetime
 
         services.TryAddSingleton<Func<TestDataConnection>>(sp => () => {
             var options = new DataOptions().UseSQLite(connectionString);
-            return new TestDataConnection(options);
+            return new(options);
         });
 
         services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();

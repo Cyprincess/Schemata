@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
-using Schemata.Abstractions.Entities;
 using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Skeleton.Entities;

@@ -52,6 +52,8 @@
     <Project Path="src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />
     <Project Path="src/Schemata.Scheduling.Event/Schemata.Scheduling.Event.csproj" />
     <Project Path="src/Schemata.Scheduling.Foundation/Schemata.Scheduling.Foundation.csproj" />
+    <Project Path="src/Schemata.Scheduling.Grpc/Schemata.Scheduling.Grpc.csproj" />
+    <Project Path="src/Schemata.Scheduling.Http/Schemata.Scheduling.Http.csproj" />
     <Project Path="src/Schemata.Scheduling.Skeleton/Schemata.Scheduling.Skeleton.csproj" />
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />

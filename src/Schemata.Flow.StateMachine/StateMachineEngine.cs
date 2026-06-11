@@ -321,11 +321,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             case EventBasedGateway:
                 return null;
             case ParallelGateway or InclusiveGateway:
-                throw new FailedPreconditionException(message: $"Gateway '{
-                    gateway.Name
-                }' of type '{
-                    gateway.GetType().Name
-                }' is not supported by the state machine engine.");
+                throw new FailedPreconditionException(message: $"Gateway '{gateway.Name}' is not supported by the state machine engine.");
         }
 
         var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
@@ -385,7 +381,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             }
             default:
                 throw new FailedPreconditionException(
-                    message: $"Unknown target element '{target.Name}' of type '{target.GetType().Name}'.");
+                    message: $"Unknown target element '{target.Name}'.");
         }
     }
 

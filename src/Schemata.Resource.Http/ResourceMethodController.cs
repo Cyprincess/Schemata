@@ -1,5 +1,5 @@
+using System;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,9 +18,9 @@ namespace Schemata.Resource.Http;
 ///     <c>POST {collection}:{verb}</c> endpoint. The route's verb suffix is
 ///     injected by <see cref="ResourceMethodControllerConvention" />; this
 ///     class only declares the action signature and dispatches through the
-///     <see cref="ResourceMethodOperationHandler{TEntity, TRequest, TResponse}" />
+///     <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />
 ///     advisor pipeline before invoking the registered
-///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" /> per
+///     <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" /> per
 ///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>.
 /// </summary>
 [ApiController]
@@ -31,18 +31,9 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     where TResponse : class, ICanonicalName
     where THandler : class, IResourceMethodHandler<TEntity, TRequest, TResponse>
 {
-    /// <summary>
-    ///     The verb that this closed-generic controller serves, looked up from the
-    ///     resource's <see cref="ResourceMethodAttribute" /> whose <c>Handler</c>
-    ///     equals <typeparamref name="THandler" />. Resolved once per closure.
-    /// </summary>
-    private static readonly string Verb = typeof(TEntity)
-        .GetCustomAttributes<ResourceMethodAttribute>()
-        .First(a => a.Handler == typeof(THandler))
-        .Verb;
-
     protected readonly THandler                                                    Handler;
     protected readonly ResourceMethodOperationHandler<TEntity, TRequest, TResponse> Operation;
+    private readonly   string                                                       _verb;
 
     /// <summary>
     ///     Initializes a new instance with the operation handler, custom-method handler, and JSON serializer options.
@@ -50,19 +41,20 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     /// <param name="operation">The <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />.</param>
     /// <param name="handler">The registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />.</param>
     /// <param name="json">The host's <see cref="JsonSerializerOptions" />.</param>
+    /// <param name="resource">The registered resource metadata.</param>
     public ResourceMethodController(
         ResourceMethodOperationHandler<TEntity, TRequest, TResponse> operation,
         THandler                                                     handler,
-        IOptions<JsonSerializerOptions>                              json
+        IOptions<JsonSerializerOptions>                              json,
+        IOptions<SchemataResourceOptions>                            resource
     ) {
         Operation   = operation;
         Handler     = handler;
         JsonOptions = json.Value;
+        _verb       = ResolveVerb(resource.Value);
     }
 
     protected JsonSerializerOptions JsonOptions { get; }
-
-    protected virtual EmptyResult EmptyResult { get; } = new();
 
     /// <summary>
     ///     Invokes the AIP-136 custom method, routing the verb through the
@@ -79,12 +71,20 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     ) {
         var fullName = string.IsNullOrEmpty(name) ? null : BuildFullName(name);
 
-        var response = await Operation.InvokeAsync(Handler, Verb, fullName, request, HttpContext.User, ct);
-        if (response is null) {
-            return EmptyResult;
-        }
+        var response = await Operation.InvokeAsync(Handler, _verb, fullName, request, HttpContext.User, ct);
 
         return new JsonResult(response, JsonOptions);
+    }
+
+    private static string ResolveVerb(SchemataResourceOptions options) {
+        if (options.Methods.TryGetValue(typeof(TEntity).TypeHandle, out var methods)) {
+            if (methods.FirstOrDefault(m => m.Handler == typeof(THandler)) is { } method) {
+                return method.Verb;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No resource method registered for handler '{typeof(THandler).FullName}' on resource '{typeof(TEntity).FullName}'.");
     }
 
     private string BuildFullName(string name) {

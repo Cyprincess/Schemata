@@ -10,6 +10,7 @@ using Humanizer;
 using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Data;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
@@ -298,6 +299,14 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         EnsureTransaction();
 
         await Context.DeleteAsync(entity, TableName, token: ct);
+    }
+
+    public override IUnitOfWork Begin() {
+        var uow = ServiceProvider.GetRequiredService<IUnitOfWork<TContext>>();
+
+        Join(uow);
+
+        return uow;
     }
 
     public override async Task CommitAsync(CancellationToken ct = default) {

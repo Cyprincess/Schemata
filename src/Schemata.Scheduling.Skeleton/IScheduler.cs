@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -22,6 +23,11 @@ public interface IScheduler
     ///     its timer.  Subsequent calls under the same name replace the entry.
     /// </summary>
     Task ScheduleAsync(SchemataJob job, CancellationToken ct);
+
+    /// <summary>
+    ///     Registers <paramref name="job" /> with typed variables owned by the Scheduling serializer.
+    /// </summary>
+    Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct);
 
     /// <summary>Removes the registry entry for <paramref name="job" />, if present.</summary>
     Task UnscheduleAsync(string job, CancellationToken ct);
