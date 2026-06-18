@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +8,7 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -17,7 +17,7 @@ namespace Schemata.Authorization.Tests;
 public class ClientSecretPostHandlerShould
 {
     private static readonly SchemataApplication TestApp = new() {
-        Uid = Guid.NewGuid(), ClientId = "my-client", ClientType = "confidential",
+        Uid = Identifiers.NewUid(), ClientId = "my-client", ClientType = "confidential",
     };
 
     private static ClientSecretPostAuthentication<SchemataApplication> CreateHandler(
@@ -81,5 +81,17 @@ public class ClientSecretPostHandlerShould
 
         await Assert.ThrowsAsync<OAuthException>(() => handler.AuthenticateAsync(
                                                      null, Form("", ""), null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ReturnsNull_WhenFormLacksClientId() {
+        var handler = CreateHandler();
+
+        // A client authenticating with HTTP Basic carries no client_id in the form, so
+        // client_secret_post is not attempted and must defer to the next authenticator.
+        var result = await handler.AuthenticateAsync(
+            null, new Dictionary<string, List<string?>>(), null, CancellationToken.None);
+
+        Assert.Null(result);
     }
 }

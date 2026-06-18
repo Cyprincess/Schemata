@@ -85,22 +85,22 @@ public class ProcessDefinition
                 if (activity is null) continue;
 
                 activity.Name = name;
-                activity.Id   = GenerateId();
+                activity.Id   = Identifiers.NewUid().ToString("n");
 
                 SetPropertyValue(this, prop, activity);
                 Elements.Add(activity);
             } else if (propType == typeof(StartEvent)) {
-                var startEvent = new StartEvent { Name = name, Id = GenerateId() };
+                var startEvent = new StartEvent { Name = name, Id = Identifiers.NewUid().ToString("n") };
 
                 SetPropertyValue(this, prop, startEvent);
                 Elements.Add(startEvent);
             } else if (propType == typeof(EndEvent)) {
-                var endEvent = new EndEvent { Name = name, Id = GenerateId() };
+                var endEvent = new EndEvent { Name = name, Id = Identifiers.NewUid().ToString("n") };
 
                 SetPropertyValue(this, prop, endEvent);
                 Elements.Add(endEvent);
             } else if (propType == typeof(FlowEvent)) {
-                var flowEvent = new FlowEvent { Name = name, Id = GenerateId() };
+                var flowEvent = new FlowEvent { Name = name, Id = Identifiers.NewUid().ToString("n") };
 
                 SetPropertyValue(this, prop, flowEvent);
                 Elements.Add(flowEvent);
@@ -123,6 +123,4 @@ public class ProcessDefinition
             }
         }
     }
-
-    internal static string GenerateId() { return Guid.NewGuid().ToString("n"); }
 }

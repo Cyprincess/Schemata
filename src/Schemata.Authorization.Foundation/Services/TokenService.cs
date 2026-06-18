@@ -26,6 +26,7 @@ public class TokenService
     private readonly JsonWebTokenHandler          _handler = new() { SetDefaultTimesOnTokenCreation = false };
     private readonly SchemataAuthorizationOptions _options;
     private readonly SigningCredentials           _signing;
+    private readonly TimeProvider                 _time;
     private readonly TokenValidationParameters    _validation;
 
     /// <summary>
@@ -34,8 +35,10 @@ public class TokenService
     ///     validation parameters.
     /// </summary>
     /// <param name="options">Server authorization options.</param>
-    public TokenService(IOptions<SchemataAuthorizationOptions> options) {
+    /// <param name="timeProvider">Clock used to stamp token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
+    public TokenService(IOptions<SchemataAuthorizationOptions> options, TimeProvider? timeProvider = null) {
         _options   = options.Value;
+        _time      = timeProvider ?? TimeProvider.System;
         _algorithm = _options.SigningAlgorithm!;
 
         _signing = new(_options.SigningKey!, _algorithm);
@@ -67,7 +70,7 @@ public class TokenService
             );
         }
 
-        var now = DateTime.UtcNow;
+        var now = _time.GetUtcNow().UtcDateTime;
         var descriptor = new SecurityTokenDescriptor {
             Subject               = new(claims),
             Expires               = now + lifetime,

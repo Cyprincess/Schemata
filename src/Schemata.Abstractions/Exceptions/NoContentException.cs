@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Abstractions.Exceptions;
@@ -18,14 +16,14 @@ public class NoContentException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="NoContentException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public NoContentException(
-        int     status  = 204,
-        string? code    = ErrorCodes.Ok,
+        int     code    = 204,
+        string? status  = ErrorCodes.Ok,
         string? message = null
-    ) : base(status, code, message) { }
+    ) : base(code, status, message) { }
 
-    public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) { return null; }
+    public override object? CreateErrorResponse(string? requestId = null, string? domain = null) { return null; }
 }

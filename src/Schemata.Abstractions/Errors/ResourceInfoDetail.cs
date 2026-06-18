@@ -7,7 +7,7 @@ namespace Schemata.Abstractions.Errors;
 ///     failed operation, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.ResourceInfo")]
 public class ResourceInfoDetail : IErrorDetail
 {
     /// <summary>
@@ -29,13 +29,4 @@ public class ResourceInfoDetail : IErrorDetail
     ///     Additional human-readable context about the resource.
     /// </summary>
     public virtual string? Description { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.ResourceInfo"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.ResourceInfo";
-
-    #endregion
 }

@@ -40,7 +40,7 @@ public sealed class SchemataSchedulingHttpFeature : FeatureBase
         services.TryAddScoped<RunJobHandler>();
         services.TryAddScoped<CancelOperationHandler>();
         services.TryAddScoped<WaitOperationHandler>();
-        services.Map<SchemataJobExecution, SchemataOperation>(map => map.With(e => SchemataOperation.FromExecution(e)));
+        services.Map<SchemataJobExecution, Operation>(map => map.With(e => OperationMapper.FromExecution(e)));
         services.AddSchedulerOperationDispatcher();
     }
 
@@ -51,7 +51,7 @@ public sealed class SchemataSchedulingHttpFeature : FeatureBase
                 new(Verbs.Run, typeof(RunJobHandler)),
             ]);
 
-        resources.Use<SchemataJobExecution, SchemataOperation, SchemataOperation, SchemataOperation>(
+        resources.Use<SchemataJobExecution, Operation, Operation, Operation>(
             [HttpResourceAttribute.Name],
             resource => {
                 resource.Operations = [Operations.Get, Operations.List, Operations.Delete];

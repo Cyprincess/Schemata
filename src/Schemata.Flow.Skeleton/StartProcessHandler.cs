@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
-using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -11,9 +10,8 @@ using Schemata.Flow.Skeleton.Utilities;
 namespace Schemata.Flow.Skeleton;
 
 public sealed class StartProcessHandler(
-    IProcessRuntime               runtime,
-    IProcessRegistry              registry,
-    IRepository<SchemataProcess>  processes
+    IProcessRuntime  runtime,
+    IProcessRegistry registry
 ) : IResourceMethodHandler<SchemataProcess, StartProcessInstanceRequest, SchemataProcess>
 {
     #region IResourceMethodHandler<SchemataProcess,StartProcessInstanceRequest,SchemataProcess> Members
@@ -28,20 +26,17 @@ public sealed class StartProcessHandler(
         FlowProcessAuthorization.EnsureDefinitionAccess(registry, request.DefinitionName, principal);
 
         var variables = request.Variables is not null ? VariableSerializer.Deserialize(request.Variables) : null;
-        var process = await runtime.StartProcessInstanceAsync(
+
+        // Display name and description flow into the start transaction so the instance is never
+        // persisted without the metadata the caller supplied.
+        return await runtime.StartProcessInstanceAsync(
             request.DefinitionName,
             variables,
             principal,
+            request.DisplayName,
+            request.Description,
+            null,
             ct);
-
-        if (!string.IsNullOrWhiteSpace(request.DisplayName) || !string.IsNullOrWhiteSpace(request.Description)) {
-            process.DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName;
-            process.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
-            await processes.UpdateAsync(process, ct);
-            await processes.CommitAsync(ct);
-        }
-
-        return process;
     }
 
     #endregion

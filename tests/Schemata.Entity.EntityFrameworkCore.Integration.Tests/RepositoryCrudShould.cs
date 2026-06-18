@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -126,7 +127,7 @@ public class RepositoryCrudShould : IAsyncLifetime
 
     [Fact]
     public async Task Add_DuplicateKey_ThrowsAlreadyExists() {
-        var uid = Guid.NewGuid();
+        var uid = Identifiers.NewUid();
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {

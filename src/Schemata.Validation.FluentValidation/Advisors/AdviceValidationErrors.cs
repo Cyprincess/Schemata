@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
@@ -25,8 +24,8 @@ public static class AdviceValidationErrors
 /// </summary>
 /// <typeparam name="T">The type being validated.</typeparam>
 /// <remarks>
-///     Runs at <see cref="SchemataConstants.Orders.Max" /> (last in the pipeline) and returns
-///     <see cref="AdviseResult.Block" /> if the errors list is non-empty, preventing further processing.
+///     Runs after <see cref="AdviceValidation.DefaultOrder" /> and returns <see cref="AdviseResult.Block" />
+///     if the errors list is non-empty, preventing further processing.
 /// </remarks>
 public sealed class AdviceValidationErrors<T> : IValidationAdvisor<T>
 {

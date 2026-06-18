@@ -88,16 +88,26 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
+        // Remove the role and every dependent row (user links, claims) in one unit of work so a
+        // failure cannot delete the role while leaving orphaned child rows behind.
+        await using var uow = RolesRepository.Begin();
+        UserRoleRepository.Join(uow);
+        RoleClaimsRepository.Join(uow);
+
         await foreach (var user in UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Uid)))
                                                      .WithCancellation(ct)) {
             await UserRoleRepository.RemoveAsync(user, ct);
         }
 
-        await UserRoleRepository.CommitAsync(ct);
+        await foreach (var claim in RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)))
+                                                        .WithCancellation(ct)) {
+            await RoleClaimsRepository.RemoveAsync(claim, ct);
+        }
 
         await RolesRepository.RemoveAsync(role, ct);
+
         try {
-            await RolesRepository.CommitAsync(ct);
+            await uow.CommitAsync(ct);
         } catch (ConcurrencyException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }

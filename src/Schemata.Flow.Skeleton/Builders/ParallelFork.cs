@@ -1,4 +1,5 @@
 using System.Linq;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -19,7 +20,7 @@ public sealed class ParallelFork
     /// <summary>Inserts a parallel join gateway joining <paramref name="exits" /> (or the fork's branch exits when empty).</summary>
     public ParallelJoin Join(params Activity[] exits) {
         var joinGateway = new ParallelGateway {
-            Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Join_{_gateway.Name}",
+            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Join_{_gateway.Name}",
         };
         _definition.Elements.Add(joinGateway);
 
@@ -27,7 +28,7 @@ public sealed class ParallelFork
 
         foreach (var exit in targetExits) {
             _definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = exit, Target = joinGateway,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = exit, Target = joinGateway,
             });
         }
 

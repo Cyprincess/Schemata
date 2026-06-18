@@ -8,6 +8,7 @@ using Xunit;
 namespace Schemata.Authorization.Integration.Tests;
 
 [Trait("Category", "Integration")]
+[Trait("Layer", "Component")]
 public class DiscoveryEndpointShould : IClassFixture<WebAppFactory>
 {
     private readonly HttpClient _client;
@@ -15,7 +16,7 @@ public class DiscoveryEndpointShould : IClassFixture<WebAppFactory>
     public DiscoveryEndpointShould(WebAppFactory factory) { _client = factory.CreateClient(); }
 
     [Fact]
-    public async Task ReturnsValidJson() {
+    public async Task ReturnsValidJson_AtDiscoveryEndpoint() {
         var response = await _client.GetAsync("/.well-known/openid-configuration");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -23,7 +24,7 @@ public class DiscoveryEndpointShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task ContainsRequiredFields() {
+    public async Task Discovery_ContainsRequiredFields() {
         var response = await _client.GetAsync("/.well-known/openid-configuration");
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var root     = json.RootElement;
@@ -37,7 +38,7 @@ public class DiscoveryEndpointShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task IssuerMatchesConfiguration() {
+    public async Task Issuer_MatchesConfiguration() {
         var response = await _client.GetAsync("/.well-known/openid-configuration");
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var issuer   = json.RootElement.GetProperty("issuer").GetString();

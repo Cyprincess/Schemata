@@ -8,20 +8,11 @@ namespace Schemata.Abstractions.Errors;
 ///     prevented the operation from proceeding, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.PreconditionFailure")]
 public class PreconditionFailureDetail : IErrorDetail
 {
     /// <summary>
     ///     The set of preconditions that were not met.
     /// </summary>
     public virtual List<PreconditionViolation>? Violations { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.PreconditionFailure"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.PreconditionFailure";
-
-    #endregion
 }

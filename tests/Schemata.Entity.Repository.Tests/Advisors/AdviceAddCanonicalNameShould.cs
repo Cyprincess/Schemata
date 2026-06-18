@@ -1,9 +1,9 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Entity.Repository.Tests.Fixtures;
 using Xunit;
@@ -17,7 +17,7 @@ public class AdviceAddCanonicalNameShould
         var advisor    = new AdviceAddCanonicalName<Student>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { Uid = Guid.NewGuid(), Name = "alice" };
+        var entity     = new Student { Uid = Identifiers.NewUid(), Name = "alice" };
 
         var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
 

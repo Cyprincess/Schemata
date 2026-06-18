@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Parlot;
 using Xunit;
 
@@ -30,6 +31,23 @@ public class CelCompilerShould
 
         Assert.True(func(new() { FullName  = "Alice" }));
         Assert.False(func(new() { FullName = null }));
+    }
+
+    [Fact]
+    public void Has_OnDictionaryKey_UsesContainsKey() {
+        var tree       = _compiler.Parse("has(labels.owner)");
+        var expression = _compiler.Compile<Student, bool>(tree);
+        var func       = expression.Compile();
+
+        Assert.True(func(new() { Labels  = new() { ["owner"] = "ops" } }));
+        Assert.False(func(new() { Labels = new() { ["team"]  = "ops" } }));
+    }
+
+    [Fact]
+    public void Has_OnUndeclaredIdentifier_Throws() {
+        var tree = _compiler.Parse("has(missing_field)");
+
+        Assert.Throws<ParseException>(() => _compiler.Compile<Student, bool>(tree));
     }
 
     [Fact]
@@ -156,6 +174,23 @@ public class CelCompilerShould
         Assert.Equal(expected, func(new()));
     }
 
+    [Fact]
+    public void Compile_SameTree_ReturnsCachedExpressionInstance() {
+        var tree   = _compiler.Parse("1 < 2");
+        var first  = _compiler.Compile<Student, bool>(tree);
+        var second = _compiler.Compile<Student, bool>(tree);
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void Compile_DistinctSources_ReturnSeparateExpressionInstances() {
+        var first  = _compiler.Compile<Student, bool>(_compiler.Parse("1 < 2"));
+        var second = _compiler.Compile<Student, bool>(_compiler.Parse("1 > 2"));
+
+        Assert.NotSame(first, second);
+    }
+
     #region Nested type: Student
 
     private sealed class Student
@@ -167,6 +202,8 @@ public class CelCompilerShould
         public bool Verified { get; set; }
 
         public long[] Scores { get; set; } = [];
+
+        public Dictionary<string, string> Labels { get; set; } = [];
     }
 
     #endregion

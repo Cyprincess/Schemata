@@ -295,6 +295,12 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     #region IUserDisplayNameStore<TUser> Members
 
     public virtual Task<string?> GetDisplayNameAsync(TUser user, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        if (user is null) {
+            throw new ArgumentNullException(nameof(user));
+        }
+
         return Task.FromResult(user.DisplayName);
     }
 
@@ -498,16 +504,34 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
+        // Remove the user and every dependent row (role links, claims, logins, tokens) in one unit
+        // of work so a failure cannot delete the user while leaving orphaned child rows behind.
+        await using var uow = UsersRepository.Begin();
+        UserRoleRepository.Join(uow);
+        UserClaimsRepository.Join(uow);
+        UserLoginsRepository.Join(uow);
+        UserTokensRepository.Join(uow);
+
         await foreach (var role in UserRoleRepository.ListAsync(q => q.Where(ur => ur.UserId.Equals(user.Uid)), ct)) {
             await UserRoleRepository.RemoveAsync(role, ct);
         }
 
-        await UserRoleRepository.CommitAsync(ct);
+        await foreach (var claim in UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)), ct)) {
+            await UserClaimsRepository.RemoveAsync(claim, ct);
+        }
+
+        await foreach (var login in UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId.Equals(user.Uid)), ct)) {
+            await UserLoginsRepository.RemoveAsync(login, ct);
+        }
+
+        await foreach (var token in UserTokensRepository.ListAsync(q => q.Where(t => t.UserId.Equals(user.Uid)), ct)) {
+            await UserTokensRepository.RemoveAsync(token, ct);
+        }
 
         await UsersRepository.RemoveAsync(user, ct);
 
         try {
-            await UsersRepository.CommitAsync(ct);
+            await uow.CommitAsync(ct);
         } catch (ConcurrencyException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -679,6 +703,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     public virtual Task<bool> HasPasswordAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        if (user is null) {
+            throw new ArgumentNullException(nameof(user));
+        }
+
         return Task.FromResult(user.PasswordHash is not null);
     }
 
@@ -1032,7 +1061,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string            providerKey,
         CancellationToken ct
     ) {
-        return await UserLoginsRepository.SingleOrDefaultAsync(q => q.Where(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey), ct);
+        return await UserLoginsRepository.FindAsync([loginProvider, providerKey], ct);
     }
 
     protected virtual async Task<TUserToken?> FindTokenAsync(

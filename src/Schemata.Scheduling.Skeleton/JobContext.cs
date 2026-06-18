@@ -24,6 +24,19 @@ public class JobContext
     public DateTime? StartTime { get; set; }
 
     /// <summary>
+    ///     The custom method verb that dispatched this execution as a long-running
+    ///     operation (e.g. <c>purge</c>), surfaced as <c>Operation.Metadata.Method</c>.
+    ///     <c>null</c> for ordinary cron / periodic fires.
+    /// </summary>
+    public string? Method { get; set; }
+
+    /// <summary>Stable job key used to resolve this fire after a restart.</summary>
+    public string? JobKey { get; set; }
+
+    /// <summary>Serialized typed arguments persisted for restart-durable replay.</summary>
+    public string? ArgsJson { get; set; }
+
+    /// <summary>
     ///     Scheduler-built <see cref="SchemataJobExecution" /> row for this fire.
     ///     Set by <see cref="IScheduler.TriggerAsync{TJob}" /> and by the timer
     ///     fire path; consumed by <see cref="IJobLifecycleObserver" /> instances
@@ -31,4 +44,12 @@ public class JobContext
     ///     MUST NOT assign this.
     /// </summary>
     public SchemataJobExecution? Execution { get; set; }
+
+    /// <summary>
+    ///     Most-restrictive <see cref="JobTriggerOutcome" /> captured when
+    ///     <see cref="IScheduler.TriggerAsync{TJob}" /> invoked
+    ///     <see cref="IJobLifecycleObserver.OnTriggeredAsync" />, so the execution path honours a
+    ///     Block/Skip without re-invoking observers. Scheduler-managed; jobs MUST NOT assign this.
+    /// </summary>
+    public JobTriggerOutcome? TriggerOutcome { get; set; }
 }

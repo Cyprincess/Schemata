@@ -31,6 +31,18 @@ public class AdviceAddTimestampShould
     }
 
     [Fact]
+    public async Task Advise_Create_CreateTimeEqualsUpdateTime() {
+        var advisor    = new AdviceAddTimestamp<Student>();
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var repository = new Mock<IRepository<Student>>().Object;
+        var entity     = new Student { CreateTime = null, UpdateTime = null };
+
+        await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+
+        Assert.Equal(entity.CreateTime, entity.UpdateTime);
+    }
+
+    [Fact]
     public async Task Advise_NonTimestampEntity_Continues() {
         var advisor    = new AdviceAddTimestamp<PlainEntity>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());

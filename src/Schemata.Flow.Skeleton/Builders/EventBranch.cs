@@ -1,4 +1,5 @@
 using System;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -44,7 +45,7 @@ public sealed class EventBranch
 
     internal void Build(ProcessDefinition definition, EventBasedGateway gateway) {
         var catchEvent = new FlowEvent {
-            Id         = $"catch_{ProcessDefinition.GenerateId()}",
+            Id         = $"catch_{Identifiers.NewUid():n}",
             Name       = _eventDefinition.Name,
             Position   = EventPosition.IntermediateCatch,
             Definition = _eventDefinition,
@@ -52,22 +53,22 @@ public sealed class EventBranch
 
         definition.Elements.Add(catchEvent);
         definition.Flows.Add(new() {
-                                 Id = $"sf_{ProcessDefinition.GenerateId()}", Source = gateway, Target = catchEvent,
+                                 Id = $"sf_{Identifiers.NewUid():n}", Source = gateway, Target = catchEvent,
                              });
 
         if (_decisionBranches is not null) {
             var exclusiveGw = new ExclusiveGateway {
-                Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Decision_{_eventDefinition.Name}",
+                Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{_eventDefinition.Name}",
             };
             definition.Elements.Add(exclusiveGw);
 
             definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = catchEvent, Target = exclusiveGw,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = catchEvent, Target = exclusiveGw,
             });
 
             foreach (var branch in _decisionBranches) {
                 definition.Flows.Add(new() {
-                    Id        = $"sf_{ProcessDefinition.GenerateId()}",
+                    Id        = $"sf_{Identifiers.NewUid():n}",
                     Source    = exclusiveGw,
                     Target    = branch.Exit,
                     Condition = branch.Condition,
@@ -76,7 +77,7 @@ public sealed class EventBranch
             }
         } else if (_target is not null) {
             definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = catchEvent, Target = _target,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = catchEvent, Target = _target,
             });
         }
     }

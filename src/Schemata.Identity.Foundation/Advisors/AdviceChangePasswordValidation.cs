@@ -37,25 +37,10 @@ public sealed class AdviceChangePasswordValidation<TUser>(SchemataUserManager<TU
             return AdviseResult.Continue;
         }
 
-        if (await users.GetUserAsync(principal) is null) {
-            throw new NotFoundException();
-        }
+        await IdentityValidation.RequireUserAsync(users, principal);
 
-        if (string.IsNullOrWhiteSpace(request.OldPassword)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.OldPassword).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.OldPassword).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.NewPassword)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.NewPassword).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.NewPassword).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
+        IdentityValidation.RequireNotEmpty(request.OldPassword, nameof(request.OldPassword));
+        IdentityValidation.RequireNotEmpty(request.NewPassword, nameof(request.NewPassword));
 
         if (string.Equals(request.NewPassword, request.OldPassword)) {
             throw new NoContentException();

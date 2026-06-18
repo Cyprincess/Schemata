@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,7 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
 
         if (oauth.RedirectUri is not null) {
             var parameters = new Dictionary<string, string?> {
-                [Parameters.Error]            = oauth.Code,
+                [Parameters.Error]            = oauth.Status,
                 [Parameters.ErrorDescription] = oauth.Message,
                 [Parameters.ErrorUri]         = oauth.ErrorUri,
                 [Parameters.State]            = oauth.State,
@@ -35,7 +36,14 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
                 oauth.ResponseMode ?? ResponseModes.Query
             );
         } else {
-            context.Result = new JsonResult(oauth.CreateErrorResponse()) { StatusCode = oauth.Status };
+            // RFC 6749 §5.2: an invalid_client error answered with HTTP 401 MUST carry a WWW-Authenticate
+            // challenge naming the scheme the client used; Basic is the scheme this server accepts on the
+            // Authorization header.
+            if (oauth.Code == (int)HttpStatusCode.Unauthorized && oauth.Status == OAuthErrors.InvalidClient) {
+                context.HttpContext.Response.Headers.WWWAuthenticate = Schemes.Basic;
+            }
+
+            context.Result = new JsonResult(oauth.CreateErrorResponse(context.HttpContext.TraceIdentifier)) { StatusCode = oauth.Code };
         }
 
         context.ExceptionHandled = true;

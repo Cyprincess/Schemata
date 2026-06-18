@@ -1,7 +1,7 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
@@ -26,7 +26,7 @@ internal sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
         if (string.IsNullOrWhiteSpace(entity.Name)) {
             // Set just the leaf slug; AdviceAddCanonicalName will resolve the full
             // canonical name "students/{slug}" using the [CanonicalName] attribute.
-            entity.Name = Guid.NewGuid().ToString("N");
+            entity.Name = Identifiers.NewUid().ToString("n");
         }
 
         return Task.FromResult(AdviseResult.Continue);

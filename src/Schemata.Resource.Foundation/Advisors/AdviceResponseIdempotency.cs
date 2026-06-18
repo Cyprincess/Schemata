@@ -1,4 +1,3 @@
-using System;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
@@ -52,7 +51,7 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
-        if (!ctx.TryGet<PendingIdempotencyKey>(out var pending) || pending is null) {
+        if (!ctx.TryGet<IdempotencyReservation>(out var reservation) || reservation is null) {
             return AdviseResult.Continue;
         }
 
@@ -60,16 +59,22 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
             return AdviseResult.Continue;
         }
 
+        var options = IdempotencyHelper.ResolveOptions(ctx.ServiceProvider);
+
         var envelope = new IdempotencyEnvelope<TDetail> {
-            Hash    = pending.PayloadHash,
+            Hash    = reservation.PayloadHash,
             Payload = detail,
         };
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope);
+        var doneBytes = JsonSerializer.SerializeToUtf8Bytes(envelope);
+        var opts      = new CacheEntryOptions { AbsoluteExpirationRelativeToNow = options.IdempotencyRetention };
 
-        var key = pending.ToCacheKey();
-        await _cache.SetAsync(key, bytes, new() {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24),
-        }, ct);
+        // Swap the reserved pending value for the finalized envelope. On a failed swap (the
+        // reservation expired or was taken over) write only when the slot is now free; never
+        // clobber another owner's value, and always return the caller's freshly produced result.
+        var swapped = await _cache.TryReplaceAsync(reservation.Key, reservation.PendingBytes, doneBytes, opts, ct);
+        if (!swapped) {
+            await _cache.TryAddAsync(reservation.Key, doneBytes, opts, ct);
+        }
 
         return AdviseResult.Continue;
     }

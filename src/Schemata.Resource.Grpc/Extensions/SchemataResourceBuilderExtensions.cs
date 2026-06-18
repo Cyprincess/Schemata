@@ -1,5 +1,4 @@
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc;
 using Schemata.Resource.Grpc.Features;
 
 // ReSharper disable once CheckNamespace
@@ -12,14 +11,14 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataResourceBuilderExtensions
 {
     /// <summary>
-    ///     Enables gRPC transport for resources and returns a
-    ///     <see cref="SchemataGrpcResourceBuilder" /> for gRPC-specific configuration.
+    ///     Enables gRPC transport for resources and returns the same builder so registration chains.
+    ///     Restrict a single resource to gRPC with <c>Use&lt;T&gt;(r =&gt; r.MapGrpc())</c>.
     /// </summary>
     /// <param name="builder">The <see cref="SchemataResourceBuilder" />.</param>
-    /// <returns>A <see cref="SchemataGrpcResourceBuilder" /> for registering gRPC resources.</returns>
-    public static SchemataGrpcResourceBuilder MapGrpc(this SchemataResourceBuilder builder) {
+    /// <returns>The resource builder for chaining.</returns>
+    public static SchemataResourceBuilder MapGrpc(this SchemataResourceBuilder builder) {
         builder.AddFeature<SchemataGrpcResourceFeature>();
 
-        return new(builder);
+        return builder;
     }
 }

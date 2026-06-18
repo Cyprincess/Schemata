@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
@@ -7,20 +8,32 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Scheduling.Skeleton.Entities;
 
 /// <summary>
-///     Long-running operation backing row. Produced by the scheduler
-///     during <see cref="IScheduler.TriggerAsync{TJob}" /> and during cron timer
-///     fires; the public wire form is <see cref="SchemataOperation" />.
-///     External callers see read / list / delete only; the scheduler writes
-///     internally through <see cref="IJobLifecycleObserver" />.
+///     Long-running operation backing row. <see cref="IScheduler.TriggerAsync{TJob}" /> writes
+///     the Pending row directly so the returned execution is immediately addressable; cron and
+///     periodic fires upsert through <see cref="IJobLifecycleObserver" />. The public wire form
+///     is <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
+///     read / list / delete only.
 /// </summary>
 [DisplayName("Operation")]
 [Table("SchemataJobExecutions")]
 [CanonicalName("operations/{operation}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataJobExecution : IIdentifier, ICanonicalName, ISoftDelete, ITimestamp
+public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, ITimestamp
 {
     /// <summary>Canonical name of the originating <see cref="SchemataJob" />.</summary>
     public virtual string? Job { get; set; }
+
+    /// <summary>
+    ///     The custom method verb that dispatched this execution as a long-running
+    ///     operation (e.g. <c>purge</c>); <c>null</c> for ordinary cron / periodic fires.
+    /// </summary>
+    public virtual string? Method { get; set; }
+
+    /// <summary>Stable job key resolving cron, periodic, one-time, and durable operation fires after a restart.</summary>
+    public virtual string? JobKey { get; set; }
+
+    /// <summary>Serialized typed arguments replayed by cron, periodic, one-time, and durable operation fires.</summary>
+    public virtual string? ArgsJson { get; set; }
 
     /// <summary>Lifecycle state of this execution.</summary>
     public virtual ExecutionState State { get; set; }
@@ -47,6 +60,13 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, ISoftDelete, IT
     public virtual string? Name { get; set; }
 
     public virtual string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
@@ -15,7 +16,7 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 [Table("SchemataTenantHosts")]
 [CanonicalName("tenants/{tenant}/hosts/{host}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataTenantHost : IIdentifier, ICanonicalName, ITimestamp
+public class SchemataTenantHost : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     /// <summary>The parent tenant's <see cref="ICanonicalName.Name" />.</summary>
     public virtual string? Tenant { get; set; }
@@ -35,6 +36,13 @@ public class SchemataTenantHost : IIdentifier, ICanonicalName, ITimestamp
     }
 
     public virtual string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

@@ -46,7 +46,13 @@ public sealed class ClientSecretPostAuthentication<TApp>(
             return null;
         }
 
-        if (form is null || !form.TryGetValue(Parameters.ClientId, out var ids) || ids.Count != 1) {
+        // client_secret_post is only attempted when the form carries a client_id; without one,
+        // defer to the next authenticator (e.g. HTTP Basic) rather than rejecting the request.
+        if (form is null || !form.TryGetValue(Parameters.ClientId, out var ids) || ids.Count == 0) {
+            return null;
+        }
+
+        if (ids.Count != 1) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)

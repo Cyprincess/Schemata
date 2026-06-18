@@ -9,7 +9,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -55,32 +54,21 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
                                      .GetRequiredService<IOptions<JsonSerializerOptions>>();
 
                 var feature = context.Features.Get<IExceptionHandlerPathFeature>();
-
-                if (feature?.Error is not SchemataException http) {
-                    context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
-                    context.Response.ContentType = MediaTypeNames.Application.Json;
-
-                    await context.Response.WriteAsJsonAsync(new ErrorResponse {
-                        Error = new() {
-                            Code    = ErrorCodes.Internal,
-                            Message = SchemataResources.GetResourceString(SchemataResources.ST1012),
-                            Details = [new RequestInfoDetail {
-                                RequestId = context.TraceIdentifier,
-                            }],
-                        },
-                    }, options.Value, context.RequestAborted);
-
+                if (feature?.Error is null) {
                     return;
                 }
 
-                context.Response.StatusCode = http.Status;
+                if (feature.Error is not SchemataException ex) {
+                    ex = new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.ST1013));
+                }
 
-                var response = http.CreateErrorResponse();
+                context.Response.StatusCode  = ex.Code;
+                context.Response.ContentType = MediaTypeNames.Application.Json;
+
+                var response = ex.CreateErrorResponse(context.TraceIdentifier);
                 if (response is null) {
                     return;
                 }
-
-                context.Response.ContentType = MediaTypeNames.Application.Json;
 
                 await context.Response.WriteAsJsonAsync(response, options.Value, context.RequestAborted);
             });

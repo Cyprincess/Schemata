@@ -19,15 +19,15 @@ public sealed class ValidationException : SchemataException
     ///     wrapped in a <see cref="BadRequestDetail" />.
     /// </summary>
     /// <param name="errors">Individual field violations that caused the validation failure.</param>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public ValidationException(
         IEnumerable<ErrorFieldViolation> errors,
-        int                              status  = 422,
-        string?                          code    = ErrorCodes.InvalidArgument,
+        int                              code    = 422,
+        string?                          status  = ErrorCodes.InvalidArgument,
         string?                          message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1009)) {
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1009)) {
         Details = [new BadRequestDetail { FieldViolations = errors.ToList() }];
     }
 }

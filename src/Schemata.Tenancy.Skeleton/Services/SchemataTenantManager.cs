@@ -110,6 +110,11 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
     }
 
     public virtual async ValueTask DeleteAsync(TTenant tenant, CancellationToken ct) {
+        // Remove the tenant and its hosts in one unit of work; committing the tenant alone left
+        // the staged host removals unpersisted, orphaning the host rows.
+        await using var uow = _tenants.Begin();
+        _hosts.Join(uow);
+
         var hosts = new List<SchemataTenantHost>();
         await foreach (var row in _hosts.ListAsync(q => q.Where(h => h.Tenant == tenant.Name), ct)) {
             hosts.Add(row);
@@ -120,7 +125,7 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
         }
 
         await _tenants.RemoveAsync(tenant, ct);
-        await _tenants.CommitAsync(ct);
+        await uow.CommitAsync(ct);
 
         _cache.Remove(tenant.Uid.ToString()!);
     }

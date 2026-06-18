@@ -74,6 +74,43 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
+    public async Task Create_Sanitize_ClearsCanonicalNameAndEntityTag() {
+        var request = new ManagedRequest {
+            CanonicalName = "managed/forged",
+            EntityTag     = "forged-etag",
+            DisplayName   = "keep-me",
+        };
+
+        var advisor = new AdviceCreateRequestSanitize<ManagedEntity, ManagedRequest>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+
+        var result = await advisor.AdviseAsync(ctx, request, new(), null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        // CanonicalName and EntityTag are the CLR targets of the wire fields name/etag, so clearing
+        // them blocks a client from forging the resource name or its concurrency tag on create.
+        Assert.Null(request.CanonicalName);
+        Assert.Null(request.EntityTag);
+        Assert.Equal("keep-me", request.DisplayName);
+    }
+
+    [Fact]
+    public async Task Update_Sanitize_StripsWireNameAndEtagFromMask() {
+        var request = new ManagedRequest {
+            UpdateMask = "display_name,etag,canonical_name,name",
+        };
+
+        var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+
+        await advisor.AdviseAsync(ctx, request, new(), null);
+
+        // Wire "etag" resolves to EntityTag and "name" to CanonicalName; both, plus the explicit
+        // canonical_name, are system-managed and stripped from the mask.
+        Assert.Equal("display_name,etag", request.UpdateMask);
+    }
+
+    [Fact]
     public async Task Update_Sanitize_EmptyMask_StaysEmpty() {
         var request = new ManagedRequest { Name = "managed/target", UpdateMask = "" };
 
@@ -125,7 +162,7 @@ public class AdviceSanitizeShould
         #endregion
     }
 
-    public sealed class ManagedRequest : ICanonicalName, IUpdateMask
+    public sealed class ManagedRequest : ICanonicalName, IFreshness, IUpdateMask
     {
         public string?        Owner       { get; set; }
         public string?        State       { get; set; }
@@ -142,6 +179,12 @@ public class AdviceSanitizeShould
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region IFreshness Members
+
+        public string? EntityTag { get; set; }
 
         #endregion
 

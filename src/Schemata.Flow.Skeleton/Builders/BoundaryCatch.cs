@@ -1,3 +1,4 @@
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -30,7 +31,7 @@ public sealed class BoundaryCatch
     /// <summary>Routes the catch to <paramref name="target" /> and returns control to the host activity builder.</summary>
     public ActivityBehavior Go(FlowElement target) {
         var boundaryEvent = new FlowEvent {
-            Id           = $"boundary_{ProcessDefinition.GenerateId()}",
+            Id           = $"boundary_{Identifiers.NewUid():n}",
             Name         = $"Catch_{_eventDefinition.Name}",
             Position     = EventPosition.Boundary,
             Definition   = _eventDefinition,
@@ -40,7 +41,7 @@ public sealed class BoundaryCatch
 
         _definition.Elements.Add(boundaryEvent);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = boundaryEvent, Target = target,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = boundaryEvent, Target = target,
         });
 
         return _behavior;

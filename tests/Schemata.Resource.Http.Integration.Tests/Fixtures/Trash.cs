@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -18,7 +19,8 @@ public class Trash : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IVal
 
     public Guid Uid { get; set; }
 
-    public Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public Guid Timestamp { get; set; }
 
     public string? EntityTag { get; set; }
 

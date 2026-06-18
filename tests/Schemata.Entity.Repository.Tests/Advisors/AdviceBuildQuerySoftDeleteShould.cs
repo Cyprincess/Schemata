@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Entity.Repository.Tests.Fixtures;
 using Xunit;
@@ -20,8 +21,8 @@ public class AdviceBuildQuerySoftDeleteShould
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
-            new() { Uid = Guid.NewGuid(), FullName = "Active", DeleteTime  = null },
-            new() { Uid = Guid.NewGuid(), FullName = "Deleted", DeleteTime = DateTime.UtcNow },
+            new() { Uid = Identifiers.NewUid(), FullName = "Active", DeleteTime  = null },
+            new() { Uid = Identifiers.NewUid(), FullName = "Deleted", DeleteTime = DateTime.UtcNow },
         }.AsQueryable();
         var container = new QueryContainer<Student>(repository, data);
 
@@ -54,8 +55,8 @@ public class AdviceBuildQuerySoftDeleteShould
         ctx.Set(new QuerySoftDeleteSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
-            new() { Uid = Guid.NewGuid(), DeleteTime = null },
-            new() { Uid = Guid.NewGuid(), DeleteTime = DateTime.UtcNow },
+            new() { Uid = Identifiers.NewUid(), DeleteTime = null },
+            new() { Uid = Identifiers.NewUid(), DeleteTime = DateTime.UtcNow },
         }.AsQueryable();
         var container = new QueryContainer<Student>(repository, data);
 

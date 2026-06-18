@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Schemata.Expressions.Skeleton;
 
-public sealed class LruCache<TKey, TValue>
+internal sealed class LruCache<TKey, TValue>
     where TKey : notnull
 {
     private readonly int                                     _capacity;

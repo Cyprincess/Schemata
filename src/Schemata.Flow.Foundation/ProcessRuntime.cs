@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -8,7 +7,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -17,8 +18,9 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Foundation;
 
-public sealed class ProcessRuntime : IProcessRuntime
+public sealed partial class ProcessRuntime : IProcessRuntime
 {
+    /// <summary>Cache of persisted process rows; repository state remains authoritative.</summary>
     private readonly ConcurrentDictionary<string, SchemataProcess> _instances = new();
     private readonly ILogger<ProcessRuntime>?                      _logger;
     private readonly ProcessPersistence                            _persistence;
@@ -33,225 +35,16 @@ public sealed class ProcessRuntime : IProcessRuntime
         _registry = registry;
         _services = services;
         _logger   = logger;
-        _persistence = new(services);
-    }
-
-    #region IProcessRuntime Members
-
-    public async ValueTask<SchemataProcess> StartProcessInstanceAsync(
-        string                                processName,
-        IReadOnlyDictionary<string, object?>? variables = null,
-        ClaimsPrincipal?                      principal = null,
-        CancellationToken                     ct        = default
-    ) {
-        var reg = _registry.GetRegistration(processName)
-               ?? throw new NotFoundException(message: $"Process definition '{processName}' not found.");
-
-        var runtime = _services.GetKeyedService<IFlowRuntime>(reg.Engine)
-                   ?? throw new NotFoundException(message: $"Runtime '{reg.Engine}' not found.");
-
-        var process = new SchemataProcess {
-            Name           = Guid.NewGuid().ToString("n"),
-            DefinitionName = processName,
-            Variables      = variables is not null ? VariableSerializer.Serialize(variables) : null,
-        };
-
-        // Pattern from [CanonicalName("processes/{process}")] on SchemataProcess;
-        // AdviceAddCanonicalName is bypassed since no repository is involved.
-        process.CanonicalName = $"processes/{process.Name}";
-
-        SchemataProcessTransition transition;
-        (_, transition) = await ApplyAsync(process, reg.Definition, "Start", null, principal,
-                                           c => runtime.StartAsync(reg.Definition, process, c), ct);
-
-        _instances[process.CanonicalName] = process;
-
-        await NotifyStartedAsync(process, ct);
-        await NotifyTransitionedAsync(process, transition, ct);
-
-        return process;
-    }
-
-    public async ValueTask<ProcessInstance> CompleteActivityAsync(
-        string                                instanceName,
-        IReadOnlyDictionary<string, object?>? variables = null,
-        ClaimsPrincipal?                      principal = null,
-        CancellationToken                     ct        = default
-    ) {
-        var (process, definition, runtime) = await LoadAsync(instanceName, ct);
-        var previousVariables = process.Variables;
-
-        if (variables?.Count > 0) {
-            var merged = string.IsNullOrEmpty(process.Variables)
-                ? new()
-                : VariableSerializer.Deserialize(process.Variables!);
-
-            foreach (var kv in variables) {
-                merged[kv.Key] = kv.Value;
-            }
-
-            process.Variables = VariableSerializer.Serialize(merged);
-        }
-
-        ProcessInstance instance;
-        SchemataProcessTransition transition;
-        try {
-            (instance, transition) = await ApplyAsync(process, definition, "CompleteActivity", null, principal,
-                                                      c => runtime.AdvanceAsync(definition, process, c), ct);
-        } catch {
-            process.Variables = previousVariables;
-            throw;
-        }
-
-        await NotifyTransitionedAsync(process, transition, ct);
-
-        if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out var _);
-            await NotifyTerminatedAsync(process, ct);
-        }
-
-        return instance;
-    }
-
-    public async ValueTask<ProcessInstance> CorrelateMessageAsync(
-        string            instanceName,
-        string            messageName,
-        object?           payload   = null,
-        ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default
-    ) {
-        var (process, definition, runtime) = await LoadAsync(instanceName, ct);
-
-        var msg = definition.Messages.FirstOrDefault(m => m.Name == messageName)
-               ?? throw new NotFoundException(message: $"Message '{messageName}' not found in process definition.");
-
-        var (instance, transition) = await ApplyAsync(process, definition, messageName, msg, principal,
-                                                      c => runtime.TriggerAsync(definition, process, msg, payload, c), ct);
-
-        await NotifyTransitionedAsync(process, transition, ct);
-
-        if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out var _);
-            await NotifyTerminatedAsync(process, ct);
-        }
-
-        return instance;
-    }
-
-    public async ValueTask ThrowSignalAsync(
-        string            signalName,
-        object?           payload   = null,
-        ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default
-    ) {
-        var candidates = new Dictionary<string, SchemataProcess>(StringComparer.Ordinal);
-        foreach (var process in _instances.Values) {
-            if (!string.IsNullOrEmpty(process.CanonicalName)) {
-                candidates[process.CanonicalName] = process;
-            }
-        }
-
-        await foreach (var process in _persistence.ListWaitingAsync(ct)) {
-            if (!string.IsNullOrEmpty(process.CanonicalName) && !candidates.ContainsKey(process.CanonicalName)) {
-                candidates.Add(process.CanonicalName, process);
-            }
-        }
-
-        foreach (var process in candidates.Values) {
-            if (process.WaitingAtId is null) continue;
-
-            var reg = _registry.GetRegistration(process.DefinitionName);
-            if (reg is null) continue;
-
-            var runtime = _services.GetKeyedService<IFlowRuntime>(reg.Engine);
-            if (runtime is null) continue;
-
-            var signal = reg.Definition.Signals.FirstOrDefault(s => s.Name == signalName);
-            if (signal is null) continue;
-
-            if (!MatchesSignal(reg.Definition, process, signalName)) continue;
-
-            Hydrate(process);
-
-            var (instance, transition) = await ApplyAsync(process, reg.Definition, signalName, signal, principal,
-                                                          c => runtime.TriggerAsync(reg.Definition, process, signal, payload, c), ct);
-
-            await NotifyTransitionedAsync(process, transition, ct);
-
-            if (instance.IsComplete) {
-                _instances.TryRemove(process.CanonicalName!, out var _);
-                await NotifyTerminatedAsync(process, ct);
-            }
-        }
-    }
-
-    public async ValueTask<ProcessInstance> TriggerEventAsync(
-        string            instanceName,
-        IEventDefinition  trigger,
-        object?           payload   = null,
-        ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default
-    ) {
-        var (process, definition, runtime) = await LoadAsync(instanceName, ct);
-
-        var (instance, transition) = await ApplyAsync(process, definition, trigger.Name, trigger, principal,
-                                                      c => runtime.TriggerAsync(definition, process, trigger, payload, c), ct);
-
-        await NotifyTransitionedAsync(process, transition, ct);
-
-        if (instance.IsComplete) {
-            _instances.TryRemove(process.CanonicalName!, out var _);
-            await NotifyTerminatedAsync(process, ct);
-        }
-
-        return instance;
-    }
-
-    public async ValueTask<ProcessInstance> TerminateProcessInstanceAsync(
-        string            instanceName,
-        ClaimsPrincipal?  principal = null,
-        CancellationToken ct        = default
-    ) {
-        var (process, definition, _) = await LoadAsync(instanceName, ct);
-
-        var (instance, transition) = await ApplyAsync(process, definition, "Terminate", null, principal,
-                                                      _ => ValueTask.FromResult(new ProcessInstance {
-                                                          StateId    = "terminated",
-                                                          State      = "Terminated",
-                                                          IsComplete = true,
-                                                          Variables = string.IsNullOrEmpty(process.Variables)
-                                                              ? new()
-                                                              : VariableSerializer.Deserialize(process.Variables!),
-                                                      }), ct);
-
-        _instances.TryRemove(instanceName, out var _);
-
-        await NotifyTransitionedAsync(process, transition, ct);
-        await NotifyTerminatedAsync(process, ct);
-
-        return instance;
-    }
-
-    #endregion
-
-    /// <summary>Adds an already-materialised process to the cache without raising lifecycle events.</summary>
-    public void Hydrate(SchemataProcess process) {
-        if (!string.IsNullOrEmpty(process.CanonicalName)) {
-            _instances[process.CanonicalName] = process;
-        }
-    }
-
-    /// <summary>Removes a process from the cache without raising lifecycle events.</summary>
-    public bool Evict(string canonicalName) {
-        return _instances.TryRemove(canonicalName, out var _);
+        _persistence = new();
     }
 
     private async ValueTask<(SchemataProcess process, ProcessDefinition definition, IFlowRuntime runtime)> LoadAsync(
+        IServiceProvider  services,
         string            instanceName,
         CancellationToken ct
     ) {
         if (!_instances.TryGetValue(instanceName, out var process)) {
-            process = await _persistence.FindAsync(instanceName, ct)
+            process = await _persistence.FindAsync(services, instanceName, ct)
                    ?? throw new NotFoundException(message: $"Process instance '{instanceName}' not found.");
 
             Hydrate(process);
@@ -260,13 +53,14 @@ public sealed class ProcessRuntime : IProcessRuntime
         var reg = _registry.GetRegistration(process.DefinitionName)
                ?? throw new NotFoundException(message: $"Process definition '{process.DefinitionName}' not found.");
 
-        var runtime = _services.GetKeyedService<IFlowRuntime>(reg.Engine)
+        var runtime = services.GetKeyedService<IFlowRuntime>(reg.Engine)
                    ?? throw new NotFoundException(message: $"Runtime '{reg.Engine}' not found.");
 
         return (process, reg.Definition, runtime);
     }
 
     private async ValueTask<(ProcessInstance instance, SchemataProcessTransition transition)> ApplyAsync(
+        IServiceProvider                                    services,
         SchemataProcess                                     process,
         ProcessDefinition?                                  definition,
         string                                              eventName,
@@ -287,13 +81,9 @@ public sealed class ProcessRuntime : IProcessRuntime
         persisted.WaitingAt   = instance.WaitingAt;
         persisted.Variables   = VariableSerializer.Serialize(instance.Variables);
 
-        var transition = CreateTransition(persisted.CanonicalName!, previousState, instance.State, eventName, principal);
+        var transition = CreateTransition(persisted.Name!, previousState, instance.State, eventName, principal);
 
-        await _persistence.PersistTransitionAsync(persisted, transition, ct);
-
-        ProcessPersistence.SyncProcessFields(process, persisted);
-
-        await NotifyFlowTransitionObserversAsync(new() {
+        var context = new FlowTransitionContext {
             Process             = process,
             Definition          = definition,
             Instance            = instance,
@@ -301,7 +91,16 @@ public sealed class ProcessRuntime : IProcessRuntime
             PreviousWaitingAtId = previousWaitingAtId,
             PreviousWaitingAt   = previousWaitingAt,
             Trigger             = trigger,
-        }, ct);
+        };
+
+        // Provision the wake-up infrastructure (timer jobs, event subscriptions) the new waiting state
+        // depends on before committing the transition. A provisioning failure aborts the transition,
+        // so the instance is never persisted waiting on infrastructure that was never created.
+        await ProvisionFlowTransitionAsync(services, context, ct);
+
+        await _persistence.PersistTransitionAsync(services, persisted, transition, ct);
+
+        ProcessPersistence.SyncProcessFields(process, persisted);
 
         return (instance, transition);
     }
@@ -321,76 +120,15 @@ public sealed class ProcessRuntime : IProcessRuntime
             DisplayNames   = source.DisplayNames,
             Description    = source.Description,
             Descriptions   = source.Descriptions,
+            SourceType    = source.SourceType,
+            Source = source.Source,
+            SourceTimestamp     = source.SourceTimestamp,
             Timestamp      = source.Timestamp,
             CreateTime     = source.CreateTime,
             UpdateTime     = source.UpdateTime,
             DeleteTime     = source.DeleteTime,
             PurgeTime      = source.PurgeTime,
         };
-    }
-
-    private async Task NotifyFlowTransitionObserversAsync(FlowTransitionContext context, CancellationToken ct) {
-        using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IFlowTransitionObserver>().ToList();
-
-        foreach (var observer in observers) {
-            try {
-                await observer.OnTransitionedAsync(context, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IFlowTransitionObserver.OnTransitionedAsync threw for process '{Name}'.",
-                                    context.Process.CanonicalName);
-            }
-        }
-    }
-
-    private async Task NotifyStartedAsync(SchemataProcess process, CancellationToken ct) {
-        using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IProcessLifecycleObserver>().ToList();
-
-        foreach (var observer in observers) {
-            try {
-                await observer.OnStartedAsync(process, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IProcessLifecycleObserver.OnStartedAsync threw for process '{Name}'.",
-                                    process.CanonicalName);
-            }
-        }
-    }
-
-    private async Task NotifyTransitionedAsync(
-        SchemataProcess           process,
-        SchemataProcessTransition transition,
-        CancellationToken         ct
-    ) {
-        using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IProcessLifecycleObserver>().ToList();
-
-        foreach (var observer in observers) {
-            try {
-                await observer.OnTransitionedAsync(process, transition, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IProcessLifecycleObserver.OnTransitionedAsync threw for process '{Name}'.",
-                                    process.CanonicalName);
-            }
-        }
-    }
-
-    private async Task NotifyTerminatedAsync(SchemataProcess process, CancellationToken ct) {
-        using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IProcessLifecycleObserver>().ToList();
-
-        foreach (var observer in observers) {
-            try {
-                await observer.OnTerminatedAsync(process, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IProcessLifecycleObserver.OnTerminatedAsync threw for process '{Name}'.",
-                                    process.CanonicalName);
-            }
-        }
     }
 
     private static bool MatchesSignal(ProcessDefinition definition, SchemataProcess process, string signalName) {
@@ -414,16 +152,26 @@ public sealed class ProcessRuntime : IProcessRuntime
             && cur.Name == signalName;
     }
 
+    private static void CaptureSource(SchemataProcess process, object? sourceEntity) {
+        if (sourceEntity is null) {
+            return;
+        }
+
+        process.SourceType    = sourceEntity.GetType().FullName;
+        process.Source = sourceEntity is ICanonicalName named ? named.CanonicalName : null;
+        process.SourceTimestamp     = sourceEntity is IConcurrency stamped ? stamped.Timestamp : null;
+    }
+
     private static SchemataProcessTransition CreateTransition(
-        string           instanceName,
+        string           processName,
         string?          previousState,
         string?          posteriorState,
         string           eventName,
         ClaimsPrincipal? principal
     ) {
         return new() {
-            Name      = Guid.NewGuid().ToString("n"),
-            Process   = instanceName,
+            Name      = Identifiers.NewUid().ToString("n"),
+            Process   = processName,
             Previous  = previousState,
             Posterior = posteriorState,
             Event     = eventName,

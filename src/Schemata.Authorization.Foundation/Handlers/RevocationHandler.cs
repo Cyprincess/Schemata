@@ -48,6 +48,17 @@ public sealed class RevocationHandler<TApp, TToken>(
             );
         }
 
+        // RFC 7009 §2.1: token_type_hint, when present, is one of access_token or refresh_token; any
+        // other value the server cannot act on is rejected with unsupported_token_type (§2.2.1).
+        if (!string.IsNullOrWhiteSpace(request.TokenTypeHint)
+         && request.TokenTypeHint != TokenTypes.AccessToken
+         && request.TokenTypeHint != TokenTypes.RefreshToken) {
+            throw new OAuthException(
+                OAuthErrors.UnsupportedTokenType,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.TokenTypeHint)
+            );
+        }
+
         var application = await client.AuthenticateAsync(null, new(){
             [Parameters.ClientId]     = [request.ClientId],
             [Parameters.ClientSecret] = [request.ClientSecret],

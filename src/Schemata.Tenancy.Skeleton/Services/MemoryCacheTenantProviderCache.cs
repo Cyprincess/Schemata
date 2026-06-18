@@ -17,16 +17,20 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     private readonly object                                    _gate = new();
     private readonly Dictionary<string, LinkedListNode<Entry>> _index;
     private readonly LinkedList<Entry>                         _order = new();
+    private readonly TimeProvider                              _time;
     private readonly TimeSpan                                  _ttl;
     private          bool                                      _disposed;
 
     /// <summary>
     ///     Initializes a new instance with capacity and sliding expiration sourced from <see cref="SchemataTenancyOptions" />.
     /// </summary>
-    public MemoryCacheTenantProviderCache(IOptions<SchemataTenancyOptions> options) {
+    /// <param name="options">Tenancy options supplying capacity and sliding expiration.</param>
+    /// <param name="timeProvider">Clock used for sliding-expiration eviction; defaults to the system clock.</param>
+    public MemoryCacheTenantProviderCache(IOptions<SchemataTenancyOptions> options, TimeProvider? timeProvider = null) {
         _ttl      = options.Value.ProviderSlidingExpiration;
         _capacity = options.Value.ProviderMaxCapacity;
         _index    = new(_capacity);
+        _time     = timeProvider ?? TimeProvider.System;
     }
 
     #region IDisposable Members
@@ -73,11 +77,15 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
                 if (_index.TryGetValue(id, out var hit)) {
                     _order.Remove(hit);
-                    hit.Value.LastAccess = DateTime.UtcNow;
+                    hit.Value.LastAccess = _time.GetUtcNow().UtcDateTime;
                     _order.AddFirst(hit);
                     hit.Value.ActiveLeases++;
                     entry = hit.Value;
                 } else {
+                    // Build the replacement before evicting so a factory failure cannot retire a
+                    // healthy provider for an entry that never gets added.
+                    var provider = factory();
+
                     while (_index.Count >= _capacity) {
                         if (!TryEvictOldestLocked(out var victim)) {
                             break;
@@ -86,9 +94,8 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                         (evicted ??= []).Add(victim!);
                     }
 
-                    var provider = factory();
-                    var fresh    = new Entry(id, provider, DateTime.UtcNow);
-                    var node     = new LinkedListNode<Entry>(fresh);
+                    var fresh = new Entry(id, provider, _time.GetUtcNow().UtcDateTime);
+                    var node  = new LinkedListNode<Entry>(fresh);
                     _order.AddFirst(node);
                     _index[id] = node;
                     fresh.ActiveLeases++;
@@ -129,7 +136,7 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     #endregion
 
     private List<Entry>? EvictExpiredLocked() {
-        var          threshold = DateTime.UtcNow - _ttl;
+        var          threshold = _time.GetUtcNow().UtcDateTime - _ttl;
         List<Entry>? expired   = null;
         var          node      = _order.Last;
         while (node is not null && node.Value.LastAccess < threshold) {

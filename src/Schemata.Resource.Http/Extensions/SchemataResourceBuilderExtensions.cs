@@ -1,5 +1,4 @@
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Http;
 using Schemata.Resource.Http.Features;
 
 // ReSharper disable once CheckNamespace
@@ -11,13 +10,14 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataResourceBuilderExtensions
 {
     /// <summary>
-    ///     Enables HTTP transport for resources and returns a builder for HTTP-specific configuration.
+    ///     Enables HTTP transport for resources and returns the same builder so registration chains.
+    ///     Restrict a single resource to HTTP with <c>Use&lt;T&gt;(r =&gt; r.MapHttp())</c>.
     /// </summary>
     /// <param name="builder">The resource builder.</param>
-    /// <returns>An HTTP resource builder for registering HTTP-only resources.</returns>
-    public static SchemataHttpResourceBuilder MapHttp(this SchemataResourceBuilder builder) {
+    /// <returns>The resource builder for chaining.</returns>
+    public static SchemataResourceBuilder MapHttp(this SchemataResourceBuilder builder) {
         builder.AddFeature<SchemataHttpResourceFeature>();
 
-        return new(builder);
+        return builder;
     }
 }

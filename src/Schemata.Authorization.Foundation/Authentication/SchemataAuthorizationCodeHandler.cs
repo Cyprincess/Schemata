@@ -40,11 +40,14 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     UrlEncoder                                            encoder,
     TokenService                                          issuer,
     IApplicationManager<TApp>                             apps,
-    ITokenManager<TToken>                                 tokens
+    ITokenManager<TToken>                                 tokens,
+    TimeProvider?                                         timeProvider = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() { throw new NotImplementedException(); }
 
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) {
@@ -134,7 +137,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
 
         string? at = null;
         if (types.Contains(ResponseTypes.Token)) {
-            at = await SchemataAuthenticationHandler<TApp, TToken>.CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, subject, app, authorizationName, sid, ct);
+            at = await SchemataAuthenticationHandler<TApp, TToken>.CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, subject, app, authorizationName, sid, _time, ct);
             parameters[Parameters.AccessToken] = at;
             parameters[Parameters.TokenType]   = Schemes.Bearer;
             parameters[Parameters.ExpiresIn]   = ((int)config.Value.AccessTokenLifetime.TotalSeconds).ToString();
@@ -186,7 +189,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         };
 
         var reference = issuer.CreateReference();
-        var now       = DateTime.UtcNow;
+        var now       = _time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
             Type              = TokenTypes.AuthorizationCode,
             Status            = TokenStatuses.Valid,

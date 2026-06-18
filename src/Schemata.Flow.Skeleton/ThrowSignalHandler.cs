@@ -12,11 +12,11 @@ namespace Schemata.Flow.Skeleton;
 public sealed class ThrowSignalHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry
-) : IResourceMethodHandler<SchemataProcess, ThrowSignalRequest, EmptyResourceRequest>
+) : IResourceMethodHandler<SchemataProcess, ThrowSignalRequest, EmptyResourceResponse>
 {
-    #region IResourceMethodHandler<SchemataProcess,ThrowSignalRequest,EmptyResourceRequest> Members
+    #region IResourceMethodHandler<SchemataProcess,ThrowSignalRequest,EmptyResourceResponse> Members
 
-    public async ValueTask<EmptyResourceRequest> InvokeAsync(
+    public async ValueTask<EmptyResourceResponse> InvokeAsync(
         string?             name,
         ThrowSignalRequest  request,
         SchemataProcess?    entity,
@@ -27,7 +27,9 @@ public sealed class ThrowSignalHandler(
 
         var payload = request.Payload is not null ? VariableSerializer.Deserialize(request.Payload) : null;
         await runtime.ThrowSignalAsync(request.SignalName, payload, principal, ct);
-        return new() { CanonicalName = "processes" };
+
+        // Throwing a signal returns no resource body.
+        return new();
     }
 
     #endregion

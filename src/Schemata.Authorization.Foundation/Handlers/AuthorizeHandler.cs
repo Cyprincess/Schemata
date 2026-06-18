@@ -40,11 +40,14 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     TokenService                           issuer,
     IOptions<SchemataAuthorizationOptions> options,
     IServiceProvider                       sp,
-    IOptions<JsonSerializerOptions>        json
+    IOptions<JsonSerializerOptions>        json,
+    TimeProvider?                          timeProvider = null
 ) : AuthorizeEndpoint
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     public override async Task<AuthorizationResult> AuthorizeAsync(
         AuthorizeRequest  request,
         ClaimsPrincipal   principal,
@@ -106,7 +109,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
             Status          = TokenStatuses.Valid,
             ReferenceId     = reference,
             Payload         = payload,
-            ExpireTime      = DateTime.UtcNow + options.Value.InteractionTokenLifetime,
+            ExpireTime      = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
         };
 
         await tokens.CreateAsync(interaction, ct);

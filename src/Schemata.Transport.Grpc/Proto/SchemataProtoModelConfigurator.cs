@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Humanizer;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -10,7 +11,7 @@ namespace Schemata.Transport.Grpc.Proto;
 /// <summary>
 ///     Configures a <see cref="RuntimeTypeModel" /> with the Schemata wire conventions:
 ///     property names are resolved through <see cref="SchemataProtoTraits" /> and emitted
-///     in snake-case via <see cref="SchemataNaming.ToWireName" />.
+///     in snake-case via <see cref="InflectorExtensions.Underscore" />.
 /// </summary>
 public static class SchemataProtoModelConfigurator
 {
@@ -48,7 +49,7 @@ public static class SchemataProtoModelConfigurator
             }
 
             var field = meta.AddField(number++, property.Name);
-            field.Name = SchemataNaming.ToWireName(resolved);
+            field.Name = resolved.Underscore();
 
             var underlying = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
 

@@ -5,7 +5,6 @@ using System.Text.Json.Serialization.Metadata;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Transport.Http;
 
@@ -22,41 +21,19 @@ internal static class SchemataJsonTraits
 {
     /// <summary>Installs the trait modifier on top of <paramref name="options" />.</summary>
     public static void Apply(JsonSerializerOptions options) {
-        options.TypeInfoResolver = options.TypeInfoResolver?.WithAddedModifier(info => {
-            if (typeof(ICanonicalName).IsAssignableFrom(info.Type)) {
-                var np = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(ICanonicalName.Name),
-                });
-                if (np is not null) {
-                    info.Properties.Remove(np);
+        options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()).WithAddedModifier(info => {
+            foreach (var property in info.Properties.ToArray()) {
+                if (property.AttributeProvider is not MemberInfo member) {
+                    continue;
                 }
 
-                var cp = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(ICanonicalName.CanonicalName),
-                });
-                cp?.Name = Parameters.Name;
-            }
-
-            if (typeof(IFreshness).IsAssignableFrom(info.Type)) {
-                var ep = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(IFreshness.EntityTag),
-                });
-
-                ep?.Name = Parameters.EntityTag;
-            }
-
-            var carrier = info.Type.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
-            if (carrier is not null) {
-                var property = info.Properties.FirstOrDefault(p => p.AttributeProvider is MemberInfo {
-                    Name: nameof(IEntitiesResult<>.Entities),
-                });
-
-                if (property is not null) {
-                    var item   = carrier.GetGenericArguments()[0];
-                    var plural = ResourceNameDescriptor.ForType(item).Plural;
+                var name = ResourceWireNameRules.Resolve(info.Type, member.Name, static type => ResourceNameDescriptor.ForType(type).Plural);
+                if (name is null) {
+                    info.Properties.Remove(property);
+                } else if (name != member.Name) {
                     property.Name = options.PropertyNamingPolicy is not null
-                        ? options.PropertyNamingPolicy.ConvertName(plural)
-                        : plural;
+                        ? options.PropertyNamingPolicy.ConvertName(name)
+                        : name;
                 }
             }
         });

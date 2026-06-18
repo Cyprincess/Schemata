@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,13 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common;
 
 var options = new WebApplicationOptions { Args = args };
 
 var builder = WebApplication.CreateBuilder(options);
 
 var testApp = new SchemataApplication {
-    Uid          = Guid.NewGuid(),
+    Uid          = Identifiers.NewUid(),
     ClientId     = "test-client",
     ClientSecret = "test-secret",
     ClientType   = "confidential",

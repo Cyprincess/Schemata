@@ -51,6 +51,30 @@ public class ResourceMethodControllerConventionShould
     }
 
     [Fact]
+    public void CloneActionPerVerb_WhenHandlerRegisteredForMultipleVerbs() {
+        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
+            [typeof(EntityB).TypeHandle] = [
+                new("archive", typeof(HandlerB)),
+                new("restore", typeof(HandlerB)),
+            ],
+        };
+        var convention = new ResourceMethodControllerConvention(methods);
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType);
+
+        convention.Apply(model);
+
+        // The single closed controller fans out into one action per verb instead of collapsing.
+        Assert.Equal(2, model.Actions.Count);
+        var templates = model.Actions.Select(a => a.Selectors[0].AttributeRouteModel!.Template).ToList();
+        Assert.Contains("~/v1/entityBs/{name}:archive", templates);
+        Assert.Contains("~/v1/entityBs/{name}:restore", templates);
+        Assert.Contains(model.Actions, a => a.ActionName == "Invoke_archive");
+        Assert.Contains(model.Actions, a => a.ActionName == "Invoke_restore");
+    }
+
+    [Fact]
     public void RewriteCollectionScopeAction_To_AbsoluteColonVerb() {
         var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
             [typeof(EntityB).TypeHandle] = [
@@ -110,7 +134,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(methods);
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
-        var model          = BuildController(controllerType, withRequestParameter: true);
+        var model          = BuildController(controllerType, true);
         model.Actions[0].Selectors[0].ActionConstraints.Add(
             new HttpMethodActionConstraint(["POST"]));
 
@@ -134,7 +158,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(methods);
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
-        var model          = BuildController(controllerType, withRequestParameter: true);
+        var model          = BuildController(controllerType, true);
         model.Actions[0].Selectors[0].ActionConstraints.Add(
             new HttpMethodActionConstraint(["POST"]));
 

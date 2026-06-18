@@ -20,6 +20,12 @@ public class Filter : LogicalBase, IArg, ISimple, IExpressionTree
 
     public List<Sequence> Sequences { get; } = [];
 
+    /// <summary>
+    ///     The original filter source this tree was parsed from. Used as a lossless compile-cache key
+    ///     instead of <see cref="ToString" />, whose display form does not round-trip quoting/escaping.
+    /// </summary>
+    public string Source { get; set; } = string.Empty;
+
     public override IEnumerable<IToken> Tokens => Sequences;
 
     public override ExpressionType Operator => ExpressionType.AndAlso;

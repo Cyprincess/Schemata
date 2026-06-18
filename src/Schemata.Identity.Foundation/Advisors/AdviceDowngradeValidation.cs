@@ -34,16 +34,8 @@ public sealed class AdviceDowngradeValidation : IIdentityRequestAdvisor<Authenti
         if (string.IsNullOrWhiteSpace(request.TwoFactorCode)
          && string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
             throw new ValidationException([
-                new() {
-                    Field       = nameof(request.TwoFactorCode).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.TwoFactorCode).Humanize(LetterCasing.Title)),
-                    Reason      = FieldReasons.NotEmpty,
-                },
-                new() {
-                    Field       = nameof(request.TwoFactorRecoveryCode).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.TwoFactorRecoveryCode).Humanize(LetterCasing.Title)),
-                    Reason      = FieldReasons.NotEmpty,
-                },
+                IdentityValidation.NotEmptyError(nameof(request.TwoFactorCode)),
+                IdentityValidation.NotEmptyError(nameof(request.TwoFactorRecoveryCode)),
             ]);
         }
 

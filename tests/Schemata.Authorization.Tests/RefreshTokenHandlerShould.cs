@@ -14,6 +14,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -36,7 +37,7 @@ public class RefreshTokenHandlerShould
         var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
-            Uid               = Guid.NewGuid(),
+            Uid               = Identifiers.NewUid(),
             Type              = TokenTypes.RefreshToken,
             Status            = TokenStatuses.Valid,
             ReferenceId       = "rt-ref",
@@ -49,7 +50,7 @@ public class RefreshTokenHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>())).ReturnsAsync(refreshToken);
 
-        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test" };
+        var app        = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -84,7 +85,7 @@ public class RefreshTokenHandlerShould
                                                               CreateRequest(refresh: refreshToken), null,
                                                               CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]

@@ -1,11 +1,12 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 [PrimaryKey(nameof(Uid))]
-public class Course : IIdentifier, ICanonicalName, ITimestamp
+public class Course : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     public string? Title   { get; set; }
     public int     Credits { get; set; }
@@ -14,6 +15,13 @@ public class Course : IIdentifier, ICanonicalName, ITimestamp
 
     public string? Name          { get; set; }
     public string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
+    [ConcurrencyCheck]
+    public Guid Timestamp { get; set; }
 
     #endregion
 

@@ -1,7 +1,7 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
@@ -24,7 +24,7 @@ internal sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
         CancellationToken    ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {
-            entity.Name = $"student-{Guid.NewGuid():N}";
+            entity.Name = $"student-{Identifiers.NewUid():n}";
         }
 
         return Task.FromResult(AdviseResult.Continue);

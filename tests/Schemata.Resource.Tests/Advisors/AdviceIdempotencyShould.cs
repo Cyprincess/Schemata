@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -80,8 +81,12 @@ public class AdviceIdempotencyShould
                                        It.IsAny<CancellationToken>()))
              .ReturnsAsync(false);
 
+        var services = new ServiceCollection();
+        services.AddSingleton<IOptions<SchemataResourceOptions>>(
+            Options.Create(new SchemataResourceOptions { IdempotencyPendingWait = TimeSpan.Zero }));
+
         var advisor   = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(cache.Object);
-        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var ctx       = new AdviceContext(services.BuildServiceProvider());
         var request   = new StudentRequest { RequestId = "req-concurrent" };
         var container = new ResourceRequestContainer<Student>();
 
@@ -159,6 +164,24 @@ public class AdviceIdempotencyShould
     }
 
     [Fact]
+    public async Task SameRequestId_DifferentResource_NoCollision() {
+        var cache = new FakeCache();
+
+        var first = await RunUpdateAsync(cache,
+                                         new() { RequestId = "req-shared", CanonicalName = "students/a", FullName = "Alice" },
+                                         null);
+        Assert.Equal(AdviseResult.Continue, first.Result);
+        await PersistResponseAsync(cache, first.Ctx, new() { FullName = "ResourceA" });
+
+        var other = await RunUpdateAsync(cache,
+                                         new() { RequestId = "req-shared", CanonicalName = "students/b", FullName = "Bob" },
+                                         null);
+
+        Assert.Equal(AdviseResult.Continue, other.Result);
+        Assert.False(other.Ctx.TryGet<UpdateResultBase<Student>>(out _));
+    }
+
+    [Fact]
     public async Task Update_ReplayWithSamePayload_ReturnsCachedResult() {
         var cache = new FakeCache();
 
@@ -184,6 +207,20 @@ public class AdviceIdempotencyShould
 
         Assert.Equal(AdviseResult.Handle, replay.Result);
         Assert.Equal("Method", replay.Ctx.Get<Student>()?.FullName);
+    }
+
+    [Fact]
+    public async Task Method_PurgeSameRequestId_ReturnsCachedOperation() {
+        var cache = new FakeCache();
+
+        var first = await RunPurgeMethodAsync(cache, new() { RequestId = "req-purge", Filter = "*" });
+        Assert.Equal(AdviseResult.Continue, first.Result);
+        await PersistOperationAsync(cache, first.Ctx, new() { Name = "op-1", CanonicalName = "operations/op-1" });
+
+        var replay = await RunPurgeMethodAsync(cache, new() { RequestId = "req-purge", Filter = "*" });
+
+        Assert.Equal(AdviseResult.Handle, replay.Result);
+        Assert.Equal("operations/op-1", replay.Ctx.Get<Operation>()?.CanonicalName);
     }
 
     [Fact]
@@ -240,9 +277,27 @@ public class AdviceIdempotencyShould
         return (result, ctx);
     }
 
+    private static async Task<(AdviseResult Result, AdviceContext Ctx)> RunPurgeMethodAsync(
+        ICacheProvider cache,
+        PurgeRequest   request
+    ) {
+        var advisor   = new AdviceMethodRequestIdempotency<Student, PurgeRequest, Operation>(cache);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var container = new ResourceRequestContainer<Student>();
+        ctx.Set(new ResourceMethodVerb("purge"));
+
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
+        return (result, ctx);
+    }
+
     private static Task PersistResponseAsync(ICacheProvider cache, AdviceContext ctx, Student detail) {
         var advisor = new AdviceResponseIdempotency<Student, Student>(cache);
         return advisor.AdviseAsync(ctx, new(), detail, null);
+    }
+
+    private static Task PersistOperationAsync(ICacheProvider cache, AdviceContext ctx, Operation operation) {
+        var advisor = new AdviceResponseIdempotency<Student, Operation>(cache);
+        return advisor.AdviseAsync(ctx, new(), operation, null);
     }
 
     private static ClaimsPrincipal Principal(string subject) {
@@ -278,6 +333,24 @@ public class AdviceIdempotencyShould
 
         public Task<byte[]> GetRawAsync() {
             return Task.FromResult(Assert.Single(_store.Values));
+        }
+
+        public Task<bool> TryReplaceAsync(string key, byte[] expected, byte[] replacement, CacheEntryOptions options, CancellationToken ct = default) {
+            if (_store.TryGetValue(key, out var current) && current.AsSpan().SequenceEqual(expected)) {
+                _store[key] = replacement;
+                return Task.FromResult(true);
+            }
+
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
+            if (_store.TryGetValue(key, out var current) && current.AsSpan().SequenceEqual(expected)) {
+                _store.Remove(key);
+                return Task.FromResult(true);
+            }
+
+            return Task.FromResult(false);
         }
 
         public Task RemoveAsync(string key, CancellationToken ct = default) {

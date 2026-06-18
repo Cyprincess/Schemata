@@ -9,6 +9,7 @@ using Xunit;
 namespace Schemata.Authorization.Integration.Tests;
 
 [Trait("Category", "Integration")]
+[Trait("Layer", "Component")]
 public class TokenEndpointShould : IClassFixture<WebAppFactory>
 {
     private readonly HttpClient _client;

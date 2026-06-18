@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Humanizer;
 using Microsoft.AspNetCore.DataProtection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -103,7 +104,7 @@ public class PageToken
                                         or IOException
                                         or InvalidDataException) {
             throw new ValidationException([new() {
-                Field       = SchemataNaming.ToWireName(nameof(ListRequest.PageToken)),
+                Field       = nameof(ListRequest.PageToken).Underscore(),
                 Description = SchemataResources.GetResourceString(SchemataResources.ST2003),
                 Reason      = FieldReasons.InvalidPageToken,
             }]);

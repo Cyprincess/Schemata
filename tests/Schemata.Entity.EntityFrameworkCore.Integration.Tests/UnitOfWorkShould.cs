@@ -171,8 +171,56 @@ public class UnitOfWorkShould : IAsyncLifetime
 
             Assert.Throws<InvalidOperationException>(() => repo.Join(uow));
 
-            // Repository still owns its context; standalone commit should still work.
+            // The first AddAsync enlisted an implicit unit of work; its standalone commit still
+            // persists the staged work.
             await repo.CommitAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CommitAsync_Twice_ThrowsAfterCompleted() {
+        var (repo, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            await repo.AddAsync(new() {
+                                    FullName = "Double-Commit",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "double-commit",
+                                });
+            await repo.CommitAsync();
+
+            // The standalone commit completed the implicit unit of work; committing again rejects it.
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.CommitAsync());
+        }
+    }
+
+    [Fact]
+    public async Task WriteAfterCommit_ThrowsAndDoesNotPersist() {
+        {
+            var (repo, scope) = _fixture.CreateScopeWithRepository();
+            using (scope) {
+                await repo.AddAsync(new() {
+                                        FullName = "Before-Commit",
+                                        Age      = 18,
+                                        Grade    = 1,
+                                        Name     = "before-commit",
+                                    });
+                await repo.CommitAsync();
+
+                // The unit of work has completed; a further write must fail fast rather than run
+                // outside the committed transaction.
+                await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.AddAsync(new() {
+                    FullName = "After-Commit", Age = 1, Grade = 1, Name = "after-commit-canary",
+                }));
+            }
+        }
+
+        {
+            var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+            using (verifyScope) {
+                var found = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "after-commit-canary"));
+                Assert.Null(found);
+            }
         }
     }
 

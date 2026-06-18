@@ -79,12 +79,14 @@
   <Folder Name="/tests/">
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
-    <Project Path="tests/Schemata.Common.Tests/Schemata.Common.Tests.csproj" />
+    <Project Path="tests/Schemata.Caching.Tests/Schemata.Caching.Tests.csproj" />
     <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Cache.Tests/Schemata.Entity.Cache.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.LinqToDB.Integration.Tests/Schemata.Entity.LinqToDB.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Repository.Tests/Schemata.Entity.Repository.Tests.csproj" />
+    <Project Path="tests/Schemata.Event.Foundation.Tests/Schemata.Event.Foundation.Tests.csproj" />
+    <Project Path="tests/Schemata.Event.RabbitMq.Integration.Tests/Schemata.Event.RabbitMq.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Aip.Tests/Schemata.Expressions.Aip.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Cel.Tests/Schemata.Expressions.Cel.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Skeleton.Tests/Schemata.Expressions.Skeleton.Tests.csproj" />

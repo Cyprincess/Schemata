@@ -1,7 +1,7 @@
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -23,7 +23,7 @@ public class IsolationShould : IAsyncLifetime
         var b = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
 
         await a.AddAsync(new() {
-                             Uid      = Guid.NewGuid(),
+                             Uid      = Identifiers.NewUid(),
                              FullName = "Iso-Alice",
                              Age      = 18,
                              Grade    = 1,
@@ -47,7 +47,7 @@ public class IsolationShould : IAsyncLifetime
             var seedRepo = seedScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
             for (var i = 0; i < 5; i++)
                 await seedRepo.AddAsync(new() {
-                                            Uid      = Guid.NewGuid(),
+                                            Uid      = Identifiers.NewUid(),
                                             FullName = $"Seed-{i}",
                                             Age      = 18 + i,
                                             Grade    = 1,
@@ -62,7 +62,7 @@ public class IsolationShould : IAsyncLifetime
 
         await foreach (var student in reader.ListAsync<Student>(q => q.OrderBy(s => s.Name))) {
             await writer.AddAsync(new() {
-                                      Uid      = Guid.NewGuid(),
+                                      Uid      = Identifiers.NewUid(),
                                       FullName = $"Side-{student.Name}",
                                       Age      = 30,
                                       Grade    = 9,

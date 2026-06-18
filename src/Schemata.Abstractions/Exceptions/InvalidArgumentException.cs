@@ -16,12 +16,12 @@ public class InvalidArgumentException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="InvalidArgumentException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public InvalidArgumentException(
-        int     status  = 400,
-        string? code    = ErrorCodes.InvalidArgument,
+        int     code    = 400,
+        string? status  = ErrorCodes.InvalidArgument,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1001)) { }
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1001)) { }
 }

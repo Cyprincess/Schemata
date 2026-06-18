@@ -10,7 +10,7 @@ public class ResourceMethodNamingShould
     [InlineData("archive",      "Book",     "ArchiveBook")]
     [InlineData("batchCreate",  "Book",     "BatchCreateBook")]
     [InlineData("signDocument", "Document", "SignDocumentDocument")]
-    public void ConcatPascalCasedVerbWithSingular(string verb, string singular, string expected) {
+    public void Concat_PascalCasedVerbWithSingular(string verb, string singular, string expected) {
         Assert.Equal(expected, ResourceMethodNaming.GetRpcName(verb, singular));
     }
 

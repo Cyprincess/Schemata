@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -12,6 +11,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -19,7 +19,7 @@ namespace Schemata.Authorization.Tests;
 
 public class TokenExchangeHandlerShould
 {
-    private static readonly SchemataApplication TestApp = new() { Uid = Guid.NewGuid(), ClientId = "test-client" };
+    private static readonly SchemataApplication TestApp = new() { Uid = Identifiers.NewUid(), ClientId = "test-client" };
 
     private static TokenExchangeHandler<SchemataApplication> CreateHandler(
         Mock<IClientAuthenticationService<SchemataApplication>>                            clientAuth,
@@ -57,7 +57,7 @@ public class TokenExchangeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class TokenExchangeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
@@ -86,11 +86,90 @@ public class TokenExchangeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
-    public async Task DelegatesToMatchingSubHandler() {
+    public async Task ThrowInvalidRequest_WhenRequestedTokenTypeNotSupported() {
+        var clientAuth = MockClientAuth();
+        var handler    = CreateHandler(clientAuth);
+
+        var request = new TokenRequest {
+            GrantType          = GrantTypes.TokenExchange,
+            SubjectToken       = "ref-1",
+            SubjectTokenType   = TokenTypeUris.AccessToken,
+            RequestedTokenType = "urn:unknown:type",
+        };
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+    }
+
+    [Fact]
+    public async Task ThrowInvalidRequest_WhenActorTokenMissingType() {
+        var clientAuth = MockClientAuth();
+        var handler    = CreateHandler(clientAuth);
+
+        var request = new TokenRequest {
+            GrantType        = GrantTypes.TokenExchange,
+            SubjectToken     = "ref-1",
+            SubjectTokenType = TokenTypeUris.AccessToken,
+            ActorToken       = "actor-1",
+        };
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+    }
+
+    [Fact]
+    public async Task ThrowInvalidRequest_WhenActorTokenTypeMissingToken() {
+        var clientAuth = MockClientAuth();
+        var handler    = CreateHandler(clientAuth);
+
+        var request = new TokenRequest {
+            GrantType        = GrantTypes.TokenExchange,
+            SubjectToken     = "ref-1",
+            SubjectTokenType = TokenTypeUris.AccessToken,
+            ActorTokenType   = TokenTypeUris.AccessToken,
+        };
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+    }
+
+    [Fact]
+    public async Task Delegates_WhenRequestedTokenTypeStandard() {
+        var tokenType  = TokenTypeUris.AccessToken;
+        var expected   = AuthorizationResult.Content(new { });
+        var subHandler = new Mock<ITokenExchangeHandler<SchemataApplication>>();
+        subHandler.SetupGet(h => h.SubjectTokenType).Returns(tokenType);
+        subHandler.Setup(h => h.HandleAsync(It.IsAny<SchemataApplication>(), It.IsAny<TokenRequest>(),
+                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(expected);
+
+        var clientAuth = MockClientAuth();
+        var handler    = CreateHandler(clientAuth, (tokenType, subHandler));
+
+        var request = new TokenRequest {
+            GrantType          = GrantTypes.TokenExchange,
+            SubjectToken       = "ref-1",
+            SubjectTokenType   = tokenType,
+            RequestedTokenType = TokenTypeUris.RefreshToken,
+        };
+
+        var result = await handler.HandleAsync(request, null, CancellationToken.None);
+
+        Assert.Same(expected, result);
+    }
+
+    [Fact]
+    public async Task Delegates_ToMatchingSubHandler() {
         const string tokenType = "urn:ietf:params:oauth:token-type:access_token";
         var          expected  = AuthorizationResult.Content(new { });
 

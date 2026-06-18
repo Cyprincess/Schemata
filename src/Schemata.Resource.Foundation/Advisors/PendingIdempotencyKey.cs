@@ -23,12 +23,15 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     AIP-231..235 batch methods.</param>
 /// <param name="EntityType">The CLR full name of the resource entity type.</param>
 /// <param name="Principal">The caller identifier from <see cref="IdempotencyHelper.PrincipalId" />.</param>
+/// <param name="CanonicalName">The target resource name (empty for a server-named create), so
+///     the same <paramref name="RequestId" /> against distinct resources never shares a key.</param>
 /// <param name="PayloadHash">The request payload hash from <see cref="IdempotencyHelper.HashPayload{TRequest}" />.</param>
 internal sealed record PendingIdempotencyKey(
     string RequestId,
     string Operation,
     string EntityType,
     string Principal,
+    string CanonicalName,
     string PayloadHash
 )
 {
@@ -37,6 +40,6 @@ internal sealed record PendingIdempotencyKey(
     ///     and the failure-release path.
     /// </summary>
     public string ToCacheKey() {
-        return $"idempotency\x1e{EntityType}\x1e{Operation}\x1e{Principal}\x1e{RequestId}".ToCacheKey(Keys.Resource);
+        return $"idempotency\x1e{EntityType}\x1e{Operation}\x1e{Principal}\x1e{CanonicalName}\x1e{RequestId}".ToCacheKey(Keys.Resource);
     }
 }

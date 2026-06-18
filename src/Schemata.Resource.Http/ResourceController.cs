@@ -7,6 +7,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Http;
@@ -42,11 +43,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     protected JsonSerializerOptions JsonOptions { get; }
 
     private string BuildFullName(string name) {
-        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        var parent     = descriptor.ResolveParent(HttpContext.Request.RouteValues);
-        return parent is not null
-            ? $"{parent}/{descriptor.Collection}/{name}"
-            : $"{descriptor.Collection}/{name}";
+        return HttpResourceIdentifiers.BuildFullName(ResourceNameDescriptor.ForType<TEntity>(), HttpContext.Request.RouteValues, name);
     }
 
     /// <summary>
@@ -134,10 +131,12 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     /// </summary>
     /// <param name="name">The resource's relative name segment.</param>
     /// <param name="etag">Optional ETag for freshness validation.</param>
+    /// <param name="allowMissing">Whether a missing resource returns an empty successful response.</param>
     [HttpDelete("{name}")]
     public virtual async Task<IActionResult> DeleteAsync(
         string              name,
-        [FromQuery] string? etag = null
+        [FromQuery] string? etag                                 = null,
+        [FromQuery(Name = "allow_missing")] bool allowMissing = false
     ) {
         var tag = etag;
         if (string.IsNullOrWhiteSpace(tag)) {
@@ -148,7 +147,8 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             BuildFullName(name),
             tag,
             HttpContext.User,
-            HttpContext.RequestAborted
+            HttpContext.RequestAborted,
+            allowMissing
         );
 
         if (result.Detail is not null) {

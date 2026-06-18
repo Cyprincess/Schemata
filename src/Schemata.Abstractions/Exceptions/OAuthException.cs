@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Schemata.Abstractions.Errors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Abstractions.Exceptions;
 
@@ -19,12 +20,12 @@ public class OAuthException : SchemataException
     /// </summary>
     /// <param name="error">OAuth 2.0 error code (e.g. <c>"invalid_grant"</c>).</param>
     /// <param name="description">Human-readable explanation of the error.</param>
-    /// <param name="status">HTTP response status code.</param>
+    /// <param name="code">HTTP response status code.</param>
     public OAuthException(
         string  error,
         string  description,
-        int     status = 400
-    ) : base(status, error, description) { }
+        int     code = 400
+    ) : base(code, error, description) { }
 
     /// <summary>
     ///     When non-<see langword="null" />, the error is delivered via a redirect to this
@@ -73,26 +74,22 @@ public class OAuthException : SchemataException
     ///     Returns an <see cref="OAuthErrorResponse" /> instead of the default
     ///     <see cref="ErrorResponse" />.
     /// </summary>
-    /// <param name="details">
-    ///     Additional detail entries appended after the exception's own
-    ///     <see cref="SchemataException.Details" />.
-    /// </param>
-    public override object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) {
-        var response = new OAuthErrorResponse {
-            Error            = Code,
-            ErrorDescription = Message,
-            ErrorUri         = ErrorUri,
-        };
+    public override object? CreateErrorResponse(string? requestId = null, string? domain = null) {
+        var status  = Status ?? ErrorCodes.Internal;
+        var details = new List<IErrorDetail>();
 
         if (Details is { Count: > 0 }) {
-            response.Details = new(Details);
+            details.AddRange(Details);
         }
 
-        if (details is not null) {
-            response.Details ??= [];
-            response.Details.AddRange(details);
-        }
+        EnsureErrorInfo(details, status, domain);
+        EnsureRequestInfo(details, requestId);
 
-        return response;
+        return new OAuthErrorResponse {
+            Error            = status,
+            ErrorDescription = Message,
+            ErrorUri         = ErrorUri,
+            Details          = details,
+        };
     }
 }

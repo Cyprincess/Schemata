@@ -1,8 +1,8 @@
 namespace Schemata.Abstractions;
 
 /// <summary>
-///     Base interface for all features, providing ordering values so the
-///     pipeline executor can sort and sequence them correctly.
+///     Base interface for all features, providing ordering values the
+///     pipeline executor uses to sort and sequence them.
 /// </summary>
 public interface IFeature
 {

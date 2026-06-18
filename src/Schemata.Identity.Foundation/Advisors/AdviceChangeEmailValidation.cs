@@ -38,17 +38,9 @@ public sealed class AdviceChangeEmailValidation<TUser>(SchemataUserManager<TUser
             return AdviseResult.Continue;
         }
 
-        if (await users.GetUserAsync(principal) is not { } user) {
-            throw new NotFoundException();
-        }
+        var user = await IdentityValidation.RequireUserAsync(users, principal);
 
-        if (string.IsNullOrWhiteSpace(request.EmailAddress)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.EmailAddress).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.EmailAddress).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
+        IdentityValidation.RequireNotEmpty(request.EmailAddress, nameof(request.EmailAddress));
 
         if (string.Equals(request.EmailAddress, user.Email, StringComparison.InvariantCultureIgnoreCase)) {
             throw new NoContentException();

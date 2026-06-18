@@ -106,6 +106,34 @@ public class MemoryCacheTenantProviderCacheShould
     }
 
     [Fact]
+    public void Lease_Evicts_Entry_Past_Sliding_Expiration() {
+        var clock = new MutableClock(DateTimeOffset.Parse("2020-01-01T00:00:00Z"));
+        var options = Options.Create(new SchemataTenancyOptions {
+            ProviderSlidingExpiration = TimeSpan.FromMinutes(30), ProviderMaxCapacity = 1000,
+        });
+        using var cache = new MemoryCacheTenantProviderCache(options, clock);
+
+        var mock       = new Mock<IServiceProvider>();
+        var disposable = mock.As<IDisposable>();
+        var disposed   = 0;
+        disposable.Setup(d => d.Dispose()).Callback(() => disposed++);
+
+        cache.Lease("t1", () => mock.Object).Dispose();
+
+        // Advancing past the sliding window makes the next lease sweep the stale entry; its provider
+        // is disposed because no lease still holds it.
+        clock.Advance(TimeSpan.FromMinutes(31));
+        cache.Lease("t2", () => new Mock<IServiceProvider>().Object).Dispose();
+
+        Assert.Equal(1, disposed);
+
+        // The swept tenant rebuilds from scratch instead of returning the evicted provider.
+        var rebuilt = new Mock<IServiceProvider>();
+        using var lease = cache.Lease("t1", () => rebuilt.Object);
+        Assert.Same(rebuilt.Object, lease.Provider);
+    }
+
+    [Fact]
     public void Lease_Dispose_Is_Idempotent() {
         using var cache      = BuildCache();
         var       mock       = new Mock<IServiceProvider>();
@@ -127,5 +155,18 @@ public class MemoryCacheTenantProviderCacheShould
             ProviderSlidingExpiration = TimeSpan.FromMinutes(30), ProviderMaxCapacity = capacity,
         });
         return new(options);
+    }
+
+    private sealed class MutableClock(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset _now = start;
+
+        public override DateTimeOffset GetUtcNow() {
+            return _now;
+        }
+
+        public void Advance(TimeSpan delta) {
+            _now += delta;
+        }
     }
 }

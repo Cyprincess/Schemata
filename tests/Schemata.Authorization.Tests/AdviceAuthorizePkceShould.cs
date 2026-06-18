@@ -14,6 +14,9 @@ namespace Schemata.Authorization.Tests;
 
 public class AdviceAuthorizePkceShould
 {
+    // A 43-character value drawn from the RFC 7636 unreserved set, valid for both plain and S256.
+    private const string Challenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+
     private static (AdviceAuthorizePkce<SchemataApplication> advisor, AdviceContext ctx,
         AuthorizeContext<SchemataApplication> authz) Create(
             bool  requirePkce    = true,
@@ -46,7 +49,7 @@ public class AdviceAuthorizePkceShould
         authz.Request             = new();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
@@ -64,16 +67,16 @@ public class AdviceAuthorizePkceShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenPlainMethodUsed_AndS256Required() {
         var (advisor, ctx, authz) = Create();
-        authz.Request             = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
+        authz.Request             = new() {         CodeChallenge = Challenge, CodeChallengeMethod = PkceMethods.Plain };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
     public async Task Continues_WhenPlainMethodUsed_AndS256NotRequired() {
         var (advisor, ctx, authz) = Create(true, false);
-        authz.Request             = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = PkceMethods.Plain };
+        authz.Request             = new() {         CodeChallenge = Challenge, CodeChallengeMethod = PkceMethods.Plain };
 
         var result = await advisor.AdviseAsync(ctx, authz);
 
@@ -83,16 +86,25 @@ public class AdviceAuthorizePkceShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenUnsupportedMethod() {
         var (advisor, ctx, authz) = Create(true, false);
-        authz.Request             = new() { CodeChallenge = "some-challenge", CodeChallengeMethod = "S512" };
+        authz.Request             = new() { CodeChallenge = Challenge, CodeChallengeMethod = "S512" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+    }
+
+    [Fact]
+    public async Task ThrowsInvalidRequest_WhenChallengeMalformed() {
+        var (advisor, ctx, authz) = Create(true, false);
+        authz.Request             = new() { CodeChallenge = "too-short", CodeChallengeMethod = PkceMethods.Plain };
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
     public async Task DefaultsToPlain_WhenMethodNotSpecified() {
         var (advisor, ctx, authz) = Create(false, false);
-        authz.Request             = new() { CodeChallenge = "some-challenge" };
+        authz.Request             = new() {         CodeChallenge = Challenge };
 
         var result = await advisor.AdviseAsync(ctx, authz);
 
@@ -100,12 +112,12 @@ public class AdviceAuthorizePkceShould
     }
 
     [Fact]
-    public async Task UsesPerClientOverride() {
+    public async Task Uses_PerClientOverride() {
         // Global: PKCE not required. Per-client: required.
         var (advisor, ctx, authz) = Create(false, appRequirePkce: true);
         authz.Request             = new();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
@@ -12,8 +13,8 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive, ISoftDelete, ITimestamp,
-                               IStateful
+public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive, ISourceReference,
+                               ISoftDelete, ITimestamp, IStateful
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the source definition.</summary>
     public virtual string DefinitionName { get; set; } = null!;
@@ -30,6 +31,19 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
     /// <summary>The <see cref="Models.FlowElement.Name" /> of the waiting element.</summary>
     public virtual string? WaitingAt { get; set; }
 
+    #region ISourceReference Members
+
+    /// <inheritdoc />
+    public virtual string? SourceType { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Source { get; set; }
+
+    /// <inheritdoc />
+    public virtual Guid? SourceTimestamp { get; set; }
+
+    #endregion
+
     #region ICanonicalName Members
 
     public virtual string? Name { get; set; }
@@ -40,7 +54,8 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
 
     #region IConcurrency Members
 
-    public virtual Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

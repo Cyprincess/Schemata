@@ -26,6 +26,7 @@ public class FlowResourceBridgeFeatureShould
 
         Configure(new SchemataFlowHttpFeature(), services);
 
+        Assert.Contains(services, d => d.ServiceType == typeof(StartProcessHandler));
         AssertHandlersRegistered(services);
         AssertFlowResources(BuildResourceOptions(services), HttpResourceAttribute.Name);
     }
@@ -36,6 +37,7 @@ public class FlowResourceBridgeFeatureShould
 
         Configure(new SchemataFlowGrpcFeature(), services);
 
+        Assert.Contains(services, d => d.ServiceType == typeof(StartProcessHandler));
         AssertHandlersRegistered(services);
         AssertFlowResources(BuildResourceOptions(services), GrpcResourceAttribute.Name);
     }

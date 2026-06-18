@@ -10,7 +10,8 @@ namespace Schemata.Abstractions.Entities;
 public interface IConcurrency
 {
     /// <summary>
-    ///     The concurrency version token for optimistic locking.
+    ///     The concurrency version token for optimistic locking. <see cref="Guid.Empty" />
+    ///     denotes an unstamped entity.
     /// </summary>
-    Guid? Timestamp { get; set; }
+    Guid Timestamp { get; set; }
 }

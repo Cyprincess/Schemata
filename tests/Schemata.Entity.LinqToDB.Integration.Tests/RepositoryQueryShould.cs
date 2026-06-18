@@ -1,7 +1,7 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -20,7 +20,7 @@ public class RepositoryQueryShould : IAsyncLifetime
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {
-                                          Uid      = Guid.NewGuid(),
+                                          Uid      = Identifiers.NewUid(),
                                           FullName = "Alice",
                                           Age      = 18,
                                           Grade    = 1,
@@ -33,7 +33,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             var (repo2, scope2) = _fixture.CreateScopeWithRepository();
             using (scope2) {
                 await repo2.AddAsync(new() {
-                                         Uid      = Guid.NewGuid(),
+                                         Uid      = Identifiers.NewUid(),
                                          FullName = "Bob",
                                          Age      = 19,
                                          Grade    = 2,
@@ -47,7 +47,7 @@ public class RepositoryQueryShould : IAsyncLifetime
             var (repo3, scope3) = _fixture.CreateScopeWithRepository();
             using (scope3) {
                 await repo3.AddAsync(new() {
-                                         Uid      = Guid.NewGuid(),
+                                         Uid      = Identifiers.NewUid(),
                                          FullName = "Charlie",
                                          Age      = 20,
                                          Grade    = 2,

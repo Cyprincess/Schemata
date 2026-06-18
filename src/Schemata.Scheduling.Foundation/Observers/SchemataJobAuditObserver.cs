@@ -14,9 +14,13 @@ namespace Schemata.Scheduling.Foundation.Observers;
 /// </summary>
 public sealed class SchemataJobAuditObserver(
     IRepository<SchemataJob>          jobs,
-    IRepository<SchemataJobExecution> executions
+    IRepository<SchemataJobExecution> executions,
+    TimeProvider?                     timeProvider = null
 ) : IJobLifecycleObserver
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
+
     #region IJobLifecycleObserver Members
 
     public async Task OnScheduledAsync(SchemataJob job, CancellationToken ct = default) {
@@ -28,7 +32,8 @@ public sealed class SchemataJobAuditObserver(
         if (existing is null) {
             await jobs.AddAsync(job, ct);
         } else {
-            existing.JobType        = job.JobType;
+            existing.JobKey         = job.JobKey;
+            existing.ArgsJson       = job.ArgsJson;
             existing.ScheduleType   = job.ScheduleType;
             existing.NextRunTime    = job.NextRunTime;
             existing.IntervalTicks  = job.IntervalTicks;
@@ -59,42 +64,56 @@ public sealed class SchemataJobAuditObserver(
         await jobs.CommitAsync(ct);
     }
 
-    public async Task<JobTriggerOutcome> OnTriggeredAsync(
+    public Task<JobTriggerOutcome> OnTriggeredAsync(
         SchemataJob       job,
         JobContext        context,
         CancellationToken ct = default
     ) {
-        // The scheduler is the single source of truth for the row identity and
-        // canonical name; an absent ctx.Execution means the caller is not the
-        // built-in scheduler, so there is nothing to audit.
-        if (context.Execution is null) {
-            return JobTriggerOutcome.Proceed;
-        }
-
-        await executions.AddAsync(context.Execution, ct);
-        await executions.CommitAsync(ct);
-
-        return JobTriggerOutcome.Proceed;
+        return Task.FromResult(JobTriggerOutcome.Proceed);
     }
 
-    public async Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
-        await UpdateJobAsync(job, ct);
-        await UpdateExecutionAsync(context, ExecutionState.Succeeded, null, ct);
+    public Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PersistOutcomeAsync(job, context, ExecutionState.Succeeded, null, ct);
     }
 
-    public async Task OnFailedAsync(
+    public Task OnFailedAsync(
         SchemataJob       job,
         JobContext        context,
         Exception         exception,
         CancellationToken ct = default
     ) {
-        await UpdateJobAsync(job, ct);
-        await UpdateExecutionAsync(context, ExecutionState.Failed, exception.Message, ct);
+        return PersistOutcomeAsync(job, context, ExecutionState.Failed, exception.Message, ct);
+    }
+
+    public Task OnBlockedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PersistOutcomeAsync(job, context, ExecutionState.Blocked, null, ct);
+    }
+
+    public Task OnSkippedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PersistOutcomeAsync(job, context, ExecutionState.Skipped, null, ct);
     }
 
     #endregion
 
-    private async Task UpdateJobAsync(SchemataJob job, CancellationToken ct) {
+    private async Task PersistOutcomeAsync(
+        SchemataJob       job,
+        JobContext        context,
+        ExecutionState    state,
+        string?           recentError,
+        CancellationToken ct
+    ) {
+        // Commit the job row and its execution row in a single unit of work so a failed write
+        // never leaves the two audit rows out of step.
+        await using var uow = jobs.Begin();
+        executions.Join(uow);
+
+        await StageJobAsync(job, ct);
+        await StageExecutionAsync(context, state, recentError, ct);
+
+        await uow.CommitAsync(ct);
+    }
+
+    private async Task StageJobAsync(SchemataJob job, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(job.Name)) {
             return;
         }
@@ -109,10 +128,9 @@ public sealed class SchemataJobAuditObserver(
         existing.NextRunTime   = job.NextRunTime;
         existing.State         = job.State;
         await jobs.UpdateAsync(existing, ct);
-        await jobs.CommitAsync(ct);
     }
 
-    private async Task UpdateExecutionAsync(
+    private async Task StageExecutionAsync(
         JobContext        context,
         ExecutionState    state,
         string?           recentError,
@@ -129,10 +147,9 @@ public sealed class SchemataJobAuditObserver(
         }
 
         execution.State       = state;
-        execution.EndTime     = DateTime.UtcNow;
+        execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = recentError;
         execution.Output      = context.Execution?.Output;
         await executions.UpdateAsync(execution, ct);
-        await executions.CommitAsync(ct);
     }
 }

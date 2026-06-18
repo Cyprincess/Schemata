@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -16,12 +17,14 @@ public class SchemataTenantManagerShould
 {
     [Fact]
     public async Task DeleteAsync_Evicts_Tenant_Provider_From_Cache() {
-        var tenantId = Guid.NewGuid();
+        var tenantId = Identifiers.NewUid();
         var tenant   = new SchemataTenant { Uid = tenantId };
 
         var tenants = new Mock<IRepository<SchemataTenant>>();
         var hosts   = new Mock<IRepository<SchemataTenantHost>>();
         var cache   = new Mock<ITenantProviderCache>();
+        var uow     = UnitOfWork();
+        tenants.Setup(t => t.Begin()).Returns(uow.Object);
 
         hosts.Setup(h => h.ListAsync(
                        It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
@@ -36,11 +39,52 @@ public class SchemataTenantManagerShould
     }
 
     [Fact]
+    public async Task DeleteTenant_RemovesHostsAtomically() {
+        var tenant = new SchemataTenant { Uid = Identifiers.NewUid(), Name = "acme" };
+        var host   = new SchemataTenantHost { Uid = Identifiers.NewUid(), Tenant = "acme", Host = "a.test" };
+
+        var tenants = new Mock<IRepository<SchemataTenant>>();
+        var hosts   = new Mock<IRepository<SchemataTenantHost>>();
+        var cache   = new Mock<ITenantProviderCache>();
+        var uow     = UnitOfWork();
+        tenants.Setup(t => t.Begin()).Returns(uow.Object);
+        tenants.Setup(t => t.RemoveAsync(It.IsAny<SchemataTenant>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        hosts.Setup(h => h.ListAsync(
+                       It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
+                       It.IsAny<CancellationToken>()))
+             .Returns(OneAsync(host));
+        hosts.Setup(h => h.RemoveRangeAsync(It.IsAny<IEnumerable<SchemataTenantHost>>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var manager = new SchemataTenantManager<SchemataTenant>(tenants.Object, hosts.Object, cache.Object);
+
+        await manager.DeleteAsync(tenant, CancellationToken.None);
+
+        hosts.Verify(h => h.Join(uow.Object), Times.Once);
+        hosts.Verify(h => h.RemoveRangeAsync(It.Is<IEnumerable<SchemataTenantHost>>(e => e.Contains(host)), It.IsAny<CancellationToken>()), Times.Once);
+        tenants.Verify(t => t.RemoveAsync(tenant, It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        tenants.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        hosts.Verify(h => h.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static Mock<IUnitOfWork> UnitOfWork() {
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        uow.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return uow;
+    }
+
+    private static async IAsyncEnumerable<T> OneAsync<T>(T item) {
+        yield return item;
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task FindByHost_Resolves_Tenant_Through_Association_Table() {
-        var tenantUid = Guid.NewGuid();
+        var tenantUid = Identifiers.NewUid();
         var tenant    = new SchemataTenant { Uid = tenantUid, Name = "acme" };
         var host = new SchemataTenantHost {
-            Uid = Guid.NewGuid(), Tenant = "acme", Host = "example.test",
+            Uid = Identifiers.NewUid(), Tenant = "acme", Host = "example.test",
         };
 
         var tenants = new Mock<IRepository<SchemataTenant>>();

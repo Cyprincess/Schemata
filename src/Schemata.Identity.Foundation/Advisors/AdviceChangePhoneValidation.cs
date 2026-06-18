@@ -38,17 +38,9 @@ public sealed class AdviceChangePhoneValidation<TUser>(SchemataUserManager<TUser
             return AdviseResult.Continue;
         }
 
-        if (await users.GetUserAsync(principal) is not { } user) {
-            throw new NotFoundException();
-        }
+        var user = await IdentityValidation.RequireUserAsync(users, principal);
 
-        if (string.IsNullOrWhiteSpace(request.PhoneNumber)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.PhoneNumber).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.PhoneNumber).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
+        IdentityValidation.RequireNotEmpty(request.PhoneNumber, nameof(request.PhoneNumber));
 
         if (string.Equals(request.PhoneNumber, user.PhoneNumber, StringComparison.InvariantCultureIgnoreCase)) {
             throw new NoContentException();

@@ -67,7 +67,7 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
 
     public virtual async ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default) {
         var result = await Handler.DeleteAsync(
-            request.CanonicalName!, request.Etag, Http?.User, context.CancellationToken);
+            request.CanonicalName!, request.Etag, Http?.User, context.CancellationToken, request.AllowMissing);
 
         return result.Detail;
     }

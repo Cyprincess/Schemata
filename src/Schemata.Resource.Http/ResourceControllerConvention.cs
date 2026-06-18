@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
-using Microsoft.AspNetCore.Mvc.Authorization;
-using Microsoft.AspNetCore.RateLimiting;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
 
@@ -26,11 +23,11 @@ public sealed class ResourceControllerConvention(
     // Custom methods are handled by ResourceMethodControllerConvention and are unaffected.
     private static readonly IReadOnlyDictionary<string, Operations> VerbByAction =
         new Dictionary<string, Operations>(StringComparer.Ordinal) {
-            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.ListAsync)]   = Operations.List,
-            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.GetAsync)]    = Operations.Get,
-            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.CreateAsync)] = Operations.Create,
-            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.UpdateAsync)] = Operations.Update,
-            [nameof(ResourceController<ICanonicalName, ICanonicalName, ICanonicalName, ICanonicalName>.DeleteAsync)] = Operations.Delete,
+            [nameof(ResourceController<,,,>.ListAsync)]   = Operations.List,
+            [nameof(ResourceController<,,,>.GetAsync)]    = Operations.Get,
+            [nameof(ResourceController<,,,>.CreateAsync)] = Operations.Create,
+            [nameof(ResourceController<,,,>.UpdateAsync)] = Operations.Update,
+            [nameof(ResourceController<,,,>.DeleteAsync)] = Operations.Delete,
         };
 
     #region IControllerModelConvention Members
@@ -46,13 +43,9 @@ public sealed class ResourceControllerConvention(
         var entityType = controller.ControllerType.GetGenericArguments()[0];
         var descriptor = ResourceNameDescriptor.ForType(entityType);
 
-        controller.ControllerName            = descriptor.Plural;
-        controller.RouteValues["Controller"] = descriptor.Plural;
+        ResourceHttpConventionHelper.ApplyControllerIdentity(controller, descriptor);
 
-        var collectionPath = descriptor.CollectionPath;
-        var route = descriptor.Package is not null
-            ? $"~/v1/{descriptor.Package.ToLowerInvariant()}/{collectionPath}"
-            : $"~/v1/{collectionPath}";
+        var route = ResourceHttpConventionHelper.BuildControllerRoute(descriptor);
 
         foreach (var selector in controller.Selectors) {
             selector.AttributeRouteModel?.Template = route;
@@ -69,22 +62,8 @@ public sealed class ResourceControllerConvention(
             }
         }
 
-        var quota = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
-        if (quota is not null) {
-            foreach (var selector in controller.Selectors) {
-                selector.EndpointMetadata.Add(new EnableRateLimitingAttribute(quota.PolicyName));
-            }
-        }
-
-        // Apply a scheme-specific authorization policy when a non-default
-        // authentication scheme is configured for resource endpoints.
-        // The always-pass assertion is intentional - we only need to set the
-        // scheme, not evaluate claims; actual authorization happens in the
-        // advisor pipeline.
-        if (!string.IsNullOrWhiteSpace(scheme)) {
-            var policy = new AuthorizationPolicyBuilder(scheme).RequireAssertion(_ => true).Build();
-            controller.Filters.Add(new AuthorizeFilter(policy));
-        }
+        ResourceHttpConventionHelper.ApplyRateLimit(controller, entityType);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, scheme);
     }
 
     #endregion

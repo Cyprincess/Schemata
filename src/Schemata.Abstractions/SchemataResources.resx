@@ -140,6 +140,9 @@
   <data name="ST2008" xml:space="preserve">
         <value>The page_size must not be negative.</value>
     </data>
+  <data name="ST2009" xml:space="preserve">
+        <value>The parent is invalid.</value>
+    </data>
   <data name="ST3001" xml:space="preserve">
         <value>The user manager must produce an authenticator key after reset.</value>
     </data>

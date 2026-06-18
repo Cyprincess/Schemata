@@ -32,6 +32,29 @@ public interface ICacheProvider
         CancellationToken ct = default
     );
 
+    /// <summary>
+    ///     Atomically replaces the value under <paramref name="key" /> with
+    ///     <paramref name="replacement" /> only when the current value equals
+    ///     <paramref name="expected" />. Returns <see langword="true" /> when the swap occurred
+    ///     and <see langword="false" /> when the current value differed or the key was absent.
+    /// </summary>
+    /// <remarks>The comparison and swap MUST be a single atomic operation across all processes.</remarks>
+    Task<bool> TryReplaceAsync(
+        string            key,
+        byte[]            expected,
+        byte[]            replacement,
+        CacheEntryOptions options,
+        CancellationToken ct = default
+    );
+
+    /// <summary>
+    ///     Atomically removes the entry under <paramref name="key" /> only when its current value
+    ///     equals <paramref name="expected" />. Returns <see langword="true" /> when the entry was
+    ///     removed and <see langword="false" /> when the current value differed or the key was absent.
+    /// </summary>
+    /// <remarks>The comparison and delete MUST be a single atomic operation across all processes.</remarks>
+    Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default);
+
     /// <summary>Removes the entry (key-value or collection) stored under <paramref name="key" />.</summary>
     Task RemoveAsync(string key, CancellationToken ct = default);
 

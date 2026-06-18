@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
+using Schemata.Common;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
@@ -25,8 +27,8 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
     [NotMapped]
     public override string? ConcurrencyStamp
     {
-        get => Timestamp?.ToString();
-        set => Timestamp = string.IsNullOrWhiteSpace(value) ? Guid.NewGuid() : Guid.Parse(value);
+        get => Timestamp == Guid.Empty ? null : Timestamp.ToString();
+        set => Timestamp = string.IsNullOrWhiteSpace(value) ? Identifiers.NewUid() : Guid.Parse(value);
     }
 
     #region ICanonicalName Members
@@ -39,7 +41,8 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
 
     #region IConcurrency Members
 
-    public virtual Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

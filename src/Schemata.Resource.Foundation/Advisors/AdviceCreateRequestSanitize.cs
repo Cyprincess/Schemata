@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -22,13 +24,17 @@ public static class AdviceCreateRequestSanitize
     public const int DefaultOrder = AdviceCreateRequestAuthorize.DefaultOrder + 10_000_000;
 
     /// <summary>
-    ///     Wire-level field names that clients MUST NOT populate on a Create request. The server
-    ///     either assigns them (name/id/uid/owner/timestamps) or derives them from state (state/
-    ///     delete_time/purge_time).
+    ///     CLR property names of fields that clients MUST NOT populate on a Create request. The server
+    ///     either assigns them (name/canonical_name/uid/owner/etag/timestamps) or derives them from
+    ///     state (state/delete_time/purge_time). <see cref="ICanonicalName.CanonicalName" /> and
+    ///     <see cref="IFreshness.EntityTag" /> are the CLR targets of the AIP wire fields <c>name</c>
+    ///     and <c>etag</c>, so they are cleared alongside the internal <see cref="ICanonicalName.Name" />.
     /// </summary>
     public static readonly string[] SystemFields = [
         nameof(ICanonicalName.Name),
+        nameof(ICanonicalName.CanonicalName),
         nameof(IConcurrency.Timestamp),
+        nameof(IFreshness.EntityTag),
         nameof(IIdentifier.Uid),
         nameof(IOwnable.Owner),
         nameof(IStateful.State),
@@ -45,10 +51,11 @@ public static class AdviceCreateRequestSanitize
     /// </summary>
     /// <typeparam name="TRequest">The request DTO type.</typeparam>
     /// <param name="request">The request instance to scrub.</param>
-    public static void ClearSystemFields<TRequest>(TRequest request) where TRequest : class {
+    /// <param name="fields">The fields to scrub.</param>
+    public static void ClearSystemFields<TRequest>(TRequest request, IEnumerable<string> fields) where TRequest : class {
         var properties = AppDomainTypeCache.GetProperties(typeof(TRequest));
 
-        foreach (var field in SystemFields) {
+        foreach (var field in fields) {
             if (!properties.TryGetValue(field, out var property) || !property.CanWrite) {
                 continue;
             }
@@ -84,7 +91,7 @@ public sealed class AdviceCreateRequestSanitize<TEntity, TRequest> : IResourceCr
         ClaimsPrincipal?                  principal,
         CancellationToken                 ct = default
     ) {
-        AdviceCreateRequestSanitize.ClearSystemFields(request);
+        AdviceCreateRequestSanitize.ClearSystemFields(request, AdviceCreateRequestSanitize.SystemFields);
 
         return Task.FromResult(AdviseResult.Continue);
     }

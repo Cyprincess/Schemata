@@ -18,14 +18,14 @@ public sealed class ConcurrencyException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="ConcurrencyException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public ConcurrencyException(
-        int     status  = 409,
-        string? code    = ErrorCodes.Aborted,
+        int     code    = 409,
+        string? status  = ErrorCodes.Aborted,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1008)) {
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1008)) {
         Details = [new ErrorInfoDetail { Reason = ErrorReasons.ConcurrencyMismatch }];
     }
 }

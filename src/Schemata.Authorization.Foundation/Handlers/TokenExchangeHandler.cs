@@ -63,6 +63,31 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             );
         }
 
+        // RFC 8693 §2.1: actor_token and actor_token_type are paired — one present without the other
+        // is malformed.
+        if (!string.IsNullOrWhiteSpace(request.ActorToken) && string.IsNullOrWhiteSpace(request.ActorTokenType)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ActorTokenType)
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ActorTokenType) && string.IsNullOrWhiteSpace(request.ActorToken)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ActorToken)
+            );
+        }
+
+        // RFC 8693 §2.1 / §3: when requested_token_type is supplied it must name a standard exchange
+        // token type the server can issue; an unrecognized URI is rejected before routing.
+        if (!string.IsNullOrWhiteSpace(request.RequestedTokenType) && !TokenTypeUris.IsStandard(request.RequestedTokenType)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.RequestedTokenType)
+            );
+        }
+
         var application = await client.AuthenticateAsync(null, new(){
             [Parameters.ClientId]     = [request.ClientId],
             [Parameters.ClientSecret] = [request.ClientSecret],

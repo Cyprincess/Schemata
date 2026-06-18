@@ -15,8 +15,8 @@ public static class AdviceUpdateTimestamp
 }
 
 /// <summary>
-///     Sets <see cref="ITimestamp.UpdateTime" /> to <see cref="DateTime.UtcNow" /> when an
-///     entity is updated, per
+///     Sets <see cref="ITimestamp.UpdateTime" /> to the current UTC time from the injected
+///     <see cref="TimeProvider" /> when an entity is updated, per
 ///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
@@ -24,9 +24,11 @@ public static class AdviceUpdateTimestamp
 ///     Runs first in the update pipeline. Only activates for entities implementing
 ///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
 /// </remarks>
-public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAdvisor<TEntity>
+public sealed class AdviceUpdateTimestamp<TEntity>(TimeProvider? timeProvider = null) : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IRepositoryUpdateAdvisor<TEntity> Members
 
     public int Order => AdviceUpdateTimestamp.DefaultOrder;
@@ -45,7 +47,7 @@ public sealed class AdviceUpdateTimestamp<TEntity> : IRepositoryUpdateAdvisor<TE
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        time.UpdateTime = DateTime.UtcNow;
+        time.UpdateTime = _time.GetUtcNow().UtcDateTime;
 
         return Task.FromResult(AdviseResult.Continue);
     }

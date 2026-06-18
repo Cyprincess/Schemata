@@ -11,6 +11,7 @@ using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -22,7 +23,7 @@ public class DeviceInteractionHandlerShould
         var jsonOpts = Options.Create(new JsonSerializerOptions());
         var authOpts = Options.Create(new SchemataAuthorizationOptions { SessionIdClaimType = "sid" });
 
-        var app  = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "device-client" };
+        var app  = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "device-client" };
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByClientIdAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
 
@@ -30,7 +31,7 @@ public class DeviceInteractionHandlerShould
             new DeviceCodePayload { Scope = "openid profile", ClientId = "device-client" }, jsonOpts.Value);
 
         var device = new SchemataToken {
-            Uid         = Guid.NewGuid(),
+            Uid         = Identifiers.NewUid(),
             Name        = "device-1",
             Type        = TokenTypes.DeviceCode,
             Status      = TokenStatuses.Valid,
@@ -45,7 +46,7 @@ public class DeviceInteractionHandlerShould
             }, jsonOpts.Value);
 
         var userCode = new SchemataToken {
-            Uid         = Guid.NewGuid(),
+            Uid         = Identifiers.NewUid(),
             Name        = "user-1",
             Type        = TokenTypes.UserCode,
             Status      = TokenStatuses.Valid,

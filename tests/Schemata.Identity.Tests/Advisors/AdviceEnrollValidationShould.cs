@@ -1,4 +1,3 @@
-using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
@@ -29,7 +29,7 @@ public class AdviceEnrollValidationShould
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
-             .ReturnsAsync(new SchemataUser { Uid = Guid.NewGuid(), UserName = "alice" });
+             .ReturnsAsync(new SchemataUser { Uid = Identifiers.NewUid(), UserName = "alice" });
         var sp = new ServiceCollection().BuildServiceProvider();
         return new(sp, store.Object, Options.Create(new IdentityOptions()), new PasswordHasher<SchemataUser>(), [], [],
                    new UpperInvariantLookupNormalizer(), new(), NullLogger<SchemataUserManager<SchemataUser>>.Instance);
@@ -58,7 +58,7 @@ public class AdviceEnrollValidationShould
     }
 
     [Fact]
-    public async Task SkipsForNonEnrollOperations() {
+    public async Task Skips_ForNonEnrollOperations() {
         var manager = MockUserManager();
         var advisor = new AdviceEnrollValidation<SchemataUser>(manager);
         var ctx     = new AdviceContext(null!);

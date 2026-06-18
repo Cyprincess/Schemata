@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
@@ -57,9 +58,13 @@ public sealed class ClientAuthenticationService<TApp>(IEnumerable<IClientAuthent
                 OAuthErrors.InvalidRequest,
                 SchemataResources.GetResourceString(SchemataResources.ST4003)
             ),
+            // RFC 6749 §5.2: a failed client authentication is invalid_client and, because credentials
+            // may have been presented via the Authorization header, carries HTTP 401 so the exception
+            // filter can attach a WWW-Authenticate challenge.
             var _ => throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId),
+                (int)HttpStatusCode.Unauthorized
             ),
         };
     }

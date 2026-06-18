@@ -13,6 +13,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -31,7 +32,7 @@ public class ClientCredentialsHandlerShould
         Guid   uid      = default
     ) {
         var app = new SchemataApplication {
-            Uid         = uid == Guid.Empty ? Guid.NewGuid() : uid,
+            Uid         = uid == Guid.Empty ? Identifiers.NewUid() : uid,
             ClientId    = clientId,
             ClientType  = type,
             Permissions = new List<string>(),
@@ -93,7 +94,7 @@ public class ClientCredentialsHandlerShould
     // -- Handler tests -------------------------------------------
 
     [Fact]
-    public async Task AcceptValidConfidentialClient() {
+    public async Task Accept_ValidConfidentialClient() {
         var application = CreateApplication();
         var (handler, _, _) = CreateHandler(application);
         var request = CreateRequest();
@@ -105,27 +106,27 @@ public class ClientCredentialsHandlerShould
     }
 
     [Fact]
-    public async Task RejectUnknownClient() {
+    public async Task Reject_UnknownClient() {
         var (handler, _, _) = CreateHandler(authFails: true);
         var request = CreateRequest("unknown");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
-        Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }
 
     [Fact]
-    public async Task RejectConfidentialClientWithoutSecret() {
+    public async Task Reject_ConfidentialClientWithoutSecret() {
         var (handler, _, _) = CreateHandler(authFails: true);
         var request = CreateRequest(secret: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
-        Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }
 
     [Fact]
-    public async Task AcceptPublicClientWithoutSecret() {
+    public async Task Accept_PublicClientWithoutSecret() {
         var application = CreateApplication(ClientTypes.Public);
         var (handler, _, _) = CreateHandler(application);
         var request = CreateRequest(secret: string.Empty);
@@ -137,17 +138,17 @@ public class ClientCredentialsHandlerShould
     }
 
     [Fact]
-    public async Task RejectInvalidSecret() {
+    public async Task Reject_InvalidSecret() {
         var (handler, _, _) = CreateHandler(authFails: true);
         var request = CreateRequest(secret: "wrong-secret");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
-        Assert.Equal(OAuthErrors.InvalidClient, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }
 
     [Fact]
-    public async Task RejectClientWithoutGrantPermission() {
+    public async Task Reject_ClientWithoutGrantPermission() {
         var application = CreateApplication(hasGrant: false);
         var (handler, _, manager) = CreateHandler(application);
 
@@ -158,6 +159,6 @@ public class ClientCredentialsHandlerShould
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
-        Assert.Equal(OAuthErrors.UnauthorizedClient, ex.Code);
+        Assert.Equal(OAuthErrors.UnauthorizedClient, ex.Status);
     }
 }

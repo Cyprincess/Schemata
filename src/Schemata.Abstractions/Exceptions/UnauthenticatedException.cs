@@ -14,12 +14,12 @@ public class UnauthenticatedException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="UnauthenticatedException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public UnauthenticatedException(
-        int     status  = 401,
-        string? code    = ErrorCodes.Unauthenticated,
+        int     code    = 401,
+        string? status  = ErrorCodes.Unauthenticated,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1004)) { }
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1004)) { }
 }

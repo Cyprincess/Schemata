@@ -31,16 +31,7 @@ public class RequestPrincipalResolver : ITenantResolver
             return Task.FromResult<Guid?>(null);
         }
 
-        var id = claim.Value;
-        if (string.IsNullOrWhiteSpace(id)) {
-            throw new TenantResolveException();
-        }
-
-        if (Guid.TryParse(id, null, out var key)) {
-            return Task.FromResult<Guid?>(key);
-        }
-
-        throw new TenantResolveException();
+        return Task.FromResult<Guid?>(TenantId.Parse(claim.Value));
     }
 
     #endregion

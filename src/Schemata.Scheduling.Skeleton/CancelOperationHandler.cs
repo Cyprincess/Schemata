@@ -17,12 +17,15 @@ namespace Schemata.Scheduling.Skeleton;
 /// </summary>
 public sealed class CancelOperationHandler(
     IRepository<SchemataJobExecution> executions,
-    IScheduler                        scheduler
-) : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataOperation>
+    IScheduler                        scheduler,
+    TimeProvider?                     timeProvider = null
+) : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation>
 {
-    #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, SchemataOperation> Members
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public async ValueTask<SchemataOperation> InvokeAsync(
+    #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation> Members
+
+    public async ValueTask<Operation> InvokeAsync(
         string?               name,
         EmptyResourceRequest  request,
         SchemataJobExecution? entity,
@@ -43,11 +46,11 @@ public sealed class CancelOperationHandler(
         }
 
         entity.State   = ExecutionState.Cancelled;
-        entity.EndTime = DateTime.UtcNow;
+        entity.EndTime = _time.GetUtcNow().UtcDateTime;
         await executions.UpdateAsync(entity, ct);
         await executions.CommitAsync(ct);
 
-        return SchemataOperation.FromExecution(entity);
+        return OperationMapper.FromExecution(entity);
     }
 
     #endregion

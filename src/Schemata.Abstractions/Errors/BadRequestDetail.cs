@@ -8,20 +8,11 @@ namespace Schemata.Abstractions.Errors;
 ///     rejected request whose fields failed validation, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.BadRequest")]
 public class BadRequestDetail : IErrorDetail
 {
     /// <summary>
     ///     Field-level violations that caused the request to be rejected.
     /// </summary>
     public virtual List<ErrorFieldViolation>? FieldViolations { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.BadRequest"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.BadRequest";
-
-    #endregion
 }

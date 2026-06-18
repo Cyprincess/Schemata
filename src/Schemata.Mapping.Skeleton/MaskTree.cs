@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
+using Humanizer;
 using Schemata.Common;
 
 namespace Schemata.Mapping.Skeleton;
@@ -39,7 +40,22 @@ public sealed class MaskTree
     /// <returns>The parsed mask tree.</returns>
     /// <exception cref="ArgumentException">Thrown when a path cannot be resolved from <paramref name="rootType" />.</exception>
     public static MaskTree FromWire(Type rootType, string mask, bool allowCollectionTraversal) {
-        return Parse(rootType, Split(mask), allowCollectionTraversal, SchemataNaming.ToClrMemberName);
+        return Parse(rootType, Split(mask), allowCollectionTraversal, static (_, segment) => InflectorExtensions.Pascalize(segment));
+    }
+
+    /// <summary>
+    ///     Parses comma-separated wire-format paths into a validated CLR-name tree, resolving each
+    ///     segment through a caller-supplied converter that may apply resource-specific aliases (e.g.
+    ///     <c>name</c> to a canonical-name property) using the segment's declaring type.
+    /// </summary>
+    /// <param name="rootType">The type where path validation starts.</param>
+    /// <param name="mask">Comma-separated AIP-161 field paths.</param>
+    /// <param name="allowCollectionTraversal">Whether nested paths may traverse collection elements.</param>
+    /// <param name="convert">Maps a declaring type and wire segment to a CLR property name.</param>
+    /// <returns>The parsed mask tree.</returns>
+    /// <exception cref="ArgumentException">Thrown when a path cannot be resolved from <paramref name="rootType" />.</exception>
+    public static MaskTree FromWire(Type rootType, string mask, bool allowCollectionTraversal, Func<Type, string, string> convert) {
+        return Parse(rootType, Split(mask), allowCollectionTraversal, convert);
     }
 
     /// <summary>
@@ -51,7 +67,7 @@ public sealed class MaskTree
     /// <returns>The parsed mask tree.</returns>
     /// <exception cref="ArgumentException">Thrown when a path cannot be resolved from <paramref name="rootType" />.</exception>
     public static MaskTree FromClr(Type rootType, IEnumerable<string> paths, bool allowCollectionTraversal) {
-        return Parse(rootType, paths, allowCollectionTraversal, static s => s);
+        return Parse(rootType, paths, allowCollectionTraversal, static (_, s) => s);
     }
 
     /// <summary>
@@ -67,10 +83,10 @@ public sealed class MaskTree
     }
 
     private static MaskTree Parse(
-        Type                 rootType,
-        IEnumerable<string>  paths,
-        bool                 allowCollectionTraversal,
-        Func<string, string> convert
+        Type                       rootType,
+        IEnumerable<string>        paths,
+        bool                       allowCollectionTraversal,
+        Func<Type, string, string> convert
     ) {
         var tree = new MaskTree(rootType);
 
@@ -93,14 +109,14 @@ public sealed class MaskTree
         string[]                     segments,
         int                          index,
         bool                         allowCollectionTraversal,
-        Func<string, string>         convert
+        Func<Type, string, string>   convert
     ) {
         var raw = segments[index].Trim();
         if (raw.Length == 0 || IsIndexSegment(raw)) {
             throw new ArgumentException($"The field-mask path `{originalPath}` contains an invalid segment.", nameof(originalPath));
         }
 
-        var clr        = convert(raw);
+        var clr        = convert(currentType, raw);
         var properties = AppDomainTypeCache.GetProperties(currentType);
         if (!properties.TryGetValue(clr, out var property)) {
             throw new ArgumentException($"The field-mask path `{originalPath}` contains an unknown segment `{raw}`.", nameof(originalPath));

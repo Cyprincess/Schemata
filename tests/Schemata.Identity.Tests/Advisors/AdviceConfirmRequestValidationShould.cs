@@ -59,7 +59,7 @@ public class AdviceConfirmRequestValidationShould
     }
 
     [Fact]
-    public async Task SkipsForOtherOperations() {
+    public async Task Skips_ForOtherOperations() {
         var advisor = new AdviceConfirmRequestValidation();
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest();

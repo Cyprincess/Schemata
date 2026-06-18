@@ -1,7 +1,7 @@
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -26,7 +26,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = new Student {
-                    Uid      = Guid.NewGuid(),
+                    Uid      = Identifiers.NewUid(),
                     FullName = "Alice",
                     Age      = 18,
                     Grade    = 1,
@@ -90,7 +90,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = new Student {
-                    Uid      = Guid.NewGuid(),
+                    Uid      = Identifiers.NewUid(),
                     FullName = "Charlie",
                     Age      = 20,
                     Grade    = 3,
@@ -121,7 +121,7 @@ public class RepositoryCrudShould : IAsyncLifetime
     }
     [Fact]
     public async Task Add_DuplicateKey_ThrowsAlreadyExists() {
-        var uid = Guid.NewGuid();
+        var uid = Identifiers.NewUid();
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {

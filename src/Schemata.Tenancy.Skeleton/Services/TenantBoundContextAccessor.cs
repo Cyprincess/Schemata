@@ -27,10 +27,6 @@ public sealed class TenantBoundContextAccessor<TTenant> : ITenantContextAccessor
 
     public TTenant? Tenant { get; }
 
-    public Task InitializeAsync(CancellationToken ct) { return Task.CompletedTask; }
-
-    public Task InitializeAsync(TTenant tenant, CancellationToken ct) { return Task.CompletedTask; }
-
     public Task<IServiceProvider> GetBaseServiceProviderAsync(CancellationToken ct) { return Task.FromResult(_root); }
 
     #endregion

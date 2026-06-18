@@ -10,43 +10,39 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation.Internal;
 
 internal sealed class SchedulerOperationDispatcher(
-    IScheduler            scheduler,
-    OperationWorkRegistry registry
+    IScheduler         scheduler,
+    IOperationRegistry registry,
+    IScheduledJobRegistry jobs
 ) : IOperationDispatcher
 {
-    private static readonly JsonSerializerOptions OutputOptions = new() {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-    };
-
-    public async Task<string> DispatchAsync<TResult>(
-        string                                                    operation,
-        Func<IServiceProvider, CancellationToken, Task<TResult?>> work,
-        CancellationToken                                         ct
+    public async Task<Operation> DispatchAsync<TArgs>(
+        string            operationKey,
+        TArgs             args,
+        CancellationToken ct
     )
-        where TResult : class {
-        var uid        = Guid.NewGuid();
+        where TArgs : class {
+        var descriptor = registry.GetRequired(operationKey);
+        if (descriptor.ArgsType != typeof(TArgs)) {
+            throw new InvalidOperationException(
+                $"Operation '{operationKey}' expects arguments of type '{descriptor.ArgsType}', but got '{typeof(TArgs)}'.");
+        }
+
+        // Persist the operation key and serialized arguments instead of an in-process
+        // closure, so a reloaded execution can rebuild and run the handler after a restart.
+        var argsJson   = JsonSerializer.Serialize(args, SchemataJson.Default);
+        var uid        = Identifiers.NewUid();
         var collection = ResourceNameDescriptor.ForType<SchemataJobExecution>().Collection;
 
-        // The typed result is serialized here, on the Scheduling side of the module
-        // boundary, into the execution row's output so the operation resource can
-        // surface it once the work completes.
-        registry.Register(uid, async (sp, context, token) => {
-            var result = await work(sp, token);
-            if (result is not null && context.Execution is not null) {
-                context.Execution.Output = JsonSerializer.Serialize(result, OutputOptions);
-            }
-        });
+        jobs.Register(typeof(DurableOperationScheduledJob<TArgs>), operationKey);
 
-        try {
-            var execution = await scheduler.TriggerAsync<OperationJob>(new() {
-                Job          = $"{collection}/{uid:N}:{operation}",
-                ExecutionUid = uid,
-            }, ct);
+        var execution = await scheduler.TriggerAsync<DurableOperationScheduledJob<TArgs>>(new() {
+            Job               = $"{collection}/{uid:n}:{descriptor.Method}",
+            ExecutionUid      = uid,
+            Method            = descriptor.Method,
+            JobKey            = operationKey,
+            ArgsJson          = argsJson,
+        }, ct);
 
-            return execution.CanonicalName ?? $"{collection}/{uid:N}";
-        } catch {
-            registry.Remove(uid);
-            throw;
-        }
+        return OperationMapper.FromExecution(execution);
     }
 }

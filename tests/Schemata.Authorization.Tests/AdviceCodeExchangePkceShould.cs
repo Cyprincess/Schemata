@@ -61,7 +61,7 @@ public class AdviceCodeExchangePkceShould
                                 new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class AdviceCodeExchangePkceShould
         var exchange = Exchange(new(), new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -101,6 +101,6 @@ public class AdviceCodeExchangePkceShould
         var exchange = Exchange(new() { CodeVerifier = Verifier }, new());
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 }

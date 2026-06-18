@@ -16,7 +16,14 @@ public sealed class ProcessDefinitionService(IProcessRegistry registry) : IProce
         CallContext context = default
     ) {
         var entities = registry.GetRegisteredProcesses()
-                               .Select(n => new ProcessDefinitionInfo { CanonicalName = $"definitions/{n}" })
+                               .Select(n => {
+                                   var definition = registry.GetRegistration(n)?.Definition;
+                                   return new ProcessDefinitionInfo {
+                                       CanonicalName = $"definitions/{n}",
+                                       DisplayName   = definition?.DisplayName,
+                                       Description   = definition?.Description,
+                                   };
+                               })
                                .ToList();
         return new(new ListResultBase<ProcessDefinitionInfo> { Entities = entities });
     }

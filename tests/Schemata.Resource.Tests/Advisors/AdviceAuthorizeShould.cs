@@ -15,11 +15,36 @@ using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
 using Xunit;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Tests.Advisors;
 
 public class AdviceAuthorizeShould
 {
+    [Fact]
+    public async Task Expunge_AuthorizesWithExpungeVerb_NotDelete() {
+        var access = new Mock<IAccessProvider<Student, EmptyResourceRequest>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<EmptyResourceRequest>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(true);
+
+        var advisor   = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object);
+        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        ctx.Set(new ResourceMethodVerb(Verbs.Expunge));
+        var request   = new EmptyResourceRequest();
+        var container = new ResourceRequestContainer<Student>();
+
+        var result = await advisor.AdviseAsync(ctx, request, container, null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        access.Verify(a => a.HasAccessAsync(It.IsAny<Student?>(),
+                                            It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == Verbs.Expunge),
+                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Once);
+        access.Verify(a => a.HasAccessAsync(It.IsAny<Student?>(),
+                                            It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == nameof(Operations.Delete)),
+                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task Create_WithAnonymousGranted_SkipsAccessCheck() {
         var access  = new Mock<IAccessProvider<Student, Student>>(MockBehavior.Strict);

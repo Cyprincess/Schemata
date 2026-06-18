@@ -26,9 +26,15 @@ namespace Schemata.Caching.Distributed;
 public sealed class DistributedCacheProvider : ICacheProvider
 {
     private readonly IDistributedCache _cache;
+    private readonly TimeProvider      _time;
 
     /// <summary>Initializes a new instance backed by the specified distributed cache.</summary>
-    public DistributedCacheProvider(IDistributedCache cache) { _cache = cache; }
+    /// <param name="cache">The distributed cache backing store.</param>
+    /// <param name="timeProvider">Clock used to compute absolute expirations; defaults to the system clock.</param>
+    public DistributedCacheProvider(IDistributedCache cache, TimeProvider? timeProvider = null) {
+        _cache = cache;
+        _time  = timeProvider ?? TimeProvider.System;
+    }
 
     #region ICacheProvider Members
 
@@ -43,21 +49,30 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
     }
 
-    public async Task<bool> TryAddAsync(
+    public Task<bool> TryAddAsync(
         string            key,
         byte[]            value,
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
-        using var _ = await IndexLocks.AcquireAsync(key, ct);
+        throw new NotSupportedException(
+            "AIP-155 idempotency requires a cache provider that supports atomic reserve - use Schemata.Caching.Redis");
+    }
 
-        var existing = await _cache.GetAsync(key, ct);
-        if (existing is { Length: > 0 }) {
-            return false;
-        }
+    public Task<bool> TryReplaceAsync(
+        string            key,
+        byte[]            expected,
+        byte[]            replacement,
+        CacheEntryOptions options,
+        CancellationToken ct = default
+    ) {
+        throw new NotSupportedException(
+            "Atomic compare-and-swap is not supported over IDistributedCache; AIP-155 idempotency requires the Redis cache provider.");
+    }
 
-        await _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
-        return true;
+    public Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
+        throw new NotSupportedException(
+            "Atomic compare-and-delete is not supported over IDistributedCache; AIP-155 idempotency requires the Redis cache provider.");
     }
 
     public Task RemoveAsync(string key, CancellationToken ct = default) { return _cache.RemoveAsync(key, ct); }
@@ -139,10 +154,10 @@ public sealed class DistributedCacheProvider : ICacheProvider
         await _cache.SetAsync(key, bytes, ToDistributedOptions(normalized), ct);
     }
 
-    private static CacheEntryOptions NormalizeOptions(CacheEntryOptions options) {
+    private CacheEntryOptions NormalizeOptions(CacheEntryOptions options) {
         if (options.AbsoluteExpirationRelativeToNow.HasValue) {
             return new() {
-                AbsoluteExpiration = DateTimeOffset.UtcNow + options.AbsoluteExpirationRelativeToNow.Value,
+                AbsoluteExpiration = _time.GetUtcNow() + options.AbsoluteExpirationRelativeToNow.Value,
                 SlidingExpiration  = options.SlidingExpiration,
             };
         }

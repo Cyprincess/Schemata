@@ -1,4 +1,6 @@
 using System;
+using System.Xml;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -29,7 +31,7 @@ public sealed class ActivityBehavior
     public ActivityBehavior Go(Activity target) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
-                                  Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = target,
+                                  Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = target,
                               });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         LastTarget = target;
@@ -41,21 +43,22 @@ public sealed class ActivityBehavior
     public ActivityBehavior Go(FlowEvent target) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
-                                  Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = target,
+                                  Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = target,
                               });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
 
     /// <summary>Connects the current activity to a synthesized anonymous end event.</summary>
+    /// <exception cref="FormatException"></exception>
     public ActivityBehavior End() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
-            Id = $"end_{ProcessDefinition.GenerateId()}", Name = "End", Position = EventPosition.End,
+            Id = $"end_{Identifiers.NewUid():n}", Name = "End", Position = EventPosition.End,
         };
         _definition.Elements.Add(endEvent);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = endEvent,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
         });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
@@ -66,7 +69,7 @@ public sealed class ActivityBehavior
     public ActivityBehavior End(EndEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = endEvent,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
         });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
@@ -77,7 +80,7 @@ public sealed class ActivityBehavior
     public ActivityBehavior End(FlowEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = endEvent,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
         });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
@@ -87,14 +90,14 @@ public sealed class ActivityBehavior
     public ActivityBehavior Terminate() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
-            Id          = $"end_{ProcessDefinition.GenerateId()}",
+            Id          = $"end_{Identifiers.NewUid():n}",
             Name        = "Terminate",
             Position    = EventPosition.End,
             IsTerminate = true,
         };
         _definition.Elements.Add(endEvent);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = endEvent,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
         });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
@@ -105,16 +108,16 @@ public sealed class ActivityBehavior
     public ActivityBehavior Decide(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new ExclusiveGateway {
-            Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Decision_{Activity.Name}",
+            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{Activity.Name}",
         };
         _definition.Elements.Add(gateway);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = gateway,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
         });
 
         foreach (var branch in branches) {
             _definition.Flows.Add(new() {
-                Id        = $"sf_{ProcessDefinition.GenerateId()}",
+                Id        = $"sf_{Identifiers.NewUid():n}",
                 Source    = gateway,
                 Target    = branch.Exit,
                 Condition = branch.Condition,
@@ -134,16 +137,16 @@ public sealed class ActivityBehavior
     public InclusiveBranch Include(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new InclusiveGateway {
-            Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Decision_{Activity.Name}",
+            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{Activity.Name}",
         };
         _definition.Elements.Add(gateway);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = gateway,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
         });
 
         foreach (var branch in branches) {
             _definition.Flows.Add(new() {
-                Id        = $"sf_{ProcessDefinition.GenerateId()}",
+                Id        = $"sf_{Identifiers.NewUid():n}",
                 Source    = gateway,
                 Target    = branch.Exit,
                 Condition = branch.Condition,
@@ -163,16 +166,16 @@ public sealed class ActivityBehavior
     public ParallelFork Fork(params FlowBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new ParallelGateway {
-            Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Fork_{Activity.Name}",
+            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Fork_{Activity.Name}",
         };
         _definition.Elements.Add(gateway);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = gateway,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
         });
 
         foreach (var branch in branches) {
             _definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = gateway, Target = branch.Entry,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = gateway, Target = branch.Entry,
             });
         }
 
@@ -185,11 +188,11 @@ public sealed class ActivityBehavior
     public ActivityBehavior Await(params EventBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
         var gateway = new EventBasedGateway {
-            Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = $"Await_{Activity.Name}",
+            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Await_{Activity.Name}",
         };
         _definition.Elements.Add(gateway);
         _definition.Flows.Add(new() {
-            Id = $"sf_{ProcessDefinition.GenerateId()}", Source = LastTarget, Target = gateway,
+            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
         });
 
         foreach (var branch in branches) {
@@ -224,7 +227,7 @@ public sealed class ActivityBehavior
     public BoundaryCatch OnTimer(TimeSpan duration) {
         return new(this, _definition, Activity,
                    new TimerDefinition {
-                       Name = $"Timer_{duration}", TimerType = TimerType.Duration, TimeExpression = duration.ToString(),
+                       Name = $"Timer_{duration}", TimerType = TimerType.Duration, TimeExpression = XmlConvert.ToString(duration),
                    });
     }
 

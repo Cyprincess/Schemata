@@ -7,13 +7,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
-using Schemata.Core;
 using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
 using Schemata.Scheduling.Event;
 using Schemata.Scheduling.Event.Events;
 using Schemata.Scheduling.Event.Features;
 using Schemata.Scheduling.Event.Internal;
+using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Skeleton;
 using Xunit;
 
 namespace Schemata.Scheduling.Tests;
@@ -23,7 +24,7 @@ public class EventPublishingJobLifecycleObserverShould
     [Fact]
     public async Task PublishTypedVariables_FromJobContextWhenTriggered() {
         var bus      = new CapturingEventBus();
-        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()));
+        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()), Registry());
         var variables = new Dictionary<string, object?> {
             ["processName"] = "processes/1",
         };
@@ -37,7 +38,7 @@ public class EventPublishingJobLifecycleObserverShould
     [Fact]
     public async Task PublishTypedVariables_FromPersistedJobWhenScheduled() {
         var bus      = new CapturingEventBus();
-        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()));
+        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()), Registry());
 
         await observer.OnScheduledAsync(new() { Name = "jobs/1", Variables = "{\"processName\":\"processes/1\"}" });
 
@@ -49,7 +50,7 @@ public class EventPublishingJobLifecycleObserverShould
     [Fact]
     public async Task PublishExceptionMessageOnly_WhenJobFails() {
         var bus      = new CapturingEventBus();
-        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()));
+        var observer = new EventPublishingJobLifecycleObserver(bus, Options.Create(new SchemataSchedulingEventOptions()), Registry());
 
         await observer.OnFailedAsync(
             new() { Name = "jobs/1" },
@@ -66,8 +67,8 @@ public class EventPublishingJobLifecycleObserverShould
 
         new SchemataSchedulingEventFeature().ConfigureServices(
             services,
-            new SchemataOptions(),
-            new Configurators(),
+            new(),
+            new(),
             new ConfigurationBuilder().Build(),
             Mock.Of<IWebHostEnvironment>());
 
@@ -100,5 +101,9 @@ public class EventPublishingJobLifecycleObserverShould
             where TRequest : IRequest<TResponse> {
             throw new NotSupportedException();
         }
+    }
+
+    private static IScheduledJobRegistry Registry() {
+        return new DefaultScheduledJobRegistry();
     }
 }

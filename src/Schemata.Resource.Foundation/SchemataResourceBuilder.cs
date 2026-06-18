@@ -120,6 +120,30 @@ public sealed class SchemataResourceBuilder
     }
 
     /// <summary>
+    ///     Registers a resource, restricting it to the transports selected through
+    ///     <paramref name="transports" />. A <see langword="null" /> or empty selector exposes the
+    ///     resource on every registered endpoint, matching the no-argument overload.
+    /// </summary>
+    /// <typeparam name="TEntity">The persistent entity type.</typeparam>
+    /// <typeparam name="TRequest">The request DTO type.</typeparam>
+    /// <typeparam name="TDetail">The detail DTO type.</typeparam>
+    /// <typeparam name="TSummary">The summary DTO type.</typeparam>
+    /// <param name="transports">A callback selecting the transports that expose this resource.</param>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(Action<ResourceEndpointSelector>? transports)
+        where TEntity : class, ICanonicalName
+        where TRequest : class, ICanonicalName
+        where TDetail : class, ICanonicalName
+        where TSummary : class, ICanonicalName {
+        var selector = new ResourceEndpointSelector();
+        transports?.Invoke(selector);
+
+        var endpoints = selector.Endpoints.Count > 0 ? new List<string>(selector.Endpoints) : null;
+
+        return Use<TEntity, TRequest, TDetail, TSummary>(endpoints, null);
+    }
+
+    /// <summary>
     ///     Registers a resource with explicit type roles and allows callers to configure
     ///     operations, endpoints, and custom methods programmatically.
     /// </summary>
@@ -131,7 +155,7 @@ public sealed class SchemataResourceBuilder
     /// <param name="configure">Optional resource metadata callback.</param>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder Use<TEntity, TRequest, TDetail, TSummary>(
-        IList<string>?              endpoints,
+        IList<string>?             endpoints,
         Action<ResourceAttribute>? configure
     )
         where TEntity : class, ICanonicalName

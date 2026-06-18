@@ -15,15 +15,17 @@ namespace Schemata.Scheduling.Skeleton;
 ///     current snapshot once the row reaches a terminal state or the deadline
 ///     elapses.
 /// </summary>
-public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> executions)
-    : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, SchemataOperation>
+public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> executions, TimeProvider? timeProvider = null)
+    : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation>
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
     public static readonly  TimeSpan MaxWait      = TimeSpan.FromSeconds(30);
 
-    #region IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, SchemataOperation> Members
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public async ValueTask<SchemataOperation> InvokeAsync(
+    #region IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation> Members
+
+    public async ValueTask<Operation> InvokeAsync(
         string?               name,
         WaitOperationRequest  request,
         SchemataJobExecution? entity,
@@ -33,33 +35,33 @@ public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> execu
         ArgumentNullException.ThrowIfNull(entity);
 
         if (IsTerminal(entity.State)) {
-            return SchemataOperation.FromExecution(entity);
+            return OperationMapper.FromExecution(entity);
         }
 
-        var deadline = DateTime.UtcNow + GetEffectiveTimeout(request.Timeout);
+        var deadline = _time.GetUtcNow().UtcDateTime + GetEffectiveTimeout(request.Timeout);
         var uid      = entity.Uid;
 
-        while (DateTime.UtcNow < deadline) {
-            var remaining = deadline - DateTime.UtcNow;
+        while (_time.GetUtcNow().UtcDateTime < deadline) {
+            var remaining = deadline - _time.GetUtcNow().UtcDateTime;
             if (remaining > TimeSpan.Zero) {
-                await Task.Delay(remaining < PollInterval ? remaining : PollInterval, ct);
+                await Task.Delay(remaining < PollInterval ? remaining : PollInterval, _time, ct);
             }
 
             var snapshot = await executions.FirstOrDefaultAsync<SchemataJobExecution>(
                 q => q.Where(e => e.Uid == uid), ct);
 
             if (snapshot is null) {
-                return SchemataOperation.FromExecution(entity);
+                return OperationMapper.FromExecution(entity);
             }
 
             if (IsTerminal(snapshot.State)) {
-                return SchemataOperation.FromExecution(snapshot);
+                return OperationMapper.FromExecution(snapshot);
             }
 
             entity = snapshot;
         }
 
-        return SchemataOperation.FromExecution(entity);
+        return OperationMapper.FromExecution(entity);
     }
 
     #endregion

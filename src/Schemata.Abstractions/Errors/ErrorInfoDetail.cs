@@ -8,7 +8,7 @@ namespace Schemata.Abstractions.Errors;
 ///     error classification, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.ErrorInfo")]
 public class ErrorInfoDetail : IErrorDetail
 {
     /// <summary>
@@ -26,13 +26,4 @@ public class ErrorInfoDetail : IErrorDetail
     ///     Arbitrary key-value pairs providing additional diagnostic context.
     /// </summary>
     public virtual Dictionary<string, string>? Metadata { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.ErrorInfo"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.ErrorInfo";
-
-    #endregion
 }

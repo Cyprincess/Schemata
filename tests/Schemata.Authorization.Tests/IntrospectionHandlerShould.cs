@@ -19,6 +19,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -39,7 +40,7 @@ public class IntrospectionHandlerShould
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = callerAppName };
+        var app        = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -67,7 +68,7 @@ public class IntrospectionHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Uid             = Guid.NewGuid(),
+            Uid             = Identifiers.NewUid(),
             Type            = type,
             Application     = appName,
             ReferenceId     = referenceId,
@@ -96,7 +97,7 @@ public class IntrospectionHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public class IntrospectionHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public class IntrospectionHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()),
             new(Claims.Subject, "user-42"),
             new(Claims.ClientId, "test-client"),
             new(Claims.Scope, "openid profile"),
@@ -146,7 +147,7 @@ public class IntrospectionHandlerShould
         var f = CreateFixture("resource-server");
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()),
             new(Claims.Subject, "user-42"),
             new(Claims.ClientId, "other-client"),
             new(Claims.Audience, "api"),
@@ -169,7 +170,7 @@ public class IntrospectionHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Guid.NewGuid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));

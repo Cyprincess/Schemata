@@ -31,7 +31,7 @@ public class TokenHandlerShould
     }
 
     [Fact]
-    public async Task RoutesToMatchingGrantHandler() {
+    public async Task Routes_ToMatchingGrantHandler() {
         var grant = MockGrant(GrantTypes.ClientCredentials);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
                                        It.IsAny<CancellationToken>()))
@@ -54,7 +54,7 @@ public class TokenHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Code);
+        Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Status);
     }
 
     [Fact]
@@ -66,11 +66,11 @@ public class TokenHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Code);
+        Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Status);
     }
 
     [Fact]
-    public async Task ReturnsResultFromMatchedHandler() {
+    public async Task Returns_ResultFromMatchedHandler() {
         var expected = AuthorizationResult.Content(new { token = "abc" });
         var grant    = MockGrant(GrantTypes.RefreshToken);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),

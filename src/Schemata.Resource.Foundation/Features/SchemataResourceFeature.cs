@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Expressions.Aip;
@@ -64,18 +65,29 @@ public sealed class SchemataResourceFeature : FeatureBase
                 continue;
             }
 
-            Type[] types;
+            Type?[] types;
             try {
                 types = assembly.GetExportedTypes();
-            } catch {
-                continue;
+            } catch (ReflectionTypeLoadException ex) {
+                // A load failure for some types must not silently drop the whole assembly;
+                // discover resources from the types that did load. Any other exception surfaces.
+                types = ex.Types;
             }
 
-            foreach (var type in types) {
-                if (type.GetCustomAttribute<ResourceAttribute>() is not { } attribute) {
-                    continue;
-                }
+            RegisterDiscoveredResources(services, types);
+        }
+    }
 
+    /// <summary>
+    ///     Registers every <see cref="ResourceAttribute" />-decorated type in <paramref name="types" />.
+    ///     Null entries (types that failed to load) are skipped, so a partial assembly load still
+    ///     registers the resources that resolved.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection" />.</param>
+    /// <param name="types">Candidate types, some of which may be <see langword="null" />.</param>
+    public static void RegisterDiscoveredResources(IServiceCollection services, IEnumerable<Type?> types) {
+        foreach (var type in types) {
+            if (type?.GetCustomAttribute<ResourceAttribute>() is { } attribute) {
                 RegisterResource(services, attribute);
             }
         }
@@ -106,6 +118,19 @@ public sealed class SchemataResourceFeature : FeatureBase
             methods.AddRange(resource.Methods);
         }
         AddBuiltInMethods(resource, methods, entity, detail);
+
+        // When the built-in purge method is active, register its restart-durable executor
+        // and descriptor so a reloaded purge operation rebuilds from the persisted request.
+        // Guarded by ISoftDelete because PurgeHandler/PurgeOperationHandler constrain TEntity.
+        if (typeof(ISoftDelete).IsAssignableFrom(entity)) {
+            var builtInPurge = typeof(PurgeHandler<>).MakeGenericType(entity);
+            if (methods.Any(m => string.Equals(m.Verb, Verbs.Purge, StringComparison.Ordinal) && m.Handler == builtInPurge)) {
+                var purgeKey = $"{Verbs.Purge}:{ResourceNameDescriptor.ForType(entity).Collection}";
+                services.AddKeyedScoped(typeof(IOperationHandler<PurgeOperationArgs>), purgeKey,
+                                        typeof(PurgeOperationHandler<>).MakeGenericType(entity));
+                services.AddSingleton(new OperationDescriptor(purgeKey, Verbs.Purge, typeof(PurgeOperationArgs)));
+            }
+        }
 
         foreach (var method in methods) {
             var handlerInterface = FindResourceMethodHandlerInterface(method.Handler);

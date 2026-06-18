@@ -11,6 +11,8 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
+using Schemata.Common;
+using Schemata.Event.Foundation;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 
@@ -21,6 +23,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 {
     private readonly IConnection                    _connection;
     private readonly CorrelationTracker             _correlation;
+    private readonly EventOutboxDispatcher?         _dispatcher;
     private readonly JsonSerializerOptions          _json;
     private readonly ILogger<RabbitMqEventBus>?     _logger;
     private readonly IOptions<RabbitMqEventOptions> _options;
@@ -35,15 +38,17 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         CorrelationTracker             correlation,
         IEventTypeRegistry             registry,
         IServiceProvider               services,
-        JsonSerializerOptions?         json   = null,
-        ILogger<RabbitMqEventBus>?     logger = null
+        IOptions<JsonSerializerOptions> json,
+        ILogger<RabbitMqEventBus>?     logger     = null,
+        EventOutboxDispatcher?         dispatcher = null
     ) {
         _options     = options;
         _correlation = correlation;
         _registry    = registry;
         _services    = services;
-        _json        = json ?? new JsonSerializerOptions();
+        _json        = json.Value;
         _logger      = logger;
+        _dispatcher  = dispatcher;
 
         var factory = new ConnectionFactory {
             HostName                   = options.Value.HostName,
@@ -55,7 +60,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         };
 
         _connection     = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-        _replyQueueName = $"reply.{Guid.NewGuid():n}";
+        _replyQueueName = $"reply.{Identifiers.NewUid():n}";
 
         _replyChannel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
         _replyChannel.QueueDeclareAsync(_replyQueueName, false, true, true).GetAwaiter().GetResult();
@@ -79,51 +84,15 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
     #region IEventBus Members
 
-    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent {
-        var routingKey = _registry.RequireName(typeof(TEvent));
+        return PublishCoreAsync(@event, null, ct);
+    }
 
-        using var scope = _services.CreateScope();
-        var eventCtx = new EventContext(@event!, routingKey) {
-            Payload = JsonSerializer.Serialize(@event, _json),
-            CorrelationId = Guid.NewGuid().ToString("n"),
-        };
-        var adviceCtx = new AdviceContext(scope.ServiceProvider);
-
-        switch (await Advisor.For<IEventPublishAdvisor>()
-                             .RunAsync(adviceCtx, eventCtx, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
-                eventCtx.Result = r;
-                return;
-            case AdviseResult.Block:
-            default:
-                throw new InvalidOperationException("Event publish blocked by advisor.");
-        }
-
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
-        foreach (var observer in observers) {
-            await observer.OnPublishedAsync(eventCtx, ct);
-        }
-
-        // CreateChannelOptions(publisherConfirmations: true, publisherConfirmationTracking: true)
-        // makes BasicPublishAsync return a Task that completes when the broker confirms the
-        // publish. Without this, the publish is fire-and-forget and a broker that loses the
-        // message after accepting the publish causes silent loss.
-        await using var channel = await _connection.CreateChannelAsync(new(true, true), ct);
-
-        var exchange = _options.Value.ExchangeName;
-        var body     = Encoding.UTF8.GetBytes(eventCtx.Payload ?? string.Empty);
-
-        var props = new BasicProperties {
-            ContentType   = "application/json",
-            DeliveryMode  = DeliveryModes.Persistent,
-            CorrelationId = eventCtx.CorrelationId,
-        };
-
-        await channel.ExchangeDeclareAsync(exchange, _options.Value.ExchangeType, true, cancellationToken: ct);
-        await channel.BasicPublishAsync(exchange, routingKey, true, props, body, ct);
+    public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
+        where TEvent : IEvent {
+        IEventBus.EnsureSourceEntityContract(sourceEntity);
+        await PublishCoreAsync(@event, sourceEntity, ct);
     }
 
     public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
@@ -135,7 +104,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         using var scope = _services.CreateScope();
         var eventCtx = new EventContext(request!, routingKey) {
             Payload = JsonSerializer.Serialize(request, _json),
-            CorrelationId = Guid.NewGuid().ToString("n"),
+            CorrelationId = Identifiers.NewUid().ToString("n"),
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
@@ -180,6 +149,41 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     }
 
     #endregion
+
+    private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
+        where TEvent : IEvent {
+        // Resolve by the runtime type so a derived event published through a base/interface
+        // static type keeps its registered name and serializes its derived members.
+        var type       = @event!.GetType();
+        var routingKey = _registry.RequireName(type);
+
+        using var scope = _services.CreateScope();
+        var eventCtx = new EventContext(@event, routingKey) {
+            Payload                = JsonSerializer.Serialize(@event, type, _json),
+            CorrelationId          = Identifiers.NewUid().ToString("n"),
+            RequiresOutboxDelivery = true,
+            Source                 = source,
+        };
+        var adviceCtx = new AdviceContext(scope.ServiceProvider);
+
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, eventCtx, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
+                eventCtx.Result = r;
+                return;
+            case AdviseResult.Block:
+            default:
+                throw new InvalidOperationException("Event publish blocked by advisor.");
+        }
+
+        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
+        foreach (var observer in observers) {
+            await observer.OnPublishedAsync(eventCtx, ct);
+        }
+        _dispatcher?.NotifyPending();
+    }
 
     private Task HandleReplyAsync(object sender, BasicDeliverEventArgs ea) {
         var correlationId = ea.BasicProperties.CorrelationId;

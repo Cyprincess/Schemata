@@ -60,6 +60,8 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
         overrides.AddSingleton(tenant);
         overrides.AddSingleton<ITenantContextAccessor<TTenant>>(_ => new TenantBoundContextAccessor<TTenant>(_root, tenant));
 
+        var baseline = overrides.Count;
+
         if (_options.TenantOverrides.TryGetValue(id, out var tenantOverrides)) {
             foreach (var apply in tenantOverrides) {
                 var snapshot = overrides.Count;
@@ -74,8 +76,28 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
             EnforceSingletonOverride(id, overrides, snapshot);
         }
 
+        // The tenant container holds only override registrations, so an override whose constructor
+        // depends on a host service cannot resolve it from the isolated container. Activate each
+        // override through the composite provider instead, which falls back to the host root for any
+        // dependency the tenant container does not register.
+        TenantCompositeServiceProvider composite = null!;
+        for (var i = baseline; i < overrides.Count; i++) {
+            var descriptor = overrides[i];
+            if (descriptor.IsKeyedService) {
+                continue;
+            }
+
+            if (descriptor.ImplementationType is { IsGenericTypeDefinition: false } implementationType) {
+                overrides[i] = ServiceDescriptor.Singleton(descriptor.ServiceType,
+                                                           _ => ActivatorUtilities.CreateInstance(composite, implementationType));
+            } else if (descriptor.ImplementationFactory is { } factory) {
+                overrides[i] = ServiceDescriptor.Singleton(descriptor.ServiceType, _ => factory(composite));
+            }
+        }
+
         var container = overrides.BuildServiceProvider();
-        return new TenantCompositeServiceProvider(container, _root);
+        composite = new TenantCompositeServiceProvider(container, _root);
+        return composite;
     }
 
     private static void EnforceSingletonOverride(string id, IServiceCollection container, int snapshot) {

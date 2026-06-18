@@ -129,26 +129,6 @@ public class OperationHandlerUpdateShould
     }
 
     [Fact]
-    public async Task Update_MissingWithAllowMissing_CreatesResource() {
-        var handler = _fixture.CreateHandler();
-        var request = new Student {
-            FullName     = "Zoe",
-            Age          = 23,
-            UpdateMask   = "full_name",
-            AllowMissing = true,
-        };
-
-        var result = await handler.UpdateAsync("students/zoe-9", request, null, null);
-
-        Assert.NotNull(result.Detail);
-        var created = Assert.Single(_fixture.Students, s => s.Name == "zoe-9");
-        Assert.Equal("students/zoe-9", created.CanonicalName);
-        Assert.Equal("Zoe", created.FullName);
-        // AIP-134: creation via allow_missing applies every field, ignoring the mask.
-        Assert.Equal(23, created.Age);
-    }
-
-    [Fact]
     public async Task Update_ETagMismatch_ThrowsConcurrencyException() {
         var handler = _fixture.CreateHandler(services => {
             services.TryAddScoped<IResourceUpdateAdvisor<Student, Student>, AdviceUpdateFreshness<Student, Student>>();

@@ -50,4 +50,18 @@ public sealed class SchemataResourceOptions
     ///     Overridable per resource via <see cref="ResourceAttribute.TotalSize" />.
     /// </summary>
     public TotalSizeMode TotalSize { get; set; }
+
+    /// <summary>
+    ///     Gets or sets how long a reserved (pending) or finalized idempotency record is retained,
+    ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>.
+    ///     The pending reservation must outlive the operation so a replay arriving after a
+    ///     commit-then-crash observes the reservation rather than re-executing the request.
+    /// </summary>
+    public TimeSpan IdempotencyRetention { get; set; } = TimeSpan.FromHours(24);
+
+    /// <summary>
+    ///     Gets or sets how long a replayed request waits for an in-flight first attempt to
+    ///     finalize its result before reporting <c>ABORTED</c> so the client retries.
+    /// </summary>
+    public TimeSpan IdempotencyPendingWait { get; set; } = TimeSpan.FromSeconds(5);
 }

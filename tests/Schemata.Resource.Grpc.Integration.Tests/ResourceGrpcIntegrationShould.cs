@@ -34,4 +34,17 @@ public class ResourceGrpcIntegrationShould
         var fetched = await client.GetAsync(new() { CanonicalName = created.CanonicalName });
         Assert.Equal("GrpcStudent", fetched.FullName);
     }
+
+    [Fact]
+    public async Task Delete_MissingStudent_WithAllowMissing_Succeeds() {
+        var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
+        var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
+
+        // A hard-delete resource maps a missing allow_missing delete to an empty success response.
+        var exception = await Record.ExceptionAsync(() => client
+                                                         .DeleteAsync(new() { CanonicalName = "students/does-not-exist", AllowMissing = true })
+                                                         .AsTask());
+
+        Assert.Null(exception);
+    }
 }

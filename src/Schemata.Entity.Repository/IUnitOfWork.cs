@@ -7,14 +7,14 @@ namespace Schemata.Entity.Repository;
 /// <summary>
 ///     Represents a unit of work that coordinates multiple repository operations
 ///     within a single database transaction. Repositories opt in via
-///     <see cref="IRepository{TEntity}.Join" />.
+///     <see cref="IRepository.Join" />.
 /// </summary>
 /// <remarks>
-///     The transaction is opened lazily on first access to
-///     <see cref="IUnitOfWork{TContext}.Context" /> (which the first
-///     <see cref="IRepository{TEntity}.Join" /> triggers). A unit of work is one-shot:
-///     after <see cref="CommitAsync" /> or <see cref="RollbackAsync" /> resolve a new
-///     instance from DI to start another transaction.
+///     The underlying transaction is provider-specific: a buffered provider (EF Core) opens it
+///     around the commit-time save, while an immediate-execution provider (LinqToDB) opens it when
+///     <see cref="IUnitOfWork{TContext}.Context" /> is first accessed. A unit of work is one-shot:
+///     after <see cref="CommitAsync" /> or <see cref="RollbackAsync" /> resolve a new instance from
+///     DI to start another transaction.
 /// </remarks>
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
@@ -41,10 +41,11 @@ public interface IUnitOfWork : IAsyncDisposable, IDisposable
 public interface IUnitOfWork<TContext> : IUnitOfWork
 {
     /// <summary>
-    ///     The data context owned by this unit of work. The first access opens the
-    ///     underlying connection and a fresh transaction; subsequent accesses return the
-    ///     same instance until <see cref="IUnitOfWork.CommitAsync" /> /
-    ///     <see cref="IUnitOfWork.RollbackAsync" /> / disposal.
+    ///     The data context owned by this unit of work. The first access opens the underlying
+    ///     connection; subsequent accesses return the same instance until
+    ///     <see cref="IUnitOfWork.CommitAsync" /> / <see cref="IUnitOfWork.RollbackAsync" /> /
+    ///     disposal. The transaction is opened per the provider's execution model (see the type
+    ///     remarks).
     /// </summary>
     TContext Context { get; }
 }

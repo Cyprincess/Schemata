@@ -24,7 +24,7 @@ public sealed class QueryContainer<TEntity>
 
     /// <summary>
     ///     The repository that initiated this query, exposed so advisors can inspect the
-    ///     <see cref="IRepository{TEntity}.AdviceContext" />.
+    ///     <see cref="IRepository.AdviceContext" />.
     /// </summary>
     public IRepository<TEntity> Repository { get; private set; }
 

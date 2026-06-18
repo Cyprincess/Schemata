@@ -29,7 +29,7 @@ public sealed class SchemataFlowEventFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionObserver, FlowEventTransitionObserver>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowEventTransitionAdvisor>());
         services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
     }
 }

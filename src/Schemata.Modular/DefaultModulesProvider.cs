@@ -14,16 +14,12 @@ namespace Schemata.Modular;
 /// </summary>
 public sealed class DefaultModulesProvider : IModulesProvider
 {
-    private static readonly ConcurrentBag<ModuleDescriptor> Modules = [];
+    private readonly ConcurrentBag<ModuleDescriptor> _modules = [];
 
     /// <summary>
     ///     Initializes the provider, scanning the entry assembly for <see cref="ModuleAttribute" /> instances.
     /// </summary>
     public DefaultModulesProvider() {
-        if (!Modules.IsEmpty) {
-            return;
-        }
-
         var entry = Assembly.GetEntryAssembly();
         if (entry is null) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1028));
@@ -54,13 +50,13 @@ public sealed class DefaultModulesProvider : IModulesProvider
 
             version = GetVersion(version);
 
-            Modules.Add(new(module.Name, assembly, type, typeof(DefaultModulesProvider), display, description, company, copyright, version));
+            _modules.Add(new(module.Name, assembly, type, typeof(DefaultModulesProvider), display, description, company, copyright, version));
         }
     }
 
     #region IModulesProvider Members
 
-    public IEnumerable<ModuleDescriptor> GetModules() { return Modules; }
+    public IEnumerable<ModuleDescriptor> GetModules() { return _modules; }
 
     #endregion
 

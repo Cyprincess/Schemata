@@ -35,6 +35,8 @@ public static class StateMachineValidator
 
             if (gateway is EventBasedGateway eventBasedGateway) {
                 ValidateEventBasedGateway(definition, eventBasedGateway);
+            } else if (gateway is ExclusiveGateway exclusiveGateway) {
+                ValidateExclusiveGateway(definition, exclusiveGateway);
             }
         }
 
@@ -59,6 +61,41 @@ public static class StateMachineValidator
                 throw new FailedPreconditionException(message: $"Activity '{
                     activity.Name
                 }' has loop characteristics which are not supported by the state machine engine.");
+            }
+        }
+
+        ValidateReachability(definition, startEvents[0]);
+    }
+
+    private static void ValidateReachability(ProcessDefinition definition, FlowEvent start) {
+        var reachable = new HashSet<FlowElement> { start };
+        var queue     = new Queue<FlowElement>();
+        queue.Enqueue(start);
+
+        while (queue.Count > 0) {
+            var current = queue.Dequeue();
+
+            foreach (var flow in definition.Flows.Where(sf => sf.Source == current)) {
+                if (flow.Target is not null && reachable.Add(flow.Target)) {
+                    queue.Enqueue(flow.Target);
+                }
+            }
+
+            // Boundary events are not targeted by sequence flows; they become reachable once
+            // the activity they are attached to is reachable.
+            foreach (var boundary in definition.Elements.OfType<FlowEvent>()
+                                               .Where(e => e.Position == EventPosition.Boundary && e.AttachedTo == current)) {
+                if (reachable.Add(boundary)) {
+                    queue.Enqueue(boundary);
+                }
+            }
+        }
+
+        foreach (var element in definition.Elements) {
+            if (!reachable.Contains(element)) {
+                throw new FailedPreconditionException(message: $"Element '{
+                    element.Name
+                }' is not reachable from the start event.");
             }
         }
     }
@@ -136,6 +173,15 @@ public static class StateMachineValidator
         }
     }
 
+    private static void ValidateExclusiveGateway(ProcessDefinition definition, ExclusiveGateway gateway) {
+        var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
+        if (outgoing.Count == 0) {
+            throw new FailedPreconditionException(message: $"Exclusive gateway '{
+                gateway.Name
+            }' must have at least one outgoing flow.");
+        }
+    }
+
     private static void ValidateBoundaryEvent(ProcessDefinition definition, FlowEvent boundary) {
         if (boundary.AttachedTo is null) {
             throw new FailedPreconditionException(message: $"Boundary event '{
@@ -166,6 +212,13 @@ public static class StateMachineValidator
 
     private static void ValidateIntermediateCatchEvent(ProcessDefinition definition, FlowEvent catchEvent) {
         var incoming = definition.Flows.Where(sf => sf.Target == catchEvent).ToList();
+        var outgoing = definition.Flows.Where(sf => sf.Source == catchEvent).ToList();
+
+        if (outgoing.Count == 0) {
+            throw new FailedPreconditionException(message: $"Intermediate catch event '{
+                catchEvent.Name
+            }' must have at least one outgoing flow.");
+        }
 
         foreach (var flow in incoming) {
             if (flow.Source is not EventBasedGateway) {
@@ -180,7 +233,9 @@ public static class StateMachineValidator
         var outgoing = definition.Flows.Where(sf => sf.Source == activity).ToList();
 
         if (outgoing.Count == 0) {
-            return;
+            throw new FailedPreconditionException(message: $"Activity '{
+                activity.Name
+            }' has no outgoing flow and cannot proceed. Route it to an end event or another element.");
         }
 
         var targets           = outgoing.Select(sf => sf.Target).ToList();

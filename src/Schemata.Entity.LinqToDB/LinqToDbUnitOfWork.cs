@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using LinqToDB.Data;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.LinqToDB;
@@ -11,13 +13,14 @@ namespace Schemata.Entity.LinqToDB;
 /// <summary>
 ///     Unit of work implementation for LinqToDB. The transaction is opened lazily on
 ///     the first access of <see cref="Context" /> (i.e. the first
-///     <see cref="IRepository{TEntity}.Join" /> on an enlisted repository).
+///     <see cref="IRepository.Join" /> on an enlisted repository).
 /// </summary>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
-public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
+public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfWorkSink
     where TContext : DataConnection
 {
     private readonly Func<TContext>                      _factory;
+    private readonly ILogger?                            _logger;
     private readonly List<Func<CancellationToken, Task>> _committed = [];
     private readonly List<Action>                        _rollback  = [];
     private          TContext?                           _context;
@@ -25,7 +28,10 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
     private          bool                                _completed;
     private          bool                                _disposed;
 
-    public LinqToDbUnitOfWork(Func<TContext> factory) { _factory = factory; }
+    public LinqToDbUnitOfWork(Func<TContext> factory, IServiceProvider sp) {
+        _factory = factory;
+        _logger  = sp.GetService<ILogger<LinqToDbUnitOfWork<TContext>>>();
+    }
 
     public TContext Context
     {
@@ -61,22 +67,23 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         try {
             await _transaction.CommitAsync(ct);
         } catch {
-            foreach (var reset in _rollback) reset();
-            try {
-                await _transaction.RollbackAsync(CancellationToken.None);
-            } catch {
-                // Transaction may already be completed; rollback during cleanup must not throw.
+            foreach (var reset in _rollback) {
+                reset();
             }
 
+            await TryRollbackAsync(_transaction);
             await _transaction.DisposeAsync();
+
             _transaction = null;
             _completed   = true;
             _committed.Clear();
             _rollback.Clear();
+
             throw;
         }
 
         await _transaction.DisposeAsync();
+
         _transaction = null;
         _completed   = true;
 
@@ -103,7 +110,9 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             return;
         }
 
-        foreach (var reset in _rollback) reset();
+        foreach (var reset in _rollback) {
+            reset();
+        }
 
         if (_transaction is not null) {
             await _transaction.RollbackAsync(ct);
@@ -122,12 +131,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         if (!_completed) {
             foreach (var reset in _rollback) reset();
             if (_transaction is not null) {
-                try {
-                    _transaction.Rollback();
-                } catch {
-                    // Transaction may already be completed; rollback during cleanup must not throw.
-                }
-
+                TryRollback(_transaction);
                 _transaction.Dispose();
                 _transaction = null;
             }
@@ -151,12 +155,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         if (!_completed) {
             foreach (var reset in _rollback) reset();
             if (_transaction is not null) {
-                try {
-                    await _transaction.RollbackAsync();
-                } catch {
-                    // Transaction may already be completed; rollback during cleanup must not throw.
-                }
-
+                await TryRollbackAsync(_transaction);
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }
@@ -176,7 +175,29 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         GC.SuppressFinalize(this);
     }
 
-    internal void AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
+    #region IUnitOfWorkSink Members
 
-    internal void AddRollbackSink(Action reset) { _rollback.Add(reset); }
+    void IUnitOfWorkSink.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
+
+    void IUnitOfWorkSink.AddRollbackSink(Action reset) { _rollback.Add(reset); }
+
+    #endregion
+
+    // Rollback during commit-failure or disposal cleanup must not throw: the transaction may already
+    // be completed, and an exception here would mask the original failure.
+    private async Task TryRollbackAsync(DataConnectionTransaction transaction) {
+        try {
+            await transaction.RollbackAsync(CancellationToken.None);
+        } catch (Exception ex) {
+            _logger?.LogWarning(ex, "Rollback during unit-of-work cleanup failed.");
+        }
+    }
+
+    private void TryRollback(DataConnectionTransaction transaction) {
+        try {
+            transaction.Rollback();
+        } catch (Exception ex) {
+            _logger?.LogWarning(ex, "Rollback during unit-of-work cleanup failed.");
+        }
+    }
 }

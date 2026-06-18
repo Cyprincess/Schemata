@@ -9,14 +9,16 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 
 namespace Schemata.Event.Foundation.Internal;
 
-/// <summary>Single-process <see cref="IEventBus"/> dispatching directly through DI-resolved handlers.</summary>
+/// <summary>Single-process <see cref="IEventBus"/> dispatching through the event outbox.</summary>
 public sealed class InProcessEventBus : IEventBus
 {
+    private readonly EventOutboxDispatcher?      _dispatcher;
     private readonly JsonSerializerOptions       _json;
     private readonly ILogger<InProcessEventBus>? _logger;
     private readonly IServiceProvider            _services;
@@ -24,67 +26,26 @@ public sealed class InProcessEventBus : IEventBus
     public InProcessEventBus(
         IServiceProvider             services,
         IOptions<JsonSerializerOptions> json,
-        ILogger<InProcessEventBus>?  logger = null
+        ILogger<InProcessEventBus>?  logger     = null,
+        EventOutboxDispatcher?       dispatcher = null
     ) {
-        _services = services;
-        _json     = json.Value;
-        _logger   = logger;
+        _services   = services;
+        _json       = json.Value;
+        _logger     = logger;
+        _dispatcher = dispatcher;
     }
 
     #region IEventBus Members
 
-    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent {
-        using var scope    = _services.CreateScope();
-        var       store    = scope.ServiceProvider.GetRequiredService<IEventSubscriptionStore>();
-        var       resolver = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
-        var       options  = scope.ServiceProvider.GetRequiredService<IOptions<SchemataEventOptions>>().Value;
-        var       registry = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
+        return PublishCoreAsync(@event, null, ct);
+    }
 
-        // Enforce the IEventTypeRegistry contract on the in-process path so the same
-        // RegisterEvent call covers both in-process and out-of-process buses.
-        var name = registry.RequireName(typeof(TEvent));
-
-        var ctx = new EventContext(@event, name) {
-            Payload       = JsonSerializer.Serialize(@event, _json),
-            CorrelationId = Guid.NewGuid().ToString("n"),
-        };
-        var adviceCtx = new AdviceContext(scope.ServiceProvider);
-
-        switch (await Advisor.For<IEventPublishAdvisor>()
-                             .RunAsync(adviceCtx, ctx, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
-                ctx.Result = r;
-                return;
-            case AdviseResult.Block:
-            default:
-                throw new InvalidOperationException("Event publish blocked by advisor.");
-        }
-
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
-        await NotifyPublishedAsync(observers, ctx, ct);
-
-        try {
-            var subscriptions = await store.FindAsync(name, ct: ct);
-
-            var context = scope.ServiceProvider.GetRequiredService<IEventDispatchContext>();
-            context.SetSubscriptions(subscriptions);
-
-            var routing = options.RoutingTable.GetValueOrDefault(typeof(TEvent), EventRouting.Broadcast);
-            await resolver.InvokeEventHandlersAsync(@event, routing, ct);
-
-            ctx.Result = true;
-        } catch (Exception ex) {
-            ctx.Exception = ex;
-            throw;
-        } finally {
-            var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
-            _ = await Advisor.For<IEventConsumeAdvisor>()
-                             .RunAsync(consumeAdviceCtx, ctx, ct);
-            await NotifyConsumedAsync(observers, ctx, ct);
-        }
+    public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
+        where TEvent : IEvent {
+        IEventBus.EnsureSourceEntityContract(sourceEntity);
+        await PublishCoreAsync(@event, sourceEntity, ct);
     }
 
     public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
@@ -99,7 +60,7 @@ public sealed class InProcessEventBus : IEventBus
 
         var eventCtx = new EventContext(request, name) {
             Payload       = JsonSerializer.Serialize(request, _json),
-            CorrelationId = Guid.NewGuid().ToString("n"),
+            CorrelationId = Identifiers.NewUid().ToString("n"),
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
 
@@ -142,6 +103,41 @@ public sealed class InProcessEventBus : IEventBus
     }
 
     #endregion
+
+    private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
+        where TEvent : IEvent {
+        using var scope    = _services.CreateScope();
+        var       registry = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
+
+        // Resolve by the runtime type so a derived event published through a base/interface
+        // static type keeps its registered name and serializes its derived members.
+        var type = @event.GetType();
+        var name = registry.RequireName(type);
+
+        var ctx = new EventContext(@event, name) {
+            Payload                = JsonSerializer.Serialize(@event, type, _json),
+            CorrelationId          = Identifiers.NewUid().ToString("n"),
+            RequiresOutboxDelivery = true,
+            Source                 = source,
+        };
+        var adviceCtx = new AdviceContext(scope.ServiceProvider);
+
+        switch (await Advisor.For<IEventPublishAdvisor>()
+                             .RunAsync(adviceCtx, ctx, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
+                ctx.Result = r;
+                return;
+            case AdviseResult.Block:
+            default:
+                throw new InvalidOperationException("Event publish blocked by advisor.");
+        }
+
+        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
+        await NotifyPublishedAsync(observers, ctx, ct);
+        _dispatcher?.NotifyPending();
+    }
 
     private static async Task NotifyPublishedAsync(
         IReadOnlyList<IEventLifecycleObserver> observers,

@@ -4,8 +4,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Humanizer;
 using Parlot;
-using Schemata.Common;
 using Schemata.Expressions.Cel.Expressions;
 using Schemata.Expressions.Skeleton;
 
@@ -89,7 +89,7 @@ internal sealed class CelCompileVisitor
 
     private Expression BuildCall(CelCall node) {
         if (node.Name == "has" && node.Args.Count == 1) {
-            return Has(Visit(node.Args[0]));
+            return BuildHas(node.Args[0]);
         }
 
         if (node.Name == "size" && node.Args.Count == 1) {
@@ -128,14 +128,14 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildList(CelList node) {
-        var add = typeof(List<object?>).GetMethod(nameof(List<object?>.Add), [typeof(object)])!;
+        var add = typeof(List<object?>).GetMethod(nameof(List<>.Add), [typeof(object)])!;
         return Expression.ListInit(Expression.New(typeof(List<object?>)),
                                    node.Items.Select(item => Expression.ElementInit(
                                                          add, ConvertIfNeeded(Visit(item), typeof(object)))));
     }
 
     private Expression BuildMap(CelMap node) {
-        var add = typeof(Dictionary<object, object?>).GetMethod(nameof(Dictionary<object, object?>.Add), [typeof(object), typeof(object),
+        var add = typeof(Dictionary<object, object?>).GetMethod(nameof(Dictionary<,>.Add), [typeof(object), typeof(object),
                                                                 ])!;
         return Expression.ListInit(Expression.New(typeof(Dictionary<object, object?>)),
                                    node.Entries.Select(entry => Expression.ElementInit(
@@ -282,6 +282,34 @@ internal sealed class CelCompileVisitor
         return false;
     }
 
+    private static bool TryGetDictionaryContainsKey(Type type, out MethodInfo method, out Type keyType) {
+        keyType = null!;
+        method  = null!;
+        if (!TryGetDictionaryKeyType(type, out keyType)) {
+            return false;
+        }
+
+        var direct = type.GetMethod("ContainsKey", [keyType]);
+        if (direct is not null) {
+            method = direct;
+            return true;
+        }
+
+        foreach (var item in type.GetInterfaces()) {
+            if (!item.IsGenericType) {
+                continue;
+            }
+
+            var definition = item.GetGenericTypeDefinition();
+            if (definition == typeof(IDictionary<,>) || definition == typeof(IReadOnlyDictionary<,>)) {
+                method = item.GetMethod("ContainsKey", [keyType])!;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static Type CommonType(Type left, Type right) {
         if (left == right) {
             return left;
@@ -299,8 +327,7 @@ internal sealed class CelCompileVisitor
     }
 
     private static bool TryAccess(Expression source, string name, out Expression expression) {
-        var memberName = SchemataNaming.ToClrMemberName(name);
-        var member = source.Type.GetMember(memberName, BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
+        var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
         if (member is PropertyInfo property) {
             expression = Expression.Property(source, property);
             return true;
@@ -313,6 +340,40 @@ internal sealed class CelCompileVisitor
 
         expression = null!;
         return false;
+    }
+
+    private Expression BuildHas(CelNode node) {
+        if (node is CelMember member) {
+            var receiver = Visit(member.Target);
+            if (TryGetDictionaryContainsKey(receiver.Type, out var containsKey, out var keyType)
+             && keyType == typeof(string)) {
+                return Expression.Call(receiver, containsKey, Expression.Constant(member.Member, typeof(string)));
+            }
+
+            if (!TryAccess(receiver, member.Member, out var access)) {
+                return Expression.Constant(false);
+            }
+
+            var present = Has(access);
+            return receiver.Type.IsValueType && Nullable.GetUnderlyingType(receiver.Type) is null
+                ? present
+                : Expression.AndAlso(Expression.NotEqual(receiver, Expression.Constant(null, receiver.Type)), present);
+        }
+
+        if (node is CelIdentifier identifier) {
+            foreach (var scope in _scopes) {
+                if (scope.ContainsKey(identifier.Name)) {
+                    return Expression.Constant(true);
+                }
+            }
+
+            if (!string.Equals(identifier.Name, Parameter.Name, StringComparison.Ordinal)
+             && !TryAccess(Parameter, identifier.Name, out _)) {
+                throw new ParseException($"Undeclared identifier '{identifier.Name}' in has() macro.", default);
+            }
+        }
+
+        return Has(Visit(node));
     }
 
     private static Expression Has(Expression expression) {

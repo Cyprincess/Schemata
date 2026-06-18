@@ -20,6 +20,7 @@ using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
@@ -52,11 +53,14 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     UrlEncoder                                            encoder,
     TokenService                                          issuer,
     IApplicationManager<TApp>                             apps,
-    ITokenManager<TToken>                                 tokens
+    ITokenManager<TToken>                                 tokens,
+    TimeProvider?                                         timeProvider = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     /// <summary>
     ///     Returns <c>true</c> when the grant type indicates a user-present flow
     ///     (authorization_code, refresh_token, or token exchange).
@@ -141,6 +145,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <param name="application">Issuing client application name.</param>
     /// <param name="authorization">Linked authorization/consent record name.</param>
     /// <param name="session">OP session identifier.</param>
+    /// <param name="time">Clock used to stamp the token's create and expiry times.</param>
     /// <param name="ct">Cancellation token.</param>
     public static async Task<string> CreateTokenAsync(
         ITokenManager<TToken> tokens,
@@ -153,9 +158,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         string?               application,
         string?               authorization,
         string?               session,
+        TimeProvider          time,
         CancellationToken     ct
     ) {
-        var jti = Guid.NewGuid().ToString("N");
+        var jti = Identifiers.NewUid().ToString("n");
         claims.Add(new(Claims.JwtId, jti));
 
         string value;
@@ -181,7 +187,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
         var payload = format == TokenFormats.Reference ? token.CreateToken(claims, lifetime) : value;
 
-        var now = DateTime.UtcNow;
+        var now = time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
             Type              = type,
             Format            = format,
@@ -313,7 +319,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         var access = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.AccessToken)).ToList();
         var id     = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.IdentityToken)).ToList();
 
-        var at = await CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, @internal, app, authorizationName, sid, ct);
+        var at = await CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, @internal, app, authorizationName, sid, _time, ct);
 
         var response = new TokenResponse {
             AccessToken = at,
@@ -323,7 +329,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         };
 
         if (ShouldIssueRefreshToken(items)) {
-            response.RefreshToken = await CreateTokenAsync(tokens, issuer, [..access], config.Value.RefreshTokenFormat, config.Value.RefreshTokenLifetime, TokenTypes.RefreshToken, @internal, app, authorizationName, sid, ct);
+            response.RefreshToken = await CreateTokenAsync(tokens, issuer, [..access], config.Value.RefreshTokenFormat, config.Value.RefreshTokenLifetime, TokenTypes.RefreshToken, @internal, app, authorizationName, sid, _time, ct);
         }
 
         // OIDC Core §3.1.3.7: ID tokens are only returned when openid is in scope

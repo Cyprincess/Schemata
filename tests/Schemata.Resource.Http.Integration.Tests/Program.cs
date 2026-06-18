@@ -1,8 +1,8 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Resource.Http.Integration.Tests;
@@ -24,12 +24,12 @@ builder.UseSchemata(schema => {
     schema.Services.AddDistributedMemoryCache();
     schema.Services.AddDistributedCache();
 
-    var dbName = "integration-" + Guid.NewGuid();
+    var dbName = "integration-" + Identifiers.NewUid();
     schema.Services.AddDbContextFactory<TestDbContext>(
         opts => opts.UseInMemoryDatabase(dbName));
 
-    schema.Services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
-    schema.Services.AddRepository<Trash, EntityFrameworkCoreRepository<TestDbContext, Trash>>();
+    schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
+    schema.Services.AddRepository<Trash, EfCoreRepository<TestDbContext, Trash>>();
 
     // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());

@@ -8,20 +8,11 @@ namespace Schemata.Abstractions.Errors;
 ///     quota limits that were exceeded, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.QuotaFailure")]
 public class QuotaFailureDetail : IErrorDetail
 {
     /// <summary>
     ///     Individual quota violations that collectively caused the error.
     /// </summary>
     public virtual List<QuotaViolation>? Violations { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.QuotaFailure"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.QuotaFailure";
-
-    #endregion
 }

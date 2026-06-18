@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
-using ProtoBuf.Meta;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Grpc.Internal;
 
 namespace Schemata.Resource.Grpc;
 
@@ -42,15 +42,12 @@ internal static class ResourceCustomMethod
 
         if (options.Resources.TryGetValue(entity.TypeHandle, out var resourceAttr)
          && resourceAttr.Endpoints is { Count: > 0 } endpoints
-         && Enumerable.All(endpoints, e => e != GrpcResourceAttribute.Name)) {
+         && endpoints.All(e => e != GrpcResourceAttribute.Name)) {
             return;
         }
 
         var descriptor = ResourceNameDescriptor.ForType(entity);
-        var package    = descriptor.Package ?? entity.Namespace;
-        var service    = package is not null
-            ? $"{package}.{descriptor.Singular}Service"
-            : $"{descriptor.Singular}Service";
+        var service    = GrpcResourceNaming.ServiceFullName(entity, descriptor);
 
         foreach (var method in methods) {
             var handlerInterface = FindHandlerInterface(method.Handler);
@@ -62,7 +59,7 @@ internal static class ResourceCustomMethod
             var request   = arguments[1];
             var response  = arguments[2];
 
-            var rpcName = ResourceMethodNaming.GetRpcName(method.Verb, descriptor.Singular);
+            var rpcName = GrpcResourceNaming.CustomMethodName(descriptor, method.Verb);
 
             var generic = RegisterTypedMethod.MakeGenericMethod(typeof(TService), entity, request, response);
             generic.Invoke(null, [context, config, service, rpcName, method.Verb, method.Handler]);
@@ -85,8 +82,8 @@ internal static class ResourceCustomMethod
             MethodType.Unary,
             service,
             rpcName,
-            CreateMarshaller<TRequest>(config.Model),
-            CreateMarshaller<TResponse>(config.Model));
+            GrpcMarshallers.Create<TRequest>(config.Model),
+            GrpcMarshallers.Create<TResponse>(config.Model));
 
         context.AddUnaryMethod(rpc, [], (_, request, callContext) => InvokeAsync<TEntity, TRequest, TResponse>(request, callContext, verb, handlerType));
     }
@@ -117,12 +114,5 @@ internal static class ResourceCustomMethod
             }
         }
         return null;
-    }
-
-    private static Marshaller<T> CreateMarshaller<T>(RuntimeTypeModel model) {
-        return new((value, ctx) => {
-            model.Serialize(ctx.GetBufferWriter(), value);
-            ctx.Complete();
-        }, ctx => model.Deserialize<T>(ctx.PayloadAsReadOnlySequence()));
     }
 }

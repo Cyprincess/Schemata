@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using Parlot;
 using Parlot.Fluent;
@@ -8,7 +6,7 @@ using static Parlot.Fluent.Parsers;
 
 namespace Schemata.Modeling.Generator;
 
-public static class Parser
+public static partial class Parser
 {
     // ── Shared sub-parsers (reused by later tasks) ──────────────────────
 
@@ -724,69 +722,4 @@ public static class Parser
                   .Compile();
     }
 
-    // ── Helper methods ──────────────────────────────────────────────────
-
-    private static ViewField BuildViewField(
-        string?                    type,
-        bool                       nullable,
-        string                     name,
-        EquatableArray<ViewOption> options,
-        IReadOnlyList<object>?     body,
-        IExpression?               assignment
-    ) {
-        var notes    = ImmutableArray.CreateBuilder<Note>();
-        var children = ImmutableArray.CreateBuilder<ViewField>();
-
-        if (body != null) {
-            for (var i = 0; i < body.Count; i++) {
-                switch (body[i]) {
-                    case Note n:
-                        notes.Add(n);
-                        break;
-                    case ViewField vf:
-                        children.Add(vf);
-                        break;
-                }
-            }
-        }
-
-        return new(type, nullable, name, options, (EquatableArray<Note>)notes.ToImmutable(),
-                   (EquatableArray<ViewField>)children.ToImmutable(), assignment);
-    }
-
-    private static string NormalizeOption(string input) {
-        // Lowercase the entire input, split on spaces/underscores, capitalize each word.
-        // "primary key" → "primarykey", "PrimaryKey" → "primarykey",
-        // "b tree" → "btree", "BTree" → "btree", "not null" → "notnull"
-        return input.ToLowerInvariant().Replace(" ", "").Replace("_", "");
-    }
-
-    private static FieldOption ParseFieldOption(string normalized) {
-        return normalized switch {
-            "required" or "notnull" => FieldOption.Required,
-            "unique"                => FieldOption.Unique,
-            "primarykey"            => FieldOption.PrimaryKey,
-            "autoincrement"         => FieldOption.AutoIncrement,
-            "btree"                 => FieldOption.BTree,
-            "hash"                  => FieldOption.Hash,
-            var _                   => throw new InvalidOperationException($"Unknown field option: {normalized}"),
-        };
-    }
-
-    private static ViewOption ParseViewOption(string normalized) {
-        return normalized switch {
-            "omit"    => ViewOption.Omit,
-            "omitall" => ViewOption.OmitAll,
-            var _     => throw new InvalidOperationException($"Unknown view option: {normalized}"),
-        };
-    }
-
-    private static PointerOption ParsePointerOption(string normalized) {
-        return normalized switch {
-            "unique" => PointerOption.Unique,
-            "btree"  => PointerOption.BTree,
-            "hash"   => PointerOption.Hash,
-            var _    => throw new InvalidOperationException($"Unknown pointer option: {normalized}"),
-        };
-    }
 }

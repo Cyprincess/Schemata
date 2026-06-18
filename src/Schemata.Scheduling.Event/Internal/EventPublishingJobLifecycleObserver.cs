@@ -24,13 +24,19 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 {
     private readonly IEventBus                      _eventBus;
     private readonly SchemataSchedulingEventOptions _options;
+    private readonly IScheduledJobRegistry          _registry;
+    private readonly TimeProvider                   _time;
 
     public EventPublishingJobLifecycleObserver(
         IEventBus                                eventBus,
-        IOptions<SchemataSchedulingEventOptions> options
+        IOptions<SchemataSchedulingEventOptions> options,
+        IScheduledJobRegistry                    registry,
+        TimeProvider?                            timeProvider = null
     ) {
         _eventBus = eventBus;
         _options  = options.Value;
+        _registry = registry;
+        _time     = timeProvider ?? TimeProvider.System;
     }
 
     #region IJobLifecycleObserver Members
@@ -44,7 +50,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         await _eventBus.PublishAsync(new JobScheduled {
             Job         = job.Name!,
             Variables   = JobVariableSerializer.Deserialize(job.Variables),
-            ScheduledAt = DateTime.UtcNow,
+            ScheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
@@ -56,7 +62,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
         await _eventBus.PublishAsync(new JobUnscheduled {
             Job       = job.Name!,
-            UnscheduledAt = DateTime.UtcNow,
+            UnscheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
@@ -92,7 +98,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         await _eventBus.PublishAsync(new JobCompleted {
             Job     = context.Job,
             Variables   = context.Variables,
-            CompletedAt = DateTime.UtcNow,
+            CompletedAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
@@ -110,7 +116,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         await _eventBus.PublishAsync(new JobFailed {
             Job   = context.Job,
             Variables = context.Variables,
-            FailedAt  = DateTime.UtcNow,
+            FailedAt  = _time.GetUtcNow().UtcDateTime,
             Error     = exception.Message,
         }, ct);
     }
@@ -118,11 +124,11 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
     #endregion
 
     private (AdviseResult Result, bool InterceptExecution) ResolveConfig(SchemataJob job) {
-        if (string.IsNullOrEmpty(job.JobType)) {
+        if (string.IsNullOrEmpty(job.JobKey)) {
             return (_options.DefaultPublishEventResult, false);
         }
 
-        var jobType = Type.GetType(job.JobType);
+        var jobType = _registry.Resolve(job.JobKey);
         if (jobType == null) {
             return (_options.DefaultPublishEventResult, false);
         }

@@ -59,6 +59,20 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
     [Fact]
+    public async Task Delete_MissingStudent_WithoutAllowMissing_Returns404() {
+        var client   = _factory.CreateClient();
+        var response = await client.DeleteAsync("/v1/students/does-not-exist");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_MissingStudent_WithAllowMissing_Returns204() {
+        var client   = _factory.CreateClient();
+        var response = await client.DeleteAsync("/v1/students/does-not-exist?allow_missing=true");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetCustomMethod_Preview_Returns200WithBody() {
         var client  = _factory.CreateClient();
         var created = await client.PostAsync(

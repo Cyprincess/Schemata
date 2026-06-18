@@ -14,12 +14,12 @@ public class QuotaExceededException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="QuotaExceededException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public QuotaExceededException(
-        int     status  = 429,
-        string? code    = ErrorCodes.ResourceExhausted,
+        int     code    = 429,
+        string? status  = ErrorCodes.ResourceExhausted,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1010)) { }
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1010)) { }
 }

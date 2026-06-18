@@ -29,10 +29,12 @@ public static class AdviceRefreshTokenValidation
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <typeparam name="TToken">The token entity type.</typeparam>
 /// <seealso cref="AdviceCodeExchangeValidation{TApp, TToken}" />
-public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAdvisor<TApp, TToken>
+public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? timeProvider = null) : IRefreshTokenAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IRefreshTokenAdvisor<TApp,TToken> Members
 
     /// <inheritdoc cref="AdviseResult" />
@@ -57,7 +59,7 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken> : IRefreshTokenAd
             );
         }
 
-        if (exchange.Token.ExpireTime.HasValue && exchange.Token.ExpireTime.Value <= DateTime.UtcNow) {
+        if (exchange.Token.ExpireTime.HasValue && exchange.Token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.ST4004)

@@ -1,14 +1,16 @@
 using System;
-using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Http.Internal;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http;
 
@@ -16,8 +18,9 @@ namespace Schemata.Resource.Http;
 ///     Generic controller exposing an AIP-136 custom method as a
 ///     <c>POST {collection}/{name}:{verb}</c> or
 ///     <c>POST {collection}:{verb}</c> endpoint. The route's verb suffix is
-///     injected by <see cref="ResourceMethodControllerConvention" />; this
-///     class only declares the action signature and dispatches through the
+///     injected by <see cref="ResourceMethodControllerConvention" />, which also tags each
+///     action with a <see cref="ResourceMethodVerbMetadata" />; this class dispatches the matched
+///     verb through the
 ///     <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />
 ///     advisor pipeline before invoking the registered
 ///     <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" /> per
@@ -33,7 +36,6 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
 {
     protected readonly THandler                                                    Handler;
     protected readonly ResourceMethodOperationHandler<TEntity, TRequest, TResponse> Operation;
-    private readonly   string                                                       _verb;
 
     /// <summary>
     ///     Initializes a new instance with the operation handler, custom-method handler, and JSON serializer options.
@@ -41,17 +43,14 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     /// <param name="operation">The <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />.</param>
     /// <param name="handler">The registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />.</param>
     /// <param name="json">The host's <see cref="JsonSerializerOptions" />.</param>
-    /// <param name="resource">The registered resource metadata.</param>
     public ResourceMethodController(
         ResourceMethodOperationHandler<TEntity, TRequest, TResponse> operation,
         THandler                                                     handler,
-        IOptions<JsonSerializerOptions>                              json,
-        IOptions<SchemataResourceOptions>                            resource
+        IOptions<JsonSerializerOptions>                              json
     ) {
         Operation   = operation;
         Handler     = handler;
         JsonOptions = json.Value;
-        _verb       = ResolveVerb(resource.Value);
     }
 
     protected JsonSerializerOptions JsonOptions { get; }
@@ -69,29 +68,20 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
         [FromBody]  TRequest request,
         CancellationToken    ct = default
     ) {
+        // The convention binds one action per verb and tags each with its verb, so a handler shared
+        // across verbs dispatches to the one whose route the request matched.
+        var verb = HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceMethodVerbMetadata>()?.Verb
+                ?? throw new InvalidOperationException(
+                       $"No resource-method verb is bound to the matched route for handler '{typeof(THandler).FullName}'.");
+
         var fullName = string.IsNullOrEmpty(name) ? null : BuildFullName(name);
 
-        var response = await Operation.InvokeAsync(Handler, _verb, fullName, request, HttpContext.User, ct);
+        var response = await Operation.InvokeAsync(Handler, verb, fullName, request, HttpContext.User, ct);
 
         return new JsonResult(response, JsonOptions);
     }
 
-    private static string ResolveVerb(SchemataResourceOptions options) {
-        if (options.Methods.TryGetValue(typeof(TEntity).TypeHandle, out var methods)) {
-            if (methods.FirstOrDefault(m => m.Handler == typeof(THandler)) is { } method) {
-                return method.Verb;
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"No resource method registered for handler '{typeof(THandler).FullName}' on resource '{typeof(TEntity).FullName}'.");
-    }
-
     private string BuildFullName(string name) {
-        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        var parent     = descriptor.ResolveParent(HttpContext.Request.RouteValues);
-        return parent is not null
-            ? $"{parent}/{descriptor.Collection}/{name}"
-            : $"{descriptor.Collection}/{name}";
+        return HttpResourceIdentifiers.BuildFullName(ResourceNameDescriptor.ForType<TEntity>(), HttpContext.Request.RouteValues, name);
     }
 }

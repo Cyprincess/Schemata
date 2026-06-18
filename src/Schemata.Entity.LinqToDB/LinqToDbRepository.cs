@@ -9,9 +9,10 @@ using System.Threading.Tasks;
 using Humanizer;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Concurrency;
 using LinqToDB.Data;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
@@ -34,8 +35,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TContext : DataConnection
     where TEntity : class
 {
-    private TContext                   _context;
-    private DataConnectionTransaction? _txn;
+    private readonly Func<TContext>   _factory;
+    private          TContext         _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="LinqToDbRepository{TContext,TEntity}" /> class.
@@ -43,6 +44,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     /// <param name="sp">The service provider.</param>
     /// <param name="factory">A factory that creates a new <typeparamref name="TContext" /> instance.</param>
     public LinqToDbRepository(IServiceProvider sp, Func<TContext> factory) : base(sp) {
+        _factory = factory;
         _context = factory();
 
         var entity = typeof(TEntity);
@@ -52,220 +54,50 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     protected virtual TContext Context => _context;
 
-    protected virtual ITable<TEntity> Table => field ??= Context.GetTable<TEntity>().TableName(TableName);
-
     /// <summary>
     ///     The table name used for CRUD operations, derived from <see cref="TableAttribute" /> or the pluralized entity name.
     /// </summary>
     public virtual string TableName { get; }
 
-    protected override IQueryable<TEntity> AsQueryable() { return Table.AsQueryable(); }
-
-    public override async IAsyncEnumerable<TResult> ListAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        [EnumeratorCancellation] CancellationToken      ct = default
-    ) {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var enumerable = query.AsAsyncEnumerable().WithCancellation(ct);
-
-        await foreach (var entity in enumerable) {
-            ct.ThrowIfCancellationRequested();
-            yield return entity;
-        }
-    }
-
-    public override async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    )
-        where TResult : default {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-
-        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return default;
-            case AdviseResult.Handle:
-                return context.Result;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        context.Result = await query.FirstOrDefaultAsync(ct);
-
-        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, TResult>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return default;
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        return context.Result;
-    }
-
-    public override async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    )
-        where TResult : default {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
-
-        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return default;
-            case AdviseResult.Handle:
-                return context.Result;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        context.Result = await query.SingleOrDefaultAsync(ct);
-
-        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, TResult>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return default;
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        return context.Result;
-    }
-
-    public override async ValueTask<bool> AnyAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    ) {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var context = new QueryContext<TEntity, TResult, bool>(this, query);
-
-        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return false;
-            case AdviseResult.Handle:
-                return context.Result;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        context.Result = await query.AnyAsync(ct);
-
-        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, bool>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return false;
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        return context.Result;
-    }
-
-    public override async ValueTask<int> CountAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    ) {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var context = new QueryContext<TEntity, TResult, int>(this, query);
-
-        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return 0;
-            case AdviseResult.Handle:
-                return context.Result;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        context.Result = await query.CountAsync(ct);
-
-        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, int>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return 0;
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        return context.Result;
-    }
-
-    public override async ValueTask<long> LongCountAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
-    ) {
-        var query = await BuildQueryAsync(predicate, ct);
-
-        var context = new QueryContext<TEntity, TResult, long>(this, query);
-
-        switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return 0;
-            case AdviseResult.Handle:
-                return context.Result;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        context.Result = await query.LongCountAsync(ct);
-
-        switch (await Advisor.For<IRepositoryResultAdvisor<TEntity, TResult, long>>()
-                             .RunAsync(AdviceContext, context, ct)) {
-            case AdviseResult.Block:
-                return 0;
-            case AdviseResult.Handle:
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        return context.Result;
-    }
+    protected override IQueryable<TEntity> AsQueryable() { return Context.GetTable<TEntity>().TableName(TableName).AsQueryable(); }
 
     public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
-        switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, this, entity, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return;
-            case AdviseResult.Continue:
-            default:
-                break;
+        ct.ThrowIfCancellationRequested();
+
+        if (!await RunAddAdvisorsAsync(entity, ct)) {
+            return;
         }
 
-        TrackAdd(entity);
-
-        EnsureTransaction();
+        EnsureWriteUnitOfWork();
 
         await Context.InsertAsync(entity, TableName, token: ct);
     }
 
+    /// <summary>
+    ///     Runs the add-advisor chain per entity, then persists the survivors with a single
+    ///     bulk-copy round trip instead of one insert per entity.
+    /// </summary>
+    public override async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
+        var staged = new List<TEntity>();
+        foreach (var entity in entities) {
+            ct.ThrowIfCancellationRequested();
+            if (await RunAddAdvisorsAsync(entity, ct)) {
+                staged.Add(entity);
+            }
+        }
+
+        if (staged.Count == 0) {
+            return;
+        }
+
+        EnsureWriteUnitOfWork();
+
+        await Context.GetTable<TEntity>().TableName(TableName).BulkCopyAsync(new BulkCopyOptions { BulkCopyType = BulkCopyType.ProviderSpecific }, staged, ct);
+    }
+
     public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
         switch (await Advisor.For<IRepositoryUpdateAdvisor<TEntity>>()
                              .RunAsync(AdviceContext, this, entity, ct)) {
             case AdviseResult.Block:
@@ -276,11 +108,18 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
                 break;
         }
 
+        EnsureWriteUnitOfWork();
+
+        if (IsConcurrencyControlled) {
+            var rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticAsync(entity, ct);
+            if (rows == 0) {
+                throw new ConcurrencyException();
+            }
+        } else {
+            await Context.UpdateAsync(entity, TableName, token: ct);
+        }
+
         TrackUpdate(entity);
-
-        EnsureTransaction();
-
-        await Context.UpdateAsync(entity, TableName, token: ct);
     }
 
     public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
@@ -294,60 +133,44 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
                 break;
         }
 
-        TrackRemove(entity);
+        EnsureWriteUnitOfWork();
 
-        EnsureTransaction();
+        TrackRemove(entity);
 
         await Context.DeleteAsync(entity, TableName, token: ct);
     }
 
-    public override IUnitOfWork Begin() {
-        var uow = ServiceProvider.GetRequiredService<IUnitOfWork<TContext>>();
-
-        Join(uow);
-
-        return uow;
+    protected override ConfiguredCancelableAsyncEnumerable<TResult> AsAsyncEnumerable<TResult>(
+        IQueryable<TResult> query,
+        CancellationToken   ct
+    ) {
+        return query.AsAsyncEnumerable().WithCancellation(ct);
     }
 
-    public override async Task CommitAsync(CancellationToken ct = default) {
-        if (!OwnsContext) {
-            throw new InvalidOperationException("Repository is enlisted in a unit of work. Call IUnitOfWork.CommitAsync instead.");
-        }
-
-        var snapshot = SnapshotChanges();
-
-        if (_txn is not null) {
-            try {
-                await _txn.CommitAsync(ct);
-            } catch {
-                try {
-                    await _txn.RollbackAsync(CancellationToken.None);
-                } catch {
-                    // Transaction may already be completed; rollback during cleanup must not throw.
-                }
-
-                ResetTracking();
-
-                throw;
-            } finally {
-                await _txn.DisposeAsync();
-                _txn = null;
-            }
-        }
-
-        await DispatchCommittedAsync(snapshot, ct);
+    protected override Task<TResult?> FirstOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct)
+        where TResult : default {
+        return query.FirstOrDefaultAsync(ct);
     }
 
-    /// <summary>
-    ///     Opens the standalone transaction on first mutation. When enlisted, the unit of work
-    ///     already owns the transaction; this is a no-op in that case.
-    /// </summary>
-    private void EnsureTransaction() {
-        if (!OwnsContext) {
-            return;
-        }
+    protected override Task<TResult?> SingleOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct)
+        where TResult : default {
+        return query.SingleOrDefaultAsync(ct);
+    }
 
-        _txn ??= Context.BeginTransaction();
+    protected override Task<bool> AnyAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
+        return query.AnyAsync(ct);
+    }
+
+    protected override Task<int> CountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
+        return query.CountAsync(ct);
+    }
+
+    protected override Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
+        return query.LongCountAsync(ct);
+    }
+
+    protected override IUnitOfWork CreateUnitOfWork() {
+        return new LinqToDbUnitOfWork<TContext>(_factory, ServiceProvider);
     }
 
     protected override void AttachContext(IUnitOfWork uow) {
@@ -359,47 +182,16 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             }.");
         }
 
-        // base.Join has already verified _added/_updated/_removed are empty before calling
-        // this and EnsureTransaction is only triggered by mutations, so _txn is necessarily
-        // null here.
         _context.Dispose();
+
         _context = db.Context;
-
-        db.AddCommitSink(async ct => await DispatchCommittedAsync(SnapshotChanges(), ct));
-        db.AddRollbackSink(ResetTracking);
     }
 
-    protected override void DisposeContext() {
-        if (_txn is not null) {
-            try {
-                _txn.Rollback();
-            } catch {
-                // Transaction may already be completed; rollback during cleanup must not throw.
-            }
+    protected override void DisposeContext() { _context.Dispose(); }
 
-            _txn.Dispose();
-            _txn = null;
-        }
+    protected override ValueTask DisposeContextAsync() { return _context.DisposeAsync(); }
 
-        _context.Dispose();
-    }
-
-    protected override async ValueTask DisposeContextAsync() {
-        if (_txn is not null) {
-            try {
-                await _txn.RollbackAsync();
-            } catch {
-                // Transaction may already be completed; rollback during cleanup must not throw.
-            }
-
-            await _txn.DisposeAsync();
-            _txn = null;
-        }
-
-        await _context.DisposeAsync();
-    }
-
-    private async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
+    protected override async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct
     ) {

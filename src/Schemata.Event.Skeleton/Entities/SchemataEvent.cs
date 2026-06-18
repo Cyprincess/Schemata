@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -9,7 +10,7 @@ namespace Schemata.Event.Skeleton.Entities;
 [DisplayName("Event")]
 [Table("SchemataEvents")]
 [CanonicalName("events/{event}")]
-public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ISourceReference, ITimestamp
 {
     /// <summary>Wire-format event type name.</summary>
     public virtual string? EventType { get; set; }
@@ -40,9 +41,23 @@ public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #endregion
 
+    #region ISourceReference Members
+
+    /// <inheritdoc />
+    public virtual string? SourceType { get; set; }
+
+    /// <inheritdoc />
+    public virtual string? Source { get; set; }
+
+    /// <inheritdoc />
+    public virtual Guid? SourceTimestamp { get; set; }
+
+    #endregion
+
     #region IConcurrency Members
 
-    public virtual Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

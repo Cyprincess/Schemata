@@ -10,7 +10,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 ///     Resolves and caches the current tenant for the request scope.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
-public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTenant>
+public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTenant>, ITenantContextInitializer<TTenant>
     where TTenant : SchemataTenant
 {
     private readonly ITenantManager<TTenant> _manager;

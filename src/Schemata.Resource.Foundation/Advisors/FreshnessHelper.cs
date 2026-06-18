@@ -23,11 +23,11 @@ internal static class FreshnessHelper
             return false;
         }
 
-        if (concurrency.Timestamp == null || concurrency.Timestamp.Value == Guid.Empty) {
+        if (concurrency.Timestamp == Guid.Empty) {
             return false;
         }
 
-        tag = $"W/\"{concurrency.Timestamp.Value.ToByteArray().ToBase64UrlString()}\"";
+        tag = $"W/\"{concurrency.Timestamp.ToByteArray().ToBase64UrlString()}\"";
 
         return true;
     }

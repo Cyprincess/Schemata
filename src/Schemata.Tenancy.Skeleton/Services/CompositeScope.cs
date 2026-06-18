@@ -31,7 +31,7 @@ internal sealed class CompositeScope : IServiceScope, IServiceProvider
         }
 
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-            return _hostScope.ServiceProvider.GetService(serviceType);
+            return TenantCompositeServiceProvider.ComposeEnumerable(serviceType, _hostScope.ServiceProvider, _composite.Overrides);
         }
 
         return _composite.Overrides.GetService(serviceType) ?? _hostScope.ServiceProvider.GetService(serviceType);

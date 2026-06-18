@@ -44,6 +44,24 @@ public class EventContext
     /// <summary>Audit record attached by an <see cref="IEventLifecycleObserver" /> during publish.</summary>
     public SchemataEvent? Record { get; set; }
 
+    /// <summary>
+    ///     Whether delivery goes through a durable broker that can fail after the audit row is
+    ///     written. The bus sets this so the audit observer records the row as
+    ///     <see cref="EventState.Pending" /> (outbox) rather than <see cref="EventState.Recorded" />.
+    /// </summary>
+    public bool RequiresOutboxDelivery { get; set; }
+
+    /// <summary>
+    ///     Optional originating business entity attached by
+    ///     <see cref="IEventBus.PublishAsync{TEvent}(TEvent, object, System.Threading.CancellationToken)" />.
+    ///     The audit observer captures its
+    ///     <see cref="Schemata.Abstractions.Entities.ICanonicalName.CanonicalName" /> and
+    ///     <see cref="Schemata.Abstractions.Entities.IConcurrency.Timestamp" /> into the
+    ///     persisted <see cref="SchemataEvent" /> row so consumers can verify the source has
+    ///     not changed since publish.
+    /// </summary>
+    public object? Source { get; set; }
+
     /// <summary>Handler outcome (request response or publish acknowledgement).</summary>
     public object? Result { get; set; }
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -31,12 +33,12 @@ public sealed class RabbitMqConsumerHost : BackgroundService
     public RabbitMqConsumerHost(
         IServiceProvider               services,
         IOptions<RabbitMqEventOptions> options,
-        JsonSerializerOptions?         json   = null,
+        IOptions<JsonSerializerOptions> json,
         ILogger<RabbitMqConsumerHost>? logger = null
     ) {
         _services = services;
         _options  = options;
-        _json     = json ?? new JsonSerializerOptions();
+        _json     = json.Value;
         _logger   = logger;
     }
 
@@ -80,26 +82,28 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (_, ea) => {
             var deliveryTag = ea.DeliveryTag;
+
+            // A handler failure decides ack vs. nack; it must not be conflated with a broker
+            // acknowledgement failure, which is a transport error the handler cannot influence.
+            bool handled;
             try {
-                var handled = await HandleMessageAsync(channel, ea, ct);
-                await _channelLock.WaitAsync(ct);
-                try {
-                    if (handled) {
-                        await channel.BasicAckAsync(deliveryTag, false, ct);
-                    } else {
-                        await channel.BasicNackAsync(deliveryTag, false, false, ct);
-                    }
-                } finally {
-                    _channelLock.Release();
-                }
+                handled = await HandleMessageAsync(channel, ea, ct);
             } catch (Exception ex) {
                 _logger?.LogError(ex, "Handler threw for routing key '{RoutingKey}', dead-lettering.", ea.RoutingKey);
-                await _channelLock.WaitAsync(ct);
-                try {
+                handled = false;
+            }
+
+            await _channelLock.WaitAsync(ct);
+            try {
+                if (handled) {
+                    await channel.BasicAckAsync(deliveryTag, false, ct);
+                } else {
                     await channel.BasicNackAsync(deliveryTag, false, false, ct);
-                } finally {
-                    _channelLock.Release();
                 }
+            } catch (Exception ex) {
+                _logger?.LogError(ex, "Failed to acknowledge delivery '{DeliveryTag}' on the broker.", deliveryTag);
+            } finally {
+                _channelLock.Release();
             }
         };
 
@@ -168,11 +172,21 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var eventForCtx = (IEvent)eventInstance;
         var eventCtx = new EventContext(eventForCtx, eventTypeName) {
             Payload = body,
-            CorrelationId = correlationId ?? Guid.NewGuid().ToString("n"),
+            CorrelationId = correlationId ?? Identifiers.NewUid().ToString("n"),
         };
 
         try {
-            if (genericMethod.Invoke(resolver, [eventInstance, routing, ct]) is Task task) {
+            object? invoked;
+            try {
+                invoked = genericMethod.Invoke(resolver, [eventInstance, routing, ct]);
+            } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
+                // Reflection wraps a synchronous throw from the (non-async) resolver method;
+                // surface the real handler failure rather than the TargetInvocationException.
+                ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
+                throw;
+            }
+
+            if (invoked is Task task) {
                 await task;
             }
 
@@ -226,14 +240,23 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         var method        = typeof(HandlerResolver).GetMethod(nameof(HandlerResolver.InvokeRequestHandlerAsync))!;
         var genericMethod = method.MakeGenericMethod(requestType, responseType);
-        var result        = genericMethod.Invoke(resolver, [request, ct]);
+        object? result;
+        try {
+            result = genericMethod.Invoke(resolver, [request, ct]);
+        } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
+            // Reflection wraps a synchronous throw from the (non-async) resolver method;
+            // surface the real handler failure rather than the TargetInvocationException.
+            ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
+            throw;
+        }
+
         if (result is not Task task) {
             return false;
         }
 
         await task;
 
-        var response           = AppDomainTypeCache.GetProperty(task.GetType(), nameof(Task<object>.Result))?.GetValue(task);
+        var response           = AppDomainTypeCache.GetProperty(task.GetType(), nameof(Task<>.Result))?.GetValue(task);
         var responseRoutingKey = registry.RequireName(responseType);
         var responseBody       = JsonSerializer.SerializeToUtf8Bytes(response, responseType, _json);
 

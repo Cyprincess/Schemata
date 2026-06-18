@@ -63,6 +63,30 @@ public class StateMachineEngineShould
         Assert.False(instance.IsComplete);
     }
 
+    [Fact]
+    public async SystemTask CyclicGraph_NoStackOverflow() {
+        var start = new FlowEvent { Id      = "start", Name = "Start", Position = EventPosition.Start };
+        var gw1   = new ExclusiveGateway { Id = "gw1", Name = "GW1" };
+        var gw2   = new ExclusiveGateway { Id = "gw2", Name = "GW2" };
+
+        var definition = new ProcessDefinition {
+            Name     = "cyclic",
+            Elements = { start, gw1, gw2 },
+            Flows = {
+                new() { Id = "f1", Source = start, Target = gw1 },
+                new() { Id = "f2", Source = gw1, Target   = gw2 },
+                new() { Id = "f3", Source = gw2, Target   = gw1 },
+            },
+        };
+
+        var engine = new StateMachineEngine();
+
+        // A gateway-only cycle with no waiting point would recurse forever; the engine must
+        // detect the revisit and fail fast rather than overflow the stack.
+        await Assert.ThrowsAsync<FailedPreconditionException>(
+            () => engine.StartAsync(definition, new()).AsTask());
+    }
+
     #endregion
 
     #region Conditional Flow Tests

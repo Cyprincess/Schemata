@@ -5,8 +5,8 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using Humanizer;
 using Parlot;
-using Schemata.Common;
 using Schemata.Expressions.Aip.Expressions;
 using Schemata.Expressions.Aip.Operations;
 using Schemata.Expressions.Aip.Values;
@@ -17,6 +17,7 @@ namespace Schemata.Expressions.Aip;
 internal sealed class AipCompileVisitor
 {
     private readonly ExpressionCompileOptions? _options;
+    private          Expression?               _guard;
 
     public AipCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
         _options  = options;
@@ -45,17 +46,39 @@ internal sealed class AipCompileVisitor
     }
 
     public Expression Visit(Restriction node) {
-        var left = Visit(node.Comparable);
-        if (node.Comparator is null || node.Arg is null) {
-            return ToBoolean(left);
+        var outerGuard = _guard;
+        _guard = null;
+
+        Expression result;
+        if (node.Comparator is Has && node.Arg is not null && TryBuildRepeatedHas(node.Comparable, node.Arg, out var has)) {
+            result = has;
+        } else {
+            var left = Visit(node.Comparable);
+            if (node.Comparator is null || node.Arg is null) {
+                // A bare term must name a field. An unresolved identifier surfaces here as a string
+                // constant, which would otherwise compile to a vacuous `!= null` matching every row.
+                if (left is ConstantExpression { Value: string token }) {
+                    throw new ParseException($"Unknown field '{token}'.", node.Position);
+                }
+
+                result = ToBoolean(left);
+            } else if (node.Comparator is Equal && TryGetQuotedLiteral(node.Arg, out var literal)) {
+                result = Expression.Equal(left, ConvertIfNeeded(Expression.Constant(literal, typeof(string)), left.Type));
+            } else {
+                var right = Visit(node.Arg);
+                result = BuildBinary(node.Comparator, left, right);
+            }
         }
 
-        if (node.Comparator is Equal && TryGetQuotedLiteral(node.Arg, out var literal)) {
-            return Expression.Equal(left, ConvertIfNeeded(Expression.Constant(literal, typeof(string)), left.Type));
+        // AIP-160 skip-as-nonmatch: a comparison against a value reached through a null
+        // chain (e.g. advisor.age == 0 when advisor is null) must evaluate to false even
+        // when the leaf's default value would coincidentally match the literal.
+        if (_guard is not null) {
+            result = Expression.AndAlso(_guard, result);
         }
 
-        var right = Visit(node.Arg);
-        return BuildBinary(node.Comparator, left, right);
+        _guard = outerGuard;
+        return result;
     }
 
     private static bool TryGetQuotedLiteral(IArg arg, out string literal) {
@@ -134,7 +157,7 @@ internal sealed class AipCompileVisitor
         };
 
         if (typeof(IDictionary).IsAssignableFrom(source.Type)) {
-            return Expression.Property(source, "Item", Expression.Constant(key));
+            return GuardAccess(source, Expression.Property(source, "Item", Expression.Constant(key)));
         }
 
         if (source.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(source.Type)) {
@@ -148,19 +171,18 @@ internal sealed class AipCompileVisitor
                                            .Single(m => m.Name == nameof(Enumerable.ElementAt)
                                                      && m.GetParameters().Length == 2)
                                            .MakeGenericMethod(elementType);
-            return Expression.Call(method, source, Expression.Constant(index));
+            return GuardAccess(source, Expression.Call(method, source, Expression.Constant(index)));
         }
 
         if (TryAccess(source, key, out var access)) {
-            return access;
+            return GuardAccess(source, access);
         }
 
         throw new ParseException($"Unknown field '{key}'.", field.Position);
     }
 
     private static bool TryAccess(Expression source, string name, out Expression expression) {
-        var memberName = SchemataNaming.ToClrMemberName(name);
-        var member = source.Type.GetMember(memberName, BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
+        var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
         if (member is PropertyInfo property) {
             expression = Expression.Property(source, property);
             return true;
@@ -173,6 +195,49 @@ internal sealed class AipCompileVisitor
 
         expression = null!;
         return false;
+    }
+
+    private bool TryBuildRepeatedHas(IComparableArg comparable, IArg arg, out Expression expression) {
+        expression = null!;
+        if (comparable is not Member { Fields.Count: > 0 } member || member.Fields[0] is not Text) {
+            return false;
+        }
+
+        var source = VisitValue(member.Value, true);
+        if (source.Type == typeof(string) || !typeof(IEnumerable).IsAssignableFrom(source.Type)) {
+            return false;
+        }
+
+        var elementType = source.Type.GetElementType()
+                       ?? source.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+        var item = Expression.Parameter(elementType, "item");
+
+        // Isolate inner-lambda guards: GuardAccess accumulations on `item` reference a
+        // parameter that lives only inside the inner Any(...) lambda, so they must wrap
+        // the lambda body rather than leak into the outer comparison guard.
+        var outerGuard = _guard;
+        _guard = null;
+
+        Expression left = item;
+        foreach (var field in member.Fields) {
+            left = Access(left, field);
+        }
+
+        var right     = Visit(arg);
+        var body      = BuildEqual(left, right);
+        var innerGuard = _guard;
+        if (innerGuard is not null) {
+            body = Expression.AndAlso(innerGuard, body);
+        }
+
+        _guard = outerGuard;
+
+        var method = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                       .Single(m => m.Name == nameof(Enumerable.Any)
+                                                 && m.GetParameters().Length == 2)
+                                       .MakeGenericMethod(elementType);
+        expression = GuardAccess(source, Expression.Call(method, source, Expression.Lambda(body, item)));
+        return true;
     }
 
     private static IReadOnlyList<string> GetSegments(Member member) {
@@ -271,6 +336,10 @@ internal sealed class AipCompileVisitor
 
     private static Expression BuildHas(Expression left, Expression right) {
         if (right is ConstantExpression { Value: "*" }) {
+            if (left.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(left.Type)) {
+                return CollectionPresence(left);
+            }
+
             return left.Type.IsValueType && Nullable.GetUnderlyingType(left.Type) is null
                 ? Expression.Constant(true)
                 : Expression.NotEqual(left, Expression.Constant(null, left.Type));
@@ -301,7 +370,49 @@ internal sealed class AipCompileVisitor
     }
 
     private static Expression ConvertIfNeeded(Expression expression, Type type) {
+        if (expression is ConstantExpression { Value: string text }) {
+            var target = Nullable.GetUnderlyingType(type) ?? type;
+            if (target == typeof(DateTimeOffset)
+             && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var offset)) {
+                return Expression.Constant(offset, type);
+            }
+
+            if (target == typeof(DateTime)
+             && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out offset)) {
+                return Expression.Constant(offset.UtcDateTime, type);
+            }
+
+            if (target == typeof(TimeSpan) && TryParseSeconds(text, out var duration)) {
+                return Expression.Constant(duration, type);
+            }
+        }
+
         return expression.Type == type ? expression : Expression.Convert(expression, type);
+    }
+
+    private static bool TryParseSeconds(string text, out TimeSpan duration) {
+        duration = default;
+        if (!text.EndsWith("s", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        if (!double.TryParse(text.Substring(0, text.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)) {
+            return false;
+        }
+
+        duration = TimeSpan.FromSeconds(seconds);
+        return true;
+    }
+
+    private Expression GuardAccess(Expression source, Expression access) {
+        if (source.Type.IsValueType && Nullable.GetUnderlyingType(source.Type) is null) {
+            return access;
+        }
+
+        var notNull = Expression.NotEqual(source, Expression.Constant(null, source.Type));
+        _guard = _guard is null ? notNull : Expression.AndAlso(_guard, notNull);
+
+        return Expression.Condition(notNull, access, Expression.Default(access.Type));
     }
 
     private static Expression ToBoolean(Expression expression) {
@@ -313,7 +424,24 @@ internal sealed class AipCompileVisitor
             return Expression.Constant(true);
         }
 
+        if (expression.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(expression.Type)) {
+            return CollectionPresence(expression);
+        }
+
         return Expression.NotEqual(expression, Expression.Constant(null, expression.Type));
+    }
+
+    // AIP-160 presence on a repeated field is satisfied only when it holds at least one element,
+    // not merely when the collection reference is non-null.
+    private static Expression CollectionPresence(Expression collection) {
+        var elementType = collection.Type.GetElementType()
+                       ?? collection.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+        var any = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                    .Single(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Length == 1)
+                                    .MakeGenericMethod(elementType);
+        return Expression.AndAlso(
+            Expression.NotEqual(collection, Expression.Constant(null, collection.Type)),
+            Expression.Call(any, collection));
     }
 
     private static Expression Combine(

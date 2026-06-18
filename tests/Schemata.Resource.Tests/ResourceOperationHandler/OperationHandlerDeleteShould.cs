@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
@@ -34,6 +35,26 @@ public class OperationHandlerDeleteShould
     }
 
     [Fact]
+    public async Task Delete_MissingEntity_WithoutAllowMissing_ThrowsNotFound() {
+        var handler = _fixture.CreateHandler();
+
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.DeleteAsync("students/missing", null, null, null));
+    }
+
+    [Fact]
+    public async Task Delete_MissingEntity_WithAllowMissing_Succeeds() {
+        var handler = _fixture.CreateHandler();
+        var before  = _fixture.Students.Count;
+
+        var result = await handler.DeleteAsync("students/missing", null, null, null, true);
+
+        Assert.NotNull(result);
+        Assert.Null(result.Detail);
+        Assert.Equal(before, _fixture.Students.Count);
+        _fixture.Repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Delete_ETagMismatch_ThrowsConcurrencyException() {
         var handler = _fixture.CreateHandler(services => {
             services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
@@ -47,10 +68,10 @@ public class OperationHandlerDeleteShould
     [Fact]
     public async Task Delete_SoftDeletableEntity_ReturnsUpdatedDetail() {
         var entity = new TrashStudent {
-            Uid           = Guid.NewGuid(),
+            Uid           = Identifiers.NewUid(),
             Name          = "alice-1",
             CanonicalName = "trashStudents/alice-1",
-            Timestamp     = Guid.NewGuid(),
+            Timestamp     = Identifiers.NewUid(),
         };
 
         var repository = new Mock<IRepository<TrashStudent>>();

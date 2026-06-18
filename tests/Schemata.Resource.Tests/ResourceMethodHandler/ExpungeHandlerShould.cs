@@ -31,8 +31,8 @@ public class ExpungeHandlerShould
 
         var response = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
 
-        Assert.Equal(entity.Name, response.Name);
-        Assert.Equal(entity.CanonicalName, response.CanonicalName);
+        // AIP-164 expunge returns an empty body, not the resource identity.
+        Assert.NotNull(response);
         repository.Verify(r => r.SuppressSoftDelete(), Times.Once);
         repository.Verify(r => r.RemoveAsync(entity, CancellationToken.None), Times.Once);
         repository.Verify(r => r.CommitAsync(CancellationToken.None), Times.Once);

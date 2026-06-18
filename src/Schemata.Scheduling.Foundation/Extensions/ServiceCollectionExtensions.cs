@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Skeleton;
 
 namespace Schemata.Scheduling.Foundation;
 
@@ -19,8 +20,9 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection" />.</param>
     /// <returns>The <see cref="IServiceCollection" /> for chaining.</returns>
     public static IServiceCollection AddSchedulerOperationDispatcher(this IServiceCollection services) {
-        services.TryAddSingleton<OperationWorkRegistry>();
-        services.TryAddTransient<OperationJob>();
+        services.TryAddSingleton<IOperationRegistry, DefaultOperationRegistry>();
+        services.TryAddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
+        services.TryAddTransient(typeof(DurableOperationScheduledJob<>));
         services.TryAddScoped<IOperationDispatcher, SchedulerOperationDispatcher>();
 
         return services;

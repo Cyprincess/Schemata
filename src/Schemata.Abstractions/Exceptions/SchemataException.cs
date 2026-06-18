@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Schemata.Abstractions.Errors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Abstractions.Exceptions;
 
@@ -19,31 +21,31 @@ public class SchemataException : Exception
     /// <summary>
     ///     Initializes a new <see cref="SchemataException" />.
     /// </summary>
-    /// <param name="status">
+    /// <param name="code">
     ///     HTTP response status code returned to the API consumer.
     /// </param>
-    /// <param name="code">
+    /// <param name="status">
     ///     Canonical error code from <c>google.rpc.Code</c> for client-side branching
     ///     (e.g. <c>"NOT_FOUND"</c>).
     /// </param>
     /// <param name="message">
     ///     Developer-oriented diagnostic message; not localized for end-user display.
     /// </param>
-    public SchemataException(int status, string? code = null, string? message = null) : base(message) {
-        Status = status;
+    public SchemataException(int code, string? status = null, string? message = null) : base(message) {
         Code   = code;
+        Status = status;
     }
 
     /// <summary>
     ///     HTTP response status code returned to the API consumer.
     /// </summary>
-    public int Status { get; }
+    public int Code { get; }
 
     /// <summary>
     ///     Canonical error code for client-side branching; drawn from <c>google.rpc.Code</c>
     ///     enum values.
     /// </summary>
-    public string? Code { get; }
+    public string? Status { get; }
 
     /// <summary>
     ///     Typed detail entries providing additional structured information about the error.
@@ -59,22 +61,46 @@ public class SchemataException : Exception
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
     ///     instead of the default <see cref="ErrorResponse" />.
     /// </remarks>
-    /// <param name="details">
-    ///     Additional detail entries appended after the exception's own
-    ///     <see cref="Details" />.
-    /// </param>
-    public virtual object? CreateErrorResponse(IEnumerable<IErrorDetail>? details = null) {
-        var body = new ErrorBody { Code = Code, Message = Message };
+    /// <param name="requestId">Optional request identifier; same semantics as the typed overload.</param>
+    /// <param name="domain">Optional ErrorInfo domain.</param>
+    public virtual object? CreateErrorResponse(string? requestId = null, string? domain = null) {
+        var status  = Status ?? ErrorCodes.Internal;
+        var details = new List<IErrorDetail>();
 
         if (Details is { Count: > 0 }) {
-            body.Details = new(Details);
+            details.AddRange(Details);
         }
 
-        if (details is not null) {
-            body.Details ??= [];
-            body.Details.AddRange(details);
+        EnsureErrorInfo(details, status, domain);
+        EnsureRequestInfo(details, requestId);
+
+        return new ErrorResponse {
+            Error = new() {
+                Code    = Code,
+                Message = Message,
+                Status  = status,
+                Details = details,
+            },
+        };
+    }
+
+    protected static void EnsureErrorInfo(List<IErrorDetail> details, string reason, string? domain) {
+        if (details.Any(d => d is ErrorInfoDetail)) {
+            return;
         }
 
-        return new ErrorResponse { Error = body };
+        details.Insert(0, new ErrorInfoDetail { Reason = reason, Domain = domain, });
+    }
+
+    protected static void EnsureRequestInfo(List<IErrorDetail> details, string? requestId) {
+        if (string.IsNullOrWhiteSpace(requestId)) {
+            return;
+        }
+
+        if (details.Any(d => d is RequestInfoDetail)) {
+            return;
+        }
+
+        details.Add(new RequestInfoDetail { RequestId = requestId });
     }
 }

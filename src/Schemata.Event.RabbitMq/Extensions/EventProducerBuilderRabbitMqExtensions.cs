@@ -18,6 +18,10 @@ public static class EventProducerBuilderRabbitMqExtensions
         builder.Services.TryAddSingleton<CorrelationTracker>();
         builder.Services.TryAddScoped<IEventBus, RabbitMqEventBus>();
 
+        // The outbox dispatcher (registered by the Event feature) replays Pending rows through
+        // this publisher when a broker publish fails.
+        builder.Services.TryAddSingleton<IEventOutboxPublisher, RabbitMqEventOutboxPublisher>();
+
         if (configure != null) {
             builder.Services.Configure(configure);
         }

@@ -101,12 +101,15 @@ Not implemented; throws `NotImplementedException`.
 
 ## Extension points
 
-To implement a custom provider, inherit from `RepositoryBase<TEntity>` and implement the abstract members. The non-generic `IRepository` surface comes for free via the base class delegation.
+To implement a custom provider, inherit from `RepositoryBase<TEntity>` and implement the abstract members. Because `IRepository<TEntity>` inherits from the non-generic `IRepository`, satisfying the generic interface also satisfies the entity-agnostic surface that framework infrastructure code depends on.
 
 ## Caveats
 
 - **EF Core `UpdateAsync` detach**: required whenever the change tracker has already seen the same row in the current context. See [Detach before Update](#detach-before-update).
 - **`SearchAsync`**: both providers throw `NotImplementedException`. Use `ListAsync` with a filter expression.
+- **Uncommitted-read visibility differs (weak consistency)**: EF Core buffers writes in the change tracker and flushes them at `CommitAsync`, so a query before commit does not observe pending inserts or updates. LINQ to DB executes mutations immediately inside the open transaction, so a later query in the same unit of work does observe them. Provider-agnostic code must not depend on reading its own uncommitted writes; the mainstream write-then-commit path is unaffected.
+- **Reusable after a failed commit**: when `CommitAsync` throws, both providers reset to a reusable state. EF Core clears the change tracker and the staged work; LINQ to DB rolls back and disposes the transaction so the next mutation opens a fresh one. The caller may stage and commit new work on the same repository.
+- **Optional cleanup diagnostics**: rollback and dispose run inside cleanup `catch` blocks that intentionally do not rethrow (the transaction may already be complete). When an `ILogger` is registered, these failures are logged at warning level; otherwise they are silent.
 
 ## See also
 

@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,18 +13,20 @@ namespace Schemata.Abstractions.Resource;
 public interface IOperationDispatcher
 {
     /// <summary>
-    ///     Dispatches <paramref name="work" /> and returns the canonical operation resource name.
-    ///     The work's result becomes the operation's outcome; how it is stored and surfaced is
-    ///     the dispatcher's concern.
+    ///     Dispatches the durable operation identified by <paramref name="operationKey" />
+    ///     with the serializable <paramref name="args" /> and returns the pending
+    ///     <see cref="Operation" /> envelope addressing it. The arguments are persisted so
+    ///     the work survives a host restart; the registered <see cref="IOperationHandler{TArgs}" />
+    ///     produces the result.
     /// </summary>
-    /// <typeparam name="TResult">The strongly-typed operation result.</typeparam>
-    /// <param name="operation">Logical operation verb, for example <c>purge</c>.</param>
-    /// <param name="work">Work to execute inside a dispatcher-owned service scope.</param>
+    /// <typeparam name="TArgs">The serializable argument type for the operation.</typeparam>
+    /// <param name="operationKey">Stable key registered via <see cref="OperationDescriptor" />.</param>
+    /// <param name="args">Serializable arguments persisted with the operation.</param>
     /// <param name="ct">Cancellation token for dispatch.</param>
-    Task<string> DispatchAsync<TResult>(
-        string                                                    operation,
-        Func<IServiceProvider, CancellationToken, Task<TResult?>> work,
-        CancellationToken                                         ct
+    Task<Operation> DispatchAsync<TArgs>(
+        string            operationKey,
+        TArgs             args,
+        CancellationToken ct
     )
-        where TResult : class;
+        where TArgs : class;
 }

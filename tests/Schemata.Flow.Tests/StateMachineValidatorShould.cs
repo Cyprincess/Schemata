@@ -22,7 +22,10 @@ public class StateMachineValidatorShould
             },
         };
 
-        StateMachineValidator.Validate(definition);
+        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
+
+        Assert.Null(ex);
+        Assert.NotEmpty(definition.Elements);
     }
 
     [Fact]
@@ -184,6 +187,42 @@ public class StateMachineValidatorShould
     }
 
     [Fact]
+    public void Validate_ExclusiveGatewayWithoutOutgoing_Throws() {
+        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
+        var gateway    = new ExclusiveGateway { Id = "gw", Name = "Gateway" };
+        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, gateway, endEvent },
+            Flows    = { new() { Id = "f1", Source = startEvent, Target = gateway } },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("Exclusive gateway", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_IntermediateCatchWithoutOutgoing_Throws() {
+        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
+        var gateway    = new EventBasedGateway { Id = "gw", Name = "Gateway" };
+        var catchEvent = new FlowEvent { Id = "catch", Name = "Catch", Position = EventPosition.IntermediateCatch };
+        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, gateway, catchEvent, endEvent },
+            Flows = {
+                new() { Id = "f1", Source = startEvent, Target = gateway },
+                new() { Id = "f2", Source = gateway, Target    = catchEvent },
+            },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("Intermediate catch event", ex.Message);
+    }
+
+    [Fact]
     public void Validate_ActivityMultipleDirectOutgoing_Throws() {
         var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
         var task       = new NoneTask { Id  = "task", Name  = "Task" };
@@ -208,5 +247,49 @@ public class StateMachineValidatorShould
         };
 
         Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+    }
+
+    [Fact]
+    public void UnreachableElement_Rejected() {
+        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Id  = "task", Name  = "Task" };
+        var orphan     = new NoneTask { Id  = "orphan", Name = "Orphan" };
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, endEvent, task, orphan },
+            Flows = {
+                new() { Id = "f1", Source = startEvent, Target = task },
+                new() { Id = "f2", Source = task, Target       = endEvent },
+                // The orphan has an outgoing flow (so it is not a dead end), yet no path from the
+                // start event reaches it.
+                new() { Id = "f3", Source = orphan, Target = endEvent },
+            },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("reachable", ex.Message);
+    }
+
+    [Fact]
+    public void NoViableEdge_Rejected() {
+        var startEvent = new FlowEvent { Id      = "start", Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Id      = "end", Name   = "End", Position   = EventPosition.End };
+        var gateway    = new ExclusiveGateway { Id = "gw", Name  = "GW" };
+        var deadEnd    = new NoneTask { Id        = "dead", Name  = "DeadEnd" };
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, endEvent, gateway, deadEnd },
+            Flows = {
+                new() { Id = "f1", Source = startEvent, Target = gateway },
+                new() { Id = "f2", Source = gateway, Target    = deadEnd },
+                new() { Id = "f3", Source = gateway, Target    = endEvent },
+            },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("outgoing", ex.Message);
     }
 }

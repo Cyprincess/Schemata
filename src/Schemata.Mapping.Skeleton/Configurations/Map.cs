@@ -48,7 +48,7 @@ public sealed class Map<TSource, TDestination>
                 continue;
             }
 
-            if (mapping.IsIgnored) {
+            if (mapping.IsIgnored || mapping is Mapping<TSource, TDestination> { IsConditionallyIgnored: true }) {
                 continue;
             }
 

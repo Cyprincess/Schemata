@@ -17,13 +17,12 @@ public class AdviceAddConcurrencyShould
         var advisor    = new AdviceAddConcurrency<Student>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { Timestamp = null };
+        var entity     = new Student { Timestamp = Guid.Empty };
 
         var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
-        Assert.NotNull(entity.Timestamp);
-        Assert.NotEqual(Guid.Empty, entity.Timestamp!.Value);
+        Assert.NotEqual(Guid.Empty, entity.Timestamp);
     }
 
     [Fact]
@@ -38,17 +37,4 @@ public class AdviceAddConcurrencyShould
         Assert.Equal(AdviseResult.Continue, result);
     }
 
-    [Fact]
-    public async Task Advise_Suppressed_DoesNotSetTimestamp() {
-        var advisor = new AdviceAddConcurrency<Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new ConcurrencySuppressed());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { Timestamp = null };
-
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Null(entity.Timestamp);
-    }
 }

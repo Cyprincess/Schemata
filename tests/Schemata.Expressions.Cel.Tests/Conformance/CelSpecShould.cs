@@ -9,7 +9,7 @@ public class CelSpecShould
 {
     [Theory]
     [MemberData(nameof(BasicSelfEvalCases))]
-    public void PassBasicSelfEvalConformanceVectors(string name, string source, CelSpecValue expected) {
+    public void Pass_BasicSelfEvalConformanceVectors(string name, string source, CelSpecValue expected) {
         var compiler = new CelCompiler();
         var tree     = compiler.Parse(source);
         if (expected.Value is CelSpecError error) {
@@ -28,7 +28,7 @@ public class CelSpecShould
     public static IEnumerable<object[]> BasicSelfEvalCases() { return CelSpecLoader.BasicSelfEvalCases(); }
 
     [Fact]
-    public void LoadsExpectedMinimumSelfEvalCaseCount() {
+    public void Loads_ExpectedMinimumSelfEvalCaseCount() {
         const int minimum = 20;
         var       cases   = CelSpecLoader.BasicSelfEvalCases().ToList();
         Assert.True(cases.Count >= minimum,

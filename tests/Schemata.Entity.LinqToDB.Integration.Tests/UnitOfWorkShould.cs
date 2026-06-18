@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -29,14 +30,14 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Guid.NewGuid(),
+                                        Uid      = Identifiers.NewUid(),
                                         FullName = "UoW-Alice",
                                         Age      = 18,
                                         Grade    = 1,
                                         Name     = "uow-alice",
                                     });
                 await repo.AddAsync(new() {
-                                        Uid      = Guid.NewGuid(),
+                                        Uid      = Identifiers.NewUid(),
                                         FullName = "UoW-Bob",
                                         Age      = 19,
                                         Grade    = 2,
@@ -63,7 +64,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Guid.NewGuid(),
+                                        Uid      = Identifiers.NewUid(),
                                         FullName = "Rollback-Alice",
                                         Age      = 18,
                                         Grade    = 1,
@@ -90,7 +91,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Guid.NewGuid(),
+                                        Uid      = Identifiers.NewUid(),
                                         FullName = "Dispose-Alice",
                                         Age      = 18,
                                         Grade    = 1,
@@ -115,7 +116,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         using (scope) {
             repo.Join(uow);
             await repo.AddAsync(new() {
-                                    Uid      = Guid.NewGuid(),
+                                    Uid      = Identifiers.NewUid(),
                                     FullName = "Enlisted",
                                     Age      = 18,
                                     Grade    = 1,
@@ -134,14 +135,14 @@ public class UnitOfWorkShould : IAsyncLifetime
                 studentRepo.Join(uow);
                 courseRepo.Join(uow);
                 await studentRepo.AddAsync(new() {
-                                               Uid      = Guid.NewGuid(),
+                                               Uid      = Identifiers.NewUid(),
                                                FullName = "Cross-Alice",
                                                Age      = 18,
                                                Grade    = 1,
                                                Name     = "cross-alice",
                                            });
                 await courseRepo.AddAsync(new() {
-                                              Uid     = Guid.NewGuid(),
+                                              Uid     = Identifiers.NewUid(),
                                               Title   = "Cross-Course",
                                               Credits = 3,
                                               Name    = "cross-course",
@@ -175,7 +176,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
-                                    Uid      = Guid.NewGuid(),
+                                    Uid      = Identifiers.NewUid(),
                                     FullName = "Self-Read",
                                     Age      = 18,
                                     Grade    = 1,
@@ -197,7 +198,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
             await repo.AddAsync(new() {
-                                    Uid      = Guid.NewGuid(),
+                                    Uid      = Identifiers.NewUid(),
                                     FullName = "Uncommitted",
                                     Age      = 18,
                                     Grade    = 1,
@@ -207,6 +208,84 @@ public class UnitOfWorkShould : IAsyncLifetime
             Assert.Throws<InvalidOperationException>(() => repo.Join(uow));
 
             await repo.CommitAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Read_ThenJoin_RebindsTableToUnitOfWorkContext() {
+        var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            // The first read caches the table against the repository's standalone context.
+            await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "rebind"));
+
+            // Joining disposes that context; the cached table must be dropped so subsequent reads
+            // bind to the unit of work's connection rather than querying the disposed one.
+            repo.Join(uow);
+            await repo.AddAsync(new() {
+                                    Uid      = Identifiers.NewUid(),
+                                    FullName = "Rebind",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "rebind",
+                                });
+
+            var found = await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "rebind"));
+            Assert.NotNull(found);
+
+            await uow.CommitAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CommitAsync_Twice_ThrowsAfterCompleted() {
+        var (repo, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            await repo.AddAsync(new() {
+                                    Uid      = Identifiers.NewUid(),
+                                    FullName = "Double-Commit",
+                                    Age      = 18,
+                                    Grade    = 1,
+                                    Name     = "double-commit",
+                                });
+            await repo.CommitAsync();
+
+            // The standalone commit completed the implicit unit of work; committing again rejects it.
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.CommitAsync());
+        }
+    }
+
+    [Fact]
+    public async Task WriteAfterCommit_ThrowsAndDoesNotPersist() {
+        {
+            var (repo, scope) = _fixture.CreateScopeWithRepository();
+            using (scope) {
+                await repo.AddAsync(new() {
+                                        Uid      = Identifiers.NewUid(),
+                                        FullName = "Before-Commit",
+                                        Age      = 18,
+                                        Grade    = 1,
+                                        Name     = "before-commit",
+                                    });
+                await repo.CommitAsync();
+
+                // The unit of work has completed; a further write must fail fast rather than run in
+                // autocommit outside the committed transaction.
+                await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.AddAsync(new() {
+                                                                        Uid      = Identifiers.NewUid(),
+                                                                        FullName = "After-Commit",
+                                                                        Age      = 1,
+                                                                        Grade    = 1,
+                                                                        Name     = "after-commit-canary",
+                                                                    }));
+            }
+        }
+
+        {
+            var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+            using (verifyScope) {
+                var found = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "after-commit-canary"));
+                Assert.Null(found);
+            }
         }
     }
 

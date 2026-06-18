@@ -127,4 +127,31 @@ public class TokenRequest
     ///     </seealso>
     /// </summary>
     public string? ActorTokenType { get; set; }
+
+    /// <summary>
+    ///     URI identifying the type of token the client wants in exchange; defaults to an access token.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+    ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+    ///         Request
+    ///     </seealso>
+    /// </summary>
+    public string? RequestedTokenType { get; set; }
+
+    /// <summary>
+    ///     Target service or resource where the issued token will be used.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+    ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+    ///         Request
+    ///     </seealso>
+    /// </summary>
+    public string? Resource { get; set; }
+
+    /// <summary>
+    ///     Logical name of the target service where the issued token will be used.
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+    ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+    ///         Request
+    ///     </seealso>
+    /// </summary>
+    public string? Audience { get; set; }
 }

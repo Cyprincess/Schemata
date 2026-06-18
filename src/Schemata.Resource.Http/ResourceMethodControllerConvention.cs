@@ -1,17 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
-using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
 
@@ -44,20 +41,16 @@ public sealed class ResourceMethodControllerConvention(
             return;
         }
 
-        var method = resourceMethods.FirstOrDefault(m => m.Handler == handler);
-        if (method is null) {
+        var handlerMethods = resourceMethods.Where(m => m.Handler == handler).ToList();
+        if (handlerMethods.Count == 0) {
             return;
         }
 
         var descriptor = ResourceNameDescriptor.ForType(entity);
 
-        controller.ControllerName            = descriptor.Plural;
-        controller.RouteValues["Controller"] = descriptor.Plural;
+        ResourceHttpConventionHelper.ApplyControllerIdentity(controller, descriptor);
 
-        var collectionPath = descriptor.CollectionPath;
-        var controllerRoute = descriptor.Package is not null
-            ? $"~/v1/{descriptor.Package.ToLowerInvariant()}/{collectionPath}"
-            : $"~/v1/{collectionPath}";
+        var controllerRoute = ResourceHttpConventionHelper.BuildControllerRoute(descriptor);
 
         // Suppress the controller-level template. AIP-136 requires `{collection}:verb` with
         // no `/` separator before the colon, but MVC's AttributeRouteModel.CombineTemplates
@@ -67,33 +60,42 @@ public sealed class ResourceMethodControllerConvention(
             selector.AttributeRouteModel = null;
         }
 
+        // One handler may be registered for several verbs, but the generated controller is a single
+        // closed type. Clone its action once per verb and bind each clone to its own `{...}:verb`
+        // route, so every verb gets a distinct endpoint instead of collapsing onto the first.
+        var pristine = controller.Actions.ToList();
+        controller.Actions.Clear();
+        foreach (var method in handlerMethods) {
+            foreach (var template in pristine) {
+                var action = new ActionModel(template) { Controller = controller };
+                ConfigureMethodAction(action, method, controllerRoute);
+                controller.Actions.Add(action);
+            }
+        }
+
+        ResourceHttpConventionHelper.ApplyRateLimit(controller, entity);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, scheme);
+    }
+
+    private static void ConfigureMethodAction(ActionModel action, ResourceMethodAttribute method, string controllerRoute) {
+        action.ActionName = $"Invoke_{method.Verb}";
+
         var actionTemplate = method.Scope == ResourceMethodScope.Instance
             ? $"{controllerRoute}/{{name}}:{method.Verb}"
             : $"{controllerRoute}:{method.Verb}";
 
-        foreach (var action in controller.Actions) {
-            action.ActionName = $"Invoke_{method.Verb}";
-            foreach (var selector in action.Selectors) {
-                selector.AttributeRouteModel = new() {
-                    Template = actionTemplate,
-                };
-            }
+        foreach (var selector in action.Selectors) {
+            selector.AttributeRouteModel = new() {
+                Template = actionTemplate,
+            };
 
-            if (method.Method == ResourceHttpMethod.Get) {
-                ApplyGetBinding(action);
-            }
+            // Carry the verb to runtime so the shared controller dispatches the matched endpoint
+            // to the correct custom method.
+            selector.EndpointMetadata.Add(new ResourceMethodVerbMetadata(method.Verb));
         }
 
-        var quota = entity.GetCustomAttribute<RateLimitPolicyAttribute>();
-        if (quota is not null) {
-            foreach (var selector in controller.Selectors) {
-                selector.EndpointMetadata.Add(new EnableRateLimitingAttribute(quota.PolicyName));
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(scheme)) {
-            var policy = new AuthorizationPolicyBuilder(scheme).RequireAssertion(_ => true).Build();
-            controller.Filters.Add(new AuthorizeFilter(policy));
+        if (method.Method == ResourceHttpMethod.Get) {
+            ApplyGetBinding(action);
         }
     }
 

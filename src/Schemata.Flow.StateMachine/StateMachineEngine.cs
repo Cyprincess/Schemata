@@ -351,7 +351,13 @@ public sealed class StateMachineEngine : IFlowRuntime
 
     private static async
         ValueTask<(string stateId, string? stateName, string? waitingAtId, string? waitingAtName, bool isComplete)>
-        ResolveTargetStateAsync(ProcessDefinition definition, FlowElement target, ProcessInstance instance) {
+        ResolveTargetStateAsync(ProcessDefinition definition, FlowElement target, ProcessInstance instance, HashSet<FlowElement>? visited = null) {
+        visited ??= [];
+        if (!visited.Add(target)) {
+            throw new FailedPreconditionException(
+                message: $"Cyclic auto-flow detected at element '{target.Name}'; the process cannot reach a stable state.");
+        }
+
         switch (target) {
             case Activity a:
                 return (a.Id, a.Name, null, null, false);
@@ -363,7 +369,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             {
                 var flows = definition.Flows.Where(sf => sf.Source == fe).ToList();
                 if (flows.Count == 1) {
-                    return await ResolveTargetStateAsync(definition, flows[0].Target, instance);
+                    return await ResolveTargetStateAsync(definition, flows[0].Target, instance, visited);
                 }
 
                 return (fe.Id, fe.Name, null, null, false);
@@ -374,7 +380,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             {
                 var flow = await ResolveGatewayFlowAsync(definition, g, instance.Variables);
                 if (flow is not null) {
-                    return await ResolveTargetStateAsync(definition, flow.Target, instance);
+                    return await ResolveTargetStateAsync(definition, flow.Target, instance, visited);
                 }
 
                 return (g.Id, g.Name, null, null, false);

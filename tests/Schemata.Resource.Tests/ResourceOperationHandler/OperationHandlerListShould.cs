@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Skeleton;
 using Schemata.Resource.Foundation;
@@ -49,6 +50,24 @@ public class OperationHandlerListShould
         var request = new ListRequest { Filter = "(" };
 
         await Assert.ThrowsAsync<ValidationException>(() => handler.ListAsync(request, null, null));
+    }
+
+    [Fact]
+    public async Task List_WithMalformedParent_ThrowsValidationException() {
+        var handler = _fixture.CreateHandler();
+        var request = new ListRequest { Parent = "garbage/value" };
+
+        await Assert.ThrowsAsync<ValidationException>(() => handler.ListAsync(request, null, null));
+    }
+
+    [Fact]
+    public async Task List_WithEmptyParent_ListsTopLevel() {
+        var handler = _fixture.CreateHandler();
+        var request = new ListRequest { Parent = "" };
+
+        var result = await handler.ListAsync(request, null, null);
+
+        Assert.Equal(2, result.TotalSize);
     }
 
     [Fact]
@@ -134,7 +153,7 @@ public class OperationHandlerListShould
     public async Task List_WithPageSize_LimitsResults() {
         for (var i = 3; i <= 5; i++) {
             _fixture.Students.Add(new() {
-                                      Uid      = Guid.NewGuid(),
+                                      Uid      = Identifiers.NewUid(),
                                       FullName = $"Student{i}",
                                       Age      = 20 + i,
                                       Grade    = i,

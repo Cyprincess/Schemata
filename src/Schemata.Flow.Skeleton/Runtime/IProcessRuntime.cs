@@ -14,12 +14,18 @@ public interface IProcessRuntime
     /// <param name="processName">The name of the registered process definition.</param>
     /// <param name="variables">Optional initial variables.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
+    /// <param name="displayName">Optional display name persisted with the instance in the start transaction.</param>
+    /// <param name="description">Optional description persisted with the instance in the start transaction.</param>
+    /// <param name="sourceEntity">Optional source entity captured by reference on the persisted process row.</param>
     /// <param name="ct">Cancellation token.</param>
     ValueTask<SchemataProcess> StartProcessInstanceAsync(
         string                                processName,
-        IReadOnlyDictionary<string, object?>? variables = null,
-        ClaimsPrincipal?                      principal = null,
-        CancellationToken                     ct        = default
+        IReadOnlyDictionary<string, object?>? variables   = null,
+        ClaimsPrincipal?                      principal   = null,
+        string?                               displayName = null,
+        string?                               description = null,
+        object?                               sourceEntity = null,
+        CancellationToken                     ct          = default
     );
 
     /// <summary>Completes the current activity and auto-advances the process instance.</summary>

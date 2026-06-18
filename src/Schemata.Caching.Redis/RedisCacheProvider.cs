@@ -21,11 +21,40 @@ namespace Schemata.Caching.Redis;
 /// </remarks>
 public sealed class RedisCacheProvider : ICacheProvider
 {
-    private const    string    MetaSuffix = ":__meta__";
-    private readonly IDatabase _db;
+    private const string MetaSuffix = ":__meta__";
+
+    private const string ReplaceScript = """
+                                         if redis.call('GET', KEYS[1]) == ARGV[1] then
+                                             redis.call('SET', KEYS[1], ARGV[2])
+                                             redis.call('SET', KEYS[2], ARGV[4])
+                                             if tonumber(ARGV[3]) > 0 then
+                                                 redis.call('PEXPIRE', KEYS[1], ARGV[3])
+                                                 redis.call('PEXPIRE', KEYS[2], ARGV[3])
+                                             end
+                                             return 1
+                                         end
+                                         return 0
+                                         """;
+
+    private const string RemoveScript = """
+                                         if redis.call('GET', KEYS[1]) == ARGV[1] then
+                                             redis.call('DEL', KEYS[1])
+                                             redis.call('DEL', KEYS[2])
+                                             return 1
+                                         end
+                                         return 0
+                                         """;
+
+    private readonly IDatabase    _db;
+    private readonly TimeProvider _time;
 
     /// <summary>Initializes a new instance using the default database from the supplied multiplexer.</summary>
-    public RedisCacheProvider(IConnectionMultiplexer multiplexer) { _db = multiplexer.GetDatabase(); }
+    /// <param name="multiplexer">The Redis connection multiplexer.</param>
+    /// <param name="timeProvider">Clock used to compute absolute expirations; defaults to the system clock.</param>
+    public RedisCacheProvider(IConnectionMultiplexer multiplexer, TimeProvider? timeProvider = null) {
+        _db   = multiplexer.GetDatabase();
+        _time = timeProvider ?? TimeProvider.System;
+    }
 
     #region ICacheProvider Members
 
@@ -78,6 +107,36 @@ public sealed class RedisCacheProvider : ICacheProvider
         StoreOptions(tx, key, options, expiry);
         await tx.ExecuteAsync();
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> TryReplaceAsync(
+        string            key,
+        byte[]            expected,
+        byte[]            replacement,
+        CacheEntryOptions options,
+        CancellationToken ct = default
+    ) {
+        var expiry = GetExpirationTimeSpan(options);
+        var ms     = expiry.HasValue ? (long)expiry.Value.TotalMilliseconds : 0;
+        var meta   = JsonSerializer.SerializeToUtf8Bytes(NormalizeOptions(options));
+
+        var result = await _db.ScriptEvaluateAsync(
+            ReplaceScript,
+            [key, GetMetaKey(key)],
+            [expected, replacement, ms, meta]);
+
+        return (long)result == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
+        var result = await _db.ScriptEvaluateAsync(
+            RemoveScript,
+            [key, GetMetaKey(key)],
+            [expected]);
+
+        return (long)result == 1;
     }
 
     /// <inheritdoc />
@@ -151,7 +210,7 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     private static string GetMetaKey(string key) { return key + MetaSuffix; }
 
-    private static void StoreOptions(
+    private void StoreOptions(
         ITransaction      tx,
         string            key,
         CacheEntryOptions options,
@@ -167,10 +226,10 @@ public sealed class RedisCacheProvider : ICacheProvider
         }
     }
 
-    private static CacheEntryOptions NormalizeOptions(CacheEntryOptions options) {
+    private CacheEntryOptions NormalizeOptions(CacheEntryOptions options) {
         if (options.AbsoluteExpirationRelativeToNow.HasValue) {
             return new() {
-                AbsoluteExpiration = DateTimeOffset.UtcNow + options.AbsoluteExpirationRelativeToNow.Value,
+                AbsoluteExpiration = _time.GetUtcNow() + options.AbsoluteExpirationRelativeToNow.Value,
                 SlidingExpiration  = options.SlidingExpiration,
             };
         }
@@ -189,6 +248,9 @@ public sealed class RedisCacheProvider : ICacheProvider
         try {
             options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes)!;
         } catch (JsonException) {
+            // Corrupt metadata cannot drive a sliding-expiration refresh; drop it so the next
+            // write re-establishes a readable companion key.
+            await _db.KeyDeleteAsync(meta);
             return;
         }
 
@@ -200,7 +262,7 @@ public sealed class RedisCacheProvider : ICacheProvider
         var expire  = sliding;
 
         if (options.AbsoluteExpiration.HasValue) {
-            var remaining = options.AbsoluteExpiration.Value - DateTimeOffset.UtcNow;
+            var remaining = options.AbsoluteExpiration.Value - _time.GetUtcNow();
             if (remaining <= TimeSpan.Zero) {
                 return;
             }
@@ -216,9 +278,9 @@ public sealed class RedisCacheProvider : ICacheProvider
         await tx.ExecuteAsync();
     }
 
-    private static TimeSpan? GetExpirationTimeSpan(CacheEntryOptions options) {
+    private TimeSpan? GetExpirationTimeSpan(CacheEntryOptions options) {
         if (options.AbsoluteExpiration.HasValue) {
-            var remaining = options.AbsoluteExpiration.Value - DateTimeOffset.UtcNow;
+            var remaining = options.AbsoluteExpiration.Value - _time.GetUtcNow();
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
 

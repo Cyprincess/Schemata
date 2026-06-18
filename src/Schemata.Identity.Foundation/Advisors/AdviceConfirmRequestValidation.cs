@@ -31,26 +31,12 @@ public sealed class AdviceConfirmRequestValidation : IIdentityRequestAdvisor<Con
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (string.IsNullOrWhiteSpace(request.Code)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.Code).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.Code).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
+        IdentityValidation.RequireNotEmpty(request.Code, nameof(request.Code));
 
         if (string.IsNullOrWhiteSpace(request.EmailAddress) && string.IsNullOrWhiteSpace(request.PhoneNumber)) {
             throw new ValidationException([
-                new() {
-                    Field       = nameof(request.EmailAddress).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.EmailAddress).Humanize(LetterCasing.Title)),
-                    Reason      = FieldReasons.NotEmpty,
-                },
-                new() {
-                    Field       = nameof(request.PhoneNumber).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.PhoneNumber).Humanize(LetterCasing.Title)),
-                    Reason      = FieldReasons.NotEmpty,
-                },
+                IdentityValidation.NotEmptyError(nameof(request.EmailAddress)),
+                IdentityValidation.NotEmptyError(nameof(request.PhoneNumber)),
             ]);
         }
 

@@ -2,14 +2,13 @@
 
 `IRepository<TEntity>` is the primary data-access abstraction in Schemata. It wraps a backing store (Entity Framework Core, LinqToDB, or any custom provider) behind a uniform API and routes every read and write through an advisor pipeline that handles timestamps, concurrency stamps, soft-delete, validation, and canonical-name generation automatically.
 
-A non-generic `IRepository` mirror exists for type-erased scenarios. The Resource layer uses it to operate on entities whose concrete type is known only at runtime. Both interfaces share the same underlying implementation: `RepositoryBase<TEntity>` implements both and delegates the non-generic calls to the generic ones after a type check.
+A non-generic `IRepository` carries the entity-agnostic surface — `AdviceContext`, `Begin`/`Join`/`CommitAsync`, and the `Suppress*` scopes — so framework code that coordinates repositories without knowing the concrete entity type takes a dependency on `IRepository`. `IRepository<TEntity>` inherits from `IRepository` and adds the entity-typed CRUD members; `RepositoryBase<TEntity>` implements the generic interface and satisfies the non-generic surface through inheritance.
 
 ## Where the code lives
 
 | Item | Path |
 |---|---|
-| `IRepository<TEntity>` | `src/Schemata.Entity.Repository/IRepository`1.cs` |
-| `IRepository` (non-generic) | `src/Schemata.Entity.Repository/IRepository.cs` |
+| `IRepository` and `IRepository<TEntity>` | `src/Schemata.Entity.Repository/IRepository.cs` |
 | `RepositoryBase<TEntity>` | `src/Schemata.Entity.Repository/RepositoryBase.cs` |
 | `IUnitOfWork` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
 | `QueryContext<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/QueryContext.cs` |
@@ -113,16 +112,16 @@ services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
-`AddRepository` validates that the implementation type implements both `IRepository` and `IRepository<>`, registers it as open-generic transient, and registers all built-in advisors via `TryAddEnumerable`. See [providers.md](providers.md) for provider-specific setup.
+`AddRepository` validates that the implementation type implements `IRepository<>`, registers it as open-generic transient, and registers all built-in advisors via `TryAddEnumerable`. See [providers.md](providers.md) for provider-specific setup.
 
 ## Extension points
 
 - **Custom advisors**: implement `IRepositoryAddAdvisor<TEntity>`, `IRepositoryUpdateAdvisor<TEntity>`, `IRepositoryRemoveAdvisor<TEntity>`, or `IRepositoryBuildQueryAdvisor<TEntity>` and register with `TryAddEnumerable`. Pick an `Order` outside `[100_000_000, 900_000_000]`.
-- **Custom providers**: inherit from `RepositoryBase<TEntity>` and implement the abstract members. The non-generic `IRepository` surface comes for free.
+- **Custom providers**: inherit from `RepositoryBase<TEntity>` and implement the abstract members. Inheritance satisfies both `IRepository<TEntity>` and the non-generic `IRepository` surface.
 
 ## Design motivation
 
-The two-interface design (`IRepository` + `IRepository<TEntity>`) lets the Resource layer hold a single `IRepository` reference and dispatch to any entity type at runtime without generics. `RepositoryBase<TEntity>` bridges the gap by casting through `Predicate.Cast<T, TEntity>` so trait-typed predicates (e.g., `Expression<Func<ISoftDelete, bool>>`) work across the type boundary.
+The two-interface design (`IRepository` + `IRepository<TEntity>`) lets framework infrastructure code — unit-of-work coordination, cross-repository advisor scopes, lifecycle hooks — depend on `IRepository` without binding to a concrete entity type, while entity-specific code uses `IRepository<TEntity>` for typed CRUD. The non-generic surface holds only what does not need `TEntity` (advisor context, unit-of-work enlistment, commit, suppression scopes); typed operations remain on the generic interface to preserve compile-time safety.
 
 ## See also
 

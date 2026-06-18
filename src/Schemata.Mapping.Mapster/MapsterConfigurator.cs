@@ -49,17 +49,15 @@ public static class MapsterConfigurator
                     return;
                 }
 
+                if (condition is Expression<Func<TSource, TDestination, bool>> predicate) {
+                    setter.IgnoreIf(predicate, member);
+                }
+
                 if (source is not Expression<Func<TSource, object>> expression) {
                     return;
                 }
 
                 setter.Map(member, expression);
-
-                if (condition is not Expression<Func<TSource, TDestination, bool>> predicate) {
-                    return;
-                }
-
-                setter.IgnoreIf(predicate, member);
             });
         }
     }

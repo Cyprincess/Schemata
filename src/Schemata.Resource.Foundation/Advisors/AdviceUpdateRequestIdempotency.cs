@@ -1,6 +1,5 @@
 using System;
 using System.Security.Claims;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
@@ -40,77 +39,33 @@ public static class AdviceUpdateRequestIdempotency
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
 /// <typeparam name="TDetail">The detail DTO type.</typeparam>
-public sealed class AdviceUpdateRequestIdempotency<TEntity, TRequest, TDetail> : IResourceUpdateRequestAdvisor<TEntity, TRequest>
+public sealed class AdviceUpdateRequestIdempotency<TEntity, TRequest, TDetail>(ICacheProvider cache, TimeProvider? timeProvider = null)
+    : AdviceRequestIdempotencyBase<TEntity, TRequest, TDetail>(cache, timeProvider), IResourceUpdateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName
 {
-    private static readonly byte[] PendingSentinelBytes = "__pending__"u8.ToArray();
-
-    private static readonly TimeSpan       PendingTtl = TimeSpan.FromSeconds(5);
-    private readonly        ICacheProvider _cache;
-
-    /// <summary>
-    ///     Initializes a new instance with the cache provider.
-    /// </summary>
-    /// <param name="cache">The <see cref="ICacheProvider" />.</param>
-    public AdviceUpdateRequestIdempotency(ICacheProvider cache) { _cache = cache; }
-
-    #region IResourceUpdateRequestAdvisor<TEntity,TRequest> Members
-
     public int Order => AdviceUpdateRequestIdempotency.DefaultOrder;
 
-    public async Task<AdviseResult> AdviseAsync(
+    public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
         TRequest                          request,
         ResourceRequestContainer<TEntity> container,
         ClaimsPrincipal?                  principal,
         CancellationToken                 ct = default
     ) {
-        if (request is not IRequestIdentification { RequestId: { Length: > 0 } requestId }) {
-            return AdviseResult.Continue;
-        }
-
-        if (ctx.Has<UpdateIdempotencySuppressed>()) {
-            return AdviseResult.Continue;
-        }
-
-        var pending = new PendingIdempotencyKey(
-            requestId,
-            nameof(Operations.Update),
-            typeof(TEntity).FullName!,
-            IdempotencyHelper.PrincipalId(principal),
-            IdempotencyHelper.HashPayload(request));
-        var key   = pending.ToCacheKey();
-        var bytes = await _cache.GetAsync(key, ct);
-        if (bytes is not null && !bytes.AsSpan().SequenceEqual(PendingSentinelBytes)) {
-            var cached = JsonSerializer.Deserialize<IdempotencyEnvelope<TDetail>>(bytes);
-            if (cached is not null) {
-                if (cached.Hash != pending.PayloadHash) {
-                    throw new ConcurrencyException();
-                }
-
-                if (cached.Payload is not null) {
-                    ctx.Set(new UpdateResultBase<TDetail> { Detail = cached.Payload });
-                    return AdviseResult.Handle;
-                }
-            }
-        }
-
-        // Atomically reserve the key with a short-lived pending sentinel. Two concurrent requests
-        // sharing the same RequestId cannot both pass this gate; the loser is reported as a
-        // conflict so the client retries (and observes the stored result if the winner persisted).
-        var reserved = await _cache.TryAddAsync(key, PendingSentinelBytes, new() {
-            AbsoluteExpirationRelativeToNow = PendingTtl,
-        }, ct);
-
-        if (!reserved) {
-            throw new ConcurrencyException();
-        }
-
-        ctx.Set(pending);
-        return AdviseResult.Continue;
+        return AdviseCoreAsync(ctx, request, principal, ct);
     }
 
-    #endregion
+    protected override string Operation(AdviceContext ctx) {
+        return nameof(Operations.Update);
+    }
+
+    protected override bool IsSuppressed(AdviceContext ctx) {
+        return ctx.Has<UpdateIdempotencySuppressed>();
+    }
+
+    protected override void StoreReplay(AdviceContext ctx, TDetail payload) {
+        ctx.Set(new UpdateResultBase<TDetail> { Detail = payload });
+    }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +7,7 @@ using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
+using Schemata.Common;
 using Schemata.Entity.Cache.Advisors;
 using Schemata.Entity.Cache.Tests.Fixtures;
 using Schemata.Entity.Repository;
@@ -32,7 +32,7 @@ public class AdviceCommittedEvictCacheShould
     public async Task AdviseAsync_WhenEntitiesUpdated_RemovesAllKeysInCollection() {
         var cacheKey1 = "first-key";
         var cacheKey2 = "second-key";
-        var uid       = Guid.NewGuid();
+        var uid       = Identifiers.NewUid();
         var indexKey  = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
@@ -58,7 +58,7 @@ public class AdviceCommittedEvictCacheShould
     [Fact]
     public async Task AdviseAsync_WhenEntitiesRemoved_RemovesAllKeysInCollection() {
         var cacheKey = "remove-key";
-        var uid      = Guid.NewGuid();
+        var uid      = Identifiers.NewUid();
         var indexKey = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
@@ -87,7 +87,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Added = [new() { Uid = Guid.NewGuid() }],
+            Added = [new() { Uid = Identifiers.NewUid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -106,8 +106,8 @@ public class AdviceCommittedEvictCacheShould
         ctx.Set(new QueryCacheEvictionSuppressed());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new() { Uid = Guid.NewGuid() }],
-            Removed = [new() { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Identifiers.NewUid() }],
+            Removed = [new() { Uid = Identifiers.NewUid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -126,8 +126,8 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new() { Uid = Guid.NewGuid() }],
-            Removed = [new() { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Identifiers.NewUid() }],
+            Removed = [new() { Uid = Identifiers.NewUid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -147,7 +147,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new() { Uid = Guid.NewGuid() }],
+            Updated = [new() { Uid = Identifiers.NewUid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -157,12 +157,12 @@ public class AdviceCommittedEvictCacheShould
 
     [Fact]
     public async Task AdviseAsync_DoesNotEvictEntriesForDifferentEntityId() {
-        var otherUid   = Guid.NewGuid();
+        var otherUid   = Identifiers.NewUid();
         var other      = new Student { Uid = otherUid };
         var otherIndex = ReverseIndex.BuildKey(typeof(Student), other);
         Assert.NotNull(otherIndex);
 
-        var targetUid   = Guid.NewGuid();
+        var targetUid   = Identifiers.NewUid();
         var targetIndex = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = targetUid });
         Assert.NotNull(targetIndex);
 
@@ -198,7 +198,7 @@ public class AdviceCommittedEvictCacheShould
         var evict   = new AdviceCommittedEvictCache<Student>(mock.Object, options);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
-        var student = new Student { Uid = Guid.NewGuid(), FullName = "Zed" };
+        var student = new Student { Uid = Identifiers.NewUid(), FullName = "Zed" };
         var data    = new[] { student }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repo, data) { Result = student };
 

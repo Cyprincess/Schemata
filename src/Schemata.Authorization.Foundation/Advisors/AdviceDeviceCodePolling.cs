@@ -58,15 +58,25 @@ public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions
             return AdviseResult.Continue;
         }
 
-        var key = $"polling\x1e{device}".ToCacheKey(Keys.Authorization);
-        if (await cache.GetAsync(key, ct) is not null) {
+        var key      = $"polling\x1e{device}".ToCacheKey(Keys.Authorization);
+        var existing = await cache.GetAsync(key, ct);
+        if (existing is not null) {
+            // RFC 8628 §3.5: the client MUST raise its polling interval by 5 seconds on every
+            // slow_down. Persist the grown interval so repeated too-fast polls widen the enforced
+            // window instead of being rejected against a fixed one.
+            var current = existing.Length >= sizeof(int) ? BitConverter.ToInt32(existing, 0) : options.Value.DeviceCodeInterval;
+            var next    = current + 5;
+            await cache.SetAsync(key, BitConverter.GetBytes(next), new() {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(next),
+            }, ct);
+
             throw new OAuthException(
                 OAuthErrors.SlowDown,
                 SchemataResources.GetResourceString(SchemataResources.ST4013)
             );
         }
 
-        await cache.SetAsync(key, [], new() {
+        await cache.SetAsync(key, BitConverter.GetBytes(options.Value.DeviceCodeInterval), new() {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.Value.DeviceCodeInterval),
         }, ct);
 

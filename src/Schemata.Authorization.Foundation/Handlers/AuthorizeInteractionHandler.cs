@@ -36,6 +36,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     private readonly IOptions<JsonSerializerOptions>        _json;
     private readonly IOptions<SchemataAuthorizationOptions> _options;
     private readonly IScopeManager<TScope>                  _scopes;
+    private readonly TimeProvider                           _time;
     private readonly ITokenManager<TToken>                  _tokens;
 
     /// <summary>
@@ -47,13 +48,15 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     /// <param name="tokens">Token storage.</param>
     /// <param name="json">JSON serialization options.</param>
     /// <param name="options">Server-level authorization configuration.</param>
+    /// <param name="timeProvider">Clock used for interaction-token expiry; defaults to the system clock.</param>
     public AuthorizeInteractionHandler(
         IApplicationManager<TApp>              apps,
         IAuthorizationManager<TAuth>           auths,
         IScopeManager<TScope>                  scopes,
         ITokenManager<TToken>                  tokens,
         IOptions<JsonSerializerOptions>        json,
-        IOptions<SchemataAuthorizationOptions> options
+        IOptions<SchemataAuthorizationOptions> options,
+        TimeProvider?                          timeProvider = null
     ) {
         _apps    = apps;
         _auths   = auths;
@@ -61,6 +64,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         _tokens  = tokens;
         _json    = json;
         _options = options;
+        _time    = timeProvider ?? TimeProvider.System;
     }
 
     #region IInteractionHandler Members
@@ -85,7 +89,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);
         if (interaction?.Status != TokenStatuses.Valid
          || interaction.Type != TokenTypes.Interaction
-         || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= DateTime.UtcNow)
+            || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -162,7 +166,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);
         if (interaction?.Status != TokenStatuses.Valid
          || interaction.Type != TokenTypes.Interaction
-         || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= DateTime.UtcNow)
+            || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

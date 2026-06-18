@@ -36,11 +36,13 @@ public static class SchemataRepositoryBuilderExtensions
     }
 
     /// <summary>
-    ///     Registers an Entity Framework Core <see cref="DbContext" /> as the repository data provider with separate
-    ///     service and implementation types.
+    ///     Registers an Entity Framework Core <see cref="DbContext" /> factory for
+    ///     <typeparamref name="TContextImplementation" /> as the repository data provider. The factory is keyed to the
+    ///     implementation type only; <typeparamref name="TContextService" /> constrains the implementation to a shared
+    ///     abstraction and is not registered as a separately resolvable context service.
     /// </summary>
-    /// <typeparam name="TContextService">The service type for the context.</typeparam>
-    /// <typeparam name="TContextImplementation">The implementation type for the context.</typeparam>
+    /// <typeparam name="TContextService">The abstraction the implementation context must satisfy.</typeparam>
+    /// <typeparam name="TContextImplementation">The concrete <see cref="DbContext" /> whose factory is registered.</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">Optional callback to configure <see cref="DbContextOptionsBuilder" /> per service provider.</param>
     /// <returns>The same builder for chaining.</returns>

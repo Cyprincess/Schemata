@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -14,6 +13,7 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -44,7 +44,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
         // ClientId and Name are aliased on SchemataApplication; setting ClientId last.
         return new() {
-            Application     = new() { Uid   = Guid.NewGuid(), ClientId = clientId },
+            Application     = new() { Uid   = Identifiers.NewUid(), ClientId = clientId },
             Request         = new() { Scope = scope },
             Principal       = new(new ClaimsIdentity(claims, "test")),
             ConsentDecision = ConsentDecision.Granted,
@@ -120,6 +120,6 @@ public class AdviceAuthorizeAutoApproveSignInShould
         authz.Principal = new(new ClaimsIdentity("test"));
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.LoginRequired, ex.Code);
+        Assert.Equal(OAuthErrors.LoginRequired, ex.Status);
     }
 }

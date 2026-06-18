@@ -17,6 +17,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -49,7 +50,7 @@ public class AuthorizationCodeHandlerShould
         };
 
         return new() {
-            Uid             = Guid.NewGuid(),
+            Uid             = Identifiers.NewUid(),
             Type            = TokenTypes.AuthorizationCode,
             Status          = status,
             ExpireTime      = expireTime ?? DateTime.UtcNow.AddMinutes(5),
@@ -77,7 +78,7 @@ public class AuthorizationCodeHandlerShould
     ) {
         var jsonOpts = Options.Create(JsonOptions);
         var codeOpts = Options.Create(new CodeFlowOptions());
-        var app      = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = TestClientId };
+        var app      = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = TestClientId };
 
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -107,7 +108,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -122,7 +123,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -137,7 +138,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -167,7 +168,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public class AuthorizationCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]

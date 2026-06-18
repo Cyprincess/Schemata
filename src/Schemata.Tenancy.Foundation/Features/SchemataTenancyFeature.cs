@@ -43,6 +43,7 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
 
         services.TryAddScoped<SchemataTenantContextAccessor<TTenant>>();
         services.TryAddTransient<ITenantContextAccessor<TTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<TTenant>>());
+        services.TryAddTransient<ITenantContextInitializer<TTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<TTenant>>());
 
         services.TryAddScoped<SchemataTenantServiceScopeFactory<TTenant>>();
         services.TryAddTransient<ITenantServiceScopeFactory<TTenant>>(sp => sp.GetRequiredService<SchemataTenantServiceScopeFactory<TTenant>>());

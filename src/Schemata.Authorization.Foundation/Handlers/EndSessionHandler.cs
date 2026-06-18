@@ -49,6 +49,7 @@ public sealed class EndSessionHandler<TApp>(
         var session = principal.FindFirstValue(config.Value.SessionIdClaimType);
 
         TApp? application = null;
+        var   mismatch    = false;
 
         if (!string.IsNullOrWhiteSpace(request.IdTokenHint)) {
             var hint = await issuer.Validate(request.IdTokenHint, request.ClientId, false);
@@ -61,7 +62,11 @@ public sealed class EndSessionHandler<TApp>(
             if (!string.IsNullOrWhiteSpace(request.ClientId) && application is not null) {
                 var requested = await apps.FindByClientIdAsync(request.ClientId, ct);
                 if (requested?.Uid != application.Uid) {
+                    // OIDC RP-Initiated Logout §2: when both id_token_hint and client_id are present they
+                    // MUST identify the same client. An inconsistent pair drops the client entirely rather
+                    // than honoring client_id, which would redirect using a client the hint did not name.
                     application = null;
+                    mismatch    = true;
                 }
             }
 
@@ -69,7 +74,7 @@ public sealed class EndSessionHandler<TApp>(
             session ??= hint?.FindFirstValue(Claims.SessionId);
         }
 
-        if (application is null && !string.IsNullOrWhiteSpace(request.ClientId)) {
+        if (!mismatch && application is null && !string.IsNullOrWhiteSpace(request.ClientId)) {
             application = await apps.FindByClientIdAsync(request.ClientId, ct);
         }
 

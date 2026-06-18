@@ -9,6 +9,73 @@ using Schemata.Entity.Repository.Advisors;
 namespace Schemata.Entity.Repository;
 
 /// <summary>
+///     Non-generic repository contract carrying the entity-agnostic surface (advisor
+///     context, unit-of-work enlistment, commit, and suppression scopes). Framework code
+///     that coordinates repositories without knowing the concrete entity type takes a
+///     dependency on this interface; entity-specific work uses
+///     <see cref="IRepository{TEntity}" />.
+/// </summary>
+public interface IRepository : IAsyncDisposable, IDisposable
+{
+    /// <summary>
+    ///     Carries the advice context that gates advisor execution and holds suppression
+    ///     flags for this repository instance.
+    /// </summary>
+    AdviceContext AdviceContext { get; }
+
+    /// <summary>
+    ///     Begins a unit of work bound to this repository's data context. The first
+    ///     <see cref="Join" /> on the returned unit of work opens the underlying connection
+    ///     and transaction; subsequent enlistments share that context.
+    /// </summary>
+    /// <returns>A new unit of work that callers must commit, roll back, or dispose.</returns>
+    IUnitOfWork Begin();
+
+    /// <summary>
+    ///     Enlists this repository in an existing unit of work. The repository then
+    ///     writes through the unit-of-work's context.
+    /// </summary>
+    /// <param name="uow">The unit of work to join.</param>
+    void Join(IUnitOfWork uow);
+
+    /// <summary>
+    ///     Persists all pending changes to the underlying data store.
+    /// </summary>
+    /// <param name="ct">A cancellation token.</param>
+    Task CommitAsync(CancellationToken ct = default);
+
+    /// <summary>
+    ///     Suppresses the add-side validation advisor for the duration of the returned
+    ///     scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressAddValidation();
+
+    /// <summary>
+    ///     Suppresses the update-side validation advisor for the duration of the returned
+    ///     scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressUpdateValidation();
+
+    /// <summary>
+    ///     Suppresses the soft-delete filter on build-query for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressQuerySoftDelete();
+
+    /// <summary>
+    ///     Suppresses the soft-delete behavior on add and remove for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressSoftDelete();
+
+    /// <summary>
+    ///     Suppresses the timestamp advisors (add and update) for the duration of the
+    ///     returned scope. Disposing the returned handle restores the previous state.
+    /// </summary>
+    IDisposable SuppressTimestamp();
+}
+
+/// <summary>
 ///     Generic repository interface providing strongly-typed CRUD operations with an
 ///     advisor pipeline. All query methods route through build-query advisors
 ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />); mutation methods
@@ -17,21 +84,15 @@ namespace Schemata.Entity.Repository;
 /// <remarks>
 ///     Provider-specific behavior for pre-commit reads: EF Core does not surface
 ///     uncommitted writes through LINQ queries because mutations are buffered in the
-///     change tracker until <see cref="CommitAsync" /> flushes them. LinqToDB does
-///     surface uncommitted writes within the active transaction (read-your-own-writes).
-///     Both providers behave identically after <see cref="CommitAsync" />.
+///     change tracker until <see cref="IRepository.CommitAsync" /> flushes them. LinqToDB
+///     does surface uncommitted writes within the active transaction
+///     (read-your-own-writes). Both providers behave identically after
+///     <see cref="IRepository.CommitAsync" />.
 /// </remarks>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
-public interface IRepository<TEntity>
-    : IAsyncDisposable, IDisposable
+public interface IRepository<TEntity> : IRepository
     where TEntity : class
 {
-    /// <summary>
-    ///     Carries the advice context that gates advisor execution and holds suppression
-    ///     flags for this repository instance.
-    /// </summary>
-    AdviceContext AdviceContext { get; }
-
     /// <summary>
     ///     Enumerates entities through the build-query advisor pipeline
     ///     (see <see cref="IRepositoryBuildQueryAdvisor{TEntity}" />), projected by the
@@ -199,58 +260,4 @@ public interface IRepository<TEntity>
     /// <param name="entities">The entities to remove.</param>
     /// <param name="ct">A cancellation token.</param>
     Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
-
-    /// <summary>
-    ///     Begins a unit of work with current context.
-    /// </summary>
-    /// <returns></returns>
-    IUnitOfWork Begin();
-
-    /// <summary>
-    ///     Enlists this repository in a unit of work.
-    /// </summary>
-    /// <param name="uow">The unit of work to join.</param>
-    void Join(IUnitOfWork uow);
-
-    /// <summary>
-    ///     Persists all pending changes to the underlying data store.
-    /// </summary>
-    /// <param name="ct">A cancellation token.</param>
-    Task CommitAsync(CancellationToken ct = default);
-
-    /// <summary>
-    ///     Suppresses the add-side validation advisor for the duration of the returned
-    ///     scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressAddValidation();
-
-    /// <summary>
-    ///     Suppresses the update-side validation advisor for the duration of the returned
-    ///     scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressUpdateValidation();
-
-    /// <summary>
-    ///     Suppresses the concurrency-token advisors (add and update) for the duration of
-    ///     the returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressConcurrency();
-
-    /// <summary>
-    ///     Suppresses the soft-delete filter on build-query for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressQuerySoftDelete();
-
-    /// <summary>
-    ///     Suppresses the soft-delete behavior on add and remove for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressSoftDelete();
-
-    /// <summary>
-    ///     Suppresses the timestamp advisors (add and update) for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressTimestamp();
 }

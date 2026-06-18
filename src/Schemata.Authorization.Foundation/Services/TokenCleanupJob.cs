@@ -12,13 +12,15 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     <see cref="ITokenManager{TToken}" />.  Registered as an hourly cron
 ///     entry on <see cref="SchemataSchedulingOptions.Jobs" />.
 /// </summary>
-public sealed class TokenCleanupJob<TToken>(ITokenManager<TToken> tokens) : IScheduledJob
+public sealed class TokenCleanupJob<TToken>(ITokenManager<TToken> tokens, TimeProvider? timeProvider = null) : IScheduledJob
     where TToken : SchemataToken
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IScheduledJob Members
 
     public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-        return tokens.PruneAsync(DateTime.UtcNow, ct);
+        return tokens.PruneAsync(_time.GetUtcNow().UtcDateTime, ct);
     }
 
     #endregion

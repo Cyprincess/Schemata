@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
 using Schemata.Scheduling.Foundation.Features;
@@ -46,6 +47,7 @@ public class SchedulingBridgeFeatureShould
 
         Configure(new SchemataSchedulingHttpFeature(), services);
 
+        Assert.Contains(services, d => d.ServiceType == typeof(RunJobHandler));
         AssertHandlersRegistered(services);
         AssertSchedulingResources(BuildResourceOptions(services), HttpResourceAttribute.Name);
     }
@@ -56,6 +58,7 @@ public class SchedulingBridgeFeatureShould
 
         Configure(new SchemataSchedulingGrpcFeature(), services);
 
+        Assert.Contains(services, d => d.ServiceType == typeof(RunJobHandler));
         AssertHandlersRegistered(services);
         AssertSchedulingResources(BuildResourceOptions(services), GrpcResourceAttribute.Name);
     }
@@ -70,21 +73,17 @@ public class SchedulingBridgeFeatureShould
 
         Configure((FeatureBase)Activator.CreateInstance(featureType)!, services);
         services.Replace(ServiceDescriptor.Singleton<IScheduler>(scheduler));
+        services.AddSingleton(new OperationDescriptor("test:op", "test", typeof(BridgeArgs)));
+        services.AddKeyedSingleton<IOperationHandler<BridgeArgs>>("test:op", new BridgeHandler(ran));
 
         using var provider = services.BuildServiceProvider();
         scheduler.Services = provider;
 
         var dispatcher = provider.GetRequiredService<IOperationDispatcher>();
 
-        var operation = await dispatcher.DispatchAsync<object>(
-            "purge",
-            (_, _) => {
-                ran.SetResult();
-                return Task.FromResult<object?>(null);
-            },
-            CancellationToken.None);
+        var operation = await dispatcher.DispatchAsync("test:op", new BridgeArgs(), CancellationToken.None);
 
-        Assert.StartsWith("operations/", operation, StringComparison.Ordinal);
+        Assert.StartsWith("operations/", operation.CanonicalName, StringComparison.Ordinal);
         await ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -105,9 +104,9 @@ public class SchedulingBridgeFeatureShould
 
         var execution = options.Resources[typeof(SchemataJobExecution).TypeHandle];
         Assert.Equal(typeof(SchemataJobExecution), execution.Entity);
-        Assert.Equal(typeof(SchemataOperation), execution.Request);
-        Assert.Equal(typeof(SchemataOperation), execution.Detail);
-        Assert.Equal(typeof(SchemataOperation), execution.Summary);
+        Assert.Equal(typeof(Operation), execution.Request);
+        Assert.Equal(typeof(Operation), execution.Detail);
+        Assert.Equal(typeof(Operation), execution.Summary);
         Assert.Equal([endpoint], execution.Endpoints);
         Assert.Equal([Operations.Get, Operations.List, Operations.Delete], execution.Operations);
 
@@ -158,17 +157,34 @@ public class SchedulingBridgeFeatureShould
 
         public async Task<SchemataJobExecution> TriggerAsync<TJob>(JobContext context, CancellationToken ct)
             where TJob : class, IScheduledJob {
-            context.ExecutionUid ??= Guid.NewGuid();
+            context.ExecutionUid ??= Identifiers.NewUid();
             context.Execution = new() {
-                Uid           = context.ExecutionUid.Value,
-                Name          = context.ExecutionUid.Value.ToString("N"),
-                CanonicalName = $"operations/{context.ExecutionUid.Value:N}",
+                Uid               = context.ExecutionUid.Value,
+                Name              = context.ExecutionUid.Value.ToString("n"),
+                CanonicalName     = $"operations/{context.ExecutionUid.Value:n}",
+                Method            = context.Method,
+            JobKey            = context.JobKey,
+            ArgsJson          = context.ArgsJson,
             };
 
             var job = Services.GetRequiredService<TJob>();
             await job.ExecuteAsync(context, ct);
 
             return context.Execution;
+        }
+
+        public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BridgeArgs;
+
+    private sealed class BridgeHandler(TaskCompletionSource ran) : IOperationHandler<BridgeArgs>
+    {
+        public Task<object?> RunAsync(BridgeArgs args, CancellationToken ct) {
+            ran.SetResult();
+            return Task.FromResult<object?>(null);
         }
     }
 }

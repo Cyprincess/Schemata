@@ -8,6 +8,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Tests.Advisors;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
@@ -135,6 +136,32 @@ public class MethodOperationHandlerShould
             Invoked = true;
             Entity  = entity;
             return ValueTask.FromResult(new Student { Name = "result", CanonicalName = "students/result" });
+        }
+    }
+
+    private sealed class ThrowingHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
+    {
+        public ValueTask<Student> InvokeAsync(
+            string?              name,
+            EmptyResourceRequest request,
+            Student?             entity,
+            ClaimsPrincipal?     principal,
+            CancellationToken    ct
+        ) {
+            throw new InvalidOperationException("handler failure");
+        }
+    }
+
+    private sealed class ThrowingStudentHandler : IResourceMethodHandler<Student, StudentRequest, Student>
+    {
+        public ValueTask<Student> InvokeAsync(
+            string?          name,
+            StudentRequest   request,
+            Student?         entity,
+            ClaimsPrincipal? principal,
+            CancellationToken ct
+        ) {
+            throw new InvalidOperationException("handler failure");
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -33,7 +34,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IV
 
     #region IConcurrency Members
 
-    public Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public Guid Timestamp { get; set; }
 
     #endregion
 

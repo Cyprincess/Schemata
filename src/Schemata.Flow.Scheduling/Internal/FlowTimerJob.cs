@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Skeleton;
@@ -19,15 +20,11 @@ public sealed class FlowTimerJob : IScheduledJob
     #region IScheduledJob Members
 
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
-        var processName = ExtractProcessName(context);
-        if (processName is null) {
-            return;
-        }
+        var processName = ExtractProcessName(context)
+                       ?? throw new FailedPreconditionException(message: "Flow timer job is missing the 'processName' variable.");
 
-        var timerDef = ExtractTimerDefinition(context);
-        if (timerDef is null) {
-            return;
-        }
+        var timerDef = ExtractTimerDefinition(context)
+                    ?? throw new FailedPreconditionException(message: "Flow timer job is missing the 'timerDef' variable.");
 
         await _runtime.TriggerEventAsync(processName, timerDef, ct: ct);
     }

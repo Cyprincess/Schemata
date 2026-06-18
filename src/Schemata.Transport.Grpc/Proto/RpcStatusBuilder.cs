@@ -12,19 +12,28 @@ namespace Schemata.Transport.Grpc.Proto;
 internal static class RpcStatusBuilder
 {
     public static Google.Rpc.Status Build(SchemataException ex, string? requestId) {
-        var status = new Google.Rpc.Status { Code = MapFromCode(ex.Code), Message = ex.Message };
-
-        if (ex.Details is { Count: > 0 }) {
-            foreach (var detail in ex.Details) {
-                var any = ToAny(detail);
-                if (any is not null) {
-                    status.Details.Add(any);
-                }
-            }
+        var response = ex.CreateErrorResponse(requestId);
+        if (response is not ErrorResponse error) {
+            return new() {
+                Code = MapFromCanonical(ex.Status),
+                Message = ex.Message,
+            };
         }
 
-        if (!string.IsNullOrWhiteSpace(requestId)) {
-            status.Details.Add(ToAny(new RequestInfoDetail { RequestId = requestId })!);
+        var status = new Google.Rpc.Status {
+            Code    = MapFromCanonical(error.Error?.Status),
+            Message = error.Error?.Message,
+        };
+
+        if (error.Error?.Details is null) {
+            return status;
+        }
+
+        foreach (var detail in error.Error.Details) {
+            var any = ToAny(detail);
+            if (any is not null) {
+                status.Details.Add(any);
+            }
         }
 
         return status;
@@ -65,11 +74,28 @@ internal static class RpcStatusBuilder
             RequestInfoDetail d => Any.Pack(new RequestInfo {
                 RequestId = d.RequestId ?? "", ServingData = d.ServingData ?? "",
             }),
+            LocalizedMessageDetail d => Any.Pack(new LocalizedMessage {
+                Locale = d.Locale ?? "", Message = d.Message ?? "",
+            }),
+            HelpDetail d => Any.Pack(new Help {
+                Links = {
+                    (d.Links ?? []).Select(l => new Help.Types.Link {
+                        Description = l.Description ?? "", Url = l.Url ?? "",
+                    }),
+                },
+            }),
+            RetryInfoDetail d => Any.Pack(new RetryInfo {
+                RetryDelay = d.RetryDelay is { } delay ? Duration.FromTimeSpan(delay) : null,
+            }),
+            DebugInfoDetail d => Any.Pack(new DebugInfo {
+                StackEntries = { d.StackEntries ?? [] },
+                Detail       = d.Detail ?? "",
+            }),
             var _ => null,
         };
     }
 
-    private static int MapFromCode(string? code) {
+    private static int MapFromCanonical(string? code) {
         return (int)(code switch {
             ErrorCodes.Ok                 => StatusCode.OK,
             ErrorCodes.InvalidArgument    => StatusCode.InvalidArgument,

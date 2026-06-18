@@ -1,8 +1,8 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Resource.Grpc.Integration.Tests;
@@ -24,11 +24,11 @@ builder.UseSchemata(schema => {
     schema.Services.AddDistributedMemoryCache();
     schema.Services.AddDistributedCache();
 
-    var dbName = "grpc-integration-" + Guid.NewGuid();
+    var dbName = "grpc-integration-" + Identifiers.NewUid();
     schema.Services.AddDbContextFactory<TestDbContext>(
         opts => opts.UseInMemoryDatabase(dbName));
 
-    schema.Services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
+    schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
 
     // Auto-assign a unique slug to every new Student (runs before AdviceAddCanonicalName).
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());

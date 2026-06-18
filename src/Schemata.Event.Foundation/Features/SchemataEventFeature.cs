@@ -31,5 +31,8 @@ public sealed class SchemataEventFeature : FeatureBase
         services.TryAddSingleton<IEventTypeRegistry>(sp => EventTypeRegistryActivator.Build(sp.GetRequiredService<IOptions<EventTypeRegistryConfiguration>>()));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventLifecycleObserver, SchemataEventAuditObserver>());
+        services.TryAddSingleton<IEventOutboxPublisher, InProcessEventOutboxPublisher>();
+        services.TryAddSingleton<EventOutboxDispatcher>();
+        services.AddHostedService(sp => sp.GetRequiredService<EventOutboxDispatcher>());
     }
 }

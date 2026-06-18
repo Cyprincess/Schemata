@@ -8,8 +8,15 @@ namespace Schemata.Scheduling.Foundation.Builders;
 /// <summary>Fluent builder for registering scheduled jobs with the Scheduling feature.</summary>
 public sealed class SchedulingBuilder
 {
+    private readonly TimeProvider _time;
+
     /// <summary>Initializes a new <see cref="SchedulingBuilder" /> bound to the given service collection.</summary>
-    public SchedulingBuilder(IServiceCollection services) { Services = services; }
+    /// <param name="services">The service collection used to register jobs and options.</param>
+    /// <param name="timeProvider">Clock used to anchor relative one-time delays; defaults to the system clock.</param>
+    public SchedulingBuilder(IServiceCollection services, TimeProvider? timeProvider = null) {
+        Services = services;
+        _time    = timeProvider ?? TimeProvider.System;
+    }
 
     /// <summary>The underlying service collection used to register jobs and configure options.</summary>
     public IServiceCollection Services { get; }
@@ -31,7 +38,7 @@ public sealed class SchedulingBuilder
     /// <summary>Registers <typeparamref name="T" /> for a one-time fire at <c>UtcNow + delay</c>.</summary>
     public SchedulingBuilder WithJob<T>(TimeSpan delay)
         where T : class, IScheduledJob {
-        return WithJob<T>(new OneTimeSchedule(DateTime.UtcNow + delay));
+        return WithJob<T>(new OneTimeSchedule(_time.GetUtcNow().UtcDateTime + delay));
     }
 
     /// <summary>Registers <typeparamref name="T" /> for a one-time fire at the given UTC <paramref name="runTime" />.</summary>

@@ -1,3 +1,4 @@
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -16,7 +17,7 @@ public sealed class ParallelJoin
     /// <summary>Continues the flow at <paramref name="target" /> after the parallel join.</summary>
     public ActivityBehavior Go(Activity target) {
         _definition.Flows.Add(new() {
-                                  Id = $"sf_{ProcessDefinition.GenerateId()}", Source = _gateway, Target = target,
+                                  Id = $"sf_{Identifiers.NewUid():n}", Source = _gateway, Target = target,
                               });
         return new(_definition, target);
     }

@@ -59,6 +59,12 @@ public static class AutoMapperConfigurator
                     return;
                 }
 
+                if (condition is Expression<Func<TSource, TDestination, bool>> predicate && source is null) {
+                    var shouldIgnore = predicate.Compile();
+                    setter.ForMember(member, options => { options.Condition((s, d) => !shouldIgnore(s, d)); });
+                    return;
+                }
+
                 if (source is not Expression<Func<TSource, object>> expression) {
                     return;
                 }

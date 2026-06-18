@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -18,29 +17,63 @@ public class FlowResourceMethodHandlerShould
     [Fact]
     public async Task Start_DelegatesToRuntime() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: false);
-        var processes = new Mock<IRepository<SchemataProcess>>();
+        var registry = Registry("approval", false);
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
 
         runtime.Setup(r => r.StartProcessInstanceAsync(
                     "approval",
                     It.IsAny<IReadOnlyDictionary<string, object?>?>(),
                     It.IsAny<ClaimsPrincipal?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<object?>(),
                     It.IsAny<CancellationToken>()))
                .ReturnsAsync(process);
 
-        var handler = new StartProcessHandler(runtime.Object, registry.Object, processes.Object);
+        var handler = new StartProcessHandler(runtime.Object, registry.Object);
 
         var result = await handler.InvokeAsync(null, new() { DefinitionName = "approval" }, null, null, CancellationToken.None);
 
         Assert.Same(process, result);
-        runtime.Verify(r => r.StartProcessInstanceAsync("approval", null, null, It.IsAny<CancellationToken>()), Times.Once);
+        runtime.Verify(r => r.StartProcessInstanceAsync("approval", null, null, null, null, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Start_PassesDisplayNameAndDescription_Atomically() {
+        var runtime = new Mock<IProcessRuntime>();
+        var registry = Registry("approval", false);
+        var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
+
+        runtime.Setup(r => r.StartProcessInstanceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyDictionary<string, object?>?>(),
+                    It.IsAny<ClaimsPrincipal?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<object?>(),
+                    It.IsAny<CancellationToken>()))
+               .ReturnsAsync(process);
+
+        var handler = new StartProcessHandler(runtime.Object, registry.Object);
+
+        await handler.InvokeAsync(
+            null,
+            new() { DefinitionName = "approval", DisplayName = "Approve PR", Description = "Review and approve" },
+            null,
+            null,
+            CancellationToken.None);
+
+        // The metadata is supplied to the single start call rather than written by a second commit;
+        // the source entity stays null instead of capturing the cancellation token.
+        runtime.Verify(r => r.StartProcessInstanceAsync(
+                            "approval", null, null, "Approve PR", "Review and approve", null, It.IsAny<CancellationToken>()),
+                        Times.Once);
     }
 
     [Fact]
     public async Task Complete_DelegatesToRuntime() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: false);
+        var registry = Registry("approval", false);
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
         var instance = new ProcessInstance { StateId = "done" };
 
@@ -58,7 +91,7 @@ public class FlowResourceMethodHandlerShould
     [Fact]
     public async Task Signal_DelegatesToRuntime() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: false, signalName: "approved");
+        var registry = Registry("approval", false, "approved");
         runtime.Setup(r => r.ThrowSignalAsync("approved", null, null, It.IsAny<CancellationToken>()))
                .Returns(ValueTask.CompletedTask);
 
@@ -66,14 +99,15 @@ public class FlowResourceMethodHandlerShould
 
         var result = await handler.InvokeAsync(null, new() { SignalName = "approved" }, null, null, CancellationToken.None);
 
-        Assert.Equal("processes", result.CanonicalName);
+        // Throwing a signal returns an empty response body.
+        Assert.NotNull(result);
         runtime.Verify(r => r.ThrowSignalAsync("approved", null, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Terminate_DelegatesToRuntime() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: false);
+        var registry = Registry("approval", false);
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
         var instance = new ProcessInstance { StateId = "terminated" };
 
@@ -91,12 +125,12 @@ public class FlowResourceMethodHandlerShould
     [Fact]
     public async Task Complete_RejectsAnonymous_WhenProcessRequiresAuthorization() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: true);
+        var registry = Registry("approval", true);
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
         var handler = new CompleteActivityHandler(runtime.Object, registry.Object);
 
         await Assert.ThrowsAsync<NotFoundException>(async () =>
-            await handler.InvokeAsync("processes/p1", new(), process, new ClaimsPrincipal(), CancellationToken.None));
+            await handler.InvokeAsync("processes/p1", new(), process, new(), CancellationToken.None));
 
         runtime.Verify(r => r.CompleteActivityAsync(
             It.IsAny<string>(),
@@ -108,7 +142,7 @@ public class FlowResourceMethodHandlerShould
     [Fact]
     public async Task Complete_AllowsAuthenticated_WhenProcessRequiresAuthorization() {
         var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", requiresAuthorization: true);
+        var registry = Registry("approval", true);
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
@@ -129,7 +163,7 @@ public class FlowResourceMethodHandlerShould
     ) {
         var definition = new ProcessDefinition { Name = processName };
         if (signalName is not null) {
-            definition.Signals.Add(new Signal { Name = signalName });
+            definition.Signals.Add(new() { Name = signalName });
         }
 
         var registration = new ProcessRegistration {

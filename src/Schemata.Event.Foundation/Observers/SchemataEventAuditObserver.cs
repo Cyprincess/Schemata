@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Entities;
@@ -31,12 +32,34 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
             EventType     = context.EventType,
             Payload       = context.Payload,
             CorrelationId = context.CorrelationId,
-            State         = EventState.Recorded,
+            State         = context.RequiresOutboxDelivery ? EventState.Pending : EventState.Recorded,
         };
+
+        if (context.Source is not null) {
+            record.SourceType    = context.Source.GetType().FullName;
+            record.Source = context.Source is ICanonicalName named ? named.CanonicalName : null;
+            record.SourceTimestamp     = context.Source is IConcurrency stamped ? stamped.Timestamp : null; 
+        }
 
         context.Record = record;
 
         await _records.AddAsync(record, ct);
+        await _records.CommitAsync(ct);
+    }
+
+    public async Task OnDeliveredAsync(EventContext context, CancellationToken ct = default) {
+        var record = context.Record;
+        if (record is null && !string.IsNullOrEmpty(context.CorrelationId)) {
+            var correlationId = context.CorrelationId;
+            record = await _records.FirstOrDefaultAsync(q => q.Where(r => r.CorrelationId == correlationId), ct);
+        }
+
+        if (record is null) {
+            return;
+        }
+
+        record.State = EventState.Recorded;
+        await _records.UpdateAsync(record, ct);
         await _records.CommitAsync(ct);
     }
 

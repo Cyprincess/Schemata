@@ -16,9 +16,10 @@ public class MapsterShould
                   .Map<Source, Destination>(map => {
                        map.For(d => d.DisplayName)
                           .From(s => (s.Sex == Sex.Male ? "Mr." : "Ms.") + " " + s.Name);
-                       map.For(d => d.Sex).From(s => s.Sex.ToString());
-                       map.For(d => d.Grade).Ignore();
-                   });
+                        map.For(d => d.Sex).From(s => s.Sex.ToString());
+                        map.For(d => d.Grade).Ignore();
+                        map.For(d => d.Nickname).Ignore((s, _) => s.Name == "Hidden");
+                    });
         });
 
         var app   = builder.Build();
@@ -71,5 +72,26 @@ public class MapsterShould
 
         Assert.NotNull(result);
         Assert.Equal(0, result.Grade);
+    }
+
+    [Fact]
+    public void Map_FieldWithIgnorePredicate_CompilesWithoutSourceField() {
+        var mapper = CreateMapper();
+
+        var result = mapper.Map<Destination>(new Source { Name = "Hidden" });
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public void Map_FieldWithIgnorePredicate_AppliesConditionPerInstance() {
+        var mapper = CreateMapper();
+
+        // Predicate is `s.Name == "Hidden"` → Nickname must be ignored for hidden, mapped for visible.
+        var hidden  = mapper.Map<Destination>(new Source { Name = "Hidden",  Nickname = "stealth" });
+        var visible = mapper.Map<Destination>(new Source { Name = "Visible", Nickname = "bright" });
+
+        Assert.Null(hidden!.Nickname);
+        Assert.Equal("bright", visible!.Nickname);
     }
 }

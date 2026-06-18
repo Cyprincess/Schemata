@@ -14,7 +14,7 @@ namespace Schemata.Resource.Foundation;
 /// </summary>
 /// <typeparam name="TEntity">The soft-deletable resource entity type.</typeparam>
 /// <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>
-public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, EmptyResourceRequest, ExpungeResponse>
+public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, EmptyResourceRequest, EmptyResourceResponse>
     where TEntity : class, ICanonicalName, ISoftDelete
 {
     private readonly IRepository<TEntity> _repository;
@@ -25,7 +25,7 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
     /// <param name="repository">The repository for the target resource.</param>
     public ExpungeHandler(IRepository<TEntity> repository) { _repository = repository; }
 
-    public async ValueTask<ExpungeResponse> InvokeAsync(
+    public async ValueTask<EmptyResourceResponse> InvokeAsync(
         string?              name,
         EmptyResourceRequest request,
         TEntity?             entity,
@@ -44,6 +44,7 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
 
         await _repository.CommitAsync(ct);
 
-        return new() { Name = entity.Name, CanonicalName = entity.CanonicalName };
+        // AIP-164 expunge carries no resource body; return an empty response.
+        return new();
     }
 }

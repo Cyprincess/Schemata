@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
@@ -11,7 +12,7 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcessTransitions")]
 [CanonicalName("processes/{process}/transitions/{transition}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataProcessTransition : IIdentifier, ICanonicalName, ITransition, ITimestamp
+public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurrency, ITransition, ITimestamp
 {
     /// <summary>The parent process's <see cref="ICanonicalName.Name" />.</summary>
     public virtual string? Process { get; set; }
@@ -27,6 +28,13 @@ public class SchemataProcessTransition : IIdentifier, ICanonicalName, ITransitio
     public virtual string? Name { get; set; }
 
     public virtual string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IConcurrency Members
+
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

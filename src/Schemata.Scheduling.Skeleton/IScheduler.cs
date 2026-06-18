@@ -39,10 +39,27 @@ public interface IScheduler
     ///     <paramref name="context" />.<see cref="JobContext.Job" /> must be
     ///     unique per trigger. The implementation persists a
     ///     <see cref="SchemataJobExecution" /> row (state <c>Pending</c>) before
-    ///     scheduling the timer so the returned row is immediately addressable
-    ///     under <c>operations/{uid}</c>; the audit observer transitions it to
-    ///     <c>Succeeded</c> / <c>Failed</c> as it fires.
+    ///     handing the row to the execution dispatcher, so the returned row is
+    ///     immediately addressable under <c>operations/{uid}</c>; the dispatcher
+    ///     transitions it to <c>Succeeded</c> / <c>Failed</c> as the body runs.
     /// </summary>
+    /// <remarks>
+    ///     The Pending row is committed in its own unit of work resolved from the
+    ///     framework service provider. Callers cannot join the commit to an outer
+    ///     business transaction: if the outer transaction rolls back, the orphaned
+    ///     Pending row is still drained by the dispatcher (and typically fails with
+    ///     a missing handler when the business context that produced it never landed).
+    ///     A future revision may add an overload accepting an <c>IUnitOfWork</c>;
+    ///     today the contract is eventual-consistency, not transactional.
+    /// </remarks>
     Task<SchemataJobExecution> TriggerAsync<TJob>(JobContext context, CancellationToken ct)
         where TJob : class, IScheduledJob;
+
+    /// <summary>
+    ///     Reschedules a persisted <paramref name="job" /> on host startup. When
+    ///     <paramref name="preparedContext" /> carries an existing unfinished operation
+    ///     execution, the fire reuses that row so a restarted operation completes its
+    ///     original execution instead of creating a duplicate.
+    /// </summary>
+    Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct);
 }

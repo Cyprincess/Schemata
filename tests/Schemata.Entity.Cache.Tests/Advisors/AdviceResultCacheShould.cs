@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
+using Schemata.Common;
 using Schemata.Entity.Cache.Advisors;
 using Schemata.Entity.Cache.Tests.Fixtures;
 using Schemata.Entity.Repository;
@@ -30,9 +31,9 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
+        var data       = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
+            Result = new() { Uid = Identifiers.NewUid(), FullName = "Alice" },
         };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -51,7 +52,7 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
+        var data       = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable();
         var context    = new QueryContext<Student, Student, Student>(repository, data) { Result = null };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -69,9 +70,9 @@ public class AdviceResultCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new QueryCacheSuppressed());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
+        var data       = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
+            Result = new() { Uid = Identifiers.NewUid(), FullName = "Alice" },
         };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -95,8 +96,8 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
-        var entity     = new Student { Uid = Guid.NewGuid(), FullName = "Alice" };
+        var data       = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable();
+        var entity     = new Student { Uid = Identifiers.NewUid(), FullName = "Alice" };
         var context    = new QueryContext<Student, Student, Student>(repository, data) { Result = entity };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -121,7 +122,7 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, Student, int>(mock.Object, DefaultOptions());
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid() } }.AsQueryable();
+        var data       = new[] { new Student { Uid = Identifiers.NewUid() } }.AsQueryable();
         var context    = new QueryContext<Student, Student, int>(repository, data) { Result = 5 };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -142,11 +143,11 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, StudentDto, StudentDto>(mock.Object, DefaultOptions());
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable()
+        var data = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable()
                                                                                      .Select(s => new StudentDto(
                                                                                                  s.Uid, s.FullName));
         var context = new QueryContext<Student, StudentDto, StudentDto>(repository, data) {
-            Result = new(Guid.NewGuid(), "Alice"),
+            Result = new(Identifiers.NewUid(), "Alice"),
         };
 
         var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
@@ -175,9 +176,9 @@ public class AdviceResultCacheShould
         var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, options);
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid() } }.AsQueryable();
+        var data       = new[] { new Student { Uid = Identifiers.NewUid() } }.AsQueryable();
         var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
+            Result = new() { Uid = Identifiers.NewUid(), FullName = "Alice" },
         };
 
         await advisor.AdviseAsync(ctx, context, CancellationToken.None);

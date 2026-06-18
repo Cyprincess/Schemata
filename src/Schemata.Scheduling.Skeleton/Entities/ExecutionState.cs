@@ -17,4 +17,10 @@ public enum ExecutionState
 
     /// <summary>The execution was cancelled before the job body ran.</summary>
     Cancelled,
+
+    /// <summary>The execution was blocked before the job body ran.</summary>
+    Blocked,
+
+    /// <summary>The execution was skipped before the job body ran.</summary>
+    Skipped,
 }

@@ -48,7 +48,7 @@ var entity = await _repository.Once()
           ?? throw ResourceNotFound(name);
 ```
 
-Soft-delete is suppressed so already-tombstoned entities can be hard-deleted. If no entity matches, `NotFoundException` is thrown.
+Soft-delete is suppressed so already-tombstoned entities can be hard-deleted. If no entity matches, `NotFoundException` is thrown - unless the request sets `allow_missing` (AIP-135), in which case the delete returns an empty success (HTTP `204`, gRPC `Empty`) without committing. Over HTTP the flag is the `allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.
 
 ### Stage 5: Delete entity advisors
 
@@ -98,7 +98,7 @@ Resources whose entity implements `ISoftDelete` automatically expose three custo
 | Method | Route | Behavior |
 |---|---|---|
 | `:undelete` | `POST {collection}/{name}:undelete` | Clears `DeleteTime`/`PurgeTime` and returns the restored resource; a live resource fails with `AlreadyExistsException` |
-| `:expunge` | `POST {collection}/{name}:expunge` | Physically removes a soft-deleted resource; a live resource fails with `FailedPreconditionException` |
+| `:expunge` | `POST {collection}/{name}:expunge` | Physically removes a soft-deleted resource and returns an empty body (`EmptyResourceResponse`) per AIP-164; a live resource fails with `FailedPreconditionException`. Authorized independently as the `expunge` permission, not `delete` |
 | `:purge` | `POST {collection}:purge` | Collection-scoped AIP-165 purge: required `filter` (`"*"` matches all) plus `force`; `force=false` previews `purge_count` and a `purge_sample` of up to 100 names without deleting; `force=true` physically deletes the matches. Executes through `IOperationDispatcher` as an addressable `operations/{uid}` resource - a Scheduling bridge package (`Schemata.Scheduling.Http`/`Schemata.Scheduling.Grpc`) must be installed, otherwise the handler throws `InvalidOperationException` |
 
 ## Design motivation
@@ -108,6 +108,7 @@ The delete pipeline returns `DeleteResultBase<TDetail>`. A soft delete responds 
 ## Caveats
 
 - After a soft-delete, `GetAsync` still returns the entity (it suppresses soft-delete filtering). The caller can inspect `DeleteTime` to determine whether the resource is tombstoned.
+- **AIP-211 authorization order.** `AuthorizeHelper` checks the primary permission first; on denial it re-probes with `Get` against the parent. A caller who cannot read the parent receives `NOT_FOUND` rather than `PERMISSION_DENIED`, so resource existence is never disclosed to an unauthorized caller. This is a deliberate deviation from AIP-211's "permission before existence" wording, traded for not leaking existence; a caller who can read the parent does receive `PERMISSION_DENIED` naming the missing permission.
 
 ## See also
 

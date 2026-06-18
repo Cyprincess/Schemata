@@ -10,16 +10,17 @@ using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Resource.Foundation.Internal;
 
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
 ///     Coordinates the advisor pipeline for an AIP-136 custom method invocation:
 ///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate
-///         -> <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
-///         -> <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
-///         -> registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />
-///         -> <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
+///     -> <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
+///     -> <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
+///     -> registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />
+///     -> <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
 ///     Each stage may short-circuit by stashing a <typeparamref name="TResponse" />
 ///     in the <see cref="AdviceContext" /> and returning
 ///     <see cref="AdviseResult.Handle" />.
@@ -44,21 +45,29 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ///     Runs the full custom-method advisor pipeline around the registered
     ///     handler.
     /// </summary>
-    /// <param name="handler">The resolved handler implementing
-    ///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />.</param>
-    /// <param name="verb">The verb in lowerCamelCase as declared by
+    /// <param name="handler">
+    ///     The resolved handler implementing
+    ///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />.
+    /// </param>
+    /// <param name="verb">
+    ///     The verb in lowerCamelCase as declared by
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     ///     Stashed in the <see cref="AdviceContext" /> as
     ///     <see cref="ResourceMethodVerb" /> so downstream advisors can key on it,
     ///     and used as the operation token passed to the
-    ///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate.</param>
-    /// <param name="name">The canonical name of the target resource for
+    ///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate.
+    /// </param>
+    /// <param name="name">
+    ///     The canonical name of the target resource for
     ///     <see cref="ResourceMethodScope.Instance" />-scoped methods, or
     ///     <see langword="null" /> for
-    ///     <see cref="ResourceMethodScope.Collection" />-scoped methods.</param>
+    ///     <see cref="ResourceMethodScope.Collection" />-scoped methods.
+    /// </param>
     /// <param name="request">The incoming request payload.</param>
-    /// <param name="principal">The authenticated caller, or
-    ///     <see langword="null" /> for anonymous calls.</param>
+    /// <param name="principal">
+    ///     The authenticated caller, or
+    ///     <see langword="null" /> for anonymous calls.
+    /// </param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The method's response.</returns>
     /// <exception cref="NotFoundException">
@@ -89,71 +98,56 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         ClaimsPrincipal?                                     principal,
         CancellationToken                                    ct
     ) {
-        switch (await Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                             .RunAsync(ctx, principal, verb, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre!;
-            case AdviseResult.Block:
-            default:
-                throw Blocked(name);
+        var gate = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
+            ctx, () => Advisor.For<IResourceRequestAdvisor<TEntity>>().RunAsync(ctx, principal, verb, ct),
+            () => Blocked(name));
+        if (gate is not null) {
+            return gate;
         }
 
         var container = new ResourceRequestContainer<TEntity>();
         if (name is not null) {
             ResourceIdentifiers.Apply(container, name);
+
+            // The URI target identifies the resource for AIP-155 idempotency; carry it on the request
+            // so the key distinguishes the same verb invoked against different resources.
+            request.CanonicalName = name;
         }
 
-        switch (await Advisor.For<IResourceMethodRequestAdvisor<TEntity, TRequest>>()
-                             .RunAsync(ctx, request, container, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre!;
-            case AdviseResult.Block:
-            default:
-                throw Blocked(name);
+        var requestResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
+            ctx,
+            () => Advisor.For<IResourceMethodRequestAdvisor<TEntity, TRequest>>()
+                         .RunAsync(ctx, request, container, principal, ct), () => Blocked(name));
+        if (requestResult is not null) {
+            return requestResult;
         }
 
-        // Collection-scoped methods (name == null) act on the collection as a whole:
-        // there is no single entity to load, so the entity-stage advisors are skipped
-        // and the handler receives a null entity.
         TEntity? entity = null;
         if (name is not null) {
             using (_repository.SuppressQuerySoftDelete()) {
                 entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
             }
+
             if (entity == null) {
                 throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
             }
 
-            switch (await Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
-                                 .RunAsync(ctx, request, entity, principal, ct)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                    return pre!;
-                case AdviseResult.Block:
-                default:
-                    throw Blocked(name);
+            var methodResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
+                ctx,
+                () => Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
+                             .RunAsync(ctx, request, entity, principal, ct), () => Blocked(name));
+            if (methodResult is not null) {
+                return methodResult;
             }
         }
 
         var response = await handler.InvokeAsync(name, request, entity, principal, ct);
 
-        switch (await Advisor.For<IResourceResponseAdvisor<TEntity, TResponse>>()
-                             .RunAsync(ctx, null, response, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<TResponse>(out var pre):
-                return pre!;
-            case AdviseResult.Block:
-            default:
-                throw Blocked(name);
-        }
-
-        return response;
+        var responseResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
+            ctx,
+            () => Advisor.For<IResourceResponseAdvisor<TEntity, TResponse>>()
+                         .RunAsync(ctx, null, response, principal, ct), () => Blocked(name));
+        return responseResult ?? response;
     }
 
     private static NotFoundException Blocked(string? name) {

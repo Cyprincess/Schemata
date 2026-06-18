@@ -53,12 +53,8 @@ public sealed class AdviceTokenScopeValidation<TApp>(IApplicationManager<TApp> a
         }
 
         foreach (var s in requested) {
-            if (!await apps.HasPermissionAsync(application, PermissionPrefixes.Scope + s, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
-                );
-            }
+            await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
+                error: OAuthErrors.InvalidScope, resource: SchemataResources.ST4006);
         }
 
         return AdviseResult.Continue;

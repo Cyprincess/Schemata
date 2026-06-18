@@ -52,7 +52,8 @@ public static class SimpleMapperHelper
             var value = property.GetValue(destination);
             interiors.Add(new(property, value, node));
             if (value is not null) {
-                SaveUnmasked(value, node, [property], saved);
+                MaskWalker.WalkUnmasked(value, node.Children, [property], false,
+                                        (prefix, target, prop) => saved.Add(new(MaskWalker.Append(prefix, prop), prop.GetValue(target))));
             }
         }
 
@@ -66,11 +67,15 @@ public static class SimpleMapperHelper
             var current = interior.Property.GetValue(destination);
             if (current is null && interior.Value is not null) {
                 interior.Property.SetValue(destination, interior.Value);
-                CopyMaskedLeaves(source, destination, [interior.Property], interior.Node);
+                CopyMaskedLeaves(source, destination, [interior.Property], interior.Node, static _ => true);
+            } else if (current is not null && interior.Value is null) {
+                // The interior was null before the map and the wholesale map populated it, so unmasked
+                // nested fields would otherwise leak in. Trim it back to the masked leaves only.
+                MaskWalker.WalkUnmasked(current, interior.Node.Children, false, static (_, target, prop) => SetDefault(target, prop));
             }
         }
 
-        ClearUnpopulatedMaskedLeaves(source, destination, typeof(TSource), typeof(TDestination), tree.Children);
+        CopyMaskedLeaves(source, destination, typeof(TSource), typeof(TDestination), tree.Children, IsUnpopulated);
     }
 
     /// <summary>
@@ -148,68 +153,23 @@ public static class SimpleMapperHelper
         return !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
     }
 
-    private static void SaveUnmasked(
-        object                      target,
-        MaskTree.MaskNode           node,
-        IReadOnlyList<PropertyInfo> prefix,
-        List<PropertySnapshot>      saved
-    ) {
-        var properties = AppDomainTypeCache.GetWritableProperties(node.TraversalType);
-        foreach (var property in properties) {
-            var path = Append(prefix, property);
-            if (!node.Children.TryGetValue(property.Name, out var child)) {
-                saved.Add(new(path, property.GetValue(target)));
-                continue;
-            }
-
-            if (child.IsLeaf) {
-                continue;
-            }
-
-            var value = property.GetValue(target);
-            if (value is not null) {
-                SaveUnmasked(value, child, path, saved);
-            }
-        }
+    private static void SetDefault(object target, PropertyInfo property) {
+        var @default = property.PropertyType.IsValueType
+            ? Activator.CreateInstance(property.PropertyType)
+            : null;
+        property.SetValue(target, @default);
     }
 
-    private static void ClearUnpopulatedMaskedLeaves(
-        object                                         source,
-        object                                         destination,
-        Type                                           sourceType,
-        Type                                           destinationType,
-        IReadOnlyDictionary<string, MaskTree.MaskNode> nodes
-    ) {
-        var sources      = AppDomainTypeCache.GetProperties(sourceType);
-        var destinations = AppDomainTypeCache.GetProperties(destinationType);
-
-        foreach (var node in nodes.Values) {
-            if (!sources.TryGetValue(node.Name, out var src) || !src.CanRead) continue;
-            if (!destinations.TryGetValue(node.Name, out var dst) || !dst.CanWrite) continue;
-
-            if (node.IsLeaf) {
-                var value = src.GetValue(source);
-                if (!IsUnpopulated(value)) continue;
-                if (CanAssign(dst.PropertyType, value)) {
-                    dst.SetValue(destination, value);
-                }
-
-                continue;
-            }
-
-            var srcValue = src.GetValue(source);
-            var dstValue = dst.GetValue(destination);
-            if (srcValue is null || dstValue is null) continue;
-
-            ClearUnpopulatedMaskedLeaves(srcValue, dstValue, src.PropertyType, dst.PropertyType, node.Children);
-        }
-    }
-
+    /// <summary>
+    ///     Copies masked leaf values from <paramref name="source" /> into the interior reached by
+    ///     <paramref name="prefix" /> on <paramref name="destination" />, honouring <paramref name="shouldCopy" />.
+    /// </summary>
     private static void CopyMaskedLeaves(
         object                      source,
         object                      destination,
         IReadOnlyList<PropertyInfo> prefix,
-        MaskTree.MaskNode           node
+        MaskTree.MaskNode           node,
+        Func<object?, bool>         shouldCopy
     ) {
         var srcRoot = GetValueByNames(source, prefix);
         var dstRoot = GetValue(destination, prefix);
@@ -217,15 +177,22 @@ public static class SimpleMapperHelper
             return;
         }
 
-        CopyMaskedLeaves(srcRoot, dstRoot, srcRoot.GetType(), dstRoot.GetType(), node.Children);
+        CopyMaskedLeaves(srcRoot, dstRoot, srcRoot.GetType(), dstRoot.GetType(), node.Children, shouldCopy);
     }
 
+    /// <summary>
+    ///     Walks the masked nodes and copies each masked leaf from source to destination when
+    ///     <paramref name="shouldCopy" /> accepts the source value. With an always-true predicate this
+    ///     restores masked leaves onto a freshly created interior; with an "unpopulated" predicate it
+    ///     applies AIP-134 clears (a masked leaf whose source is blank clears the destination).
+    /// </summary>
     private static void CopyMaskedLeaves(
         object                                         source,
         object                                         destination,
         Type                                           sourceType,
         Type                                           destinationType,
-        IReadOnlyDictionary<string, MaskTree.MaskNode> nodes
+        IReadOnlyDictionary<string, MaskTree.MaskNode> nodes,
+        Func<object?, bool>                            shouldCopy
     ) {
         var sources      = AppDomainTypeCache.GetProperties(sourceType);
         var destinations = AppDomainTypeCache.GetProperties(destinationType);
@@ -236,6 +203,7 @@ public static class SimpleMapperHelper
 
             if (node.IsLeaf) {
                 var value = src.GetValue(source);
+                if (!shouldCopy(value)) continue;
                 if (CanAssign(dst.PropertyType, value)) {
                     dst.SetValue(destination, value);
                 }
@@ -247,7 +215,7 @@ public static class SimpleMapperHelper
             var dstValue = dst.GetValue(destination);
             if (srcValue is null || dstValue is null) continue;
 
-            CopyMaskedLeaves(srcValue, dstValue, src.PropertyType, dst.PropertyType, node.Children);
+            CopyMaskedLeaves(srcValue, dstValue, src.PropertyType, dst.PropertyType, node.Children, shouldCopy);
         }
     }
 
@@ -298,16 +266,6 @@ public static class SimpleMapperHelper
         }
 
         path[^1].SetValue(current, value);
-    }
-
-    private static PropertyInfo[] Append(IReadOnlyList<PropertyInfo> prefix, PropertyInfo property) {
-        var path = new PropertyInfo[prefix.Count + 1];
-        for (var i = 0; i < prefix.Count; i++) {
-            path[i] = prefix[i];
-        }
-
-        path[^1] = property;
-        return path;
     }
 
     private sealed record PropertySnapshot(IReadOnlyList<PropertyInfo> Path, object? Value);

@@ -58,7 +58,7 @@ public sealed class ResourceNameDescriptor
             var p = parts[i];
             if (p.Length > 2 && p[0] == '{' && p[p.Length - 1] == '}') {
                 var name = p.Substring(1, p.Length - 2);
-                _segments[i] = new(p, name, ResolvePropertyName(SchemataNaming.ToClrMemberName(name)));
+                _segments[i] = new(p, name, ResolvePropertyName(name.Pascalize()));
             } else {
                 _segments[i] = new(p, null, null);
             }
@@ -186,7 +186,7 @@ public sealed class ResourceNameDescriptor
             var value = property.GetValue(entity)?.ToString();
             if (string.IsNullOrWhiteSpace(value)) {
                 throw new ValidationException([new() {
-                    Field       = SchemataNaming.ToWireName(seg.Property!),
+                    Field       = seg.Property!.Underscore(),
                     Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), seg.Property!.Humanize(LetterCasing.Title)),
                     Reason      = FieldReasons.NotEmpty,
                 }]);

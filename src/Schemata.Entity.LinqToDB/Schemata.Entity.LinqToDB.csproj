@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="linq2db" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>

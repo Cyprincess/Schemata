@@ -12,22 +12,21 @@ namespace Schemata.Flow.Foundation;
 
 internal sealed class ProcessPersistence
 {
-    private readonly IServiceProvider             _services;
-
-    public ProcessPersistence(IServiceProvider services) {
-        _services = services;
-    }
-
-    public async ValueTask<SchemataProcess?> FindAsync(string canonicalName, CancellationToken ct) {
-        var processes = _services.GetRequiredService<IRepository<SchemataProcess>>();
+    public async ValueTask<SchemataProcess?> FindAsync(
+        IServiceProvider  services,
+        string            canonicalName,
+        CancellationToken ct
+    ) {
+        var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
 
         return await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == canonicalName), ct);
     }
 
     public async IAsyncEnumerable<SchemataProcess> ListWaitingAsync(
+        IServiceProvider                           services,
         [EnumeratorCancellation] CancellationToken ct
     ) {
-        var processes = _services.GetRequiredService<IRepository<SchemataProcess>>();
+        var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
 
         await foreach (var process in processes.ListAsync<SchemataProcess>(
                            q => q.Where(p => p.WaitingAtId != null), ct)) {
@@ -36,6 +35,7 @@ internal sealed class ProcessPersistence
     }
 
     public async Task PersistTransitionAsync(
+        IServiceProvider          services,
         SchemataProcess           process,
         SchemataProcessTransition transition,
         CancellationToken         ct
@@ -44,8 +44,8 @@ internal sealed class ProcessPersistence
             throw new InvalidOperationException("Process canonical name is required before persistence.");
         }
 
-        var processes = _services.GetRequiredService<IRepository<SchemataProcess>>();
-        var transitions = _services.GetRequiredService<IRepository<SchemataProcessTransition>>();
+        var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
+        var transitions = services.GetRequiredService<IRepository<SchemataProcessTransition>>();
 
         await using var uow = processes.Begin();
         transitions.Join(uow);
@@ -78,6 +78,9 @@ internal sealed class ProcessPersistence
         target.State          = source.State;
         target.WaitingAtId    = source.WaitingAtId;
         target.WaitingAt      = source.WaitingAt;
+        target.SourceType    = source.SourceType;
+        target.Source = source.Source;
+        target.SourceTimestamp     = source.SourceTimestamp;
         target.DisplayName    = source.DisplayName;
         target.DisplayNames   = source.DisplayNames;
         target.Description    = source.Description;

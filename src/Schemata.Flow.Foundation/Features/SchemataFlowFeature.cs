@@ -7,14 +7,17 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Flow.Foundation.Builders;
+using Schemata.Event.Foundation.Features;
+using Schemata.Event.Foundation.Internal;
 using Schemata.Flow.Skeleton;
+using Schemata.Flow.Skeleton.Events;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine;
 
 namespace Schemata.Flow.Foundation.Features;
 
 /// <summary>Registers the BPMN process engine, registry, runtime, and lifecycle observers.</summary>
+[DependsOn<SchemataEventFeature>]
 public sealed class SchemataFlowFeature : FeatureBase
 {
     /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow feature.</summary>
@@ -29,14 +32,11 @@ public sealed class SchemataFlowFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var builder   = new FlowBuilder();
-        var configure = configurators.PopOrDefault<FlowBuilder>();
-        configure(builder);
-
-        var flows = builder.Build();
-
-        services.Configure<SchemataFlowOptions>(options => {
-            options.Configurations.AddRange(flows);
+        services.Configure<EventTypeRegistryConfiguration>(options => {
+            options.Registrations.Add((typeof(ProcessStartedEvent), "flow.process.started"));
+            options.Registrations.Add((typeof(ProcessCompletedEvent), "flow.process.completed"));
+            options.Registrations.Add((typeof(ProcessFailedEvent), "flow.process.failed"));
+            options.Registrations.Add((typeof(TransitionMadeEvent), "flow.transition.made"));
         });
 
         services.TryAddSingleton<IProcessRegistry>(sp => {

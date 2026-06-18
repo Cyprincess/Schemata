@@ -14,9 +14,9 @@ public sealed class EventConsumerBuilder
     /// <summary>The underlying service collection the builder writes to.</summary>
     public IServiceCollection Services { get; }
 
-    /// <summary>Registers the in-process subscription store, handler resolver, and dispatch context.</summary>
+    /// <summary>Registers the durable subscription store, handler resolver, and dispatch context.</summary>
     public EventConsumerBuilder UseInProcess() {
-        Services.TryAddSingleton<IEventSubscriptionStore, InMemoryEventSubscriptionStore>();
+        Services.TryAddScoped<IEventSubscriptionStore, RepositoryEventSubscriptionStore>();
         Services.TryAddScoped<HandlerResolver>();
         Services.TryAddScoped<IEventDispatchContext, EventDispatchContext>();
         return this;

@@ -7,12 +7,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 using SystemTask = System.Threading.Tasks.Task;
@@ -38,6 +40,43 @@ public class ProcessRuntimeShould
         fixture.Transitions.Verify(
             r => r.AddAsync(It.Is<SchemataProcessTransition>(t => t.Event == "Start"), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async SystemTask StartProcessInstanceAsync_TransitionStoresParentProcessName() {
+        var fixture = new RuntimeFixture();
+
+        SchemataProcess?           addedProcess    = null;
+        SchemataProcessTransition? addedTransition = null;
+        fixture.Processes.Setup(r => r.AddAsync(It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
+               .Callback<SchemataProcess, CancellationToken>((p, _) => addedProcess = p)
+               .Returns(SystemTask.CompletedTask);
+        fixture.Transitions.Setup(r => r.AddAsync(It.IsAny<SchemataProcessTransition>(), It.IsAny<CancellationToken>()))
+               .Callback<SchemataProcessTransition, CancellationToken>((t, _) => addedTransition = t)
+               .Returns(SystemTask.CompletedTask);
+
+        await fixture.Runtime.StartProcessInstanceAsync("approval");
+
+        Assert.NotNull(addedProcess);
+        Assert.NotNull(addedTransition);
+        Assert.Equal(addedProcess!.Name, addedTransition!.Process);
+    }
+
+    [Fact]
+    public async SystemTask FlowTransitionAdvisorFailure_AbortsBeforeCommit() {
+        var advisor = new Mock<IFlowTransitionAdvisor>();
+        advisor.SetupGet(a => a.Order).Returns(0);
+        advisor.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new InvalidOperationException("provisioning failed"));
+
+        var fixture = new RuntimeFixture(transitionAdvisor: advisor.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Runtime.StartProcessInstanceAsync("approval").AsTask());
+
+        // Provisioning runs before the transition is persisted, so a failure leaves the unit of
+        // work (and thus the commit) untouched rather than stranding a committed instance.
+        Assert.Empty(fixture.UnitOfWorks);
     }
 
     [Fact]
@@ -97,7 +136,7 @@ public class ProcessRuntimeShould
         public Mock<IRepository<SchemataProcessTransition>> Transitions { get; } = new();
         public List<Mock<IUnitOfWork>> UnitOfWorks { get; } = [];
 
-        public RuntimeFixture() {
+        public RuntimeFixture(IFlowTransitionAdvisor? transitionAdvisor = null) {
             var definition = CreateSignalDefinition();
             var registration = new ProcessRegistration {
                 Name          = definition.Name,
@@ -143,6 +182,9 @@ public class ProcessRuntimeShould
             services.AddKeyedSingleton(SchemataConstants.FlowEngines.StateMachine, Engine.Object);
             services.AddSingleton(Processes.Object);
             services.AddSingleton(Transitions.Object);
+            if (transitionAdvisor is not null) {
+                services.AddSingleton(transitionAdvisor);
+            }
 
             Runtime = new(registry.Object, services.BuildServiceProvider());
         }

@@ -13,6 +13,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;
@@ -60,7 +61,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task ReturnsResponse_WithAllRequiredFields() {
-        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);
@@ -78,7 +79,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task UserCode_HasCorrectFormat() {
-        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest(), null, CancellationToken.None);
@@ -96,8 +97,8 @@ public class DeviceAuthorizeHandlerShould
     }
 
     [Fact]
-    public async Task CreatesDeviceCodeAndUserCodeTokens() {
-        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
+    public async Task Creates_DeviceCodeAndUserCodeTokens() {
+        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var (handler, tokens) = CreateHandler(app);
 
         await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);

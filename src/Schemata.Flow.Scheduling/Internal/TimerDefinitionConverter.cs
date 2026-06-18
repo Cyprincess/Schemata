@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Xml;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
@@ -9,10 +10,12 @@ namespace Schemata.Flow.Scheduling.Internal;
 public static class TimerDefinitionConverter
 {
     /// <summary>Maps a <see cref="TimerDefinition"/> to the matching <see cref="IScheduleDefinition"/>.</summary>
-    public static IScheduleDefinition ToSchedule(TimerDefinition timer) {
+    /// <param name="timer">The BPMN timer definition.</param>
+    /// <param name="time">Clock used to anchor relative durations; defaults to the system clock.</param>
+    public static IScheduleDefinition ToSchedule(TimerDefinition timer, TimeProvider? time = null) {
         return timer.TimerType switch {
-            TimerType.Date     => new OneTimeSchedule(DateTime.Parse(timer.TimeExpression)),
-            TimerType.Duration => new OneTimeSchedule(DateTime.UtcNow + XmlConvert.ToTimeSpan(timer.TimeExpression)),
+            TimerType.Date     => new OneTimeSchedule(DateTime.Parse(timer.TimeExpression, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)),
+            TimerType.Duration => new OneTimeSchedule((time ?? TimeProvider.System).GetUtcNow().UtcDateTime + XmlConvert.ToTimeSpan(timer.TimeExpression)),
             TimerType.Cycle    => new CronSchedule(timer.TimeExpression),
             var _              => throw new ArgumentOutOfRangeException(),
         };

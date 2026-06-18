@@ -228,12 +228,31 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.Equal("run", registered.Verb);
     }
 
+    [Fact]
+    public void AssemblyLoadError_RegistersLoadableResources_NotSilentDropAll() {
+        var services = new ServiceCollection();
+
+        // Simulates a partially-loaded assembly (ReflectionTypeLoadException.Types): one type
+        // resolved, one is null. The resolved resource must still register.
+        SchemataResourceFeature.RegisterDiscoveredResources(services, [typeof(ScanResource), null]);
+
+        var options = BuildOptions(services);
+        Assert.True(options.Resources.ContainsKey(typeof(ScanResource).TypeHandle));
+    }
+
     private static SchemataResourceOptions BuildOptions(IServiceCollection services) {
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
     }
 
     public sealed class PlainEntity : ICanonicalName
+    {
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+    }
+
+    [Resource<ScanResource>]
+    public sealed class ScanResource : ICanonicalName
     {
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }

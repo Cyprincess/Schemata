@@ -68,13 +68,17 @@ public static class SchemataRepositoryBuilderExtensions
     )
         where TContextImplementation : TContext
         where TContext : DataConnection {
-        // Register the default metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
-        // to LINQ to DB mapping attributes so that [Table], [Column], etc. are recognized.
+        // Register the metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
+        // to LINQ to DB mapping attributes so [Table], [Column], etc. are recognized. This mutates the
+        // process-wide MappingSchema.Default rather than a per-context schema: the reader therefore affects
+        // every DataConnection in the process, and repeated UseLinqToDb calls append additional reader
+        // instances. LINQ to DB resolves attributes through any registered reader, so the duplication is
+        // harmless, but the global reach is intentional and shared.
         MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
-        builder.Services.TryAddSingleton(typeof(Func<TContext>), sp => ActivatorUtilities.CreateInstance<TContextImplementation>(sp));
+        builder.Services.TryAddSingleton(typeof(Func<TContext>), sp => (Func<TContext>)(() => ActivatorUtilities.CreateInstance<TContextImplementation>(sp)));
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:

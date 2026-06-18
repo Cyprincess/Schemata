@@ -14,12 +14,12 @@ public class NotFoundException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="NotFoundException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public NotFoundException(
-        int     status  = 404,
-        string? code    = ErrorCodes.NotFound,
+        int     code    = 404,
+        string? status  = ErrorCodes.NotFound,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1006)) { }
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1006)) { }
 }

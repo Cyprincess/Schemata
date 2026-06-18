@@ -12,6 +12,7 @@ using LinqToDB.Mapping;
 using LinqToDB.Metadata;
 using Schemata.Abstractions;
 using ColumnAttribute = System.ComponentModel.DataAnnotations.Schema.ColumnAttribute;
+using ConcurrencyCheckAttribute = System.ComponentModel.DataAnnotations.ConcurrencyCheckAttribute;
 using EfPrimaryKey = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
@@ -27,7 +28,11 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.ColumnAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />, and
-///     <see cref="EfPrimaryKey" /> into their LINQ to DB equivalents.
+///     <see cref="EfPrimaryKey" /> into their LINQ to DB equivalents, and maps
+///     <see cref="ConcurrencyCheckAttribute" /> to
+///     <see cref="global::LinqToDB.Mapping.OptimisticLockPropertyAttribute" /> with
+///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
+///     concurrency token drives LINQ to DB's optimistic-update predicate.
 ///     <see cref="System.ComponentModel.DataAnnotations.KeyAttribute" /> is intentionally NOT
 ///     translated; declare keys with class-level <c>[PrimaryKey]</c> on the entity.
 /// </remarks>
@@ -121,6 +126,10 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
                 Name   = c.Name,
                 DbType = c.TypeName,
             });
+        }
+
+        if (member.HasAttribute<ConcurrencyCheckAttribute>()) {
+            attributes.Add(new OptimisticLockPropertyAttribute(VersionBehavior.Guid));
         }
 
         return attributes.ToArray();

@@ -12,6 +12,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -22,7 +23,7 @@ public class DeviceCodeHandlerShould
     private static Fixture CreateFixture(string? approvedScope = "openid profile email") {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
 
-        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
+        var app        = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -34,7 +35,7 @@ public class DeviceCodeHandlerShould
                                                jsonOpts.Value);
 
         var device = new SchemataToken {
-            Uid               = Guid.NewGuid(),
+            Uid               = Identifiers.NewUid(),
             Name              = "device-1",
             Type              = TokenTypes.DeviceCode,
             Status            = TokenStatuses.Authorized,
@@ -74,7 +75,7 @@ public class DeviceCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public class DeviceCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     [Fact]
@@ -127,7 +128,7 @@ public class DeviceCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidScope, ex.Status);
     }
 
     [Fact]
@@ -138,7 +139,7 @@ public class DeviceCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidScope, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidScope, ex.Status);
     }
 
     [Fact]
@@ -160,7 +161,7 @@ public class DeviceCodeHandlerShould
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               CreateRequest(), null, CancellationToken.None));
 
-        Assert.Equal(OAuthErrors.InvalidGrant, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
     }
 
     #region Nested type: Fixture

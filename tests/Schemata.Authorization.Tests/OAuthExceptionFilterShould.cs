@@ -83,11 +83,11 @@ public class OAuthExceptionFilterShould
         filter.OnException(ctx);
 
         var json = Assert.IsType<JsonResult>(ctx.Result);
-        Assert.Equal(exception.Status, json.StatusCode);
+        Assert.Equal(exception.Code, json.StatusCode);
     }
 
     [Fact]
-    public void IgnoresNonOAuthException() {
+    public void Ignores_NonOAuthException() {
         var filter = CreateFilter("https://auth.example.com");
         var ctx    = CreateContext(null!);
         ctx.Exception = new InvalidOperationException("boom");

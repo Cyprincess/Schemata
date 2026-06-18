@@ -6,6 +6,7 @@ using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -13,7 +14,7 @@ namespace Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 
 public class IntegrationFixture : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Guid.NewGuid():N}.db";
+    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
 
     private ServiceProvider? _root;
 

@@ -71,6 +71,13 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             return Task.FromResult(AdviseResult.Continue);
         }
 
+        if (!IsValidCodeChallenge(authz.Request.CodeChallenge)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.CodeChallenge)
+            );
+        }
+
         // Normalize a missing method to "plain" per RFC 7636 §4.3, and write the result back to
         // the request so every downstream path (silent auto-approval, consent UI, code persistence)
         // sees the same canonical value. Without this, AdviceCodeExchangePkce later receives a null
@@ -104,4 +111,25 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
     }
 
     #endregion
+
+    // RFC 7636 §4.1/§4.2: a code challenge is 43-128 characters drawn from the unreserved set
+    // [A-Za-z0-9-._~]. Rejecting a malformed value here surfaces the fault at the authorize step
+    // instead of as an opaque verifier mismatch during the later code exchange.
+    private static bool IsValidCodeChallenge(string value) {
+        if (value.Length is < 43 or > 128) {
+            return false;
+        }
+
+        foreach (var c in value) {
+            var valid = c is >= 'A' and <= 'Z'
+                     or >= 'a' and <= 'z'
+                     or >= '0' and <= '9'
+                     or '-' or '.' or '_' or '~';
+            if (!valid) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

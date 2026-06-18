@@ -117,7 +117,7 @@ public class AdviceIdentityFeatureGateShould
     [InlineData(IdentityOperation.Login)]
     [InlineData(IdentityOperation.Refresh)]
     [InlineData(IdentityOperation.Profile)]
-    public async Task AlwaysAllowsLoginRefreshProfile(IdentityOperation op) {
+    public async Task AlwaysAllows_LoginRefreshProfile(IdentityOperation op) {
         // These operations have no toggle — they're always allowed
         var opts = new SchemataIdentityOptions {
             AllowRegistration            = false,

@@ -1,11 +1,12 @@
 using Schemata.Core;
+using Schemata.Flow.Foundation.Builders;
 using Schemata.Flow.Http.Features;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Provides the <c>UseFlowHttp</c> extension method on <see cref="SchemataBuilder" />.
+///     Provides the <c>MapHttp</c> extension method on <see cref="SchemataBuilder" />.
 /// </summary>
 public static class SchemataBuilderExtensions
 {
@@ -16,8 +17,7 @@ public static class SchemataBuilderExtensions
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
     /// <returns>The builder for chaining.</returns>
     /// <seealso cref="SchemataFlowHttpFeature" />
-    public static SchemataBuilder UseFlowHttp(this SchemataBuilder builder) {
-        builder.AddSchemataApplicationPart<SchemataFlowHttpFeature>();
+    public static SchemataFlowBuilder MapHttp(this SchemataFlowBuilder builder) {
         builder.AddFeature<SchemataFlowHttpFeature>();
 
         return builder;

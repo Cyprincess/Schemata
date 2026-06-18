@@ -16,17 +16,19 @@ public static class AdviceAddTimestamp
 
 /// <summary>
 ///     Sets <see cref="ITimestamp.CreateTime" /> and <see cref="ITimestamp.UpdateTime" />
-///     to <see cref="DateTime.UtcNow" /> when an entity is added, per
-///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>.
+///     to the current UTC time from the injected <see cref="TimeProvider" /> when an entity is
+///     added, per <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     Runs first in the add pipeline. Only activates for entities implementing
 ///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
 /// </remarks>
-public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAdvisor<TEntity>
+public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? timeProvider = null) : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IRepositoryAddAdvisor<TEntity> Members
 
     public int Order => AdviceAddTimestamp.DefaultOrder;
@@ -45,8 +47,10 @@ public sealed class AdviceAddTimestamp<TEntity> : IRepositoryAddAdvisor<TEntity>
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        timestamp.CreateTime = DateTime.UtcNow;
-        timestamp.UpdateTime = DateTime.UtcNow;
+        // A single reading keeps CreateTime and UpdateTime equal on create per AIP-148.
+        var now = _time.GetUtcNow().UtcDateTime;
+        timestamp.CreateTime = now;
+        timestamp.UpdateTime = now;
 
         return Task.FromResult(AdviseResult.Continue);
     }

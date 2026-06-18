@@ -107,6 +107,30 @@ public class AutoMapperFieldSelectiveShould
     }
 
     [Fact]
+    public void Map_WithNestedFieldList_NullTarget_PopulatesOnlyMaskedLeaf() {
+        var mapper = CreateMapper();
+
+        var source = new Source {
+            Age     = 30,
+            Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
+        };
+
+        var destination = new Destination {
+            Age     = 99,
+            Profile = null,
+        };
+
+        mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
+
+        Assert.Equal(99, destination.Age);
+        Assert.NotNull(destination.Profile);
+        Assert.Equal("New Name", destination.Profile.DisplayName);
+        // The interior was null before mapping; unmasked nested fields must not leak from the source.
+        Assert.Null(destination.Profile.Bio);
+        Assert.Null(destination.Profile.Locale);
+    }
+
+    [Fact]
     public void Map_WithNestedFieldList_ClearsMaskedNullLeaf() {
         var mapper = CreateMapper();
 

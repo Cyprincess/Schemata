@@ -106,22 +106,24 @@ Enables soft deletion per AIP-164. Instead of physically removing a row, the ent
 ```csharp
 public interface IConcurrency
 {
-    Guid? Timestamp { get; set; }
+    Guid Timestamp { get; set; }
 }
 ```
 
-Supports optimistic concurrency control via a GUID version token, per AIP-154. The field is named `Timestamp` for historical reasons; it is not a time value.
+Supports optimistic concurrency control via a GUID version token, per AIP-154. The field is named `Timestamp` for historical reasons; it is not a time value. `Guid.Empty` denotes an unstamped entity.
 
-**Built-in advisors:**
+**Add stamping:**
 
 | Advisor | Pipeline | Order | Behavior |
 |---|---|---|---|
 | `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 | Mints a new `Guid` and assigns it to `Timestamp`. |
-| `AdviceUpdateConcurrency<TEntity>` | Update | 900,000,000 | Loads the stored entity via `repository.GetAsync`, compares `Timestamp` values, throws `ConcurrencyException` on mismatch, then mints a new `Guid`. |
 
-`AdviceUpdateConcurrency` reads the stored row to compare `Timestamp`. Like several other repository-layer behaviours, that read leaves a tracked instance in the EF Core change tracker. The EF Core provider's `UpdateAsync` defends against this by calling `Detach(entity)` before `Context.Update(entity)`; see [Detach before Update](../repository/providers.md#detach-before-update) for the full set of paths it covers.
+**Update enforcement (provider-level).** The concurrency check on update is enforced by the database, not an advisor. Annotate the concrete entity's `Timestamp` with `[ConcurrencyCheck]` (`System.ComponentModel.DataAnnotations`) to enable it. The attribute on the interface does not flow to the implementation, so each consumer entity must declare it.
 
-Both advisors are suppressed by `ConcurrencySuppressed` (call `repository.SuppressConcurrency()`).
+- **EF Core** recognizes `[ConcurrencyCheck]` natively. `UpdateAsync` snapshots the incoming token as the original value and bumps the current value, so `SaveChangesAsync` issues `WHERE <key> AND Timestamp = @original`. A zero-row result raises `DbUpdateConcurrencyException`, normalized to `ConcurrencyException` (ABORTED).
+- **LINQ to DB** maps `[ConcurrencyCheck]` to an optimistic-lock column through the metadata reader registered by `UseLinqToDb`, and `UpdateAsync` calls `UpdateOptimisticAsync`. A zero-row result raises `ConcurrencyException`.
+
+Without `[ConcurrencyCheck]` the update writes unconditionally and concurrent writers can lose updates; the add stamp alone does not guard the update path.
 
 `IConcurrency` is the entity-side counterpart of `IFreshness`. The resource layer computes weak ETags from `Timestamp` and writes them to the response DTO's `EntityTag`.
 

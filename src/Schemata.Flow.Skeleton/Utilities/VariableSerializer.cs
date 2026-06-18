@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Schemata.Common;
 
 namespace Schemata.Flow.Skeleton.Utilities;
 
@@ -9,26 +10,22 @@ namespace Schemata.Flow.Skeleton.Utilities;
 /// </summary>
 public static class VariableSerializer
 {
-    private static readonly JsonSerializerOptions Options = new() {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
     /// <summary>
-    ///     Serializes a dictionary of variables to a JSON string using camelCase property naming.
+    ///     Serializes a dictionary of variables to a JSON string using the shared default JSON options.
     /// </summary>
     /// <param name="variables">The dictionary of variables to serialize.</param>
     /// <returns>A JSON string representing the serialized variables.</returns>
     public static string Serialize(IReadOnlyDictionary<string, object?> variables) {
-        return JsonSerializer.Serialize(variables, Options);
+        return JsonSerializer.Serialize(variables, SchemataJson.Default);
     }
 
     /// <summary>
-    ///     Deserializes a JSON string to a dictionary of variables using camelCase property naming.
+    ///     Deserializes a JSON string to a dictionary of variables using the shared default JSON options.
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
     /// <returns>A dictionary of variables. Returns an empty dictionary if deserialization yields null.</returns>
     public static Dictionary<string, object?> Deserialize(string json) {
-        return JsonSerializer.Deserialize<Dictionary<string, object?>>(json, Options) ?? [];
+        return JsonSerializer.Deserialize<Dictionary<string, object?>>(json, SchemataJson.Default) ?? [];
     }
 
     /// <summary>
@@ -42,13 +39,13 @@ public static class VariableSerializer
     ///     <see cref="JsonElement" />.
     /// </returns>
     public static Dictionary<string, object?> Deserialize(string json, Dictionary<string, Type> typeMap) {
-        var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, Options);
+        var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, SchemataJson.Default);
         raw ??= [];
 
         var result = new Dictionary<string, object?>();
         foreach (var kv in raw) {
             if (typeMap.TryGetValue(kv.Key, out var type)) {
-                result[kv.Key] = JsonSerializer.Deserialize(kv.Value.GetRawText(), type, Options);
+                result[kv.Key] = JsonSerializer.Deserialize(kv.Value.GetRawText(), type, SchemataJson.Default);
             } else {
                 result[kv.Key] = kv.Value;
             }

@@ -534,6 +534,9 @@ public static class SchemataConstants
 
         /// <summary>Cross-parent operations are not supported.</summary>
         public const string CrossParentUnsupported = "cross_parent_unsupported";
+
+        /// <summary>The parent is malformed or unsupported.</summary>
+        public const string InvalidParent = "invalid_parent";
     }
 
     #endregion
@@ -807,6 +810,16 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string ConsentRequired = "consent_required";
+
+        /// <summary>
+        ///     The authorization server does not support the presented token type, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2.1">
+        ///         RFC 7009: OAuth 2.0 Token Revocation
+        ///         §2.2.1: Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string UnsupportedTokenType = "unsupported_token_type";
     }
 
     #endregion
@@ -1038,6 +1051,76 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string SubjectTokenType = "subject_token_type";
+
+        /// <summary>
+        ///     Token exchange actor_token parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ActorToken = "actor_token";
+
+        /// <summary>
+        ///     Token exchange actor_token_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ActorTokenType = "actor_token_type";
+
+        /// <summary>
+        ///     Token exchange requested_token_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RequestedTokenType = "requested_token_type";
+
+        /// <summary>
+        ///     Token exchange issued_token_type response parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange
+        ///         §2.2.1: Successful Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string IssuedTokenType = "issued_token_type";
+
+        /// <summary>
+        ///     Token exchange resource parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string TargetResource = "resource";
+
+        /// <summary>
+        ///     Token exchange audience parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Audience = "audience";
+
+        /// <summary>
+        ///     Token revocation / introspection token_type_hint parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.1">
+        ///         RFC 7009: OAuth 2.0 Token Revocation
+        ///         §2.1: Revocation Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string TokenTypeHint = "token_type_hint";
 
         /// <summary>
         ///     PKCE code_challenge parameter, per
@@ -1635,6 +1718,56 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string AccessToken = "urn:ietf:params:oauth:token-type:access_token";
+
+        /// <summary>
+        ///     Refresh token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RefreshToken = "urn:ietf:params:oauth:token-type:refresh_token";
+
+        /// <summary>
+        ///     ID token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string IdToken = "urn:ietf:params:oauth:token-type:id_token";
+
+        /// <summary>
+        ///     SAML 1.1 assertion token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Saml1 = "urn:ietf:params:oauth:token-type:saml1";
+
+        /// <summary>
+        ///     SAML 2.0 assertion token type URI, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-3">
+        ///         RFC 8693: OAuth 2.0 Token Exchange §3: Token
+        ///         Type Identifiers
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Saml2 = "urn:ietf:params:oauth:token-type:saml2";
+
+        /// <summary>
+        ///     Indicates whether <paramref name="uri" /> is a standard RFC 8693 §3 token type
+        ///     identifier. Schemata-internal token type URIs are not standard exchange types.
+        /// </summary>
+        /// <param name="uri">The token type URI to test.</param>
+        /// <returns><see langword="true" /> for a standard RFC 8693 token type URI.</returns>
+        public static bool IsStandard(string uri) {
+            return uri is Jwt or AccessToken or RefreshToken or IdToken or Saml1 or Saml2;
+        }
 
         /// <summary>Schemata-internal token type URI for an interaction token reference.</summary>
         public const string Interaction = "urn:schemata:authorization:token-type:interaction";

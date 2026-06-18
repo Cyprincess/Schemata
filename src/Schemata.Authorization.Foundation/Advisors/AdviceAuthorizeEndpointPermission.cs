@@ -36,17 +36,14 @@ public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        if (!await manager.HasPermissionAsync(authz.Application, PermissionPrefixes.Endpoint + Endpoints.Authorize, ct)) {
-            throw new OAuthException(
-                OAuthErrors.UnauthorizedClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4007),
-                403
-            ) {
-                RedirectUri  = authz.Request?.RedirectUri,
-                State        = authz.Request?.State,
-                ResponseMode = authz.ResponseMode,
-            };
-        }
+        await PermissionAdvice.RequireAsync(
+            manager, authz.Application, PermissionPrefixes.Endpoint + Endpoints.Authorize, ct,
+            code: 403,
+            configure: exception => {
+                exception.RedirectUri  = authz.Request?.RedirectUri;
+                exception.State        = authz.Request?.State;
+                exception.ResponseMode = authz.ResponseMode;
+            });
 
         return AdviseResult.Continue;
     }

@@ -7,7 +7,7 @@ namespace Schemata.Abstractions.Errors;
 ///     and log correlation, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-[Polymorphic(typeof(IErrorDetail))]
+[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.RequestInfo")]
 public class RequestInfoDetail : IErrorDetail
 {
     /// <summary>
@@ -21,13 +21,4 @@ public class RequestInfoDetail : IErrorDetail
     ///     (e.g. serialized headers, routing annotations).
     /// </summary>
     public virtual string? ServingData { get; set; }
-
-    #region IErrorDetail Members
-
-    /// <summary>
-    ///     Returns <c>"type.googleapis.com/google.rpc.RequestInfo"</c>.
-    /// </summary>
-    public string Type => "type.googleapis.com/google.rpc.RequestInfo";
-
-    #endregion
 }

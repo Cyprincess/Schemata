@@ -34,10 +34,12 @@ public static class AdviceCodeExchangeValidation
 ///     (RFC 6749 §2.3.1).
 /// </remarks>
 /// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
-public sealed class AdviceCodeExchangeValidation<TApp, TToken> : ICodeExchangeAdvisor<TApp, TToken>
+public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? timeProvider = null) : ICodeExchangeAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region ICodeExchangeAdvisor<TApp,TToken> Members
 
     /// <inheritdoc cref="AdviseResult" />
@@ -62,7 +64,7 @@ public sealed class AdviceCodeExchangeValidation<TApp, TToken> : ICodeExchangeAd
             );
         }
 
-        if (exchange.CodeToken.ExpireTime.HasValue && exchange.CodeToken.ExpireTime.Value <= DateTime.UtcNow) {
+        if (exchange.CodeToken.ExpireTime.HasValue && exchange.CodeToken.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.ST4004)

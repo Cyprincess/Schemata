@@ -1,6 +1,8 @@
 using System;
 using System.Text.Json;
+using System.Xml;
 using Humanizer;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -49,12 +51,12 @@ public static class ProcessBuilder
     /// <param name="definition">The process definition being built.</param>
     /// <param name="exits">The parallel branches that must all arrive before the join fires.</param>
     public static ParallelJoin Join(this ProcessDefinition definition, params Activity[] exits) {
-        var joinGateway = new ParallelGateway { Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = "Join" };
+        var joinGateway = new ParallelGateway { Id = $"gateway_{Identifiers.NewUid():n}", Name = "Join" };
         definition.Elements.Add(joinGateway);
 
         foreach (var exit in exits) {
             definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = exit, Target = joinGateway,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = exit, Target = joinGateway,
             });
         }
 
@@ -65,12 +67,12 @@ public static class ProcessBuilder
     /// <param name="definition">The process definition being built.</param>
     /// <param name="exits">The inclusive branches that must all arrive before the merge fires.</param>
     public static InclusiveMerge Merge(this ProcessDefinition definition, params Activity[] exits) {
-        var mergeGateway = new InclusiveGateway { Id = $"gateway_{ProcessDefinition.GenerateId()}", Name = "Merge" };
+        var mergeGateway = new InclusiveGateway { Id = $"gateway_{Identifiers.NewUid():n}", Name = "Merge" };
         definition.Elements.Add(mergeGateway);
 
         foreach (var exit in exits) {
             definition.Flows.Add(new() {
-                Id = $"sf_{ProcessDefinition.GenerateId()}", Source = exit, Target = mergeGateway,
+                Id = $"sf_{Identifiers.NewUid():n}", Source = exit, Target = mergeGateway,
             });
         }
 
@@ -79,19 +81,20 @@ public static class ProcessBuilder
 
     public static Branch When<T>(this ProcessDefinition definition, Func<T, bool> predicate)
         where T : class {
-        var key     = typeof(T).Name.Underscore().ToLowerInvariant();
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var key = typeof(T).Name.Underscore().ToLowerInvariant();
 
-        return new(new NoneTask { Name = "branch", Id = ProcessDefinition.GenerateId() },
+        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") },
                    new LambdaConditionExpression {
                        Lambda = ctx => {
                            if (!ctx.Variables.TryGetValue(key, out var value)) {
                                return new(false);
                            }
 
+                           // Condition variables may arrive from legacy payloads with casing that differs
+                           // from the process model, so bind with the case-insensitive shared options.
                            var entity = value switch {
                                T t              => t,
-                               JsonElement json => JsonSerializer.Deserialize<T>(json.GetRawText(), options),
+                               JsonElement json => JsonSerializer.Deserialize<T>(json.GetRawText(), SchemataJson.Default),
                                var _            => null,
                            };
 
@@ -104,13 +107,13 @@ public static class ProcessBuilder
     /// <param name="definition">The process definition being built.</param>
     /// <param name="condition">The condition expression that must evaluate to true for this branch to be taken.</param>
     public static Branch When(this ProcessDefinition definition, IConditionExpression condition) {
-        return new(new NoneTask { Name = "branch", Id = ProcessDefinition.GenerateId() }, condition);
+        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") }, condition);
     }
 
     /// <summary>Creates the default branch taken when no other condition in a gateway matches.</summary>
     /// <param name="definition">The process definition being built.</param>
     public static Branch Otherwise(this ProcessDefinition definition) {
-        return new(new NoneTask { Name = "branch", Id = ProcessDefinition.GenerateId() }, isDefault: true);
+        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") }, isDefault: true);
     }
 
     /// <summary>Creates an event-based gateway branch that fires when <paramref name="message" /> is received.</summary>
@@ -128,7 +131,7 @@ public static class ProcessBuilder
     /// <param name="duration">The elapsed time before this branch fires.</param>
     public static EventBranch OnTimer(this ProcessDefinition definition, TimeSpan duration) {
         return new(new TimerDefinition {
-            Name = $"Timer_{duration}", TimerType = TimerType.Duration, TimeExpression = duration.ToString(),
+            Name = $"Timer_{duration}", TimerType = TimerType.Duration, TimeExpression = XmlConvert.ToString(duration),
         });
     }
 

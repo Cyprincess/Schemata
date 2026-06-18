@@ -42,9 +42,11 @@ public static class AdviceAuthorizePrompt
 ///     exceeds the specified age.
 /// </remarks>
 /// <seealso cref="AdviceAuthorizeConsent{TApp, TAuth}" />
-public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
+public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? timeProvider = null) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IAuthorizeAdvisor<TApp> Members
 
     /// <inheritdoc cref="AdviseResult" />
@@ -105,7 +107,7 @@ public sealed class AdviceAuthorizePrompt<TApp> : IAuthorizeAdvisor<TApp>
         var at = authz.Principal?.FindFirstValue(Claims.AuthTime);
         if (!string.IsNullOrWhiteSpace(at) && long.TryParse(at, out var epoch)) {
             var time = DateTimeOffset.FromUnixTimeSeconds(epoch);
-            if (DateTimeOffset.UtcNow - time <= TimeSpan.FromSeconds(age)) {
+            if (_time.GetUtcNow() - time <= TimeSpan.FromSeconds(age)) {
                 return Task.FromResult(AdviseResult.Continue);
             }
         }

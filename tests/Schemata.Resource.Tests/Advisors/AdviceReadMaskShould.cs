@@ -25,6 +25,29 @@ public class AdviceReadMaskShould
     }
 
     [Fact]
+    public async Task Response_WithNameAndEtagMask_KeepsCanonicalNameAndEntityTag() {
+        var advisor = new AdviceResponseReadMask<Student, Student>();
+        var ctx     = Ctx(new("name,etag"));
+        var detail = new Student {
+            FullName      = "Alice",
+            Age           = 18,
+            Name          = "alice-1",
+            CanonicalName = "students/alice-1",
+            EntityTag     = "v1",
+        };
+
+        await advisor.AdviseAsync(ctx, new(), detail, null);
+
+        // Wire "name" resolves to CanonicalName and "etag" to EntityTag; the internal Name and every
+        // unlisted field are trimmed.
+        Assert.Equal("students/alice-1", detail.CanonicalName);
+        Assert.Equal("v1", detail.EntityTag);
+        Assert.Null(detail.Name);
+        Assert.Null(detail.FullName);
+        Assert.Equal(0, detail.Age);
+    }
+
+    [Fact]
     public async Task Response_WithoutMarker_LeavesDetailIntact() {
         var advisor = new AdviceResponseReadMask<Student, Student>();
         var ctx     = Ctx(null);

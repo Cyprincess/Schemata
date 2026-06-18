@@ -14,12 +14,12 @@ public class AlreadyExistsException : SchemataException
     /// <summary>
     ///     Initializes a new <see cref="AlreadyExistsException" />.
     /// </summary>
-    /// <param name="status">HTTP response status code.</param>
-    /// <param name="code">Canonical error code from <c>google.rpc.Code</c>.</param>
+    /// <param name="code">HTTP response status code.</param>
+    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
     /// <param name="message">Developer-oriented diagnostic message.</param>
     public AlreadyExistsException(
-        int     status  = 409,
-        string? code    = ErrorCodes.AlreadyExists,
+        int     code    = 409,
+        string? status  = ErrorCodes.AlreadyExists,
         string? message = null
-    ) : base(status, code, message ?? SchemataResources.GetResourceString(SchemataResources.ST1007)) { }
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1007)) { }
 }

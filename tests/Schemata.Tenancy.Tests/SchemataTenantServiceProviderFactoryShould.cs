@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,6 +73,40 @@ public class SchemataTenantServiceProviderFactoryShould
     }
 
     [Fact]
+    public void TenantOverride_ResolvesDependencyFromHostRoot() {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDependency, RootDependency>();
+
+        var options = new SchemataTenancyOptions();
+        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IConsumer, TenantConsumer>()];
+
+        var       factory = Build(options, services);
+        using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));
+
+        // The tenant override's constructor dependency is satisfied from the host root.
+        var consumer = Assert.IsType<TenantConsumer>(lease.Provider.GetRequiredService<IConsumer>());
+        Assert.IsType<RootDependency>(consumer.Dependency);
+    }
+
+    [Fact]
+    public void Enumerable_MergesHostAndTenantRegistrations() {
+        var services = new ServiceCollection();
+        services.AddSingleton<IMarker, MarkerA>();
+
+        var options = new SchemataTenancyOptions();
+        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerB>()];
+
+        var       factory = Build(options, services);
+        using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));
+
+        // IEnumerable resolution sees both the host registration and the tenant addition.
+        var markers = lease.Provider.GetServices<IMarker>().ToList();
+        Assert.Equal(2, markers.Count);
+        Assert.Contains(markers, m => m is MarkerA);
+        Assert.Contains(markers, m => m is MarkerB);
+    }
+
+    [Fact]
     public void Null_Tenant_Throws_TenantResolveException() {
         var factory = Build(new());
 
@@ -126,9 +161,6 @@ public class SchemataTenantServiceProviderFactoryShould
         var guid = DeterministicGuid(id);
         var mock = new Mock<ITenantContextAccessor<SchemataTenant>>();
         mock.SetupGet(a => a.Tenant).Returns(new SchemataTenant { Uid = guid });
-        mock.Setup(a => a.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        mock.Setup(a => a.InitializeAsync(It.IsAny<SchemataTenant>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
         mock.Setup(a => a.GetBaseServiceProviderAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ServiceCollection().BuildServiceProvider());
         return mock.Object;
@@ -182,6 +214,33 @@ public class SchemataTenantServiceProviderFactoryShould
     #region Nested type: MarkerC
 
     private sealed class MarkerC : IMarker;
+
+    #endregion
+
+    #region Nested type: IDependency
+
+    private interface IDependency;
+
+    #endregion
+
+    #region Nested type: RootDependency
+
+    private sealed class RootDependency : IDependency;
+
+    #endregion
+
+    #region Nested type: IConsumer
+
+    private interface IConsumer;
+
+    #endregion
+
+    #region Nested type: TenantConsumer
+
+    private sealed class TenantConsumer(IDependency dependency) : IConsumer
+    {
+        public IDependency Dependency { get; } = dependency;
+    }
 
     #endregion
 }

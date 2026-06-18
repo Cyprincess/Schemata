@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
@@ -11,10 +12,16 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [Table("SchemataJobs")]
 [CanonicalName("jobs/{job}")]
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(Name), IsUnique = true)]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    /// <summary>Assembly-qualified <see cref="IScheduledJob" /> type the scheduler will resolve and run.</summary>
+    /// <summary>Legacy assembly-qualified <see cref="IScheduledJob" /> type retained for JobKey migration read-back.</summary>
+    [Obsolete("Migrated to JobKey. Will be removed after AQN→JobKey migration completes.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public virtual string? JobType { get; set; }
+
+    /// <summary>Stable job identifier resolved through <see cref="IScheduledJobRegistry" />.</summary>
+    public virtual string? JobKey { get; set; }
 
     /// <summary>Discriminator for the schedule kind.</summary>
     public virtual ScheduleType ScheduleType { get; set; }
@@ -25,10 +32,19 @@ public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
     /// <summary>Interval ticks for <see cref="Entities.ScheduleType.Periodic" /> entries.</summary>
     public virtual long? IntervalTicks { get; set; }
 
+    /// <summary>
+    ///     Anchor for <see cref="Entities.ScheduleType.Periodic" /> entries, preserving the
+    ///     <c>StartTime</c> so interval boundaries survive a round-trip through persistence.
+    /// </summary>
+    public virtual DateTime? AnchorTime { get; set; }
+
     /// <summary>Cron expression for <see cref="Entities.ScheduleType.Cron" /> entries.</summary>
     public virtual string? CronExpression { get; set; }
 
-    /// <summary>Serialized <see cref="JobContext.Variables" /> for the next fire.</summary>
+    /// <summary>Serialized typed argument payload consumed by the job body through <see cref="JobContext.ArgsJson" />.</summary>
+    public virtual string? ArgsJson { get; set; }
+
+    /// <summary>Serialized free-form <see cref="JobContext.Variables" /> for callers that use the dictionary channel.</summary>
     public virtual string? Variables { get; set; }
 
     /// <summary>
@@ -57,7 +73,8 @@ public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 
     #region IConcurrency Members
 
-    public virtual Guid? Timestamp { get; set; }
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #endregion
 

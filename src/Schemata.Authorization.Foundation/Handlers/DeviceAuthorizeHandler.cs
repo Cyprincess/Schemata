@@ -40,12 +40,14 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
     ITokenManager<TToken>                  tokens,
     IOptions<SchemataAuthorizationOptions> options,
     IServiceProvider                       sp,
-    IOptions<JsonSerializerOptions>        json
+    IOptions<JsonSerializerOptions>        json,
+    TimeProvider?                          timeProvider = null
 ) : DeviceAuthorizeEndpoint
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    private const string UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private const    string       UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private readonly TimeProvider _time            = timeProvider ?? TimeProvider.System;
 
     public override async Task<AuthorizationResult> DeviceAuthorizeAsync(
         DeviceAuthorizeRequest             request,
@@ -79,7 +81,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
                 );
         }
 
-        var now    = DateTime.UtcNow;
+        var now    = _time.GetUtcNow().UtcDateTime;
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new TToken {

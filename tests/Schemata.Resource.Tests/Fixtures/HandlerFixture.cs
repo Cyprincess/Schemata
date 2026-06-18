@@ -101,7 +101,7 @@ public class HandlerFixture
             Grade         = 1,
             Name          = "alice-1",
             CanonicalName = "students/alice-1",
-            Timestamp     = Guid.NewGuid(),
+            Timestamp     = Identifiers.NewUid(),
         },
         new() {
             Uid           = Guid.Parse("22222222-2222-2222-2222-222222222222"),
@@ -110,7 +110,7 @@ public class HandlerFixture
             Grade         = 2,
             Name          = "bob-2",
             CanonicalName = "students/bob-2",
-            Timestamp     = Guid.NewGuid(),
+            Timestamp     = Identifiers.NewUid(),
         },
     ];
 

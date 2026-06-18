@@ -29,6 +29,14 @@ public static class AipParser
         var not   = WithWordBoundary(Parsers.Terms.Text("NOT", true)).Then(_ => "NOT");
         var minus = Parsers.Terms.Char('-');
 
+        var duration = Parsers.Terms.Pattern(c => char.IsDigit(c) || c is '.' or 's' or 'S')
+                              .When((_, span) => {
+                                   var s = span.Span.ToString();
+                                   return s.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+                                       && s.Length > 1
+                                       && s.Substring(0, s.Length - 1).Any(char.IsDigit);
+                               })
+                              .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
         var number = Parsers.Terms.Decimal().Then((c, n) => new Number(c.Scanner.Cursor.Position, n));
         var integer = Parsers.Terms.Integer()
                              .When((ctx, _) => {
@@ -72,8 +80,9 @@ public static class AipParser
         var eq  = Parsers.Terms.Char(Equal.Char).Then((c,       _) => new Equal(c.Scanner.Cursor.Position));
         var has = Parsers.Terms.Char(Has.Char).Then((c,         _) => new Has(c.Scanner.Cursor.Position));
 
-        var value = integer.Then<IValue>(v => v)
-                           .Or(number.Then<IValue>(v => v))
+        var value = duration.Then<IValue>(v => v)
+                            .Or(integer.Then<IValue>(v => v))
+                            .Or(number.Then<IValue>(v => v))
                            .Or(truth.Then<IValue>(v => v))
                            .Or(@null.Then<IValue>(v => v))
                            .Or(unquoted.Then<IValue>(v => v))

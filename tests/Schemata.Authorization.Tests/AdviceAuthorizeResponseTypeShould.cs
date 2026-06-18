@@ -54,7 +54,7 @@ public class AdviceAuthorizeResponseTypeShould
     }
 
     [Fact]
-    public async Task AcceptAllowedResponseType() {
+    public async Task Accept_AllowedResponseType() {
         var (advisor, ctx) = Create("code");
 
         var result = await advisor.AdviseAsync(ctx, Authz(Req("code")));
@@ -63,7 +63,7 @@ public class AdviceAuthorizeResponseTypeShould
     }
 
     [Fact]
-    public async Task NormalizeResponseTypeOrder() {
+    public async Task Normalize_ResponseTypeOrder() {
         var (advisor, ctx) = Create("code id_token");
 
         var request = Req("id_token code");
@@ -73,24 +73,24 @@ public class AdviceAuthorizeResponseTypeShould
     }
 
     [Fact]
-    public async Task RejectUnsupportedResponseType() {
+    public async Task Reject_UnsupportedResponseType() {
         var (advisor, ctx) = Create("code");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, Authz(Req("token"))));
-        Assert.Equal(OAuthErrors.UnsupportedResponseType, ex.Code);
+        Assert.Equal(OAuthErrors.UnsupportedResponseType, ex.Status);
     }
 
     [Fact]
-    public async Task RejectUnsupportedResponseMode() {
+    public async Task Reject_UnsupportedResponseMode() {
         var (advisor, ctx) = Create("code");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(
                                                               ctx, Authz(Req("code", "form_post"))));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
-    public async Task AcceptEmptyResponseMode() {
+    public async Task Accept_EmptyResponseMode() {
         var (advisor, ctx) = Create("code");
 
         var result = await advisor.AdviseAsync(ctx, Authz(Req("code")));

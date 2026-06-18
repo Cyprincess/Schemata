@@ -38,6 +38,8 @@ public sealed class Mapping<TSource, TDestination> : IMapping
 
     public bool IsIgnored { get; set; }
 
+    internal bool IsConditionallyIgnored => IgnoreCondition is not null;
+
     public bool HasSourceField => SourceField is not null;
 
     public string DestinationFieldName => DestinationField!.ToString();
@@ -52,6 +54,8 @@ public sealed class Mapping<TSource, TDestination> : IMapping
 
     internal void SetIgnoreCondition(Expression<Func<TSource, TDestination, bool>> condition) {
         IgnoreCondition = condition;
+        SourceField     = null;
+        WithExpression  = null;
     }
 
     internal void SetWithExpression(Expression<Func<TSource, TDestination>> expression) { WithExpression = expression; }

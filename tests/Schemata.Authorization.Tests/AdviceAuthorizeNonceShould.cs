@@ -25,16 +25,16 @@ public class AdviceAuthorizeNonceShould
     }
 
     [Fact]
-    public async Task RequireNonceForIdTokenResponseType() {
+    public async Task RequireNonce_ForIdTokenResponseType() {
         var (advisor, ctx) = Create();
         var authz = new AuthorizeContext<SchemataApplication> { Request = new() { ResponseType = "code id_token" } };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.InvalidRequest, ex.Code);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
     }
 
     [Fact]
-    public async Task AcceptIdTokenResponseTypeWithNonce() {
+    public async Task AcceptIdTokenResponseType_WithNonce() {
         var (advisor, ctx) = Create();
         var authz = new AuthorizeContext<SchemataApplication> {
             Request = new() { ResponseType = "code id_token", Nonce = "abc" },
@@ -46,7 +46,7 @@ public class AdviceAuthorizeNonceShould
     }
 
     [Fact]
-    public async Task SkipNonceCheckWhenNotRequired() {
+    public async Task SkipNonceCheck_WhenNotRequired() {
         var (advisor, ctx) = Create(false);
         var authz = new AuthorizeContext<SchemataApplication> { Request = new() { ResponseType = "code id_token" } };
 
@@ -56,7 +56,7 @@ public class AdviceAuthorizeNonceShould
     }
 
     [Fact]
-    public async Task ContinueWhenResponseTypeHasNoIdToken() {
+    public async Task Continue_WhenResponseTypeHasNoIdToken() {
         var (advisor, ctx) = Create();
         var authz = new AuthorizeContext<SchemataApplication> { Request = new() { ResponseType = "code" } };
 

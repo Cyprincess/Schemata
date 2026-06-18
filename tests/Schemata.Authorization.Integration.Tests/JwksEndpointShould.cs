@@ -9,6 +9,7 @@ using Xunit;
 namespace Schemata.Authorization.Integration.Tests;
 
 [Trait("Category", "Integration")]
+[Trait("Layer", "Component")]
 public class JwksEndpointShould : IClassFixture<WebAppFactory>
 {
     private readonly HttpClient _client;
@@ -16,7 +17,7 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
     public JwksEndpointShould(WebAppFactory factory) { _client = factory.CreateClient(); }
 
     [Fact]
-    public async Task ReturnsValidJwkSet() {
+    public async Task ReturnsValidJwkSet_FromJwksEndpoint() {
         var response = await _client.GetAsync("/.well-known/jwks");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -27,7 +28,7 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task ContainsPublicKeyOnly() {
+    public async Task Jwks_ContainsPublicKeyOnly() {
         var response = await _client.GetAsync("/.well-known/jwks");
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var keys     = json.RootElement.GetProperty("keys");
@@ -44,7 +45,7 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
-    public async Task HasRequiredFields() {
+    public async Task Jwks_HasRequiredFields() {
         var response = await _client.GetAsync("/.well-known/jwks");
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var keys     = json.RootElement.GetProperty("keys");

@@ -37,17 +37,9 @@ public sealed class AdviceEnrollValidation<TUser>(SchemataUserManager<TUser> use
             return AdviseResult.Continue;
         }
 
-        if (await users.GetUserAsync(principal) is not { } user) {
-            throw new NotFoundException();
-        }
+        var user = await IdentityValidation.RequireUserAsync(users, principal);
 
-        if (string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
-            throw new ValidationException([new() {
-                Field       = nameof(request.TwoFactorCode).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(request.TwoFactorCode).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
-            }]);
-        }
+        IdentityValidation.RequireNotEmpty(request.TwoFactorCode, nameof(request.TwoFactorCode));
 
         if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode)) {
             throw new AuthorizationException();

@@ -26,9 +26,11 @@ public static class AdviceRemoveSoftDelete
 ///     the physical delete. Only activates for entities implementing <see cref="ISoftDelete" />.
 ///     Suppressed by <see cref="SoftDeleteSuppressed" />.
 /// </remarks>
-public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAdvisor<TEntity>
+public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? timeProvider = null) : IRepositoryRemoveAdvisor<TEntity>
     where TEntity : class
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IRepositoryRemoveAdvisor<TEntity> Members
 
     public int Order => AdviceRemoveSoftDelete.DefaultOrder;
@@ -47,7 +49,7 @@ public sealed class AdviceRemoveSoftDelete<TEntity> : IRepositoryRemoveAdvisor<T
             return AdviseResult.Continue;
         }
 
-        trash.DeleteTime = DateTime.UtcNow;
+        trash.DeleteTime = _time.GetUtcNow().UtcDateTime;
 
         // Persist as an update rather than a delete so the row is retained.
         await repository.UpdateAsync(entity, ct);

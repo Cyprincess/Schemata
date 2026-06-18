@@ -1,8 +1,8 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Common;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -24,7 +24,6 @@ public static class AdviceAddConcurrency
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     Only activates for entities implementing <see cref="IConcurrency" />.
-///     Suppressed by <see cref="ConcurrencySuppressed" />.
 /// </remarks>
 public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -39,15 +38,11 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntit
         TEntity              entity,
         CancellationToken    ct
     ) {
-        if (ctx.Has<ConcurrencySuppressed>()) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
         if (entity is not IConcurrency concurrency) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        concurrency.Timestamp = Guid.NewGuid();
+        concurrency.Timestamp = Identifiers.NewUid();
 
         return Task.FromResult(AdviseResult.Continue);
     }

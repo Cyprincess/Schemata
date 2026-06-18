@@ -33,13 +33,16 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     IScopeManager<TScope>                  scopes,
     IAuthorizationManager<TAuth>           auths,
     IOptions<SchemataAuthorizationOptions> options,
-    IOptions<JsonSerializerOptions>        json
+    IOptions<JsonSerializerOptions>        json,
+    TimeProvider?                          timeProvider = null
 ) : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
     where TToken : SchemataToken
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     #region IInteractionHandler Members
 
     /// <inheritdoc cref="IInteractionHandler.CodeType" />
@@ -60,7 +63,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
         if (token?.Status != TokenStatuses.Valid
          || token.Type != TokenTypes.UserCode
-         || (token.ExpireTime.HasValue && token.ExpireTime.Value <= DateTime.UtcNow)
+            || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -79,7 +82,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Status != TokenStatuses.Valid
          || device.Type != TokenTypes.DeviceCode
-         || (device.ExpireTime.HasValue && device.ExpireTime.Value <= DateTime.UtcNow)
+            || (device.ExpireTime.HasValue && device.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(device.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -152,7 +155,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
         if (token?.Status != TokenStatuses.Valid
          || token.Type != TokenTypes.UserCode
-         || (token.ExpireTime.HasValue && token.ExpireTime.Value <= DateTime.UtcNow)
+            || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -171,7 +174,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Status != TokenStatuses.Valid
          || device.Type != TokenTypes.DeviceCode
-         || (device.ExpireTime.HasValue && device.ExpireTime.Value <= DateTime.UtcNow)
+            || (device.ExpireTime.HasValue && device.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(device.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

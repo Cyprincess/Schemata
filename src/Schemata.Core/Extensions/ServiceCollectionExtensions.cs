@@ -89,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Transient<IStartupFilter, SchemataStartup>(_ => SchemataStartup.Create(configuration, environment)));
 
         services.TryAddSingleton(builder.Options);
+        services.TryAddSingleton(TimeProvider.System);
 
         schema?.Invoke(builder);
         configure?.Invoke(builder.Options);

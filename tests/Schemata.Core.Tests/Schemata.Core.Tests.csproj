@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Modular\Schemata.Modular.csproj" />
   </ItemGroup>
 
 </Project>

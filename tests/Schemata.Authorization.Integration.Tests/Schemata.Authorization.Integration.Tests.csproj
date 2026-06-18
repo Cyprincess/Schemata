@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <Description>Component-level authorization endpoint tests with mocked authorization managers.</Description>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,11 +49,41 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
         }
 
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-            return _root.GetService(serviceType);
+            return ComposeEnumerable(serviceType, _root, _overrides);
         }
 
         return _overrides.GetService(serviceType) ?? _root.GetService(serviceType);
     }
 
     #endregion
+
+    /// <summary>
+    ///     Concatenates an <see cref="IEnumerable{T}" /> resolved from <paramref name="root" /> with
+    ///     the same set from <paramref name="overrides" />, preserving registration order (host
+    ///     registrations first, tenant additions after) so a tenant override that adds to a
+    ///     collection is visible alongside the host's services.
+    /// </summary>
+    internal static object ComposeEnumerable(Type enumerableType, IServiceProvider root, IServiceProvider overrides) {
+        var elementType = enumerableType.GetGenericArguments()[0];
+        var items       = new List<object?>();
+
+        if (root.GetService(enumerableType) is IEnumerable fromRoot) {
+            foreach (var item in fromRoot) {
+                items.Add(item);
+            }
+        }
+
+        if (overrides.GetService(enumerableType) is IEnumerable fromOverrides) {
+            foreach (var item in fromOverrides) {
+                items.Add(item);
+            }
+        }
+
+        var array = Array.CreateInstance(elementType, items.Count);
+        for (var i = 0; i < items.Count; i++) {
+            array.SetValue(items[i], i);
+        }
+
+        return array;
+    }
 }

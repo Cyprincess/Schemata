@@ -12,6 +12,7 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -45,14 +46,6 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    private static Guid NextJobId() {
-#if NET10_0_OR_GREATER
-        return Guid.CreateVersion7();
-#else
-        return Guid.NewGuid();
-#endif
-    }
-
     #region ILogoutNotifier Members
 
     public Task<List<string>>
@@ -85,7 +78,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             var sub = !string.IsNullOrWhiteSpace(subject) ? identifier.Resolve(subject, app) : null;
 
             var claims = new List<Claim> {
-                new(Claims.JwtId, Guid.NewGuid().ToString("N")),
+                new(Claims.JwtId, Identifiers.NewUid().ToString("n")),
                 new(Claims.Events, "{\"" + EventTypes.LogoutEvent + "\":{}}", JsonClaimValueTypes.Json),
             };
 
@@ -109,7 +102,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             var jwt = issuer.CreateToken(claims, TimeSpan.FromMinutes(2));
 
             await scheduler.TriggerAsync<BackChannelLogoutJob>(new() {
-                Job = $"authorization/back-channel-logout/{NextJobId():N}",
+                Job = $"authorization/back-channel-logout/{Identifiers.NewUid():n}",
                 Variables = new Dictionary<string, object?> {
                     [BackChannelLogoutJob.VariableKeys.Uri]         = uri,
                     [BackChannelLogoutJob.VariableKeys.LogoutToken] = jwt,

@@ -8,6 +8,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Grpc.Internal;
 using WellKnownReflection = Google.Protobuf.WellKnownTypes;
 
 namespace Schemata.Resource.Grpc;
@@ -28,7 +29,8 @@ internal static class FileDescriptorBridge
             var package    = descriptor.Package ?? entityType.Namespace;
 
             options.Methods.TryGetValue(entityType.TypeHandle, out var methods);
-            var file = BuildFileDescriptor(model, descriptor, package, args, methods ?? []);
+            options.Resources.TryGetValue(entityType.TypeHandle, out var resource);
+            var file = BuildFileDescriptor(model, descriptor, package, args, methods ?? [], resource?.Operations);
             results.AddRange(file.Services);
         }
 
@@ -40,7 +42,8 @@ internal static class FileDescriptorBridge
         ResourceNameDescriptor descriptor,
         string?                package,
         Type[]                 entityArgs,
-        IReadOnlyList<ResourceMethodAttribute> methods
+        IReadOnlyList<ResourceMethodAttribute> methods,
+        Operations[]?          operations
     ) {
         var requestType    = entityArgs[1];
         var detailType     = entityArgs[2];
@@ -83,38 +86,56 @@ internal static class FileDescriptorBridge
         }
 
         var fqPrefix    = package is not null ? $".{package}." : ".";
-        var serviceName = $"{descriptor.Singular}Service";
+        var serviceName = GrpcResourceNaming.ServiceName(descriptor);
         var service     = new ServiceDescriptorProto { Name = serviceName };
 
-        service.Method.Add(new MethodDescriptorProto {
-            Name       = $"List{descriptor.Plural}",
-            InputType  = $"{fqPrefix}{nameof(ListRequest)}",
-            OutputType = $"{fqPrefix}List{descriptor.Plural}Response",
-        });
-        service.Method.Add(new MethodDescriptorProto {
-            Name       = $"Get{descriptor.Singular}",
-            InputType  = $"{fqPrefix}{nameof(GetRequest)}",
-            OutputType = $"{fqPrefix}{messages[detailType]}",
-        });
-        service.Method.Add(new MethodDescriptorProto {
-            Name       = $"Create{descriptor.Singular}",
-            InputType  = $"{fqPrefix}{messages[requestType]}",
-            OutputType = $"{fqPrefix}{messages[detailType]}",
-        });
-        service.Method.Add(new MethodDescriptorProto {
-            Name       = $"Update{descriptor.Singular}",
-            InputType  = $"{fqPrefix}{messages[requestType]}",
-            OutputType = $"{fqPrefix}{messages[detailType]}",
-        });
-        // Soft-deletable resources respond with the updated resource per AIP-164;
-        // hard-deletable resources respond with Empty per AIP-135.
-        service.Method.Add(new MethodDescriptorProto {
-            Name      = $"Delete{descriptor.Singular}",
-            InputType = $"{fqPrefix}{nameof(DeleteRequest)}",
-            OutputType = typeof(ISoftDelete).IsAssignableFrom(entityArgs[0])
-                ? $"{fqPrefix}{messages[detailType]}"
-                : ".google.protobuf.Empty",
-        });
+        // Advertise only the standard verbs the transport actually serves; a null whitelist exposes
+        // all five so reflection stays in step with the resource's Operations restriction.
+        var allowed = operations is null ? null : new HashSet<Operations>(operations);
+
+        if (allowed is null || allowed.Contains(Operations.List)) {
+            service.Method.Add(new MethodDescriptorProto {
+                Name       = GrpcResourceNaming.MethodName(descriptor, Operations.List),
+                InputType  = $"{fqPrefix}{nameof(ListRequest)}",
+                OutputType = $"{fqPrefix}List{descriptor.Plural}Response",
+            });
+        }
+
+        if (allowed is null || allowed.Contains(Operations.Get)) {
+            service.Method.Add(new MethodDescriptorProto {
+                Name       = GrpcResourceNaming.MethodName(descriptor, Operations.Get),
+                InputType  = $"{fqPrefix}{nameof(GetRequest)}",
+                OutputType = $"{fqPrefix}{messages[detailType]}",
+            });
+        }
+
+        if (allowed is null || allowed.Contains(Operations.Create)) {
+            service.Method.Add(new MethodDescriptorProto {
+                Name       = GrpcResourceNaming.MethodName(descriptor, Operations.Create),
+                InputType  = $"{fqPrefix}{messages[requestType]}",
+                OutputType = $"{fqPrefix}{messages[detailType]}",
+            });
+        }
+
+        if (allowed is null || allowed.Contains(Operations.Update)) {
+            service.Method.Add(new MethodDescriptorProto {
+                Name       = GrpcResourceNaming.MethodName(descriptor, Operations.Update),
+                InputType  = $"{fqPrefix}{messages[requestType]}",
+                OutputType = $"{fqPrefix}{messages[detailType]}",
+            });
+        }
+
+        if (allowed is null || allowed.Contains(Operations.Delete)) {
+            // Soft-deletable resources respond with the updated resource per AIP-164;
+            // hard-deletable resources respond with Empty per AIP-135.
+            service.Method.Add(new MethodDescriptorProto {
+                Name      = GrpcResourceNaming.MethodName(descriptor, Operations.Delete),
+                InputType = $"{fqPrefix}{nameof(DeleteRequest)}",
+                OutputType = typeof(ISoftDelete).IsAssignableFrom(entityArgs[0])
+                    ? $"{fqPrefix}{messages[detailType]}"
+                    : ".google.protobuf.Empty",
+            });
+        }
 
         foreach (var method in methods) {
             var iface = FindHandlerInterface(method.Handler);
@@ -124,7 +145,7 @@ internal static class FileDescriptorBridge
 
             var arguments = iface.GetGenericArguments();
             service.Method.Add(new MethodDescriptorProto {
-                Name       = ResourceMethodNaming.GetRpcName(method.Verb, descriptor.Singular),
+                Name       = GrpcResourceNaming.CustomMethodName(descriptor, method.Verb),
                 InputType  = $"{fqPrefix}{messages[arguments[1]]}",
                 OutputType = $"{fqPrefix}{messages[arguments[2]]}",
             });

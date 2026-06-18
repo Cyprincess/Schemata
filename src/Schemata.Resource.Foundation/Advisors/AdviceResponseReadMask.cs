@@ -1,10 +1,9 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Humanizer;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -37,44 +36,13 @@ public static class AdviceResponseReadMask
     public static void Trim<T>(T target, string mask) where T : class {
         MaskTree tree;
         try {
-            tree = MaskTree.FromWire(typeof(T), mask, true);
+            tree = MaskTree.FromWire(typeof(T), mask, true, ResourceWireMask.Convert);
         } catch (ArgumentException ex) {
             throw InvalidReadMaskPath(mask, ex.Message);
         }
 
-        Trim(target, tree.Children);
-    }
-
-    private static void Trim(object target, IReadOnlyDictionary<string, MaskTree.MaskNode> nodes) {
-        var properties = AppDomainTypeCache.GetWritableProperties(target.GetType());
-
-        foreach (var property in properties) {
-            if (!nodes.TryGetValue(property.Name, out var node)) {
-                Clear(target, property);
-                continue;
-            }
-
-            if (node.IsLeaf) {
-                continue;
-            }
-
-            var value = property.GetValue(target);
-            if (value is null) {
-                continue;
-            }
-
-            if (value is IEnumerable items && value is not string) {
-                foreach (var item in items) {
-                    if (item is not null) {
-                        Trim(item, node.Children);
-                    }
-                }
-
-                continue;
-            }
-
-            Trim(value, node.Children);
-        }
+        // AIP-157 read masks may traverse repeated fields, so collection elements are trimmed too.
+        MaskWalker.WalkUnmasked(target, tree.Children, true, static (_, t, p) => Clear(t, p));
     }
 
     private static void Clear(object target, PropertyInfo property) {
@@ -86,7 +54,7 @@ public static class AdviceResponseReadMask
 
     private static ValidationException InvalidReadMaskPath(string path, string reason) {
         return new([new() {
-            Field       = SchemataNaming.ToWireName(nameof(GetRequest.ReadMask)),
+            Field       = nameof(GetRequest.ReadMask).Underscore(),
             Description = $"The read_mask path `{path}` is invalid: {reason}.",
             Reason      = FieldReasons.InvalidReadMask,
         }]);

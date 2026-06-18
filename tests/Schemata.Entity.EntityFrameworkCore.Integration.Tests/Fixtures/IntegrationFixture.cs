@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -10,7 +11,7 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 public class IntegrationFixture : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Guid.NewGuid():N}.db";
+    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
 
     private ServiceProvider? _root;
 
@@ -24,8 +25,8 @@ public class IntegrationFixture : IAsyncLifetime
         services.AddDbContextFactory<TestDbContext>(
             opts => opts.UseSqlite($"Data Source={_dbPath}"));
 
-        services.AddRepository<Student, EntityFrameworkCoreRepository<TestDbContext, Student>>();
-        services.AddRepository<Course, EntityFrameworkCoreRepository<TestDbContext, Course>>();
+        services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
+        services.AddRepository<Course, EfCoreRepository<TestDbContext, Course>>();
 
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
 
