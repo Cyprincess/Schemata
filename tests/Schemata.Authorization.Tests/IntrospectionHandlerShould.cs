@@ -68,14 +68,14 @@ public class IntrospectionHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Uid             = Identifiers.NewUid(),
-            Type            = type,
-            Application     = appName,
-            ReferenceId     = referenceId,
-            Payload         = payload,
-            Format          = format,
-            Status          = status,
-            ExpireTime      = DateTime.UtcNow.AddHours(1),
+            Uid         = Identifiers.NewUid(),
+            Type        = type,
+            Application = appName,
+            ReferenceId = referenceId,
+            Payload     = payload,
+            Format      = format,
+            Status      = status,
+            ExpireTime  = DateTime.UtcNow.AddHours(1),
         };
     }
 
@@ -141,9 +141,8 @@ public class IntrospectionHandlerShould
 
     [Fact]
     public async Task ReturnsActive_WhenCallerDiffersFromTokenClient() {
-        // RFC 7662: introspection callers are protected resources, not necessarily
-        // the client that issued the token. Access is gated upstream via the
-        // ep:introspection permission (AdviceIntrospectionProtectedResource).
+        // RFC 7662 introspection callers are protected resources, with access gated
+        // upstream via the ep:introspection permission.
         var f = CreateFixture("resource-server");
 
         var claims = new List<Claim> {
@@ -170,7 +169,9 @@ public class IntrospectionHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.Subject, "user-42"),
+            new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));

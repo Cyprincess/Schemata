@@ -18,7 +18,7 @@ public class CorrelationTrackerShould
         Assert.True(completed);
         Assert.Equal("reply", await tcs.Task);
 
-        // Past the original timeout window the result must remain the reply, never a timeout.
+        // Past the original timeout window the result remains the reply.
         await Task.Delay(250);
         Assert.True(tcs.Task.IsCompletedSuccessfully);
         Assert.Equal("reply", await tcs.Task);
@@ -41,7 +41,6 @@ public class CorrelationTrackerShould
         var       id      = tracker.Track(tcs, TimeSpan.FromMilliseconds(100));
 
         Assert.True(tracker.Complete(id, "reply"));
-        // A second completion finds nothing pending under the same id.
         Assert.False(tracker.Complete(id, "again"));
 
         Assert.Equal("reply", await tcs.Task);

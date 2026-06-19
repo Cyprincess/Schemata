@@ -18,15 +18,16 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>Coordinates process runtime operations against registered Flow engines.</summary>
 public sealed partial class ProcessRuntime : IProcessRuntime
 {
-    /// <summary>Cache of persisted process rows; repository state remains authoritative.</summary>
     private readonly ConcurrentDictionary<string, SchemataProcess> _instances = new();
     private readonly ILogger<ProcessRuntime>?                      _logger;
     private readonly ProcessPersistence                            _persistence;
     private readonly IProcessRegistry                              _registry;
     private readonly IServiceProvider                              _services;
 
+    /// <summary>Creates a process runtime backed by the registered Flow engine registry.</summary>
     public ProcessRuntime(
         IProcessRegistry         registry,
         IServiceProvider         services,
@@ -94,8 +95,8 @@ public sealed partial class ProcessRuntime : IProcessRuntime
         };
 
         // Provision the wake-up infrastructure (timer jobs, event subscriptions) the new waiting state
-        // depends on before committing the transition. A provisioning failure aborts the transition,
-        // so the instance is never persisted waiting on infrastructure that was never created.
+        // depends on before committing the transition. A provisioning failure aborts the transition
+        // before persistence can strand the instance.
         await ProvisionFlowTransitionAsync(services, context, ct);
 
         await _persistence.PersistTransitionAsync(services, persisted, transition, ct);

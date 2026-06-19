@@ -11,6 +11,7 @@ public sealed class ParallelFork
     private readonly ProcessDefinition _definition;
     private readonly ParallelGateway   _gateway;
 
+    /// <summary>Creates a parallel fork continuation for <paramref name="gateway" />.</summary>
     internal ParallelFork(ProcessDefinition definition, ParallelGateway gateway, FlowBranch[] branches) {
         _definition = definition;
         _gateway    = gateway;

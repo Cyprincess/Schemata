@@ -11,6 +11,12 @@ namespace Schemata.Transport.Grpc.Proto;
 /// <summary>Builds an AIP-193 <see cref="Google.Rpc.Status" /> from a <see cref="SchemataException" />.</summary>
 internal static class RpcStatusBuilder
 {
+    /// <summary>
+    ///     Builds a gRPC status message from a Schemata exception and request identifier.
+    /// </summary>
+    /// <param name="ex">The Schemata exception.</param>
+    /// <param name="requestId">The request identifier to include in error details.</param>
+    /// <returns>The gRPC status message.</returns>
     public static Google.Rpc.Status Build(SchemataException ex, string? requestId) {
         var response = ex.CreateErrorResponse(requestId);
         if (response is not ErrorResponse error) {

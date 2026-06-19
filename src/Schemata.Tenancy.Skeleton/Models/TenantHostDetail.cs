@@ -4,9 +4,10 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Tenancy.Skeleton.Models;
 
-/// <summary>Get response body for <see cref="Entities.SchemataTenantHost" />.</summary>
+/// <summary>Detailed response body for <see cref="Entities.SchemataTenantHost" />.</summary>
 public class TenantHostDetail : IIdentifier, ICanonicalName, ITimestamp, IFreshness
 {
+    /// <summary>HTTP Host header value that routes requests to the parent tenant.</summary>
     public string? Host { get; set; }
 
     #region ICanonicalName Members

@@ -7,7 +7,7 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     Implementations run in <see cref="IAdvisor" />.<c>Order</c> sequence and receive the
 ///     <see cref="IRepository{TEntity}" /> instance plus the entity being removed.
 ///     Returning <see cref="AdviseResult.Handle" /> prevents the physical delete;
-///     returning <see cref="AdviseResult.Block" /> aborts without deleting.
+///     returning <see cref="AdviseResult.Block" /> aborts before deletion.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being removed.</typeparam>
 public interface IRepositoryRemoveAdvisor<TEntity> : IAdvisor<IRepository<TEntity>, TEntity>

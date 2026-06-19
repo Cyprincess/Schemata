@@ -13,6 +13,7 @@ public sealed class RepositoryEventSubscriptionStore : IEventSubscriptionStore
 {
     private readonly IRepository<SchemataEventSubscription> _records;
 
+    /// <summary>Initializes a subscription store over the supplied repository.</summary>
     public RepositoryEventSubscriptionStore(IRepository<SchemataEventSubscription> records) {
         _records = records;
     }

@@ -6,8 +6,10 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Authorization checks shared by flow resource method handlers.</summary>
 internal static class FlowProcessAuthorization
 {
+    /// <summary>Verifies access to a registered process definition.</summary>
     public static void EnsureDefinitionAccess(
         IProcessRegistry registry,
         string           definitionName,
@@ -19,6 +21,7 @@ internal static class FlowProcessAuthorization
         }
     }
 
+    /// <summary>Verifies access to a persisted process instance through its source definition.</summary>
     public static void EnsureProcessAccess(
         IProcessRegistry registry,
         SchemataProcess  process,
@@ -27,6 +30,7 @@ internal static class FlowProcessAuthorization
         EnsureDefinitionAccess(registry, process.DefinitionName, principal);
     }
 
+    /// <summary>Verifies access to signal delivery when any listening process requires authorization.</summary>
     public static void EnsureSignalAccess(
         IProcessRegistry registry,
         string           signalName,

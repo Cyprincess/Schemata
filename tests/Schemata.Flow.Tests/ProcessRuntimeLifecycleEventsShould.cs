@@ -15,7 +15,7 @@ public class ProcessRuntimeLifecycleEventsShould
         var process = await fixture.Runtime.StartProcessInstanceAsync("approval");
 
         var published = fixture.EventBus.Published.First(p => p.Event is ProcessStartedEvent);
-        var evt = Assert.IsType<ProcessStartedEvent>(published.Event);
+        var evt       = Assert.IsType<ProcessStartedEvent>(published.Event);
         Assert.Same(process, published.Source);
         Assert.Equal(process.CanonicalName, evt.ProcessCanonicalName);
         Assert.Equal("approval", evt.DefinitionName);
@@ -32,21 +32,20 @@ public class ProcessRuntimeLifecycleEventsShould
         await fixture.Runtime.CompleteActivityAsync(process.CanonicalName!);
 
         var published = fixture.EventBus.Published.First(p => p.Event is ProcessCompletedEvent);
-        var evt = Assert.IsType<ProcessCompletedEvent>(published.Event);
+        var evt       = Assert.IsType<ProcessCompletedEvent>(published.Event);
         Assert.Same(process, published.Source);
         Assert.Equal(process.CanonicalName, evt.ProcessCanonicalName);
     }
 
     [Fact]
     public async Task FailProcess_PublishesProcessFailedEvent_WithErrorMessage() {
-        var fixture = new ProcessRuntimeFixture {
-            StartException = new InvalidOperationException("start failed"),
-        };
+        var fixture = new ProcessRuntimeFixture { StartException = new InvalidOperationException("start failed") };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval").AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval")
+                                                                         .AsTask());
 
         var published = fixture.EventBus.Published.First(p => p.Event is ProcessFailedEvent);
-        var evt = Assert.IsType<ProcessFailedEvent>(published.Event);
+        var evt       = Assert.IsType<ProcessFailedEvent>(published.Event);
         Assert.NotNull(published.Source);
         Assert.Equal("start failed", evt.ErrorMessage);
     }
@@ -58,7 +57,7 @@ public class ProcessRuntimeLifecycleEventsShould
         var process = await fixture.Runtime.StartProcessInstanceAsync("approval");
 
         var published = fixture.EventBus.Published.First(p => p.Event is TransitionMadeEvent);
-        var evt = Assert.IsType<TransitionMadeEvent>(published.Event);
+        var evt       = Assert.IsType<TransitionMadeEvent>(published.Event);
         Assert.Same(process, published.Source);
         Assert.Null(evt.FromStateId);
         Assert.Equal("Draft", evt.ToStateId);

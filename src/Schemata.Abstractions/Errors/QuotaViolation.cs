@@ -1,7 +1,7 @@
 namespace Schemata.Abstractions.Errors;
 
 /// <summary>
-///     A single quota limit that was exceeded by a particular subject, per
+///     A single quota limit exceeded by a particular subject, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 public class QuotaViolation
@@ -13,7 +13,7 @@ public class QuotaViolation
     public virtual string? Subject { get; set; }
 
     /// <summary>
-    ///     Human-readable description of which quota was exceeded and by how much.
+    ///     Human-readable description of the exceeded quota and amount.
     /// </summary>
     public virtual string? Description { get; set; }
 }

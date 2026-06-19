@@ -1,5 +1,8 @@
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Authenticator enrollment and status response body.
+/// </summary>
 public class AuthenticatorResponse
 {
     /// <summary>Whether two-factor authentication is currently enabled for the user.</summary>
@@ -11,9 +14,9 @@ public class AuthenticatorResponse
     /// <summary>Number of unused recovery codes remaining.</summary>
     public int RecoveryCodesLeft { get; set; }
 
-    /// <summary>Provided during initial enrollment only.</summary>
+    /// <summary>Authenticator shared key returned for enrollment.</summary>
     public string? SharedKey { get; set; }
 
-    /// <summary>Provided during initial enrollment only.</summary>
+    /// <summary>Recovery codes returned for enrollment.</summary>
     public string[]? RecoveryCodes { get; set; }
 }

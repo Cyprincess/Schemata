@@ -22,6 +22,7 @@ using Schemata.Event.Skeleton.Advisors;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
+/// <summary>Background RabbitMQ consumer that dispatches broker messages into event handlers.</summary>
 public sealed class RabbitMqConsumerHost : BackgroundService
 {
     private readonly SemaphoreSlim                  _channelLock = new(1, 1);
@@ -30,6 +31,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
     private readonly IOptions<RabbitMqEventOptions> _options;
     private readonly IServiceProvider               _services;
 
+    /// <summary>Initializes a RabbitMQ consumer host over the configured broker topology.</summary>
     public RabbitMqConsumerHost(
         IServiceProvider               services,
         IOptions<RabbitMqEventOptions> options,
@@ -83,8 +85,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         consumer.ReceivedAsync += async (_, ea) => {
             var deliveryTag = ea.DeliveryTag;
 
-            // A handler failure decides ack vs. nack; it must not be conflated with a broker
-            // acknowledgement failure, which is a transport error the handler cannot influence.
+            // Handler failures decide ack vs. nack; broker acknowledgement failures are transport
+            // errors outside handler control.
             bool handled;
             try {
                 handled = await HandleMessageAsync(channel, ea, ct);
@@ -124,7 +126,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var       registry = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
         var       tracker  = scope.ServiceProvider.GetService<CorrelationTracker>();
 
-        // Reply correlation comes first because reply payloads do not need a subscription.
+        // Reply correlation comes first because reply payloads bypass subscription matching.
         if (!string.IsNullOrEmpty(correlationId) && tracker != null) {
             var responseType = registry.Resolve(eventTypeName);
             if (responseType != null) {
@@ -150,8 +152,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         var subscriptions = await store.FindAsync(eventTypeName, ct: ct);
         if (subscriptions.Count == 0) {
-            // No interested subscribers - ACK and drop. The queue is shared with other
-            // consumers and orphan events are expected during rolling deploys.
+            // ACK and drop orphan events. The queue is shared with other consumers and orphan
+            // events are expected during rolling deploys.
             return true;
         }
 
@@ -180,8 +182,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             try {
                 invoked = genericMethod.Invoke(resolver, [eventInstance, routing, ct]);
             } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
-                // Reflection wraps a synchronous throw from the (non-async) resolver method;
-                // surface the real handler failure rather than the TargetInvocationException.
+                // Reflection wraps a synchronous throw from the resolver method; surface the real
+                // handler failure.
                 ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
                 throw;
             }
@@ -244,8 +246,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         try {
             result = genericMethod.Invoke(resolver, [request, ct]);
         } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
-            // Reflection wraps a synchronous throw from the (non-async) resolver method;
-            // surface the real handler failure rather than the TargetInvocationException.
+            // Reflection wraps a synchronous throw from the resolver method; surface the real
+            // handler failure.
             ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
             throw;
         }

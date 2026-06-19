@@ -9,10 +9,9 @@ namespace Schemata.Abstractions.Resource;
 public sealed class OperationResponse
 {
     /// <summary>
-    ///     The serialized result document. It already holds a JSON document, so
-    ///     <see cref="RawJsonConverter" /> emits it as structured JSON on the HTTP
-    ///     wire rather than an escaped string; the protobuf-net (gRPC) path carries
-    ///     it as a plain string field.
+    ///     The serialized result document. It already holds JSON, so
+    ///     <see cref="RawJsonConverter" /> emits structured JSON on the HTTP
+    ///     wire; the protobuf-net (gRPC) path carries a plain string field.
     /// </summary>
     [JsonConverter(typeof(RawJsonConverter))]
     public string? Output { get; set; }

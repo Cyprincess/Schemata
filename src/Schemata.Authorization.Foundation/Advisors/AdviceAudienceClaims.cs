@@ -10,7 +10,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Authorization.Foundation.Advisors;
 
 /// <summary>
-///     Claims advisor that derives the <c>aud</c> claim from the authorized client_id when not explicitly set,
+///     Claims advisor that derives the <c>aud</c> claim from the authorized client_id when the request omits it,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
 ///         RFC 6749: The OAuth 2.0 Authorization
@@ -25,11 +25,11 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <seealso cref="IClaimsAdvisor" />
 public sealed class AdviceAudienceClaims : IClaimsAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 
     #region IClaimsAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {

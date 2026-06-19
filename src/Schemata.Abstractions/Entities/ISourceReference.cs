@@ -7,7 +7,7 @@ namespace Schemata.Abstractions.Entities;
 ///     (AIP-122 canonical resource name), and <see cref="SourceTimestamp" /> (the source
 ///     entity's <c>IConcurrency.Timestamp</c> at capture time). Consumers can compare the
 ///     captured timestamp against the source entity's current timestamp to detect drift
-///     without materializing the full business state in the derived row.
+///     while keeping the derived row compact.
 /// </summary>
 /// <remarks>
 ///     All three properties are nullable so derived rows that have no semantic source (system
@@ -31,7 +31,7 @@ public interface ISourceReference
 
     /// <summary>
     ///     The source entity's <c>IConcurrency.Timestamp</c> snapshot at capture time, or
-    ///     <see langword="null" /> when the source does not implement <c>IConcurrency</c>.
+    ///     <see langword="null" /> for sources outside <c>IConcurrency</c>.
     /// </summary>
     System.Guid? SourceTimestamp { get; set; }
 }

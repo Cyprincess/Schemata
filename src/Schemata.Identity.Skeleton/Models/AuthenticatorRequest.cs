@@ -1,5 +1,8 @@
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Authenticator verification request body.
+/// </summary>
 public class AuthenticatorRequest
 {
     /// <summary>TOTP code from an authenticator app for two-factor verification.</summary>

@@ -29,7 +29,6 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.TokenExchange;
 
     /// <summary>

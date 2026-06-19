@@ -4,10 +4,9 @@ using System.Collections.Generic;
 namespace Schemata.Identity.Skeleton.Claims;
 
 /// <summary>
-///     An ordered collection of string values representing a single claim type's values.
+///     Stores the values associated with a single claim type.
 /// </summary>
 /// <remarks>
-///     Null or whitespace values are silently ignored on <see cref="Add" />.
 ///     Serialized as a JSON array (or a single string when the count is one) via
 ///     <see cref="Schemata.Identity.Skeleton.Json.ClaimStoreJsonConverter" />.
 /// </remarks>
@@ -17,7 +16,6 @@ public sealed class ClaimStore : IList<string>
 
     #region IList<string> Members
 
-    /// <remarks>Null or whitespace values are silently ignored.</remarks>
     public void Add(string? value) {
         if (string.IsNullOrWhiteSpace(value)) {
             return;

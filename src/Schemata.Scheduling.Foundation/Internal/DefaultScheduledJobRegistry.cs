@@ -7,6 +7,7 @@ using Schemata.Scheduling.Skeleton.Attributes;
 
 namespace Schemata.Scheduling.Foundation.Internal;
 
+/// <summary>Thread-safe registry that maps scheduled job keys to concrete job types.</summary>
 public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 {
     private readonly ConcurrentDictionary<string, Type> _byKey = new(StringComparer.Ordinal);

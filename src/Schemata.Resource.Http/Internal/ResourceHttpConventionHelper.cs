@@ -9,8 +9,16 @@ using Schemata.Common;
 
 namespace Schemata.Resource.Http.Internal;
 
+/// <summary>
+///     Shared helpers for applying generated resource MVC conventions.
+/// </summary>
 internal static class ResourceHttpConventionHelper
 {
+    /// <summary>
+    ///     Builds the absolute route template for a resource collection.
+    /// </summary>
+    /// <param name="descriptor">The resolved resource name descriptor.</param>
+    /// <returns>The MVC route template.</returns>
     public static string BuildControllerRoute(ResourceNameDescriptor descriptor) {
         var collectionPath = descriptor.CollectionPath;
         return descriptor.Package is not null
@@ -18,11 +26,21 @@ internal static class ResourceHttpConventionHelper
             : $"~/v1/{collectionPath}";
     }
 
+    /// <summary>
+    ///     Applies the generated controller name and route value for a resource.
+    /// </summary>
+    /// <param name="controller">The controller model to update.</param>
+    /// <param name="descriptor">The resolved resource name descriptor.</param>
     public static void ApplyControllerIdentity(ControllerModel controller, ResourceNameDescriptor descriptor) {
         controller.ControllerName            = descriptor.Plural;
         controller.RouteValues["Controller"] = descriptor.Plural;
     }
 
+    /// <summary>
+    ///     Adds rate-limit endpoint metadata from a resource entity attribute.
+    /// </summary>
+    /// <param name="controller">The controller model to update.</param>
+    /// <param name="entityType">The resource entity type.</param>
     public static void ApplyRateLimit(ControllerModel controller, Type entityType) {
         var quota = entityType.GetCustomAttribute<RateLimitPolicyAttribute>();
         if (quota is null) {
@@ -34,6 +52,11 @@ internal static class ResourceHttpConventionHelper
         }
     }
 
+    /// <summary>
+    ///     Adds an authorization filter for the configured authentication scheme.
+    /// </summary>
+    /// <param name="controller">The controller model to update.</param>
+    /// <param name="scheme">The authentication scheme.</param>
     public static void ApplyAuthorization(ControllerModel controller, string? scheme) {
         if (string.IsNullOrWhiteSpace(scheme)) {
             return;

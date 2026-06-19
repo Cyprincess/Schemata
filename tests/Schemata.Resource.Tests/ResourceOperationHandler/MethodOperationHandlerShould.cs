@@ -8,8 +8,8 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Tests.Advisors;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Resource.Tests.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
 
@@ -89,16 +89,10 @@ public class MethodOperationHandlerShould
         services.AddSingleton<IResourceMethodAdvisor<Student, Student, Student>>(
             new AdviceMethodFreshness<Student, Student, Student>());
         var operation = new ResourceMethodOperationHandler<Student, Student, Student>(
-            _fixture.Repository.Object,
-            services.BuildServiceProvider());
+            _fixture.Repository.Object, services.BuildServiceProvider());
 
-        var response = await operation.InvokeAsync(
-            handler,
-            "run",
-            "students/alice-1",
-            new() { EntityTag = "W/\"stale\"" },
-            null,
-            null);
+        var response = await operation.InvokeAsync(handler, "run", "students/alice-1",
+                                                   new() { EntityTag = "W/\"stale\"" }, null, null);
 
         Assert.Equal("result", response.Name);
     }
@@ -108,8 +102,8 @@ public class MethodOperationHandlerShould
         var handler   = new RecordingHandler();
         var operation = CreateOperation();
 
-        await Assert.ThrowsAsync<NotFoundException>(
-            () => operation.InvokeAsync(handler, "run", "students/zoe-9", new(), null, null));
+        await Assert.ThrowsAsync<NotFoundException>(() => operation.InvokeAsync(
+                                                        handler, "run", "students/zoe-9", new(), null, null));
     }
 
     private ResourceMethodOperationHandler<Student, EmptyResourceRequest, Student> CreateOperation(
@@ -121,66 +115,13 @@ public class MethodOperationHandlerShould
         return new(_fixture.Repository.Object, sp);
     }
 
-    private sealed class RecordingHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
-    {
-        public Student? Entity;
-        public bool     Invoked;
-
-        public ValueTask<Student> InvokeAsync(
-            string?              name,
-            EmptyResourceRequest request,
-            Student?             entity,
-            ClaimsPrincipal?     principal,
-            CancellationToken    ct
-        ) {
-            Invoked = true;
-            Entity  = entity;
-            return ValueTask.FromResult(new Student { Name = "result", CanonicalName = "students/result" });
-        }
-    }
-
-    private sealed class ThrowingHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
-    {
-        public ValueTask<Student> InvokeAsync(
-            string?              name,
-            EmptyResourceRequest request,
-            Student?             entity,
-            ClaimsPrincipal?     principal,
-            CancellationToken    ct
-        ) {
-            throw new InvalidOperationException("handler failure");
-        }
-    }
-
-    private sealed class ThrowingStudentHandler : IResourceMethodHandler<Student, StudentRequest, Student>
-    {
-        public ValueTask<Student> InvokeAsync(
-            string?          name,
-            StudentRequest   request,
-            Student?         entity,
-            ClaimsPrincipal? principal,
-            CancellationToken ct
-        ) {
-            throw new InvalidOperationException("handler failure");
-        }
-    }
-
-    private sealed class RecordingStudentHandler : IResourceMethodHandler<Student, Student, Student>
-    {
-        public ValueTask<Student> InvokeAsync(
-            string?          name,
-            Student          request,
-            Student?         entity,
-            ClaimsPrincipal? principal,
-            CancellationToken ct
-        ) {
-            return ValueTask.FromResult(new Student { Name = "result", CanonicalName = "students/result" });
-        }
-    }
+    #region Nested type: RecordingAdvisor
 
     private sealed class RecordingAdvisor : IResourceMethodAdvisor<Student, EmptyResourceRequest, Student>
     {
         public bool Invoked;
+
+        #region IResourceMethodAdvisor<Student,EmptyResourceRequest,Student> Members
 
         public int Order => 0;
 
@@ -194,5 +135,98 @@ public class MethodOperationHandlerShould
             Invoked = true;
             return Task.FromResult(AdviseResult.Continue);
         }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: RecordingHandler
+
+    private sealed class RecordingHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
+    {
+        public Student? Entity;
+        public bool     Invoked;
+
+        #region IResourceMethodHandler<Student,EmptyResourceRequest,Student> Members
+
+        public ValueTask<Student> InvokeAsync(
+            string?              name,
+            EmptyResourceRequest request,
+            Student?             entity,
+            ClaimsPrincipal?     principal,
+            CancellationToken    ct
+        ) {
+            Invoked = true;
+            Entity  = entity;
+            return ValueTask.FromResult(new Student { Name = "result", CanonicalName = "students/result" });
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: RecordingStudentHandler
+
+    private sealed class RecordingStudentHandler : IResourceMethodHandler<Student, Student, Student>
+    {
+        #region IResourceMethodHandler<Student,Student,Student> Members
+
+        public ValueTask<Student> InvokeAsync(
+            string?           name,
+            Student           request,
+            Student?          entity,
+            ClaimsPrincipal?  principal,
+            CancellationToken ct
+        ) {
+            return ValueTask.FromResult(new Student { Name = "result", CanonicalName = "students/result" });
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: ThrowingHandler
+
+    private sealed class ThrowingHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
+    {
+        #region IResourceMethodHandler<Student,EmptyResourceRequest,Student> Members
+
+        public ValueTask<Student> InvokeAsync(
+            string?              name,
+            EmptyResourceRequest request,
+            Student?             entity,
+            ClaimsPrincipal?     principal,
+            CancellationToken    ct
+        ) {
+            throw new InvalidOperationException("handler failure");
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: ThrowingStudentHandler
+
+    private sealed class ThrowingStudentHandler : IResourceMethodHandler<Student, StudentRequest, Student>
+    {
+        #region IResourceMethodHandler<Student,StudentRequest,Student> Members
+
+        public ValueTask<Student> InvokeAsync(
+            string?           name,
+            StudentRequest    request,
+            Student?          entity,
+            ClaimsPrincipal?  principal,
+            CancellationToken ct
+        ) {
+            throw new InvalidOperationException("handler failure");
+        }
+
+        #endregion
+    }
+
+    #endregion
 }

@@ -4,7 +4,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Tenancy.Skeleton.Models;
 
-/// <summary>Create/update request body for <see cref="Entities.SchemataTenant" />.</summary>
+/// <summary>Create or update request body for <see cref="Entities.SchemataTenant" />.</summary>
 public class TenantRequest : ICanonicalName, IDescriptive, IFreshness
 {
     #region ICanonicalName Members

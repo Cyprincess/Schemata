@@ -19,6 +19,7 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Builds the authenticated user's profile claims.</summary>
     public async Task<IdentityResult<ClaimsStore>> ProfileAsync(
         ClaimsPrincipal   principal,
         CancellationToken ct = default
@@ -60,6 +61,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<ClaimsStore>.Success(claims);
     }
 
+    /// <summary>Sends an email-change confirmation code for the authenticated user.</summary>
     public async Task<IdentityResult<Unit>> ChangeEmailAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
@@ -98,6 +100,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Sends a phone-change confirmation code for the authenticated user.</summary>
     public async Task<IdentityResult<Unit>> ChangePhoneAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
@@ -136,6 +139,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Changes the authenticated user's password.</summary>
     public async Task<IdentityResult<Unit>> ChangePasswordAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
@@ -177,6 +181,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Builds two-factor authenticator enrollment state for the authenticated user.</summary>
     public async Task<IdentityResult<AuthenticatorResponse>> AuthenticatorAsync(
         ClaimsPrincipal   principal,
         CancellationToken ct = default
@@ -219,6 +224,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<AuthenticatorResponse>.Success(result);
     }
 
+    /// <summary>Enables two-factor authenticator sign-in for the authenticated user.</summary>
     public async Task<IdentityResult<Unit>> EnrollAsync(
         AuthenticatorRequest request,
         ClaimsPrincipal      principal,
@@ -257,6 +263,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Disables two-factor authenticator sign-in for the authenticated user.</summary>
     public async Task<IdentityResult<Unit>> DowngradeAsync(
         AuthenticatorRequest request,
         ClaimsPrincipal      principal,

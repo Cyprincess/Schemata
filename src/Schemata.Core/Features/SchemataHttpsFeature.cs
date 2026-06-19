@@ -11,6 +11,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataHttpsFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for HSTS and HTTPS redirection.
+    /// </summary>
     public const int DefaultPriority = SchemataW3CLoggingFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

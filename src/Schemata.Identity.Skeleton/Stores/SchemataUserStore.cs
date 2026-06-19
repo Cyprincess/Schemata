@@ -12,9 +12,16 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
+/// <summary>
+///     Repository-backed user store using the default Schemata role entity.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
 public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     where TUser : SchemataUser
 {
+    /// <summary>
+    ///     Initializes a user store with the default Schemata role entity.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<SchemataRole>      roles,
@@ -26,11 +33,19 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
 }
 
+/// <summary>
+///     Repository-backed user store using the default Schemata user relation entities.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
+/// <typeparam name="TRole">The role entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, SchemataUserClaim, SchemataUserRole,
     SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>
     where TUser : SchemataUser
     where TRole : SchemataRole
 {
+    /// <summary>
+    ///     Initializes a user store with the default Schemata user relation entities.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>             users,
         IRepository<TRole>             roles,
@@ -43,11 +58,16 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
 }
 
 /// <summary>
-///     Repository-backed user store. Implements the Identity store interfaces directly:
-///     every read goes through the <see cref="IRepository{TEntity}" /> advisor pipeline,
-///     and <see cref="IQueryableUserStore{TUser}" /> is intentionally not implemented
-///     because exposing a raw <see cref="IQueryable{T}" /> would bypass that pipeline.
+///     Repository-backed user store that routes identity queries through the
+///     <see cref="IRepository{TEntity}" /> advisor pipeline.
 /// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
+/// <typeparam name="TRole">The role entity type.</typeparam>
+/// <typeparam name="TUserClaim">The user claim entity type.</typeparam>
+/// <typeparam name="TUserRole">The user-role link entity type.</typeparam>
+/// <typeparam name="TUserLogin">The user login entity type.</typeparam>
+/// <typeparam name="TUserToken">The user token entity type.</typeparam>
+/// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
 public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim> :
     IUserLoginStore<TUser>, IUserClaimStore<TUser>, IUserPasswordStore<TUser>, IUserSecurityStampStore<TUser>,
     IUserEmailStore<TUser>, IUserLockoutStore<TUser>, IUserTwoFactorStore<TUser>, IUserAuthenticationTokenStore<TUser>,
@@ -66,20 +86,29 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     private const string AuthenticatorKeyTokenName = "AuthenticatorKey";
     private const string RecoveryCodeTokenName     = "RecoveryCodes";
 
+    /// <summary>Repository for roles.</summary>
     protected readonly IRepository<TRole> RolesRepository;
 
+    /// <summary>Repository for user claims.</summary>
     protected readonly IRepository<TUserClaim> UserClaimsRepository;
 
+    /// <summary>Repository for user logins.</summary>
     protected readonly IRepository<TUserLogin> UserLoginsRepository;
 
+    /// <summary>Repository for user-role links.</summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
+    /// <summary>Repository for users.</summary>
     protected readonly IRepository<TUser> UsersRepository;
 
+    /// <summary>Repository for user tokens.</summary>
     protected readonly IRepository<TUserToken> UserTokensRepository;
 
     private bool _disposed;
 
+    /// <summary>
+    ///     Initializes a user store with repositories for users, roles, and user relation entities.
+    /// </summary>
     public SchemataUserStore(
         IRepository<TUser>      users,
         IRepository<TRole>      roles,
@@ -998,12 +1027,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #endregion
 
+    /// <summary>
+    ///     Creates a user claim entity from a user and claim.
+    /// </summary>
     protected virtual TUserClaim CreateUserClaim(TUser user, Claim claim) {
         var userClaim = new TUserClaim { UserId = user.Uid };
         userClaim.InitializeFromClaim(claim);
         return userClaim;
     }
 
+    /// <summary>
+    ///     Creates a user login entity from a user and external login.
+    /// </summary>
     protected virtual TUserLogin CreateUserLogin(TUser user, UserLoginInfo login) {
         return new() {
             UserId              = user.Uid,
@@ -1013,6 +1048,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         };
     }
 
+    /// <summary>
+    ///     Creates a user token entity from a user, login provider, token name, and token value.
+    /// </summary>
     protected virtual TUserToken CreateUserToken(
         TUser   user,
         string  loginProvider,
@@ -1027,23 +1065,38 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         };
     }
 
+    /// <summary>
+    ///     Creates a user-role link entity from a user and role.
+    /// </summary>
     protected virtual TUserRole CreateUserRole(TUser user, TRole role) {
         return new() { UserId = user.Uid, RoleId = role.Uid };
     }
 
+    /// <summary>
+    ///     Finds a role by normalized role name.
+    /// </summary>
     protected virtual async Task<TRole?> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
         return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName),
                                                           ct);
     }
 
+    /// <summary>
+    ///     Finds a user-role link by user and role identifiers.
+    /// </summary>
     protected virtual async Task<TUserRole?> FindUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct) {
         return await UserRoleRepository.FindAsync([userId, roleId], ct);
     }
 
+    /// <summary>
+    ///     Finds a user by identifier.
+    /// </summary>
     protected virtual async Task<TUser?> FindUserAsync(Guid userId, CancellationToken ct) {
         return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == userId), ct);
     }
 
+    /// <summary>
+    ///     Finds a user login by user identifier, login provider, and provider key.
+    /// </summary>
     protected virtual async Task<TUserLogin?> FindUserLoginAsync(
         Guid              userId,
         string            loginProvider,
@@ -1056,6 +1109,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                            && l.ProviderKey == providerKey), ct);
     }
 
+    /// <summary>
+    ///     Finds a user login by login provider and provider key.
+    /// </summary>
     protected virtual async Task<TUserLogin?> FindUserLoginAsync(
         string            loginProvider,
         string            providerKey,
@@ -1064,6 +1120,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UserLoginsRepository.FindAsync([loginProvider, providerKey], ct);
     }
 
+    /// <summary>
+    ///     Finds a user token by user, login provider, and token name.
+    /// </summary>
     protected virtual async Task<TUserToken?> FindTokenAsync(
         TUser             user,
         string            loginProvider,
@@ -1073,6 +1132,9 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         return await UserTokensRepository.FindAsync([user.Uid, loginProvider, name], ct);
     }
 
+    /// <summary>
+    ///     Throws when the store has been disposed.
+    /// </summary>
     protected virtual void ThrowIfDisposed() {
         if (!_disposed) {
             return;

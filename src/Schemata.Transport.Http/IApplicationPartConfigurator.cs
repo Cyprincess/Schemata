@@ -9,6 +9,9 @@ namespace Schemata.Transport.Http;
 /// </summary>
 public interface IApplicationPartConfigurator
 {
-    /// <summary>Applies this configurator to <paramref name="manager" />.</summary>
+    /// <summary>
+    ///     Applies this configurator to the application part manager.
+    /// </summary>
+    /// <param name="manager">The application part manager.</param>
     void Configure(ApplicationPartManager manager);
 }

@@ -9,8 +9,14 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Mapping.Foundation.Features;
 
+/// <summary>
+///     Shared mapping feature ordering values.
+/// </summary>
 public static class SchemataMappingFeature
 {
+    /// <summary>
+    ///     Default priority for the mapping feature in the extension feature range.
+    /// </summary>
     public const int DefaultPriority = Orders.Extension + 60_000_000;
 }
 

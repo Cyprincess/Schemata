@@ -1,119 +1,107 @@
 # Delete Pipeline
 
-`ResourceOperationHandler.DeleteAsync` accepts a canonical name string, an optional ETag, and a `ClaimsPrincipal?`. It loads the existing entity, runs it through a fixed sequence of advisor stages, removes it from the repository, and returns a `DeleteResultBase<TDetail>`: a soft delete carries the updated resource in `Detail` per AIP-164, a hard delete carries nothing. Authorization is checked before the entity is loaded, per AIP-211.
+`ResourceOperationHandler.DeleteAsync` takes a name, an optional ETag, and a `ClaimsPrincipal?`. It loads the
+entity, runs the delete stages, removes it, and returns a `DeleteResultBase<TDetail>`: a soft delete carries the
+updated resource in `Detail` per AIP-164, a hard delete carries nothing. Authorization is checked before the
+entity loads, per AIP-211. The stage order is fixed; advisor `Order` only sequences advisors within a stage.
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 534-594) |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceDeleteFreshness.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceDeleteRequestAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceDeleteAdvisor.cs` |
-| `Schemata.Abstractions` | `Entities/ISoftDelete.cs` |
+| --- | --- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Delete.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceDeleteFreshness.cs`, `Advisors/IResourceDeleteRequestAdvisor.cs`, `Advisors/IResourceDeleteAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `UndeleteHandler.cs`, `ExpungeHandler.cs`, `PurgeHandler.cs` |
+| `Schemata.Abstractions` | `Resource/DeleteRequest.cs`, `Resource/DeleteResultBase.cs`, `Entities/ISoftDelete.cs` |
 
-## Pipeline walkthrough
+## Stages
 
-### Stage 1: Gate check
+### 1. Gate — `IResourceRequestAdvisor<TEntity>`
 
-```
-IResourceRequestAdvisor<TEntity>
-```
+Receives the principal and the token `nameof(Operations.Delete)`. `Block` throws `ResourceNotFound(name)`.
+`Handle` returns the stashed result, or the fallback `() => new()` (an empty delete result). The handler then
+builds a `DeleteRequest { Name, Etag, AllowMissing }`.
 
-Receives the principal and the operation token `nameof(Operations.Delete)`. A `Block` throws `NotFoundException`. A `Handle` returns early (the advisor handled the deletion itself, optionally stashing a `DeleteResultBase<TDetail>` in the `AdviceContext`).
+### 2. Name predicates
 
-### Stage 2: Name parsing
+`ApplyIdentifierPredicates` adds the leaf and parent `Where` predicates to the
+`ResourceRequestContainer<TEntity>`.
 
-`ApplyIdentifierPredicates` parses the canonical name and applies leaf and parent predicates to the `ResourceRequestContainer<TEntity>`.
+### 3. Delete request — `IResourceDeleteRequestAdvisor<TEntity>`
 
-### Stage 3: Delete request advisors
+Receives the `DeleteRequest`, the container, and the principal. Authorization advisors run here when
+`WithAuthorization()` is configured:
 
-```
-IResourceDeleteRequestAdvisor<TEntity>
-```
+| Advisor | What it does |
+| --- | --- |
+| `AdviceDeleteRequestAnonymous` | Grants anonymous access when configured |
+| `AdviceDeleteRequestAuthorize` | Authorizes the request through the access provider |
 
-Receives a `DeleteRequest { Name, Etag }`, the container, and the principal. Authorization advisors run here when `WithAuthorization()` is configured.
+### 4. Entity load
 
-| Order | Advisor | What it does |
-|---|---|---|
-| `AdviceDeleteRequestAnonymous.DefaultOrder` (80M) | `AdviceDeleteRequestAnonymous` | Honors `[Anonymous(Operations.Delete)]` |
-| `AdviceDeleteRequestAuthorize.DefaultOrder` (100M) | `AdviceDeleteRequestAuthorize` | Calls `IAccessProvider`; throws `AuthorizationException` on denial |
+The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so an already-tombstoned entity can be
+hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRequest.AllowMissing` is set
+(AIP-135), in which case the delete returns an empty success without committing. Over HTTP the flag is the
+`allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.
 
-### Stage 4: Entity load
+### 5. Delete entity — `IResourceDeleteAdvisor<TEntity>`
 
-```csharp
-var entity = await _repository.Once()
-                              .SuppressQuerySoftDelete()
-                              .SingleOrDefaultAsync(q => container.Query(q), ct)
-          ?? throw ResourceNotFound(name);
-```
+| Advisor | What it does |
+| --- | --- |
+| `AdviceDeleteFreshness` | Validates `DeleteRequest.Etag` against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
-Soft-delete is suppressed so already-tombstoned entities can be hard-deleted. If no entity matches, `NotFoundException` is thrown - unless the request sets `allow_missing` (AIP-135), in which case the delete returns an empty success (HTTP `204`, gRPC `Empty`) without committing. Over HTTP the flag is the `allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.
+`AdviceDeleteFreshness` fires when `Etag` is non-empty: any value differing from the entity's current weak tag
+throws `ConcurrencyException`. Only an absent or whitespace tag opts out.
 
-### Stage 5: Delete entity advisors
+### 6. Persistence and soft-delete branching
 
-```
-IResourceDeleteAdvisor<TEntity>
-```
+`_repository.RemoveAsync(entity, ct)` then `_repository.CommitAsync(ct)`. For an `ISoftDelete` entity, a
+repository remove advisor turns the physical delete into an update that sets `DeleteTime`. After commit the
+handler inspects the entity: `entity is ISoftDelete { DeleteTime: not null }` identifies the soft path, maps the
+entity to `TDetail`, runs `IResourceResponseAdvisor<TEntity, TDetail>`, and returns it in `Detail`. A hard delete
+returns an empty `DeleteResultBase<TDetail>`.
 
-| Order | Advisor | What it does |
-|---|---|---|
-| `Orders.Base` (100M) | `AdviceDeleteFreshness` | Compares the request ETag against the entity's `IConcurrency.Timestamp`; throws `ConcurrencyException` on mismatch |
+## Soft delete vs. hard delete
 
-`AdviceDeleteFreshness` fires whenever `DeleteRequest.Etag` is non-empty: any value that differs from the entity's current weak tag - including strong-format or malformed tags - throws `ConcurrencyException` per AIP-154. Only an absent or whitespace tag opts out.
+| Scenario | Result |
+| --- | --- |
+| Entity implements `ISoftDelete` | Row tombstoned (`DeleteTime` set); `Detail` carries the updated resource |
+| Entity does not implement `ISoftDelete` | Row removed; `Detail` is null |
 
-### Soft-delete interception
-
-If the entity implements `ISoftDelete`, the repository-layer advisor `AdviceRemoveSoftDelete<TEntity>` intercepts `RemoveAsync` and converts it to an update that sets `DeleteTime = DateTimeOffset.UtcNow`. It returns `AdviseResult.Handle` to prevent the physical delete. The entity is not removed from the database; it is tombstoned.
-
-To physically delete a soft-deleted entity, call `repository.SuppressSoftDelete()` before `RemoveAsync`, or use the built-in `:expunge` method described below.
-
-### Stage 6: Persistence
-
-```csharp
-await _repository.RemoveAsync(entity, ct)
-await _repository.CommitAsync(ct)
-```
-
-If `AdviceRemoveSoftDelete` returns `Handle`, the repository skips the physical delete and commits the tombstone update instead.
-
-## Soft-delete vs. physical delete
-
-| Scenario | Behavior |
-|---|---|
-| Entity implements `ISoftDelete`, no suppression | `RemoveAsync` sets `DeleteTime`; entity remains in DB |
-| Entity implements `ISoftDelete`, `SuppressSoftDelete()` called | Physical delete |
-| Entity does not implement `ISoftDelete` | Physical delete |
-
-## Extension points
-
-- Implement `IResourceDeleteRequestAdvisor<TEntity>` to add pre-load logic (e.g., dependency checks).
-- Implement `IResourceDeleteAdvisor<TEntity>` to add entity-level logic after load (e.g., cascade soft-delete of children).
-- Soft deletes run the `IResourceResponseAdvisor<TEntity, TDetail>` stage on the returned detail (freshness ETags apply); hard deletes have no response stage. Post-delete repository side effects should use `IRepositoryCommittedAdvisor<TEntity>` when they need the committed delete snapshot.
+The transport renders this split: HTTP returns `200` with the JSON body for a soft delete and `204 No Content`
+for a hard delete; gRPC returns the detail message or `google.protobuf.Empty`.
 
 ## Built-in soft-delete methods
 
-Resources whose entity implements `ISoftDelete` automatically expose three custom methods per AIP-164/165 (each can be disabled via the `Operations` whitelist or overridden by declaring the same verb):
+`SchemataResourceFeature.RegisterResource` adds three AIP-164/165 custom methods to every `ISoftDelete` resource.
+Each is skipped when the `Operations` whitelist excludes it or the entity already declares the same verb.
 
-| Method | Route | Behavior |
-|---|---|---|
-| `:undelete` | `POST {collection}/{name}:undelete` | Clears `DeleteTime`/`PurgeTime` and returns the restored resource; a live resource fails with `AlreadyExistsException` |
-| `:expunge` | `POST {collection}/{name}:expunge` | Physically removes a soft-deleted resource and returns an empty body (`EmptyResourceResponse`) per AIP-164; a live resource fails with `FailedPreconditionException`. Authorized independently as the `expunge` permission, not `delete` |
-| `:purge` | `POST {collection}:purge` | Collection-scoped AIP-165 purge: required `filter` (`"*"` matches all) plus `force`; `force=false` previews `purge_count` and a `purge_sample` of up to 100 names without deleting; `force=true` physically deletes the matches. Executes through `IOperationDispatcher` as an addressable `operations/{uid}` resource - a Scheduling bridge package (`Schemata.Scheduling.Http`/`Schemata.Scheduling.Grpc`) must be installed, otherwise the handler throws `InvalidOperationException` |
+| Method | Route | Handler | Behavior |
+| --- | --- | --- | --- |
+| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException` |
+| `:expunge` | `POST /v1/{collection}/{name}:expunge` | `ExpungeHandler<TEntity>` | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException` |
+| `:purge` | `POST /v1/{collection}:purge` | `PurgeHandler<TEntity>` | Collection-scoped AIP-165 purge through `IOperationDispatcher`; the dispatcher and its `PurgeOperationHandler<TEntity>` are registered only when the built-in purge method is active |
 
-## Design motivation
+## Extension points
 
-The delete pipeline returns `DeleteResultBase<TDetail>`. A soft delete responds with the updated resource - HTTP `200` with the JSON body, gRPC the detail message - so callers observe `delete_time` per AIP-164. A hard delete has no body: HTTP `204 No Content`, gRPC `Empty`.
+- Implement `IResourceDeleteRequestAdvisor<TEntity>` for pre-load logic (dependency checks).
+- Implement `IResourceDeleteAdvisor<TEntity>` for entity-level logic after load (cascade soft-delete).
+- A soft delete runs the response chain on the returned detail; a hard delete has no response stage.
+
+## Design rationale
+
+Returning `DeleteResultBase<TDetail>` lets a soft delete surface the tombstoned resource so callers observe
+`delete_time` per AIP-164, while a hard delete returns nothing. Suppressing the soft-delete query filter during
+the load lets the same path hard-delete an already-tombstoned row.
 
 ## Caveats
 
-- After a soft-delete, `GetAsync` still returns the entity (it suppresses soft-delete filtering). The caller can inspect `DeleteTime` to determine whether the resource is tombstoned.
-- **AIP-211 authorization order.** `AuthorizeHelper` checks the primary permission first; on denial it re-probes with `Get` against the parent. A caller who cannot read the parent receives `NOT_FOUND` rather than `PERMISSION_DENIED`, so resource existence is never disclosed to an unauthorized caller. This is a deliberate deviation from AIP-211's "permission before existence" wording, traded for not leaking existence; a caller who can read the parent does receive `PERMISSION_DENIED` naming the missing permission.
+- After a soft delete, `GetAsync` still returns the entity (it suppresses the soft-delete filter); inspect
+  `DeleteTime` to tell whether it is tombstoned.
+- `:expunge` is authorized as the `expunge` permission, independent of `delete`.
 
 ## See also
 
 - [Resource Overview](overview.md)
 - [Update Pipeline](update-pipeline.md)
-- [Advice Pipeline](../core/advice-pipeline.md)
-- [Entity Traits](../entity/traits.md)
-- [Repository Mutation Pipeline](../repository/mutation-pipeline.md)
+- [Custom Methods](custom-methods.md)

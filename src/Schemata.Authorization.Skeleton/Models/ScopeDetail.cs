@@ -5,9 +5,10 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Authorization.Skeleton.Models;
 
-/// <summary>Get response body for <see cref="Entities.SchemataScope" />.</summary>
+/// <summary>Detailed response body for <see cref="Entities.SchemataScope" /> resources.</summary>
 public class ScopeDetail : IIdentifier, ICanonicalName, IDescriptive, ITimestamp, IFreshness
 {
+    /// <summary>API resources that this scope grants access to.</summary>
     public ICollection<string>? Resources { get; set; }
 
     #region ICanonicalName Members

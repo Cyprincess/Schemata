@@ -17,6 +17,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataQuotaFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for rate limiting.
+    /// </summary>
     public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

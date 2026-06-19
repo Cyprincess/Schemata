@@ -10,6 +10,9 @@ namespace Schemata.Core.Features;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 public sealed class InformationAttribute : Attribute
 {
+    /// <summary>
+    ///     Initializes a registration-time log message.
+    /// </summary>
     /// <param name="message">Log message template.</param>
     /// <param name="parameters">Optional template arguments.</param>
     public InformationAttribute(string message, params object?[] parameters) {

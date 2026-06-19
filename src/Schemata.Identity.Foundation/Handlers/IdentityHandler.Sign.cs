@@ -18,6 +18,7 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Registers a user and builds the sign-in principal.</summary>
     public async Task<IdentityResult<ClaimsPrincipal>> RegisterAsync(
         RegisterRequest   request,
         ClaimsPrincipal   principal,
@@ -78,6 +79,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<ClaimsPrincipal>.Success(claims);
     }
 
+    /// <summary>Authenticates a user and builds the sign-in principal.</summary>
     public async Task<IdentityResult<ClaimsPrincipal>> LoginAsync(
         LoginRequest      request,
         ClaimsPrincipal   principal,
@@ -140,6 +142,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<ClaimsPrincipal>.Success(claims);
     }
 
+    /// <summary>Refreshes a sign-in principal from an authentication ticket.</summary>
     public async Task<IdentityResult<ClaimsPrincipal>> RefreshAsync(
         AuthenticationTicket? ticket,
         ClaimsPrincipal       principal,

@@ -25,6 +25,13 @@ internal static class ResourceCustomMethod
     private static readonly MethodInfo RegisterTypedMethod = typeof(ResourceCustomMethod)
         .GetMethod(nameof(RegisterTyped), BindingFlags.NonPublic | BindingFlags.Static)!;
 
+    /// <summary>
+    ///     Registers custom-method RPCs for the supplied resource service type.
+    /// </summary>
+    /// <typeparam name="TService">The closed resource service type.</typeparam>
+    /// <param name="context">The gRPC service method discovery context.</param>
+    /// <param name="config">The resource gRPC binder configuration.</param>
+    /// <param name="options">The registered resource options.</param>
     public static void Register<TService>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config,

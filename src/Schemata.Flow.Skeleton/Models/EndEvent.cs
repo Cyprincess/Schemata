@@ -1,10 +1,9 @@
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A convenience subclass of <see cref="FlowEvent" /> whose <see cref="FlowEvent.Position" />
-///     defaults to <see cref="EventPosition.End" />. Exists primarily so that magic property
-///     discovery in <see cref="ProcessDefinition.InitializeProperties" /> can infer the correct
-///     position from the property type without requiring the user to set it manually.
+///     A <see cref="FlowEvent" /> subclass whose <see cref="FlowEvent.Position" /> defaults to
+///     <see cref="EventPosition.End" />. Property discovery in
+///     <see cref="ProcessDefinition.InitializeProperties" /> infers the position from this type.
 /// </summary>
 public class EndEvent : FlowEvent
 {

@@ -20,9 +20,7 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
     private readonly IRepository<SchemataTenantHost> _hosts;
     private readonly IRepository<TTenant>            _tenants;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantManager{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates a manager backed by tenant and tenant-host repositories.</summary>
     public SchemataTenantManager(
         IRepository<TTenant>            tenants,
         IRepository<SchemataTenantHost> hosts,
@@ -110,8 +108,8 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
     }
 
     public virtual async ValueTask DeleteAsync(TTenant tenant, CancellationToken ct) {
-        // Remove the tenant and its hosts in one unit of work; committing the tenant alone left
-        // the staged host removals unpersisted, orphaning the host rows.
+        // Remove the tenant and its hosts in one unit of work so host rows are committed
+        // with the tenant removal.
         await using var uow = _tenants.Begin();
         _hosts.Join(uow);
 

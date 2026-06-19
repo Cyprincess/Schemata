@@ -50,10 +50,13 @@ public class FlowResourceBridgeFeatureShould
 
         var methods = BuildResourceOptions(services).Methods[typeof(SchemataProcess).TypeHandle];
 
-        Assert.Contains(methods, m => m.Handler == typeof(StartProcessHandler)
-                                  && HandlerRequest(m.Handler) == typeof(StartProcessInstanceRequest));
-        Assert.Contains(methods, m => m.Handler == typeof(ThrowSignalHandler)
-                                  && HandlerRequest(m.Handler) == typeof(ThrowSignalRequest));
+        Assert.Contains(
+            methods,
+            m => m.Handler == typeof(StartProcessHandler)
+              && HandlerRequest(m.Handler) == typeof(StartProcessInstanceRequest));
+        Assert.Contains(
+            methods,
+            m => m.Handler == typeof(ThrowSignalHandler) && HandlerRequest(m.Handler) == typeof(ThrowSignalRequest));
     }
 
     private static void AssertHandlersRegistered(IServiceCollection services) {
@@ -73,14 +76,12 @@ public class FlowResourceBridgeFeatureShould
         Assert.Equal([endpoint], process.Endpoints);
         Assert.Equal([Operations.Get, Operations.List], process.Operations);
 
-        var processMethods = options.Methods[typeof(SchemataProcess).TypeHandle]
-                                    .OrderBy(m => m.Verb)
-                                    .ToArray();
+        var processMethods = options.Methods[typeof(SchemataProcess).TypeHandle].OrderBy(m => m.Verb).ToArray();
         Assert.Equal(5, processMethods.Length);
-        AssertMethod(processMethods, "complete",  typeof(CompleteActivityHandler), ResourceMethodScope.Instance);
+        AssertMethod(processMethods, "complete", typeof(CompleteActivityHandler), ResourceMethodScope.Instance);
         AssertMethod(processMethods, "correlate", typeof(CorrelateMessageHandler), ResourceMethodScope.Instance);
-        AssertMethod(processMethods, "signal",    typeof(ThrowSignalHandler), ResourceMethodScope.Collection);
-        AssertMethod(processMethods, "start",     typeof(StartProcessHandler), ResourceMethodScope.Collection);
+        AssertMethod(processMethods, "signal", typeof(ThrowSignalHandler), ResourceMethodScope.Collection);
+        AssertMethod(processMethods, "start", typeof(StartProcessHandler), ResourceMethodScope.Collection);
         AssertMethod(processMethods, "terminate", typeof(TerminateProcessHandler), ResourceMethodScope.Instance);
 
         var transition = options.Resources[typeof(SchemataProcessTransition).TypeHandle];
@@ -105,7 +106,8 @@ public class FlowResourceBridgeFeatureShould
 
     private static Type HandlerRequest(Type handler) {
         return handler.GetInterfaces()
-                      .Single(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>))
+                      .Single(i => i.IsGenericType
+                                && i.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>))
                       .GetGenericArguments()[1];
     }
 
@@ -115,11 +117,7 @@ public class FlowResourceBridgeFeatureShould
     }
 
     private static void Configure(FeatureBase feature, IServiceCollection services) {
-        feature.ConfigureServices(
-            services,
-            new(),
-            new(),
-            new ConfigurationBuilder().Build(),
-            Mock.Of<IWebHostEnvironment>());
+        feature.ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(),
+                                  Mock.Of<IWebHostEnvironment>());
     }
 }

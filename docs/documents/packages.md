@@ -170,7 +170,7 @@ Effective references (all of base plus):
 
 The three-family split (Application / Business / Module) reflects the three project roles in a Schemata solution. Application projects host the ASP.NET Core pipeline and need `Schemata.Core` plus `Microsoft.AspNetCore.App`. Business projects define domain logic and need only `Schemata.Abstractions`. Module projects implement `IModule` and need both `Schemata.Abstractions` and `Microsoft.AspNetCore.App` (for middleware and endpoint registration).
 
-Within each family, the Persisting variant adds `Schemata.Entity.Repository` for data access. The Complex variant adds the full suite of runtime packages. Business and Module Complex variants use `*.Skeleton` packages (contracts only) rather than `*.Foundation` packages (full implementations) because business and module projects should not depend on the ASP.NET Core hosting infrastructure.
+Within each family, the Persisting variant adds `Schemata.Entity.Repository` for data access. The Complex variant adds the full suite of runtime packages. Business and Module Complex variants reference `*.Skeleton` packages (contracts only) so the projects stay free of the ASP.NET Core hosting infrastructure that `*.Foundation` packages pull in.
 
 ## Caveats
 
@@ -181,7 +181,6 @@ Within each family, the Persisting variant adds `Schemata.Entity.Repository` for
 
 ## See also
 
-- [Built-in Features](core/built-in-features.md) — feature priority table
+- [Built-in Features](core/built-in-features.md) — the feature priority table
 - [Modules](modules.md) — `IModule`, `ModuleAttribute`, `UseModular()`
-- [Validation](validation.md) — `AddValidator<TValidator>()` registration
-- [Security](security.md) — `UseSecurity()` and access providers
+- [Getting Started](../guides/getting-started.md) — using `Schemata.Application.Complex.Targets`

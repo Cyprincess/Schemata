@@ -64,11 +64,8 @@ public sealed class SchedulingInitializer : BackgroundService
     /// <summary>
     ///     Pre-populates <see cref="IScheduledJobRegistry" /> with one
     ///     <see cref="DurableOperationScheduledJob{TArgs}" /> closed-generic adapter per
-    ///     <see cref="OperationDescriptor" />. Without this, persisted operation rows whose
-    ///     dispatcher never ran in this process (typical after a host restart) would have no
-    ///     registry mapping for their <see cref="SchemataJobExecution.JobKey" /> and would be
-    ///     transitioned to <see cref="ExecutionState.Failed" /> by
-    ///     <see cref="JobExecutionDispatcher" /> instead of completing their original handler.
+    ///     <see cref="OperationDescriptor" /> so persisted operation rows can resolve their
+    ///     <see cref="SchemataJobExecution.JobKey" /> during scheduler recovery.
     /// </summary>
     private void RehydrateDurableOperationRegistrations() {
         var descriptors = _services.GetServices<OperationDescriptor>();
@@ -107,8 +104,7 @@ public sealed class SchedulingInitializer : BackgroundService
 
             var prepared = await BuildOperationContextAsync(executions, job.Name, ct);
 
-            // Rescheduling replaces any same-named entry armed from Options.Jobs, so the
-            // persisted row wins on restart.
+            // Rescheduling gives the persisted row precedence over same-named entries from Options.Jobs.
             await _scheduler.RescheduleAsync(job, prepared, ct);
         }
     }
@@ -127,8 +123,7 @@ public sealed class SchedulingInitializer : BackgroundService
             return null;
         }
 
-        // Replay the operation against its existing row rather than allocating a fresh
-        // execution, which would orphan the original and double-count the operation.
+        // Replay the operation against its existing row to preserve the original execution.
         return new() {
             Job               = jobName,
             ExecutionUid      = pending.Uid,

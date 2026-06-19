@@ -11,6 +11,7 @@ namespace Schemata.Identity.Foundation.Controllers;
 public sealed partial class AuthenticateController<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Confirms an email address or phone number with a confirmation code.</summary>
     [HttpGet(nameof(Confirm))]
     public async Task<IActionResult> Confirm([FromQuery] ConfirmRequest request, CancellationToken ct) {
         var result = await handler.ConfirmAsync(request, HttpContext.User, ct);
@@ -21,6 +22,7 @@ public sealed partial class AuthenticateController<TUser>
         };
     }
 
+    /// <summary>Sends an account-confirmation code to a contact address.</summary>
     [HttpPost(nameof(Code))]
     public async Task<IActionResult> Code([FromBody] ForgetRequest request, CancellationToken ct) {
         var result = await handler.CodeAsync(request, HttpContext.User, ct);

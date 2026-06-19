@@ -16,9 +16,7 @@ public class ExpungeHandlerShould
     [Fact]
     public async Task Invoke_SoftDeletedEntity_PhysicallyRemovesAndCommits() {
         var entity = new TrashStudent {
-            Name          = "alice-1",
-            CanonicalName = "trashStudents/alice-1",
-            DeleteTime    = DateTime.UtcNow,
+            Name = "alice-1", CanonicalName = "trashStudents/alice-1", DeleteTime = DateTime.UtcNow,
         };
 
         var suppression = new Mock<IDisposable>();
@@ -29,9 +27,10 @@ public class ExpungeHandlerShould
 
         var handler = new ExpungeHandler<TrashStudent>(repository.Object);
 
-        var response = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
+        var response = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(),
+                                                 CancellationToken.None);
 
-        // AIP-164 expunge returns an empty body, not the resource identity.
+        // AIP-164 expunge returns an empty body.
         Assert.NotNull(response);
         repository.Verify(r => r.SuppressSoftDelete(), Times.Once);
         repository.Verify(r => r.RemoveAsync(entity, CancellationToken.None), Times.Once);
@@ -41,16 +40,16 @@ public class ExpungeHandlerShould
 
     [Fact]
     public async Task Invoke_LiveEntity_ThrowsFailedPreconditionException() {
-        var entity = new TrashStudent {
-            Name          = "alice-1",
-            CanonicalName = "trashStudents/alice-1",
-        };
+        var entity = new TrashStudent { Name = "alice-1", CanonicalName = "trashStudents/alice-1" };
 
         var repository = new Mock<IRepository<TrashStudent>>();
         var handler    = new ExpungeHandler<TrashStudent>(repository.Object);
 
         await Assert.ThrowsAsync<FailedPreconditionException>(() => handler.InvokeAsync(
-            entity.CanonicalName, new(), entity, null, CancellationToken.None).AsTask());
+                                                                                entity.CanonicalName, new(), entity,
+                                                                                null,
+                                                                                CancellationToken.None)
+                                                                           .AsTask());
 
         repository.Verify(r => r.SuppressSoftDelete(), Times.Never);
         repository.Verify(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);

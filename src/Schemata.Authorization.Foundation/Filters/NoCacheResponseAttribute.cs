@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Schemata.Authorization.Foundation.Filters;
 
+/// <summary>Applies no-store response cache headers to MVC results.</summary>
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class NoCacheResponseAttribute : Attribute, IResultFilter
 {

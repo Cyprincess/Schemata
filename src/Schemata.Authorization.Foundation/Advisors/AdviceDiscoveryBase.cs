@@ -19,11 +19,11 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <seealso cref="AdviceDiscoveryUserInfo" />
 public sealed class AdviceDiscoveryBase : IDiscoveryAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 
     #region IDiscoveryAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

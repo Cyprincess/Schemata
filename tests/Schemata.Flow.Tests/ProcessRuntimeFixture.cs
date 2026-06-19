@@ -20,20 +20,6 @@ namespace Schemata.Flow.Tests;
 
 internal sealed class ProcessRuntimeFixture
 {
-    public Mock<IFlowRuntime> Engine { get; } = new();
-    public RecordingEventBus EventBus { get; } = new();
-    public ProcessInstance AdvanceResult { get; set; } = new() { StateId = "review", State = "Review" };
-    public Exception? AdvanceException { get; set; }
-    public List<SchemataProcess> Persisted { get; } = [];
-    public Mock<IRepository<SchemataProcess>> Processes { get; } = new();
-    public ProcessRuntime Runtime { get; }
-    public ProcessInstance StartResult { get; set; } = new() { StateId = "draft", State = "Draft" };
-    public Exception? StartException { get; set; }
-    public Mock<IRepository<SchemataProcessTransition>> Transitions { get; } = new();
-    public List<Mock<IUnitOfWork>> UnitOfWorks { get; } = [];
-
-    public string? AdvancedStateId { get; private set; }
-
     public ProcessRuntimeFixture() {
         var definition = CreateDefinition();
         var registration = new ProcessRegistration {
@@ -49,33 +35,43 @@ internal sealed class ProcessRuntimeFixture
         registry.Setup(r => r.GetRegisteredProcesses()).Returns([definition.Name]);
 
         Engine.SetupGet(e => e.EngineName).Returns(SchemataConstants.FlowEngines.StateMachine);
-        Engine.Setup(e => e.StartAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
+        Engine.Setup(e => e.StartAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
+                                       It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess _, CancellationToken _) => {
-                  if (StartException is not null) {
-                      throw StartException;
-                  }
+                   if (StartException is not null) {
+                       throw StartException;
+                   }
 
-                  return new(StartResult);
-              });
-        Engine.Setup(e => e.AdvanceAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
-              .Callback((ProcessDefinition _, SchemataProcess process, CancellationToken _) => AdvancedStateId = process.StateId)
-              .Returns((ProcessDefinition _, SchemataProcess _, CancellationToken _) => {
-                  if (AdvanceException is not null) {
-                      throw AdvanceException;
-                  }
+                   return new(StartResult);
+               });
+        Engine
+           .Setup(e => e.AdvanceAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
+                                      It.IsAny<CancellationToken>()))
+           .Callback((ProcessDefinition _, SchemataProcess process, CancellationToken _)
+                         => AdvancedStateId = process.StateId)
+           .Returns((ProcessDefinition _, SchemataProcess _, CancellationToken _) => {
+                if (AdvanceException is not null) {
+                    throw AdvanceException;
+                }
 
-                  return new(AdvanceResult);
-              });
+                return new(AdvanceResult);
+            });
 
         Processes.Setup(r => r.FirstOrDefaultAsync(
                             It.IsAny<Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>>>(),
                             It.IsAny<CancellationToken>()))
-                 .Returns((Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate, CancellationToken _)
+                 .Returns((
+                                  Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate,
+                                  CancellationToken                                              _
+                              )
                               => ValueTask.FromResult(predicate(Persisted.AsQueryable()).FirstOrDefault()));
         Processes.Setup(r => r.ListAsync(
                             It.IsAny<Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>>>(),
                             It.IsAny<CancellationToken>()))
-                 .Returns((Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate, CancellationToken _)
+                 .Returns((
+                                  Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate,
+                                  CancellationToken                                              _
+                              )
                               => ToAsync(predicate(Persisted.AsQueryable()).ToList()));
         Processes.Setup(r => r.AddAsync(It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
                  .Callback((SchemataProcess process, CancellationToken _) => Persisted.Add(process))
@@ -98,6 +94,20 @@ internal sealed class ProcessRuntimeFixture
         Runtime = new(registry.Object, services.BuildServiceProvider());
     }
 
+    public Mock<IFlowRuntime> Engine { get; } = new();
+    public RecordingEventBus EventBus { get; } = new();
+    public ProcessInstance AdvanceResult { get; set; } = new() { StateId = "review", State = "Review" };
+    public Exception? AdvanceException { get; set; }
+    public List<SchemataProcess> Persisted { get; } = [];
+    public Mock<IRepository<SchemataProcess>> Processes { get; } = new();
+    public ProcessRuntime Runtime { get; }
+    public ProcessInstance StartResult { get; set; } = new() { StateId = "draft", State = "Draft" };
+    public Exception? StartException { get; set; }
+    public Mock<IRepository<SchemataProcessTransition>> Transitions { get; } = new();
+    public List<Mock<IUnitOfWork>> UnitOfWorks { get; } = [];
+
+    public string? AdvancedStateId { get; private set; }
+
     public static void MutatePersisted(SchemataProcess process, string stateId, string state) {
         process.StateId = stateId;
         process.State   = state;
@@ -118,14 +128,19 @@ internal sealed class ProcessRuntimeFixture
     }
 
     private static ProcessDefinition CreateDefinition() {
-        var start  = new StartEvent { Id = "start", Name = "Start" };
-        var draft  = new NoneTask { Id = "draft", Name = "Draft" };
-        var review = new NoneTask { Id = "review", Name = "Review" };
-        var done   = new EndEvent { Id = "done", Name = "Done" };
+        var start  = new StartEvent { Id = "start", Name  = "Start" };
+        var draft  = new NoneTask { Id   = "draft", Name  = "Draft" };
+        var review = new NoneTask { Id   = "review", Name = "Review" };
+        var done   = new EndEvent { Id   = "done", Name   = "Done" };
 
         return new() {
             Name = "approval",
-            Elements = { start, draft, review, done },
+            Elements = {
+                start,
+                draft,
+                review,
+                done,
+            },
             Flows = {
                 new() { Id = "f1", Source = start, Target  = draft },
                 new() { Id = "f2", Source = draft, Target  = review },
@@ -134,9 +149,28 @@ internal sealed class ProcessRuntimeFixture
         };
     }
 
+    #region Nested type: NamedOnlySource
+
+    internal sealed class NamedOnlySource : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name { get; set; }
+
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: RecordingEventBus
+
     internal sealed class RecordingEventBus : IEventBus
     {
         public List<(IEvent Event, object? Source)> Published { get; } = [];
+
+        #region IEventBus Members
 
         public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
             where TEvent : IEvent {
@@ -155,21 +189,30 @@ internal sealed class ProcessRuntimeFixture
             where TRequest : IRequest<TResponse> {
             throw new NotSupportedException();
         }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: SourceEntity
 
     internal sealed class SourceEntity : ICanonicalName, IConcurrency
     {
+        #region ICanonicalName Members
+
         public string? Name { get; set; }
 
         public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region IConcurrency Members
 
         public Guid Timestamp { get; set; }
+
+        #endregion
     }
 
-    internal sealed class NamedOnlySource : ICanonicalName
-    {
-        public string? Name { get; set; }
-
-        public string? CanonicalName { get; set; }
-    }
+    #endregion
 }

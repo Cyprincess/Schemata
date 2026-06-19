@@ -13,6 +13,7 @@ internal sealed class RegisterEventConfiguration : IPostConfigureOptions<EventTy
     private readonly string _name;
     private readonly Type   _type;
 
+    /// <summary>Initializes a post-configure action for a single event registration.</summary>
     public RegisterEventConfiguration(Type type, string name) {
         _type = type;
         _name = name;

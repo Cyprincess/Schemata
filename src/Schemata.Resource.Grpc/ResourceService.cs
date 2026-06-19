@@ -23,7 +23,14 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
     where TDetail : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
+    /// <summary>
+    ///     Provides access to the current HTTP context for gRPC calls.
+    /// </summary>
     protected readonly IHttpContextAccessor                                                Accessor;
+
+    /// <summary>
+    ///     Handles resource operations for this service.
+    /// </summary>
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>      Handler;
 
     /// <summary>
@@ -39,6 +46,9 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
         Accessor = accessor;
     }
 
+    /// <summary>
+    ///     Gets the current HTTP context for the active gRPC call.
+    /// </summary>
     protected HttpContext? Http => Accessor.HttpContext;
 
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members

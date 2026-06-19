@@ -10,8 +10,10 @@ using Schemata.Flow.Skeleton.Entities;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>Persists Flow process instances and transition history.</summary>
 internal sealed class ProcessPersistence
 {
+    /// <summary>Finds a persisted process by canonical name.</summary>
     public async ValueTask<SchemataProcess?> FindAsync(
         IServiceProvider  services,
         string            canonicalName,
@@ -22,6 +24,7 @@ internal sealed class ProcessPersistence
         return await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == canonicalName), ct);
     }
 
+    /// <summary>Lists persisted processes that are waiting at a BPMN element.</summary>
     public async IAsyncEnumerable<SchemataProcess> ListWaitingAsync(
         IServiceProvider                           services,
         [EnumeratorCancellation] CancellationToken ct
@@ -34,6 +37,7 @@ internal sealed class ProcessPersistence
         }
     }
 
+    /// <summary>Stores the current process state and appends its transition history entry in one unit of work.</summary>
     public async Task PersistTransitionAsync(
         IServiceProvider          services,
         SchemataProcess           process,
@@ -68,6 +72,7 @@ internal sealed class ProcessPersistence
         }
     }
 
+    /// <summary>Copies persisted process fields from <paramref name="source"/> into <paramref name="target"/>.</summary>
     public static void SyncProcessFields(SchemataProcess target, SchemataProcess source) {
         target.Uid            = source.Uid;
         target.Name           = source.Name;

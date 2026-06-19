@@ -18,7 +18,12 @@
 
 `SetAsync` uses a Redis transaction (`IDatabase.CreateTransaction()`) to atomically set the value and its expiration, then store the serialized `CacheEntryOptions` in a companion metadata key (`key + ":__meta__"`).
 
-`TryAddAsync` uses `StringSetAsync(key, value, expiry, When.NotExists)` — a single-round-trip atomic insert-if-absent (`SET key value EX <expiry> NX`). This is cluster-safe.
+`TryAddAsync` uses `StringSetAsync(key, value, expiry, When.NotExists)` — a single-round-trip atomic insert-if-absent (`SET key value EX <expiry> NX`).
+
+`TryReplaceAsync` (compare-and-swap) and `TryRemoveAsync` (compare-and-delete) run server-side Lua
+scripts that read the current value, compare it to the expected bytes, and apply the change only on a
+match — value key and metadata key together — returning whether the change occurred. Running the
+compare and the write in one script makes each operation atomic across processes.
 
 `RemoveAsync` deletes both the value key and the metadata key in a transaction.
 
@@ -46,13 +51,17 @@ Redis does not natively support sliding expiration. `RedisCacheProvider` emulate
 
 The metadata key shares the same TTL as the value key, so both expire together.
 
-## Cluster safety
+## Concurrency safety
 
-Collection operations are cluster-safe because `SADD`, `SMEMBERS`, `SREM`, and `DEL` are atomic Redis commands. Multiple application instances can safely add and remove members from the same set concurrently.
+**Scope: cluster-safe.** Collection operations are atomic at the Redis server level (`SADD`,
+`SMEMBERS`, `SREM`, `DEL`); multiple application instances can add and remove members from the
+same set concurrently. Key-value operations are also cluster-safe: `TryAddAsync` uses `SET NX`,
+and the compare-and-swap operations run server-side Lua scripts.
 
-Key-value operations are also cluster-safe. `TryAddAsync` uses `SET NX`, which is atomic.
-
-However, cache and database are not atomic together. There is no distributed transaction spanning Redis and the application database. The committed eviction pattern (see [query-cache.md](query-cache.md)) mitigates this by deferring eviction until after the database transaction commits, but a process crash between commit and eviction can leave stale cache entries until TTL expires.
+Cache and database commits are not atomic together: there is no distributed transaction spanning
+Redis and the application database. Consumers can defer cache writes until after the database
+transaction commits, but a process crash between commit and the cache write can leave stale cache
+entries until TTL expires.
 
 ## Registration
 
@@ -77,7 +86,7 @@ services.AddRedisCache();
 
 ## Design motivation
 
-Using native Redis Set commands for collection operations eliminates the read-modify-write race that affects `DistributedCacheProvider`. The metadata key pattern for sliding expiration is a pragmatic workaround for Redis's lack of native sliding TTL support; it adds one extra key per cached entry but keeps the implementation self-contained without requiring Lua scripts.
+Using native Redis Set commands for collection operations eliminates the read-modify-write race that affects `DistributedCacheProvider`. The metadata key pattern for sliding expiration is a pragmatic workaround for Redis's lack of native sliding TTL support; it adds one extra key per cached entry. The atomic compare-and-swap operations use Lua scripts because they need to read, compare, and write the value and metadata keys as a single server-side step.
 
 ## Caveats
 
@@ -89,4 +98,3 @@ Using native Redis Set commands for collection operations eliminates the read-mo
 
 - [overview.md](overview.md) — `ICacheProvider` abstraction and provider selection
 - [distributed.md](distributed.md) — `DistributedCacheProvider` for single-process deployments
-- [query-cache.md](query-cache.md) — how `RedisCacheProvider` is used by the reverse index

@@ -70,8 +70,7 @@ public sealed class SchemataBuilder
     }
 
     /// <summary>
-    ///     Returns <see langword="true" /> if the given feature type was already
-    ///     registered.
+    ///     Returns <see langword="true" /> when the given feature type is registered.
     /// </summary>
     /// <typeparam name="T">The feature type to check.</typeparam>
     /// <returns><see langword="true" /> when the feature is registered.</returns>

@@ -46,7 +46,6 @@ public class IntegrationFixture : IAsyncLifetime
 
         _root = services.BuildServiceProvider();
 
-        // Create the tables
         using var scope      = _root.CreateScope();
         var       connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
         connection.CreateTable<Student>(tableOptions: TableOptions.CreateIfNotExists);

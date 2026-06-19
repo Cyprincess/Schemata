@@ -61,7 +61,7 @@ public sealed class Configurators
     /// </summary>
     /// <typeparam name="T">The options type keyed by <c>typeof(T)</c>.</typeparam>
     /// <param name="action">The registered action, or <see langword="null" /> when absent.</param>
-    /// <returns><see langword="true" /> when an action was found for <typeparamref name="T" />.</returns>
+    /// <returns><see langword="true" /> when an action exists for <typeparamref name="T" />.</returns>
     public bool TryGet<T>(out Action<T>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof(T), out var @object)) {
@@ -81,7 +81,7 @@ public sealed class Configurators
     ///     by the tuple <c>(T1, T2)</c>.
     /// </summary>
     /// <param name="action">The registered action, or <see langword="null" /> when absent.</param>
-    /// <returns><see langword="true" /> when an action was found for <c>(T1, T2)</c>.</returns>
+    /// <returns><see langword="true" /> when an action exists for <c>(T1, T2)</c>.</returns>
     public bool TryGet<T1, T2>(out Action<T1, T2>? action) {
         action = null;
         if (!_configurators.TryGetValue(typeof((T1, T2)), out var @object)) {

@@ -2,17 +2,20 @@
 
 ## What you'll build
 
-A `SlugNormalizeAdvisor<TEntity>` that lower-cases the `Name` field on every update, registered open-generic so it applies to any entity that implements `ICanonicalName`. You'll also write an integration test that confirms the advisor runs and the database row reflects the normalized value.
+A `SlugNormalizeAdvisor<TEntity>` that lower-cases the `Name` field on every update, registered
+open-generic so it applies to any entity implementing `ICanonicalName`. You'll also write an
+integration test that confirms the advisor runs and the stored row reflects the normalized value.
 
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
 - NuGet packages: `Schemata.Entity.Repository`, `Schemata.Abstractions`.
-- For the integration test: `Microsoft.EntityFrameworkCore.InMemory`, `Microsoft.AspNetCore.Mvc.Testing`, `xunit`.
+- For the test: `Microsoft.EntityFrameworkCore.InMemory`, `xunit`.
 
 ## Step 1: Implement the advisor
 
-`IRepositoryUpdateAdvisor<TEntity>` is the correct interface for logic that runs before an entity is persisted during an update. It extends `IAdvisor<IRepository<TEntity>, TEntity>`, which means the pipeline passes the repository instance and the entity being updated.
+`IRepositoryUpdateAdvisor<TEntity>` runs before an entity is persisted on update. It extends
+`IAdvisor<IRepository<TEntity>, TEntity>`, so the pipeline passes the repository and the entity.
 
 ```csharp
 using Schemata.Abstractions.Advisors;
@@ -23,13 +26,13 @@ using Schemata.Entity.Repository.Advisors;
 public sealed class SlugNormalizeAdvisor<TEntity> : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class, ICanonicalName
 {
-    public int Order => 50_000_000;   // runs before AdviceUpdateTimestamp (100M)
+    public int Order => 50_000_000;   // runs before AdviceUpdateTimestamp (Orders.Base = 100M)
 
     public Task<AdviseResult> AdviseAsync(
-        AdviceContext      ctx,
+        AdviceContext        ctx,
         IRepository<TEntity> repository,
-        TEntity            entity,
-        CancellationToken  ct = default
+        TEntity              entity,
+        CancellationToken    ct = default
     ) {
         if (!string.IsNullOrWhiteSpace(entity.Name)) {
             entity.Name = entity.Name.ToLowerInvariant();
@@ -40,50 +43,56 @@ public sealed class SlugNormalizeAdvisor<TEntity> : IRepositoryUpdateAdvisor<TEn
 }
 ```
 
-Return `AdviseResult.Continue` to let the rest of the pipeline proceed. Return `AdviseResult.Block` to abort the update without persisting. Return `AdviseResult.Handle` only when your advisor has already performed the persistence itself and the repository should skip its own write.
+Return `Continue` to let the rest of the pipeline proceed, `Block` to abort the update without
+persisting, or `Handle` only when the advisor has already persisted the entity and the repository
+should skip its own write.
 
-**Assertion:** The class compiles with no errors. The `Order` value is below 100_000_000, placing it before all built-in repository advisors.
+**Assertion:** The class compiles. `Order = 50_000_000` is below `Orders.Base` (100M), so it runs
+before every built-in update advisor.
 
 ## Step 2: Register the advisor
 
-Use `TryAddEnumerable` with an open-generic `ServiceDescriptor`. This registers the advisor for every `TEntity` that satisfies the constraint without requiring per-entity registration.
+Use `TryAddEnumerable` with an open-generic `ServiceDescriptor`, which registers the advisor for
+every `TEntity` that satisfies the constraint:
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.Repository.Advisors;
 
-// In your startup or extension method:
 services.TryAddEnumerable(
     ServiceDescriptor.Scoped(
         typeof(IRepositoryUpdateAdvisor<>),
-        typeof(SlugNormalizeAdvisor<>)
-    )
-);
+        typeof(SlugNormalizeAdvisor<>)));
 ```
 
-Place this call inside a `Use*` extension method on `SchemataBuilder`, or inside a feature's `ConfigureServices`. Do not call it directly on the host `IServiceCollection` from `Program.cs` — write it into the `schema.Services` buffer instead:
+Place the call inside a feature's `ConfigureServices`, or inside a `schema.ConfigureServices(...)`
+block so it writes into the builder's staging collection rather than the live container:
 
 ```csharp
-schema.Services.TryAddEnumerable(
-    ServiceDescriptor.Scoped(
-        typeof(IRepositoryUpdateAdvisor<>),
-        typeof(SlugNormalizeAdvisor<>)
-    )
-);
+schema.ConfigureServices(services => {
+    services.TryAddEnumerable(
+        ServiceDescriptor.Scoped(
+            typeof(IRepositoryUpdateAdvisor<>),
+            typeof(SlugNormalizeAdvisor<>)));
+});
 ```
 
-**Assertion:** Resolve `IEnumerable<IRepositoryUpdateAdvisor<Student>>` from the DI container. The collection contains a `SlugNormalizeAdvisor<Student>` instance.
+**Assertion:** Resolving `IEnumerable<IRepositoryUpdateAdvisor<Student>>` yields a
+`SlugNormalizeAdvisor<Student>` instance.
 
 ## Step 3: Write an integration test
 
-The test spins up a real in-memory EF Core context and exercises the full repository pipeline, including the advisor.
+The test runs a real in-memory EF Core context through the full repository pipeline, including the
+advisor.
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using Xunit;
 
 public sealed class SlugNormalizeAdvisorShould
@@ -93,16 +102,14 @@ public sealed class SlugNormalizeAdvisorShould
     {
         var services = new ServiceCollection();
 
-        services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase("slug-test"));
-        services.AddRepository<EntityFrameworkCoreRepository<AppDbContext>>();
+        services.AddDbContextFactory<AppDbContext>(o => o.UseInMemoryDatabase("slug-test"));
+        services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>();
         services.TryAddEnumerable(
             ServiceDescriptor.Scoped(
                 typeof(IRepositoryUpdateAdvisor<>),
-                typeof(SlugNormalizeAdvisor<>)
-            )
-        );
+                typeof(SlugNormalizeAdvisor<>)));
 
-        await using var sp = services.BuildServiceProvider();
+        await using var sp    = services.BuildServiceProvider();
         await using var scope = sp.CreateAsyncScope();
 
         var repo = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
@@ -112,44 +119,60 @@ public sealed class SlugNormalizeAdvisorShould
         await repo.AddAsync(student);
         await repo.CommitAsync();
 
-        // Update with mixed-case name
+        // Update with a mixed-case name
         student.Name = "ALICE-UPDATED";
         await repo.UpdateAsync(student);
         await repo.CommitAsync();
 
-        // Verify
-        var found = await repo.FirstOrDefaultAsync<Student>(s => s.Name == "alice-updated");
+        // Verify — FirstOrDefaultAsync takes a query transform, not a boolean predicate
+        var found = await repo.FirstOrDefaultAsync<Student>(
+            q => q.Where(s => s.Name == "alice-updated"));
+
         Assert.NotNull(found);
         Assert.Equal("alice-updated", found.Name);
     }
 }
 ```
 
+`AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()` registers the closed-generic EF
+Core repository for `Student`; `EfCoreRepository<TContext, TEntity>` resolves its context from the
+`IDbContextFactory<AppDbContext>` registered by `AddDbContextFactory`.
+
 **Assertion:** The test passes. `found.Name` is `"alice-updated"`, not `"ALICE-UPDATED"`.
 
-## Step 4: Confirm ordering relative to built-in advisors
+## Step 4: Ordering relative to built-in advisors
 
-The built-in update advisors and their `Order` values are:
+The built-in update advisors and their `Order` values:
 
 | Advisor | Order |
 | --- | --- |
-| `AdviceUpdateTimestamp` | 100_000_000 (`Orders.Base`) |
-| `AdviceUpdateValidation` | 110_000_000 |
-| `AdviceUpdateConcurrency` | 900_000_000 (`Orders.Max`) |
+| `AdviceUpdateTimestamp` | 100,000,000 (`Orders.Base`) |
+| `AdviceUpdateValidation` | 110,000,000 |
 
-`SlugNormalizeAdvisor` at `Order = 50_000_000` runs before all of them. To run between validation and concurrency, pick an `Order` in `[110_000_001, 899_999_999]` and outside the reserved range `[100_000_000, 900_000_000]` if your advisor ships in user code.
+`SlugNormalizeAdvisor` at `Order = 50_000_000` runs before both. To run after validation, pick an
+`Order` above 110,000,000; user advisors stay outside the reserved range
+`[100_000_000, 900_000_000]`. The update pipeline applies no concurrency advisor — concurrency runs
+on the add pipeline (`AdviceAddConcurrency`, 110M); freshness on update is enforced by the resource
+layer.
 
-**Assertion:** Add a second advisor at `Order = 200_000_000` and confirm via a test that the slug normalization happens before the second advisor sees the entity.
+**Assertion:** Add a second advisor at `Order = 200_000_000` and confirm by test that slug
+normalization happens before the second advisor sees the entity.
 
 ## Common pitfalls
 
-- **Registering as `AddScoped` instead of `TryAddEnumerable`.** `AddScoped(typeof(IRepositoryUpdateAdvisor<Student>), typeof(SlugNormalizeAdvisor<Student>))` replaces any existing registration for that closed type. `TryAddEnumerable` appends to the collection, which is what the pipeline expects.
-- **Forgetting the open-generic constraint.** `SlugNormalizeAdvisor<TEntity>` has `where TEntity : class, ICanonicalName`. If you register it as `typeof(IRepositoryUpdateAdvisor<>)` against `typeof(SlugNormalizeAdvisor<>)`, the DI container will attempt to construct it for every entity type, including those that don't implement `ICanonicalName`. Add a null-check guard or split into a closed registration per entity type if the constraint is critical.
-- **Returning `Handle` unintentionally.** `Handle` tells the repository to skip its own `Context.Update` call. If your advisor returns `Handle` without actually persisting the entity, the update is silently dropped.
-- **Advisor not running in the resource pipeline.** The resource handler calls `IRepository<TEntity>.UpdateAsync`, which runs the advisor chain. If you bypass the repository and call `Context.Update` directly, advisors don't run.
+- **Registering with `AddScoped` instead of `TryAddEnumerable`.** `AddScoped(typeof(...))` for a
+  closed advisor type replaces any existing registration; `TryAddEnumerable` appends to the
+  collection the pipeline expects.
+- **`FirstOrDefaultAsync` takes a query transform.** The argument is
+  `Func<IQueryable<TEntity>, IQueryable<TResult>>`, so pass `q => q.Where(...)`, not a bare boolean
+  predicate.
+- **Returning `Handle` unintentionally.** `Handle` tells the repository to skip its own `Update`.
+  Returning `Handle` without persisting silently drops the update.
+- **Advisor bypassed.** The advisor chain runs only through `IRepository<TEntity>.UpdateAsync`.
+  Mutating the EF Core context directly skips it.
 
 ## See also
 
-- [Advice pipeline](../documents/core/advice-pipeline.md)
-- [Repository mutation pipeline](../documents/repository/mutation-pipeline.md)
-- [Entity traits](../documents/entity/traits.md)
+- [Advice Pipeline](../documents/core/advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`
+- [Mutation Pipeline](../documents/repository/mutation-pipeline.md) — built-in advisor order
+- [Entity Traits](../documents/entity/traits.md) — trait interfaces such as `ICanonicalName`

@@ -9,6 +9,7 @@ public sealed class StartFlow
     private readonly ProcessDefinition _definition;
     private readonly IEventDefinition? _eventDefinition;
 
+    /// <summary>Creates a start-flow builder for <paramref name="definition" />.</summary>
     internal StartFlow(ProcessDefinition definition, IEventDefinition? eventDefinition = null) {
         _definition      = definition;
         _eventDefinition = eventDefinition;

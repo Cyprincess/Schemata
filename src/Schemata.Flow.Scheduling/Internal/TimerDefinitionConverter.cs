@@ -11,7 +11,7 @@ public static class TimerDefinitionConverter
 {
     /// <summary>Maps a <see cref="TimerDefinition"/> to the matching <see cref="IScheduleDefinition"/>.</summary>
     /// <param name="timer">The BPMN timer definition.</param>
-    /// <param name="time">Clock used to anchor relative durations; defaults to the system clock.</param>
+    /// <param name="time">Clock for anchoring relative durations; defaults to the system clock.</param>
     public static IScheduleDefinition ToSchedule(TimerDefinition timer, TimeProvider? time = null) {
         return timer.TimerType switch {
             TimerType.Date     => new OneTimeSchedule(DateTime.Parse(timer.TimeExpression, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)),

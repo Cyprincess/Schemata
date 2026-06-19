@@ -1,14 +1,12 @@
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Indicates that the entity records the principal that owns it (typically the authenticated subject
-///     who created the resource). The owner is persisted so ownership survives across requests and can be
-///     enforced by authorization advisors.
+///     Records the principal that owns an entity for authorization decisions.
 /// </summary>
 public interface IOwnable
 {
     /// <summary>
-    ///     Gets or sets the canonical name of the principal that owns this resource (e.g., "users/chino").
+    ///     The canonical name of the principal that owns this resource (e.g., <c>"users/chino"</c>).
     /// </summary>
     string? Owner { get; set; }
 }

@@ -9,8 +9,8 @@ namespace Schemata.Resource.Tests.Models;
 
 public class PageTokenShould
 {
-    private static readonly IDataProtector Protector =
-        new EphemeralDataProtectionProvider(NullLoggerFactory.Instance).CreateProtector(PageToken.ProtectionPurpose);
+    private static readonly IDataProtector Protector
+        = new EphemeralDataProtectionProvider(NullLoggerFactory.Instance).CreateProtector(PageToken.ProtectionPurpose);
 
     [Fact]
     public async Task RoundTrip_PreservesAllFields() {

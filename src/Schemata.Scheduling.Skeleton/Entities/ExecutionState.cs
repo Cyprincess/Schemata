@@ -3,13 +3,13 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 /// <summary>Lifecycle state of a <see cref="SchemataJobExecution" /> row.</summary>
 public enum ExecutionState
 {
-    /// <summary>The execution was registered by the trigger pipeline but the job body has not yet started.</summary>
+    /// <summary>The execution is registered and waiting for the job body to start.</summary>
     Pending,
 
-    /// <summary>The execution started and has not yet finished.</summary>
+    /// <summary>The execution is running.</summary>
     Running,
 
-    /// <summary>The job body returned without throwing.</summary>
+    /// <summary>The job body completed successfully.</summary>
     Succeeded,
 
     /// <summary>The job body threw an exception.</summary>

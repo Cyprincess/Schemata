@@ -11,15 +11,16 @@ namespace Schemata.Flow.Event.Internal;
 
 /// <summary>
 ///     Maintains event-bus subscriptions for BPMN intermediate message and signal catches,
-///     including those reached through an event-based gateway. Boundary message/signal events
-///     are not bridged because the single-token state machine waits at the host activity, not
-///     the boundary catch. Multi-token engines plugged in via keyed <c>IFlowRuntime</c> may
-///     bridge boundary catches by following the intermediate-catch subscription pattern.
+///     including those reached through an event-based gateway. The single-token state machine
+///     waits at the host activity for boundary message and signal events. Multi-token engines
+///     plugged in via keyed <c>IFlowRuntime</c> may bridge boundary catches by following the
+///     intermediate-catch subscription pattern.
 /// </summary>
 public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
 {
     private readonly IEventSubscriptionStore _store;
 
+    /// <summary>Creates an advisor that stores Flow event subscriptions.</summary>
     public FlowEventTransitionAdvisor(IEventSubscriptionStore store) {
         _store = store;
     }
@@ -101,7 +102,7 @@ public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
     ) {
         var correlationKey = definition is Message ? process.CanonicalName : null;
         // Key the subscription by the waiting element id so two catches sharing an event
-        // name in one process do not overwrite each other.
+        // name in one process keep distinct subscriptions.
         var id             = $"flow:{process.CanonicalName}:{elementId}";
         var target         = process.CanonicalName!;
         var eventType      = definition.Name;

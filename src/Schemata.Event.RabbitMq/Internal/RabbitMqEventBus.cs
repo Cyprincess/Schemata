@@ -153,7 +153,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
         where TEvent : IEvent {
         // Resolve by the runtime type so a derived event published through a base/interface
-        // static type keeps its registered name and serializes its derived members.
+        // static type keeps its registered name and serialized derived members.
         var type       = @event!.GetType();
         var routingKey = _registry.RequireName(type);
 

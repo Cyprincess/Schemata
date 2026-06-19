@@ -108,10 +108,10 @@ public class AuthorizeRequest
     /// <summary>Maximum authentication age in seconds; forces re-authentication if exceeded.</summary>
     public string? MaxAge { get; set; }
 
-    /// <summary>Actual authentication time (epoch seconds) recorded when the authorization code was issued.</summary>
+    /// <summary>Authentication time in epoch seconds recorded for the authorization code.</summary>
     public string? AuthTime { get; set; }
 
-    /// <summary>Previously issued <c>id_token</c> for session validation.</summary>
+    /// <summary><c>id_token</c> hint for session validation.</summary>
     public string? IdTokenHint { get; set; }
 
     /// <summary>

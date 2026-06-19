@@ -6,6 +6,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Identity role claim entity with Schemata identifiers and timestamps.
+/// </summary>
 [Table("SchemataRoleClaims")]
 [PrimaryKey(nameof(Uid))]
 public class SchemataRoleClaim : IdentityRoleClaim<Guid>, IIdentifier, ITimestamp

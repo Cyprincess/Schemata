@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Entity.Repository.Advisors;
 
 namespace Schemata.Entity.Repository;
 

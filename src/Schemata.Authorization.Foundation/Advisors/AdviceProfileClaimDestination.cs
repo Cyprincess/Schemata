@@ -24,11 +24,11 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <seealso cref="AdviceSubjectClaimDestination" />
 public sealed class AdviceProfileClaimDestination : IDestinationAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceSubjectClaimDestination.DefaultOrder + 10_000_000;
 
     #region IDestinationAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

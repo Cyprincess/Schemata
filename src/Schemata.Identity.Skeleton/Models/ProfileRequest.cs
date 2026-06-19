@@ -2,13 +2,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Profile update request body.
+/// </summary>
 public class ProfileRequest
 {
-    /// <summary>New email address to change to; requires confirmation.</summary>
+    /// <summary>Email address requested for the profile.</summary>
     [EmailAddress]
     public string? EmailAddress { get; set; }
 
-    /// <summary>New phone number to change to; requires confirmation.</summary>
+    /// <summary>Phone number requested for the profile.</summary>
     [Phone]
     public string? PhoneNumber { get; set; }
 

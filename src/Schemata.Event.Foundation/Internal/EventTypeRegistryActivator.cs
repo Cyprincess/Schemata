@@ -10,6 +10,7 @@ namespace Schemata.Event.Foundation.Internal;
 /// </summary>
 internal static class EventTypeRegistryActivator
 {
+    /// <summary>Builds an event type registry from configured event registrations.</summary>
     public static IEventTypeRegistry Build(IOptions<EventTypeRegistryConfiguration> options) {
         var registry = new DefaultEventTypeRegistry();
         foreach (var (type, name) in options.Value.Registrations) {

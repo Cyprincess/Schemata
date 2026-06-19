@@ -14,6 +14,13 @@ namespace Schemata.Resource.Foundation;
 /// </summary>
 internal static class ResourceIdentifiers
 {
+    /// <summary>
+    ///     Applies canonical-name predicates to the request container.
+    /// </summary>
+    /// <typeparam name="TEntity">The resource entity type.</typeparam>
+    /// <param name="container">The request container receiving name and parent predicates.</param>
+    /// <param name="name">The canonical resource name from the request.</param>
+    /// <exception cref="ValidationException">The name is missing or malformed.</exception>
     public static void Apply<TEntity>(ResourceRequestContainer<TEntity> container, string? name)
         where TEntity : class, ICanonicalName {
         if (string.IsNullOrWhiteSpace(name)) {

@@ -8,8 +8,7 @@ namespace Schemata.Tenancy.Skeleton;
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
-///     When a tenant is resolved, scopes are created from the tenant's isolated container.
-///     When no tenant is resolved, scopes fall back to the root provider.
+    ///     Resolved tenants use their isolated container. Requests with an absent tenant use the root provider.
 /// </remarks>
 public interface ITenantServiceScopeFactory<TTenant> : IServiceScopeFactory
     where TTenant : SchemataTenant;

@@ -8,8 +8,10 @@ using Schemata.Event.RabbitMq.Internal;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary><see cref="EventConsumerBuilder" /> extensions that enable RabbitMQ consumers.</summary>
 public static class EventConsumerBuilderRabbitMqExtensions
 {
+    /// <summary>Registers the RabbitMQ consumer host and request/response correlation tracker.</summary>
     public static EventConsumerBuilder UseRabbitMq(
         this EventConsumerBuilder     builder,
         Action<RabbitMqEventOptions>? configure = null

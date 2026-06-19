@@ -1,19 +1,18 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Humanizer;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Models;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Advisors;
 
+/// <summary>Validates account-confirmation requests.</summary>
 public sealed class AdviceConfirmRequestValidation : IIdentityRequestAdvisor<ConfirmRequest>
 {
+    /// <summary>Default order for account-confirmation request validation.</summary>
     public const int DefaultOrder = AdviceIdentityFeatureGate.DefaultOrder + 10_000_000;
 
     #region IIdentityRequestAdvisor<ConfirmRequest> Members

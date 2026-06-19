@@ -40,6 +40,7 @@ public class ProcessDefinition
     /// <summary>Sequence flows connecting <see cref="Elements"/>.</summary>
     public List<SequenceFlow> Flows { get; } = [];
 
+    /// <summary>Activities that already have outgoing sequence flows during graph construction.</summary>
     internal HashSet<Activity> ActivitiesWithOutgoing { get; } = [];
 
     /// <summary>Message definitions referenced by message events and tasks.</summary>

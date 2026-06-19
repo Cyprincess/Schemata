@@ -23,6 +23,7 @@ namespace Schemata.Flow.Grpc.Features;
 [DependsOn<SchemataGrpcResourceFeature>]
 public sealed class SchemataFlowGrpcFeature : FeatureBase
 {
+    /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow gRPC feature.</summary>
     public const int DefaultPriority = SchemataFlowFeature.DefaultPriority + 200_000;
 
     public override int Priority => DefaultPriority;

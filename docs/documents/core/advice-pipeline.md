@@ -1,18 +1,21 @@
 # Advice Pipeline
 
-The advice pipeline is Schemata's mechanism for injecting cross-cutting concerns into operations at well-defined interception points. Advisors are small, focused units of logic that run in sequence before, during, or after an operation. Each advisor can inspect and modify state, allow the operation to continue, or short-circuit the pipeline entirely. The pipeline is the primary extension point for repository mutations, resource operations, validation, and authorization.
+The advice pipeline injects cross-cutting logic at well-defined interception points. An advisor is
+a focused unit that runs in sequence; it inspects and mutates shared state, lets the operation
+continue, or short-circuits the chain. The pipeline backs repository mutations, resource
+operations, validation, and authorization.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
 | `Schemata.Abstractions` | `Advisors/IAdvisor.cs` (arities 1..16), `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
-| `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs`, `AdviceRunner\`2.cs` .. `AdviceRunner\`17.cs` |
-| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits `RunAsync` extension methods |
+| `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs`, the `AdviceRunner` family |
+| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits the `RunAsync` extension methods |
 
 ## IAdvisor
 
-All advisors implement the marker interface `IAdvisor`, which defines a single property:
+Every advisor implements the marker interface `IAdvisor`:
 
 ```csharp
 public interface IAdvisor
@@ -21,11 +24,13 @@ public interface IAdvisor
 }
 ```
 
-`Order` controls the sequence in which advisors execute within a pipeline. Lower values run first.
+`Order` sets execution sequence within a pipeline; lower runs first.
 
 ### Generic variants
 
-`IAdvisor<T1>` through `IAdvisor<T1, ..., T16>` extend `IAdvisor` and declare `AdviseAsync`. The arity matches the number of arguments the advisor receives alongside the `AdviceContext`. There is no zero-argument specialization; the minimum arity is 1.
+`IAdvisor<T1>` through `IAdvisor<T1, ..., T16>` extend `IAdvisor` and declare `AdviseAsync`. The
+arity matches the number of domain arguments passed alongside the `AdviceContext`; the minimum is
+1.
 
 ```csharp
 public interface IAdvisor<in T1> : IAdvisor
@@ -37,44 +42,45 @@ public interface IAdvisor<in T1, in T2> : IAdvisor
 {
     Task<AdviseResult> AdviseAsync(AdviceContext ctx, T1 a1, T2 a2, CancellationToken ct = default);
 }
-
-// ... up to IAdvisor<T1, T2, ..., T16>
+// ... up to IAdvisor<T1, ..., T16>
 ```
 
-Every type parameter is declared `in` (contravariant), so an advisor registered against a base type matches pipelines that pass a derived type.
+Every type parameter is `in` (contravariant), so an advisor registered against a base type matches
+pipelines that pass a derived type.
 
 ## AdviceContext
 
-`AdviceContext` is a typed property bag that flows through the entire pipeline, giving advisors shared state and access to the service provider.
+`AdviceContext` is a typed property bag flowing through the pipeline, giving advisors shared state
+and access to the service provider. Values key on `RuntimeTypeHandle`, so each type stores one
+value.
 
 ```csharp
 public class AdviceContext
 {
     public AdviceContext(IServiceProvider sp);
-
     public IServiceProvider ServiceProvider { get; }
 
     public void Set<T>(T? value);
     public T?   Get<T>();
     public bool TryGet<T>(out T? value);
     public bool Has<T>();
+    public IDisposable Use<T>(T? value = default);
 }
 ```
 
-Values are keyed by `RuntimeTypeHandle`, so each type can store exactly one value. This makes `AdviceContext` a lightweight alternative to passing many parameters through the pipeline.
-
-| Method | Behavior |
+| Member | Behavior |
 | --- | --- |
-| `Set<T>(value)` | Stores `value` keyed by `typeof(T)`. Overwrites any previous value of the same type. |
-| `Get<T>()` | Returns the stored value or throws `KeyNotFoundException`. |
-| `TryGet<T>(out value)` | Returns `true` and sets `value` when a non-null entry exists; otherwise returns `false`. |
-| `Has<T>()` | Returns `true` if an entry for `typeof(T)` exists, even if the stored value is `null`. |
+| `Set<T>(value)` | Stores `value` keyed by `typeof(T)`, overwriting any prior value of that type. |
+| `Get<T>()` | Returns the stored value; throws `KeyNotFoundException` when absent. |
+| `TryGet<T>(out value)` | Returns `true` and sets `value` only when a non-null entry exists. |
+| `Has<T>()` | Returns `true` when an entry for `typeof(T)` exists, even if the stored value is `null`. |
+| `Use<T>(value)` | Sets `value` and returns an `IDisposable` that restores the previous entry (or removes the key) on dispose, supporting nested scopes. |
 
-`ServiceProvider` allows advisors to resolve additional services at execution time without constructor injection.
+`ServiceProvider` lets advisors resolve services at execution time without constructor injection.
 
 ## AdviseResult
 
-Every `AdviseAsync` call returns one of three `AdviseResult` values:
+`AdviseAsync` returns one of three values:
 
 ```csharp
 public enum AdviseResult
@@ -87,17 +93,18 @@ public enum AdviseResult
 
 | Result | Meaning |
 | --- | --- |
-| `Continue` | Proceed to the next advisor. If this is the last advisor, the operation executes normally. |
-| `Block` | Abort the operation. No further advisors execute. Callers treat this as a silent refusal or return a default value. |
-| `Handle` | The advisor has fully handled the operation (for example, returning a cached result or converting a delete into a soft-delete update). No further advisors execute. Callers use whatever state the advisor placed in the context. |
+| `Continue` | Proceed to the next advisor. After the last advisor, the operation runs normally. |
+| `Block` | Abort the operation; no further advisors run. The caller treats it as a silent refusal or default value. |
+| `Handle` | The advisor has fully handled the operation (e.g. a cached result, or a delete converted to a soft-delete). No further advisors run; the caller uses what the advisor placed in the context. |
 
-Both `Block` and `Handle` short-circuit the pipeline. The distinction lets callers decide how to interpret the early exit.
+`Block` and `Handle` both short-circuit; the distinction lets the caller interpret the early exit.
 
 ## Pipeline execution
 
 ### AdviceRunner
 
-The `AdviceRunner<TAdvisor, T1, ..., TN>` static classes contain the execution loop. There is one class per arity, covering arities 1 through 16 (`AdviceRunner\`2.cs` through `AdviceRunner\`17.cs`). Every runner follows the same algorithm:
+The `AdviceRunner<TAdvisor, T1, ..., TN>` static classes hold the loop, one per arity (1..16).
+Every runner runs the same algorithm:
 
 ```csharp
 public static async Task<AdviseResult> RunAsync(AdviceContext ctx, T1 a1, CancellationToken ct = default)
@@ -107,26 +114,21 @@ public static async Task<AdviseResult> RunAsync(AdviceContext ctx, T1 a1, Cancel
     {
         ct.ThrowIfCancellationRequested();
         var result = await advisor.AdviseAsync(ctx, a1, ct);
-        if (result is not AdviseResult.Continue)
-        {
-            return result;
-        }
+        if (result is not AdviseResult.Continue) return result;
     }
 
     return AdviseResult.Continue;
 }
 ```
 
-Key points:
-
-1. **Resolution** — advisors are resolved from DI via `GetServices<TAdvisor>()`, which returns all registrations for the advisor interface.
-2. **Ordering** — the resolved advisors are sorted by `Order` ascending. Advisors with the same `Order` value run in registration order.
-3. **Short-circuiting** — the loop stops on the first non-`Continue` result and propagates it to the caller.
-4. **Cancellation** — `CancellationToken` is checked before each advisor executes.
+1. **Resolution** — advisors come from DI via `GetServices<TAdvisor>()`.
+2. **Ordering** — sorted by `Order` ascending; ties run in DI registration order.
+3. **Cancellation** — checked before each advisor.
+4. **Short-circuit** — the loop returns the first non-`Continue` result.
 
 ### Advisor entry point
 
-Callers create a pipeline through the `Advisor` static class:
+Callers open a pipeline through the `Advisor` static class:
 
 ```csharp
 public static class Advisor
@@ -136,18 +138,15 @@ public static class Advisor
 }
 ```
 
-`AdvicePipeline<TAdvisor>` is a zero-size struct used purely as a dispatch token for source-generated extension methods. It carries no state and causes no heap allocation. The call site reads:
+`AdvicePipeline<TAdvisor>` is a zero-size `readonly struct` used as a dispatch token for the
+source-generated extension methods. It allocates nothing. The call site reads:
 
 ```csharp
 var result = await Advisor.For<IRepositoryAddAdvisor<Student>>()
                           .RunAsync(ctx, repository, entity, ct);
 ```
 
-The `RunAsync` extension method is emitted by `Schemata.Advice.Generator` — see [Generator](../advice/generator.md).
-
-### How callers consume the result
-
-Repository and resource operations typically switch on the result:
+`Schemata.Advice.Generator` emits the `RunAsync` extension. Callers typically switch on the result:
 
 ```csharp
 switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
@@ -157,33 +156,33 @@ switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
     case AdviseResult.Handle:
         return;
 }
-
 // Normal operation proceeds here
 ```
 
-Some pipelines interpret the three results differently. Query pipelines treat `Handle` as "use the result already placed in the context" and `Block` as "return the default value."
+Query pipelines read `Handle` as "use the result already in the context" and `Block` as "return
+the default value."
 
 ## Registering advisors
 
-Advisors are registered in the DI container using `TryAddEnumerable` with a `ServiceDescriptor.Scoped` descriptor. This ensures each implementation type is registered at most once while allowing multiple different advisor types for the same interface.
-
-**Closed-type registration** (concrete advisor targeting a specific entity):
+Advisors register with `TryAddEnumerable` and a `ServiceDescriptor.Scoped` descriptor, so each
+implementation type registers once while many advisor types share one interface.
 
 ```csharp
+// Closed-type registration
 services.TryAddEnumerable(
     ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
-```
 
-**Open-generic registration** (advisor applying to all entities):
-
-```csharp
+// Open-generic registration
 services.TryAddEnumerable(
     ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddConcurrency<>)));
 ```
 
 ## State markers
 
-Advisors communicate suppression state through empty marker classes stored in `AdviceContext`. The fluent method is a verb (`SuppressSoftDelete()`); the marker class it sets is a state noun (`SoftDeleteSuppressed`). The advisor checks `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync` and returns `Continue` immediately if the marker is present.
+Advisors signal suppression through empty marker classes stored in `AdviceContext`. A fluent verb
+method (`SuppressSoftDelete()`) sets a state-noun marker (`SoftDeleteSuppressed`); the advisor
+checks `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync` and returns `Continue` when
+the marker is present.
 
 ```csharp
 public sealed class SoftDeleteSuppressed;
@@ -199,30 +198,34 @@ public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity
 
 ## Order constants
 
-`SchemataConstants.Orders` defines three anchor constants used by built-in advisors:
+`SchemataConstants.Orders` anchors advisor ordering:
 
 | Constant | Value | Usage |
 | --- | --- | --- |
 | `Base` | 100,000,000 | Starting point for most built-in advisors |
-| `Extension` | 400,000,000 | Starting point for extension feature advisors |
-| `Max` | 900,000,000 | Terminal advisors (soft-delete, concurrency, response idempotency) |
+| `Extension` | 400,000,000 | Starting point for extension advisors |
+| `Max` | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
 
-Built-in advisors chain by adding 10,000,000 increments from an anchor. Custom advisors can use any value that falls between the built-in increments or outside the reserved range.
+Built-in repository advisors chain by 10M increments from `Base`. On the add pipeline:
+`AdviceAddTimestamp` (100M), `AdviceAddConcurrency` (110M), `AdviceAddCanonicalName` (120M),
+`AdviceAddValidation` (130M), `AdviceAddUniqueness` (140M), and `AdviceAddSoftDelete` (`Max`, 900M).
 
-## Design motivation
+## Design rationale
 
-The advisor pattern separates cross-cutting concerns from the core operation logic. Adding a new behavior (timestamps, soft-delete, idempotency) requires only a new advisor class and a `TryAddEnumerable` registration. The operation handler never changes. The `Order` property provides a single axis for sequencing without requiring explicit dependency declarations between advisors.
+The advisor pattern keeps cross-cutting concerns out of the operation handler. A new behavior is a
+new advisor class plus a `TryAddEnumerable` registration; the handler never changes. `Order` gives
+a single sequencing axis without explicit dependencies between advisors.
 
 ## Caveats
 
-- Advisors are resolved from DI on every pipeline execution. Scoped advisors get a fresh instance per request; singleton advisors are shared. Avoid mutable state in singleton advisors.
-- `AdviceContext` is not thread-safe. Do not share a single context across concurrent pipeline executions.
-- Two `AdviceContext` instances coexist per resource request: one inside the handler and one inside `IRepository<T>.AdviceContext`. They never share state by design.
+- Advisors resolve from DI on every pipeline run. Scoped advisors get a fresh instance per request;
+  avoid mutable state in singletons.
+- `AdviceContext` is not thread-safe; do not share one context across concurrent pipelines.
+- Two `AdviceContext` instances coexist per resource request — one in the handler, one in
+  `IRepository<T>.AdviceContext` — and never share state.
 
 ## See also
 
-- [Advice Overview](../advice/overview.md) — `AdvicePipeline`, `AdviceRunner`, short-circuit semantics
-- [Advice Runtime](../advice/runtime.md) — `AdviceRunner` arity 1..16
+- [Advice Overview](../advice/overview.md) — `AdvicePipeline`, `Advisor`, short-circuit semantics
+- [Advice Runtime](../advice/runtime.md) — the `AdviceRunner` family, arity 1..16
 - [Advice Generator](../advice/generator.md) — `AdvicePipelineGenerator` emission rules
-- [Feature System](feature-system.md) — `Order` vs `Priority` for features
-- [Built-in Features](built-in-features.md) — priority table

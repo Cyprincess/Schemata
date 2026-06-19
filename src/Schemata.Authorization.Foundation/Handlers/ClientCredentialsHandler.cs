@@ -35,7 +35,6 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.ClientCredentials;
 
     /// <summary>

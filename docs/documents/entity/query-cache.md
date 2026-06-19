@@ -73,16 +73,16 @@ The reverse index maps `(entity type, primary key)` to the set of cache keys tha
 
 For single-column primary keys, the key value is formatted via `IFormattable.ToString(null, InvariantCulture)` or `ToString()`. For composite keys, values are joined with `\x1f` (ASCII Unit Separator).
 
-`ReverseIndex.BuildKey` returns `null` when no key properties can be resolved (no `[PrimaryKey]` attribute and no `IIdentifier.Uid` property), in which case the result is cached but not reverse-indexed and will only expire via TTL.
+`ReverseIndex.BuildKey` returns `null` when no key properties can be resolved (no `[PrimaryKey]` attribute and no `IIdentifier.Uid` property); the result is cached but not reverse-indexed and expires only via TTL.
 
 ## Cache key generation
 
 Cache keys for queries are derived from the LINQ expression tree:
 
 1. `PartialEvaluator.Eval` folds captured local variables and other closed sub-expressions to constants, so different values of a captured variable produce different keys.
-2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string.
-3. The return type name (`typeof(T).Name`) is appended, separated by `\x1e`.
-4. The combined string is hashed and prefixed with the Schemata domain marker via `ToCacheKey`.
+2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string. Lambda parameters are renamed `_p0`, `_p1`, … in discovery order, and `IFormattable` values use the invariant culture, so equivalent queries stringize identically.
+3. The return type's `typeof(T).FullName` is appended, separated by `\x1e` (ASCII Record Separator).
+4. The combined string is hashed (CityHash128) and prefixed with the Schemata framework GUID and the `entity` domain marker via `ToCacheKey`.
 
 Two queries that produce the same LINQ expression tree and target the same return type share a cache key.
 
@@ -108,18 +108,19 @@ If the transaction rolls back, committed advisors do not run. The cache retains 
 | `repository.SuppressQueryCache()` | `QueryCacheSuppressed` | Skips `AdviceQueryCache` and `AdviceResultCache`. |
 | `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache`. |
 
-Use `Once()` to scope suppression to a single call:
+Scope a suppression with `using`:
 
 ```csharp
-var fresh = await repository.Once()
-    .SuppressQueryCache()
-    .FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id), ct);
+using (repository.SuppressQueryCache())
+{
+    var fresh = await repository.FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id), ct);
+}
 ```
 
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+services.AddRepository(typeof(EfCoreRepository<,>))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
@@ -128,15 +129,12 @@ services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
 ## Caveats
 
 - Rollback skips eviction. If the database transaction rolls back, committed advisors do not run and stale cache entries remain until TTL expires.
-- Aggregate queries and projections are cached but not reverse-indexed. They expire only via TTL, not via entity-level eviction.
-- `DistributedCacheProvider` collection operations are single-process safe only. For multi-process deployments, use `RedisCacheProvider`.
-- Cache and database are not atomic together. A crash between database commit and cache eviction leaves stale entries until TTL expires.
+- Aggregate queries and projections are cached but not reverse-indexed. They expire only via TTL.
+- `DistributedCacheProvider` collection operations are single-process safe. For multi-process deployments use `RedisCacheProvider`.
+- Cache and database commits are not atomic together. A crash between database commit and cache eviction leaves stale entries until TTL expires.
 
 ## See also
 
-- [overview.md](overview.md) - `ICacheProvider` abstraction and provider selection
-- [distributed.md](distributed.md) - `DistributedCacheProvider` (single-process safe collection ops)
-- [redis.md](redis.md) - `RedisCacheProvider` (cluster-safe collection ops)
-- [repository/caching.md](../repository/caching.md) - `UseQueryCache()` registration and options
-- [repository/unit-of-work.md](../repository/unit-of-work.md) - explicit enlistment and committed advisors
-- [core/advice-pipeline.md](../core/advice-pipeline.md) - `AdviseResult.Handle` semantics
+- [caching/overview.md](../caching/overview.md) — `ICacheProvider` abstraction and provider selection
+- [repository/caching.md](../repository/caching.md) — `UseQueryCache()` registration and options
+- [repository/unit-of-work.md](../repository/unit-of-work.md) — the committed pipeline that drives eviction

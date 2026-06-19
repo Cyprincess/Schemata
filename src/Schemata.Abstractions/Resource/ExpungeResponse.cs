@@ -8,9 +8,7 @@ namespace Schemata.Abstractions.Resource;
 /// <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>
 public sealed class ExpungeResponse : ICanonicalName
 {
-    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
     public string? CanonicalName { get; set; }
 }

@@ -20,6 +20,7 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
     private readonly JsonSerializerOptions      _json;
     private readonly IRepository<SchemataEvent> _records;
 
+    /// <summary>Initializes an audit observer over the supplied event repository.</summary>
     public SchemataEventAuditObserver(IRepository<SchemataEvent> records, IOptions<JsonSerializerOptions> json) {
         _records = records;
         _json    = json.Value;
@@ -64,7 +65,7 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
     }
 
     public async Task OnConsumedAsync(EventContext context, CancellationToken ct = default) {
-        // Cross-process consume: producer wrote the row in another process; recover by CorrelationId.
+        // Cross-process consume: recover the producer's audit row by CorrelationId.
         if (context.Record == null && !string.IsNullOrEmpty(context.CorrelationId)) {
             var correlationId = context.CorrelationId;
             context.Record = await _records.FirstOrDefaultAsync(

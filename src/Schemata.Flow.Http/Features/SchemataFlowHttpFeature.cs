@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,7 @@ namespace Schemata.Flow.Http.Features;
 [DependsOn<SchemataHttpResourceFeature>]
 public sealed class SchemataFlowHttpFeature : FeatureBase
 {
+    /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow HTTP feature.</summary>
     public const int DefaultPriority = SchemataFlowFeature.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
@@ -30,6 +32,8 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.AddSchemataApplicationPart<SchemataFlowHttpFeature>();
+
         RegisterHandlers(services);
         RegisterResources(new(schemata, services), HttpResourceAttribute.Name);
     }

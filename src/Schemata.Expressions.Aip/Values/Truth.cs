@@ -3,13 +3,22 @@ using Schemata.Expressions.Aip.Expressions;
 
 namespace Schemata.Expressions.Aip.Values;
 
+/// <summary>
+///     Represents an AIP boolean literal.
+/// </summary>
 public class Truth : IValue
 {
+    /// <summary>
+    ///     Creates a boolean literal at the supplied source position.
+    /// </summary>
     public Truth(TextPosition position, bool value) {
         Value    = value;
         Position = position;
     }
 
+    /// <summary>
+    ///     Gets the parsed boolean value.
+    /// </summary>
     public bool Value { get; }
 
     #region IValue Members

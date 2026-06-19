@@ -58,15 +58,12 @@ public class ResourceGrpcReflectionShould
                              .Select(f => f.Name)
                              .ToHashSet();
 
-        // CanonicalName must appear as "name", not "canonical_name"
         Assert.Contains("name", allFields);
         Assert.DoesNotContain("canonical_name", allFields);
 
-        // EntityTag must appear as "etag", not "entity_tag"
         Assert.Contains("etag", allFields);
         Assert.DoesNotContain("entity_tag", allFields);
 
-        // ListResult.Entities must be renamed to the entity plural ("students")
         Assert.Contains("students", allFields);
         Assert.DoesNotContain("entities", allFields);
     }

@@ -6,7 +6,7 @@ namespace Schemata.Entity.Repository.Advisors;
 ///     Advisor invoked after the query is built but before it is executed against the data store.
 ///     Returning <see cref="AdviseResult.Handle" /> short-circuits execution and returns
 ///     <see cref="QueryContext{TEntity,TResult,T}.Result" />; e.g., to serve a cached value
-///     without hitting the database.
+///     from the advisor pipeline.
 ///     Returning <see cref="AdviseResult.Block" /> returns default.
 /// </summary>
 /// <typeparam name="TEntity">The root entity type being queried.</typeparam>

@@ -16,8 +16,7 @@ public class CacheCasShould
     public async Task Distributed_TryReplace_ThrowsNotSupported() {
         var provider = new DistributedCacheProvider(new UnusedCache());
 
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => provider.TryReplaceAsync("key", [1], [2], new()));
+        await Assert.ThrowsAsync<NotSupportedException>(() => provider.TryReplaceAsync("key", [1], [2], new()));
     }
 
     [Fact]
@@ -31,8 +30,7 @@ public class CacheCasShould
     public async Task DistributedTryAddAsync_ThrowsNotSupported() {
         var provider = new DistributedCacheProvider(new UnusedCache());
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(
-            () => provider.TryAddAsync("key", [1], new()));
+        var ex = await Assert.ThrowsAsync<NotSupportedException>(() => provider.TryAddAsync("key", [1], new()));
         Assert.Contains("supports atomic reserve", ex.Message, StringComparison.Ordinal);
     }
 
@@ -80,28 +78,11 @@ public class CacheCasShould
         Assert.Equal([1], await provider.GetAsync("key"));
     }
 
-    private sealed class UnusedCache : IDistributedCache
-    {
-        public byte[]? Get(string key) { throw new InvalidOperationException(); }
-
-        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) { throw new InvalidOperationException(); }
-
-        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) { throw new InvalidOperationException(); }
-
-        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default) { throw new InvalidOperationException(); }
-
-        public void Refresh(string key) { throw new InvalidOperationException(); }
-
-        public Task RefreshAsync(string key, CancellationToken token = default) { throw new InvalidOperationException(); }
-
-        public void Remove(string key) { throw new InvalidOperationException(); }
-
-        public Task RemoveAsync(string key, CancellationToken token = default) { throw new InvalidOperationException(); }
-    }
+    #region Nested type: FakeProvider
 
     private sealed class FakeProvider : ICacheProvider
     {
-        private readonly SemaphoreSlim _gate = new(1, 1);
+        private readonly SemaphoreSlim              _gate   = new(1, 1);
         private readonly Dictionary<string, byte[]> _values = new(StringComparer.Ordinal);
 
         #region ICacheProvider Members
@@ -115,7 +96,12 @@ public class CacheCasShould
             }
         }
 
-        public async Task SetAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default) {
+        public async Task SetAsync(
+            string            key,
+            byte[]            value,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             await _gate.WaitAsync(ct);
             try {
                 _values[key] = value.ToArray();
@@ -124,7 +110,12 @@ public class CacheCasShould
             }
         }
 
-        public async Task<bool> TryAddAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default) {
+        public async Task<bool> TryAddAsync(
+            string            key,
+            byte[]            value,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             await _gate.WaitAsync(ct);
             try {
                 if (_values.ContainsKey(key)) {
@@ -177,7 +168,12 @@ public class CacheCasShould
             return Task.CompletedTask;
         }
 
-        public Task CollectionAddAsync(string key, string member, CacheEntryOptions options, CancellationToken ct = default) {
+        public Task CollectionAddAsync(
+            string            key,
+            string            member,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             throw new NotSupportedException();
         }
 
@@ -199,4 +195,48 @@ public class CacheCasShould
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: UnusedCache
+
+    private sealed class UnusedCache : IDistributedCache
+    {
+        #region IDistributedCache Members
+
+        public byte[]? Get(string key) { throw new InvalidOperationException(); }
+
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) {
+            throw new InvalidOperationException();
+        }
+
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) {
+            throw new InvalidOperationException();
+        }
+
+        public Task SetAsync(
+            string                       key,
+            byte[]                       value,
+            DistributedCacheEntryOptions options,
+            CancellationToken            token = default
+        ) {
+            throw new InvalidOperationException();
+        }
+
+        public void Refresh(string key) { throw new InvalidOperationException(); }
+
+        public Task RefreshAsync(string key, CancellationToken token = default) {
+            throw new InvalidOperationException();
+        }
+
+        public void Remove(string key) { throw new InvalidOperationException(); }
+
+        public Task RemoveAsync(string key, CancellationToken token = default) {
+            throw new InvalidOperationException();
+        }
+
+        #endregion
+    }
+
+    #endregion
 }

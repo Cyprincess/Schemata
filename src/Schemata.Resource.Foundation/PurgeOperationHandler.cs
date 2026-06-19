@@ -24,6 +24,10 @@ public sealed class PurgeOperationHandler<TEntity> : IOperationHandler<PurgeOper
 
     private readonly IServiceProvider _services;
 
+    /// <summary>
+    ///     Initializes the durable purge executor.
+    /// </summary>
+    /// <param name="services">The service provider for resolving repositories and expression compilers.</param>
     public PurgeOperationHandler(IServiceProvider services) { _services = services; }
 
     #region IOperationHandler<PurgeOperationArgs> Members

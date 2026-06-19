@@ -3,7 +3,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     The caller does not have permission to execute the operation.
+///     The caller lacks permission to execute the operation.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.PERMISSION_DENIED</c> (HTTP 403), per

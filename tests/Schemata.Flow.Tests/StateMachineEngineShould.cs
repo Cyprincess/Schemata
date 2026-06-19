@@ -13,8 +13,6 @@ namespace Schemata.Flow.Tests;
 
 public class StateMachineEngineShould
 {
-    #region Basic Flow Tests
-
     [Fact]
     public async SystemTask StartAsync_WithValidDefinition_ReturnsInitialState() {
         var engine     = new StateMachineEngine();
@@ -65,9 +63,9 @@ public class StateMachineEngineShould
 
     [Fact]
     public async SystemTask CyclicGraph_NoStackOverflow() {
-        var start = new FlowEvent { Id      = "start", Name = "Start", Position = EventPosition.Start };
-        var gw1   = new ExclusiveGateway { Id = "gw1", Name = "GW1" };
-        var gw2   = new ExclusiveGateway { Id = "gw2", Name = "GW2" };
+        var start = new FlowEvent { Id        = "start", Name = "Start", Position = EventPosition.Start };
+        var gw1   = new ExclusiveGateway { Id = "gw1", Name   = "GW1" };
+        var gw2   = new ExclusiveGateway { Id = "gw2", Name   = "GW2" };
 
         var definition = new ProcessDefinition {
             Name     = "cyclic",
@@ -81,15 +79,9 @@ public class StateMachineEngineShould
 
         var engine = new StateMachineEngine();
 
-        // A gateway-only cycle with no waiting point would recurse forever; the engine must
-        // detect the revisit and fail fast rather than overflow the stack.
-        await Assert.ThrowsAsync<FailedPreconditionException>(
-            () => engine.StartAsync(definition, new()).AsTask());
+        // A pure gateway cycle would recurse forever; the engine fails fast on revisit.
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => engine.StartAsync(definition, new()).AsTask());
     }
-
-    #endregion
-
-    #region Conditional Flow Tests
 
     [Fact]
     public async SystemTask AdvanceAsync_ConditionalCondition_MatchesWhenTrue() {
@@ -114,10 +106,6 @@ public class StateMachineEngineShould
         Assert.Equal("Rejected", instance.State);
         Assert.True(instance.IsComplete);
     }
-
-    #endregion
-
-    #region Manual Definition Helpers
 
     private static ProcessDefinition CreateConditionalDefinition() {
         var startEvent     = new FlowEvent { Id = "start", Name    = "Start", Position = EventPosition.Start };
@@ -181,10 +169,6 @@ public class StateMachineEngineShould
             },
         };
     }
-
-    #endregion
-
-    #region DSL Tests
 
     [Fact]
     public async SystemTask Dsl_BuildsValidDefinition_StartAndAdvanceWork() {
@@ -361,9 +345,9 @@ public class StateMachineEngineShould
 
     [Fact]
     public async SystemTask AdvanceAsync_UnsupportedGateway_UsesElementNameInMessage() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
+        var startEvent = new FlowEvent { Id       = "start", Name         = "Start", Position = EventPosition.Start };
         var gateway    = new ParallelGateway { Id = "parallel-join", Name = "Parallel Join" };
-        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var endEvent   = new FlowEvent { Id       = "end", Name           = "End", Position = EventPosition.End };
         var definition = new ProcessDefinition {
             Name     = "unsupported-gateway",
             Elements = { startEvent, gateway, endEvent },
@@ -373,15 +357,33 @@ public class StateMachineEngineShould
             },
         };
 
-        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(() => new StateMachineEngine().StartAsync(definition, new()).AsTask());
+        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(() => new StateMachineEngine()
+                                                                            .StartAsync(definition, new())
+                                                                            .AsTask());
 
         Assert.Contains("Gateway 'Parallel Join'", ex.Message);
         Assert.DoesNotContain(nameof(ParallelGateway), ex.Message);
     }
 
+    #region Nested type: BoundaryEventProcess
+
+    private class BoundaryEventProcess : ProcessDefinition
+    {
+        public BoundaryEventProcess() {
+            this.Start().Go(Processing);
+            this.During(Processing).OnError<TimeoutException>().Go(Rejected);
+            this.During(Processing).End();
+            this.During(Rejected).End(RejectedEnd);
+        }
+
+        public NoneTask Processing  { get; } = null!;
+        public NoneTask Rejected    { get; } = null!;
+        public EndEvent RejectedEnd { get; } = null!;
+    }
+
     #endregion
 
-    #region DSL Process Definitions
+    #region Nested type: DslApprovalProcess
 
     private class DslApprovalProcess : ProcessDefinition
     {
@@ -395,6 +397,10 @@ public class StateMachineEngineShould
         public UserTask Review   { get; } = null!;
         public EndEvent Approved { get; } = null!;
     }
+
+    #endregion
+
+    #region Nested type: DslConditionalProcess
 
     private class DslConditionalProcess : ProcessDefinition
     {
@@ -418,18 +424,9 @@ public class StateMachineEngineShould
         public NoneTask Rejected { get; } = null!;
     }
 
-    private class EventBasedProcess : ProcessDefinition
-    {
-        public EventBasedProcess() {
-            this.Start().Go(New);
-            this.During(New).Await(this.On(Pay).Go(Processing));
-            this.During(Processing).End();
-        }
+    #endregion
 
-        public NoneTask New        { get; } = null!;
-        public NoneTask Processing { get; } = null!;
-        public Message  Pay        { get; } = null!;
-    }
+    #region Nested type: EventBasedConditionalProcess
 
     private class EventBasedConditionalProcess : ProcessDefinition
     {
@@ -449,19 +446,35 @@ public class StateMachineEngineShould
         public Message  Pay         { get; } = null!;
     }
 
-    private class BoundaryEventProcess : ProcessDefinition
+    #endregion
+
+    #region Nested type: EventBasedProcess
+
+    private class EventBasedProcess : ProcessDefinition
     {
-        public BoundaryEventProcess() {
-            this.Start().Go(Processing);
-            this.During(Processing).OnError<TimeoutException>().Go(Rejected);
+        public EventBasedProcess() {
+            this.Start().Go(New);
+            this.During(New).Await(this.On(Pay).Go(Processing));
             this.During(Processing).End();
-            this.During(Rejected).End(RejectedEnd);
         }
 
-        public NoneTask Processing  { get; } = null!;
-        public NoneTask Rejected    { get; } = null!;
-        public EndEvent RejectedEnd { get; } = null!;
+        public NoneTask New        { get; } = null!;
+        public NoneTask Processing { get; } = null!;
+        public Message  Pay        { get; } = null!;
     }
+
+    #endregion
+
+    #region Nested type: Order
+
+    private class Order
+    {
+        public long Amount { get; set; }
+    }
+
+    #endregion
+
+    #region Nested type: TypedConditionProcess
 
     private class TypedConditionProcess : ProcessDefinition
     {
@@ -473,11 +486,6 @@ public class StateMachineEngineShould
         public NoneTask Draft    { get; } = null!;
         public NoneTask Approved { get; } = null!;
         public NoneTask Rejected { get; } = null!;
-    }
-
-    private class Order
-    {
-        public long Amount { get; set; }
     }
 
     #endregion

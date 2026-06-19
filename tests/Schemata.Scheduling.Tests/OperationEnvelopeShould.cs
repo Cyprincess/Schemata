@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
-using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -90,7 +89,8 @@ public class OperationEnvelopeShould
         var json = JsonSerializer.Serialize(operation);
 
         using var document = JsonDocument.Parse(json);
-        var output = document.RootElement.GetProperty(nameof(Operation.Response)).GetProperty(nameof(OperationResponse.Output));
+        var output = document.RootElement.GetProperty(nameof(Operation.Response))
+                             .GetProperty(nameof(OperationResponse.Output));
 
         // A double-encoded result would surface Output as a JSON string literal.
         Assert.Equal(JsonValueKind.Object, output.ValueKind);
@@ -123,17 +123,23 @@ public class OperationEnvelopeShould
         Assert.Equal("purge", operation.Metadata?.Method);
     }
 
-    private sealed class SampleArgs;
+    #region Nested type: EchoScheduler
 
     private sealed class EchoScheduler(SchemataJobExecution execution) : IScheduler
     {
+        #region IScheduler Members
+
         public Task StartAsync(CancellationToken ct) { return Task.CompletedTask; }
 
         public Task StopAsync(CancellationToken ct) { return Task.CompletedTask; }
 
         public Task ScheduleAsync(SchemataJob job, CancellationToken ct) { return Task.CompletedTask; }
 
-        public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
+        public Task ScheduleAsync(
+            SchemataJob                           job,
+            IReadOnlyDictionary<string, object?>? variables,
+            CancellationToken                     ct
+        ) {
             return Task.CompletedTask;
         }
 
@@ -148,5 +154,15 @@ public class OperationEnvelopeShould
         public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
             return Task.CompletedTask;
         }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: SampleArgs
+
+    private sealed class SampleArgs;
+
+    #endregion
 }

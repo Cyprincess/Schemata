@@ -6,7 +6,6 @@ using Parlot;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -19,6 +18,14 @@ namespace Schemata.Resource.Foundation;
 /// </summary>
 internal static class PurgeFilter
 {
+    /// <summary>
+    ///     Compiles a purge filter into a predicate over the target resource type.
+    /// </summary>
+    /// <typeparam name="TEntity">The entity type selected by the purge operation.</typeparam>
+    /// <param name="services">The service provider for resolving the AIP expression compiler.</param>
+    /// <param name="filter">The AIP filter expression, or <c>*</c> for every soft-deleted resource.</param>
+    /// <returns>The compiled predicate, or <see langword="null" /> when the filter selects every resource.</returns>
+    /// <exception cref="ValidationException">The filter is missing or malformed.</exception>
     public static Expression<Func<TEntity, bool>>? Compile<TEntity>(IServiceProvider services, string? filter)
         where TEntity : class {
         if (string.IsNullOrWhiteSpace(filter)) {

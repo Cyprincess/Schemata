@@ -1,108 +1,187 @@
 # Identity
 
-`Schemata.Identity.Foundation` wraps ASP.NET Core Identity with Schemata entity types, a user manager extension, and a headless `AuthenticateController` that exposes registration, login, token refresh, profile management, password reset, account confirmation, and two-factor authentication as JSON API endpoints. The feature runs at priority `Orders.Extension + 30_000_000` = 430,000,000 and depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`. The controller is exposed via `SchemataExtensionPart` so MVC discovers it even though it lives in a Schemata assembly.
+`Schemata.Identity.Foundation` wraps ASP.NET Core Identity in Schemata entity types and a headless
+`AuthenticateController`. The controller exposes registration, login, token refresh, profile
+management, email and phone change, password reset, account confirmation, and TOTP two-factor
+enrollment as JSON APIs — there are no HTML pages. The feature runs at priority 430,000,000 and
+depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Identity.Skeleton` | `Entities/SchemataUser.cs`, `Entities/SchemataRole.cs`, `Stores/`, `Managers/SchemataUserManager.cs` |
-| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` — three `UseIdentity` overloads |
-| `Schemata.Identity.Foundation` | `Features/SchemataIdentityFeature.cs` — priority 430,000,000 |
-| `Schemata.Identity.Foundation` | `Controllers/AuthenticateController.cs` |
+| `Schemata.Identity.Skeleton` | `Entities/SchemataUser.cs`, `Entities/SchemataRole.cs`, the join entities, `Managers/SchemataUserManager.cs`, `Stores/`, `Advisors/`, `Json/ClaimStoreJsonConverter.cs`, `Services/IMailSender.cs`, `Services/IMessageSender.cs` |
+| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (three `UseIdentity` overloads), `Features/SchemataIdentityFeature.cs`, `Controllers/AuthenticateController*.cs`, `Handlers/IdentityHandler*.cs`, `Advisors/Advice*.cs`, `SchemataIdentityOptions.cs` |
 
-## Mechanism walkthrough
+## Entity types
 
-### 1. Enable the feature
-
-Three overloads are available, each delegating to the next:
+`Schemata.Identity.Skeleton.Entities.SchemataUser` extends `IdentityUser<Guid>` and implements
+`IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, and `ITimestamp`. The primary key
+is `Guid Uid`; the inherited `Id` is `[NotMapped]` and bridges to `Uid`:
 
 ```csharp
-// Default: SchemataUser + SchemataRole + default stores
-builder.UseSchemata(schema => schema.UseIdentity());
-
-// Custom user and role types, default stores
-builder.UseSchemata(schema => schema.UseIdentity<MyUser, MyRole>());
-
-// Fully custom: user, role, user store, role store
-builder.UseSchemata(schema =>
-    schema.UseIdentity<MyUser, MyRole, MyUserStore, MyRoleStore>());
+[NotMapped]
+public override Guid Id { get => Uid; set => Uid = value; }
 ```
 
-All overloads accept four optional configuration delegates:
+`ConcurrencyStamp` is likewise `[NotMapped]` and projects the `Guid Timestamp` concurrency token.
+The table is `SchemataUsers`, canonical-name pattern `users/{user}`. `SchemataRole` follows the
+same shape over `IdentityRole<Guid>`: table `SchemataRoles`, pattern `roles/{role}`.
+
+The supporting join entities — `SchemataUserClaim`, `SchemataRoleClaim`, `SchemataUserRole`,
+`SchemataUserLogin`, `SchemataUserToken` — each carry their own `[Table]` and `[PrimaryKey]`
+attributes, so an `IdentityDbContext` over these types needs no extra Fluent configuration.
+
+## Enabling the feature
+
+Three overloads chain into one another; each takes the same four optional delegates:
+
+```csharp
+schema.UseIdentity();                                          // SchemataUser, SchemataRole, default stores
+schema.UseIdentity<MyUser, MyRole>();                          // custom user/role, default stores
+schema.UseIdentity<MyUser, MyRole, MyUserStore, MyRoleStore>(); // fully custom
+```
 
 | Parameter | Type | Purpose |
 | --- | --- | --- |
-| `identify` | `Action<SchemataIdentityOptions>?` | Toggle which endpoints are enabled |
-| `configure` | `Action<IdentityOptions>?` | Standard ASP.NET Core Identity options |
-| `build` | `Action<IdentityBuilder>?` | Add token providers, custom validators, etc. |
+| `identify` | `Action<SchemataIdentityOptions>?` | Toggle which endpoint groups are enabled |
+| `configure` | `Action<IdentityOptions>?` | Standard ASP.NET Core Identity options (password, lockout, sign-in) |
+| `build` | `Action<IdentityBuilder>?` | Add token providers, validators, custom stores |
 | `bearer` | `Action<BearerTokenOptions>?` | Bearer token lifetime and validation |
 
-### 2. What the feature registers
+Type constraints: `TUser : SchemataUser, new()`, `TRole : SchemataRole`,
+`TUserStore : class, IUserStore<TUser>`, `TRoleStore : class, IRoleStore<TRole>`. The default
+stores are `SchemataUserStore<TUser>` and `SchemataRoleStore<TRole>`.
 
-`SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>` (priority 430,000,000):
+## What the feature registers
 
-- Adds `ClaimStoreJsonConverter` to all three JSON option surfaces (`JsonSerializerOptions`, `Http.Json.JsonOptions`, `Mvc.JsonOptions`).
-- Creates a `SchemataExtensionPart` and registers `AuthenticateController<TUser>` via a custom `IdentityControllerFeatureProvider`, making the controller visible to MVC without adding the entire assembly as an `ApplicationPart`.
-- Registers `IdentityHandler<TUser>` (scoped) and the identity request advisor chain.
-- Registers `IMailSender<T>` and `IMessageSender<T>` with no-op defaults.
-- Registers `IUserStore<TUser>` and `IRoleStore<TRole>` as scoped services.
-- Calls `services.AddIdentityApiEndpoints<TUser>()` with the `configure` delegate, then `.AddRoles<TRole>().AddUserManager<SchemataUserManager<TUser>>()`.
-- Applies the `build` delegate to the resulting `IdentityBuilder`.
-- Overrides `IdentityOptions.ClaimsIdentity` to use OIDC-standard claim types (`sub`, `preferred_username`, `email`, `role`).
+`SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>` (`Priority = Orders.Extension +
+30_000_000 = 430_000_000`) does the following in `ConfigureServices`:
 
-### 3. Entity types
+- Adds `ClaimStoreJsonConverter` to all three JSON option surfaces: `JsonSerializerOptions`,
+  `Microsoft.AspNetCore.Http.Json.JsonOptions`, and `Microsoft.AspNetCore.Mvc.JsonOptions`.
+- Calls `AddSchemataApplicationPart<...>()`, then registers `AuthenticateController<TUser>` through
+  an `IdentityControllerFeatureProvider` so MVC discovers the controller without exposing the whole
+  Schemata assembly as an `ApplicationPart`.
+- Registers `IdentityHandler<TUser>` (scoped) and the request-advisor chain (see below).
+- Registers `IMailSender<>` and `IMessageSender<>` with the `NoOpMailSender<>` /
+  `NoOpMessageSender<>` defaults.
+- Registers `IUserStore<TUser>` and `IRoleStore<TRole>` with the supplied store types.
+- Overrides `IdentityOptions.ClaimsIdentity` to OIDC-standard claim types: `UserIdClaimType =
+  "sub"`, `UserNameClaimType = "preferred_username"`, `EmailClaimType = "email"`, `RoleClaimType =
+  "role"`, `SecurityStampClaimType = "security_stamp"`.
+- Builds the Identity stack: `AddIdentityApiEndpoints<TUser>(configure).AddRoles<TRole>()
+  .AddUserManager<SchemataUserManager<TUser>>()`, then applies the `build` delegate to the result.
 
-`SchemataUser` implements `IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, and `ITimestamp`. It extends `IdentityUser<Guid>` and uses `Guid Uid` as the primary key (bridged to `IdentityUser<Guid>.Id` via `[NotMapped] override Guid Id { get => Uid; set => Uid = value; }`). Canonical name pattern: `users/{user}`.
+## AuthenticateController
 
-`SchemataRole` follows the same pattern, extending `IdentityRole<Guid>`. Canonical name pattern: `roles/{role}`.
+The class is routed at `[Route("~/Authenticate")]`. Most actions sit under that prefix; the
+profile-management actions use absolute `~/Account/...` routes. Sign-in actions are anonymous;
+account actions carry `[Authorize]`.
 
-### 4. AuthenticateController
+| Method | Route | Action | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `~/Authenticate/Register` | `Register` | Create an account and sign in |
+| `POST` | `~/Authenticate/Login` | `Login` | Password login; issues a bearer token |
+| `POST` | `~/Authenticate/Refresh` | `Refresh` | Exchange a refresh token |
+| `POST` | `~/Authenticate/SignOut` | `SignOut` | Clear cookie and bearer sessions |
+| `GET` | `~/Authenticate/Confirm` | `Confirm` | Confirm email or phone from a code |
+| `POST` | `~/Authenticate/Code` | `Code` | Send an account-confirmation code |
+| `POST` | `~/Authenticate/Forgot` | `Forgot` | Send a password-reset code |
+| `POST` | `~/Authenticate/Reset` | `Reset` | Reset the password with a code |
+| `GET` | `~/Authenticate/Authenticator` | `Authenticator` | Return 2FA enrollment state |
+| `POST` | `~/Authenticate/Enroll` | `Enroll` | Enable authenticator (TOTP) sign-in |
+| `PATCH` | `~/Authenticate/Downgrade` | `Downgrade` | Disable authenticator sign-in |
+| `GET` | `~/Account/Profile` | `Profile` | Return the caller's profile claims |
+| `PUT` | `~/Account/Profile/Email` | `Email` | Start an email-address change |
+| `PUT` | `~/Account/Profile/Phone` | `Phone` | Start a phone-number change |
+| `PUT` | `~/Account/Profile/Password` | `Password` | Change the password |
 
-Mounted at `~/Authenticate`. All endpoints are `[ApiController]` JSON APIs — no UI is provided. The controller delegates to `IdentityHandler<TUser>`, which runs the advisor pipeline before each operation.
+Each action delegates to `IdentityHandler<TUser>`, which runs the request advisor pipeline for the
+operation before performing it. The request bodies are the `*Request` models in
+`Schemata.Identity.Skeleton.Models`; with snake_case serialization, `RegisterRequest` posts
+`username`, `email_address`, `phone_number`, `password`, and an optional `use_cookies`.
 
-Key endpoints:
+## Request advisors
 
-| Method | Path | Purpose |
+Every identity operation runs `IIdentityRequestAdvisor<T>`, whose `AdviseAsync` receives the
+request `T`, the `IdentityOperation` enum value, and the caller's `ClaimsPrincipal`. The feature
+registers these built-ins:
+
+| Advisor | Request | Validates |
 | --- | --- | --- |
-| `POST` | `~/Authenticate/Register` | Create account |
-| `POST` | `~/Authenticate/Login` | Password login, returns bearer token |
-| `POST` | `~/Authenticate/Refresh` | Exchange refresh token |
-| `GET` | `~/Account/Profile` | Return claims (requires auth) |
-| `PUT` | `~/Account/Profile/Email` | Request email change |
-| `PUT` | `~/Account/Profile/Password` | Change password |
-| `POST` | `~/Authenticate/Forgot` | Send password reset code |
-| `POST` | `~/Authenticate/Reset` | Apply reset code |
-| `GET` | `~/Authenticate/Confirm` | Confirm email/phone |
-| `GET/POST` | `~/Authenticate/Authenticator` | 2FA status / enroll |
-| `PATCH` | `~/Authenticate/Authenticator` | Disable 2FA |
+| `AdviceIdentityFeatureGate<T>` | all | The matching `SchemataIdentityOptions` flag is enabled; throws `NotFoundException` otherwise |
+| `AdviceConfirmRequestValidation` | `ConfirmRequest` | A code plus at least one of email/phone is present |
+| `AdviceChangeEmailValidation<TUser>` | `ProfileRequest` | New email differs from current (on `ChangeEmail`) |
+| `AdviceChangePhoneValidation<TUser>` | `ProfileRequest` | New phone differs from current |
+| `AdviceChangePasswordValidation<TUser>` | `ProfileRequest` | Old/new password fields are coherent |
+| `AdviceEnrollValidation<TUser>` | `AuthenticatorRequest` | A valid 2FA code is supplied for enrollment |
+| `AdviceDowngradeValidation` | `AuthenticatorRequest` | A valid 2FA code is supplied for downgrade |
+
+`AdviceIdentityFeatureGate<T>` runs at `Orders.Base = 100,000,000`; the validation advisors at
+110,000,000. Operation-specific advisor interfaces — `IIdentityRegisterAdvisor<TUser>`,
+`IIdentityLoginAdvisor`, `IIdentityRefreshAdvisor`, `IIdentityProfileChangeAdvisor`,
+`IIdentity2FaAdvisor`, `IIdentityRecoveryAdvisor`, `IIdentityProfileResponseAdvisor<TUser>` — let
+you hook a single phase without filtering on the operation enum.
+
+## SchemataUserManager
+
+`Schemata.Identity.Skeleton.Managers.SchemataUserManager<TUser>` extends `UserManager<TUser>` with
+four lookups that the Schemata stores back:
+
+- `GetDisplayNameAsync(TUser)`
+- `GetUserPrincipalNameAsync(TUser)`
+- `FindByCanonicalNameAsync(string canonicalName)`
+- `FindByPhoneAsync(string phone)`
+
+These rely on the custom store interfaces `IUserDisplayNameStore<TUser>`,
+`IUserPrincipalNameStore<TUser>`, `IUserCanonicalNameStore<TUser>`, and `IUserPhoneStore<TUser>`,
+all implemented by `SchemataUserStore`.
+
+## SchemataIdentityOptions
+
+Seven booleans, all defaulting to `true`, gate the endpoint groups:
+
+| Property | Gates |
+| --- | --- |
+| `AllowRegistration` | `Register` |
+| `AllowAccountConfirmation` | `Confirm`, `Code` |
+| `AllowPasswordReset` | `Forgot`, `Reset` |
+| `AllowPasswordChange` | `~/Account/Profile/Password` |
+| `AllowEmailChange` | `~/Account/Profile/Email` |
+| `AllowPhoneNumberChange` | `~/Account/Profile/Phone` |
+| `AllowTwoFactorAuthentication` | `Authenticator`, `Enroll`, `Downgrade` |
+
+A disabled operation returns `NotFoundException` (HTTP 404) from `AdviceIdentityFeatureGate`.
 
 ## Extension points
 
 | Interface | Purpose |
 | --- | --- |
-| `IIdentityRequestAdvisor<T>` | Gate or transform any identity request before the handler runs. Register via `services.TryAddEnumerable`. |
-| `IMailSender<T>` | Send confirmation and reset emails. Replace the no-op default. |
-| `IMessageSender<T>` | Send SMS confirmation codes. Replace the no-op default. |
-| `SchemataUserManager<TUser>` | Extend with domain-specific user operations. |
+| `IIdentityRequestAdvisor<T>` | Gate or transform any request before the handler runs. |
+| `IMailSender<TUser>` | Send confirmation and reset emails. Replace `NoOpMailSender<TUser>`. |
+| `IMessageSender<TUser>` | Send SMS confirmation/reset codes. Replace `NoOpMessageSender<TUser>`. |
+| `SchemataUserManager<TUser>` | Subclass for domain-specific user operations. |
 
-## Design motivation
+## Design rationale
 
-Using `SchemataExtensionPart` rather than a plain `ApplicationPart` keeps the controller opt-in: `SchemataControllersFeature` strips all `Schemata.*` assembly parts from MVC by default, so only controllers explicitly registered via `SchemataExtensionPart` are exposed. This prevents accidental controller discovery when a Schemata package is referenced but the feature is not enabled.
-
-The three-overload chain (`UseIdentity()` → `UseIdentity<TUser, TRole>()` → `UseIdentity<TUser, TRole, TUserStore, TRoleStore>()`) lets you customize incrementally without repeating boilerplate.
+Registering the controller through `IdentityControllerFeatureProvider` keeps it opt-in: a project
+that references the package but never calls `UseIdentity()` does not expose the endpoints. The
+three-overload chain lets you swap user, role, and store types incrementally without re-stating the
+delegates. Pinning the claim types to OIDC names (`sub`, `preferred_username`, `email`, `role`)
+means the principal issued here is already the one the authorization server consumes.
 
 ## Caveats
 
-- `SchemataIdentityFeature` has `Priority = Orders.Extension + 30_000_000 = 430_000_000`. See [Built-in Features](core/built-in-features.md) for the full priority table.
-- The feature depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature` via `[DependsOn<T>]`. Both are pulled in automatically if not already registered.
-- `SchemataUser` uses `Guid Uid` as the primary key, not `long`. The `IdentityUser<Guid>.Id` property is bridged via `[NotMapped]` override. Do not add a separate `long Id` column.
-- `ClaimStoreJsonConverter` is registered on all three JSON option surfaces. If you configure `JsonSerializerOptions` after `UseIdentity`, ensure the converter is not removed.
-- The `build` delegate receives the `IdentityBuilder` returned by `AddIdentityApiEndpoints`. Calling `builder.AddDefaultTokenProviders()` inside it is safe and idempotent.
+- The primary key is `Guid Uid`, not `long Id`. The `Id` and `ConcurrencyStamp` overrides are
+  `[NotMapped]`; do not add separate columns for them.
+- The profile endpoints live under `~/Account/...`, not `~/Authenticate/...`. Authorize them
+  through the bearer scheme the same way as any protected route.
+- `ClaimStoreJsonConverter` is added to all three JSON surfaces. Replacing
+  `JsonSerializerOptions.Converters` wholesale after `UseIdentity` drops it.
 
 ## See also
 
-- [Built-in Features](core/built-in-features.md) — feature priority table
+- [Identity guide](../guides/identity.md) — registration, login, and refresh on the Student app
+- [Authorization](authorization.md) — the OIDC server that consumes Identity subjects
 - [Security](security.md) — access providers and row-level filtering
-- [Authorization](authorization.md) — OAuth 2.0 / OIDC server built on top of Identity
-- [Entity Traits](entity/traits.md) — `IIdentifier`, `ICanonicalName`, `IDescriptive`, `IConcurrency`, `ITimestamp`

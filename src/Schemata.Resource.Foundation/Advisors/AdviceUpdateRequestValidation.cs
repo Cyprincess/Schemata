@@ -13,7 +13,7 @@ public static class AdviceUpdateRequestValidation
 {
     /// <summary>
     ///     Default order: runs after <see cref="AdviceUpdateRequestSanitize{TEntity,TRequest}" />
-    ///     so validation sees the sanitized payload without server-managed fields.
+    ///     so validation sees the sanitized payload after server-managed fields are cleared.
     /// </summary>
     public const int DefaultOrder = AdviceUpdateRequestSanitize.DefaultOrder + 10_000_000;
 }

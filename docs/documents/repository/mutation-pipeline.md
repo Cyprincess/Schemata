@@ -1,27 +1,31 @@
 # Mutation Pipeline
 
-Every call to `AddAsync`, `UpdateAsync`, or `RemoveAsync` on `IRepository<TEntity>` runs a pipeline of advisors before (and sometimes instead of) the underlying store operation. Advisors are sorted by their `Order` property and executed sequentially. Each advisor returns an `AdviseResult`:
+Every `AddAsync`, `UpdateAsync`, and `RemoveAsync` on `IRepository<TEntity>` runs an advisor pipeline
+before — and sometimes instead of — the backing-store operation. Advisors are sorted by their `Order`
+property and run in sequence. Each returns an `AdviseResult`:
 
-- **Continue** - proceed to the next advisor, then to the store operation.
-- **Block** - stop the pipeline and skip the store operation entirely.
-- **Handle** - stop the pipeline; the advisor has already performed an alternative action.
+- **Continue** — proceed to the next advisor, then to the store operation.
+- **Block** — stop the pipeline; skip the store operation.
+- **Handle** — stop the pipeline; the advisor has performed an alternative action in place of the store
+  operation.
 
-If any advisor returns `Block` or `Handle`, the remaining advisors are skipped and the backing-store call never executes.
+`Block` or `Handle` skips the remaining advisors and the backing-store call.
 
 ## Where the code lives
 
 | Item | Path |
-|---|---|
+| --- | --- |
 | `IRepositoryAddAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryAddAdvisor.cs` |
 | `IRepositoryUpdateAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryUpdateAdvisor.cs` |
 | `IRepositoryRemoveAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryRemoveAdvisor.cs` |
 | `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
-| Built-in mutation advisors | `src/Schemata.Entity.Repository/Advisors/Advice{Add,Update,Remove}*.cs` |
+| Built-in advisors | `src/Schemata.Entity.Repository/Advisors/Advice{Add,Update,Remove}*.cs` |
 | Registration | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
 
 ## Advisor interfaces
 
-Mutation advisor interfaces receive the repository and entity as arguments alongside the shared `AdviceContext`:
+The add, update, and remove advisor interfaces receive the repository and entity alongside the shared
+`AdviceContext`:
 
 ```csharp
 public interface IRepositoryAddAdvisor<TEntity>
@@ -34,7 +38,7 @@ public interface IRepositoryRemoveAdvisor<TEntity>
     : IAdvisor<IRepository<TEntity>, TEntity> where TEntity : class;
 ```
 
-Committed advisors run after persistence succeeds and receive a commit snapshot:
+Committed advisors run after persistence succeeds and receive a change snapshot:
 
 ```csharp
 public interface IRepositoryCommittedAdvisor<TEntity>
@@ -43,56 +47,69 @@ public interface IRepositoryCommittedAdvisor<TEntity>
 
 ## Add pipeline
 
-Built-in add advisors in execution order:
+Built-in add advisors, in execution order:
 
 | Order | Advisor | Trait | Behavior |
-|---|---|---|---|
-| 100,000,000 | `AdviceAddTimestamp<TEntity>` | `ITimestamp` | Sets `CreateTime` and `UpdateTime` to `DateTime.UtcNow`. Suppressed by `TimestampSuppressed`. |
-| 110,000,000 | `AdviceAddConcurrency<TEntity>` | `IConcurrency` | Mints a new `Guid` for `Timestamp`. Suppressed by `ConcurrencySuppressed`. |
+| --- | --- | --- | --- |
+| 100,000,000 | `AdviceAddTimestamp<TEntity>` | `ITimestamp` | Sets `CreateTime` and `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`. |
+| 110,000,000 | `AdviceAddConcurrency<TEntity>` | `IConcurrency` | Mints a new GUID for `Timestamp`. |
 | 220,000,000 | `AdviceAddCanonicalName<TEntity>` | `ICanonicalName` | Resolves the `[CanonicalName]` pattern and writes `CanonicalName`. No suppress flag. |
 | 230,000,000 | `AdviceAddOwner<TEntity>` | `IOwnable` | Calls `IOwnerResolver<TEntity>.ResolveAsync` and sets `Owner`. Registered by `UseOwner()`. Suppressed by `OwnerSuppressed`. |
-| 900,000,000 | `AdviceAddValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Create`. Throws `ValidationException` on `Block`. Suppressed by `AddValidationSuppressed`. |
+| 230,000,000 | `AdviceAddValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Create`. Throws `ValidationException` when an advisor blocks. Suppressed by `AddValidationSuppressed`. |
+| 240,000,000 | `AdviceAddUniqueness<TEntity>` | (any) | Looks up the entity by key (with the query soft-delete filter suppressed); throws `AlreadyExistsException` when a row already exists. Suppressed by `UniquenessSuppressed`. |
 | 900,000,000 | `AdviceAddSoftDelete<TEntity>` | `ISoftDelete` | Clears `DeleteTime` to `null`. Suppressed by `SoftDeleteSuppressed`. |
 
-After all advisors return `Continue`, the entity is added to the backing store's change tracker or pending operation list.
+After every advisor returns `Continue`, the entity is staged for the store: EF Core calls
+`Context.AddAsync(entity)`; LinqToDB inserts immediately inside the active transaction.
+
+`AdviceAddOwner` is in scope only when `UseOwner()` has registered it; it shares order 230,000,000 with
+`AdviceAddValidation`. `AdviceAddUniqueness` is optimistic — a concurrent insert between its lookup and
+the commit still surfaces as the provider's own constraint error.
 
 ## Update pipeline
 
 | Order | Advisor | Trait | Behavior |
-|---|---|---|---|
-| 100,000,000 | `AdviceUpdateTimestamp<TEntity>` | `ITimestamp` | Sets `UpdateTime` to `DateTime.UtcNow`. Suppressed by `TimestampSuppressed`. |
-| 900,000,000 | `AdviceUpdateValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Update`. Throws `ValidationException` on `Block`. Suppressed by `UpdateValidationSuppressed`. |
-| 900,000,000 | `AdviceUpdateConcurrency<TEntity>` | `IConcurrency` | Loads the stored entity via `repository.GetAsync<IConcurrency>`, compares `Timestamp`, throws `ConcurrencyException` on mismatch, then mints a new `Guid`. Suppressed by `ConcurrencySuppressed`. |
+| --- | --- | --- | --- |
+| 100,000,000 | `AdviceUpdateTimestamp<TEntity>` | `ITimestamp` | Sets `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`. |
+| 110,000,000 | `AdviceUpdateValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Update`. Throws `ValidationException` when an advisor blocks. Suppressed by `UpdateValidationSuppressed`. |
 
-After all advisors return `Continue`, the EF Core provider calls `Detach(entity)` then `Context.Update(entity)`. The detach clears any pre-existing tracker entry for the same key so `Context.Update` can attach the caller's instance without an "already tracked" conflict. See [providers.md](providers.md#detach-before-update).
-
-`AdviceUpdateConcurrency` runs at `Orders.Max` (900,000,000) so it sees the final entity state after all other advisors have modified it.
+There is no update-side concurrency advisor. Optimistic concurrency on update is enforced by the
+database when the concrete entity annotates `IConcurrency.Timestamp` with `[ConcurrencyCheck]`. EF Core
+detaches the entity, re-attaches it as modified, and bumps the current `Timestamp` so `SaveChangesAsync`
+issues a guarded `UPDATE ... WHERE Timestamp = @original`; a zero-row result becomes
+`ConcurrencyException`. LinqToDB calls `UpdateOptimisticAsync` for the same effect. See
+[providers.md](providers.md) and [entity/traits.md](../entity/traits.md#iconcurrency).
 
 ## Remove pipeline
 
 | Order | Advisor | Trait | Behavior |
-|---|---|---|---|
-| 900,000,000 | `AdviceRemoveSoftDelete<TEntity>` | `ISoftDelete` | Sets `DeleteTime = DateTime.UtcNow`, calls `repository.UpdateAsync(entity)`, returns `Handle` to prevent the physical delete. Suppressed by `SoftDeleteSuppressed`. |
+| --- | --- | --- | --- |
+| 900,000,000 | `AdviceRemoveSoftDelete<TEntity>` | `ISoftDelete` | Sets `DeleteTime` to the current UTC time, calls `repository.UpdateAsync(entity)`, and returns `Handle` to prevent the physical delete. Suppressed by `SoftDeleteSuppressed`. |
 
-When `AdviceRemoveSoftDelete` returns `Handle`, the entity stays in the database with a non-null `DeleteTime`. Subsequent queries exclude it automatically via `AdviceBuildQuerySoftDelete`. If the entity does not implement `ISoftDelete`, or if `SoftDeleteSuppressed` is active, the entity is physically removed.
+When `AdviceRemoveSoftDelete` returns `Handle`, the row stays with a non-null `DeleteTime`, and later
+queries exclude it via `AdviceBuildQuerySoftDelete`. When the entity does not implement `ISoftDelete`,
+or `SoftDeleteSuppressed` is active, the entity is physically removed.
 
 ## Committed pipeline
 
-`IRepositoryCommittedAdvisor<TEntity>` runs after a standalone repository commit or unit-of-work commit succeeds. The cache package registers `AdviceCommittedEvictCache<TEntity>` at `Orders.Max`; it evicts reverse-indexed cache entries for updated and removed entities and honors `QueryCacheEvictionSuppressed`.
-
-Committed advisors do not run when persistence fails or the unit of work rolls back.
+`IRepositoryCommittedAdvisor<TEntity>` runs after a standalone repository commit or a unit-of-work
+commit succeeds, receiving the `CommitChanges<TEntity>` snapshot of added, updated, and removed
+entities. The cache package registers `AdviceCommittedEvictCache<TEntity>` at order 900,000,000; it
+evicts reverse-indexed cache entries for updated and removed entities and honors
+`QueryCacheEvictionSuppressed`. Committed advisors do not run when persistence fails or the unit of work
+rolls back.
 
 ## Registration
 
-All built-in mutation advisors are registered automatically by `AddRepository`:
+`AddRepository` registers all built-in mutation advisors as open generics:
 
 ```csharp
-services.AddRepository(typeof(EntityFrameworkCoreRepository<,>));
+services.AddRepository(typeof(EfCoreRepository<,>));
 ```
 
-The DI container closes the open-generic registrations at resolve time, so `IRepositoryAddAdvisor<Book>` resolves `AdviceAddTimestamp<Book>`, `AdviceAddConcurrency<Book>`, and so on.
-
-To add a custom advisor:
+The container closes each open generic at resolve time, so `IRepositoryAddAdvisor<Book>` materializes
+`AdviceAddTimestamp<Book>`, `AdviceAddConcurrency<Book>`, and the rest. Add a custom advisor with
+`TryAddEnumerable`:
 
 ```csharp
 services.TryAddEnumerable(ServiceDescriptor.Scoped(
@@ -100,17 +117,19 @@ services.TryAddEnumerable(ServiceDescriptor.Scoped(
     typeof(MyAuditAdvisor<>)));
 ```
 
-Pick an `Order` outside the reserved range `[100_000_000, 900_000_000]` for user-defined advisors.
+Pick an `Order` outside the built-in `[100_000_000, 900_000_000]` window.
 
 ## Extension points
 
-- **New mutation behavior**: implement the relevant advisor interface, check `entity is IMyTrait`, return `Continue` if the trait is absent.
-- **Post-commit behavior**: implement `IRepositoryCommittedAdvisor<TEntity>` when the extension needs the final committed add/update/remove snapshot.
-- **Suppression**: add a `sealed class MySuppressed;` marker, check `ctx.Has<MySuppressed>()` at the top of `AdviseAsync`, and expose a `SuppressMy()` method on a repository extension.
+- **New mutation behavior** — implement the relevant advisor interface, check `entity is IMyTrait`, and
+  return `Continue` when the trait is absent.
+- **Post-commit behavior** — implement `IRepositoryCommittedAdvisor<TEntity>` when the extension needs
+  the final add/update/remove snapshot.
+- **Suppression** — add a `sealed class MySuppressed;` marker, check `ctx.Has<MySuppressed>()` at the
+  top of `AdviseAsync`, and expose a `SuppressMy()` extension that calls `AdviceContext.Use<MySuppressed>()`.
 
 ## See also
 
-- [query-pipeline.md](query-pipeline.md) - build-query/query/result advisor chains
-- [unit-of-work.md](unit-of-work.md) - explicit enlistment and committed advisors
-- [entity/traits.md](../entity/traits.md) - trait interfaces and their advisor order numbers
-- [core/advice-pipeline.md](../core/advice-pipeline.md) - `AdviseResult` semantics and runner mechanics
+- [query-pipeline.md](query-pipeline.md) — build-query/query/result advisor chains
+- [unit-of-work.md](unit-of-work.md) — enlistment and committed advisors
+- [entity/traits.md](../entity/traits.md) — trait interfaces and advisor order numbers

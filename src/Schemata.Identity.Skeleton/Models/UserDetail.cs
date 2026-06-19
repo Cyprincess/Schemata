@@ -5,25 +5,34 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>Get response body for <see cref="Entities.SchemataUser" />.</summary>
+/// <summary>Detailed user response body.</summary>
 public class UserDetail : IIdentifier, ICanonicalName, IDescriptive, ITimestamp, IFreshness
 {
+    /// <summary>ASP.NET Core Identity login name; distinct from the AIP-122 canonical <see cref="Name" />.</summary>
     public string? UserName { get; set; }
 
+    /// <summary>Primary email address for sign-in and notifications.</summary>
     public string? Email { get; set; }
 
+    /// <summary>Set to <see langword="true" /> once the user has verified ownership of <see cref="Email" />.</summary>
     public bool EmailConfirmed { get; set; }
 
+    /// <summary>Phone number used for SMS-based notifications and second-factor sign-in.</summary>
     public string? PhoneNumber { get; set; }
 
+    /// <summary>Set to <see langword="true" /> once the user has verified ownership of <see cref="PhoneNumber" />.</summary>
     public bool PhoneNumberConfirmed { get; set; }
 
+    /// <summary>Requires the user to complete a second factor during sign-in.</summary>
     public bool TwoFactorEnabled { get; set; }
 
+    /// <summary>Subjects this account to the configured lockout policy after repeated failed sign-ins.</summary>
     public bool LockoutEnabled { get; set; }
 
+    /// <summary>UTC instant after which the current lockout expires; <see langword="null" /> when not locked.</summary>
     public DateTimeOffset? LockoutEnd { get; set; }
 
+    /// <summary>Consecutive failed sign-in attempts since the last successful one; lockout fires when this reaches the configured threshold.</summary>
     public int AccessFailedCount { get; set; }
 
     #region ICanonicalName Members

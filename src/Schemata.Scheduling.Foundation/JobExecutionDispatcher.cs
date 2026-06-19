@@ -17,9 +17,8 @@ namespace Schemata.Scheduling.Foundation;
 ///     Background service that drains <see cref="SchemataJobExecution" /> rows left in
 ///     <see cref="ExecutionState.Pending" /> by <see cref="IScheduler.TriggerAsync{TJob}" />
 ///     (or any other producer), claims each so a single worker runs it, and records the terminal
-///     state. Once a row is claimed (<see cref="ExecutionState.Running" />) the dispatcher's work is
-///     finished: a worker crash or a long-running operation that needs a timeout is an LRO /
-///     application concern, not a re-claim performed here. Job resolution goes through
+///     state. Once a row is claimed (<see cref="ExecutionState.Running" />), workers and LRO
+///     clients own completion or timeout handling. Job resolution goes through
 ///     <see cref="IScheduledJobRegistry" />; unknown keys or construction failures transition the
 ///     row to <see cref="ExecutionState.Failed" />.
 /// </summary>
@@ -52,13 +51,13 @@ public sealed class JobExecutionDispatcher(
         }
     }
 
+    /// <summary>Claims and runs pending execution rows in a scoped dispatch pass.</summary>
     public async Task DispatchPendingAsync(CancellationToken ct) {
         using var scope      = services.CreateScope();
         var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         var       pending    = new List<SchemataJobExecution>();
 
-        // Only Pending rows are the dispatcher's concern; a Running row has already been claimed, and
-        // its completion or timeout is owned by the worker / LRO client rather than re-claimed here.
+        // Only Pending rows are the dispatcher's concern; the worker or LRO client owns a Running row's completion.
         await foreach (var row in executions.ListAsync(
                            q => q.Where(e => e.State == ExecutionState.Pending).Take(BatchSize),
                            ct)) {
@@ -81,7 +80,7 @@ public sealed class JobExecutionDispatcher(
             return;
         }
 
-        // Claim the row so a second dispatcher does not run the same execution.
+        // Claim the row before execution to serialize competing dispatchers.
         execution.State = ExecutionState.Running;
         try {
             await executions.UpdateAsync(execution, ct);

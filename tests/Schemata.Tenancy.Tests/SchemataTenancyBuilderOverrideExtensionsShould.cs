@@ -31,7 +31,7 @@ public class SchemataTenancyBuilderOverrideExtensionsShould
 
         using var sp = services.BuildServiceProvider();
 
-        // ForTenant(id) must NOT register into the root container.
+        // ForTenant(id) records overrides in keyed options; the root container keeps its registrations.
         Assert.Null(sp.GetService<IMarker>());
 
         var opts = sp.GetRequiredService<IOptions<SchemataTenancyOptions>>().Value;

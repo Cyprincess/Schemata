@@ -9,10 +9,8 @@ namespace Schemata.Tenancy.Skeleton;
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
-///     Implemented only by accessors that resolve the tenant during the request pipeline. Accessors
-///     bound to an already-resolved tenant inside a per-tenant scope are read-only and intentionally
-///     do not implement this, so an initialization call on a bound context fails to compile rather
-///     than silently doing nothing.
+    ///     Request-pipeline accessors implement this contract. Bound per-tenant accessors expose
+    ///     read-only context after the request pipeline resolves the tenant.
 /// </remarks>
 public interface ITenantContextInitializer<TTenant>
     where TTenant : SchemataTenant

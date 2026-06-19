@@ -25,7 +25,7 @@ public sealed class ProcessRegistration
     public ProcessDefinition Definition { get; set; } = null!;
 
     /// <summary>
-    ///     The configuration used to register this process.
+    ///     Registration options for this process.
     /// </summary>
     public ProcessConfiguration Configuration { get; set; } = null!;
 }

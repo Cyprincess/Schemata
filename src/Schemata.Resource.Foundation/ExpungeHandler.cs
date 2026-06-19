@@ -44,7 +44,7 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
 
         await _repository.CommitAsync(ct);
 
-        // AIP-164 expunge carries no resource body; return an empty response.
+        // AIP-164 expunge returns an empty response body.
         return new();
     }
 }

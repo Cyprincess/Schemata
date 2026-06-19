@@ -18,19 +18,18 @@ builder.UseSchemata(schema => {
     var resource = schema.UseResource();
     resource.MapGrpc().Use<Student, Student, Student, Student>();
 
-    // Suppress validation noise; keep freshness enabled for ETag tests
+    // Disable validation so freshness behavior remains isolated.
     resource.WithoutCreateValidation().WithoutUpdateValidation();
 
     schema.Services.AddDistributedMemoryCache();
     schema.Services.AddDistributedCache();
 
     var dbName = "grpc-integration-" + Identifiers.NewUid();
-    schema.Services.AddDbContextFactory<TestDbContext>(
-        opts => opts.UseInMemoryDatabase(dbName));
+    schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
 
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
 
-    // Auto-assign a unique slug to every new Student (runs before AdviceAddCanonicalName).
+    // Supply the leaf name before canonical-name advice builds students/{slug}.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
 });
 
@@ -38,4 +37,7 @@ var app = builder.Build();
 
 app.Run();
 
-public partial class Program;
+namespace Schemata.Resource.Grpc.Integration.Tests
+{
+    public partial class Program;
+}

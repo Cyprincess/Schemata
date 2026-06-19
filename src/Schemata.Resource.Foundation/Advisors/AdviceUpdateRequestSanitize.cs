@@ -43,10 +43,9 @@ public static class AdviceUpdateRequestSanitize
 }
 
 /// <summary>
-///     Silently clears server-managed fields on an Update request and strips matching paths from the update
-///     mask. Without the mask strip, a client could clear <c>owner</c> by setting <c>update_mask=owner</c> even
-///     though the payload field was ignored, because partial-update merges the mask — not the payload — into the
-///     entity.
+///     Clears server-managed fields on an Update request and strips matching paths from the update
+///     mask. Mask stripping prevents clients from clearing fields such as <c>owner</c> by setting
+///     <c>update_mask=owner</c> after the payload field is ignored.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <typeparam name="TRequest">The request DTO type carrying update data.</typeparam>

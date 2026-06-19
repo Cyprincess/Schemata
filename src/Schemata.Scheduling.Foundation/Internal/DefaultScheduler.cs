@@ -14,8 +14,7 @@ namespace Schemata.Scheduling.Foundation.Internal;
 ///     loop and delegate audit through <see cref="IJobLifecycleObserver" /> implementations.
 ///     <see cref="TriggerAsync{TJob}" /> persists a <see cref="SchemataJobExecution" /> row
 ///     and hands execution to <see cref="JobExecutionDispatcher" /> when one is registered;
-///     in fixture setups without a dispatcher, the same call falls back to the in-process
-///     timer so legacy single-process usage keeps working without dispatcher wiring.
+///     fixture setups that omit a dispatcher fall back to the in-process timer.
 /// </summary>
 public sealed partial class DefaultScheduler : IScheduler
 {
@@ -56,7 +55,7 @@ public sealed partial class DefaultScheduler : IScheduler
             _stopped = true;
             foreach (var entry in _entries.Values) {
                 try {
-                    entry.Cts.Cancel();
+                    await entry.Cts.CancelAsync();
                 } catch (ObjectDisposedException) {
                     // Another path already disposed this entry; safe to swallow.
                 }
@@ -78,17 +77,10 @@ public sealed partial class DefaultScheduler : IScheduler
             PreparedContext = preparedContext;
         }
 
-        /// <summary>The scheduled job descriptor this entry tracks.</summary>
         public SchemataJob             Job { get; }
 
-        /// <summary>Cancellation source signalled when the job is unscheduled or the scheduler stops.</summary>
         public CancellationTokenSource Cts { get; }
 
-        /// <summary>
-        ///     Context pre-built by <see cref="DefaultScheduler.TriggerAsync{TJob}" />.
-        ///     When set, the timer fire path uses it instead of constructing a
-        ///     fresh context, preserving the caller-supplied execution UID.
-        /// </summary>
         public JobContext?             PreparedContext { get; }
     }
 }

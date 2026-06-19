@@ -2,7 +2,7 @@ using Schemata.Event.Skeleton;
 
 namespace Schemata.Flow.Event.Models;
 
-/// <summary><see cref="IEventSubscription"/> implementation used by the Flow.Event bridge.</summary>
+/// <summary>Stores event-bus subscription data for the Flow.Event bridge.</summary>
 public sealed class FlowEventSubscription : IEventSubscription
 {
     #region IEventSubscription Members

@@ -16,9 +16,6 @@ public abstract class FeatureBase : ISimpleFeature
 
     public virtual int Order => Priority;
 
-    /// <summary>
-    ///     Lower values run earlier.
-    /// </summary>
     public virtual int Priority => int.MaxValue;
 
     public virtual void ConfigureServices(

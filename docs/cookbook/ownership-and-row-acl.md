@@ -69,7 +69,7 @@ an `Owner` column to the `Students` table.
 
 ```csharp
 schema.ConfigureServices(services => {
-    services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+    services.AddRepository(typeof(EfCoreRepository<,>))
             .UseEntityFrameworkCore<AppDbContext>(
                 (_, opts) => opts.UseSqlite("Data Source=app.db"))
             .UseOwner();
@@ -178,28 +178,29 @@ that lists all students. Use `SuppressQueryOwner()` on the repository:
 ```csharp
 public class AdminStudentService(IRepository<Student> repository)
 {
-    public IAsyncEnumerable<Student> ListAllAsync(CancellationToken ct)
+    public async Task<List<Student>> ListAllAsync(CancellationToken ct)
     {
-        return repository.Once()
-                         .SuppressQueryOwner()
-                         .ListAsync<Student>(null, null, ct);
+        using (repository.SuppressQueryOwner())
+        {
+            return await repository.ListAsync<Student>(null, ct).ToListAsync(ct);
+        }
     }
 }
 ```
 
-`Once()` creates a fresh repository instance with a fresh `AdviceContext` so
-the suppression doesn't leak into the caller's repository instance. The
-`QueryOwnerSuppressed` marker is set on the new instance's context.
-`AdviceBuildQueryOwner` checks `ctx.Has<QueryOwnerSuppressed>()` and skips
-the filter when it's present.
+`SuppressQueryOwner()` sets `QueryOwnerSuppressed` in the `AdviceContext` and
+returns an `IDisposable`. The `using` scope restores the prior state on exit.
+`AdviceBuildQueryOwner` checks `ctx.Has<QueryOwnerSuppressed>()` and skips the
+filter while the marker is present.
 
-To suppress owner stamping on insert (e.g., seeding data), set
-`OwnerSuppressed` on the context:
+To suppress owner stamping on insert (e.g., seeding data), scope
+`SuppressOwner()`:
 
 ```csharp
-// ctx is an AdviceContext you control
-ctx.Set<OwnerSuppressed>();
-await repository.AddAsync(entity, ct);
+using (repository.SuppressOwner())
+{
+    await repository.AddAsync(entity, ct);
+}
 ```
 
 **Verify:** `ListAllAsync` returns rows from all owners. A normal
@@ -217,15 +218,12 @@ is registered, DI throws at the first request that touches an `IOwnable`
 entity. Register a resolver for every entity type, or use an open-generic
 registration as shown in Step 3.
 
-**`Owner` is not cleared by the sanitize advisor.** Unlike `Name`,
-`CanonicalName`, and `Uid`, the `Owner` field is not zeroed by
-`AdviceXxxRequestSanitize`. The advisor sets it from the resolver, so a client
-that sends `"owner": "users/admin"` in the request body will have that value
-overwritten only if the resolver returns a non-empty string and the existing
-value is empty. If `Owner` is already set on the entity before `AdviceAddOwner`
-runs, the advisor leaves it untouched (see the `!string.IsNullOrEmpty` guard
-in `AdviceAddOwner`). Clear it explicitly in a sanitize advisor if you need
-strict enforcement.
+**`AdviceAddOwner` leaves an already-set `Owner` untouched.** Its
+`!string.IsNullOrEmpty(ownable.Owner)` guard returns early when `Owner` is
+already populated, so a value present on the entity before the advisor runs is
+preserved — the resolver does not override it. If untrusted input can reach the
+entity directly (bypassing request handling that clears the field), clear
+`Owner` yourself before `AddAsync` to force the resolver's value.
 
 **Per-entity resolvers override the open-generic registration.** If you
 register `IOwnerResolver<Student>` explicitly, it takes precedence over the

@@ -15,12 +15,16 @@ namespace Schemata.Event.Foundation;
 
 /// <summary>
 ///     Re-delivers <see cref="SchemataEvent" /> rows left <see cref="EventState.Pending" /> when a
-///     broker publish failed (or the process died before the broker confirmed). Each row is claimed
+///     broker publish failed or the process stopped before broker confirmation. Each row is claimed
 ///     with the entity's optimistic concurrency token, replayed through <see cref="IEventOutboxPublisher" />
-///     (not the publish pipeline, so no duplicate audit row is written), and marked
+///     using the existing audit row, and marked
 ///     <see cref="EventState.Recorded" /> on confirmation or returned to <see cref="EventState.Pending" />
 ///     with an incremented retry count on failure. Delivery is at-least-once; consumers must be idempotent.
 /// </summary>
+/// <param name="services">Root service provider for creating dispatcher scopes.</param>
+/// <param name="publisher">Broker replay publisher used for pending outbox rows.</param>
+/// <param name="logger">Logger for dispatch failures.</param>
+/// <param name="timeProvider">Clock used for claim timeout checks.</param>
 public sealed class EventOutboxDispatcher(
     IServiceProvider                services,
     IEventOutboxPublisher?          publisher    = null,
@@ -56,6 +60,7 @@ public sealed class EventOutboxDispatcher(
         }
     }
 
+    /// <summary>Claims pending outbox rows and attempts broker delivery.</summary>
     public async Task DispatchPendingAsync(CancellationToken ct) {
         if (publisher is null) {
             return;
@@ -81,7 +86,7 @@ public sealed class EventOutboxDispatcher(
     }
 
     private async Task DeliverAsync(IRepository<SchemataEvent> records, SchemataEvent record, CancellationToken ct) {
-        // Claim the row so a second dispatcher does not publish the same event.
+        // Claim the row before broker publish so competing dispatchers skip it.
         record.State = EventState.Publishing;
         try {
             await records.UpdateAsync(record, ct);
@@ -102,22 +107,22 @@ public sealed class EventOutboxDispatcher(
             if (delivery == EventOutboxDelivery.Delivered) {
                 // The broker accepted the message; a downstream consumer sets the terminal state
                 // later. Mark the row delivered as a fallback; a ConcurrencyException means the
-                // audit observer's OnDeliveredAsync already committed the transition.
+                // audit observer's OnDeliveredAsync committed the transition first.
                 record.State = EventState.Recorded;
                 try {
                     await records.UpdateAsync(record, ct);
                     await records.CommitAsync(ct);
                 } catch (ConcurrencyException) {
-                    // The audit observer already moved the row to Recorded; nothing to do.
+                    // The audit observer committed the Recorded transition first.
                 }
             }
 
-            // EventOutboxDelivery.Consumed: the in-process consume path already committed the
-            // terminal Succeeded/Failed state, so the dispatcher must not overwrite it.
+            // EventOutboxDelivery.Consumed: the in-process consume path owns the terminal
+            // Succeeded/Failed state.
         } catch (Exception ex) {
             // A delivery failure (e.g. the broker is unreachable) leaves the row retryable; the next
-            // pass re-publishes it. In-process replay reports Consumed instead of throwing, so an
-            // application handler failure does not reach here.
+            // pass re-publishes it. In-process replay reports Consumed and captures application
+            // handler failures in the audit row.
             record.State       =  EventState.Pending;
             record.RetryCount  += 1;
             record.RecentError =  ex.Message;
@@ -125,7 +130,7 @@ public sealed class EventOutboxDispatcher(
                 await records.UpdateAsync(record, ct);
                 await records.CommitAsync(ct);
             } catch (ConcurrencyException) {
-                // The row moved on under another dispatcher; nothing to do.
+                // Another dispatcher committed the row first.
             }
         }
     }

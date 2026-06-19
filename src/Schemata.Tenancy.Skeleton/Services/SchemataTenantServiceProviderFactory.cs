@@ -9,8 +9,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 /// <summary>
 ///     Per-tenant <see cref="IServiceProvider" /> factory that caches one provider per tenant
 ///     holding tenant-specific singletons (tenant entity, accessor, registered overrides).
-///     Non-overridden services resolve from the host root via
-///     <see cref="TenantCompositeServiceProvider" />.
+///     Host services resolve through <see cref="TenantCompositeServiceProvider" />.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
@@ -27,9 +26,7 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
     private readonly SchemataTenancyOptions _options;
     private readonly IServiceProvider       _root;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantServiceProviderFactory{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates a factory that builds and caches tenant-specific service providers.</summary>
     public SchemataTenantServiceProviderFactory(
         IServiceProvider                 root,
         ITenantProviderCache             cache,
@@ -76,10 +73,8 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
             EnforceSingletonOverride(id, overrides, snapshot);
         }
 
-        // The tenant container holds only override registrations, so an override whose constructor
-        // depends on a host service cannot resolve it from the isolated container. Activate each
-        // override through the composite provider instead, which falls back to the host root for any
-        // dependency the tenant container does not register.
+        // The tenant container holds only override registrations. Activate each override through
+        // the composite provider so host-root fallback supplies dependencies outside the tenant container.
         TenantCompositeServiceProvider composite = null!;
         for (var i = baseline; i < overrides.Count; i++) {
             var descriptor = overrides[i];

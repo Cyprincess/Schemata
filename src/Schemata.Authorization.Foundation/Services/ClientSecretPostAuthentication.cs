@@ -31,11 +31,6 @@ public sealed class ClientSecretPostAuthentication<TApp>(
 {
     #region IClientAuthentication<TApp> Members
 
-    /// <summary>
-    ///     Authenticates the client using form-posted credentials.  Returns
-    ///     <c>null</c> when <c>client_secret_post</c> is not an allowed method.
-    /// </summary>
-    /// <inheritdoc cref="IClientAuthentication{TApp}.AuthenticateAsync" />
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,

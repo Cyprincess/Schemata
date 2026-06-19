@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Registration request body.
+/// </summary>
 public class RegisterRequest
 {
     /// <summary>Desired username for the new account.</summary>
@@ -20,6 +23,6 @@ public class RegisterRequest
     [Required]
     public string Password { get; set; } = null!;
 
-    /// <summary>When true, issue a cookie instead of a bearer token after registration.</summary>
+    /// <summary>Requests cookie-based sign-in after registration.</summary>
     public bool? UseCookies { get; set; }
 }

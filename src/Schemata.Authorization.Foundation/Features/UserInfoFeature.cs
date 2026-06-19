@@ -25,7 +25,6 @@ public sealed class UserInfoFeature : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 3_000;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

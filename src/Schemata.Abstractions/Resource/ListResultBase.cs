@@ -17,7 +17,7 @@ public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
 
     /// <summary>
     ///     Total number of matching resources across all pages.
-    ///     May be <see langword="null" /> when the server cannot compute a total.
+    ///     <see langword="null" /> indicates the server skipped total computation.
     /// </summary>
     public virtual int? TotalSize { get; set; }
 

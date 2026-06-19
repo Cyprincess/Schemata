@@ -1,24 +1,25 @@
 # Unit of Work
 
-The unit-of-work pattern coordinates multiple repository mutations within a single database transaction. `IUnitOfWork` provides explicit begin/commit/rollback control, and repositories opt in through `Enlist`.
+A unit of work coordinates multiple repository mutations within one database transaction.
+`IUnitOfWork` provides commit and rollback; repositories enlist through `IRepository.Join`. A
+repository that mutates without enlisting opens its own implicit unit of work, so a single
+`repository.CommitAsync()` is transactional on its own.
 
 ## Where the code lives
 
 | Item | Path |
-|---|---|
-| `IUnitOfWork` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
-| `IUnitOfWork<TContext>` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
-| `IRepository.Enlist` | `src/Schemata.Entity.Repository/IRepository.cs` |
-| `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
+| --- | --- |
+| `IUnitOfWork`, `IUnitOfWork<TContext>` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
+| `IUnitOfWorkSink` | `src/Schemata.Entity.Repository/IUnitOfWorkSink.cs` |
+| `IRepository.Begin` / `Join` / `CommitAsync` | `src/Schemata.Entity.Repository/IRepository.cs` |
 | `CommitChanges<TEntity>` | `src/Schemata.Entity.Repository/CommitChanges.cs` |
+| `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
 
 ## IUnitOfWork interface
 
 ```csharp
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
-    bool IsActive { get; }
-    void Begin();
     Task CommitAsync(CancellationToken ct = default);
     Task RollbackAsync(CancellationToken ct = default);
 }
@@ -30,117 +31,109 @@ public interface IUnitOfWork<TContext> : IUnitOfWork
 ```
 
 | Member | Purpose |
-|---|---|
-| `IsActive` | `true` when a transaction has been started and not yet committed or rolled back. |
-| `Begin()` | Starts a new database transaction and owns a fresh data context. |
-| `CommitAsync` | Persists enlisted repository changes, commits the transaction, then dispatches committed advisors. |
-| `RollbackAsync` | Rolls back the transaction and clears enlisted repository tracking state. |
-| `Dispose()` / `DisposeAsync()` | Rolls back if still active and releases the owned data context. |
+| --- | --- |
+| `CommitAsync` | Persists the enlisted repositories' changes, commits the transaction, then dispatches each repository's committed advisors. |
+| `RollbackAsync` | Rolls back the transaction and resets each enlisted repository's tracking lists. |
+| `Context` | The provider context (`DbContext` or `DataConnection`). First access opens the connection; the transaction opens per the provider's execution model. |
+| `Dispose` / `DisposeAsync` | Rolls back when never committed, then releases the context. |
 
-`IUnitOfWork<TContext>` carries a type parameter bound to the concrete data context (`DbContext` or `DataConnection`), enabling multiple provider types to coexist in the same DI container.
+A unit of work is one-shot: after `CommitAsync` or `RollbackAsync`, resolve a fresh `IUnitOfWork` from
+DI to start another transaction. `IUnitOfWork<TContext>` binds the type parameter to a concrete context
+so multiple provider types coexist in one container.
 
-## Repository enlistment
+## Starting and enlisting
 
-Repositories are transient. Each resolution owns its own provider context, so repositories from the same DI scope can query and write independently. To share a transaction, begin a unit of work and enlist each repository:
+Two entry points open a unit of work:
 
-```csharp
-uow.Begin();
-orders.Enlist(uow);
-items.Enlist(uow);
-
-await orders.AddAsync(order);
-await items.AddAsync(lineItem);
-
-await uow.CommitAsync();
-```
-
-After enlistment, the repository adopts the unit of work's context and registers commit/rollback sinks with the provider implementation. Calling `repository.CommitAsync()` while enlisted throws `InvalidOperationException`; commit through `uow.CommitAsync()`.
+- `IRepository.Begin()` creates a provider unit of work, enlists the calling repository, and returns it.
+- `IRepository.Join(uow)` enlists the repository in a unit of work resolved separately (typically from
+  the DI scope), letting several repositories share one transaction.
 
 ```csharp
-public class OrderService(
-    IRepository<Order>          orders,
-    IRepository<OrderItem>      items,
-    IUnitOfWork<AppDbContext>   uow)
+public sealed class EnrollmentService(
+    IRepository<Student>      students,
+    IRepository<Course>       courses,
+    IUnitOfWork<AppDbContext> uow)
 {
-    public async Task PlaceAsync(Order order, List<OrderItem> lines)
+    public async Task EnrollAsync(Student student, Course course, CancellationToken ct)
     {
-        uow.Begin();
-        orders.Enlist(uow);
-        items.Enlist(uow);
+        students.Join(uow);
+        courses.Join(uow);
 
-        await orders.AddAsync(order);
-        foreach (var line in lines)
-            await items.AddAsync(line);
+        await students.AddAsync(student, ct);
+        await courses.AddAsync(course, ct);
 
-        await uow.CommitAsync();
+        await uow.CommitAsync(ct);
     }
 }
 ```
 
-`IUnitOfWork<TContext>` is registered as scoped, so all injections within the same HTTP request resolve the same instance. The current implementation is single-use per instance: begin once, commit or roll back, then dispose.
+`Join` replaces the repository's owned context with the unit of work's context and registers commit and
+rollback sinks through `IUnitOfWorkSink`. While enlisted, `repository.CommitAsync()` throws
+`InvalidOperationException` — commit through `uow.CommitAsync()`. `Join` also throws if the repository
+already holds uncommitted work or is already enlisted.
+
+`IUnitOfWork<TContext>` is typically registered scoped (via `.WithUnitOfWork<TContext>()`), so every
+injection in one request resolves the same instance.
+
+## Standalone commit
+
+A repository that mutates without enlisting opens an implicit unit of work on the first write
+(`EnsureWriteUnitOfWork`) and commits it through `repository.CommitAsync()`:
+
+```csharp
+await students.AddAsync(student, ct);
+await students.CommitAsync(ct);
+```
+
+The implicit unit of work is one-shot too: after a standalone commit, the repository is completed, and
+a further write or commit throws `InvalidOperationException`. Resolve a fresh `IRepository<T>` to start
+new work. A repository owned but never mutated still dispatches an empty committed snapshot on commit,
+so committed advisors observe the no-op on the same footing as the enlisted path.
 
 ## Committed advisor pipeline
 
-`IRepositoryCommittedAdvisor<TEntity>` runs after a successful commit boundary. It receives a typed snapshot of entity changes:
+`IRepositoryCommittedAdvisor<TEntity>` runs after a successful commit boundary. It receives a typed
+snapshot:
 
 ```csharp
-public sealed class CommitChanges<TEntity>
-    where TEntity : class
+public sealed class CommitChanges<TEntity> where TEntity : class
 {
-    public IReadOnlyList<TEntity> Added { get; init; }
+    public IReadOnlyList<TEntity> Added   { get; init; }
     public IReadOnlyList<TEntity> Updated { get; init; }
     public IReadOnlyList<TEntity> Removed { get; init; }
 }
 ```
 
-Standalone `repository.CommitAsync()` snapshots the repository's tracked adds, updates, and removes before persisting, then dispatches committed advisors after persistence succeeds. `uow.CommitAsync()` invokes the committed sinks registered by every enlisted repository after the transaction commits.
+A standalone `repository.CommitAsync()` snapshots the repository's tracked adds, updates, and removes,
+then dispatches committed advisors after persistence. `uow.CommitAsync()` invokes the committed sink
+each enlisted repository registered, in turn dispatching that repository's committed advisors. When a
+committed sink throws, the unit of work collects the errors and rethrows them (single error directly,
+several as an `AggregateException`) after running the remaining sinks.
 
-Query cache eviction uses this pipeline: updated and removed entities evict reverse-indexed entries after commit; added entities do not evict.
+Query-cache eviction uses this pipeline: updated and removed entities evict reverse-indexed cache
+entries after commit; added entities do not.
 
-## Once() and SuppressX() state markers
+## Rollback and disposal
 
-`Once()` creates a new repository instance with a fresh `AdviceContext` via `ActivatorUtilities.CreateInstance(ServiceProvider, GetType())`.
-
-```csharp
-var tombstone = await _repository.Once()
-    .SuppressQuerySoftDelete()
-    .FirstOrDefaultAsync<Book>(q => q.Where(b => b.Name == name));
-```
-
-Every `SuppressX()` method stores a state-noun marker class in `AdviceContext` and returns `this`. Advisors check `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync`.
+`RollbackAsync` rolls back the transaction and runs each repository's rollback sink, which clears its
+tracking lists. Disposing a unit of work that never committed rolls back the same way. Both are safe to
+call after the unit of work has already completed. A repository enlisted in an externally supplied unit
+of work does not dispose that unit of work — the caller owns its lifetime.
 
 ## Registration
 
-Chain `.WithUnitOfWork<TContext>()` on the repository builder:
-
 ```csharp
-services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+services.AddRepository(typeof(EfCoreRepository<,>))
+        .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlite(connectionString))
         .WithUnitOfWork<AppDbContext>();
 ```
 
-`.WithUnitOfWork<TContext>()` registers `IUnitOfWork<TContext>` as scoped using `TryAdd`, so a prior registration takes precedence.
-
-## Independent repositories without UoW
-
-Without explicit enlistment, transient repositories do not share a provider context. Commit each repository independently:
-
-```csharp
-await students.AddAsync(student);
-await students.CommitAsync();
-
-await courses.AddAsync(course);
-await courses.CommitAsync();
-```
-
-## Caveats
-
-- Calling `repository.CommitAsync()` while a repository is enlisted throws `InvalidOperationException`. Commit via `uow.CommitAsync()`.
-- A repository can be enlisted only once for its current lifetime.
-- `RollbackAsync`, `Dispose`, and `DisposeAsync` clear provider tracking for enlisted repositories.
+`.WithUnitOfWork<TContext>()` registers `IUnitOfWork<TContext>` as scoped with `TryAddScoped`, so a
+prior registration wins. Both providers expose the same method.
 
 ## See also
 
-- [overview.md](overview.md) - repository API and `Once()` / `Suppress*()` reference
-- [mutation-pipeline.md](mutation-pipeline.md) - mutation advisors and committed advisors
-- [caching.md](caching.md) - cache eviction via committed advisors
-- [providers.md](providers.md) - EF Core and LinqToDB UoW implementations
+- [overview.md](overview.md) — repository API and suppression scopes
+- [mutation-pipeline.md](mutation-pipeline.md) — mutation advisors and the committed pipeline
+- [providers.md](providers.md) — EF Core and LinqToDB unit-of-work implementations

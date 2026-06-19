@@ -17,8 +17,7 @@ public class AdviceUpdateSoftDeletedShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new TrashStudent { CanonicalName = "trashStudents/alice-1", DeleteTime = DateTime.UtcNow };
 
-        await Assert.ThrowsAsync<FailedPreconditionException>(
-            () => advisor.AdviseAsync(ctx, new(), entity, null));
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => advisor.AdviseAsync(ctx, new(), entity, null));
     }
 
     [Fact]

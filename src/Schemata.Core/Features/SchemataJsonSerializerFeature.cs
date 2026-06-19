@@ -17,6 +17,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default service-configuration priority for JSON serializer setup.
+    /// </summary>
     public const int DefaultPriority = SchemataControllersFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

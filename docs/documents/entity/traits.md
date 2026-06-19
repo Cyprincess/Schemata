@@ -1,39 +1,41 @@
 # Entity Traits
 
-Traits are marker interfaces that add cross-cutting behavior to entities. The behavior is delivered by ordinary advisors registered alongside the repository pipeline: each advisor checks the entity with a plain `is`-test inside its `AdviseAsync` method (or via a constrained generic type parameter), then runs its logic when the test matches. For the built-in traits listed below, the repository setup wires the matching advisors automatically — no per-entity step is needed beyond implementing the interface. For custom traits, defining the interface is only half the work; behavior requires registering an advisor that performs the same kind of check.
+Traits are marker interfaces that add cross-cutting behavior to entities. Each is delivered by an
+advisor registered with the repository pipeline: the advisor checks the entity with an `is`-test (or a
+constrained generic parameter) and runs its logic when the test matches. For the built-in traits below,
+`AddRepository` wires the matching advisors — implementing the interface is the only per-entity step.
+A custom trait needs both the interface and an advisor that performs the same kind of check.
 
-Traits live in two packages depending on where they are applied:
+The traits live in `Schemata.Abstractions.Entities`. Their built-in advisors live in three packages:
+the always-on repository advisors in `Schemata.Entity.Repository`, the ownership advisors in
+`Schemata.Entity.Owner` (activated by `UseOwner()`), and the query-cache advisors in
+`Schemata.Entity.Cache` (activated by `UseQueryCache()`).
 
-| Package | Applied to | Traits |
-|---|---|---|
-| `Schemata.Abstractions.Entities` | Entity classes | `IIdentifier`, `ITimestamp`, `ISoftDelete`, `IConcurrency`, `ICanonicalName`, `IDescriptive`, `ITransition`, `IOwnable`, `IStateful`, `IExpiration` |
-| `Schemata.Abstractions.Resource` | Request/response DTOs | `IFreshness` |
+## Trait-to-advisor summary
 
-`IFreshness` lives in `Schemata.Abstractions/Resource/IFreshness.cs` as an HTTP-layer concern (ETag / If-Match) carried by request and response DTOs.
+| Trait | Built-in advisor | Pipeline | Order |
+| --- | --- | --- | --- |
+| `IIdentifier` | — | — | — |
+| `ITimestamp` | `AdviceAddTimestamp<TEntity>` | Add | 100,000,000 |
+| `ITimestamp` | `AdviceUpdateTimestamp<TEntity>` | Update | 100,000,000 |
+| `IConcurrency` | `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 |
+| `ICanonicalName` | `AdviceAddCanonicalName<TEntity>` | Add | 220,000,000 |
+| `ISoftDelete` | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 |
+| `ISoftDelete` | `AdviceAddSoftDelete<TEntity>` | Add | 900,000,000 |
+| `ISoftDelete` | `AdviceRemoveSoftDelete<TEntity>` | Remove | 900,000,000 |
+| `IOwnable` | `AdviceAddOwner<TEntity>` | Add | 230,000,000 |
+| `IOwnable` | `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 |
+| `IExpiration` | — | — | — |
+| `IDescriptive` | — | — | — |
+| `IStateful` | — | — | — |
+| `ITransition` | — | — | — |
+| `ISourceReference` | — | — | — |
 
-## Where the code lives
-
-| Trait | Source file |
-|---|---|
-| `IIdentifier` | `src/Schemata.Abstractions/Entities/IIdentifier.cs` |
-| `ITimestamp` | `src/Schemata.Abstractions/Entities/ITimestamp.cs` |
-| `ISoftDelete` | `src/Schemata.Abstractions/Entities/ISoftDelete.cs` |
-| `IConcurrency` | `src/Schemata.Abstractions/Entities/IConcurrency.cs` |
-| `ICanonicalName` | `src/Schemata.Abstractions/Entities/ICanonicalName.cs` |
-| `CanonicalNameAttribute` | `src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs` |
-| `IDescriptive` | `src/Schemata.Abstractions/Entities/IDescriptive.cs` |
-| `ITransition` | `src/Schemata.Abstractions/Entities/ITransition.cs` |
-| `IOwnable` | `src/Schemata.Abstractions/Entities/IOwnable.cs` |
-| `IStateful` | `src/Schemata.Abstractions/Entities/IStateful.cs` |
-| `IExpiration` | `src/Schemata.Abstractions/Entities/IExpiration.cs` |
-| `IFreshness` | `src/Schemata.Abstractions/Resource/IFreshness.cs` |
-| Built-in advisors | `src/Schemata.Entity.Repository/Advisors/` |
-
----
+Traits with no built-in advisor are data contracts: application code or other subsystems read and
+write their properties. `IConcurrency` enforcement on update is provider-level, not an advisor — see
+the `IConcurrency` section.
 
 ## IIdentifier
-
-**File:** `src/Schemata.Abstractions/Entities/IIdentifier.cs`
 
 ```csharp
 public interface IIdentifier
@@ -42,15 +44,11 @@ public interface IIdentifier
 }
 ```
 
-Provides a `Guid` primary key. `RepositoryBase` falls back to `Uid` when no `[PrimaryKey]` attribute is present on the entity class. `Guid` was chosen over `long` for AIP alignment and to support decentralized inserts without a database sequence.
-
-**Built-in advisors:** None. `Uid` is assigned by application code or a custom advisor before `AddAsync` is called.
-
----
+Provides a `Guid` primary key. `RepositoryBase.ResolveKeyProperties` falls back to `Uid` when no
+class-level `[PrimaryKey]` attribute resolves. No advisor assigns `Uid`; application code or a custom
+add advisor sets it before `AddAsync`.
 
 ## ITimestamp
-
-**File:** `src/Schemata.Abstractions/Entities/ITimestamp.cs`
 
 ```csharp
 public interface ITimestamp
@@ -60,48 +58,16 @@ public interface ITimestamp
 }
 ```
 
-Records creation and last-update times, corresponding to AIP-148 `create_time` and `update_time`.
-
-**Built-in advisors:**
+Records creation and last-update times, per AIP-148 `create_time` / `update_time`.
 
 | Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceAddTimestamp<TEntity>` | Add | 100,000,000 | Sets `CreateTime` and `UpdateTime` to `DateTime.UtcNow`. |
-| `AdviceUpdateTimestamp<TEntity>` | Update | 100,000,000 | Sets `UpdateTime` to `DateTime.UtcNow`. |
+| --- | --- | --- | --- |
+| `AdviceAddTimestamp<TEntity>` | Add | 100,000,000 | Sets `CreateTime` and `UpdateTime` to one reading of the injected `TimeProvider`'s UTC clock, so both are equal on create. |
+| `AdviceUpdateTimestamp<TEntity>` | Update | 100,000,000 | Sets `UpdateTime` to the current UTC time. |
 
-Both advisors are suppressed when `TimestampSuppressed` is present in the advice context (call `repository.SuppressTimestamp()`).
-
----
-
-## ISoftDelete
-
-**File:** `src/Schemata.Abstractions/Entities/ISoftDelete.cs`
-
-```csharp
-public interface ISoftDelete
-{
-    DateTime? DeleteTime { get; set; }
-    DateTime? PurgeTime  { get; set; }
-}
-```
-
-Enables soft deletion per AIP-164. Instead of physically removing a row, the entity is flagged with a deletion timestamp. `PurgeTime` is an optional scheduled permanent-removal time.
-
-**Built-in advisors:**
-
-| Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceAddSoftDelete<TEntity>` | Add | 900,000,000 | Clears `DeleteTime` to `null` so newly added entities are never marked deleted. |
-| `AdviceRemoveSoftDelete<TEntity>` | Remove | 900,000,000 | Sets `DeleteTime = DateTime.UtcNow`, calls `repository.UpdateAsync(entity)`, returns `AdviseResult.Handle` to prevent the physical delete. |
-| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 | Appends `.Where(e => e.DeleteTime == null)` to every query. |
-
-`AdviceAddSoftDelete` and `AdviceRemoveSoftDelete` are suppressed by `SoftDeleteSuppressed` (call `repository.SuppressSoftDelete()`). The query filter is suppressed separately by `QuerySoftDeleteSuppressed` (call `repository.SuppressQuerySoftDelete()`).
-
----
+Both advisors skip when `TimestampSuppressed` is present (call `repository.SuppressTimestamp()`).
 
 ## IConcurrency
-
-**File:** `src/Schemata.Abstractions/Entities/IConcurrency.cs`
 
 ```csharp
 public interface IConcurrency
@@ -110,28 +76,35 @@ public interface IConcurrency
 }
 ```
 
-Supports optimistic concurrency control via a GUID version token, per AIP-154. The field is named `Timestamp` for historical reasons; it is not a time value. `Guid.Empty` denotes an unstamped entity.
-
-**Add stamping:**
+Supports optimistic concurrency via a GUID version token, per AIP-154. The property is named
+`Timestamp` but holds a `Guid`, not a time value. `Guid.Empty` denotes an unstamped entity.
 
 | Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 | Mints a new `Guid` and assigns it to `Timestamp`. |
+| --- | --- | --- | --- |
+| `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 | Mints a new GUID and assigns it to `Timestamp`. |
 
-**Update enforcement (provider-level).** The concurrency check on update is enforced by the database, not an advisor. Annotate the concrete entity's `Timestamp` with `[ConcurrencyCheck]` (`System.ComponentModel.DataAnnotations`) to enable it. The attribute on the interface does not flow to the implementation, so each consumer entity must declare it.
+There is no add-side suppress flag and no update advisor. The update check is enforced by the database,
+gated on the concrete entity annotating its `Timestamp` with `[ConcurrencyCheck]`
+(`System.ComponentModel.DataAnnotations`). The attribute on the interface does not flow to the
+implementation, so each consuming entity declares it:
 
-- **EF Core** recognizes `[ConcurrencyCheck]` natively. `UpdateAsync` snapshots the incoming token as the original value and bumps the current value, so `SaveChangesAsync` issues `WHERE <key> AND Timestamp = @original`. A zero-row result raises `DbUpdateConcurrencyException`, normalized to `ConcurrencyException` (ABORTED).
-- **LINQ to DB** maps `[ConcurrencyCheck]` to an optimistic-lock column through the metadata reader registered by `UseLinqToDb`, and `UpdateAsync` calls `UpdateOptimisticAsync`. A zero-row result raises `ConcurrencyException`.
+```csharp
+[ConcurrencyCheck]
+public Guid Timestamp { get; set; }
+```
 
-Without `[ConcurrencyCheck]` the update writes unconditionally and concurrent writers can lose updates; the add stamp alone does not guard the update path.
+- **EF Core** reads `[ConcurrencyCheck]` natively. `UpdateAsync` detaches the entity, re-attaches it as
+  modified, and bumps `Timestamp` to a fresh GUID as the current value while the incoming token stays
+  the original. `SaveChangesAsync` then issues `UPDATE ... WHERE <key> AND Timestamp = @original`; a
+  zero-row result raises `DbUpdateConcurrencyException`, normalized to `ConcurrencyException`.
+- **LinqToDB** maps `[ConcurrencyCheck]` to an optimistic-lock column through the metadata reader
+  registered by `UseLinqToDb`, and `UpdateAsync` calls `UpdateOptimisticAsync`. A zero-row result
+  raises `ConcurrencyException`.
 
-`IConcurrency` is the entity-side counterpart of `IFreshness`. The resource layer computes weak ETags from `Timestamp` and writes them to the response DTO's `EntityTag`.
-
----
+Without `[ConcurrencyCheck]`, the update writes unconditionally; concurrent writers can lose updates.
+The add stamp alone does not guard the update path.
 
 ## ICanonicalName
-
-**File:** `src/Schemata.Abstractions/Entities/ICanonicalName.cs`
 
 ```csharp
 public interface ICanonicalName
@@ -141,30 +114,79 @@ public interface ICanonicalName
 }
 ```
 
-Provides a fully-qualified resource name following AIP-122. `Name` is the short identifier segment; `CanonicalName` is the full path (e.g., `publishers/acme/books/les-miserables`).
-
+Provides a fully-qualified resource name per AIP-122. `Name` is the short identifier segment;
+`CanonicalName` is the full collection-relative path (e.g., `publishers/acme/books/les-miserables`).
 Declare the pattern on the entity class:
 
 ```csharp
 [CanonicalName("publishers/{publisher}/books/{book}")]
-public class Book : ICanonicalName { ... }
+public class Book : ICanonicalName { /* ... */ }
 ```
 
-`CanonicalNameAttribute` (`src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs`) stores the pattern string. `ResourceNameDescriptor.Resolve` substitutes placeholder segments from the entity's properties at add time.
+| Advisor | Pipeline | Order | Behavior |
+| --- | --- | --- | --- |
+| `AdviceAddCanonicalName<TEntity>` | Add | 220,000,000 | Resolves the `[CanonicalName]` pattern against entity properties via `ResourceNameDescriptor` and writes the result to `CanonicalName`. |
 
-**Built-in advisors:**
+The advisor has no suppress flag and runs whenever the entity implements `ICanonicalName` and its type
+carries a registered pattern.
+
+## ISoftDelete
+
+```csharp
+public interface ISoftDelete
+{
+    DateTime? DeleteTime { get; set; }
+    DateTime? PurgeTime  { get; set; }
+}
+```
+
+Enables soft deletion per AIP-164: a delete sets `DeleteTime` instead of removing the row. `PurgeTime`
+is an optional scheduled permanent-removal time the framework does not enforce.
 
 | Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceAddCanonicalName<TEntity>` | Add | 220,000,000 | Reads the `[CanonicalName]` pattern, resolves placeholders against entity properties, writes the result to `CanonicalName`. |
+| --- | --- | --- | --- |
+| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 | Appends `.Where(e => e.DeleteTime == null)` to every query. |
+| `AdviceAddSoftDelete<TEntity>` | Add | 900,000,000 | Clears `DeleteTime` to `null` so a newly added entity is never marked deleted. |
+| `AdviceRemoveSoftDelete<TEntity>` | Remove | 900,000,000 | Sets `DeleteTime` to the current UTC time, calls `repository.UpdateAsync(entity)`, and returns `AdviseResult.Handle` to prevent the physical delete. |
 
-No suppress flag exists for this advisor; it always runs when the entity implements `ICanonicalName` and has a registered pattern.
+The add and remove advisors skip when `SoftDeleteSuppressed` is present
+(`repository.SuppressSoftDelete()`). The query filter skips separately under `QuerySoftDeleteSuppressed`
+(`repository.SuppressQuerySoftDelete()`).
 
----
+## IOwnable
+
+```csharp
+public interface IOwnable
+{
+    string? Owner { get; set; }
+}
+```
+
+Records the canonical name of the principal that owns the entity (e.g., `users/chino`). The
+`Schemata.Entity.Owner` package supplies two advisors, both registered by `UseOwner()`:
+
+| Advisor | Pipeline | Order | Behavior |
+| --- | --- | --- | --- |
+| `AdviceAddOwner<TEntity>` | Add | 230,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset. |
+| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query. |
+
+Both consult `SchemataOwnerOptions.OnNullOwner` when the resolver returns `null`: `Reject` (default)
+throws `AuthorizationException`, `EmptyResult` blocks, `AllowAll` continues. See
+[ownership.md](../repository/ownership.md).
+
+## IExpiration
+
+```csharp
+public interface IExpiration
+{
+    DateTime? ExpireTime { get; set; }
+}
+```
+
+Marks an entity that expires at a scheduled time, per AIP-214 `expire_time`. Application code sets
+`ExpireTime`; no built-in advisor reads or purges it.
 
 ## IDescriptive
-
-**File:** `src/Schemata.Abstractions/Entities/IDescriptive.cs`
 
 ```csharp
 public interface IDescriptive
@@ -176,15 +198,21 @@ public interface IDescriptive
 }
 ```
 
-Provides user-facing display names and descriptions per AIP-148. `DisplayNames` and `Descriptions` are localized variants keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`).
+Provides user-facing display names and descriptions per AIP-148. `DisplayNames` and `Descriptions` are
+localized variants keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`). No built-in advisor.
 
-**Built-in advisors:** None. Application code sets these fields during create and update.
+## IStateful
 
----
+```csharp
+public interface IStateful
+{
+    string? State { get; set; }
+}
+```
+
+Declares a discrete workflow or lifecycle state, per AIP-216 `state`. No built-in repository advisor.
 
 ## ITransition
-
-**File:** `src/Schemata.Abstractions/Entities/ITransition.cs`
 
 ```csharp
 public interface ITransition
@@ -195,87 +223,30 @@ public interface ITransition
 }
 ```
 
-Marks an entity as an audit-log entry. `Event` is the event type identifier (e.g., `created`, `updated`). `UpdatedBy` is the canonical resource name of the principal who triggered the event.
+Records an audit event: `Event` is the event-type identifier (e.g., `created`, `updated`), `Note` an
+optional human-readable note, `UpdatedBy` the canonical name of the principal who triggered it. Pair
+with `ITimestamp` for a complete audit record. No built-in advisor.
 
-Pair with `ITimestamp` for a complete audit record: `CreateTime` records when the event occurred, `Event` records what happened, `UpdatedBy` records who did it.
-
-**Built-in advisors:** None. Transition records are created by application code or advisors.
-
----
-
-## IOwnable
-
-**File:** `src/Schemata.Abstractions/Entities/IOwnable.cs`
+## ISourceReference
 
 ```csharp
-public interface IOwnable
+public interface ISourceReference
 {
-    string? Owner { get; set; }
+    string? SourceType      { get; set; }
+    string? Source          { get; set; }
+    Guid?   SourceTimestamp { get; set; }
 }
 ```
 
-Records the canonical name of the principal that owns the entity (e.g., `users/chino`). The `Schemata.Entity.Owner` package provides two advisors that activate when `UseOwner()` is called on the repository builder:
-
-| Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceAddOwner<TEntity>` | Add | 230,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and sets `Owner` if not already set. |
-| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query. |
-
-Both advisors consult `SchemataOwnerOptions.OnNullOwner` when the resolver returns `null`: `Reject` throws `AuthorizationException`, `EmptyResult` returns `Block`, `AllowAll` continues. The default is `Reject`.
-
-See [ownership.md](../repository/ownership.md) for registration and extension details.
-
----
-
-## IStateful
-
-**File:** `src/Schemata.Abstractions/Entities/IStateful.cs`
-
-Indicates that an entity has a discrete lifecycle state. The `State` property holds the current state name. The Flow engine reads and writes this property during process execution.
-
-**Built-in advisors:** None in the repository package.
-
----
-
-## IExpiration
-
-**File:** `src/Schemata.Abstractions/Entities/IExpiration.cs`
-
-Marks an entity that can expire at a scheduled time. `ExpireTime` is set by application code; the framework does not automatically purge expired entities.
-
-**Built-in advisors:** None.
-
----
-
-## IFreshness
-
-**File:** `src/Schemata.Abstractions/Resource/IFreshness.cs`
-
-```csharp
-public interface IFreshness
-{
-    string? EntityTag { get; set; }
-}
-```
-
-Carries an HTTP ETag for conditional requests (`If-Match` / `If-None-Match`) per AIP-154. Implemented on request and response DTOs. The built-in freshness advisors honor only weak validators (values beginning with `W/`); missing or non-`W/` tags are treated as "client did not opt into freshness validation."
-
-`IFreshness` depends on the entity implementing `IConcurrency`. Without a `Timestamp` on the entity, the freshness advisors short-circuit.
-
-**Built-in advisors** (in `Schemata.Resource.Foundation`):
-
-| Advisor | Pipeline | Order | Behavior |
-|---|---|---|---|
-| `AdviceUpdateFreshness` | Update request | 300,000,000 | Compares the request ETag against the stored `IConcurrency.Timestamp`; throws `ConcurrencyException` on mismatch. |
-| `AdviceDeleteFreshness` | Delete request | 300,000,000 | Same check for delete operations. |
-| `AdviceResponseFreshness` | Response | 100,000,000 | Computes a weak ETag from `IConcurrency.Timestamp` and writes it to the detail DTO's `EntityTag`. |
-
----
+A weak-consistency reference from a derived row (event, audit entry) back to its originating entity:
+`SourceType` is the source CLR `Type.FullName`, `Source` its `ICanonicalName.CanonicalName`, and
+`SourceTimestamp` a snapshot of its `IConcurrency.Timestamp` at capture time. All three are nullable so
+rows with no semantic source leave them empty. No built-in repository advisor.
 
 ## Common combinations
 
 | Pattern | Traits |
-|---|---|
+| --- | --- |
 | Basic entity | `IIdentifier` + `ITimestamp` + `ISoftDelete` |
 | Concurrency-safe | adds `IConcurrency` |
 | Named resource | adds `ICanonicalName` |
@@ -284,8 +255,6 @@ Carries an HTTP ETag for conditional requests (`If-Match` / `If-None-Match`) per
 
 ## See also
 
-- [overview.md](overview.md) — entity design philosophy and primary key convention
-- [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains with order numbers
+- [overview.md](overview.md) — entity design and primary-key convention
+- [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains
 - [repository/query-pipeline.md](../repository/query-pipeline.md) — build-query/query/result advisor chains
-- [repository/ownership.md](../repository/ownership.md) — `IOwnable` registration and `IOwnerResolver`
-- [core/advice-pipeline.md](../core/advice-pipeline.md) — advisor runtime mechanics and `AdviseResult` semantics

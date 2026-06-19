@@ -26,7 +26,9 @@ namespace Schemata.Transport.Http.Features;
 [DependsOn<SchemataJsonSerializerFeature>]
 public sealed class SchemataTransportHttpFeature : FeatureBase
 {
-    /// <summary>First slot of the Extension priority range.</summary>
+    /// <summary>
+    ///     Default priority for the shared HTTP transport feature.
+    /// </summary>
     public const int DefaultPriority = Orders.Extension + 10_000_000;
 
     public override int Priority => DefaultPriority;

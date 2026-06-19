@@ -11,7 +11,7 @@ public abstract class Activity : FlowElement
     /// <summary>Whether this activity participates in compensation handling.</summary>
     public bool IsForCompensation { get; set; }
 
-    /// <summary>Default outgoing sequence flow taken when no other condition matches.</summary>
+    /// <summary>Fallback outgoing sequence flow taken after other conditions fail.</summary>
     public SequenceFlow? DefaultFlow { get; set; }
 
     /// <summary>Sequence flows entering this activity.</summary>

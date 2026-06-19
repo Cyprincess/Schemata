@@ -9,6 +9,7 @@ using Schemata.Scheduling.Skeleton;
 
 namespace Schemata.Scheduling.Foundation.Internal;
 
+/// <summary>Scheduled job adapter that runs a keyed resource operation handler.</summary>
 public sealed class DurableOperationScheduledJob<TArgs>(IServiceProvider services) : IScheduledJob
     where TArgs : class
 {

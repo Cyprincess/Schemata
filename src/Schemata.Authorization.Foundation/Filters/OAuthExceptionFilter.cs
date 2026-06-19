@@ -11,6 +11,7 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Filters;
 
+/// <summary>Converts OAuth exceptions into redirect callbacks or JSON error responses.</summary>
 public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> options) : IExceptionFilter
 {
     #region IExceptionFilter Members

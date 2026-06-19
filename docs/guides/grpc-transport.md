@@ -1,10 +1,11 @@
 # gRPC Transport
 
-Expose the `Student` resource over gRPC alongside the existing HTTP endpoints using code-first protobuf-net serialization. This guide builds on [Getting Started](getting-started.md).
+Expose the `Student` resource over gRPC alongside its HTTP endpoints, using code-first protobuf-net serialization.
+This guide builds on [Getting Started](getting-started.md).
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Resource.Grpc`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already includes `Schemata.Resource.Grpc`. Composing packages by hand:
 
 ```shell
 dotnet add package --prerelease Schemata.Resource.Grpc
@@ -12,9 +13,8 @@ dotnet add package --prerelease Schemata.Resource.Grpc
 
 ## Enable gRPC transport
 
-`MapGrpc()` is an extension method on `SchemataResourceBuilder` that returns a `SchemataGrpcResourceBuilder`. `SchemataGrpcResourceFeature` runs at `Order = Priority = 490_200_000`.
-
-In `Program.cs`, chain `.MapGrpc().Use<Student>()` alongside `.MapHttp()`:
+`MapGrpc()` is an extension on `SchemataResourceBuilder` that activates the gRPC transport and returns the
+same builder, so it chains alongside `.MapHttp()` and `.Use<Student>()`:
 
 ```csharp
 var resource = schema.UseResource();
@@ -26,7 +26,8 @@ resource.MapGrpc()
         .Use<Student>();
 ```
 
-`Use<Student>()` on `SchemataGrpcResourceBuilder` is shorthand for `Use<Student, Student, Student, Student>()`. To use separate DTOs, pass all four type parameters:
+`Use<Student>()` is shorthand for `Use<Student, Student, Student, Student>()`. To split the surfaces, pass all
+four type parameters:
 
 ```csharp
 resource.MapGrpc()
@@ -37,7 +38,8 @@ All four types must implement `ICanonicalName`.
 
 ## Add protobuf-net attributes
 
-Code-first gRPC requires protobuf-net serialization attributes on your types. Add `[ProtoContract]` and `[ProtoMember]` to `Student`:
+Code-first gRPC needs protobuf-net field numbers on the serialized types. Add `[ProtoContract]` and
+`[ProtoMember]` to `Student`:
 
 ```csharp
 using ProtoBuf;
@@ -47,23 +49,27 @@ using Schemata.Abstractions.Entities;
 [CanonicalName("students/{student}")]
 public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 {
-    [ProtoMember(1)] public Guid      Uid          { get; set; }
-    [ProtoMember(2)] public string?   Name         { get; set; }
+    [ProtoMember(1)] public Guid      Uid           { get; set; }
+    [ProtoMember(2)] public string?   Name          { get; set; }
     [ProtoMember(3)] public string?   CanonicalName { get; set; }
-    [ProtoMember(4)] public string?   FullName     { get; set; }
-    [ProtoMember(5)] public int       Age          { get; set; }
-    [ProtoMember(6)] public DateTime? CreateTime   { get; set; }
-    [ProtoMember(7)] public DateTime? UpdateTime   { get; set; }
-    [ProtoMember(8)] public DateTime? DeleteTime   { get; set; }
-    [ProtoMember(9)] public DateTime? PurgeTime    { get; set; }
+    [ProtoMember(4)] public string?   FullName      { get; set; }
+    [ProtoMember(5)] public int       Age           { get; set; }
+    [ProtoMember(6)] public DateTime? CreateTime    { get; set; }
+    [ProtoMember(7)] public DateTime? UpdateTime    { get; set; }
+    [ProtoMember(8)] public DateTime? DeleteTime    { get; set; }
+    [ProtoMember(9)] public DateTime? PurgeTime     { get; set; }
 }
 ```
 
 ## How it works
 
-`SchemataGrpcResourceFeature` synthesizes an open-generic `ResourceService<TEntity, TRequest, TDetail, TSummary>` for each registered resource and maps it via `endpoints.MapGrpcService<...>()`. The service delegates to the same `ResourceOperationHandler` used by HTTP, so all advisors (authorization, validation, timestamps, soft-delete) apply identically to both transports.
-
-gRPC reflection is enabled automatically when at least one gRPC resource is registered, allowing tools like `grpcurl` to discover services.
+`SchemataGrpcResourceFeature` synthesizes a `ResourceService<Student, ...>` for the resource and maps it via
+`endpoints.MapGrpcService<...>()`. The service delegates to the same `ResourceOperationHandler` as HTTP, so
+authorization, validation, timestamps, and soft-delete apply identically across both transports. The service is
+named `StudentService` (or `{package}.StudentService` with `[ResourcePackage]`), and its RPCs are `ListStudents`,
+`GetStudent`, `CreateStudent`, `UpdateStudent`, and `DeleteStudent`. Field names match the HTTP JSON (`Name`
+suppressed, `CanonicalName` as `name`, snake_case). gRPC reflection is enabled once any gRPC resource is
+registered.
 
 ## Verify
 
@@ -72,12 +78,11 @@ dotnet run
 ```
 
 ```shell
-# List available services
+# Discover services
 grpcurl -plaintext localhost:5000 list
 
-# List students via gRPC
-grpcurl -plaintext -d '{}' \
-    localhost:5000 IResourceService_Student_Student_Student_Student/ListAsync
+# List students
+grpcurl -plaintext -d '{}' localhost:5000 StudentService/ListStudents
 ```
 
 From a .NET client:
@@ -92,8 +97,12 @@ var client  = channel.CreateGrpcService<IResourceService<Student, Student, Stude
 var result  = await client.ListAsync(new ListRequest());
 ```
 
+## Next steps
+
+- [Multi-Tenancy](multi-tenancy.md) — tenant resolvers cover both HTTP and gRPC requests
+- [Authorization](authorization.md) — issue bearer tokens that authenticate both transports
+- [Event Bus](event-bus.md) — publish domain events from either transport
+
 ## See also
 
-- [Authorization](authorization.md) — previous in the series: OAuth 2.0 / OpenID Connect server
-- [Multi-Tenancy](multi-tenancy.md) — next in the series: tenant resolution and data isolation
-- [gRPC Transport](../documents/resource/grpc-transport.md) — `MapGrpc`, service synthesis, exception mapping
+- [gRPC Transport](../documents/resource/grpc-transport.md) — service synthesis, naming, and error mapping

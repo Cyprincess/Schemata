@@ -12,15 +12,20 @@ namespace Schemata.Entity.LinqToDB.Integration.Tests;
 public class IsolationShould : IAsyncLifetime
 {
     private readonly IntegrationFixture _fixture = new();
-    public           Task                        InitializeAsync() { return _fixture.InitializeAsync(); }
+
+    #region IAsyncLifetime Members
+
+    public Task InitializeAsync() { return _fixture.InitializeAsync(); }
 
     public Task DisposeAsync() { return _fixture.DisposeAsync(); }
+
+    #endregion
 
     [Fact]
     public async Task TwoRepositoriesInSameScope_HaveIndependentChangeTrackers() {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var a = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
-        var b = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var       a     = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var       b     = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
 
         await a.AddAsync(new() {
                              Uid      = Identifiers.NewUid(),
@@ -30,13 +35,13 @@ public class IsolationShould : IAsyncLifetime
                              Name     = "iso-alice",
                          });
 
-        // b has no transaction of its own; CommitAsync is a no-op.
+        // Repository b commits an empty standalone context while repository a keeps its write pending.
         await b.CommitAsync();
 
         await a.CommitAsync();
 
         using var verifyScope = _fixture.ServiceProvider.CreateScope();
-        var verify = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         Assert.Equal(1, await verify.CountAsync(q => q.Where(s => s.Name == "iso-alice")));
     }
 
@@ -44,8 +49,8 @@ public class IsolationShould : IAsyncLifetime
     public async Task EnumerateOnOneRepo_ConcurrentWriteOnAnother_DoesNotThrow() {
         {
             using var seedScope = _fixture.ServiceProvider.CreateScope();
-            var seedRepo = seedScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
-            for (var i = 0; i < 5; i++)
+            var       seedRepo  = seedScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+            for (var i = 0; i < 5; i++) {
                 await seedRepo.AddAsync(new() {
                                             Uid      = Identifiers.NewUid(),
                                             FullName = $"Seed-{i}",
@@ -53,12 +58,14 @@ public class IsolationShould : IAsyncLifetime
                                             Grade    = 1,
                                             Name     = $"seed-{i}",
                                         });
+            }
+
             await seedRepo.CommitAsync();
         }
 
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var reader = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
-        var writer = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        using var scope  = _fixture.ServiceProvider.CreateScope();
+        var       reader = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var       writer = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
 
         await foreach (var student in reader.ListAsync<Student>(q => q.OrderBy(s => s.Name))) {
             await writer.AddAsync(new() {
@@ -69,11 +76,12 @@ public class IsolationShould : IAsyncLifetime
                                       Name     = $"side-{student.Name}",
                                   });
         }
+
         await writer.CommitAsync();
 
         using var verifyScope = _fixture.ServiceProvider.CreateScope();
-        var verify = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
-        var count  = await verify.CountAsync(q => q.Where(s => s.Name!.StartsWith("side-")));
+        var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var       count       = await verify.CountAsync(q => q.Where(s => s.Name!.StartsWith("side-")));
         Assert.Equal(5, count);
     }
 }

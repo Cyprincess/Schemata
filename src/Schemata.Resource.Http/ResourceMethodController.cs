@@ -34,7 +34,14 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     where TResponse : class, ICanonicalName
     where THandler : class, IResourceMethodHandler<TEntity, TRequest, TResponse>
 {
+    /// <summary>
+    ///     Handles the custom resource method.
+    /// </summary>
     protected readonly THandler                                                    Handler;
+
+    /// <summary>
+    ///     Invokes the custom-method advisor pipeline.
+    /// </summary>
     protected readonly ResourceMethodOperationHandler<TEntity, TRequest, TResponse> Operation;
 
     /// <summary>
@@ -53,6 +60,9 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
         JsonOptions = json.Value;
     }
 
+    /// <summary>
+    ///     Gets the JSON serializer options used for controller responses.
+    /// </summary>
     protected JsonSerializerOptions JsonOptions { get; }
 
     /// <summary>

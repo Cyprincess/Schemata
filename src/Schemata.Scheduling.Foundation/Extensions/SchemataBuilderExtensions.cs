@@ -12,6 +12,6 @@ public static class SchemataBuilderExtensions
     public static SchedulingBuilder UseScheduling(this SchemataBuilder builder) {
         builder.AddFeature<SchemataSchedulingFeature>();
 
-        return new(builder.Services);
+        return new(builder.Options, builder.Services);
     }
 }

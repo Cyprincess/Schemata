@@ -41,8 +41,8 @@ public class RabbitMqEventOptions
 
     /// <summary>
     ///     Dead-letter exchange routed to when a handler throws, the message references an
-    ///     unregistered event type, or deserialization fails. Leave empty to disable DLX routing
-    ///     (poison messages will then be rejected without re-queue and lost).
+    ///     unregistered event type, or deserialization fails. Empty values reject poison messages
+    ///     with re-queue disabled.
     /// </summary>
     public string DeadLetterExchange { get; set; } = "schemata.events.dlx";
 

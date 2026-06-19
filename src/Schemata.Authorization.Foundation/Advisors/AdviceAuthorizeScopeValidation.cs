@@ -15,6 +15,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceAuthorizeScopeValidation{TApp}" />.</summary>
 public static class AdviceAuthorizeScopeValidation
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceAuthorizeGrantPermission.DefaultOrder + 10_000_000;
 }
 
@@ -36,7 +37,6 @@ public sealed class AdviceAuthorizeScopeValidation<TApp>(
 {
     #region IAuthorizeAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeScopeValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

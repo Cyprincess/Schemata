@@ -1,5 +1,6 @@
 namespace Schemata.Identity.Foundation;
 
+/// <summary>Configures Schemata identity endpoints.</summary>
 public sealed class SchemataIdentityOptions
 {
     /// <summary>Whether the registration endpoint is enabled. Default: true.</summary>

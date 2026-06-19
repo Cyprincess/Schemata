@@ -9,6 +9,7 @@ public sealed class ParallelJoin
     private readonly ProcessDefinition _definition;
     private readonly ParallelGateway   _gateway;
 
+    /// <summary>Creates a parallel join continuation for <paramref name="gateway" />.</summary>
     internal ParallelJoin(ProcessDefinition definition, ParallelGateway gateway) {
         _definition = definition;
         _gateway    = gateway;

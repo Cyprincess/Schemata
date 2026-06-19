@@ -30,19 +30,18 @@ public class SchedulingInitializerShould
         options.Jobs.Add(new(typeof(JobA), new OneTimeSchedule(DateTime.UtcNow.AddMinutes(1))));
         options.Jobs.Add(new(typeof(JobB), new CronSchedule("0 * * * *")));
 
-        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(options), EmptyServices(), Registry(typeof(JobA), typeof(JobB)));
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(options), EmptyServices(),
+                                                    Registry(typeof(JobA), typeof(JobB)));
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
         scheduler.Verify(s => s.StartAsync(It.IsAny<CancellationToken>()), Times.Once);
-        scheduler.Verify(s => s.ScheduleAsync(
-                             It.Is<SchemataJob>(j => j.JobKey == typeof(JobA).FullName),
-                             It.IsAny<CancellationToken>()),
-                         Times.Once);
-        scheduler.Verify(s => s.ScheduleAsync(
-                             It.Is<SchemataJob>(j => j.JobKey == typeof(JobB).FullName),
-                             It.IsAny<CancellationToken>()),
-                         Times.Once);
+        scheduler.Verify(
+            s => s.ScheduleAsync(It.Is<SchemataJob>(j => j.JobKey == typeof(JobA).FullName),
+                                 It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(
+            s => s.ScheduleAsync(It.Is<SchemataJob>(j => j.JobKey == typeof(JobB).FullName),
+                                 It.IsAny<CancellationToken>()), Times.Once);
 
         await initializer.StopAsync(CancellationToken.None);
     }
@@ -53,13 +52,13 @@ public class SchedulingInitializerShould
         scheduler.Setup(s => s.StartAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         scheduler.Setup(s => s.StopAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()), EmptyServices(), Registry());
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
+                                                    EmptyServices(), Registry());
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
         scheduler.Verify(s => s.StartAsync(It.IsAny<CancellationToken>()), Times.Once);
-        scheduler.Verify(s => s.ScheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()),
-                         Times.Never);
+        scheduler.Verify(s => s.ScheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()), Times.Never);
 
         await initializer.StopAsync(CancellationToken.None);
 
@@ -81,7 +80,8 @@ public class SchedulingInitializerShould
         options.Jobs.Add(new(typeof(JobB), new CronSchedule("0 * * * *")));
         options.Jobs.Add(new(typeof(JobC), new PeriodicSchedule(TimeSpan.FromMinutes(15))));
 
-        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(options), EmptyServices(), Registry(typeof(JobA), typeof(JobB), typeof(JobC)));
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(options), EmptyServices(),
+                                                    Registry(typeof(JobA), typeof(JobB), typeof(JobC)));
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
@@ -107,16 +107,19 @@ public class SchedulingInitializerShould
         var captured  = new List<(SchemataJob Job, JobContext? Context)>();
         var scheduler = new Mock<IScheduler>();
         scheduler.Setup(s => s.StartAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        scheduler.Setup(s => s.RescheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
-                 .Callback<SchemataJob, JobContext?, CancellationToken>((j, c, _) => captured.Add((j, c)))
-                 .Returns(Task.CompletedTask);
+        scheduler
+           .Setup(s => s.RescheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                         It.IsAny<CancellationToken>()))
+           .Callback<SchemataJob, JobContext?, CancellationToken>((j, c, _) => captured.Add((j, c)))
+           .Returns(Task.CompletedTask);
 
         var persisted = new SchemataJob {
             Name = "jobs/report", JobKey = typeof(JobA).FullName, State = JobState.Active,
         };
         var services = ServicesWith([persisted], null);
 
-        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()), services, Registry(typeof(JobA)));
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
+                                                    services, Registry(typeof(JobA)));
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
@@ -132,22 +135,25 @@ public class SchedulingInitializerShould
         var captured  = new List<(SchemataJob Job, JobContext? Context)>();
         var scheduler = new Mock<IScheduler>();
         scheduler.Setup(s => s.StartAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        scheduler.Setup(s => s.RescheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
-                 .Callback<SchemataJob, JobContext?, CancellationToken>((j, c, _) => captured.Add((j, c)))
-                 .Returns(Task.CompletedTask);
+        scheduler
+           .Setup(s => s.RescheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                         It.IsAny<CancellationToken>()))
+           .Callback<SchemataJob, JobContext?, CancellationToken>((j, c, _) => captured.Add((j, c)))
+           .Returns(Task.CompletedTask);
 
         var uid          = Identifiers.NewUid();
         var operationJob = new SchemataJob { Name = "operations/op:purge", State = JobState.Active };
         var pending = new SchemataJobExecution {
-            Uid               = uid,
-            Job               = "operations/op:purge",
-            State             = ExecutionState.Pending,
-            JobKey            = "purge:books",
-            ArgsJson          = "{\"filter\":\"*\"}",
+            Uid      = uid,
+            Job      = "operations/op:purge",
+            State    = ExecutionState.Pending,
+            JobKey   = "purge:books",
+            ArgsJson = "{\"filter\":\"*\"}",
         };
         var services = ServicesWith([operationJob], pending);
 
-        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()), services, Registry(typeof(JobA)));
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
+                                                    services, Registry(typeof(JobA)));
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
@@ -160,9 +166,7 @@ public class SchedulingInitializerShould
         await initializer.StopAsync(CancellationToken.None);
     }
 
-    private static IServiceProvider EmptyServices() {
-        return new ServiceCollection().BuildServiceProvider();
-    }
+    private static IServiceProvider EmptyServices() { return new ServiceCollection().BuildServiceProvider(); }
 
     private static IScheduledJobRegistry Registry(params Type[] jobTypes) {
         var registry = new DefaultScheduledJobRegistry();
@@ -175,11 +179,10 @@ public class SchedulingInitializerShould
         SchemataJobExecution?            pendingExecution
     ) {
         var jobs = new Mock<IRepository<SchemataJob>>();
-        jobs.Setup(r => r.ListAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                       It.IsAny<CancellationToken>()))
-            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> predicate, CancellationToken _) =>
-                ToAsync(predicate(activeJobs.AsQueryable())));
+        jobs.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                                    It.IsAny<CancellationToken>()))
+            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> predicate, CancellationToken _)
+                         => ToAsync(predicate(activeJobs.AsQueryable())));
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.FirstOrDefaultAsync(
@@ -187,10 +190,7 @@ public class SchedulingInitializerShould
                              It.IsAny<CancellationToken>()))
                   .Returns(new ValueTask<SchemataJobExecution?>(pendingExecution));
 
-        return new ServiceCollection()
-              .AddSingleton(jobs.Object)
-              .AddSingleton(executions.Object)
-              .BuildServiceProvider();
+        return new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object).BuildServiceProvider();
     }
 
     private static async IAsyncEnumerable<SchemataJob> ToAsync(IEnumerable<SchemataJob> jobs) {
@@ -200,36 +200,42 @@ public class SchedulingInitializerShould
         }
     }
 
+    #region Nested type: JobA
+
     private sealed class JobA : IScheduledJob
     {
         #region IScheduledJob Members
 
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: JobB
 
     private sealed class JobB : IScheduledJob
     {
         #region IScheduledJob Members
 
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: JobC
 
     private sealed class JobC : IScheduledJob
     {
         #region IScheduledJob Members
 
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 
         #endregion
     }
+
+    #endregion
 }

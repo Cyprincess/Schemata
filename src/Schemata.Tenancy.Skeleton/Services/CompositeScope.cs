@@ -14,6 +14,7 @@ internal sealed class CompositeScope : IServiceScope, IServiceProvider
     private readonly IServiceScope                  _hostScope;
     private          bool                           _disposed;
 
+    /// <summary>Initializes a composite scope over tenant overrides and a host scope.</summary>
     public CompositeScope(TenantCompositeServiceProvider composite, IServiceScope hostScope) {
         _composite = composite;
         _hostScope = hostScope;

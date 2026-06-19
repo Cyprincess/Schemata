@@ -8,6 +8,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Http.Controllers;
 
+/// <summary>Lists Flow process definitions over HTTP.</summary>
 [ApiController]
 [Route("~/v1/processes:definitions")]
 public sealed class ProcessDefinitionsController(
@@ -15,6 +16,7 @@ public sealed class ProcessDefinitionsController(
     IOptions<JsonSerializerOptions> json
 ) : ControllerBase
 {
+    /// <summary>Lists registered Flow process definitions.</summary>
     [HttpGet]
     public IActionResult ListProcessDefinitions() {
         var entities = registry.GetRegisteredProcesses()

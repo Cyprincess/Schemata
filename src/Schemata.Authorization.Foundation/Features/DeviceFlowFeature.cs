@@ -36,7 +36,6 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_400;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

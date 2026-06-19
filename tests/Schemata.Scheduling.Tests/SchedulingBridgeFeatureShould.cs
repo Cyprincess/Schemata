@@ -36,7 +36,7 @@ public class SchedulingBridgeFeatureShould
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(WaitOperationHandler));
 
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetService<IOptions<SchemataResourceOptions>>();
+        var       options  = provider.GetService<IOptions<SchemataResourceOptions>>();
         Assert.True(options is null || !options.Value.Resources.ContainsKey(typeof(SchemataJob).TypeHandle));
         Assert.True(options is null || !options.Value.Resources.ContainsKey(typeof(SchemataJobExecution).TypeHandle));
     }
@@ -67,8 +67,8 @@ public class SchedulingBridgeFeatureShould
     [InlineData(typeof(SchemataSchedulingHttpFeature))]
     [InlineData(typeof(SchemataSchedulingGrpcFeature))]
     public async Task RegisterDispatcherAndExecuteWork_WhenBridgeIsInstalled(Type featureType) {
-        var services = new ServiceCollection();
-        var ran      = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services  = new ServiceCollection();
+        var ran       = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var scheduler = new ImmediateScheduler();
 
         Configure((FeatureBase)Activator.CreateInstance(featureType)!, services);
@@ -131,17 +131,39 @@ public class SchedulingBridgeFeatureShould
     }
 
     private static void Configure(FeatureBase feature, IServiceCollection services) {
-        feature.ConfigureServices(
-            services,
-            new(),
-            new(),
-            new ConfigurationBuilder().Build(),
-            Mock.Of<IWebHostEnvironment>());
+        feature.ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(),
+                                  Mock.Of<IWebHostEnvironment>());
     }
+
+    #region Nested type: BridgeArgs
+
+    private sealed class BridgeArgs;
+
+    #endregion
+
+    #region Nested type: BridgeHandler
+
+    private sealed class BridgeHandler(TaskCompletionSource ran) : IOperationHandler<BridgeArgs>
+    {
+        #region IOperationHandler<BridgeArgs> Members
+
+        public Task<object?> RunAsync(BridgeArgs args, CancellationToken ct) {
+            ran.SetResult();
+            return Task.FromResult<object?>(null);
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: ImmediateScheduler
 
     private sealed class ImmediateScheduler : IScheduler
     {
         public IServiceProvider Services { get; set; } = null!;
+
+        #region IScheduler Members
 
         public Task StartAsync(CancellationToken ct) { return Task.CompletedTask; }
 
@@ -149,7 +171,11 @@ public class SchedulingBridgeFeatureShould
 
         public Task ScheduleAsync(SchemataJob job, CancellationToken ct) { return Task.CompletedTask; }
 
-        public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
+        public Task ScheduleAsync(
+            SchemataJob                           job,
+            IReadOnlyDictionary<string, object?>? variables,
+            CancellationToken                     ct
+        ) {
             return Task.CompletedTask;
         }
 
@@ -159,12 +185,12 @@ public class SchedulingBridgeFeatureShould
             where TJob : class, IScheduledJob {
             context.ExecutionUid ??= Identifiers.NewUid();
             context.Execution = new() {
-                Uid               = context.ExecutionUid.Value,
-                Name              = context.ExecutionUid.Value.ToString("n"),
-                CanonicalName     = $"operations/{context.ExecutionUid.Value:n}",
-                Method            = context.Method,
-            JobKey            = context.JobKey,
-            ArgsJson          = context.ArgsJson,
+                Uid           = context.ExecutionUid.Value,
+                Name          = context.ExecutionUid.Value.ToString("n"),
+                CanonicalName = $"operations/{context.ExecutionUid.Value:n}",
+                Method        = context.Method,
+                JobKey        = context.JobKey,
+                ArgsJson      = context.ArgsJson,
             };
 
             var job = Services.GetRequiredService<TJob>();
@@ -176,15 +202,9 @@ public class SchedulingBridgeFeatureShould
         public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
             return Task.CompletedTask;
         }
+
+        #endregion
     }
 
-    private sealed class BridgeArgs;
-
-    private sealed class BridgeHandler(TaskCompletionSource ran) : IOperationHandler<BridgeArgs>
-    {
-        public Task<object?> RunAsync(BridgeArgs args, CancellationToken ct) {
-            ran.SetResult();
-            return Task.FromResult<object?>(null);
-        }
-    }
+    #endregion
 }

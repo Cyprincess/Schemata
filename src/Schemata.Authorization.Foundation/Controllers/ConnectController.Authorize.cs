@@ -8,13 +8,18 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains authorization endpoint actions for GET and POST requests.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles authorization requests submitted through the query string.</summary>
     [HttpGet("Authorize")]
     public Task<IActionResult> AuthorizeGet([FromQuery] AuthorizeRequest request, CancellationToken ct) {
         return HandleAuthorize(request, ct);
     }
 
+    /// <summary>Handles authorization requests submitted as form posts.</summary>
     [HttpPost("Authorize")]
     public Task<IActionResult> AuthorizePost([FromForm] AuthorizeRequest request, CancellationToken ct) {
         return HandleAuthorize(request, ct);

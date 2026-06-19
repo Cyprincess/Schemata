@@ -15,7 +15,7 @@ public interface ITokenManager<TToken>
 {
     /// <summary>
     ///     Finds a token by its opaque reference identifier.
-    ///     The raw token value is never stored; only the reference is persisted.
+    ///     Only the reference is persisted for opaque tokens.
     /// </summary>
     Task<TToken?> FindByReferenceIdAsync(string? reference, CancellationToken ct = default);
 

@@ -5,15 +5,15 @@ namespace Schemata.Authorization.Skeleton;
 /// </summary>
 public enum ConsentDecision
 {
-    /// <summary>The consent check has not run yet.</summary>
+    /// <summary>The consent decision awaits evaluation.</summary>
     Pending,
 
-    /// <summary>Consent was previously granted; the request can be auto-approved.</summary>
+    /// <summary>Existing consent allows the request to be auto-approved.</summary>
     Granted,
 
     /// <summary>Consent is required; the user must be shown a consent prompt.</summary>
     Required,
 
-    /// <summary>Consent was explicitly denied; the request must be rejected.</summary>
+    /// <summary>The resource owner denied consent; the request must be rejected.</summary>
     Denied,
 }

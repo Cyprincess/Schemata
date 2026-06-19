@@ -29,14 +29,20 @@ Start with [Getting Started](getting-started.md) and work through the guides in 
 | 13 | [Flow](flow.md) | BPMN process engine with typed DSL |
 | 14 | [Event Bus](event-bus.md) | In-process event publishing and handling |
 | 15 | [Scheduling](scheduling.md) | Cron and periodic background jobs |
-| 16 | [Modular](modular.md) | Module discovery and assembly loading |
+| 16 | [Push](push.md) | Broadcast notification fan-out across transports |
+| 17 | [Modular](modular.md) | Module discovery and assembly loading |
 
 ## What the guides don't cover
 
 Advanced scenarios — RabbitMQ event bus, flow timer integration, OIDC server setup, custom advisors, and more — live in the [Cookbook](../cookbook/overview.md). Deep mechanism explanations and design rationale live in [Documents](../documents/overview.md).
 
+## Next steps
+
+- [Getting Started](getting-started.md) — minimal Student HTTP CRUD API; the entry point for the chain
+- [Unit of Work](unit-of-work.md) — wrap batch mutations in a transaction
+- [Identity](identity.md) — jump straight to user management
+
 ## See also
 
 - [Cookbook](../cookbook/overview.md) — scenario-driven recipes for advanced use cases
 - [Documents](../documents/overview.md) — technical reference for framework internals
-- [Getting Started](getting-started.md) — start here

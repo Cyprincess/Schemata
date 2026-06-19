@@ -22,8 +22,8 @@ public interface ICacheProvider
 
     /// <summary>
     ///     Atomically stores <paramref name="value" /> under <paramref name="key" /> only when the
-    ///     key does not already exist. Returns <see langword="true" /> when the value was inserted
-    ///     and <see langword="false" /> when an entry already lived under the key.
+    ///     key is absent. Returns <see langword="true" /> when the value is inserted and
+    ///     <see langword="false" /> when an entry exists under the key.
     /// </summary>
     Task<bool> TryAddAsync(
         string            key,
@@ -36,7 +36,7 @@ public interface ICacheProvider
     ///     Atomically replaces the value under <paramref name="key" /> with
     ///     <paramref name="replacement" /> only when the current value equals
     ///     <paramref name="expected" />. Returns <see langword="true" /> when the swap occurred
-    ///     and <see langword="false" /> when the current value differed or the key was absent.
+    ///     and <see langword="false" /> when the current value differs or the key is absent.
     /// </summary>
     /// <remarks>The comparison and swap MUST be a single atomic operation across all processes.</remarks>
     Task<bool> TryReplaceAsync(
@@ -50,7 +50,7 @@ public interface ICacheProvider
     /// <summary>
     ///     Atomically removes the entry under <paramref name="key" /> only when its current value
     ///     equals <paramref name="expected" />. Returns <see langword="true" /> when the entry was
-    ///     removed and <see langword="false" /> when the current value differed or the key was absent.
+    ///     removed and <see langword="false" /> when the current value differs or the key is absent.
     /// </summary>
     /// <remarks>The comparison and delete MUST be a single atomic operation across all processes.</remarks>
     Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default);
@@ -59,7 +59,7 @@ public interface ICacheProvider
     Task RemoveAsync(string key, CancellationToken ct = default);
 
     /// <summary>Adds <paramref name="member" /> to the collection stored under <paramref name="key" />.</summary>
-    /// <remarks>Creates the collection if it does not already exist.</remarks>
+    /// <remarks>Creates the collection for absent keys.</remarks>
     Task CollectionAddAsync(
         string            key,
         string            member,

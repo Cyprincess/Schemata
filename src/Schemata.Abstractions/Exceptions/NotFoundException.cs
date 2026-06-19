@@ -3,7 +3,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     The requested resource or entity was not found.
+///     The requested resource or entity is missing.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.NOT_FOUND</c> (HTTP 404), per

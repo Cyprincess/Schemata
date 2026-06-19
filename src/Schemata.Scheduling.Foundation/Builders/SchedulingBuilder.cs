@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Core;
+using Schemata.Core.Features;
 using Schemata.Scheduling.Skeleton;
 
 namespace Schemata.Scheduling.Foundation.Builders;
@@ -11,15 +13,28 @@ public sealed class SchedulingBuilder
     private readonly TimeProvider _time;
 
     /// <summary>Initializes a new <see cref="SchedulingBuilder" /> bound to the given service collection.</summary>
-    /// <param name="services">The service collection used to register jobs and options.</param>
-    /// <param name="timeProvider">Clock used to anchor relative one-time delays; defaults to the system clock.</param>
-    public SchedulingBuilder(IServiceCollection services, TimeProvider? timeProvider = null) {
+    /// <param name="schemata">The <see cref="SchemataOptions" />.</param>
+    /// <param name="services">The service collection that receives jobs and options.</param>
+    /// <param name="timeProvider">Clock that anchors relative one-time delays; <c>null</c> uses the system clock.</param>
+    public SchedulingBuilder(SchemataOptions schemata, IServiceCollection services, TimeProvider? timeProvider = null) {
+        Schemata = schemata;
         Services = services;
         _time    = timeProvider ?? TimeProvider.System;
     }
 
-    /// <summary>The underlying service collection used to register jobs and configure options.</summary>
+    private SchemataOptions Schemata { get; }
+    
+    /// <summary>Service collection that receives job registrations and scheduler options.</summary>
     public IServiceCollection Services { get; }
+
+    /// <summary>
+    ///     Adds a feature to the Schemata configuration.
+    /// </summary>
+    /// <typeparam name="T">The <see cref="ISimpleFeature" /> type.</typeparam>
+    public void AddFeature<T>()
+        where T : ISimpleFeature {
+        Schemata.AddFeature<T>();
+    }
 
     /// <summary>Registers <typeparamref name="T" /> against the supplied <see cref="IScheduleDefinition" />.</summary>
     public SchedulingBuilder WithJob<T>(IScheduleDefinition schedule)

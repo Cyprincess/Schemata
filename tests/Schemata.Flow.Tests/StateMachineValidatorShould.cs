@@ -188,9 +188,9 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_ExclusiveGatewayWithoutOutgoing_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var gateway    = new ExclusiveGateway { Id = "gw", Name = "Gateway" };
-        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var startEvent = new FlowEvent { Id        = "start", Name = "Start", Position = EventPosition.Start };
+        var gateway    = new ExclusiveGateway { Id = "gw", Name    = "Gateway" };
+        var endEvent   = new FlowEvent { Id        = "end", Name   = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name     = "test",
@@ -210,8 +210,13 @@ public class StateMachineValidatorShould
         var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
-            Name     = "test",
-            Elements = { startEvent, gateway, catchEvent, endEvent },
+            Name = "test",
+            Elements = {
+                startEvent,
+                gateway,
+                catchEvent,
+                endEvent,
+            },
             Flows = {
                 new() { Id = "f1", Source = startEvent, Target = gateway },
                 new() { Id = "f2", Source = gateway, Target    = catchEvent },
@@ -251,19 +256,23 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void UnreachableElement_Rejected() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
-        var task       = new NoneTask { Id  = "task", Name  = "Task" };
+        var startEvent = new FlowEvent { Id = "start", Name  = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Id = "end", Name    = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Id  = "task", Name   = "Task" };
         var orphan     = new NoneTask { Id  = "orphan", Name = "Orphan" };
 
         var definition = new ProcessDefinition {
-            Name     = "test",
-            Elements = { startEvent, endEvent, task, orphan },
+            Name = "test",
+            Elements = {
+                startEvent,
+                endEvent,
+                task,
+                orphan,
+            },
             Flows = {
                 new() { Id = "f1", Source = startEvent, Target = task },
                 new() { Id = "f2", Source = task, Target       = endEvent },
-                // The orphan has an outgoing flow (so it is not a dead end), yet no path from the
-                // start event reaches it.
+                // The orphan has an outgoing flow but remains unreachable from the start event.
                 new() { Id = "f3", Source = orphan, Target = endEvent },
             },
         };
@@ -274,14 +283,19 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void NoViableEdge_Rejected() {
-        var startEvent = new FlowEvent { Id      = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id      = "end", Name   = "End", Position   = EventPosition.End };
-        var gateway    = new ExclusiveGateway { Id = "gw", Name  = "GW" };
-        var deadEnd    = new NoneTask { Id        = "dead", Name  = "DeadEnd" };
+        var startEvent = new FlowEvent { Id        = "start", Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Id        = "end", Name   = "End", Position   = EventPosition.End };
+        var gateway    = new ExclusiveGateway { Id = "gw", Name    = "GW" };
+        var deadEnd    = new NoneTask { Id         = "dead", Name  = "DeadEnd" };
 
         var definition = new ProcessDefinition {
-            Name     = "test",
-            Elements = { startEvent, endEvent, gateway, deadEnd },
+            Name = "test",
+            Elements = {
+                startEvent,
+                endEvent,
+                gateway,
+                deadEnd,
+            },
             Flows = {
                 new() { Id = "f1", Source = startEvent, Target = gateway },
                 new() { Id = "f2", Source = gateway, Target    = deadEnd },

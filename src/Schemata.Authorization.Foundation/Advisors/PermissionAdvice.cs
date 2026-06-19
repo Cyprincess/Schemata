@@ -20,7 +20,7 @@ public static class PermissionAdvice
     ///     <paramref name="permission" />.
     /// </summary>
     /// <typeparam name="TApp">The application entity type.</typeparam>
-    /// <param name="manager">The application manager used to evaluate the permission.</param>
+    /// <param name="manager">The application manager that evaluates the permission.</param>
     /// <param name="application">The application to check; may be <see langword="null" />.</param>
     /// <param name="permission">The fully-qualified permission entry (prefix + value).</param>
     /// <param name="ct">The cancellation token.</param>

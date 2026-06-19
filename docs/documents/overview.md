@@ -1,163 +1,163 @@
 # Documents
 
-The Documents section provides technical reference for every subsystem in the Schemata framework. Each section describes the architecture, interfaces, configuration, and behavior of a specific part of the framework. Start here when you need to understand how something works, not just how to use it.
+Technical reference for every subsystem in Schemata. Each section covers a subsystem's
+architecture, key types, behavior, configuration, and extension points. Read here to understand
+how a part of the framework works and why it is built that way.
 
-## Sections
+## Core
 
-### Core
+The foundation that the other features build on.
 
-The foundation that all other features build on.
-
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](core/overview.md) | Package structure and startup sequence |
-| [Feature System](core/feature-system.md) | SchemataBuilder, FeatureBase, feature lifecycle, DependsOn |
-| [Advice Pipeline](core/advice-pipeline.md) | IAdvisor, AdviceContext, AdviseResult, pipeline execution |
-| [Built-in Features](core/built-in-features.md) | Authoritative priority table for all built-in and extension features |
-| [JSON Serialization](core/json-serialization.md) | snake_case, long-as-string, polymorphic types |
-| [Error Model](core/error-model.md) | Exception hierarchy, structured error responses |
+| [Overview](core/overview.md) | Package layout and the startup sequence |
+| [Feature System](core/feature-system.md) | `SchemataBuilder`, `FeatureBase`, the three-phase lifecycle, `DependsOn` |
+| [Advice Pipeline](core/advice-pipeline.md) | `IAdvisor`, `AdviceContext`, `AdviseResult`, pipeline execution |
+| [Built-in Features](core/built-in-features.md) | The authoritative priority table for built-in and extension features |
+| [JSON Serialization](core/json-serialization.md) | snake_case, long-as-string, polymorphic discriminator |
+| [Error Model](core/error-model.md) | Exception hierarchy and the structured error response |
 
-### Advice
+## Advice
 
-The source generator and runtime that power the advisor pipeline.
+The source generator and runtime behind the advisor pipeline.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](advice/overview.md) | AdvicePipeline, AdviceRunner, short-circuit semantics |
-| [Runtime](advice/runtime.md) | AdviceRunner family (arity 1..16), generated extension methods |
-| [Generator](advice/generator.md) | Schemata.Advice.Generator emission rules and gotchas |
+| [Overview](advice/overview.md) | `AdvicePipeline`, the runner, short-circuit semantics |
+| [Runtime](advice/runtime.md) | The `AdviceRunner` family (arity 1..16) and generated extension methods |
+| [Generator](advice/generator.md) | `Schemata.Advice.Generator` emission rules |
 
-### Entity
+## Entity
 
-The entity modeling layer.
+The trait-based entity model.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](entity/overview.md) | Trait system overview |
-| [Traits](entity/traits.md) | All trait interfaces and their advisor mappings |
+| [Overview](entity/overview.md) | The trait system and key resolution |
+| [Traits](entity/traits.md) | Every trait interface and the advisor that acts on it |
 
-### Repository
+## Repository
 
-The data access layer.
+The data-access layer.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](repository/overview.md) | IRepository surfaces, Once(), Suppress*() methods |
-| [Mutation Pipeline](repository/mutation-pipeline.md) | Add/Update/Remove advisor chains |
-| [Query Pipeline](repository/query-pipeline.md) | BuildQuery/Query/Result advisor chains |
-| [Unit of Work](repository/unit-of-work.md) | Explicit enlistment and committed advisors |
-| [Caching](repository/caching.md) | Query result caching, cross-link to caching section |
-| [Ownership](repository/ownership.md) | Schemata.Entity.Owner, IOwnable |
-| [Providers](repository/providers.md) | EF Core and LinqToDB setup, Detach before Update, search-path gaps |
+| [Overview](repository/overview.md) | `IRepository` surface, query and mutation methods, suppression scopes |
+| [Mutation Pipeline](repository/mutation-pipeline.md) | Add, update, and remove advisor chains |
+| [Query Pipeline](repository/query-pipeline.md) | Build-query, query, and result advisor chains |
+| [Unit of Work](repository/unit-of-work.md) | Explicit enlistment and commit |
+| [Caching](repository/caching.md) | Query-result caching from the repository's side |
+| [Ownership](repository/ownership.md) | `Schemata.Entity.Owner` and `IOwnable` |
+| [Providers](repository/providers.md) | EF Core and LinqToDB setup and caveats |
 
-### Caching
+## Caching
 
 The distributed cache layer.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](caching/overview.md) | ICacheProvider, key format, layer stack |
-| [Distributed](caching/distributed.md) | DistributedCacheProvider, index locks |
-| [Redis](caching/redis.md) | RedisCacheProvider, meta key TTL refresh |
-| [Query Cache](caching/query-cache.md) | Query/result advisors, reverse index, committed eviction |
+| [Overview](caching/overview.md) | `ICacheProvider`, the key format, provider stack |
+| [Distributed](caching/distributed.md) | `DistributedCacheProvider` over `IDistributedCache` |
+| [Redis](caching/redis.md) | `RedisCacheProvider` and its compare-and-set scripts |
+| [Query Cache](entity/query-cache.md) | Query and result advisors, the reverse index, committed eviction |
 
-### Resource
+## Resource
 
-The CRUD service layer and transport bindings.
+The AIP-aligned CRUD service and its transports.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](resource/overview.md) | Four type parameters, handler stages, type collapsing |
-| [Create Pipeline](resource/create-pipeline.md) | Create operation, idempotency |
-| [Read Pipeline](resource/read-pipeline.md) | List and Get operations |
-| [Update Pipeline](resource/update-pipeline.md) | Field masks, concurrency, freshness |
-| [Delete Pipeline](resource/delete-pipeline.md) | Soft-delete, physical delete |
-| [Resource Naming](resource/resource-naming.md) | AIP-122 canonical names, ResourceNameDescriptor |
-| [HTTP Transport](resource/http-transport.md) | MapHttp, controller synthesis, route conventions |
-| [gRPC Transport](resource/grpc-transport.md) | MapGrpc, code-first service synthesis |
-| [Filtering](resource/filtering.md) | AIP-160 filter grammar, AIP-132 ordering, pagination |
+| [Overview](resource/overview.md) | The four type parameters, handler stages, type collapsing |
+| [Create Pipeline](resource/create-pipeline.md) | Create, request sanitization, idempotency |
+| [Read Pipeline](resource/read-pipeline.md) | List and Get |
+| [Update Pipeline](resource/update-pipeline.md) | Field masks, freshness, soft-deleted handling |
+| [Delete Pipeline](resource/delete-pipeline.md) | Soft and hard delete |
+| [Resource Naming](resource/resource-naming.md) | AIP-122 canonical names and the name descriptor |
+| [Custom Methods](resource/custom-methods.md) | AIP-136 verb-noun methods on a resource |
+| [HTTP Transport](resource/http-transport.md) | REST controller synthesis and route conventions |
+| [gRPC Transport](resource/grpc-transport.md) | Code-first gRPC service synthesis |
+| [Filtering](resource/filtering.md) | AIP-160 filter, AIP-132 order, pagination |
 
-### Expressions
+## Expressions
 
 The filter and order-by compiler stack.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](expressions/overview.md) | IExpressionCompiler, IOrderCompiler, ExpressionCache LRU |
-| [AIP](expressions/aip.md) | Hand-written Parlot parser, operators, functions |
-| [CEL](expressions/cel.md) | CEL macros, conformance tests, missing IOrderCompiler |
-| [Custom Language](expressions/custom-language.md) | Authoring a keyed IExpressionCompiler |
+| [Overview](expressions/overview.md) | `IExpressionCompiler`, `IOrderCompiler`, the expression cache |
+| [AIP](expressions/aip.md) | The AIP-160 parser, operators, and functions |
+| [CEL](expressions/cel.md) | The CEL compiler and its conformance scope |
+| [Custom Language](expressions/custom-language.md) | Authoring a keyed `IExpressionCompiler` |
 
-### Event
+## Event
 
 The event bus and dispatch pipeline.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](event/overview.md) | Contracts, wire names vs CLR names, IEventTypeRegistry |
-| [Dispatch Pipeline](event/dispatch-pipeline.md) | Publish/consume advisor pairs, routing |
-| [Providers](event/providers.md) | InProcess and RabbitMQ transports |
+| [Overview](event/overview.md) | Contracts, wire names, `IEventTypeRegistry` |
+| [Dispatch Pipeline](event/dispatch-pipeline.md) | Publish to the outbox, drain, consume |
+| [Providers](event/providers.md) | In-process and RabbitMQ transports |
 
-`EventType` carries the wire name registered via `IEventTypeRegistry` end-to-end: `EventContext.EventType` and the `SchemataEvent.EventType` audit column hold the same string. See [Event Overview](event/overview.md).
+## Scheduling
 
-### Scheduling
+The job scheduler and its observers.
 
-The job scheduler and lifecycle observer pipeline.
-
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](scheduling/overview.md) | IScheduler, IScheduledJob, schedule kinds |
-| [Triggers](scheduling/triggers.md) | Cronos cron, periodic, one-shot, missed-fire policy |
-| [Jobs](scheduling/jobs.md) | IJobExecutionAdvisor pipeline, IJobLifecycleObserver (Proceed/Skip/Block) |
-| [Persistence](scheduling/persistence.md) | SchemataJob and SchemataJobExecution rows |
-| [Event Integration](scheduling/event-integration.md) | UseSchedulingEvent, EventPublishingJobLifecycleObserver, InterceptExecution behavior change |
+| [Overview](scheduling/overview.md) | `IScheduler`, `IScheduledJob`, schedule kinds |
+| [Triggers](scheduling/triggers.md) | Cron, periodic, one-time, missed-fire policy |
+| [Jobs](scheduling/jobs.md) | The execution advisor and the lifecycle observer |
+| [Persistence](scheduling/persistence.md) | The `SchemataJob` and `SchemataJobExecution` rows |
+| [Event Integration](scheduling/event-integration.md) | Publishing lifecycle events to the bus |
 
-`SchemataSchedulingEventOptions.InterceptExecution=true` maps to `JobTriggerOutcome.Skip`: the scheduled job is not executed, the execution row is marked `Cancelled`, and the schedule advances to the next occurrence. To freeze the schedule on a triggered fire, return `JobTriggerOutcome.Block` from a custom `IJobLifecycleObserver`. Migration from prior advisor-based configurations is covered in [Event Integration](scheduling/event-integration.md).
+## Push
 
-### Flow
+The broadcast notification fan-out layer.
 
-The BPMN 2.0.2 process engine.
-
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](flow/overview.md) | Architecture and package structure |
-| [AST Reference](flow/ast.md) | FlowElement type hierarchy |
-| [DSL Reference](flow/dsl.md) | Fluent builder API for process graphs |
-| [Engine](flow/engine.md) | Single-token state machine engine |
-| [Validator](flow/validator.md) | Process definition validation rules |
-| [Runtime Services](flow/runtime.md) | ProcessRuntime, endpoints, registration |
-| [State Machine](flow/state-machine.md) | Default engine wiring via SchemataFlowFeature |
-| [Event Integration](flow/event.md) | UseFlowEvent, SchemataFlowEventFeature, FlowEventTransitionObserver |
-| [Scheduling Integration](flow/scheduling.md) | UseFlowScheduling, SchemataFlowSchedulingFeature, FlowTimerJob |
-| [HTTP Transport](flow/http.md) | UseFlowHttp, SchemataFlowHttpFeature, ProcessController |
-| [gRPC Transport](flow/grpc.md) | UseFlowGrpc, SchemataFlowGrpcFeature, ProcessService |
+| [Overview](push/overview.md) | `IPushService`, `IPushTransport`, targets, startup |
+| [Dispatch](push/dispatch.md) | Fan-out, self-filtering, streaming order, isolation, the advisor |
+| [Subscriptions](push/subscriptions.md) | `SchemataPushSubscription`, the manager, ownership |
+| [Scheduling](push/scheduling.md) | Durable scheduled dispatch over `IOperationDispatcher` |
 
-`Schemata.Flow.StateMachine` ships the default `IFlowRuntime`; `SchemataFlowFeature` wires it directly so `UseFlow()` makes it available without further configuration. HTTP and gRPC surfaces are added with `UseFlowHttp()` and `UseFlowGrpc()` respectively.
+## Flow
 
-### Mapping
+The BPMN process engine.
+
+| Document | Covers |
+| --- | --- |
+| [Overview](flow/overview.md) | Architecture and package layout |
+| [AST](flow/ast.md) | The `FlowElement` hierarchy |
+| [DSL](flow/dsl.md) | The typed builder for process graphs |
+| [Engine](flow/engine.md) | The single-token state-machine engine |
+| [Validator](flow/validator.md) | Process-definition validation rules |
+| [Runtime Services](flow/runtime.md) | `ProcessRuntime`, persistence, registration |
+| [State Machine](flow/state-machine.md) | The default engine wiring |
+| [Event Integration](flow/event.md) | Message and signal catches on the event bus |
+| [Scheduling Integration](flow/scheduling.md) | Timer catches on the scheduler |
+| [HTTP Transport](flow/http.md) | The process surface over HTTP |
+| [gRPC Transport](flow/grpc.md) | The process surface over gRPC |
+
+## Mapping
 
 The object-to-object mapping abstraction.
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Overview](mapping/overview.md) | ISimpleMapper, SimpleMapperHelper, UpdateMask |
-| [AutoMapper](mapping/automapper.md) | Adapter behavior, null skip |
-| [Mapster](mapping/mapster.md) | Adapter behavior, IgnoreNullValues |
+| [Overview](mapping/overview.md) | `ISimpleMapper`, merge vs mask, the mask tree |
+| [AutoMapper](mapping/automapper.md) | The AutoMapper adapter |
+| [Mapster](mapping/mapster.md) | The Mapster adapter |
 
-### Cross-cutting
+## Cross-cutting
 
-| Document | Description |
+| Document | Covers |
 | --- | --- |
-| [Validation](validation.md) | FluentValidation integration, IValidationAdvisor |
-| [Security](security.md) | Access providers, entitlement-based query filtering |
-| [Identity](identity.md) | ASP.NET Core Identity, generic parameters |
-| [Authorization](authorization.md) | OAuth 2.0 / OIDC server |
-| [Tenancy](tenancy.md) | Multi-tenant resolution, per-tenant DI |
-| [Modules](modules.md) | Build-time discovery, runtime load order, and the `IModule` lifecycle that turns a referenced assembly into a host plug-in |
-| [Packages](packages.md) | Meta-package matrix |
-
-## See also
-
-- [Guides](../guides/overview.md) — step-by-step tutorials
-- [Cookbook](../cookbook/overview.md) — scenario-driven recipes
-- [Modeling](../modeling/overview.md) — SKM language reference
+| [Validation](validation.md) | FluentValidation integration and the validation advisors |
+| [Security](security.md) | Access providers and entitlement-based query filtering |
+| [Identity](identity.md) | ASP.NET Core Identity integration |
+| [Authorization](authorization.md) | The OAuth 2.0 / OpenID Connect server |
+| [Tenancy](tenancy.md) | Tenant resolution and per-tenant DI |
+| [Modules](modules.md) | Discovery, load order, and the `IModule` lifecycle |
+| [Packages](packages.md) | The meta-package matrix |

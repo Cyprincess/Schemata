@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Login request body.
+/// </summary>
 public class LoginRequest
 {
     /// <summary>Account username used for authentication.</summary>
@@ -18,6 +21,6 @@ public class LoginRequest
     /// <summary>One-time recovery code used when the authenticator app is unavailable.</summary>
     public string? TwoFactorRecoveryCode { get; set; }
 
-    /// <summary>When true, issue a cookie instead of a bearer token.</summary>
+    /// <summary>Requests cookie-based sign-in.</summary>
     public bool? UseCookies { get; set; }
 }

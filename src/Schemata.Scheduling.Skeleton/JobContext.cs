@@ -20,7 +20,7 @@ public class JobContext
     /// </summary>
     public Guid? ExecutionUid { get; set; }
 
-    /// <summary>Scheduler-managed execution start time.  Jobs MUST NOT assign this.</summary>
+    /// <summary>Scheduler-managed execution start time reserved for scheduler assignment.</summary>
     public DateTime? StartTime { get; set; }
 
     /// <summary>
@@ -30,7 +30,7 @@ public class JobContext
     /// </summary>
     public string? Method { get; set; }
 
-    /// <summary>Stable job key used to resolve this fire after a restart.</summary>
+    /// <summary>Stable job key that resolves this fire during scheduler recovery.</summary>
     public string? JobKey { get; set; }
 
     /// <summary>Serialized typed arguments persisted for restart-durable replay.</summary>
@@ -40,8 +40,8 @@ public class JobContext
     ///     Scheduler-built <see cref="SchemataJobExecution" /> row for this fire.
     ///     Set by <see cref="IScheduler.TriggerAsync{TJob}" /> and by the timer
     ///     fire path; consumed by <see cref="IJobLifecycleObserver" /> instances
-    ///     (e.g. audit observer) as the source of truth for persistence. Jobs
-    ///     MUST NOT assign this.
+    ///     (e.g. audit observer) as the source of truth for persistence. Reserved
+    ///     for scheduler assignment.
     /// </summary>
     public SchemataJobExecution? Execution { get; set; }
 
@@ -49,7 +49,7 @@ public class JobContext
     ///     Most-restrictive <see cref="JobTriggerOutcome" /> captured when
     ///     <see cref="IScheduler.TriggerAsync{TJob}" /> invoked
     ///     <see cref="IJobLifecycleObserver.OnTriggeredAsync" />, so the execution path honours a
-    ///     Block/Skip without re-invoking observers. Scheduler-managed; jobs MUST NOT assign this.
+    ///     Block/Skip while preserving the observer result. Reserved for scheduler assignment.
     /// </summary>
     public JobTriggerOutcome? TriggerOutcome { get; set; }
 }

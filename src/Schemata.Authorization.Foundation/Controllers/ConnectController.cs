@@ -10,6 +10,9 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Hosts OAuth 2.0 and OpenID Connect endpoints under <c>/Connect</c>.
+/// </summary>
 [NoCacheResponse]
 [Route("~/Connect")]
 [TypeFilter(typeof(OAuthExceptionFilter))]

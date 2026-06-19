@@ -10,12 +10,12 @@ namespace Schemata.Abstractions.Entities;
 public interface ITimestamp
 {
     /// <summary>
-    ///     The time at which the entity was created.
+    ///     The entity creation time.
     /// </summary>
     DateTime? CreateTime { get; set; }
 
     /// <summary>
-    ///     The time at which the entity was last updated.
+    ///     The most recent entity update time.
     /// </summary>
     DateTime? UpdateTime { get; set; }
 }

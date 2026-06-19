@@ -1,33 +1,42 @@
 # Mapping
 
-The mapping subsystem provides a unified `ISimpleMapper` abstraction over concrete mapping engines (AutoMapper, Mapster, or custom). Application code depends only on `ISimpleMapper`; the engine is swapped by changing a single `UseAutoMapper()` or `UseMapster()` call at startup. `SimpleMapperHelper.MapWithMask` implements the UpdateMask pattern used by the resource layer for partial updates.
+The mapping subsystem exposes a single `Schemata.Mapping.Skeleton.ISimpleMapper` abstraction over
+a concrete engine (AutoMapper or Mapster). Application code depends only on `ISimpleMapper`; the
+engine is chosen by one `UseAutoMapper()` or `UseMapster()` call at startup. Two helpers in
+`Schemata.Mapping.Foundation.SimpleMapperHelper` implement the AIP-134 update semantics the
+resource layer relies on: `MapMerging` for implicit-mask merges and `MapWithMask` for explicit
+field masks.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Mapping.Skeleton` | `ISimpleMapper.cs`, `SchemataMappingOptions.cs`, `Configurations/Map.cs`, `Configurations/Mapping.cs`, `Configurations/FieldSelection.cs`, `Configurations/IMapping.cs`, `Extensions/ServiceCollectionExtensions.cs`, `Extensions/MapperExtensions.cs` |
-| `Schemata.Mapping.Foundation` | `SchemataMappingBuilder.cs`, `SimpleMapperHelper.cs`, `Features/SchemataMappingFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Extensions/SchemataMappingBuilderExtensions.cs` |
-| `Schemata.Mapping.AutoMapper` | `SimpleMapper.cs`, `AutoMapperConfigurator.cs`, `SchemataBuilderExtensions.cs`, `SchemataMappingBuilderExtensions.cs` |
-| `Schemata.Mapping.Mapster` | `SimpleMapper.cs`, `MapsterConfigurator.cs`, `SchemataBuilderExtensions.cs`, `SchemataMappingBuilderExtensions.cs` |
+| Package | Role | Key types |
+| --- | --- | --- |
+| `Schemata.Mapping.Skeleton` | Contracts | `ISimpleMapper`, `SchemataMappingOptions`, `Configurations.Map<,>`, `MaskTree`, `MaskWalker` |
+| `Schemata.Mapping.Foundation` | Builder + helpers | `SchemataMappingBuilder`, `SimpleMapperHelper`, `SchemataMappingFeature<T>` |
+| `Schemata.Mapping.AutoMapper` | AutoMapper adapter | `SimpleMapper`, `AutoMapperConfigurator` |
+| `Schemata.Mapping.Mapster` | Mapster adapter | `SimpleMapper`, `MapsterConfigurator` |
 
 ## Startup
 
-`UseMapping` on `SchemataBuilder` returns a `SchemataMappingBuilder` for selecting the engine. `UseMapping` itself does not register a feature — the engine selection method does:
+`UseMapping()` on `SchemataBuilder` returns a `SchemataMappingBuilder`. The engine method
+registers the feature; `UseMapping()` alone registers nothing.
 
 ```csharp
 builder.UseSchemata(schema => {
     schema.UseMapping().UseAutoMapper();
-    // or
-    schema.UseAutoMapper();  // shorthand, same result
+    // schema.UseAutoMapper() is the same call chain
 });
 ```
 
-`SchemataMappingFeature<T>` (Priority 460,000,000) registers `ISimpleMapper` as scoped with the concrete implementation `T`.
+`UseAutoMapper()` and `UseMapster()` each register their engine configuration as a singleton and
+add `SchemataMappingFeature<SimpleMapper>`. The feature's `ConfigureServices` registers
+`ISimpleMapper` with `TryAddScoped`, so the first engine added wins.
 
 ## ISimpleMapper
 
 ```csharp
+namespace Schemata.Mapping.Skeleton;
+
 public interface ISimpleMapper
 {
     T? Map<T>(object source);
@@ -40,11 +49,41 @@ public interface ISimpleMapper
 }
 ```
 
-The overload `Map<TSource, TDestination>(source, destination, fields)` maps only the specified fields from source onto the destination, preserving other destination values. This is the UpdateMask overload used by the resource layer.
+Three families of overload, each with distinct null behavior:
 
-## SimpleMapperHelper.MapWithMask
+| Overload | Semantics | Null source member |
+| --- | --- | --- |
+| `Map<T>(source)`, `Map<TSource, TDestination>(source)` | Produce a fresh instance | Copied to the result |
+| `Map(source, destination)` | Merge onto an existing object | Preserves the destination value |
+| `Map(source, destination, fields)` | Field-selective update | Masked fields are authoritative; unmasked preserved |
 
-`MapWithMask` implements the snapshot-and-restore pattern for field-selective mapping:
+Both adapters route the two-argument `Map(source, destination)` through
+`SimpleMapperHelper.MapMerging` and the field overload through `SimpleMapperHelper.MapWithMask`.
+The fresh-instance overloads call the engine directly, so they copy null source members verbatim.
+
+`MapperExtensions.Each` and `EachAsync` (in `Schemata.Mapping.Skeleton`) map a sequence element
+by element and drop null results.
+
+## Merge semantics
+
+`MapMerging` gives `Map(source, destination)` AIP-134 implicit-mask behavior: a source member that
+is null or whitespace-only is treated as unpopulated, and its destination value is kept.
+
+```text
+source.Nickname = null  ->  destination.Nickname unchanged
+source.Nickname = "  "  ->  destination.Nickname unchanged
+source.Nickname = "New" ->  destination.Nickname = "New"
+```
+
+`MapMerging` snapshots every destination property whose matching source property is unpopulated,
+runs the engine map, then restores the snapshots. The engine's own null handling never has to be
+relied upon for this guarantee.
+
+## Field-mask semantics
+
+`MapWithMask` implements explicit AIP-161 field masks. The mask is a set of CLR property paths
+(dot paths traverse nested objects); listed fields are written authoritatively, and everything
+else is restored to its pre-map value.
 
 ```csharp
 public static void MapWithMask<TSource, TDestination>(
@@ -54,50 +93,66 @@ public static void MapWithMask<TSource, TDestination>(
     Action<TSource, TDestination> mapAction)
 ```
 
-1. Builds a `HashSet<string>` from `mask` (case-insensitive).
-2. Snapshots the current values of all writable properties on `destination` that are **not** in the mask.
-3. Calls `mapAction(source, destination)` — the full mapping runs.
-4. Restores the snapshotted values for non-masked properties.
+1. Parse the mask into a `MaskTree` rooted at `typeof(TDestination)` via `MaskTree.FromClr`.
+2. Snapshot the value of every writable destination property outside the mask, recursing into
+   masked interior objects through `MaskWalker.WalkUnmasked`.
+3. Run `mapAction(source, destination)` — the engine maps the whole object.
+4. Restore the snapshots, then copy the masked leaf values from source so a masked field can be
+   set to null.
 
-This means the mapping engine runs its full logic (including null-skip rules), but non-masked fields are always restored to their pre-map values. Both `AutoMapper.SimpleMapper` and `Mapster.SimpleMapper` delegate their `Map(..., fields)` overload to `MapWithMask`.
+A masked leaf is authoritative: if the source value is null, the destination leaf is cleared. An
+unmasked field always retains its pre-map value, even one the engine would otherwise have written.
 
-## Mapping configuration
+The mask uses CLR property names. The resource layer converts wire-format (`snake_case`) mask
+paths to CLR leaf paths with `MaskTree.FromWire` before calling this overload; see
+[Object Mapping](../../guides/object-mapping.md).
 
-Mappings are declared via `SchemataMappingBuilder.Map<TSource, TDestination>`:
+`MaskTree` validates every path segment against the destination type through reflection, so an
+unknown or collection-traversing path raises `ArgumentException` at parse time.
+
+## Declaring mappings
+
+`SchemataMappingBuilder.Map<TSource, TDestination>` and the `IServiceCollection.Map<,>` extension
+both append to `SchemataMappingOptions`. A configure action uses the
+`Schemata.Mapping.Skeleton.Configurations.Map<TSource, TDestination>` fluent surface:
 
 ```csharp
 schema.UseAutoMapper()
       .Map<StudentRequest, Student>()
       .Map<Student, StudentDetail>(map => {
-          map.Field(d => d.FullName, s => s.FirstName + " " + s.LastName);
+          map.For(d => d.FullName).From(s => s.FirstName + " " + s.LastName);
+          map.For(d => d.InternalId).Ignore();
       });
 ```
 
-`Map<TSource, TDestination>` registers an `IMapping` via `SchemataMappingOptions`. The configurator (`AutoMapperConfigurator` or `MapsterConfigurator`) translates these into engine-specific rules at startup.
+| Method | Effect |
+| --- | --- |
+| `For(dest)` | Begin a field mapping for the destination property |
+| `From(src)` | Supply the source expression for the current field |
+| `Ignore()` | Skip the field |
+| `Ignore((s, d) => ...)` | Skip the field when the predicate holds |
+| `With(s => dest)` | Whole-object converter for the type pair |
 
-## Feature priority
+`SchemataMappingOptions.AddMapping` invokes the configure action, then calls `Map<,>.Compile()`.
+`Compile()` throws `InvalidOperationException` ("Mapping for field {0} is missing a source field.")
+for any field that has neither a source expression, an ignore, nor a converter.
+
+## Feature ordering
 
 | Feature | Priority |
 | --- | --- |
-| `SchemataMappingFeature<T>` | 440,000,000 |
+| `SchemataMappingFeature<T>` | `Orders.Extension + 60_000_000` (460,000,000) |
 
 ## Extension points
 
-- Implement `ISimpleMapper` to wrap a different mapping engine.
-- Implement `IMapping` to define custom mapping rules.
-- Use `SchemataMappingBuilder.Map<TSource, TDestination>` to declare mappings without engine-specific code.
-
-## Design motivation
-
-The `ISimpleMapper` abstraction decouples application code from the mapping engine. The `MapWithMask` pattern is necessary because neither AutoMapper nor Mapster natively supports "map only these fields and leave the rest unchanged" — both engines map all fields by default. The snapshot-and-restore approach is engine-agnostic and works correctly with both null-skip rules.
-
-## Caveats
-
-- `MapWithMask` uses reflection to snapshot and restore property values. For large objects with many properties, this has a small performance cost. The resource layer calls it only on update operations, not on reads.
-- `SchemataMappingFeature<T>` uses `TryAddScoped`, so the first registered engine wins. If both `UseAutoMapper()` and `UseMapster()` are called, only the first takes effect.
+- Implement `ISimpleMapper` to bridge a different engine, then register it through a feature.
+- Implement `Schemata.Mapping.Skeleton.Configurations.IMapping` to define rules an existing
+  configurator can translate.
+- Resolve `MapperConfiguration` (AutoMapper) or `TypeAdapterConfig` (Mapster) from DI to add
+  engine-specific rules the fluent surface does not express.
 
 ## See also
 
-- [AutoMapper](automapper.md)
-- [Mapster](mapster.md)
-- [Guides: Object Mapping](../../guides/object-mapping.md)
+- [AutoMapper adapter](automapper.md)
+- [Mapster adapter](mapster.md)
+- [Object Mapping guide](../../guides/object-mapping.md)

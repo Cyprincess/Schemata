@@ -43,12 +43,20 @@ public class GrpcResourceNamingShould
         Assert.Equal("PreviewStudent", name);
     }
 
+    #region Nested type: PackagedStudent
+
     [ResourcePackage("school.v1")]
     [DisplayName("Student")]
     private sealed class PackagedStudent : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name { get; set; }
 
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
+
+    #endregion
 }

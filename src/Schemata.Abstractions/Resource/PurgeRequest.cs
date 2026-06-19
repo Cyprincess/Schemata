@@ -25,12 +25,9 @@ public sealed class PurgeRequest : ICanonicalName, IRequestIdentification
     /// </summary>
     public bool Force { get; set; }
 
-    /// <inheritdoc cref="IRequestIdentification.RequestId" />
     public string? RequestId { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
     public string? CanonicalName { get; set; }
 }

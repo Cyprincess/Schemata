@@ -22,21 +22,6 @@ public sealed class ClientAuthenticationService<TApp>(IEnumerable<IClientAuthent
 {
     #region IClientAuthenticationService<TApp> Members
 
-    /// <summary>
-    ///     Authenticates the client by trying every registered authenticator,
-    ///     per
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.3">
-    ///         RFC 9700: The OAuth 2.0 Authorization
-    ///         Framework: Best Current Practice §2.1.3
-    ///     </seealso>
-    ///     .
-    ///     Multiple matches indicate ambiguous credentials and are rejected.
-    /// </summary>
-    /// <param name="query">Query parameters from the HTTP request.</param>
-    /// <param name="form">Form body parameters from the HTTP request.</param>
-    /// <param name="headers">HTTP request headers.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The authenticated application, or throws.</returns>
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,

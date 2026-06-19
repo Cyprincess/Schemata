@@ -5,8 +5,10 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.StateMachine;
 
+/// <summary>Validates BPMN definitions supported by the single-token state machine engine.</summary>
 public static class StateMachineValidator
 {
+    /// <summary>Validates a process definition against the state machine engine constraints.</summary>
     public static void Validate(ProcessDefinition definition) {
         var startEvents = definition.Elements.OfType<FlowEvent>()
                                     .Where(e => e.Position == EventPosition.Start)
@@ -81,8 +83,7 @@ public static class StateMachineValidator
                 }
             }
 
-            // Boundary events are not targeted by sequence flows; they become reachable once
-            // the activity they are attached to is reachable.
+            // Boundary events become reachable through their attached activity.
             foreach (var boundary in definition.Elements.OfType<FlowEvent>()
                                                .Where(e => e.Position == EventPosition.Boundary && e.AttachedTo == current)) {
                 if (reachable.Add(boundary)) {

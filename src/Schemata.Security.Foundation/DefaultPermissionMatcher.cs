@@ -8,8 +8,8 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Security.Foundation;
 
 /// <summary>
-///     Matches AIP-style dot-separated permissions against claims, with single-segment wildcard (*) support.
-///     The * matches any single segment at the same position; namespace position (first of 3+) is excluded.
+///     Matches AIP-style dot-separated permissions against claims, with single-segment <c>*</c> wildcard support.
+///     Wildcards match any single segment at the same position after the namespace segment.
 /// </summary>
 public sealed class DefaultPermissionMatcher(IOptions<SchemataSecurityOptions> options) : IPermissionMatcher
 {
@@ -31,15 +31,15 @@ public sealed class DefaultPermissionMatcher(IOptions<SchemataSecurityOptions> o
             var starIdx = Array.IndexOf(cSegs, Wildcards.Any);
 
             if (starIdx < 0) {
-                continue; // no wildcard — already checked exact match
+                continue;
             }
 
             if (starIdx == 0 && cSegs.Length > 2) {
-                continue; // namespace cannot be wildcard (3+ segments)
+                continue;
             }
 
             if (Array.LastIndexOf(cSegs, Wildcards.Any) != starIdx) {
-                continue; // only one wildcard supported
+                continue;
             }
 
             var match = true;

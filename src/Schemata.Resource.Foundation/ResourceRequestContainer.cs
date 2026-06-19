@@ -20,6 +20,10 @@ public class ResourceRequestContainer<T>
     /// </summary>
     public Func<IQueryable<T>, IQueryable<T>> Query { get; private set; } = q => q;
 
+    /// <summary>
+    ///     Adds a filter predicate to the composed query.
+    /// </summary>
+    /// <param name="predicate">The filter expression, or <see langword="null" />.</param>
     public void ApplyFiltering(Expression<Func<T, bool>>? predicate) {
         if (predicate is null) {
             return;
@@ -29,6 +33,10 @@ public class ResourceRequestContainer<T>
         Query = q => query(q).Where(predicate);
     }
 
+    /// <summary>
+    ///     Adds an ordering function to the composed query.
+    /// </summary>
+    /// <param name="order">The ordering function, or <see langword="null" />.</param>
     public void ApplyOrdering(Func<IQueryable<T>, IOrderedQueryable<T>>? order) {
         if (order is null) {
             return;

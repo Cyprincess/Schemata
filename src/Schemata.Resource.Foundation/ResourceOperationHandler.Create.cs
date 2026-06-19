@@ -37,6 +37,15 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return CreateCoreAsync(ctx, request, principal, ct.Value, true);
     }
 
+    /// <summary>
+    ///     Runs create processing with an existing advisor context.
+    /// </summary>
+    /// <param name="ctx">The advisor context shared with the caller.</param>
+    /// <param name="request">The creation request DTO.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
+    /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the resource detail DTO.</returns>
     internal async Task<CreateResultBase<TDetail>> CreateCoreAsync(
         AdviceContext     ctx,
         TRequest          request,

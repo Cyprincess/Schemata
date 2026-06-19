@@ -9,6 +9,7 @@ public sealed class InclusiveBranch
     private readonly ProcessDefinition _definition;
     private readonly InclusiveGateway  _gateway;
 
+    /// <summary>Creates an inclusive branch continuation for <paramref name="gateway" />.</summary>
     internal InclusiveBranch(ProcessDefinition definition, InclusiveGateway gateway) {
         _definition = definition;
         _gateway    = gateway;

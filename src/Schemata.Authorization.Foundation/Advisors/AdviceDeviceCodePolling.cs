@@ -17,6 +17,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceDeviceCodePolling{TApp}" />.</summary>
 public static class AdviceDeviceCodePolling
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceTokenGrantPermission.DefaultOrder + 10_000_000;
 }
 
@@ -40,7 +41,6 @@ public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions
 {
     #region ITokenRequestAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDeviceCodePolling.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

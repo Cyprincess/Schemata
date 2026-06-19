@@ -1,170 +1,151 @@
 # AIP Expressions
 
-`AipCompiler` and `AipOrderCompiler` implement the AIP-160 filter language and AIP-132 order-by language respectively. Both are built on the Parlot parser combinator library and registered as keyed singletons under `AipLanguage.Name` ("aip"). `SchemataResourceFeature` registers them automatically via `services.AddAipExpressions()`.
+`AipCompiler` implements the AIP-160 filter language and `AipOrderCompiler` the AIP-132 order-by language. Both
+are built on the Parlot parser-combinator library and register as keyed singletons under `AipLanguage.Name`
+(`"aip"`). `SchemataResourceFeature` registers them through `services.AddAipExpressions()`.
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
+| --- | --- |
 | `Schemata.Expressions.Aip` | `AipLanguage.cs`, `AipParser.cs` |
-| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipCompileVisitor.cs` |
-| `Schemata.Expressions.Aip` | `AipOrderCompiler.cs` |
-| `Schemata.Expressions.Aip` | `AipBuiltInFunctions.cs` |
-| `Schemata.Expressions.Aip` | `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipOrderCompiler.cs` |
+| `Schemata.Expressions.Aip` | `AipBuiltInFunctions.cs`, `Ordering.cs`, `ServiceCollectionExtensions.cs` |
 
 ## Registration
 
 ```csharp
 services.AddAipExpressions();
-// Registers:
-//   IExpressionCompiler keyed "aip" -> AipCompiler (singleton)
-//   IOrderCompiler keyed "aip"      -> AipOrderCompiler (singleton)
+//   IExpressionCompiler keyed "aip" -> AipCompiler
+//   IOrderCompiler      keyed "aip" -> AipOrderCompiler
 ```
-
-`SchemataResourceFeature` calls this automatically. You only need to call it manually when using the AIP compiler outside the resource system.
 
 ## Parser
 
-`AipParser` is a static class with two compiled Parlot parsers:
+`AipParser` holds two compiled Parlot parsers, built once at class initialization:
 
-- `AipParser.Filter` — parses a filter string into a `Filter` AST node.
-- `AipParser.Order` — parses an order-by string into a list of `(Member, Ordering)` pairs.
-
-Both parsers are compiled once at class initialization and reused for all subsequent parses. The `Filter` parser is built from a recursive grammar that handles the full AIP-160 expression language.
+- `AipParser.Filter` parses a filter string into a `Filter` AST node.
+- `AipParser.Order` parses an order-by string into a list of `(Member, Ordering)` pairs.
 
 ## Filter grammar
 
-The AIP-160 grammar supported by `AipParser` is:
-
 ```text
-filter     = sequence (AND sequence)*
-sequence   = factor+
-factor     = term (OR term)*
-term       = [NOT | -] simple
-simple     = restriction | composite
-composite  = "(" filter ")"
+filter      = sequence (AND sequence)*
+sequence    = factor+
+factor      = term (OR term)*
+term        = [NOT | -] simple
+simple      = restriction | composite
+composite   = "(" filter ")"
 restriction = comparable [comparator arg]
 comparable  = function | member
 function    = path "(" [args] ")"
 member      = value ("." field)*
 comparator  = "<=" | "<" | ">=" | ">" | "!=" | "=" | ":"
-arg         = comparable | composite
 value       = integer | number | TRUE | FALSE | NULL | unquoted | quoted
 ```
 
 ### Operators
 
 | Operator | Symbol | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Equality | `=` | String and numeric equality |
 | Inequality | `!=` | String and numeric inequality |
-| Less than | `<` | Numeric comparison |
-| Less than or equal | `<=` | Numeric comparison |
-| Greater than | `>` | Numeric comparison |
-| Greater than or equal | `>=` | Numeric comparison |
-| Has | `:` | Substring match on strings; membership on collections |
+| Less / less-or-equal | `<`, `<=` | Numeric comparison |
+| Greater / greater-or-equal | `>`, `>=` | Numeric comparison |
+| Has | `:` | Substring on strings, membership on collections |
 | Logical AND | `AND` | Case-insensitive; implicit between adjacent terms |
 | Logical OR | `OR` | Case-insensitive |
-| Logical NOT | `NOT` | Case-insensitive |
-| Negation | `-` | Equivalent to `NOT` |
+| Logical NOT | `NOT`, `-` | Case-insensitive |
 
-`AND` and `OR` are keyword-bounded — they must be surrounded by non-identifier characters. `AND` has higher precedence than `OR`; adjacent terms (no explicit operator) are implicitly ANDed.
+`AND` binds tighter than `OR`; adjacent terms with no explicit operator are implicitly ANDed.
 
 ### Literals
 
 | Type | Examples |
-|---|---|
+| --- | --- |
 | Integer | `42`, `-7` |
-| Decimal | `3.14`, `-0.5` |
+| Number | `3.14`, `-0.5` |
 | Boolean | `TRUE`, `FALSE` (case-insensitive) |
 | Null | `NULL` (case-insensitive) |
 | Unquoted string | `alice`, `les-miserables` |
-| Quoted string | `"hello world"`, `"it's a test"` |
-
-Unquoted strings match identifier characters and Unicode code points above 127. Keywords (`AND`, `OR`, `NOT`, `TRUE`, `FALSE`, `NULL`) are excluded from unquoted strings.
+| Quoted string | `"hello world"` |
 
 ### Member access
 
-Members are dot-separated paths: `author.name`, `address.city`. Each segment is resolved against the context type via `SchemataNaming.ToClrMemberName` (Pascalize), so `author.display_name` resolves to `Author.DisplayName` on the entity.
+Members are dot paths: `author.display_name`. Each segment is resolved against the context type by Pascalizing
+(Humanizer `Pascalize()`), so `author.display_name` resolves to `Author.DisplayName`.
 
 ## Order-by grammar
 
 ```text
-order  = item ("," item)*
-item   = member [ASC | DESC]
+order = item ("," item)*
+item  = member [ASC | DESC]
 ```
 
-Default direction is ascending. `ASC` and `DESC` are case-insensitive and keyword-bounded.
+Default direction is ascending; `ASC`/`DESC` are case-insensitive. `Ordering` is `{ Ascending, Descending }`.
+`AipOrderCompiler.CompileOrder<T>` builds an `OrderBy`/`OrderByDescending`/`ThenBy`/`ThenByDescending` chain over
+`Queryable`. Member paths may be nested (`foo.bar`).
 
 ```
-grade DESC, name ASC
+grade DESC, full_name ASC
 ```
 
 ## Built-in functions
 
-`AipBuiltInFunctions` provides two built-in functions:
+`AipBuiltInFunctions.Resolve` checks `options.Functions` first, then the two built-ins:
 
-| Function | Signature | Returns |
-|---|---|---|
-| `timestamp(s)` | One string literal argument | `DateTime` parsed with `DateTimeStyles.RoundtripKind` |
-| `duration(s)` | One string literal argument | `TimeSpan` parsed from `h`/`m`/`s` units |
+| Function | Argument | Returns |
+| --- | --- | --- |
+| `timestamp(s)` | One string literal | `DateTime.Parse(s, InvariantCulture, RoundtripKind)` |
+| `duration(s)` | One string literal | `TimeSpan` summed from `h`/`m`/`s` units |
 
 ```
 create_time > timestamp("2024-01-01T00:00:00Z")
-age > duration("1h30m")
+elapsed > duration("1h30m")
 ```
 
-Duration units: `h` (hours), `m` (minutes), `s` (seconds). Units can be combined: `"1h30m"`, `"90s"`.
+`duration` reads an integer count followed by a unit (`h`, `m`, `s`), repeated; e.g. `"1h30m"`, `"90s"`.
 
-Custom functions can be injected via `ExpressionCompileOptions.Functions`:
+Inject custom functions through `ExpressionCompileOptions.Functions`:
 
 ```csharp
 var options = new ExpressionCompileOptions();
-options.Functions["now"] = new ExpressionFunction(args =>
-    Expression.Constant(DateTime.UtcNow));
-
+options.Functions["now"] = new ExpressionFunction(_ => Expression.Constant(DateTime.UtcNow));
 var expr = compiler.Compile<Student, bool>(tree, options);
 ```
 
 ## Compilation
 
-`AipCompiler.Parse` caches the AST by `ExpressionCacheKey.Create(language, source, null, null, null)`. `AipCompiler.Compile` caches the compiled lambda by a key that includes the context type, result type, and a fingerprint of any custom functions.
-
-`AipCompileVisitor` walks the AST and builds LINQ expression nodes:
-
-- `Restriction` nodes compile to `BinaryExpression` (e.g., `Equal`, `LessThan`).
-- `Has` (`:`) compiles to `string.Contains` for string members, `Enumerable.Contains` for collections.
-- `Function` nodes are resolved via `AipBuiltInFunctions.Resolve` or `options.Functions`.
-- `Member` nodes resolve property paths via `SchemataNaming.ToClrMemberName` (Pascalize).
-- `NOT`/`-` compile to `Expression.Not`.
-- `AND`/`OR` compile to `Expression.AndAlso`/`Expression.OrElse`.
-
-## Order compilation
-
-`AipOrderCompiler.CompileOrder<T>` parses the order string and builds a chain of `OrderBy`/`OrderByDescending`/`ThenBy`/`ThenByDescending` calls via reflection on `Queryable`. The first field uses `OrderBy`; subsequent fields use `ThenBy`.
+`AipCompiler.Parse` caches the AST keyed by `(language, source, null, null, null)`. `AipCompiler.Compile` caches
+the lambda keyed by language, source, context type, result type, and `AipBuiltInFunctions.Fingerprint(options)`.
+`AipCompileVisitor` walks the AST: restrictions become comparison expressions, `:` becomes a `Contains` call,
+functions resolve through `AipBuiltInFunctions.Resolve`, members resolve by Pascalizing, and `NOT`/`AND`/`OR`
+become `Expression.Not`/`AndAlso`/`OrElse`.
 
 ## Error handling
 
-Both `Parse` and `CompileOrder` throw `ArgumentException` on invalid input. `ResourceOperationHandler.ListAsync` catches `ParseException` and `ArgumentException` and converts them to `ValidationException` with `FieldReasons.InvalidFilter` or `FieldReasons.InvalidOrderBy`.
+`Parse` and `CompileOrder` throw `ArgumentException` (and Parlot's `ParseException`) on invalid input.
+`ResourceOperationHandler.ListAsync` converts both to `ValidationException` with `FieldReasons.InvalidFilter` or
+`FieldReasons.InvalidOrderBy`.
 
 ## Extension points
 
 - Inject custom functions via `ExpressionCompileOptions.Functions` when calling `Compile` directly.
-- The `AipCompileVisitor` is `internal`. To extend compilation behavior, implement a new `IExpressionCompiler` that wraps `AipCompiler` and post-processes the resulting expression.
+- `AipCompileVisitor` is `internal`; to alter compilation, implement an `IExpressionCompiler` that wraps
+  `AipCompiler` and post-processes the result.
 
-## Design motivation
+## Design rationale
 
-Parlot was chosen for its zero-allocation parser combinator design and its ability to compile parsers to delegates at initialization time. The static `AipParser.Filter` and `AipParser.Order` fields are compiled once and reused, avoiding per-request parser construction overhead.
-
-Member resolution via `SchemataNaming.ToClrMemberName` (Pascalize) maps snake_case wire names straight to PascalCase CLR property names, so the same filter string works against your entities directly.
+Parlot compiles its parsers to delegates at initialization, so the static `AipParser.Filter` and `AipParser.Order`
+fields avoid per-request parser construction. Pascalizing member segments maps snake_case wire names straight to
+PascalCase CLR properties.
 
 ## Caveats
 
-- The `has` operator (`:`) on a non-string, non-collection property will throw `ParseException` at compile time with "Type is not enumerable."
-- Wildcard `*` in a `has` expression (e.g., `name:*`) compiles to a presence check (not-null for reference types, always-true for value types). It does not support glob patterns.
-- `timestamp(s)` parses with `DateTimeStyles.RoundtripKind`. Timezone-naive strings are treated as UTC. Malformed strings throw `ParseException` at compile time.
-- `duration(s)` supports only `h`, `m`, `s` units. Fractional values are supported (e.g., `"1.5h"`). Other units (days, weeks) are not supported and throw `ParseException`.
-- The AIP compiler does not support nested function calls (e.g., `timestamp(now())`). Function arguments must be string literals.
+- `duration` accepts only integer counts before `h`/`m`/`s`; a fractional count such as `"1.5h"` raises
+  `ParseException`. Day and week units are unsupported.
+- `timestamp` parses with `DateTimeStyles.RoundtripKind`; a malformed string throws at compile time.
+- A function argument must be a string literal; nested calls such as `timestamp(now())` are not parsed.
 
 ## See also
 

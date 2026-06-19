@@ -3,7 +3,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     The system is not in a state required for the operation to proceed.
+///     The system state blocks the operation.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.FAILED_PRECONDITION</c> (HTTP 412), per

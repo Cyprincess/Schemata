@@ -12,7 +12,12 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ServicesExtensions
 {
-    /// <summary>Adds gRPC with code-first (protobuf-net) support.</summary>
+    /// <summary>
+    ///     Adds gRPC with code-first protobuf-net support.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configureOptions">Optional gRPC server options configuration.</param>
+    /// <returns>The gRPC server builder.</returns>
     public static IGrpcServerBuilder AddCodeFirstGrpc(
         this IServiceCollection     services,
         Action<GrpcServiceOptions>? configureOptions

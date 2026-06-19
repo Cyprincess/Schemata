@@ -1,37 +1,22 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Core;
 using Schemata.Transport.Http;
-using Schemata.Transport.Http.Features;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     <c>UseHttpTransport</c> and <c>AddSchemataApplicationPart&lt;T&gt;</c> extensions.
+///     Extension methods for enabling shared HTTP transport services.
 /// </summary>
 public static class SchemataBuilderExtensions
 {
-    /// <summary>Enables <see cref="SchemataTransportHttpFeature" />.</summary>
-    public static SchemataBuilder UseHttpTransport(this SchemataBuilder builder) {
-        builder.AddFeature<SchemataTransportHttpFeature>();
-
-        return builder;
-    }
-
-    /// <summary>
-    ///     Registers a <see cref="SchemataExtensionPart{T}" /> on MVC and exposes the
-    ///     matching <see cref="IApplicationPartConfigurator" /> through DI. Idempotent.
-    /// </summary>
-    public static SchemataBuilder AddSchemataApplicationPart<T>(this SchemataBuilder builder) {
-        builder.Services.AddSchemataApplicationPart<T>();
-        return builder;
-    }
-
     /// <summary>
     ///     <see cref="IServiceCollection" /> overload for use inside a feature's
     ///     <c>ConfigureServices</c>.
     /// </summary>
+    /// <typeparam name="T">A type from the assembly to expose to MVC.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataApplicationPart<T>(this IServiceCollection services) {
         var configurator = new ApplicationPartConfigurator<T>();
 

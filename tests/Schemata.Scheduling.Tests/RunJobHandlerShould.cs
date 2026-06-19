@@ -21,25 +21,30 @@ public class RunJobHandlerShould
         var services = new ServiceCollection().AddTransient<SampleJob>().BuildServiceProvider();
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<SampleJob>();
-        var handler  = new RunJobHandler(scheduler.Object, services, registry);
-        var job      = new SchemataJob { CanonicalName = "jobs/x", JobKey = typeof(SampleJob).FullName };
+        var handler = new RunJobHandler(scheduler.Object, services, registry);
+        var job     = new SchemataJob { CanonicalName = "jobs/x", JobKey = typeof(SampleJob).FullName };
 
         // The reflected dispatch wraps a synchronous scheduler failure in a
         // TargetInvocationException; the handler must surface the original.
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.InvokeAsync(null, new(), job, null, CancellationToken.None).AsTask());
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => handler
+                                                                          .InvokeAsync(
+                                                                               null, new(), job, null,
+                                                                               CancellationToken.None)
+                                                                          .AsTask());
 
         Assert.Equal("scheduler boom", ex.Message);
     }
+
+    #region Nested type: SampleJob
 
     private sealed class SampleJob : IScheduledJob
     {
         #region IScheduledJob Members
 
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 
         #endregion
     }
+
+    #endregion
 }

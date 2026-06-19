@@ -6,8 +6,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Common;
 
+/// <summary>
+///     Maps resource-specific CLR property names to their public wire names and back.
+/// </summary>
 public static class ResourceWireNameRules
 {
+    /// <summary>
+    ///     Resolves the wire field name for a resource property.
+    /// </summary>
+    /// <param name="owner">The type that declares the property.</param>
+    /// <param name="propertyName">The CLR property name.</param>
+    /// <param name="pluralName">Resolves the plural collection name for a list element type.</param>
+    /// <returns>The wire field name, or <see langword="null" /> when the property is suppressed.</returns>
     public static string? Resolve(Type owner, string propertyName, Func<Type, string> pluralName) {
         if (propertyName == nameof(IEntitiesResult<>.Entities)) {
             var carrier = owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));

@@ -21,11 +21,11 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <seealso cref="Features.UserInfoFeature" />
 public sealed class AdviceUserInfoOpenIdRequirement : IUserInfoAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 
     #region IUserInfoAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(AdviceContext ctx, UserInfoContext info, CancellationToken ct = default) {

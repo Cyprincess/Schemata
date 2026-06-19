@@ -119,6 +119,7 @@ public class RepositoryCrudShould : IAsyncLifetime
             }
         }
     }
+
     [Fact]
     public async Task Add_DuplicateKey_ThrowsAlreadyExists() {
         var uid = Identifiers.NewUid();
@@ -126,10 +127,8 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 await repository.AddAsync(new() {
-                    Uid      = uid,
-                    FullName = "Original",
-                    Name     = "original-dup",
-                });
+                                              Uid = uid, FullName = "Original", Name = "original-dup",
+                                          });
                 await repository.CommitAsync();
             }
         }
@@ -137,12 +136,12 @@ public class RepositoryCrudShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                await Assert.ThrowsAsync<AlreadyExistsException>(
-                    () => repository.AddAsync(new() {
-                        Uid      = uid,
-                        FullName = "Duplicate",
-                        Name     = "duplicate-dup",
-                    }));
+                await Assert.ThrowsAsync<AlreadyExistsException>(() => repository.AddAsync(
+                                                                     new() {
+                                                                         Uid      = uid,
+                                                                         FullName = "Duplicate",
+                                                                         Name     = "duplicate-dup",
+                                                                     }));
             }
         }
     }

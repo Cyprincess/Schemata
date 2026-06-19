@@ -13,9 +13,8 @@ using Schemata.Event.Skeleton;
 namespace Schemata.Event.RabbitMq.Internal;
 
 /// <summary>
-///     Replays a persisted event to RabbitMQ for the outbox dispatcher, using the same
-///     publisher-confirm channel as <see cref="RabbitMqEventBus" /> so a confirmed publish is
-///     durable. It does not run the publish pipeline, so retries never write a second audit row.
+///     Replays a persisted event to RabbitMQ for the outbox dispatcher, using a
+///     publisher-confirm channel so a confirmed publish is durable and reuses the existing audit row.
 /// </summary>
 public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsyncDisposable
 {
@@ -26,6 +25,7 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
     private readonly IEventTypeRegistry                     _registry;
     private readonly IServiceProvider                       _services;
 
+    /// <summary>Initializes an outbox publisher over the configured RabbitMQ connection.</summary>
     public RabbitMqEventOutboxPublisher(
         IOptions<RabbitMqEventOptions>         options,
         IServiceProvider                       services,

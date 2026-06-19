@@ -11,6 +11,7 @@ internal sealed class CompositeScopeFactory : IServiceScopeFactory
 {
     private readonly TenantCompositeServiceProvider _composite;
 
+    /// <summary>Initializes a factory for scopes composed from the tenant provider and host root.</summary>
     public CompositeScopeFactory(TenantCompositeServiceProvider composite) { _composite = composite; }
 
     #region IServiceScopeFactory Members

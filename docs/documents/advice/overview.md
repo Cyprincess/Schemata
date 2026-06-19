@@ -1,21 +1,27 @@
 # Advice Overview
 
-The `Schemata.Advice` package provides the runtime infrastructure for the advisor pipeline: a zero-allocation dispatch token (`AdvicePipeline<TAdvisor>`), a static entry point (`Advisor.For<TAdvisor>()`), and a family of `AdviceRunner` static classes that resolve, sort, and execute advisors from the DI container. The `Schemata.Advice.Generator` package emits the `RunAsync` extension methods that connect the dispatch token to the correct runner at compile time.
+`Schemata.Advice` is the runtime for the advisor pipeline: a zero-allocation dispatch token
+(`AdvicePipeline<TAdvisor>`), a static entry point (`Advisor.For<TAdvisor>()`), and a family of
+`AdviceRunner` static classes that resolve, sort, and execute advisors from DI.
+`Schemata.Advice.Generator` emits the `RunAsync` extension methods that bind the token to the
+correct runner at compile time.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
 | `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs` |
-| `Schemata.Advice` | `AdviceRunner\`2.cs` .. `AdviceRunner\`17.cs` (arities 1..16) |
+| `Schemata.Advice` | the `AdviceRunner` family (arities 1..16) |
 | `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs` |
 | `Schemata.Abstractions` | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
 
 ## AdvicePipeline and Advisor
 
-`AdvicePipeline<TAdvisor>` is a zero-size `readonly struct`. It carries no state and causes no heap allocation. Its sole purpose is to carry the generic parameter `TAdvisor` so that source-generated `RunAsync` extension methods can dispatch to the correct `AdviceRunner<...>` overload without ambiguity.
+`AdvicePipeline<TAdvisor>` is a zero-size `readonly struct`. It carries no state and allocates
+nothing; it exists only to carry the `TAdvisor` type so a source-generated `RunAsync` extension
+can dispatch to the right `AdviceRunner<...>`.
 
-`Advisor` is the static entry point:
+`Advisor` is the entry point:
 
 ```csharp
 public static class Advisor
@@ -26,29 +32,39 @@ public static class Advisor
 }
 ```
 
-Calling `Advisor.For<IRepositoryAddAdvisor<Student>>()` returns a zero-size struct. The source-generated `RunAsync` extension method on that struct then delegates to `AdviceRunner<IRepositoryAddAdvisor<Student>, IRepository<Student>, Student>.RunAsync(...)`.
+`Advisor.For<IRepositoryAddAdvisor<Student>>()` returns the zero-size struct; the generated
+`RunAsync` extension on it delegates to
+`AdviceRunner<IRepositoryAddAdvisor<Student>, IRepository<Student>, Student>.RunAsync(...)`.
 
 ## Short-circuit semantics
 
-The runner resolves all DI-registered implementations of `TAdvisor`, sorts them by `Order` ascending, and invokes each in sequence. The chain stops on the first non-`Continue` result:
+The runner resolves all DI-registered `TAdvisor` implementations, sorts by `Order` ascending, and
+invokes each in turn. The chain stops on the first non-`Continue` result:
 
 | Result | Meaning |
 | --- | --- |
-| `Continue` | Proceed to the next advisor. If this is the last advisor, the operation executes normally. |
-| `Block` | Abort the operation. No further advisors execute. |
-| `Handle` | The advisor has fully handled the operation. No further advisors execute. Callers use whatever state the advisor placed in `AdviceContext`. |
+| `Continue` | Proceed to the next advisor; after the last, the operation runs normally. |
+| `Block` | Abort the operation; no further advisors run. |
+| `Handle` | The advisor handled the operation; no further advisors run, and the caller uses the state it placed in `AdviceContext`. |
 
-`Block` and `Handle` both short-circuit, but callers interpret them differently. `Block` typically means "deny the operation silently." `Handle` means "I completed the operation; use my result." `AdviceCreateRequestIdempotency` is the canonical case: it returns `Handle` when it finds a cached response in the idempotency store, and the resource handler picks up the cached `CreateResultBase<TDetail>` from `AdviceContext`.
+`AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>` is the canonical `Handle` case: on a
+cache hit with a matching payload hash it returns `Handle` after storing a `CreateResultBase<TDetail>`
+in the context, and the resource handler returns that cached result.
 
 ## AdviceContext
 
-`AdviceContext` is a typed property bag keyed by `RuntimeTypeHandle`. It flows through the entire pipeline and gives advisors shared state and access to the service provider. See [Advice Pipeline](../core/advice-pipeline.md) for the full API.
+`AdviceContext` is a typed property bag keyed by `RuntimeTypeHandle`, flowing through the pipeline
+with shared state and the service provider. See [Advice Pipeline](../core/advice-pipeline.md) for
+the full API.
 
-Two `AdviceContext` instances coexist per resource request: one inside the resource operation handler and one inside `IRepository<T>.AdviceContext`. They never share state by design — `repository.SuppressQuerySoftDelete()` sets a marker only on the repository's context.
+Two `AdviceContext` instances coexist per resource request: one in the resource operation handler,
+one in `IRepository<T>.AdviceContext`. They never share state — `repository.SuppressQuerySoftDelete()`
+sets a marker only on the repository's context.
 
 ## Registering advisors
 
-Advisors are registered via `TryAddEnumerable` with a `ServiceDescriptor.Scoped` descriptor. This ensures each implementation type is registered at most once while allowing multiple different advisor types for the same interface.
+Advisors register with `TryAddEnumerable` and a `ServiceDescriptor.Scoped` descriptor, so each
+implementation type registers once while many advisor types share one interface.
 
 ```csharp
 // Closed-type registration
@@ -62,23 +78,25 @@ services.TryAddEnumerable(
 
 ## Order constants
 
-`SchemataConstants.Orders` defines three anchor constants used by built-in advisors:
+`SchemataConstants.Orders` anchors advisor ordering:
 
 | Constant | Value | Usage |
 | --- | --- | --- |
 | `Base` | 100,000,000 | Starting point for most built-in advisors |
-| `Extension` | 400,000,000 | Starting point for extension feature advisors |
-| `Max` | 900,000,000 | Terminal advisors (soft-delete, concurrency, response idempotency) |
+| `Extension` | 400,000,000 | Starting point for extension advisors |
+| `Max` | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
 
-Built-in advisors chain by adding 10,000,000 increments from an anchor. Custom advisors can use any value that falls between the built-in increments or outside the reserved range.
+Built-in advisors chain by 10M increments from an anchor. Custom advisors take a value between the
+built-in steps or outside the reserved range.
 
-## Design motivation
+## Design rationale
 
-The zero-size struct dispatch token avoids heap allocation on every pipeline invocation. The source generator eliminates boilerplate `RunAsync` overloads — adding a new advisor interface requires only the interface declaration; the generator emits the extension method automatically. The `AdviceContext` typed bag avoids parameter explosion as pipelines grow more complex.
+The zero-size struct token avoids heap allocation on every pipeline invocation. The generator
+removes the boilerplate `RunAsync` overloads — a new advisor interface needs only its declaration.
+The `AdviceContext` typed bag avoids parameter explosion as pipelines grow.
 
 ## See also
 
-- [Advice Runtime](runtime.md) — `AdviceRunner` arity 1..16, no zero-argument specialization
-- [Advice Generator](generator.md) — `AdvicePipelineGenerator` emission rules and gotchas
+- [Advice Runtime](runtime.md) — the `AdviceRunner` family, arity 1..16
+- [Advice Generator](generator.md) — `AdvicePipelineGenerator` emission rules
 - [Advice Pipeline](../core/advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`
-- [Built-in Features](../core/built-in-features.md) — priority table

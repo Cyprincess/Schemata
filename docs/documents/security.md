@@ -1,33 +1,67 @@
 # Security
 
-`Schemata.Security.Foundation` provides a pluggable security model built on two provider interfaces: `IAccessProvider<T, TRequest>` for entity-level access decisions and `IEntitlementProvider<T, TRequest>` for row-level query filtering. Calling `UseSecurity()` on `SchemataBuilder` registers the feature at priority 400,000,000 and installs allow-all default implementations via `TryAddScoped`, so any custom providers registered earlier take precedence.
+`Schemata.Security.Foundation` enforces access at two points: an `IAccessProvider<T, TRequest>`
+gate that decides whether a principal may perform an operation, and an
+`IEntitlementProvider<T, TRequest>` that narrows a repository query to the rows the principal may
+see. `UseSecurity()` registers the feature and the default providers; the resource pipeline calls
+them through the authorize advisors that `WithAuthorization()` installs.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Security.Skeleton` | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs` |
-| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` — `UseSecurity()` |
-| `Schemata.Security.Foundation` | `Features/SchemataSecurityFeature.cs` — priority 400,000,000 |
+| `Schemata.Security.Skeleton` | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs`, `AnonymousAccess.cs`, `AnonymousGranted.cs` |
+| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseSecurity`), `Features/SchemataSecurityFeature.cs`, `SchemataSecurityOptions.cs` |
 | `Schemata.Security.Foundation` | `DefaultAccessProvider.cs`, `DefaultEntitlementProvider.cs`, `DefaultPermissionResolver.cs`, `DefaultPermissionMatcher.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/Advice{List,Get,Create,Update,Delete}RequestAuthorize.cs`, `SchemataResourceBuilder.WithAuthorization` |
 
-## Mechanism walkthrough
+## The two providers
 
-### 1. Enable the feature
+Both interfaces live in `Schemata.Security.Skeleton` and are open generic over the entity type
+`T` and the request DTO `TRequest`. Both receive an `AccessContext<TRequest>` carrying the
+operation name and the request payload:
+
+```csharp
+public class AccessContext<TRequest>
+{
+    public string?  Operation { get; set; }   // "List", "Get", "Create", "Update", "Delete"
+    public TRequest? Request  { get; set; }
+}
+```
+
+`IAccessProvider<T, TRequest>` returns a yes/no decision:
+
+```csharp
+Task<bool> HasAccessAsync(
+    T?                      entity,
+    AccessContext<TRequest> context,
+    ClaimsPrincipal?        principal,
+    CancellationToken       ct = default);
+```
+
+`IEntitlementProvider<T, TRequest>` returns a predicate, or `null` for no filtering:
+
+```csharp
+Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
+    AccessContext<TRequest> context,
+    ClaimsPrincipal?        principal,
+    CancellationToken       ct = default);
+```
+
+## Enabling the feature
 
 ```csharp
 builder.UseSchemata(schema => {
     schema.UseSecurity();
-    // or with options:
-    schema.UseSecurity(o => o.SomeOption = value);
+    schema.UseSecurity(o => o.PermissionClaimType = "permissions"); // override the claim type
 });
 ```
 
-`UseSecurity` stores the optional `Action<SchemataSecurityOptions>` in `Configurators` and calls `builder.AddFeature<SchemataSecurityFeature>()`.
+`Microsoft.AspNetCore.Builder.SchemataBuilderExtensions.UseSecurity` stores the optional
+`Action<SchemataSecurityOptions>` and calls `builder.AddFeature<SchemataSecurityFeature>()`.
 
-### 2. What the feature registers
-
-`SchemataSecurityFeature.ConfigureServices` calls `TryAddScoped` for four services:
+`SchemataSecurityFeature` has `Priority = Orders.Extension = 400_000_000` and no declared
+dependencies. `ConfigureServices` registers four services, all with `TryAddScoped`:
 
 ```csharp
 services.TryAddScoped<IPermissionResolver, DefaultPermissionResolver>();
@@ -36,83 +70,118 @@ services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,
 services.TryAddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
 ```
 
-Because all four use `TryAdd`, any implementation registered before `UseSecurity()` is called wins.
+Because every registration uses `TryAdd`, a provider registered before `UseSecurity()` wins. To
+authorize a specific entity, register a closed-generic `IAccessProvider<Student, StudentRequest>`
+first; the open-generic default fills in the rest.
 
-### 3. Access check flow
+## Default access decision
 
-The resource authorization advisors (e.g., `AdviceCreateRequestAuthorize`, `AdviceUpdateRequestAuthorize`) run at Order = 100,000,000 and resolve `IAccessProvider<TEntity, TRequest>` from DI to call `HasAccessAsync`. The signature:
+`DefaultAccessProvider<T, TRequest>` is a claims-based gate composing `IPermissionResolver` and
+`IPermissionMatcher`:
+
+1. An unauthenticated principal (`principal?.Identity?.IsAuthenticated != true`) is denied.
+2. A missing operation name is denied.
+3. Otherwise it resolves a permission string and asks the matcher whether the principal holds it.
+
+`DefaultPermissionResolver.Resolve(operation, entity)` produces `{entity}.{operation}` in
+kebab-case via Humanizer's `Kebaberize()`. `Resolve("Create", typeof(OrderItem))` returns
+`"order-item.create"`.
+
+`DefaultPermissionMatcher` reads claims of type `SchemataSecurityOptions.PermissionClaimType`
+(default `"role"`) and matches the resolved permission against them:
+
+- An exact string match succeeds.
+- A claim may contain a single `*` wildcard segment. The claim and permission must have the same
+  number of dot-separated segments; each non-wildcard segment must match positionally.
+- The wildcard may not be the first segment when the permission has more than two segments, and a
+  claim with two or more wildcards never matches.
+
+So `student.*` grants every operation on `Student`, and `*.list` grants `List` on any single-word
+entity, while a bare `*` matches nothing.
+
+| Claim | Matches `student.create`? |
+| --- | --- |
+| `student.create` | yes (exact) |
+| `student.*` | yes |
+| `*.create` | yes |
+| `*` | no |
+| `student.*.*` | no (two wildcards) |
+
+## Default entitlement
+
+`DefaultEntitlementProvider<T, TRequest>.GenerateEntitlementExpressionAsync` returns `null`, so no
+row-level filter is applied. A custom provider returns an `Expression<Func<T, bool>>` to narrow
+results, or `null` to opt out for a given request.
+
+## How the resource pipeline invokes security
+
+The security providers are dormant until the resource builder opts an entity in:
 
 ```csharp
-public interface IAccessProvider<T, TRequest>
-{
-    Task<bool> HasAccessAsync(
-        T?                      entity,
-        AccessContext<TRequest> context,
-        ClaimsPrincipal?        principal,
-        CancellationToken       ct = default
-    );
-}
+schema.UseResource()
+      .WithAuthorization()
+      .MapHttp()
+      .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
-`entity` is `null` for collection-level checks (List). `context` carries the operation kind and the request DTO. Returning `false` causes the advisor to return `AdviseResult.Block`, which short-circuits to a `Blocked` result before the entity is touched.
+`SchemataResourceBuilder.WithAuthorization(string? scheme = null)` registers two advisor families
+per operation via `TryAddEnumerable`:
 
-### 4. Row-level filtering
+| Advisor family | Order | Role |
+| --- | --- | --- |
+| `Advice{List,Get,Create,Update,Delete,Method}RequestAnonymous` | `Orders.Base` = 100,000,000 | Stashes `AnonymousGranted` in `AdviceContext` when the entity's `[Anonymous]` attribute covers the operation |
+| `Advice{List,Get,Create,Update,Delete,Method}RequestAuthorize` | 110,000,000 | Calls the access and entitlement providers |
 
-`IEntitlementProvider<T, TRequest>` generates a LINQ predicate that is composed into repository queries:
+Each authorize advisor builds an `AccessContext<TRequest>` with the operation name, then:
 
-```csharp
-public interface IEntitlementProvider<T, TRequest>
-{
-    Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
-        AccessContext<TRequest> context,
-        ClaimsPrincipal?        principal,
-        CancellationToken       ct = default
-    );
-}
-```
+1. Calls `IEntitlementProvider.GenerateEntitlementExpressionAsync` and passes the result to
+   `container.ApplyModification(expression)`. A non-null predicate becomes a `.Where(...)` on the
+   composed query, narrowing the result set at the data layer. Entitlement filtering runs on List,
+   Get, Update, and Delete regardless of the anonymous marker; Create has no entitlement step.
+2. Skips the access check when `AdviceContext.Has<AnonymousGranted>()`; otherwise calls
+   `AuthorizeHelper.EnsureAsync(access, context, parent, principal, ct)`, which throws
+   `AuthorizationException` (HTTP 403) when access is denied.
 
-Returning `null` applies no additional filtering. Returning a predicate means unauthorized rows are excluded at the data layer, not after retrieval.
+`AnonymousGranted` is set by the anonymous advisors, which consult `AnonymousAccess.IsAnonymous`.
+That helper reads the `[Anonymous]` attribute on the entity: no operation list grants all
+operations; a list grants only the named ones (case-insensitive).
 
-### 5. Permission resolution
-
-`IPermissionResolver` converts an operation name and entity type to a permission string:
-
-```csharp
-public interface IPermissionResolver
-{
-    string Resolve(string operation, Type entity);
-}
-```
-
-`DefaultPermissionResolver` produces strings in the format `{operation}:{entity}` (kebab-cased). `IPermissionMatcher` then checks whether the principal holds that permission.
+If the resource is mapped without `WithAuthorization()`, neither advisor family is registered and
+the providers are never called.
 
 ## Extension points
 
 | Interface | Purpose |
 | --- | --- |
-| `IAccessProvider<T, TRequest>` | Entity-level access gate. Register via `services.TryAddScoped` before `UseSecurity()`. |
-| `IEntitlementProvider<T, TRequest>` | Row-level query filter. Same registration pattern. |
-| `IPermissionResolver` | Converts operation + entity type to a permission string. |
-| `IPermissionMatcher` | Checks whether a principal holds a resolved permission. |
+| `IAccessProvider<T, TRequest>` | Decide whether a principal may run an operation. Register a closed generic before `UseSecurity()`. |
+| `IEntitlementProvider<T, TRequest>` | Return a query predicate for row-level filtering. Same registration pattern. |
+| `IPermissionResolver` | Map operation + entity type to a permission string. |
+| `IPermissionMatcher` | Decide whether a principal holds a resolved permission. |
 
-## Design motivation
+`SchemataSecurityOptions` carries one property, `PermissionClaimType` (default `"role"`), used by
+`DefaultPermissionMatcher`.
 
-Separating `IAccessProvider` (entity-level) from `IEntitlementProvider` (query-level) lets you enforce access at two independent points. The access provider gates individual operations; the entitlement provider ensures that even bulk queries only return rows the principal is allowed to see. Both are open-generic so a single implementation can cover all entity types, while specific implementations for particular entities take precedence via `TryAdd` ordering.
+## Design rationale
 
-`IPermissionResolver` and `IPermissionMatcher` are split so the string format (resolver) and the claim-matching logic (matcher) can be replaced independently.
+The split is deliberate: the access provider answers "may this principal touch this kind of thing
+at all", while the entitlement provider answers "which specific rows". The entitlement predicate
+runs in the database, so a List that the principal is allowed to call still returns only the rows
+they own. Replacing `DefaultAccessProvider` with a domain check and `DefaultEntitlementProvider`
+with an ownership predicate covers most row-level security needs without touching the resource
+pipeline.
 
 ## Caveats
 
-- `SchemataSecurityFeature` has `Priority = Orders.Extension = 400_000_000`. See [Built-in Features](core/built-in-features.md) for the full priority table.
-- All four registrations use `TryAddScoped`. Register custom providers before calling `UseSecurity()` to ensure they take precedence over the defaults.
-- `DefaultAccessProvider<,>` always returns `true`. Without a custom provider, all principals have access to all entities.
-- `DefaultEntitlementProvider<,>` returns `null` (no filtering). Without a custom provider, all rows are visible to all principals.
-- The resource advisor pipeline calls `IAccessProvider` at Order = 100,000,000. Advisors at lower Order values run before the access check.
+- The defaults deny unauthenticated callers and require a matching permission claim. Mapping an
+  entity with `WithAuthorization()` and no claims yields 403 until the principal carries the right
+  permission or the entity is marked `[Anonymous]`.
+- `DefaultPermissionResolver` kebab-cases the bare type name, not the namespace. Two entities with
+  the same short name resolve to the same permission.
+- A `*` wildcard claim only matches permissions with the same segment count. `student.*` does not
+  match a three-segment permission.
 
 ## See also
 
+- [Access Control](../guides/access-control.md) — a worked roles-and-row-level-security setup
 - [Built-in Features](core/built-in-features.md) — feature priority table
-- [Advice Pipeline](core/advice-pipeline.md) — how advisors short-circuit
-- [Create Pipeline](resource/create-pipeline.md) — authorization lane in the resource pipeline
-- [Identity](identity.md) — ASP.NET Core Identity integration
-- [Authorization](authorization.md) — OAuth 2.0 / OIDC server
+- [Ownership](repository/ownership.md) — `UseOwner()` for automatic ownership filtering

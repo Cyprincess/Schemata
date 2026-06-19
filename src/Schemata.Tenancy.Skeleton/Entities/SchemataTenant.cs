@@ -17,6 +17,7 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataTenant : IIdentifier, ICanonicalName, IDescriptive, IConcurrency, ITimestamp
 {
+    /// <summary>Navigation to <see cref="SchemataTenantHost" /> rows whose <c>Host</c> resolves to this tenant.</summary>
     public virtual ICollection<SchemataTenantHost>? Hosts { get; set; }
 
     #region ICanonicalName Members

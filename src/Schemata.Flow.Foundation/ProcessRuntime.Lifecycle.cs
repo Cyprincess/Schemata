@@ -15,6 +15,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>Coordinates process runtime operations against registered Flow engines.</summary>
 public sealed partial class ProcessRuntime
 {
     public async ValueTask<SchemataProcess> StartProcessInstanceAsync(
@@ -52,7 +53,7 @@ public sealed partial class ProcessRuntime
         CaptureSource(process, sourceEntity);
 
         // Pattern from [CanonicalName("processes/{process}")] on SchemataProcess;
-        // AdviceAddCanonicalName is bypassed since no repository is involved.
+        // this path bypasses repository advice.
         process.CanonicalName = $"processes/{process.Name}";
 
         SchemataProcessTransition transition;

@@ -20,10 +20,7 @@ public class ResourceIdentifiersShould
     [Fact]
     public void BuildFullName_MultiSegmentParent_ReturnsParentCollectionAndName() {
         var descriptor = ResourceNameDescriptor.ForType<ChildThing>();
-        var route = new RouteValueDictionary {
-            ["org"]     = "acme",
-            ["project"] = "alpha",
-        };
+        var route      = new RouteValueDictionary { ["org"] = "acme", ["project"] = "alpha" };
 
         var name = ResourceIdentifiers.BuildFullName(descriptor, route, "item1");
 
@@ -33,28 +30,41 @@ public class ResourceIdentifiersShould
     [Fact]
     public void BuildFullName_WildcardParent_ReturnsWildcardInParentPath() {
         var descriptor = ResourceNameDescriptor.ForType<ChildThing>();
-        var route = new RouteValueDictionary {
-            ["org"]     = "-",
-            ["project"] = "alpha",
-        };
+        var route      = new RouteValueDictionary { ["org"] = "-", ["project"] = "alpha" };
 
         var name = ResourceIdentifiers.BuildFullName(descriptor, route, "item1");
 
         Assert.Equal("orgs/-/projects/alpha/children/item1", name);
     }
 
-    private sealed class SimpleThing : ICanonicalName
-    {
-        public string? Name { get; set; }
-
-        public string? CanonicalName { get; set; }
-    }
+    #region Nested type: ChildThing
 
     [CanonicalName("orgs/{org}/projects/{project}/children/{child}")]
     private sealed class ChildThing : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name { get; set; }
 
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: SimpleThing
+
+    private sealed class SimpleThing : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name { get; set; }
+
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
 }

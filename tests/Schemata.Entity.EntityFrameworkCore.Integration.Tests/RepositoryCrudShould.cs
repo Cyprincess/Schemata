@@ -132,10 +132,8 @@ public class RepositoryCrudShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 await repository.AddAsync(new() {
-                    Uid      = uid,
-                    FullName = "Original",
-                    Name     = "original",
-                });
+                                              Uid = uid, FullName = "Original", Name = "original",
+                                          });
                 await repository.CommitAsync();
             }
         }
@@ -143,12 +141,12 @@ public class RepositoryCrudShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                await Assert.ThrowsAsync<AlreadyExistsException>(
-                    () => repository.AddAsync(new() {
-                        Uid      = uid,
-                        FullName = "Duplicate",
-                        Name     = "duplicate",
-                    }));
+                await Assert.ThrowsAsync<AlreadyExistsException>(() => repository.AddAsync(
+                                                                     new() {
+                                                                         Uid      = uid,
+                                                                         FullName = "Duplicate",
+                                                                         Name     = "duplicate",
+                                                                     }));
             }
         }
     }
@@ -165,7 +163,7 @@ public class RepositoryCrudShould : IAsyncLifetime
                     Name     = "dave",
                 };
                 await repository.AddAsync(entity);
-                // intentionally no CommitAsync
+                // Scope disposal leaves the pending insert uncommitted.
             }
         }
 

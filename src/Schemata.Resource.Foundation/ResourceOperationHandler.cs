@@ -66,6 +66,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         ResourceIdentifiers.Apply(container, name);
     }
 
+    /// <summary>
+    ///     Creates the standard missing-resource exception for the target entity type.
+    /// </summary>
+    /// <param name="name">The requested resource name.</param>
+    /// <returns>An exception carrying missing-resource error details.</returns>
     internal static NotFoundException ResourceNotFound(string? name) {
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
         return new(message: string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Resource", name)) {

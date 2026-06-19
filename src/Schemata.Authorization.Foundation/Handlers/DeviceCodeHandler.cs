@@ -45,7 +45,6 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.DeviceCode;
 
     /// <summary>

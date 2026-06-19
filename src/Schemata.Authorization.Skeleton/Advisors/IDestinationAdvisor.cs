@@ -10,8 +10,8 @@ namespace Schemata.Authorization.Skeleton.Advisors;
 ///     to the provided set.
 /// </summary>
 /// <remarks>
-///     <c>Handle</c> and <c>Continue</c> results are equivalent: both mean destinations were added
-///     to the set. <c>Handle</c> short-circuits remaining advisors; <c>Continue</c> lets the next
+///     <c>Handle</c> and <c>Continue</c> results are equivalent: both keep destinations in
+///     the set. <c>Handle</c> short-circuits remaining advisors; <c>Continue</c> lets the next
 ///     advisor try. <c>Block</c> excludes the claim from all destinations.
 /// </remarks>
 public interface IDestinationAdvisor : IAdvisor<Claim, HashSet<string>, ClaimsPrincipal>;

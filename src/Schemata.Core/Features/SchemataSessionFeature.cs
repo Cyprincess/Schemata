@@ -17,6 +17,9 @@ namespace Schemata.Core.Features;
 public sealed class SchemataSessionFeature<T> : FeatureBase
     where T : class, ISessionStore
 {
+    /// <summary>
+    ///     Default middleware priority for session state.
+    /// </summary>
     public const int DefaultPriority = SchemataAuthenticationFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Foundation.Observers;
 using Schemata.Scheduling.Skeleton;
@@ -30,8 +31,8 @@ public class DefaultSchedulerShould
         observer.Setup(o => o.OnSucceededAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
                                                It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
-        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
-                                            It.IsAny<Exception>(), It.IsAny<CancellationToken>()))
+        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                            It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
         var services = new ServiceCollection();
@@ -62,13 +63,12 @@ public class DefaultSchedulerShould
 
             await scheduler.ScheduleAsync(job, CancellationToken.None);
 
-            observer.Verify(o => o.OnScheduledAsync(
-                                It.Is<SchemataJob>(j => j.Name == "test/scheduled/once"),
-                                It.IsAny<CancellationToken>()),
-                            Times.Once);
+            observer.Verify(
+                o => o.OnScheduledAsync(It.Is<SchemataJob>(j => j.Name == "test/scheduled/once"),
+                                        It.IsAny<CancellationToken>()), Times.Once);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -89,14 +89,13 @@ public class DefaultSchedulerShould
 
             await scheduler.UnscheduleAsync("test/unscheduled", CancellationToken.None);
 
-            observer.Verify(o => o.OnUnscheduledAsync(
-                                It.Is<SchemataJob>(j => j.Name == "test/unscheduled"
-                                                     && j.State == JobState.Paused),
-                                It.IsAny<CancellationToken>()),
-                            Times.Once);
+            observer.Verify(
+                o => o.OnUnscheduledAsync(
+                    It.Is<SchemataJob>(j => j.Name == "test/unscheduled" && j.State == JobState.Paused),
+                    It.IsAny<CancellationToken>()), Times.Once);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -111,10 +110,11 @@ public class DefaultSchedulerShould
         try {
             await scheduler.StartAsync(CancellationToken.None);
 
-            await scheduler.TriggerAsync<NoopJob>(new() {
-                Job   = "authorization/back-channel-logout/abc123",
-                Variables = new Dictionary<string, object?> { ["uri"] = "https://rp" },
-            }, CancellationToken.None);
+            await scheduler.TriggerAsync<NoopJob>(
+                new() {
+                    Job       = "authorization/back-channel-logout/abc123",
+                    Variables = new Dictionary<string, object?> { ["uri"] = "https://rp" },
+                }, CancellationToken.None);
 
             Assert.NotNull(captured);
             Assert.Equal("authorization/back-channel-logout/abc123", captured!.Name);
@@ -124,7 +124,7 @@ public class DefaultSchedulerShould
             Assert.NotNull(captured.NextRunTime);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -147,14 +147,15 @@ public class DefaultSchedulerShould
                 State        = JobState.Active,
             };
 
-            await scheduler.ScheduleAsync(job, new Dictionary<string, object?> { ["uri"] = "https://rp" }, CancellationToken.None);
+            await scheduler.ScheduleAsync(job, new Dictionary<string, object?> { ["uri"] = "https://rp" },
+                                          CancellationToken.None);
 
             Assert.NotNull(captured);
             var variables = JsonSerializer.Deserialize<Dictionary<string, object?>>(captured!.Variables!);
             Assert.Equal("https://rp", ((JsonElement)variables!["uri"]!).GetString());
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -176,7 +177,7 @@ public class DefaultSchedulerShould
                             Times.Never);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -205,7 +206,7 @@ public class DefaultSchedulerShould
                             Times.Never);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -240,7 +241,7 @@ public class DefaultSchedulerShould
             Assert.True(updated.NextRunTime > DateTime.UtcNow.AddMinutes(9));
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -257,8 +258,8 @@ public class DefaultSchedulerShould
         observer.Setup(o => o.OnSucceededAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
                                                It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
-        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
-                                            It.IsAny<Exception>(), It.IsAny<CancellationToken>()))
+        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                            It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
         var signal   = new RunSignal();
@@ -280,7 +281,7 @@ public class DefaultSchedulerShould
             Assert.NotSame(signal.Ran.Task, finished);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
@@ -292,21 +293,23 @@ public class DefaultSchedulerShould
         ExecutionState    state
     ) {
         var gate = StandardObserver();
-        gate.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+        gate.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                           It.IsAny<CancellationToken>()))
             .ReturnsAsync(outcome);
 
-        var jobs       = new Mock<Schemata.Entity.Repository.IRepository<SchemataJob>>();
-        var executions = new Mock<Schemata.Entity.Repository.IRepository<SchemataJobExecution>>();
-        var uow        = new Mock<Schemata.Entity.Repository.IUnitOfWork>();
+        var jobs       = new Mock<IRepository<SchemataJob>>();
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        var uow        = new Mock<IUnitOfWork>();
         uow.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         uow.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
         jobs.Setup(r => r.Begin()).Returns(uow.Object);
         executions.Setup(r => r.Begin()).Returns(uow.Object);
 
-        var existingJob = new SchemataJob { Name = $"test/{outcome.ToString().ToLowerInvariant()}", State = JobState.Active };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        var existingJob = new SchemataJob {
+            Name = $"test/{outcome.ToString().ToLowerInvariant()}", State = JobState.Active,
+        };
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existingJob));
 
         SchemataJobExecution? persisted = null;
@@ -314,8 +317,8 @@ public class DefaultSchedulerShould
                   .Callback<SchemataJobExecution, CancellationToken>((execution, _) => persisted = execution)
                   .Returns(Task.CompletedTask);
         executions.Setup(r => r.FirstOrDefaultAsync(
-                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
-                              It.IsAny<CancellationToken>()))
+                             It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
+                             It.IsAny<CancellationToken>()))
                   .Returns(() => new(persisted));
 
         var services = new ServiceCollection();
@@ -340,20 +343,26 @@ public class DefaultSchedulerShould
             Assert.NotNull(persisted.EndTime);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
     [Fact]
     public async Task JobBodyThrows_StateFailed() {
-        var observer = StandardObserver();
-        SchemataJob? failed = null;
-        var failedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(), It.IsAny<CancellationToken>()))
-                .Callback<SchemataJob, JobContext, Exception, CancellationToken>((j, _, _, _) => {
-                    failed = j;
-                    failedSignal.TrySetResult();
-                })
+        var          observer     = StandardObserver();
+        SchemataJob? failed       = null;
+        var          failedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                            It.IsAny<CancellationToken>()))
+                .Callback<SchemataJob, JobContext, Exception, CancellationToken>((
+                                                                                     j,
+                                                                                     _,
+                                                                                     _,
+                                                                                     _
+                                                                                 ) => {
+                                                                                     failed = j;
+                                                                                     failedSignal.TrySetResult();
+                                                                                 })
                 .Returns(Task.CompletedTask);
 
         var services = new ServiceCollection();
@@ -374,20 +383,22 @@ public class DefaultSchedulerShould
             Assert.Equal(JobState.Failed, failed!.State);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
     [Fact]
     public async Task ServiceResolutionFails_DoesNotMarkJobFailed() {
-        var observer = StandardObserver();
+        var          observer  = StandardObserver();
         SchemataJob? triggered = null;
-        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
-                .Callback<SchemataJob, JobContext, CancellationToken>((j, _, _) => triggered = j)
-                .ReturnsAsync(JobTriggerOutcome.Proceed);
+        observer
+           .Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                          It.IsAny<CancellationToken>()))
+           .Callback<SchemataJob, JobContext, CancellationToken>((j, _, _) => triggered = j)
+           .ReturnsAsync(JobTriggerOutcome.Proceed);
 
         var errorLogged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var logger      = new SignalLogger<DefaultScheduler>(level => {
+        var logger = new SignalLogger<DefaultScheduler>(level => {
             if (level == LogLevel.Error) {
                 errorLogged.TrySetResult();
             }
@@ -397,7 +408,7 @@ public class DefaultSchedulerShould
         services.AddSingleton(observer.Object);
         services.AddSingleton<IScheduledJobRegistry>(Registry(typeof(UnresolvableJob)));
 
-        // UnresolvableJob is deliberately not registered, so resolving the job instance throws.
+        // Service resolution throws because UnresolvableJob is absent from the provider.
         var sp        = services.BuildServiceProvider();
         var scheduler = new DefaultScheduler(sp, Options.Create(new SchemataSchedulingOptions()), logger);
 
@@ -406,42 +417,36 @@ public class DefaultSchedulerShould
 
             await scheduler.TriggerAsync<UnresolvableJob>(new() { Job = "test/unresolvable" }, CancellationToken.None);
 
-            // The resolution failure is logged as a system error rather than failing the job.
+            // The resolution failure logs as a system error and leaves job state unchanged.
             await errorLogged.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.NotNull(triggered);
             Assert.NotEqual(JobState.Failed, triggered!.State);
-            observer.Verify(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
-                                                 It.IsAny<CancellationToken>()),
-                            Times.Never);
+            observer.Verify(
+                o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                     It.IsAny<CancellationToken>()), Times.Never);
         } finally {
             await scheduler.StopAsync(CancellationToken.None);
-            sp.Dispose();
+            await sp.DisposeAsync();
         }
     }
 
     private static Mock<IJobLifecycleObserver> StandardObserver() {
         var observer = new Mock<IJobLifecycleObserver>();
-        observer.Setup(o => o.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        observer.Setup(o => o.OnUnscheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(JobTriggerOutcome.Proceed);
-        observer.Setup(o => o.OnSucceededAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+        observer.Setup(o => o.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
-        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(), It.IsAny<CancellationToken>()))
+        observer.Setup(o => o.OnUnscheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                               It.IsAny<CancellationToken>()))
+                .ReturnsAsync(JobTriggerOutcome.Proceed);
+        observer.Setup(o => o.OnSucceededAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                               It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                            It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
         return observer;
-    }
-
-    private sealed class NoopJob : IScheduledJob
-    {
-        #region IScheduledJob Members
-
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
-
-        #endregion
     }
 
     private static IScheduledJobRegistry Registry(params Type[] jobTypes) {
@@ -463,39 +468,56 @@ public class DefaultSchedulerShould
         Assert.True(condition());
     }
 
-    private sealed class ThrowingJob : IScheduledJob
+    #region Nested type: NoopJob
+
+    private sealed class NoopJob : IScheduledJob
     {
         #region IScheduledJob Members
 
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            throw new InvalidOperationException("job body failed");
-        }
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 
         #endregion
     }
 
-    private sealed class UnresolvableJob : IScheduledJob
+    #endregion
+
+    #region Nested type: RunSignal
+
+    private sealed class RunSignal
+    {
+        public TaskCompletionSource Ran { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    #endregion
+
+    #region Nested type: SignalJob
+
+    private sealed class SignalJob(RunSignal signal) : IScheduledJob
     {
         #region IScheduledJob Members
 
         public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            signal.Ran.TrySetResult();
             return Task.CompletedTask;
         }
 
         #endregion
     }
 
+    #endregion
+
+    #region Nested type: SignalLogger
+
     private sealed class SignalLogger<T>(Action<LogLevel> onLog) : ILogger<T>
     {
         #region ILogger<T> Members
 
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull {
             return null;
         }
 
-        public bool IsEnabled(LogLevel logLevel) {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) { return true; }
 
         public void Log<TState>(
             LogLevel                         logLevel,
@@ -510,20 +532,33 @@ public class DefaultSchedulerShould
         #endregion
     }
 
-    private sealed class RunSignal
-    {
-        public TaskCompletionSource Ran { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    }
+    #endregion
 
-    private sealed class SignalJob(RunSignal signal) : IScheduledJob
+    #region Nested type: ThrowingJob
+
+    private sealed class ThrowingJob : IScheduledJob
     {
         #region IScheduledJob Members
 
         public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            signal.Ran.TrySetResult();
-            return Task.CompletedTask;
+            throw new InvalidOperationException("job body failed");
         }
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: UnresolvableJob
+
+    private sealed class UnresolvableJob : IScheduledJob
+    {
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
+
+        #endregion
+    }
+
+    #endregion
 }

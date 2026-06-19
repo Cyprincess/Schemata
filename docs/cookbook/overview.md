@@ -15,9 +15,10 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 
 | Recipe | What it covers |
 | --- | --- |
-| [Cron Jobs](cron-jobs.md) | CronSchedule with Cronos syntax, missed-fire policy |
-| [Flow with Timers](flow-with-timers.md) | BPMN intermediate timer event, UseFlowScheduling |
-| [Flow with Events](flow-with-events.md) | BPMN event-based gateway, UseFlowEvent, CorrelateMessageAsync |
+| [Cron Jobs](cron-jobs.md) | A cron schedule with Cronos syntax and a missed-fire policy |
+| [Push Notifications](push-notifications.md) | A custom transport, a send advisor, and durable scheduled delivery |
+| [Flow with Timers](flow-with-timers.md) | A BPMN intermediate timer catch fired through the scheduler |
+| [Flow with Events](flow-with-events.md) | A BPMN event-based gateway correlated through the event bus |
 
 ## Identity, Security, and Tenancy
 
@@ -64,6 +65,3 @@ Every recipe follows this structure:
 
 - [Guides](../guides/overview.md) — step-by-step tutorials for core capabilities
 - [Documents](../documents/overview.md) — technical reference for framework internals
-- [Flow](../documents/flow/overview.md) — BPMN process engine reference
-- [Event](../documents/event/overview.md) — event bus reference
-- [Scheduling](../documents/scheduling/overview.md) — scheduler reference

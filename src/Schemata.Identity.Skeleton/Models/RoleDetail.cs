@@ -5,7 +5,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>Get response body for <see cref="Entities.SchemataRole" />.</summary>
+/// <summary>Detailed role response body.</summary>
 public class RoleDetail : IIdentifier, ICanonicalName, IDescriptive, ITimestamp, IFreshness
 {
     #region ICanonicalName Members

@@ -1,126 +1,138 @@
 # Filtering
 
-`ResourceOperationHandler.ListAsync` supports AIP-160 filter expressions and AIP-132 order-by expressions. Both are compiled to LINQ expressions at request time and applied to the entity query via `ResourceRequestContainer`. The filter and order compilers are resolved as keyed services from DI; the keys are hard-wired to `AipLanguage.Name` ("aip").
+`ResourceOperationHandler.ListAsync` accepts an AIP-160 filter and an AIP-132 order-by, compiles each to a LINQ
+expression at request time, and applies it to the entity query through `ResourceRequestContainer<TEntity>`. The
+filter and order compilers are resolved as keyed DI services under the fixed key `AipLanguage.Name` (`"aip"`).
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 193-220) |
-| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs` |
+| --- | --- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs` |
 | `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipOrderCompiler.cs`, `AipLanguage.cs` |
 | `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs` |
 
-## Filter parameter
+## `filter` parameter
 
-The `filter` query parameter accepts an AIP-160 filter expression. The expression is compiled to an `Expression<Func<TEntity, bool>>` and applied as a `Where` clause on the entity query.
-
-```
-GET /students?filter=grade>3 AND name:"alice"
-```
-
-## Order-by parameter
-
-The `order_by` query parameter accepts a comma-separated list of field names with optional `ASC` or `DESC` suffixes (default is ascending).
+The `filter` query parameter takes an AIP-160 expression compiled to `Expression<Func<TEntity, bool>>` and applied
+as a `Where` clause:
 
 ```
-GET /students?order_by=grade DESC, name ASC
+GET /v1/students?filter=age>18 AND full_name:"ali"
+```
+
+## `order_by` parameter
+
+The `order_by` query parameter takes a comma-separated list of fields with optional `ASC` (default) or `DESC`:
+
+```
+GET /v1/students?order_by=age DESC, full_name ASC
 ```
 
 ## How compilation works
 
 ```csharp
-// Filter
+// filter
 var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
-var tree = compiler.Parse(request.Filter);
-var filter = compiler.Compile<TEntity, bool>(tree);
+var tree     = compiler.Parse(request.Filter);
+var filter   = compiler.Compile<TEntity, bool>(tree);
 container.ApplyFiltering(filter);
 
-// Order
-var compiler = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name);
-var order = compiler.CompileOrder<TEntity>(request.OrderBy);
-container.ApplyOrdering(order);
+// order
+var order = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name)
+               .CompileOrder<TEntity>(request.OrderBy);
+container.ApplyOrdering(KeyOrdering<TEntity>.Compose(order));
 ```
 
-Both compilers are registered as keyed singletons under `AipLanguage.Name` by `services.AddAipExpressions()`, which `SchemataResourceFeature` calls automatically.
-
-## Hard-wired to AIP (caveat #4)
-
-`ListAsync` resolves `IExpressionCompiler` and `IOrderCompiler` by the key `AipLanguage.Name` ("aip"). This key is hard-coded in the handler. Registering a different `IExpressionCompiler` under a custom key (e.g., `"cel"`) does not affect `ListAsync` — the resource system will still use the AIP compiler for filtering and ordering.
-
-If you need CEL or a custom language for filtering, you must call the compiler directly in your own code (e.g., in a custom advisor or a non-resource endpoint). See [Custom Language](../expressions/custom-language.md) for how to register a custom compiler.
-
-## Pagination
-
-Pagination uses a cursor-based page token. The `page_token` parameter is a Brotli-compressed JSON object containing `parent`, `filter`, `order_by`, `show_deleted`, `page_size`, and `skip`, sealed with ASP.NET Core Data Protection so clients can neither read nor alter it; tokens that fail to decode throw `ValidationException` (`invalid_page_token`). The decoded token is validated against the current request parameters — if any of `parent`, `filter`, `order_by`, or `show_deleted` differ from the token, a `ValidationException` is thrown.
-
-| Parameter | Default | Max |
-|---|---|---|
-| `page_size` | 25 | 100 |
-| `skip` | 0 | unbounded |
-
-The query fetches one look-ahead row beyond the page size, and `next_page_token` is included only when that extra row exists - an exactly-full last page omits it. A negative `page_size` throws `ValidationException` (`invalid_page_size`). `total_size` computation is configurable through `TotalSizeMode` (`Exact` by default, `Estimated` via `IRepository.EstimateCountAsync`, or `None` to omit the field and skip counting), set globally on `SchemataResourceOptions.TotalSize` or per resource on `ResourceAttribute.TotalSize`.
-
-## `ResourceRequestContainer`
-
-`ResourceRequestContainer<T>` accumulates query modifications as a composable `Func<IQueryable<T>, IQueryable<T>>`:
-
-| Method | Effect |
-|---|---|
-| `ApplyFiltering(predicate)` | Appends a `Where(predicate)` clause |
-| `ApplyOrdering(order)` | Applies the order function |
-| `ApplyPaginating(token)` | Appends `Skip` and `Take` |
-| `ApplyModification(predicate)` | Appends an arbitrary `Where` clause (used for parent scoping and entitlement filtering) |
-
-All modifications compose in the order they are applied. The final `Query` function is passed to `repository.CountAsync` and `repository.ListAsync`.
+Both are registered as keyed singletons by `services.AddAipExpressions()`, which `SchemataResourceFeature` calls
+automatically. The key is fixed to `AipLanguage.Name` in the handler; registering an `IExpressionCompiler` under a
+different key (e.g. `"cel"`) does not change List behavior. To filter with another language, call its compiler
+directly from a custom advisor or endpoint — see [Custom Language](../expressions/custom-language.md).
 
 ## Supported AIP-160 operators
 
 | Operator | Syntax | Example |
-|---|---|---|
-| Equality | `=` | `name = "alice"` |
-| Inequality | `!=` | `grade != 3` |
-| Less than | `<` | `grade < 3` |
-| Less than or equal | `<=` | `grade <= 3` |
-| Greater than | `>` | `grade > 3` |
-| Greater than or equal | `>=` | `grade >= 3` |
-| Has (substring/membership) | `:` | `name:"ali"` |
-| Wildcard | `*` | `name:*` (presence check) |
-| Logical AND | `AND` | `grade > 2 AND name:"ali"` |
-| Logical OR | `OR` | `grade = 1 OR grade = 2` |
-| Logical NOT | `NOT` | `NOT grade = 3` |
-| Negation | `-` | `-grade = 3` |
-| Grouping | `(...)` | `(grade > 2 OR name:"ali")` |
+| --- | --- | --- |
+| Equality | `=` | `full_name = "alice"` |
+| Inequality | `!=` | `age != 20` |
+| Less than | `<` | `age < 25` |
+| Less than or equal | `<=` | `age <= 25` |
+| Greater than | `>` | `age > 18` |
+| Greater than or equal | `>=` | `age >= 18` |
+| Has (substring/membership) | `:` | `full_name:"ali"` |
+| Wildcard presence | `*` (with `:`) | `tags:*` |
+| Logical AND | `AND` | `age > 18 AND full_name:"ali"` |
+| Logical OR | `OR` | `age = 1 OR age = 2` |
+| Logical NOT | `NOT` / `-` | `NOT age = 3`, `-age = 3` |
+| Grouping | `(...)` | `(age > 18 OR full_name:"ali")` |
 
-For the full grammar and built-in functions (`timestamp(...)`, `duration(...)`), see [AIP Expressions](../expressions/aip.md).
+For the full grammar, value types, and built-in functions (`timestamp`, `duration`), see
+[AIP Expressions](../expressions/aip.md).
 
-## Error handling
+## Pagination
 
-If the filter or order expression fails to parse, `ListAsync` catches `ParseException` and `ArgumentException` and throws a `ValidationException` with:
+`PageToken` carries `Parent`, `Filter`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON,
+Brotli-compressed, sealed with ASP.NET Core Data Protection (purpose
+`Schemata.Resource.Foundation.PageToken`), and emitted as a URL-safe Base64 string, so a client can neither read
+nor forge it. `PageToken.FromStringAsync` rejects a tampered or malformed token with `ValidationException`
+(`InvalidPageToken`).
 
-- `Field`: `"filter"` or `"order_by"` (wire name)
-- `Reason`: `FieldReasons.InvalidFilter` or `FieldReasons.InvalidOrderBy`
+| Parameter | Default | Cap |
+| --- | --- | --- |
+| `page_size` | 25 | 100 |
+| `skip` | 0 | unbounded |
+
+The query fetches one look-ahead row beyond `page_size`; `next_page_token` is emitted only when that extra row
+exists, so an exactly-full last page omits it per AIP-158. A negative `page_size` throws `ValidationException`
+(`InvalidPageSize`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the request
+throws `ValidationException` (`InvalidPageToken`).
+
+`total_size` follows `TotalSizeMode`: `Exact` (default) counts with `CountAsync`, `Estimated` uses
+`EstimateCountAsync`, `None` omits the field and skips counting. Set it globally on
+`SchemataResourceOptions.TotalSize` or per resource on `ResourceAttribute.TotalSize`.
+
+## `ResourceRequestContainer`
+
+`ResourceRequestContainer<T>` accumulates query modifications into a composable
+`Func<IQueryable<T>, IQueryable<T>>`:
+
+| Method | Effect |
+| --- | --- |
+| `ApplyFiltering(predicate)` | Appends a `Where(predicate)` |
+| `ApplyOrdering(order)` | Applies the order function |
+| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` (with the look-ahead row) |
+| `ApplyModification(predicate)` | Appends an arbitrary `Where` (parent scoping, entitlement filtering) |
+
+The composed `Query` function is passed to `CountAsync` and `ListAsync`.
+
+## Error mapping
+
+A filter or order that fails to parse raises `ParseException` or `ArgumentException`, which `ListAsync` converts to
+`ValidationException` with `Field` `filter` or `order_by` and reason `FieldReasons.InvalidFilter` or
+`FieldReasons.InvalidOrderBy`. The HTTP transport surfaces this as `422`; gRPC surfaces it as
+`InvalidArgument`.
 
 ## Extension points
 
-- Implement `IResourceListRequestAdvisor<TEntity>` to add additional predicates via `container.ApplyModification(predicate)` (e.g., entitlement filtering, tenant scoping).
-- The `ResourceRequestContainer` is passed to all list request advisors, so any advisor can add predicates before the query executes.
+- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyModification`
+  (entitlement, tenant scoping). The container is passed to every list request advisor.
 
-## Design motivation
+## Design rationale
 
-Compiling filter expressions to LINQ at request time (rather than evaluating them in memory) lets the database engine apply the filter efficiently. The `ExpressionCache` (see [Expressions Overview](../expressions/overview.md)) caches compiled expressions by a SHA-256 key so repeated identical filters don't re-compile.
+Compiling filters to LINQ (rather than evaluating in memory) lets the database apply them. The shared
+`ExpressionCache` keys compiled expressions by a SHA-256 hash so a repeated identical filter does not recompile —
+see [Expressions Overview](../expressions/overview.md).
 
 ## Caveats
 
-- The filter and order compilers are hard-wired to `AipLanguage.Name`. Registering a CEL or custom compiler does not affect `ListAsync`.
-- The `has` operator (`:`) compiles to a `Contains` call on strings and a membership check on collections. Its behavior on non-string, non-collection properties is undefined and may throw at runtime.
-- Wildcard `*` in a `has` expression compiles to a presence check (not-null, not-empty). It does not support glob patterns.
-- `CountAsync` runs before pagination. On large tables, consider caching the count or using approximate counts.
+- The filter and order compilers are fixed to `AipLanguage.Name`.
+- The `has` operator (`:`) compiles to a `Contains` call on strings and a membership check on collections;
+  `field:*` is a presence check, not a glob pattern.
+- `CountAsync` runs before paging; on large tables use `TotalSizeMode.Estimated` or `None`.
 
 ## See also
 
-- [Resource Overview](overview.md)
 - [Read Pipeline](read-pipeline.md)
 - [AIP Expressions](../expressions/aip.md)
 - [Expressions Overview](../expressions/overview.md)
-- [Custom Language](../expressions/custom-language.md)
+- [Filtering and Pagination](../../guides/filtering-and-pagination.md)

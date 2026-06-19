@@ -23,8 +23,8 @@ public sealed class AnonymousAttribute : Attribute
     }
 
     /// <summary>
-    ///     Allows anonymous access for named operation identifiers (e.g. state-machine
-    ///     event names) that are not part of the standard <see cref="Entities.Operations" /> enum.
+    ///     Allows anonymous access for named operation identifiers such as state-machine
+    ///     event names outside the standard <see cref="Entities.Operations" /> enum.
     /// </summary>
     /// <param name="first">The first operation name.</param>
     /// <param name="rest">Additional operation names.</param>

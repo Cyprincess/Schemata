@@ -19,6 +19,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceCodeExchangePkce{TApp, TToken}" />.</summary>
 public static class AdviceCodeExchangePkce
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceCodeExchangeValidation.DefaultOrder + 10_000_000;
 }
 
@@ -47,7 +48,6 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
 {
     #region ICodeExchangeAdvisor<TApp,TToken> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceCodeExchangePkce.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

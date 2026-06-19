@@ -7,7 +7,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public enum MIEventBehavior
 {
-    /// <summary>No aggregation - each instance fires independently.</summary>
+    /// <summary>Each instance completion fires independently.</summary>
     None,
 
     /// <summary>The activity completes as soon as one instance finishes.</summary>

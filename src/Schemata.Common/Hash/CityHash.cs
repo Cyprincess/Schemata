@@ -59,9 +59,6 @@ public class CityHash {
     private const uint C2 = 0x1b873593;
 
     #region . FMix .
-    /// <summary>
-    /// A 32-bit to 32-bit integer hash copied from Murmur3.
-    /// </summary>
     private static uint FMix(uint h) {
         h ^= h >> 16;
         h *= 0x85ebca6b;
@@ -73,10 +70,6 @@ public class CityHash {
     #endregion
 
     #region . Rotate .
-    /// <summary>
-    /// Bitwise right rotate.
-    /// Normally this will compile to a single instruction, especially if the shift is a manifest constant.
-    /// </summary>
 #if NETSTANDARD
         [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]
 #endif
@@ -141,12 +134,6 @@ public class CityHash {
     #endregion
 
     #region . Fetch32 .
-    /// <summary>
-    /// Returns a 32-bit unsigned integer converted from four bytes at a specified position in a byte array.
-    /// </summary>
-    /// <param name="value">An array of bytes.</param>
-    /// <param name="index">The starting position within value.</param>
-    /// <returns>A 32-bit unsigned integer formed by four bytes beginning at <paramref name="index"/>.</returns>
 #if NETSTANDARD
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]
@@ -154,12 +141,6 @@ public class CityHash {
     private static uint Fetch32(byte[] value, int index = 0) {
         return BitConverter.ToUInt32(value, index);
     }
-    /// <summary>
-    /// Returns a 32-bit unsigned integer converted from four bytes at a specified position in a byte array.
-    /// </summary>
-    /// <param name="value">An array of bytes.</param>
-    /// <param name="index">The starting position within value.</param>
-    /// <returns>A 32-bit unsigned integer formed by four bytes beginning at <paramref name="index"/>.</returns>
 #if NETSTANDARD
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]
@@ -171,12 +152,6 @@ public class CityHash {
     #endregion
 
     #region . Fetch64 .
-    /// <summary>
-    /// Returns a 64-bit unsigned integer converted from eight bytes at a specified position in a byte array.
-    /// </summary>
-    /// <param name="value">An array of bytes.</param>
-    /// <param name="index">The starting position within <paramref name="value"/>.</param>
-    /// <returns>A 64-bit unsigned integer formed by the eight bytes beginning at <paramref name="index"/>.</returns>
 #if NETSTANDARD
         [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]
 #endif
@@ -330,8 +305,7 @@ public class CityHash {
     /// <returns>A 32-bit city hash.</returns>
     /// <exception cref="System.ArgumentNullException">value</exception>
     /// <remarks>
-    /// The city hash is designed to compute hash for STRINGs only!
-    /// The city hash "works" with other types of data, but keep in mind it was not built for it.
+    /// CityHash is designed for string data.
     /// </remarks>
     protected internal static uint CityHash32(byte[] value) {
         if (value == null)
@@ -445,8 +419,7 @@ public class CityHash {
     /// <param name="value">The encoded string.</param>
     /// <returns>The 64-bit city hash.</returns>
     /// <remarks>
-    /// The city hash is designed to compute hash for STRINGs only!
-    /// The city hash "works" with other types of data, but keep in mind it was not built for it.
+    /// CityHash is designed for string data.
     /// </remarks>
     protected internal static ulong CityHash64(byte[] value) {
         if (value.Length <= 16)
@@ -540,7 +513,7 @@ public class CityHash {
     #region . CityHash128 .
 
     /// <summary>
-    /// Computes the 128-bit city hash and are tuned for strings of at least a few hundred bytes.
+    /// Computes the 128-bit city hash tuned for strings of at least a few hundred bytes.
     /// </summary>
     /// <param name="value">The string value.</param>
     /// <returns>The 128-bit city hash.</returns>
@@ -553,7 +526,7 @@ public class CityHash {
     }
 
     /// <summary>
-    /// Computes the 128-bit city hash and are tuned for strings of at least a few hundred bytes using
+    /// Computes the 128-bit city hash tuned for strings of at least a few hundred bytes using
     /// the specified <paramref name="seed"/>.
     /// </summary>
     /// <param name="value">The string value.</param>
@@ -573,8 +546,7 @@ public class CityHash {
     /// <param name="value">The encoded string.</param>
     /// <returns>The 128-bit city hash.</returns>
     /// <remarks>
-    /// The city hash is designed to compute hash for STRINGs only!
-    /// The city hash "works" with other types of data, but keep in mind it was not built for it.
+    /// CityHash is designed for string data.
     /// </remarks>
 #if NETSTANDARD
         [TargetedPatchingOptOut("Performance critical to inline across NGen image boundaries.")]
@@ -586,16 +558,15 @@ public class CityHash {
     }
 
     /// <summary>
-    /// Computes the 128-bit city hash and are tuned for strings of at least a few hundred bytes using
+    /// Computes the 128-bit city hash tuned for strings of at least a few hundred bytes using
     /// the specified <paramref name="seed"/> starting at a <paramref name="offset"/> position.
     /// </summary>
     /// <param name="value">The encoded string.</param>
-    /// <param name="seed">The seed used by the hash alrorithm.</param>
+    /// <param name="seed">The seed used by the hash algorithm.</param>
     /// <param name="offset">The offset position in the byte array.</param>
     /// <returns>The 128-bit city hash.</returns>
     /// <remarks>
-    /// The city hash is designed to compute hash for STRINGs only!
-    /// The city hash "works" with other types of data, but keep in mind it was not built for it.
+    /// CityHash is designed for string data.
     /// </remarks>
 #if NETSTANDARD
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -746,9 +717,6 @@ public class CityHash {
     #endregion
 
     #region . HashLen17to32 .
-    /// <summary>
-    /// This probably works well for 16-byte strings as well, but it may be overkill in that case.
-    /// </summary>
 #if NETSTANDARD
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
@@ -766,9 +734,6 @@ public class CityHash {
     #endregion
 
     #region . HashLen33to64 .
-    /// <summary>
-    /// Return an 8-byte hash for 33 to 64 bytes.
-    /// </summary>
 #if NETSTANDARD
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
@@ -815,10 +780,6 @@ public class CityHash {
     #endregion
 
     #region . WeakHashLen32WithSeeds .
-    /// <summary>
-    /// Return a 16-byte hash for 48 bytes. Quick and dirty.
-    /// Callers do best to use "random-looking" values for a and b.
-    /// </summary>
     private static Uint128 WeakHashLen32WithSeeds(ulong w, ulong x, ulong y, ulong z, ulong a, ulong b) {
         a += w;
         b =  Rotate(b + a + z, 21);

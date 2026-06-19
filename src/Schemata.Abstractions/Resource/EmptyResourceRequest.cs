@@ -10,9 +10,7 @@ namespace Schemata.Abstractions.Resource;
 /// </summary>
 public sealed class EmptyResourceRequest : ICanonicalName
 {
-    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
     public string? CanonicalName { get; set; }
 }

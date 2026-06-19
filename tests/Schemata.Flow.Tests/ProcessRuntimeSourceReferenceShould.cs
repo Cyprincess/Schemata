@@ -11,8 +11,7 @@ public class ProcessRuntimeSourceReferenceShould
     public async Task StartProcess_WithSource_CapturesSourceReferenceColumns() {
         var fixture = new ProcessRuntimeFixture();
         var source = new ProcessRuntimeFixture.SourceEntity {
-            CanonicalName = "orders/1",
-            Timestamp     = Identifiers.NewUid(),
+            CanonicalName = "orders/1", Timestamp = Identifiers.NewUid(),
         };
 
         await fixture.Runtime.StartProcessInstanceAsync("approval", sourceEntity: source);
@@ -39,7 +38,11 @@ public class ProcessRuntimeSourceReferenceShould
     public async Task StartProcess_SourceNotImplementingConcurrency_ThrowsInvalidOperationException() {
         var fixture = new ProcessRuntimeFixture();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Runtime.StartProcessInstanceAsync("approval", sourceEntity: new ProcessRuntimeFixture.NamedOnlySource()).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime
+                                                                         .StartProcessInstanceAsync(
+                                                                              "approval",
+                                                                              sourceEntity: new ProcessRuntimeFixture.
+                                                                                  NamedOnlySource())
+                                                                         .AsTask());
     }
 }

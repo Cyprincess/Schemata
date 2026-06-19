@@ -4,4 +4,7 @@ using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Skeleton.Advisors;
 
+/// <summary>
+///     Advises the created user and registration request after user creation.
+/// </summary>
 public interface IIdentityRegisterUserAdvisor : IAdvisor<SchemataUser, RegisterRequest>;

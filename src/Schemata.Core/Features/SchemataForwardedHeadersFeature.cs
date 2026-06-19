@@ -14,6 +14,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataForwardedHeadersFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for forwarded headers.
+    /// </summary>
     public const int DefaultPriority = Orders.Base;
 
     public override int Priority => DefaultPriority;

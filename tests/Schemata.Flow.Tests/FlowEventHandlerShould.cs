@@ -25,19 +25,34 @@ public class FlowEventHandlerShould
 
         await handler.HandleAsync(new TestEvent(), CancellationToken.None);
 
-        runtime.Verify(r => r.ThrowSignalAsync("invoice_paid", It.IsAny<IEvent>(), null, It.IsAny<CancellationToken>()), Times.Once);
-        runtime.Verify(r => r.ThrowSignalAsync("invoice_cancelled", It.IsAny<IEvent>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        runtime.Verify(r => r.ThrowSignalAsync("invoice_paid", It.IsAny<IEvent>(), null, It.IsAny<CancellationToken>()),
+                       Times.Once);
+        runtime.Verify(
+            r => r.ThrowSignalAsync("invoice_cancelled", It.IsAny<IEvent>(), null, It.IsAny<CancellationToken>()),
+            Times.Once);
         runtime.VerifyNoOtherCalls();
     }
 
+    #region Nested type: TestEvent
+
     private sealed class TestEvent : IEvent;
+
+    #endregion
+
+    #region Nested type: TestEventDispatchContext
 
     private sealed class TestEventDispatchContext : IEventDispatchContext
     {
+        #region IEventDispatchContext Members
+
         public IReadOnlyList<IEventSubscription>? MatchedSubscriptions { get; private set; }
 
         public void SetSubscriptions(IReadOnlyList<IEventSubscription>? subscriptions) {
             MatchedSubscriptions = subscriptions;
         }
+
+        #endregion
     }
+
+    #endregion
 }

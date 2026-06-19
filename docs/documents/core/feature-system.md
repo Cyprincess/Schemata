@@ -1,6 +1,9 @@
 # Feature System
 
-Every capability in Schemata is packaged as a **feature**: a class that hooks into three lifecycle phases (service registration, middleware pipeline, endpoint mapping) and executes in a deterministic order controlled by two integer properties. The feature system is the mechanism that turns a flat list of `Use*` calls into a correctly-ordered ASP.NET Core pipeline.
+A **feature** is a unit of capability that hooks into three startup phases — service
+registration, middleware pipeline, endpoint mapping — and runs in a deterministic order set by
+two integer properties. The feature system orders the flat list of `Use*` calls into a
+deterministic ASP.NET Core pipeline regardless of call order.
 
 ## Where the code lives
 
@@ -8,13 +11,13 @@ Every capability in Schemata is packaged as a **feature**: a class that hooks in
 | --- | --- |
 | `Schemata.Core` | `Features/ISimpleFeature.cs`, `Features/FeatureBase.cs` |
 | `Schemata.Core` | `Features/DependsOnAttribute.cs`, `Features/DependsOnAttribute\`1.cs`, `Features/InformationAttribute.cs` |
-| `Schemata.Core` | `SchemataBuilder.cs`, `Configurators.cs`, `SchemataOptions.cs` |
-| `Schemata.Core` | `Extensions/SchemataBuilderExtensions.cs` |
-| `Schemata.Abstractions` | `SchemataConstants.cs` (Orders class) |
+| `Schemata.Core` | `SchemataBuilder.cs`, `Configurators.cs`, `Extensions/SchemataOptionsExtensions.cs` |
+| `Schemata.Abstractions` | `IFeature.cs`, `SchemataConstants.cs` (`Orders`) |
 
 ## ISimpleFeature and FeatureBase
 
-`ISimpleFeature` (in `Schemata.Core.Features`) extends `IFeature` (from `Schemata.Abstractions`) and defines three lifecycle hooks:
+`Schemata.Core.Features.ISimpleFeature` extends `Schemata.Abstractions.IFeature` and declares the
+three lifecycle hooks:
 
 ```csharp
 public interface ISimpleFeature : IFeature
@@ -42,7 +45,7 @@ public interface ISimpleFeature : IFeature
 }
 ```
 
-`IFeature` (from `Schemata.Abstractions`) declares the two ordering properties:
+`IFeature` declares the two ordering properties:
 
 ```csharp
 public interface IFeature
@@ -52,83 +55,78 @@ public interface IFeature
 }
 ```
 
-`FeatureBase` is the abstract base class providing no-op implementations of all three hooks. Most features extend it and override only what they need:
+`FeatureBase` provides no-op implementations of all three hooks and the default ordering:
 
 ```csharp
 public abstract class FeatureBase : ISimpleFeature
 {
     public virtual int Order    => Priority;
     public virtual int Priority => int.MaxValue;
-
-    public virtual void ConfigureServices(...)    { }
-    public virtual void ConfigureApplication(...) { }
-    public virtual void ConfigureEndpoints(...)   { }
+    // virtual no-op ConfigureServices / ConfigureApplication / ConfigureEndpoints
 }
 ```
 
-`Order` defaults to `Priority`. Features that need different ordering for service registration versus middleware activation override `Order` independently.
+`Order` defaults to `Priority`. A feature whose service registration must sit at a different
+position than its middleware overrides `Order` separately.
 
 ## Order vs Priority
-
-These two properties control execution sequence across two different phases:
 
 | Property | Controls | Sorted in |
 | --- | --- | --- |
 | `Order` | `ConfigureServices` sequence | `SchemataBuilder.Invoke` |
 | `Priority` | `ConfigureApplication` and `ConfigureEndpoints` sequence | `SchemataStartup.Configure` |
 
-Both sorts are ascending. Lower values execute first. Most built-in features set only `Priority` and let `Order` inherit the same value via the `FeatureBase` default.
+Both sorts are ascending; lower runs first. Ties resolve in dictionary iteration order.
 
-`SchemataConstants.Orders` defines three anchor constants:
+`SchemataConstants.Orders` defines three anchors:
 
 | Constant | Value | Purpose |
 | --- | --- | --- |
-| `Base` | 100,000,000 | Anchor for built-in core features |
-| `Extension` | 400,000,000 | Anchor for extension feature chains |
-| `Max` | 900,000,000 | Terminal anchor for features that must run last |
+| `Base` | 100,000,000 | Anchor for built-in core features and advisors |
+| `Extension` | 400,000,000 | Anchor for extension feature chains (`Base + 300M`) |
+| `Max` | 900,000,000 | Terminal anchor for units that must run last |
 
-The range `[100_000_000, 900_000_000]` is reserved for built-in and extension features. User features pick values outside that range. See [Built-in Features](built-in-features.md) for the complete priority table.
+The range `[100_000_000, 900_000_000]` is reserved for built-in and extension features. User
+features pick values outside it. The complete table is in [Built-in Features](built-in-features.md).
 
-## Feature lifecycle
+## Lifecycle
 
-Features participate in three phases during application startup:
+### ConfigureServices
 
-### 1. ConfigureServices
+Runs inside `SchemataBuilder.Invoke` at `UseSchemata` time, after staged services flush into the
+host container. Features are sorted by `Order`. Each receives the host `IServiceCollection`, the
+shared `SchemataOptions`, the `Configurators` registry, the `IConfiguration`, and the
+`IWebHostEnvironment`. A feature retrieves and consumes its user-supplied options delegate via
+`configurators.PopOrDefault<TOptions>()`.
 
-Called during `SchemataBuilder.Invoke`, which runs inside `AddSchemata` at `UseSchemata` time. Features are sorted by `Order` (ascending). Each feature receives:
+After all features run, `Configurators.Invoke(services)` wraps every remaining delegate as an
+`IConfigureOptions<T>` singleton.
 
-- `IServiceCollection services` — the host service collection.
-- `SchemataOptions schemata` — the shared options container.
-- `Configurators configurators` — the deferred configurator registry. Features call `configurators.PopOrDefault<TOptions>()` to retrieve and consume user-provided option delegates.
-- `IConfiguration configuration` — the application configuration.
-- `IWebHostEnvironment environment` — the hosting environment.
+### ConfigureApplication
 
-After all features run, `Configurators.Invoke(services)` flushes any remaining (unconsumed) configurators as `IConfigureOptions<T>` singletons into the DI container.
+Runs from `SchemataStartup` (an `IStartupFilter`) ahead of the rest of the middleware pipeline.
+Features are sorted by `Priority`. This is where a feature inserts middleware via `app.Use*(...)`.
 
-### 2. ConfigureApplication
+### ConfigureEndpoints
 
-Called by `SchemataStartup` (an `IStartupFilter`) before the rest of the middleware pipeline. Features are sorted by `Priority` (ascending). This is where features add middleware via `app.Use*(...)`.
-
-### 3. ConfigureEndpoints
-
-Called by `SchemataStartup` inside `app.UseEndpoints(...)`, but only if an `EndpointDataSource` is registered. Features are sorted by `Priority` (ascending). This is where features map routes via `IEndpointRouteBuilder`.
-
-After both phases complete, `app.CleanSchemata()` removes the features dictionary from `SchemataOptions` to free memory.
+Runs from `SchemataStartup` inside `app.UseEndpoints(...)`, and only when an `EndpointDataSource`
+is registered. Features are sorted by `Priority`. This is where a feature maps routes on the
+`IEndpointRouteBuilder`. Afterwards, `app.CleanSchemata()` drops the features dictionary.
 
 ## Use* extension methods
 
-Each `Use*` method on `SchemataBuilder` follows the same pattern:
+A `Use*` method follows one pattern:
 
 1. Accept an optional `Action<TOptions>` for the feature's options.
-2. Store the options delegate in `Configurators` via `builder.Configure<TOptions>(...)`.
-3. Register the feature type via `builder.AddFeature<TFeature>()`.
+2. Stage that delegate with `builder.Configure<TOptions>(...)`.
+3. Register the feature type with `builder.AddFeature<TFeature>()`.
 4. Return the builder for chaining.
 
-`UseRouting` registers `SchemataRoutingFeature` directly. `UseCors` stores a `CorsOptions` delegate first and then registers `SchemataCorsFeature`; the feature retrieves the delegate from `Configurators` during `ConfigureServices`.
+`UseRouting()` registers `SchemataRoutingFeature` directly. `UseCors(...)` stages a `CorsOptions`
+delegate, then registers `SchemataCorsFeature`, which pops the delegate during `ConfigureServices`.
 
-Because features are sorted by `Priority` at startup, the call order of `Use*` methods is irrelevant. The pipeline is always deterministic.
-
-For service registrations that do not belong to any feature, `SchemataBuilder.ConfigureServices(Action<IServiceCollection>)` exposes a staging collection that is flushed into the host container before any feature's `ConfigureServices` runs:
+For registrations that belong to no feature, `SchemataBuilder.ConfigureServices(Action<IServiceCollection>)`
+writes straight into the staging collection, flushed before any feature runs:
 
 ```csharp
 builder.UseSchemata(schema => {
@@ -141,70 +139,80 @@ builder.UseSchemata(schema => {
 
 ## Configurators
 
-`Configurators` is a `Type`-keyed dictionary of deferred `Action<T>` delegates. `Set<T>(action)` merges: if a delegate for `T` already exists, the new one is chained after it (post-write composes after pre-write). Features consume entries via `Pop<T>()` (throws if absent) or `PopOrDefault<T>()` (returns a no-op if absent).
+`Configurators` is a `Type`-keyed registry of deferred `Action<T>` delegates. `Set<T>(action)`
+chains: an existing delegate runs first, the new one after. Features consume entries via `Pop<T>()`
+(throws `KeyNotFoundException` when absent) or `PopOrDefault<T>()` (returns a no-op when absent). A
+two-parameter variant keyed by the `(T1, T2)` value-tuple handles callbacks such as
+`AuthenticationBuilder` that take two arguments.
 
-A two-parameter variant keyed by `(T1, T2)` value-tuple handles callbacks like `AuthenticationBuilder` that require two arguments.
+`Configurators.Invoke(services)` converts each surviving delegate into a `ConfigureNamedOptions<T>`
+under `Options.DefaultName`, registered as an `IConfigureOptions<T>` singleton.
 
-After all features have run `ConfigureServices`, `Configurators.Invoke(services)` converts any remaining unconsumed delegates into `IConfigureOptions<T>` registrations via `ConfigureNamedOptions<T>` and `Activator.CreateInstance`.
+## DependsOn and Information
 
-## DependsOn
+A feature declares prerequisites with two attribute forms, processed during
+`SchemataOptionsExtensions.AddFeature`:
 
-Features declare dependencies using two attribute forms:
+- **`[DependsOn<T>]`** (`DependsOnAttribute<T>`) — typed dependency. When the dependency is not
+  already registered, `AddFeature` registers it first, recursively. `UseControllers()` pulls in
+  `SchemataRoutingFeature` this way.
+- **`[DependsOn("Fully.Qualified.Name")]`** (`DependsOnAttribute`) — string dependency for
+  cross-assembly cases where the type cannot be referenced. The name resolves through
+  `AppDomainTypeCache.GetType`, and `AddFeature` only checks `HasFeature(dependency)`; it does
+  **not** auto-register. A missing required dependency logs at `LogLevel.Error`; setting
+  `Optional = true` drops that to `LogLevel.Information`.
+- **`[Information("message", args...)]`** — a registration-time log line, emitted only when
+  `SchemataLoggingFeature` is registered. `Level` defaults to `Information`.
+  `SchemataHttpLoggingFeature` carries two such warnings about performance and PII logging.
 
-**`[DependsOn<T>]`** (generic, `DependsOnAttribute<T>`) — typed dependency. The dependency is automatically registered before the declaring feature during `SchemataOptionsExtensions.AddFeature`. The recursion is automatic, so `UseControllers()` pulls in `SchemataRoutingFeature` without the user naming it.
+Only attributes in the `Schemata.Core.Features` namespace are processed; others are ignored.
 
-**`[DependsOn("Fully.Qualified.Name")]`** (string, `DependsOnAttribute`) — for cross-assembly dependencies where the type cannot be directly referenced. Resolved via `AppDomainTypeCache.GetType`. The string form does **not** auto-register the dependency; it only checks `HasFeature(dependency)` after resolving the name. Setting `Optional = true` downgrades a missing dependency from `LogLevel.Error` to `LogLevel.Information`.
-
-**`[Information("message", args...)]`** — attaches a log line that the framework emits when the feature is registered, provided `SchemataLoggingFeature` is active. `Level` controls the severity (default `Information`). `SchemataHttpLoggingFeature` carries one warning about PII logging.
-
-Key dependency chains in the built-in and extension features:
+Key dependency chains across built-in and extension features:
 
 | Feature | Depends on |
 | --- | --- |
-| `SchemataTransportHttpFeature` | `SchemataDeveloperExceptionPageFeature`, `SchemataControllersFeature`, `SchemataJsonSerializerFeature` |
-| `SchemataTransportGrpcFeature` | `SchemataRoutingFeature` |
-| `SchemataSessionFeature<T>` | `SchemataCookiePolicyFeature` |
 | `SchemataControllersFeature` | `SchemataRoutingFeature` |
+| `SchemataWellKnownFeature` | `SchemataRoutingFeature` |
+| `SchemataSessionFeature<T>` | `SchemataCookiePolicyFeature` |
+| `SchemataTransportHttpFeature` | `SchemataControllersFeature`, `SchemataJsonSerializerFeature`, `SchemataDeveloperExceptionPageFeature` |
+| `SchemataTransportGrpcFeature` | `SchemataRoutingFeature` |
 
 ## SchemataOptions
 
-`SchemataOptions` is a `string`-keyed `object` bag plus an `ILoggerFactory`. It is registered as a singleton and shared across all features.
+`SchemataOptions` is a `string`-keyed `object` bag plus an `ILoggerFactory`, registered as a
+singleton:
 
 ```csharp
-// Store a value (null removes the key)
-schemata.Set<MyConfig>("MyFeature:Config", config);
-
-// Retrieve without removing
-var config = schemata.Get<MyConfig>("MyFeature:Config");
-
-// Retrieve and remove (one-time consumption)
-var config = schemata.Pop<MyConfig>("MyFeature:Config");
+schemata.Set<MyConfig>("MyFeature:Config", config); // null removes the key
+var keep = schemata.Get<MyConfig>("MyFeature:Config"); // read
+var once = schemata.Pop<MyConfig>("MyFeature:Config"); // read and remove
 ```
 
-The registered features dictionary is stored inside `SchemataOptions` under the key `"Features"`. Extension methods on `SchemataOptions` manage it: `AddFeature<T>()`, `HasFeature<T>()`, `GetFeatures()`. `AddFeature` deduplicates by `RuntimeTypeHandle`, so calling `UseControllers()` twice registers the feature only once.
+The registered features live under the `"Features"` key. The extension methods
+`AddFeature<T>()`, `HasFeature<T>()`, and `GetFeatures()` manage them. `AddFeature` deduplicates by
+`RuntimeTypeHandle`, so `UseControllers()` called twice registers the feature once.
+`HasFeature(typeof(SchemataSessionFeature<>))` is the open-generic check — it matches any closed
+instantiation.
 
-`HasFeature(typeof(SchemataSessionFeature<>))` is the open-generic existence check — it matches any closed instantiation of the generic feature.
+## Design rationale
 
-## Extension points
-
-- Implement `ISimpleFeature` (or extend `FeatureBase`) and call `builder.AddFeature<T>()`.
-- Add a `Use*` extension method on `SchemataBuilder` in the `Microsoft.AspNetCore.Builder` namespace (with `// ReSharper disable once CheckNamespace`) so it appears alongside the built-in methods.
-- Declare `[DependsOn<T>]` on your feature class to pull in prerequisites automatically.
-
-## Design motivation
-
-Sorting by `Order` and `Priority` independently lets a feature register its services at one position in the DI graph while inserting its middleware at a different position in the pipeline. The tenancy feature uses this: its `Order` is `900_000_000` (services register last, after all other features have set up their stores) while its `Priority` is `160_000_000` (middleware runs early, before routing).
-
-The `Configurators` dictionary decouples the user-facing fluent API from the DI container. Multiple `Use*` calls can compose their options delegates without knowing about each other, and features can take ownership of a delegate via `Pop` to prevent double-application.
+Sorting `Order` and `Priority` independently lets a feature register its services at one point in
+the DI graph and insert its middleware at another point in the pipeline. The tenancy feature uses
+this: `Order` is `Orders.Max` (900M, services register last, after every store is set up) while
+`Priority` is 160M (middleware runs early, before routing).
 
 ## Caveats
 
-- Features added during another feature's `ConfigureServices` are picked up by `ConfigureApplication` and `ConfigureEndpoints` only if they were already in the sorted list when `Invoke` ran. Late additions miss `ConfigureServices`.
-- `SchemataControllersFeature` strips every `Schemata.*` `AssemblyPart` from MVC's `ApplicationPartManager`. To expose a controller from a `Schemata.*` assembly, register a `SchemataExtensionPart<T>` for it.
-- `AddFeature` deduplicates by `RuntimeTypeHandle`. `SchemataSessionFeature<MyStore>` and `SchemataSessionFeature<OtherStore>` are two different features and both will be registered.
+- `AddFeature` deduplicates by `RuntimeTypeHandle`. `SchemataSessionFeature<MyStore>` and
+  `SchemataSessionFeature<OtherStore>` are distinct features; both register.
+- `SchemataControllersFeature` removes every `Schemata.*` `AssemblyPart` from MVC's
+  `ApplicationPartManager`. Expose a controller from a `Schemata.*` assembly by registering a
+  `SchemataExtensionPart<T>` for it.
+- A feature added during another feature's `ConfigureServices` misses `ConfigureServices` if it
+  was not in the sorted list when `Invoke` ran.
 
 ## See also
 
-- [Core Overview](overview.md) — startup sequence and three-bucket model
-- [Built-in Features](built-in-features.md) — authoritative priority table
+- [Core Overview](overview.md) — startup sequence and the three-bucket model
+- [Built-in Features](built-in-features.md) — the authoritative priority table
 - [Advice Pipeline](advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`

@@ -4,9 +4,10 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Authorization.Skeleton.Models;
 
-/// <summary>Create/update request body for <see cref="Entities.SchemataScope" />.</summary>
+/// <summary>Create or update request body for <see cref="Entities.SchemataScope" /> resources.</summary>
 public class ScopeRequest : ICanonicalName, IDescriptive, IFreshness
 {
+    /// <summary>API resources that this scope grants access to.</summary>
     public ICollection<string>? Resources { get; set; }
 
     #region ICanonicalName Members

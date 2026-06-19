@@ -15,6 +15,7 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Sends a password-reset code to a confirmed contact address.</summary>
     public async Task<IdentityResult<Unit>> ForgotAsync(
         ForgetRequest     request,
         ClaimsPrincipal   principal,
@@ -58,6 +59,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Resets a password with a password-reset code.</summary>
     public async Task<IdentityResult<Unit>> ResetAsync(
         ResetRequest      request,
         ClaimsPrincipal   principal,
@@ -76,11 +78,9 @@ public sealed partial class IdentityHandler<TUser>
                 throw new AuthorizationException();
         }
 
-        // Unauthenticated reset/confirm flows must not let an attacker distinguish "no such
-        // account", "account exists but contact unconfirmed", and "token invalid". All three
-        // failure modes surface as NoContentException — the same shape ForgotAsync uses —
-        // so the only observable difference between success and failure is the absence of a
-        // delivered reset code.
+        // Unauthenticated reset and confirm flows share one failure shape for missing accounts,
+        // unconfirmed contacts, and invalid tokens. Success is observable through the delivered
+        // reset code.
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (found is null) {
             throw new NoContentException();

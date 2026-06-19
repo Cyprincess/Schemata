@@ -15,5 +15,8 @@ namespace Schemata.Abstractions.Resource;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class ResourceAttribute<TEntity, TRequest, TDetail, TSummary> : ResourceAttribute
 {
+    /// <summary>
+    ///     Maps the generic type arguments to the four resource API roles.
+    /// </summary>
     public ResourceAttribute() : base(typeof(TEntity), typeof(TRequest), typeof(TDetail), typeof(TSummary)) { }
 }

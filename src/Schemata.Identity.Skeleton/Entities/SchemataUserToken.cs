@@ -6,6 +6,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Authentication token entity for Schemata identity users.
+/// </summary>
 [Table("SchemataUserTokens")]
 [PrimaryKey(nameof(UserId), nameof(LoginProvider), nameof(Name))]
 public class SchemataUserToken : IdentityUserToken<Guid>, ITimestamp

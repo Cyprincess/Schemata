@@ -6,6 +6,9 @@ using Schemata.Core;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary>
+///     Extension methods for adding Identity-backed authorization services.
+/// </summary>
 public static class SchemataAuthorizationIdentityBuilderExtensions
 {
     /// <summary>

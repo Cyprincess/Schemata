@@ -50,7 +50,7 @@ public class AipCompilerShould
 
     [Fact]
     public void Compile_BareUnknownTerm_Throws() {
-        // A bare term that names no field must fail rather than compile to a vacuous match-all.
+        // Unknown bare terms fail before a vacuous match-all predicate can compile.
         var tree = _compiler.Parse("nonexistent");
 
         Assert.Throws<ParseException>(() => _compiler.Compile<Student, bool>(tree));
@@ -209,17 +209,25 @@ public class AipCompilerShould
         var equalFunc    = _compiler.Compile<Student, bool>(equalTree).Compile();
         var notEqualFunc = _compiler.Compile<Student, bool>(notEqualTree).Compile();
 
-        // Null receiver: AIP skip-as-nonmatch requires BOTH = and != to be false, even when
-        // the value-type leaf's default (0) would coincidentally satisfy = against literal 0.
+        // AIP skip-as-nonmatch treats null receiver comparisons as false for both operators,
+        // even when the value-type leaf's default would match the literal.
         Assert.False(equalFunc(new() { Advisor    = null }));
         Assert.False(notEqualFunc(new() { Advisor = null }));
 
-        // Present receiver: ordinary comparison semantics apply.
         Assert.True(equalFunc(new() { Advisor     = new() { Age = 0 } }));
         Assert.False(notEqualFunc(new() { Advisor = new() { Age = 0 } }));
         Assert.False(equalFunc(new() { Advisor    = new() { Age = 5 } }));
         Assert.True(notEqualFunc(new() { Advisor  = new() { Age = 5 } }));
     }
+
+    #region Nested type: Pet
+
+    private sealed class Pet
+    {
+        public int Age { get; set; }
+    }
+
+    #endregion
 
     #region Nested type: Student
 
@@ -234,11 +242,6 @@ public class AipCompilerShould
         public List<Pet>                  Pets      { get; set; } = [];
         public Dictionary<string, string> Metadata  { get; set; } = [];
         public StudentProfile?            Advisor   { get; set; }
-    }
-
-    private sealed class Pet
-    {
-        public int Age { get; set; }
     }
 
     #endregion

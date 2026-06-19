@@ -14,6 +14,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceCodeExchangeValidation{TApp, TToken}" />.</summary>
 public static class AdviceCodeExchangeValidation
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 }
 
@@ -42,7 +43,6 @@ public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? tim
 
     #region ICodeExchangeAdvisor<TApp,TToken> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceCodeExchangeValidation.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

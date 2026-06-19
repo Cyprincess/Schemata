@@ -8,7 +8,6 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
-using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -21,6 +20,7 @@ namespace Schemata.Scheduling.Http.Features;
 [DependsOn<SchemataHttpResourceFeature>]
 public sealed class SchemataSchedulingHttpFeature : FeatureBase
 {
+    /// <summary>Default <see cref="FeatureBase.Priority" /> for the Scheduling HTTP feature.</summary>
     public const int DefaultPriority = SchemataSchedulingFeature.DefaultPriority + 200_000;
 
     public override int Priority => DefaultPriority;

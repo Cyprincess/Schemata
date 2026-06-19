@@ -1,6 +1,6 @@
 using Schemata.Abstractions.Advisors;
 
-namespace Schemata.Entity.Repository;
+namespace Schemata.Entity.Repository.Advisors;
 
 /// <summary>
 ///     Advisor invoked after a repository commit completes.

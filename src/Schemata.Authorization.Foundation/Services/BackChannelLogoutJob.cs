@@ -52,9 +52,15 @@ public sealed class BackChannelLogoutJob(
 
     #endregion
 
+    /// <summary>
+    ///     Defines scheduler variable names consumed by back-channel logout jobs.
+    /// </summary>
     internal static class VariableKeys
     {
+        /// <summary>Scheduler variable containing the relying party logout URI.</summary>
         public const string Uri         = "uri";
+
+        /// <summary>Scheduler variable containing the logout token JWT.</summary>
         public const string LogoutToken = "logout_token";
     }
 }

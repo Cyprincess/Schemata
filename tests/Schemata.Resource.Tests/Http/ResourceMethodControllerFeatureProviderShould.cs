@@ -14,8 +14,7 @@ public class ResourceMethodControllerFeatureProviderShould
     [Fact]
     public void AddNoControllers_WhenMethodsAreEmpty() {
         var provider = new ResourceMethodControllerFeatureProvider {
-            Resources = new() { [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) },
-            Methods   = [],
+            Resources = new() { [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) }, Methods = [],
         };
         var feature = new ControllerFeature();
 
@@ -30,11 +29,7 @@ public class ResourceMethodControllerFeatureProviderShould
             Resources = new() {
                 [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
             },
-            Methods = new() {
-                [typeof(EntityA).TypeHandle] = [
-                    new("run", typeof(HandlerA)),
-                ],
-            },
+            Methods = new() { [typeof(EntityA).TypeHandle] = [new("run", typeof(HandlerA))] },
         };
         var feature = new ControllerFeature();
 
@@ -45,10 +40,10 @@ public class ResourceMethodControllerFeatureProviderShould
         Assert.Equal(typeof(ResourceMethodController<,,,>), controller.GetGenericTypeDefinition());
 
         var args = controller.GetGenericArguments();
-        Assert.Equal(typeof(EntityA),  args[0]);
+        Assert.Equal(typeof(EntityA), args[0]);
         Assert.Equal(typeof(RequestA), args[1]);
         Assert.Equal(typeof(ResponseA), args[2]);
-        Assert.Equal(typeof(HandlerA),  args[3]);
+        Assert.Equal(typeof(HandlerA), args[3]);
     }
 
     [Fact]
@@ -57,11 +52,7 @@ public class ResourceMethodControllerFeatureProviderShould
             Resources = new() {
                 [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [GrpcResourceAttribute.Name] },
             },
-            Methods = new() {
-                [typeof(EntityA).TypeHandle] = [
-                    new("run", typeof(HandlerA)),
-                ],
-            },
+            Methods = new() { [typeof(EntityA).TypeHandle] = [new("run", typeof(HandlerA))] },
         };
         var feature = new ControllerFeature();
 
@@ -77,10 +68,7 @@ public class ResourceMethodControllerFeatureProviderShould
                 [typeof(EntityA).TypeHandle] = new(typeof(EntityA)) { Endpoints = [HttpResourceAttribute.Name] },
             },
             Methods = new() {
-                [typeof(EntityA).TypeHandle] = [
-                    new("run",     typeof(HandlerA)),
-                    new("archive", typeof(HandlerB)),
-                ],
+                [typeof(EntityA).TypeHandle] = [new("run", typeof(HandlerA)), new("archive", typeof(HandlerB))],
             },
         };
         var feature = new ControllerFeature();
@@ -95,12 +83,7 @@ public class ResourceMethodControllerFeatureProviderShould
     [Fact]
     public void SkipMethods_WhenResourceIsNotRegistered() {
         var provider = new ResourceMethodControllerFeatureProvider {
-            Resources = [],
-            Methods   = new() {
-                [typeof(EntityA).TypeHandle] = [
-                    new("run", typeof(HandlerA)),
-                ],
-            },
+            Resources = [], Methods = new() { [typeof(EntityA).TypeHandle] = [new("run", typeof(HandlerA))] },
         };
         var feature = new ControllerFeature();
 
@@ -109,43 +92,87 @@ public class ResourceMethodControllerFeatureProviderShould
         Assert.Empty(feature.Controllers);
     }
 
+    #region Nested type: EntityA
+
     public sealed class EntityA : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
-    public sealed class RequestA : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+    #endregion
 
-    public sealed class ResponseA : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+    #region Nested type: HandlerA
 
     public sealed class HandlerA : IResourceMethodHandler<EntityA, RequestA, ResponseA>
     {
+        #region IResourceMethodHandler<EntityA,RequestA,ResponseA> Members
+
         public ValueTask<ResponseA> InvokeAsync(
             string?           name,
             RequestA          request,
             EntityA?          entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
-        ) => ValueTask.FromResult(new ResponseA());
+        ) {
+            return ValueTask.FromResult(new ResponseA());
+        }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: HandlerB
 
     public sealed class HandlerB : IResourceMethodHandler<EntityA, RequestA, ResponseA>
     {
+        #region IResourceMethodHandler<EntityA,RequestA,ResponseA> Members
+
         public ValueTask<ResponseA> InvokeAsync(
             string?           name,
             RequestA          request,
             EntityA?          entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
-        ) => ValueTask.FromResult(new ResponseA());
+        ) {
+            return ValueTask.FromResult(new ResponseA());
+        }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: RequestA
+
+    public sealed class RequestA : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: ResponseA
+
+    public sealed class ResponseA : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
 }

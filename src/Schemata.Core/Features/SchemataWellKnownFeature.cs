@@ -13,6 +13,9 @@ namespace Schemata.Core.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataWellKnownFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default endpoint priority for well-known URI routes.
+    /// </summary>
     public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 5_000_000;
 
     public override int Priority => DefaultPriority;

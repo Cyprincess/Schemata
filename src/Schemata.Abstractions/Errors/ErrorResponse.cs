@@ -8,8 +8,7 @@ namespace Schemata.Abstractions.Errors;
 public class ErrorResponse
 {
     /// <summary>
-    ///     The nested error body; <see langword="null" /> when the response represents a success
-    ///     or has no serialized error content.
+    ///     The nested error body. Success and empty responses leave this unset.
     /// </summary>
     public virtual ErrorBody? Error { get; set; }
 }

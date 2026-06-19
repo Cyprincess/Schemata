@@ -10,6 +10,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Resource method handler that completes the current activity for a process instance.</summary>
 public sealed class CompleteActivityHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry

@@ -6,9 +6,9 @@ namespace Schemata.Abstractions.Exceptions;
 ///     Signals a successful operation whose response contains no body.
 /// </summary>
 /// <remarks>
-///     This is <em>not</em> a failure — it maps to <c>google.rpc.Code.OK</c>, per
+///     Maps to <c>google.rpc.Code.OK</c>, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
-///     The error-response pipeline must suppress JSON serialization and return HTTP 204
+///     The error-response pipeline suppresses JSON serialization and returns HTTP 204
 ///     with an empty body.
 /// </remarks>
 public class NoContentException : SchemataException

@@ -24,9 +24,9 @@ public class ErrorBody
     public virtual int Code { get; set; }
 
     /// <summary>
-    ///     Developer-oriented description of the error intended for logging and diagnostics,
-    ///     not localized end-user display. Localized messages belong in a
-    ///     <see cref="LocalizedMessageDetail" /> entry under <see cref="Details" />.
+    ///     Developer-oriented description of the error for logging and diagnostics.
+    ///     Localized messages belong in a <see cref="LocalizedMessageDetail" /> entry
+    ///     under <see cref="Details" />.
     /// </summary>
     public virtual string? Message { get; set; }
 

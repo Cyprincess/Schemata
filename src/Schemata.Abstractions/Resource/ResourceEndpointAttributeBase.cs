@@ -16,7 +16,7 @@ public abstract class ResourceEndpointAttributeBase : Attribute
     public ResourceEndpointAttributeBase(string endpoint) { Endpoint = endpoint; }
 
     /// <summary>
-    ///     The endpoint protocol name used to match and generate routes.
+    ///     The endpoint protocol name for route matching and generation.
     /// </summary>
     public string Endpoint { get; }
 }

@@ -13,6 +13,7 @@ public sealed class FlowTimerJob : IScheduledJob
 {
     private readonly IProcessRuntime _runtime;
 
+    /// <summary>Creates a scheduled job that triggers timers through the process runtime.</summary>
     public FlowTimerJob(IProcessRuntime runtime) {
         _runtime = runtime;
     }

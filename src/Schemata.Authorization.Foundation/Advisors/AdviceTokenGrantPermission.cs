@@ -1,8 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
@@ -14,6 +12,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceTokenGrantPermission{TApp}" />.</summary>
 public static class AdviceTokenGrantPermission
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceTokenEndpointPermission.DefaultOrder + 10_000_000;
 }
 
@@ -34,7 +33,6 @@ public sealed class AdviceTokenGrantPermission<TApp>(IApplicationManager<TApp> m
 {
     #region ITokenRequestAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenGrantPermission.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

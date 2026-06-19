@@ -25,8 +25,7 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     /// <summary>
     ///     Distinguishes consent records so the consent advisor can apply the correct reuse policy.
     ///     <c>"ad-hoc"</c> records (authorization-code flow) may be matched on subsequent /authorize calls;
-    ///     <c>"device"</c> records are explicitly skipped so a device approval cannot silently authorize
-    ///     a browser /authorize on the same client;
+    ///     <c>"device"</c> records are limited to device approval flows;
     ///     <c>"permanent"</c> records represent persistent cross-session consent.
     /// </summary>
     public virtual string? Type { get; set; }

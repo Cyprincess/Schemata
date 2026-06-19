@@ -18,8 +18,7 @@ public class DeleteRequest : ICanonicalName, IAllowMissing
     #region IAllowMissing Members
 
     /// <summary>
-    ///     When <see langword="true" />, deleting a resource that does not exist succeeds
-    ///     instead of failing with <c>NOT_FOUND</c>, per AIP-135.
+    ///     When <see langword="true" />, deleting a missing resource succeeds per AIP-135.
     /// </summary>
     public bool AllowMissing { get; set; }
 

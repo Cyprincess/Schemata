@@ -43,7 +43,6 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_100;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

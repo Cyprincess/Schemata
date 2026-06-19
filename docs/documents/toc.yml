@@ -31,6 +31,8 @@
       href: entity/overview.md
     - name: Traits
       href: entity/traits.md
+    - name: Query Cache
+      href: entity/query-cache.md
 - name: Repository
   href: repository/overview.md
   items:
@@ -57,8 +59,6 @@
       href: caching/distributed.md
     - name: Redis
       href: caching/redis.md
-    - name: Query Cache
-      href: caching/query-cache.md
 - name: Resource
   href: resource/overview.md
   items:
@@ -115,6 +115,10 @@
       href: scheduling/persistence.md
     - name: Event Integration
       href: scheduling/event-integration.md
+    - name: HTTP Transport
+      href: scheduling/http.md
+    - name: gRPC Transport
+      href: scheduling/grpc.md
 - name: Flow
   href: flow/overview.md
   items:

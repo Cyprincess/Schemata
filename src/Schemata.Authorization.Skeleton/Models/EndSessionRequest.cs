@@ -3,13 +3,11 @@ namespace Schemata.Authorization.Skeleton.Models;
 /// <summary>
 ///     RP-Initiated Logout request parameters,
 ///     per
-///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>
-///     ,
-///     OpenID Connect RP-Initiated Logout 1.0.
+///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">OpenID Connect RP-Initiated Logout 1.0</seealso>.
 /// </summary>
 public sealed class EndSessionRequest
 {
-    /// <summary>Previously issued <c>id_token</c> as a hint about the current session.</summary>
+    /// <summary><c>id_token</c> hint for the current session.</summary>
     public string? IdTokenHint { get; set; }
 
     /// <summary>URI to redirect to after logout.</summary>

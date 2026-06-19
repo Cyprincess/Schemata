@@ -68,14 +68,14 @@ public class RevocationHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Uid             = Identifiers.NewUid(),
-            Type            = type,
-            Application     = appName,
-            ReferenceId     = referenceId,
-            Format          = format,
-            Status          = status,
-            Payload         = payload,
-            ExpireTime      = DateTime.UtcNow.AddHours(1),
+            Uid         = Identifiers.NewUid(),
+            Type        = type,
+            Application = appName,
+            ReferenceId = referenceId,
+            Format      = format,
+            Status      = status,
+            Payload     = payload,
+            ExpireTime  = DateTime.UtcNow.AddHours(1),
         };
     }
 
@@ -120,7 +120,9 @@ public class RevocationHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.Subject, "user-42"),
+            new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
@@ -155,7 +157,9 @@ public class RevocationHandlerShould
         var f = CreateFixture();
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()), new(Claims.Subject, "user-42"), new(Claims.Audience, "api"),
+            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.Subject, "user-42"),
+            new(Claims.Audience, "api"),
         };
 
         var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));

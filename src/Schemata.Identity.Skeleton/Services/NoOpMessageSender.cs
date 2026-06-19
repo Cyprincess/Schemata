@@ -3,6 +3,10 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Services;
 
+/// <summary>
+///     Phone message sender that completes identity messaging operations immediately.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
 public sealed class NoOpMessageSender<TUser> : IMessageSender<TUser>
     where TUser : SchemataUser
 {

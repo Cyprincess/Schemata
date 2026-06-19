@@ -10,6 +10,9 @@ using Schemata.Common;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Identity role entity used by Schemata identity stores.
+/// </summary>
 [DisplayName("Role")]
 [Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
@@ -23,7 +26,6 @@ public class SchemataRole : IdentityRole<Guid>, IIdentifier, ICanonicalName, IDe
         set => Uid = value;
     }
 
-    /// <summary>Bridges Identity's string-based ConcurrencyStamp to the Guid-based Timestamp.</summary>
     [NotMapped]
     public override string? ConcurrencyStamp
     {

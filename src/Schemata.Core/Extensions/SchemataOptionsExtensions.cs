@@ -30,8 +30,7 @@ public static class SchemataOptionsExtensions
     }
 
     /// <summary>
-    ///     Stores the given feature dictionary, replacing any previously
-    ///     registered features.
+    ///     Stores the given feature dictionary as the active registration set.
     /// </summary>
     /// <param name="schemata">The options container.</param>
     /// <param name="value">

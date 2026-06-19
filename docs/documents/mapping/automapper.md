@@ -1,32 +1,33 @@
 # AutoMapper Adapter
 
-`Schemata.Mapping.AutoMapper` wraps AutoMapper behind `ISimpleMapper`. It translates `SchemataMappingOptions` declarations into AutoMapper profile rules at startup and registers the resulting `MapperConfiguration` as a singleton.
-
-## Where the code lives
-
-| Package | Key files |
-| --- | --- |
-| `Schemata.Mapping.AutoMapper` | `SimpleMapper.cs`, `AutoMapperConfigurator.cs`, `SchemataBuilderExtensions.cs`, `SchemataMappingBuilderExtensions.cs` |
-| `Schemata.Mapping.Foundation` | `SchemataMappingBuilder.cs`, `SimpleMapperHelper.cs` |
+`Schemata.Mapping.AutoMapper` implements `Schemata.Mapping.Skeleton.ISimpleMapper` over AutoMapper.
+It translates `SchemataMappingOptions` into AutoMapper rules at startup and registers the resulting
+`AutoMapper.MapperConfiguration` as a singleton.
 
 ## Activation
 
 ```csharp
 builder.UseSchemata(schema => {
     schema.UseAutoMapper();
-    // or equivalently:
-    schema.UseMapping().UseAutoMapper();
+    // schema.UseMapping().UseAutoMapper() is the same call chain
 });
 ```
 
-Both forms call `SchemataMappingBuilder.UseAutoMapper()`, which:
+`SchemataMappingBuilder.UseAutoMapper()`:
 
-1. Registers `SchemataMappingFeature<Schemata.Mapping.AutoMapper.SimpleMapper>` (Priority 460,000,000).
-2. Registers `MapperConfiguration` as a singleton, built from `SchemataMappingOptions` via `AutoMapperConfigurator.Configure`.
+1. Registers `MapperConfiguration` as a singleton, built from `IOptions<SchemataMappingOptions>`
+   and an `ILoggerFactory` resolved from DI.
+2. Adds `SchemataMappingFeature<Schemata.Mapping.AutoMapper.SimpleMapper>`
+   (Priority `Orders.Extension + 60_000_000`).
+
+The configuration is built inside the singleton factory, so AutoMapper sees every mapping declared
+before the service provider is built.
 
 ## AutoMapperConfigurator
 
-`AutoMapperConfigurator.Configure` translates `SchemataMappingOptions.Mappings` into AutoMapper rules:
+`Schemata.Mapping.AutoMapper.AutoMapperConfigurator.Configure` groups
+`SchemataMappingOptions.Mappings` by `(SourceType, DestinationType)` and applies each group through
+a generic `CreateMap<TSource, TDestination>()`:
 
 ```csharp
 public static IMapperConfigurationExpression Configure(
@@ -34,50 +35,42 @@ public static IMapperConfigurationExpression Configure(
     SchemataMappingOptions         options)
 ```
 
-For each `(SourceType, DestinationType)` pair in `options.Mappings`:
+For each type pair:
 
-1. Calls `config.CreateMap<TSource, TDestination>()`.
-2. Applies `ForAllMembers(opts => opts.Condition((_, _, srcMember) => srcMember != null))` — **null source members are skipped**. This is the AutoMapper null-skip rule.
-3. Calls `PreserveReferences()` to handle circular references.
-4. Applies per-field rules from `IMapping.Invoke(...)`:
-   - `ConvertUsing(converter)` for full-type converters.
-   - `ForMember(member, opts => opts.MapFrom(expression))` for field mappings.
-   - `ForMember(member, opts => opts.Ignore())` for ignored fields.
-   - `Condition((s, d) => !shouldIgnore(s, d))` for conditional mappings.
+1. `CreateMap<TSource, TDestination>()`.
+2. `ForAllMembers(opts => opts.Condition((_, _, srcMember) => srcMember != null))` — a member
+   whose source value is null is skipped, so the destination keeps its current value.
+3. `PreserveReferences()` for circular graphs.
+4. Per-field rules from each `IMapping.Invoke(...)`:
+   - `ConvertUsing(converter)` for a whole-object converter (`With`).
+   - `ForMember(member, o => o.Ignore())` for `Ignore()`.
+   - `ForMember(member, o => o.Condition((s, d) => !predicate(s, d)))` for `Ignore(predicate)`.
+   - `ForMember(member, o => o.MapFrom(expression))` for `For(...).From(...)`, with the same
+     conditional guard added when both a source and a predicate are present.
 
-## Null-skip behavior
+## Null handling
 
-The `ForAllMembers` null-skip rule means that if a source property is `null`, the corresponding destination property retains its existing value. This is the correct behavior for partial updates (UpdateMask): only non-null source fields overwrite the destination.
+The global `ForAllMembers` condition is the engine-level half of the merge contract: a null source
+member never overwrites the destination. The framework still wraps `Map(source, destination)` in
+`SimpleMapperHelper.MapMerging`, which additionally treats whitespace-only strings as unpopulated
+and restores them by snapshot. The two layers combine so that:
 
-Combined with `SimpleMapperHelper.MapWithMask`, the full update flow is:
-
-1. `MapWithMask` snapshots non-masked destination fields.
-2. AutoMapper maps all fields, skipping null source values.
-3. `MapWithMask` restores non-masked destination fields.
-
-The result: only fields in the mask that are non-null in the source are updated.
+- `Map<TSource, TDestination>(source)` produces a fresh object and copies null members.
+- `Map(source, destination)` merges; null or blank source members keep the destination value.
+- `Map(source, destination, fields)` masks; a masked field is authoritative and can be cleared.
 
 ## SimpleMapper
 
+`Schemata.Mapping.AutoMapper.SimpleMapper` wraps an `AutoMapper.Mapper` built from the singleton
+`MapperConfiguration`. The fresh-instance and typed overloads delegate straight to the engine; the
+in-place overloads delegate through the foundation helpers:
+
 ```csharp
-public sealed class SimpleMapper : ISimpleMapper
-{
-    private readonly IMapper _mapper;
+public void Map<TSource, TDestination>(TSource source, TDestination destination)
+    => SimpleMapperHelper.MapMerging(source, destination, (s, d) => _mapper.Map(s, d));
 
-    public SimpleMapper(MapperConfiguration config) { _mapper = new Mapper(config); }
-
-    public TDestination? Map<TSource, TDestination>(TSource source)
-        => _mapper.Map<TSource, TDestination>(source);
-
-    public void Map<TSource, TDestination>(TSource source, TDestination destination)
-        => _mapper.Map(source, destination);
-
-    public void Map<TSource, TDestination>(
-        TSource source, TDestination destination, IEnumerable<string> fields)
-        => SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
-
-    // ... other overloads delegate to _mapper
-}
+public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields)
+    => SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
 ```
 
 ## Declaring mappings
@@ -86,30 +79,23 @@ public sealed class SimpleMapper : ISimpleMapper
 schema.UseAutoMapper()
       .Map<StudentRequest, Student>()
       .Map<Student, StudentDetail>(map => {
-          map.Field(d => d.FullName, s => s.FirstName + " " + s.LastName);
-          map.Ignore(d => d.InternalId);
+          map.For(d => d.FullName).From(s => s.FirstName + " " + s.LastName);
+          map.For(d => d.InternalId).Ignore();
       });
 ```
 
-`Map<TSource, TDestination>` without a configure action generates a default mapping with the null-skip rule applied to all members.
-
-## Extension points
-
-- Call `SchemataMappingBuilder.Map<TSource, TDestination>(configure)` to declare custom field mappings.
-- Implement `IMapping` to define reusable mapping rules that work across engines.
-
-## Design motivation
-
-The null-skip rule (`ForAllMembers` condition) is applied globally rather than per-field because the resource layer's UpdateMask pattern relies on it: a request DTO with null fields should not overwrite existing entity values. Applying it globally avoids the need to annotate every field individually.
+`Map<TSource, TDestination>()` without a configure action registers a type pair whose member-name
+matches map automatically, under the global null-skip rule.
 
 ## Caveats
 
-- `MapperConfiguration` is a singleton. AutoMapper validates all mappings at startup. A misconfigured mapping (e.g., a missing member) throws at startup, not at first use.
-- `PreserveReferences()` adds a small overhead for non-circular object graphs. If performance is critical and your mappings have no circular references, you can disable it by providing a custom `AutoMapperConfigurator`.
-- The null-skip rule applies to all members globally. If you need a specific member to be set to `null` when the source is `null`, use `ForMember(d => d.Prop, opts => opts.AllowNull())` in a custom mapping.
+- `MapperConfiguration` validates at startup. A field mapping missing its source expression throws
+  `InvalidOperationException` from `Map<,>.Compile()` while the singleton is built, not at first map.
+- The null-skip condition is global. A field that must copy null source values needs a custom
+  `AutoMapperConfigurator` or a direct `MapperConfiguration` rule that overrides the condition.
 
 ## See also
 
-- [Overview](overview.md)
-- [Mapster](mapster.md)
-- [Guides: Object Mapping](../../guides/object-mapping.md)
+- [Mapping overview](overview.md)
+- [Mapster adapter](mapster.md)
+- [Multi-engine mapping](../../cookbook/multi-engine-mapping.md)

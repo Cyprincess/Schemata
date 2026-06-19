@@ -91,8 +91,8 @@ public class AdviceFreshnessShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(
-            () => advisor.AdviseAsync(ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(
+                                                           ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
     }
 
     [Fact]

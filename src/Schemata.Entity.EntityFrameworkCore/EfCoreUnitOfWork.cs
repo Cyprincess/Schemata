@@ -13,10 +13,9 @@ namespace Schemata.Entity.EntityFrameworkCore;
 ///     Unit of work for Entity Framework Core, coordinating writes across repositories that share
 ///     the same <see cref="DbContext" />. EF Core buffers changes in the change tracker, so a single
 ///     <see cref="DbContext.SaveChangesAsync(CancellationToken)" /> at commit persists every enlisted
-///     repository's work atomically without an explicit transaction. Avoiding an explicit transaction
-///     keeps the unit of work usable against providers that do not support one (the in-memory
-///     provider) and lets concurrent standalone writers serialize at save time rather than holding a
-///     write lock between staging and commit.
+///     repository's work atomically through the provider's save pipeline. This keeps the unit of
+///     work usable against providers such as the in-memory provider and lets concurrent standalone
+///     writers serialize at save time after staging completes.
 /// </summary>
 /// <typeparam name="TContext">The <see cref="DbContext" /> type.</typeparam>
 public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfWorkSink

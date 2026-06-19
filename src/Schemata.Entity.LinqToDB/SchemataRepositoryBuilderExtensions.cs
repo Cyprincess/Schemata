@@ -70,7 +70,7 @@ public static class SchemataRepositoryBuilderExtensions
         where TContext : DataConnection {
         // Register the metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
         // to LINQ to DB mapping attributes so [Table], [Column], etc. are recognized. This mutates the
-        // process-wide MappingSchema.Default rather than a per-context schema: the reader therefore affects
+        // process-wide MappingSchema.Default, making the reader affect
         // every DataConnection in the process, and repeated UseLinqToDb calls append additional reader
         // instances. LINQ to DB resolves attributes through any registered reader, so the duplication is
         // harmless, but the global reach is intentional and shared.

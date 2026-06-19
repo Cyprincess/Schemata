@@ -10,6 +10,9 @@ using Schemata.Common;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Identity user entity used by Schemata identity stores.
+/// </summary>
 [DisplayName("User")]
 [Table("SchemataUsers")]
 [CanonicalName("users/{user}")]
@@ -23,7 +26,6 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
         set => Uid = value;
     }
 
-    /// <summary>Bridges Identity's string-based ConcurrencyStamp to the Guid-based Timestamp.</summary>
     [NotMapped]
     public override string? ConcurrencyStamp
     {

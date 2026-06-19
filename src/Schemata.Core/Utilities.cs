@@ -26,7 +26,15 @@ public static class Utilities
         return CreateInstance<T>(null, type, parameters.ToList());
     }
 
-    /// <inheritdoc cref="CreateInstance{T}(IServiceProvider?, Type, List{object}?)" />
+    /// <summary>
+    ///     Instantiates <paramref name="type" /> via constructor, resolving missing
+    ///     parameters from <paramref name="sp" />.
+    /// </summary>
+    /// <typeparam name="T">Expected return type.</typeparam>
+    /// <param name="sp">Service provider for resolving unmatched parameters.</param>
+    /// <param name="type">Concrete type to instantiate.</param>
+    /// <param name="parameters">Values to match against constructor parameters by type.</param>
+    /// <returns>The created instance, or <see langword="default" /> if no constructor exists.</returns>
     public static T? CreateInstance<T>(IServiceProvider sp, Type type, params object?[] parameters) {
         return CreateInstance<T>(sp, type, parameters.ToList());
     }
@@ -77,12 +85,25 @@ public static class Utilities
         return (T?)Activator.CreateInstance(type, arguments);
     }
 
-    /// <inheritdoc cref="CallMethod(IServiceProvider?, object, string, List{object?}?)" />
+    /// <summary>
+    ///     Invokes a public instance method by name, matching provided parameters by
+    ///     assignable type.
+    /// </summary>
+    /// <param name="instance">The target object.</param>
+    /// <param name="method">The method name.</param>
+    /// <param name="parameters">Values to match against method parameters by type.</param>
     public static void CallMethod(object instance, string method, params object?[] parameters) {
         CallMethod(null, instance, method, parameters.ToList());
     }
 
-    /// <inheritdoc cref="CallMethod(IServiceProvider?, object, string, List{object?}?)" />
+    /// <summary>
+    ///     Invokes a public instance method by name, matching provided parameters by
+    ///     assignable type and resolving remaining from <paramref name="sp" />.
+    /// </summary>
+    /// <param name="sp">Service provider for resolving unmatched parameters.</param>
+    /// <param name="instance">The target object.</param>
+    /// <param name="method">The method name.</param>
+    /// <param name="parameters">Values to match against method parameters by type.</param>
     public static void CallMethod(
         IServiceProvider sp,
         object           instance,

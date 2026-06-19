@@ -1,13 +1,17 @@
 # Scheduling Jobs
 
-Job execution in Schemata runs through two sequential pipelines: the `IJobExecutionAdvisor` intercept lane and the `IJobLifecycleObserver` gate. The advisor pipeline runs first and can short-circuit execution entirely. The observer pipeline runs next, collects outcomes from all registered observers, and applies the most-restrictive result before calling `IScheduledJob.ExecuteAsync`.
+A fire runs through two stages: the `IJobExecutionAdvisor` intercept lane, then the
+`IJobLifecycleObserver` gate. The advisor pipeline runs first and can short-circuit the fire
+entirely. The observer pipeline runs next; the scheduler collects every observer's
+`OnTriggeredAsync` outcome and applies the most-restrictive result before calling
+`IScheduledJob.ExecuteAsync`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduledJob.cs`, `IJobLifecycleObserver.cs`, `JobContext.cs`, `Advisors/IJobExecutionAdvisor.cs` |
-| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.cs` |
+| `Schemata.Scheduling.Skeleton` | `IScheduledJob.cs`, `IJobLifecycleObserver.cs`, `JobContext.cs`, `JobTriggerOutcome.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/ExecutionState.cs` |
+| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.Execute.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Observers/SchemataJobAuditObserver.cs`, `JobExecutionDispatcher.cs` |
 
 ## IScheduledJob
 
@@ -18,7 +22,9 @@ public interface IScheduledJob
 }
 ```
 
-`JobContext` carries the job name and a `Dictionary<string, object?>` of variables deserialized from `SchemataJob.Variables`. Implement `IScheduledJob` to define job logic:
+`JobContext.Job` is the job's canonical name; `JobContext.Variables` is the variable dictionary
+deserialized from `SchemataJob.Variables`. A job assigns `JobContext.Execution.Output` to surface a
+result document on the execution row.
 
 ```csharp
 public sealed class ReportJob : IScheduledJob
@@ -46,11 +52,11 @@ schema.UseScheduling()
 public interface IJobExecutionAdvisor : IAdvisor<JobContext>;
 ```
 
-The advisor pipeline runs before the lifecycle observer pipeline. It follows the standard `IAdvisor` contract:
+The advisor pipeline runs before the observer gate and follows the `IAdvisor` contract:
 
-- `Continue`: proceed to the observer pipeline.
-- `Handle`: skip execution entirely (no observers called, execution row not updated).
-- `Block`: skip execution entirely (no observers called, execution row not updated).
+- `Continue` — proceed to the observer pipeline.
+- `Handle` — return without firing the job or notifying observers.
+- `Block` — return without firing the job or notifying observers.
 
 Register via `TryAddEnumerable`:
 
@@ -61,99 +67,108 @@ services.TryAddEnumerable(
 
 ## IJobLifecycleObserver
 
-`IJobLifecycleObserver` is the primary extension point for observing and gating job execution. Implementations participate in three lifecycle phases and can short-circuit a fire by returning a non-`Proceed` outcome from `OnTriggeredAsync`.
+`IJobLifecycleObserver` is the audit, gating, and bridge extension point. It spans the schedule and
+fire lifecycle:
 
 ```csharp
 public interface IJobLifecycleObserver
 {
+    Task OnScheduledAsync(SchemataJob job, CancellationToken ct = default);
+    Task OnUnscheduledAsync(SchemataJob job, CancellationToken ct = default);
+
     Task<JobTriggerOutcome> OnTriggeredAsync(
         SchemataJob job, JobContext context, CancellationToken ct = default);
 
-    Task OnSucceededAsync(
-        SchemataJob job, JobContext context, CancellationToken ct = default);
-
+    Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default);
     Task OnFailedAsync(
         SchemataJob job, JobContext context, Exception exception, CancellationToken ct = default);
 }
 ```
+
+`OnScheduledAsync` / `OnUnscheduledAsync` fire when an entry is recorded, advanced, or removed.
+`OnTriggeredAsync` returns a `JobTriggerOutcome` that gates the fire. `OnSucceededAsync` and
+`OnFailedAsync` fire after the body settles. Observer exceptions are logged at `Warning` and
+swallowed, so one failing observer does not stop the others.
 
 ### JobTriggerOutcome
 
 ```csharp
 public enum JobTriggerOutcome
 {
-    Proceed = 0,  // execute the job normally
-    Skip    = 1,  // skip execution, mark Cancelled, advance schedule
-    Block   = 2,  // skip execution, mark Failed, do NOT advance schedule
+    Proceed = 0,  // run the job
+    Skip    = 1,  // skip this fire and advance the schedule
+    Block   = 2,  // skip this fire and freeze the schedule
 }
 ```
 
-`OnTriggeredAsync` is called after the `IJobExecutionAdvisor` pipeline returns `Continue`, but before `IScheduledJob.ExecuteAsync` runs. When multiple observers are registered, `DefaultScheduler` collects all outcomes and applies the **most-restrictive** result: `Block > Skip > Proceed`.
+When multiple observers run, the scheduler keeps the most-restrictive outcome: `Block > Skip >
+Proceed`.
 
 ### Outcome semantics
 
-| Outcome | Execution row state | Schedule advances? |
+| Outcome | Execution row state | Schedule |
 | --- | --- | --- |
-| `Proceed` | `Succeeded` (after `ExecuteAsync`) | Yes |
-| `Skip` | `Cancelled` | Yes |
-| `Block` | `Failed` | No (`NextRunTime` unchanged) |
+| `Proceed` | `Succeeded` after `ExecuteAsync` returns (`Failed` if it throws) | Advances |
+| `Skip` | `Skipped` | Advances to the next occurrence |
+| `Block` | `Blocked` | Frozen at the current `NextRunTime` |
 
-`Skip` is appropriate when an external system has already handled the fire (for example, an event handler took over). `Block` is appropriate when the job must not run and must not advance (for example, a prerequisite is not met and the job should retry at the same time).
+`Skip` fits an external system that already handled the fire. `Block` fits a prerequisite that is not
+met and a job that must retry at the same time.
 
-### OnSucceededAsync and OnFailedAsync
+## Where OnTriggeredAsync runs
 
-`OnSucceededAsync` is called after `ExecuteAsync` returns without throwing. `OnFailedAsync` is called when `ExecuteAsync` throws. Both are called on all registered observers regardless of individual observer failures (observer exceptions are logged at `Warning` and swallowed).
+For cron and periodic fires, `DefaultScheduler` collects `OnTriggeredAsync` outcomes inside the fire
+path. For `TriggerAsync` fires, the scheduler invokes `OnTriggeredAsync` once when the operation is
+triggered, captures the result on `JobContext.TriggerOutcome`, and the execution path honors that
+captured value — one observer call and one audit row per trigger.
 
-## Execution flow in DefaultScheduler
+## Execution flow
 
 ```
-ExecuteJobAsync(jobName)
-    |
-    v
-Load SchemataJob from repository
-    |
-    v
-Create SchemataJobExecution { State = Running }
-    |
-    v
+fire
+  |
+  v
 IJobExecutionAdvisor pipeline
-    |-- Continue: proceed
-    |-- Handle or Block: return (no observers, no execution)
-    |
-    v
-Collect IJobLifecycleObserver.OnTriggeredAsync outcomes
-    |-- most-restrictive merge (Block > Skip > Proceed)
-    |
-    v (Block)
-    Mark execution Failed, do NOT advance NextRunTime, return
-    |
-    v (Skip)
-    Mark execution Cancelled, advance NextRunTime, reschedule, return
-    |
-    v (Proceed)
-    IScheduledJob.ExecuteAsync(context, ct)
-        |-- success: call OnSucceededAsync on all observers
-        |-- exception: call OnFailedAsync on all observers
-    |
-    v
-Update SchemataJobExecution { State = Succeeded | Failed }
-Update SchemataJob { RecentRunTime, NextRunTime, State }
-Reschedule if Active and NextRunTime != null
+  |-- Continue: proceed
+  |-- Handle / Block: return (no observers, body not run)
+  |
+  v
+resolve OnTriggeredAsync outcome (most-restrictive merge)
+  |-- Block: mark execution Blocked, leave NextRunTime, notify OnBlockedAsync, return
+  |-- Skip:  mark execution Skipped, advance NextRunTime, notify OnSkippedAsync, reschedule, return
+  |-- Proceed:
+  |       IScheduledJob.ExecuteAsync(context, ct)
+  |         |-- returns: OnSucceededAsync on all observers, advance schedule, reschedule
+  |         |-- throws:  job marked Failed, OnFailedAsync on all observers
 ```
+
+`OnBlockedAsync` and `OnSkippedAsync` are extra hooks on the built-in `SchemataJobAuditObserver`; the
+scheduler invokes them only on registered `SchemataJobAuditObserver` instances to persist the
+`Blocked` / `Skipped` execution state.
+
+## SchemataJobAuditObserver
+
+The built-in observer commits the `SchemataJob` row and its `SchemataJobExecution` row in a single
+unit of work, so a failed write never leaves the two audit rows out of step. `OnScheduledAsync`
+upserts the job row; `OnSucceededAsync` / `OnFailedAsync` write the terminal execution state, end
+time, error, and output.
 
 ## Extension points
 
-- Implement `IJobLifecycleObserver` and register via `TryAddEnumerable` to observe lifecycle transitions, publish metrics, or gate execution.
-- Implement `IJobExecutionAdvisor` and register via `TryAddEnumerable` to intercept execution before the observer pipeline.
-
-## Design motivation
-
-The observer pipeline gives each observer a first-class return value (`JobTriggerOutcome`) rather than relying on `AdviseResult` semantics that were designed for a different context. The most-restrictive merge ensures that a single observer returning `Block` prevents execution even if other observers return `Proceed`.
+- Implement `IJobLifecycleObserver` (`TryAddEnumerable`) to observe transitions, gate fires, or
+  bridge to other systems.
+- Implement `IJobExecutionAdvisor` (`TryAddEnumerable`) to intercept a fire before the observer
+  pipeline.
 
 ## Caveats
 
-- Observer exceptions in `OnFailedAsync` are logged at `Warning` and swallowed. An observer that throws does not prevent other observers from running.
-- `IJobExecutionAdvisor` runs before observers. If it returns `Handle` or `Block`, no observers are called and the execution row is not updated. This is intentional for cases where the advisor wants to completely bypass the job lifecycle.
+- `IJobExecutionAdvisor` returning `Handle` or `Block` bypasses the observer pipeline entirely: no
+  observer runs and the execution row is left untouched.
+- Observer exceptions are logged at `Warning` and swallowed. A throwing observer does not stop other
+  observers or fail the job.
+- A job body throwing is the only path that marks the `SchemataJob` row `Failed`; an advisor,
+  observer, or resolution failure is a system error that leaves the job's state for the next
+  occurrence.
 
 ## See also
 

@@ -15,6 +15,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceAuthorizePkce{TApp}" />.</summary>
 public static class AdviceAuthorizePkce
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceAuthorizeScopeValidation.DefaultOrder + 10_000_000;
 }
 
@@ -47,7 +48,6 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
 {
     #region IAuthorizeAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizePkce.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
@@ -112,9 +112,6 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
 
     #endregion
 
-    // RFC 7636 §4.1/§4.2: a code challenge is 43-128 characters drawn from the unreserved set
-    // [A-Za-z0-9-._~]. Rejecting a malformed value here surfaces the fault at the authorize step
-    // instead of as an opaque verifier mismatch during the later code exchange.
     private static bool IsValidCodeChallenge(string value) {
         if (value.Length is < 43 or > 128) {
             return false;

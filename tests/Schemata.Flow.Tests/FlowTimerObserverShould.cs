@@ -23,7 +23,8 @@ public class FlowTimerObserverShould
         scheduler
            .Setup(s => s.ScheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<IReadOnlyDictionary<string, object?>?>(),
                                        It.IsAny<CancellationToken>()))
-           .Callback<SchemataJob, IReadOnlyDictionary<string, object?>?, CancellationToken>((job, _, _) => scheduled.Add(job.Name!))
+           .Callback<SchemataJob, IReadOnlyDictionary<string, object?>?,
+                CancellationToken>((job, _, _) => scheduled.Add(job.Name!))
            .Returns(SystemTask.CompletedTask);
         scheduler.Setup(s => s.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                  .Returns(SystemTask.CompletedTask);
@@ -48,17 +49,15 @@ public class FlowTimerObserverShould
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(advice, new() {
-            Process    = process,
-            Definition = definition,
-            Instance   = new() { WaitingAtId = "timer-a" },
-        });
+        await advisor.AdviseAsync(
+            advice, new() {
+                Process = process, Definition = definition, Instance = new() { WaitingAtId = "timer-a" },
+            });
 
-        await advisor.AdviseAsync(advice, new() {
-            Process    = process,
-            Definition = definition,
-            Instance   = new() { WaitingAtId = "timer-b" },
-        });
+        await advisor.AdviseAsync(
+            advice, new() {
+                Process = process, Definition = definition, Instance = new() { WaitingAtId = "timer-b" },
+            });
 
         Assert.Equal(2, scheduled.Count);
         Assert.Equal(2, scheduled.Distinct().Count());
@@ -68,8 +67,7 @@ public class FlowTimerObserverShould
 
     [Fact]
     public async SystemTask NonTimerTransition_WithoutScheduler_DoesNotThrow() {
-        // No IScheduler is registered. A transition that neither leaves nor enters a timer catch
-        // must pass through instead of demanding scheduling infrastructure.
+        // A scheduler-free service provider still allows transitions outside timer catches.
         var provider = new ServiceCollection().BuildServiceProvider();
         var advisor  = new FlowTimerTransitionAdvisor(provider);
         var advice   = new AdviceContext(provider);
@@ -79,10 +77,9 @@ public class FlowTimerObserverShould
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(advice, new() {
-            Process    = process,
-            Definition = definition,
-            Instance   = new() { WaitingAtId = "catch-msg" },
-        });
+        await advisor.AdviseAsync(
+            advice, new() {
+                Process = process, Definition = definition, Instance = new() { WaitingAtId = "catch-msg" },
+            });
     }
 }

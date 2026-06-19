@@ -11,16 +11,28 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Cel;
 
+/// <summary>
+///     Converts CEL AST nodes into LINQ expression tree nodes.
+/// </summary>
 internal sealed class CelCompileVisitor
 {
     private readonly Stack<Dictionary<string, ParameterExpression>> _scopes = new();
 
+    /// <summary>
+    ///     Creates a visitor for expressions evaluated against the supplied context type.
+    /// </summary>
     public CelCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
         Parameter = Expression.Parameter(contextType, LowerFirst(contextType.Name));
     }
 
+    /// <summary>
+    ///     Gets the root parameter used by generated expressions.
+    /// </summary>
     public ParameterExpression Parameter { get; }
 
+    /// <summary>
+    ///     Visits a CEL AST node.
+    /// </summary>
     public Expression Visit(CelNode node) {
         return node switch {
             CelConstant constant       => Expression.Constant(constant.Value),

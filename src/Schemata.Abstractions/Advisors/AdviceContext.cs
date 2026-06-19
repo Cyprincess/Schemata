@@ -39,8 +39,8 @@ public class AdviceContext
     ///     otherwise <see langword="null" />.
     /// </param>
     /// <returns>
-    ///     <see langword="true" /> if a non-null value was found for type
-    ///     <typeparamref name="T" />; otherwise <see langword="false" />.
+    ///     <see langword="true" /> if type <typeparamref name="T" /> has a non-null stored value;
+    ///     otherwise <see langword="false" />.
     /// </returns>
     public bool TryGet<T>(out T? value) {
         if (!_options.TryGetValue(typeof(T).TypeHandle, out var @object)) {
@@ -80,16 +80,15 @@ public class AdviceContext
 
     /// <summary>
     ///     Sets the marker keyed by type <typeparamref name="T" /> and returns a disposable
-    ///     that restores the prior state on <see cref="IDisposable.Dispose" />.
+    ///     that restores the captured state on <see cref="IDisposable.Dispose" />.
     /// </summary>
     /// <remarks>
-    ///     Nested scopes preserve the outer value: <c>Dispose</c> restores the value present
-    ///     before this <c>Use</c> call (or removes the key when none was present), rather than
-    ///     unconditionally removing the key.
+    ///     Nested scopes preserve the outer value: <c>Dispose</c> restores the captured value
+    ///     or removes the key when the scope created it.
     /// </remarks>
     /// <typeparam name="T">The key type.</typeparam>
     /// <param name="value">The value to set; may be <see langword="null" />.</param>
-    /// <returns>A disposable that restores the prior state.</returns>
+    /// <returns>A disposable that restores the captured state.</returns>
     public IDisposable Use<T>(T? value = default) {
         var handle  = typeof(T).TypeHandle;
         var hadPrev = _options.TryGetValue(handle, out var prev);

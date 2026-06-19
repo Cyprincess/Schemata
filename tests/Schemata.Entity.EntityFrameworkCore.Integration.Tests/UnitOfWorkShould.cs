@@ -92,7 +92,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                                         Grade    = 1,
                                         Name     = "dispose-alice",
                                     });
-                // intentionally no commit/rollback
+                // Scope disposal rolls back the enlisted unit of work.
             }
         }
 
@@ -171,7 +171,7 @@ public class UnitOfWorkShould : IAsyncLifetime
 
             Assert.Throws<InvalidOperationException>(() => repo.Join(uow));
 
-            // The first AddAsync enlisted an implicit unit of work; its standalone commit still
+            // The first AddAsync enlisted an implicit unit of work; its standalone commit
             // persists the staged work.
             await repo.CommitAsync();
         }
@@ -207,10 +207,13 @@ public class UnitOfWorkShould : IAsyncLifetime
                                     });
                 await repo.CommitAsync();
 
-                // The unit of work has completed; a further write must fail fast rather than run
-                // outside the committed transaction.
+                // The unit of work has completed; a further write must fail fast before any
+                // autocommit path can persist it.
                 await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.AddAsync(new() {
-                    FullName = "After-Commit", Age = 1, Grade = 1, Name = "after-commit-canary",
+                    FullName = "After-Commit",
+                    Age      = 1,
+                    Grade    = 1,
+                    Name     = "after-commit-canary",
                 }));
             }
         }

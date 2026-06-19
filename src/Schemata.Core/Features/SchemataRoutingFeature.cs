@@ -11,6 +11,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataRoutingFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for endpoint routing.
+    /// </summary>
     public const int DefaultPriority = SchemataCookiePolicyFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

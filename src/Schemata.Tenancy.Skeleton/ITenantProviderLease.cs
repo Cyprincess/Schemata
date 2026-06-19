@@ -7,14 +7,13 @@ namespace Schemata.Tenancy.Skeleton;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         While at least one lease is held, the underlying provider is pinned and will
-///         not be disposed even if the cache retires the entry (eviction or removal).
-///         The provider is disposed deterministically once the entry is retired and
-///         the active lease count reaches zero.
+    ///         While at least one lease is held, the underlying provider remains pinned
+    ///         after cache eviction or removal. The provider is disposed deterministically
+    ///         once the entry is retired and the active lease count reaches zero.
 ///     </para>
 ///     <para>
-///         <see cref="IDisposable.Dispose" /> is idempotent — disposing the same lease
-///         twice does not under-count the active lease tally.
+    ///         <see cref="IDisposable.Dispose" /> is idempotent, so repeated disposal leaves
+    ///         the active lease tally consistent.
 ///     </para>
 /// </remarks>
 public interface ITenantProviderLease : IDisposable

@@ -32,7 +32,8 @@ public class UndeleteHandlerShould
 
         var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
-        var detail = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
+        var detail = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(),
+                                               CancellationToken.None);
 
         Assert.Same(entity, detail);
         Assert.Null(entity.DeleteTime);
@@ -43,17 +44,17 @@ public class UndeleteHandlerShould
 
     [Fact]
     public async Task Invoke_LiveEntity_ThrowsAlreadyExistsException() {
-        var entity = new TrashStudent {
-            Name          = "alice-1",
-            CanonicalName = "trashStudents/alice-1",
-        };
+        var entity = new TrashStudent { Name = "alice-1", CanonicalName = "trashStudents/alice-1" };
 
         var repository = new Mock<IRepository<TrashStudent>>();
         var mapper     = new Mock<ISimpleMapper>();
         var handler    = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
         var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.InvokeAsync(
-            entity.CanonicalName, new(), entity, null, CancellationToken.None).AsTask());
+                                                                                    entity.CanonicalName, new(), entity,
+                                                                                    null,
+                                                                                    CancellationToken.None)
+                                                                               .AsTask());
 
         Assert.Contains(entity.CanonicalName, ex.Message, StringComparison.Ordinal);
         repository.Verify(r => r.UpdateAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);

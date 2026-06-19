@@ -12,8 +12,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Identity.Foundation.Advisors;
 
 /// <summary>
-///     Shared guards for the Identity request-validation advisors: required-field violations and the
-///     authenticated-user lookup, so each per-operation advisor stays a thin op-specific check.
+///     Provides shared required-field violations and authenticated-user lookup for identity request-validation advisors.
 /// </summary>
 internal static class IdentityValidation
 {

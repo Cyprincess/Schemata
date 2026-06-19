@@ -17,8 +17,10 @@ public class FlowTimerJobShould
         var runtime = new Mock<IProcessRuntime>();
         var job     = new FlowTimerJob(runtime.Object);
 
-        await Assert.ThrowsAsync<FailedPreconditionException>(() =>
-            job.ExecuteAsync(new() { Variables = new Dictionary<string, object?>() }, CancellationToken.None));
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => job.ExecuteAsync(
+                                                                  new() {
+                                                                      Variables = new Dictionary<string, object?>(),
+                                                                  }, CancellationToken.None));
     }
 
     [Fact]

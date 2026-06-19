@@ -73,8 +73,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
     ) {
         var config = ResolveConfig(job);
 
-        // Block at config time means: do not publish anything and stop the fire entirely;
-        // the schedule does not advance.
+        // Block at config time suppresses publishing, stops the fire, and freezes the schedule.
         if (config.Result == AdviseResult.Block) {
             return JobTriggerOutcome.Block;
         }

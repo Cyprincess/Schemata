@@ -13,15 +13,13 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// </summary>
 /// <remarks>
 ///     Returns <see langword="null" /> when the header is absent. Throws <see cref="TenantResolveException" />
-///     when the header is present but the value cannot be parsed.
+///     when the header contains a malformed value.
 /// </remarks>
 public class RequestHeaderResolver : ITenantResolver
 {
     private readonly IHttpContextAccessor _accessor;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="RequestHeaderResolver" /> class.
-    /// </summary>
+    /// <summary>Creates a resolver that reads from the current HTTP request headers.</summary>
     public RequestHeaderResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
     #region ITenantResolver Members

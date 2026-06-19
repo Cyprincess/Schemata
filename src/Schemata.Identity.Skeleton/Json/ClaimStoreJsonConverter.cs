@@ -6,8 +6,7 @@ using Schemata.Identity.Skeleton.Claims;
 namespace Schemata.Identity.Skeleton.Json;
 
 /// <summary>
-///     JSON converter for <see cref="ClaimStore" /> that serializes single values as a plain string
-///     and multiple values as a JSON array.
+///     Converts <see cref="ClaimStore" /> values between strings or string arrays and JSON.
 /// </summary>
 public sealed class ClaimStoreJsonConverter : JsonConverter<ClaimStore>
 {

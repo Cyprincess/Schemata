@@ -46,6 +46,7 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IV
     #endregion
 
     #region IIdentifier Members
+
     public Guid Uid { get; set; }
 
     #endregion

@@ -11,7 +11,7 @@ namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 /// </summary>
 public sealed class PreviewHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
 {
-    #region IResourceMethodHandler<Student, EmptyResourceRequest, Student> Members
+    #region IResourceMethodHandler<Student,EmptyResourceRequest,Student> Members
 
     public ValueTask<Student> InvokeAsync(
         string?              name,

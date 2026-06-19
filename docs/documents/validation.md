@@ -1,20 +1,35 @@
 # Validation
 
-Schemata's validation layer integrates [FluentValidation](https://docs.fluentvalidation.net/) into the resource advisor pipeline. You register a validator on `IServiceCollection` via `AddValidator<TValidator>()`. The helper wires two open-generic advisors (`AdviceValidation<T>` and `AdviceValidationErrors<T>`) as `IValidationAdvisor<T>`, so every resource operation whose request type matches a registered validator runs validation at the request stage.
+`Schemata.Validation.FluentValidation` integrates [FluentValidation](https://docs.fluentvalidation.net/)
+into the resource validation pipeline. Registering a validator with
+`IServiceCollection.AddValidator<TValidator>()` wires two open-generic advisors as
+`Schemata.Validation.Skeleton.Advisors.IValidationAdvisor<T>`, and the resource request pipeline
+runs them against any request whose type has a registered validator.
 
-## Where the code lives
+## Packages
 
-| Package | Key files |
+| Package | Key types |
 | --- | --- |
-| `Schemata.Validation.Skeleton` | `Advisors/IValidationAdvisor.cs` |
-| `Schemata.Validation.FluentValidation` | `Extensions/ServiceCollectionExtensions.cs` — `AddValidator<TValidator>()` and `AddValidator<T, TValidator>()` |
-| `Schemata.Validation.FluentValidation` | `Advisors/AdviceValidation.cs`, `Advisors/AdviceValidationErrors.cs` |
+| `Schemata.Validation.Skeleton` | `Advisors.IValidationAdvisor<T>` |
+| `Schemata.Validation.FluentValidation` | `AddValidator<TValidator>`, `Advisors.AdviceValidation<T>`, `Advisors.AdviceValidationErrors<T>` |
 
-## Mechanism walkthrough
+## IValidationAdvisor
 
-### 1. Register a validator
+```csharp
+namespace Schemata.Validation.Skeleton.Advisors;
 
-Call `AddValidator` on the `IServiceCollection` exposed by `SchemataBuilder.Services`:
+public interface IValidationAdvisor<in T>
+    : IAdvisor<Operations, T, IList<ErrorFieldViolation>>;
+```
+
+Each advisor receives the CRUD `Operations` kind, the request being validated, and a mutable
+`IList<ErrorFieldViolation>` to populate. Advisors run in `Order` sequence. A collecting advisor
+appends violations and returns `AdviseResult.Continue`; a terminal advisor inspects the list and
+returns `AdviseResult.Block` when it is non-empty.
+
+## Registration
+
+`AddValidator` is an extension on `IServiceCollection`, reachable through `schema.Services`:
 
 ```csharp
 builder.UseSchemata(schema => {
@@ -26,73 +41,91 @@ builder.UseSchemata(schema => {
 });
 ```
 
-`AddValidator<TValidator>()` inspects the validator's implemented `IValidator<T>` interface to determine the entity type, then calls the shared private helper. The two-argument overload `AddValidator<T, TValidator>()` skips the reflection step when you want to be explicit:
+`AddValidator<TValidator>()` reflects the validator's `IValidator<T>` interface to find the request
+type. The two-argument overload `AddValidator<T, TValidator>()` states the request type explicitly:
 
 ```csharp
 schema.Services.AddValidator<StudentRequest, StudentRequestValidator>();
 ```
 
-Both overloads accept an optional `ServiceLifetime` parameter (default `Scoped`).
+Both overloads take an optional `ServiceLifetime` (default `Scoped`). The shared helper performs
+three registrations:
 
-### 2. What the helper registers
+1. `TryAdd` the validator as `IValidator<T>` with the chosen lifetime.
+2. `TryAddEnumerable` `AdviceValidation<>` as `IValidationAdvisor<>`.
+3. `TryAddEnumerable` `AdviceValidationErrors<>` as `IValidationAdvisor<>`.
 
-The private `AddValidator(services, serviceType, implementationType, lifetime)` helper does three things:
+`TryAddEnumerable` registers each advisor open-generic once, regardless of how many validators are
+added. `TryAdd` registers one `IValidator<T>` per request type; a second `AddValidator` call for the
+same type is ignored.
 
-1. `services.TryAdd(new ServiceDescriptor(typeof(IValidator<T>), typeof(TValidator), lifetime))` — registers the FluentValidation validator.
-2. `services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidation<>)))` — registers the validation advisor open-generic.
-3. `services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidationErrors<>)))` — registers the error-collection advisor open-generic.
+## Advisor behavior
 
-`TryAddEnumerable` means the advisors are registered once regardless of how many validators you add.
+`Schemata.Validation.FluentValidation.Advisors.AdviceValidation<T>`
+(`Order = Orders.Base`, 100,000,000) resolves `IValidator<T>` from DI, builds a
+`ValidationContext<T>` carrying the `Operations` kind in `RootContextData`, and runs `ValidateAsync`.
+Each FluentValidation failure becomes an `ErrorFieldViolation`:
 
-### 3. Pipeline integration
+- `Field` — `PropertyName` in `snake_case`.
+- `Reason` — the error code with the `Validator` suffix stripped and `snake_case`-d, plus any
+  comparison operands (e.g. `inclusive_between,1,150`, `maximum_length,200`).
+- `Description` — the formatted message.
 
-The resource operation handler runs `IValidationAdvisor<TRequest>` at `Order = 200_000_000` in the request stage, after authorization (`Order = 100_000_000`) and sanitization (`Order = 150_000_000`). See [Create Pipeline](resource/create-pipeline.md) for the full lane table.
+It returns `AdviseResult.Continue` whether or not it found errors; collection, not short-circuit, is
+its job.
 
-`AdviceValidation<T>` resolves `IValidator<T>` from DI and calls `ValidateAsync`. On failure it returns `AdviseResult.Block`, which short-circuits the operation before the entity is touched.
+`AdviceValidationErrors<T>` (`Order = Orders.Base + 10_000_000`, 110,000,000) is the terminal
+advisor: it returns `AdviseResult.Block` when the violation list is non-empty, otherwise
+`AdviseResult.Continue`.
 
-`AdviceValidationErrors<T>` collects `ValidationFailure` entries and stores them in `AdviceContext` so the response layer can surface structured error details.
+## Resource pipeline integration
 
-### 4. Validator implementation
+The resource request pipeline runs the `IValidationAdvisor<TRequest>` chain through
+`AdviceCreateRequestValidation` / `AdviceUpdateRequestValidation`, after the authorize and sanitize
+advisors. `Schemata.Resource.Foundation.Advisors.ValidationHelper.ValidateAsync` drives the chain:
 
-Validators are standard FluentValidation classes:
+1. Runs the `IValidationAdvisor<TRequest>` advisors over a fresh `List<ErrorFieldViolation>`.
+2. On `AdviseResult.Block`, throws `Schemata.Abstractions.Exceptions.ValidationException(errors)`,
+   which maps to `INVALID_ARGUMENT` / HTTP 422 with a `BadRequestDetail`.
+3. When the request implements `IValidation` with `ValidateOnly = true`, throws
+   `NoContentException` after validation passes, so a dry run never persists.
+
+A request type with no registered `IValidator<T>` makes `AdviceValidation<T>` return immediately;
+the chain produces no violations and the operation proceeds.
+
+## Validator implementation
+
+Validators are standard FluentValidation classes; no Schemata base type is required.
 
 ```csharp
 public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
 {
     public StudentRequestValidator() {
-        RuleFor(r => r.DisplayName).NotEmpty().MaximumLength(200);
-        RuleFor(r => r.Email).EmailAddress().When(r => r.Email is not null);
+        RuleFor(r => r.FullName).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.Age).InclusiveBetween(1, 150);
     }
 }
 ```
-
-No Schemata-specific base class is required. The validator must implement `IValidator<T>` (which `AbstractValidator<T>` satisfies).
 
 ## Extension points
 
 | Interface | Purpose |
 | --- | --- |
-| `IValidationAdvisor<T>` | Implement to add custom validation logic outside FluentValidation. Register via `services.TryAddEnumerable`. |
-| `IValidator<T>` | Standard FluentValidation entry point. Multiple validators for the same `T` are not merged — only the first registered wins via `TryAdd`. |
-
-To run multiple validators for the same type, compose them inside a single `AbstractValidator<T>` using `Include(new OtherValidator())`.
-
-## Design motivation
-
-Validation activates the moment a validator is registered. Registration goes on `IServiceCollection` directly, so validation works in any DI context, including outside `UseSchemata`. The advisor is open-generic, so the pipeline picks up new validators without per-entity wiring.
-
-The two-advisor split (`AdviceValidation` for the gate, `AdviceValidationErrors` for error collection) keeps the short-circuit logic separate from the error-formatting logic. Either can be replaced independently.
+| `IValidationAdvisor<T>` | Add validation logic outside FluentValidation. Register via `TryAddEnumerable` and choose an `Order` between the collector (100,000,000) and the terminal (110,000,000) to contribute violations, or after the terminal to react to the outcome. |
+| `IValidator<T>` | The FluentValidation entry point. Compose multiple rule sets for one type with `Include(new OtherValidator())` inside a single `AbstractValidator<T>`. |
 
 ## Caveats
 
-- There is no `UseValidation` extension on `SchemataBuilder`. Registration goes through `IServiceCollection.AddValidator<TValidator>()` on `schema.Services`.
-- `TryAdd` means only the first registered `IValidator<T>` for a given `T` is used. If you call `AddValidator` twice for the same request type, the second call is silently ignored.
-- The `ServiceLifetime` parameter defaults to `Scoped`. Validators that hold singleton-scoped dependencies should be registered with `ServiceLifetime.Singleton` explicitly.
-- Validation runs in the resource request stage only. Repository-level operations (direct `IRepository<T>` calls outside a resource handler) do not trigger `IValidationAdvisor<T>` unless you invoke the advisor pipeline manually.
+- Registration is on `IServiceCollection`, not `SchemataBuilder`; there is no `UseValidation`
+  builder method.
+- `TryAdd` keeps the first `IValidator<T>` per request type. A second `AddValidator` for the same
+  type has no effect.
+- Validation runs in the resource request stage. A direct `IRepository<T>` call outside a resource
+  handler runs the repository advisors, which include their own add/update validation advisors,
+  rather than this chain.
 
 ## See also
 
-- [Create Pipeline](resource/create-pipeline.md) — validation lane order in the resource pipeline
-- [Update Pipeline](resource/update-pipeline.md) — same advisor chain applies to update requests
-- [Advice Pipeline](core/advice-pipeline.md) — how `IAdvisor` pipelines execute and short-circuit
-- [Built-in Features](core/built-in-features.md) — feature priority reference
+- [Validation guide](../guides/validation.md)
+- [Create Pipeline](resource/create-pipeline.md)
+- [Advice Pipeline](core/advice-pipeline.md)

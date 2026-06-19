@@ -27,7 +27,7 @@ namespace Schemata.Entity.LinqToDB;
 ///     The transaction opens lazily on the first <see cref="AddAsync" /> / <see cref="UpdateAsync" />
 ///     / <see cref="RemoveAsync" /> when the repository owns its context; once enlisted via
 ///     <see cref="RepositoryBase{TEntity}.Join" />, the unit of work owns the transaction and
-///     this repository simply executes statements against the shared connection.
+///     this repository executes statements against the shared connection.
 /// </remarks>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
@@ -52,6 +52,9 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         TableName = entity.GetCustomAttribute<TableAttribute>(false)?.Name ?? entity.Name.Pluralize();
     }
 
+    /// <summary>
+    ///     The active LINQ to DB connection used by repository operations.
+    /// </summary>
     protected virtual TContext Context => _context;
 
     /// <summary>

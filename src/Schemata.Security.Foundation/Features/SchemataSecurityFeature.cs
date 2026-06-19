@@ -9,8 +9,10 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Security.Foundation.Features;
 
+/// <summary>Registers default security providers for Schemata applications.</summary>
 public sealed class SchemataSecurityFeature : FeatureBase
 {
+    /// <summary>Default priority for security feature startup.</summary>
     public const int DefaultPriority = Orders.Extension;
 
     public override int Priority => DefaultPriority;

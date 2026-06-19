@@ -33,17 +33,6 @@ public sealed class FrontChannelLogoutService<TApp, TToken>(
 {
     #region ILogoutNotifier Members
 
-    /// <summary>
-    ///     Returns the set of front-channel logout URIs for all RPs that have
-    ///     active tokens under the given subject or session, per
-    ///     <seealso href="https://openid.net/specs/openid-connect-frontchannel-1_0.html#OPLogout">
-    ///         OpenID Connect
-    ///         Front-Channel Logout 1.0 §3: OpenID Provider Logout Functionality
-    ///     </seealso>
-    ///     .
-    ///     Each URI includes <c>iss</c> and optionally <c>sid</c> as query
-    ///     parameters.
-    /// </summary>
     public async Task<List<string>> GetFrontChannelUrisAsync(
         string?           subject,
         string?           session,

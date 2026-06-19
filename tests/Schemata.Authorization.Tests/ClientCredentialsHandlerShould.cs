@@ -19,10 +19,6 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Tests;
 
-/// <summary>
-///     Tests for the client_credentials grant handler including client authentication
-///     (via IClientAuthenticationService) and grant permission checks (via the advisor pipeline).
-/// </summary>
 public class ClientCredentialsHandlerShould
 {
     private static SchemataApplication CreateApplication(
@@ -90,8 +86,6 @@ public class ClientCredentialsHandlerShould
             ClientId = clientId, ClientSecret = secret, GrantType = GrantTypes.ClientCredentials,
         };
     }
-
-    // -- Handler tests -------------------------------------------
 
     [Fact]
     public async Task Accept_ValidConfidentialClient() {

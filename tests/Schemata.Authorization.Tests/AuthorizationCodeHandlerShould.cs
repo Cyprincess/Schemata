@@ -50,13 +50,13 @@ public class AuthorizationCodeHandlerShould
         };
 
         return new() {
-            Uid             = Identifiers.NewUid(),
-            Type            = TokenTypes.AuthorizationCode,
-            Status          = status,
-            ExpireTime      = expireTime ?? DateTime.UtcNow.AddMinutes(5),
-            Subject         = subject,
+            Uid         = Identifiers.NewUid(),
+            Type        = TokenTypes.AuthorizationCode,
+            Status      = status,
+            ExpireTime  = expireTime ?? DateTime.UtcNow.AddMinutes(5),
+            Subject     = subject,
             Application = clientId,
-            Payload         = JsonSerializer.Serialize(payload, JsonOptions),
+            Payload     = JsonSerializer.Serialize(payload, JsonOptions),
         };
     }
 

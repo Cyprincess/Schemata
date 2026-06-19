@@ -64,8 +64,7 @@ public class AdviceReadMaskShould
         var advisor = new AdviceResponseReadMask<Student, Student>();
         var ctx     = Ctx(new("no_such_field"));
 
-        await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(ctx, new(), new(), null));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, new(), new(), null));
     }
 
     [Fact]
@@ -73,8 +72,7 @@ public class AdviceReadMaskShould
         var advisor = new AdviceResponseReadMask<Student, Student>();
         var ctx     = Ctx(new("profile.display_name"));
         var detail = new Student {
-            FullName = "Alice",
-            Profile  = new() { DisplayName = "Visible", Bio = "Hidden", Locale = "en" },
+            FullName = "Alice", Profile = new() { DisplayName = "Visible", Bio = "Hidden", Locale = "en" },
         };
 
         await advisor.AdviseAsync(ctx, new(), detail, null);
@@ -91,8 +89,7 @@ public class AdviceReadMaskShould
         var advisor = new AdviceResponseReadMask<Student, Student>();
         var ctx     = Ctx(new("full_name.value"));
 
-        await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(ctx, new(), new(), null));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, new(), new(), null));
     }
 
     [Fact]
@@ -100,17 +97,15 @@ public class AdviceReadMaskShould
         var advisor = new AdviceResponseReadMask<Student, Student>();
         var ctx     = Ctx(new("profile.no_such_field"));
 
-        await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(ctx, new(), new(), null));
+        await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(ctx, new(), new(), null));
     }
 
     [Fact]
     public async Task ListResponse_WithMask_TrimsEverySummary() {
         var advisor = new AdviceListResponseReadMask<Student>();
         var ctx     = Ctx(new("age"));
-        var summaries = ImmutableArray.Create(
-            new() { FullName = "Alice", Age = 18 },
-            new Student { FullName = "Bob", Age   = 19 });
+        var summaries = ImmutableArray.Create(new() { FullName       = "Alice", Age = 18 },
+                                              new Student { FullName = "Bob", Age   = 19 });
 
         await advisor.AdviseAsync(ctx, summaries, null);
 
@@ -125,10 +120,7 @@ public class AdviceReadMaskShould
         var ctx     = Ctx(new("courses.title"));
         var summaries = ImmutableArray.Create(new Student {
             FullName = "Alice",
-            Courses = [
-                new() { Title = "Math", Code = "M101" },
-                new() { Title = "History", Code = "H202" },
-            ],
+            Courses  = [new() { Title = "Math", Code = "M101" }, new() { Title = "History", Code = "H202" }],
         });
 
         await advisor.AdviseAsync(ctx, summaries, null);

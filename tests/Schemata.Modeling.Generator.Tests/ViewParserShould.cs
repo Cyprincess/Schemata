@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class ViewParserShould
 {
     [Fact]
-    public void Parse_BasicView() {
+    public void Parse_BasicView_ReturnsNameAndFields() {
         var input  = "Object response {\n  id\n  name\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);
@@ -15,7 +15,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewWithNote() {
+    public void Parse_ViewWithNote_ReturnsNoteAndField() {
         var input  = "Object response {\n  Note 'A response view'\n  id\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);
@@ -24,7 +24,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_CaseInsensitive() {
+    public void Parse_LowercaseObjectKeyword_ReturnsView() {
         var input  = "object response {\n  id\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);
@@ -32,7 +32,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewWithNestedChildren() {
+    public void Parse_ViewWithNestedChildren_ReturnsChildField() {
         var input
             = "Object response {\n  Category.response category [omit all] {\n    id = category_id\n  }\n  status\n  title\n  body\n}";
         var result = Parser.View.Parse(input);
@@ -45,7 +45,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldOmitAllOption() {
+    public void Parse_ViewFieldOmitAllOption_ReturnsOmitAllOption() {
         var input  = "Object response {\n  Category.response category [omit all] {\n    id\n  }\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);
@@ -53,7 +53,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_UntypedViewField() {
+    public void Parse_UntypedViewField_ReturnsNameWithoutType() {
         var result = Parser.ViewField.Parse("id");
         Assert.NotNull(result);
         Assert.Equal("id", result.Name);
@@ -62,7 +62,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_TypedViewField() {
+    public void Parse_TypedViewField_ReturnsTypeAndName() {
         var result = Parser.ViewField.Parse("timestamp expiration_date");
         Assert.NotNull(result);
         Assert.Equal("timestamp", result.Type);
@@ -70,7 +70,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_QualifiedTypeViewField() {
+    public void Parse_QualifiedTypeViewField_PreservesQualifiedType() {
         var result = Parser.ViewField.Parse("Category.response category");
         Assert.NotNull(result);
         Assert.Equal("Category.response", result.Type);
@@ -78,7 +78,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_NullableViewField() {
+    public void Parse_NullableViewField_MarksFieldNullable() {
         var result = Parser.ViewField.Parse("timestamp? modification_date");
         Assert.NotNull(result);
         Assert.Equal("timestamp", result.Type);
@@ -86,7 +86,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithOmitOption() {
+    public void Parse_ViewFieldWithOmitOption_ReturnsOmitOption() {
         var result = Parser.ViewField.Parse("email_address [omit]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -94,7 +94,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithReferenceAssignment() {
+    public void Parse_ViewFieldWithReferenceAssignment_ReturnsReference() {
         var result = Parser.ViewField.Parse("category_id [omit] = category.id");
         Assert.NotNull(result);
         var r = Assert.IsType<Reference>(result.Assignment);
@@ -102,7 +102,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithFunctionAssignment() {
+    public void Parse_ViewFieldWithFunctionAssignment_ReturnsFunctionCall() {
         var result = Parser.ViewField.Parse("timestamp foo = now()");
         Assert.NotNull(result);
         Assert.Equal("timestamp", result.Type);
@@ -112,7 +112,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithLiteralAssignment() {
+    public void Parse_ViewFieldWithLiteralAssignment_ReturnsLiteral() {
         var result = Parser.ViewField.Parse("string foo = 'bar'");
         Assert.NotNull(result);
         var lit = Assert.IsType<Literal>(result.Assignment);
@@ -120,7 +120,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithNestedChildren() {
+    public void Parse_ViewFieldWithNestedChildren_ReturnsNestedChild() {
         var input  = "Category.response category [omit all] {\n  id = category_id\n}";
         var result = Parser.ViewField.Parse(input);
         Assert.NotNull(result);
@@ -132,7 +132,7 @@ public class ViewParserShould
     }
 
     [Fact]
-    public void Parse_ViewFieldWithNoteAndChildren() {
+    public void Parse_ViewFieldWithNoteAndChildren_ReturnsChildNote() {
         var input  = "User.response user [omit all] {\n  id {\n    Note 'Nested Object field'\n  }\n}";
         var result = Parser.ViewField.Parse(input);
         Assert.NotNull(result);

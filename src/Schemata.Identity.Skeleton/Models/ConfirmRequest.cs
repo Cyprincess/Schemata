@@ -2,13 +2,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Email or phone confirmation request body.
+/// </summary>
 public class ConfirmRequest
 {
-    /// <summary>Email address to confirm; mutually exclusive with PhoneNumber.</summary>
+    /// <summary>Email address to confirm.</summary>
     [EmailAddress]
     public string? EmailAddress { get; set; }
 
-    /// <summary>Phone number to confirm; mutually exclusive with EmailAddress.</summary>
+    /// <summary>Phone number to confirm.</summary>
     [Phone]
     public string? PhoneNumber { get; set; }
 

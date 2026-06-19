@@ -62,8 +62,12 @@ public class OperationHandlerBlockShould
         });
     }
 
+    #region Nested type: BlockingAdvisor
+
     private sealed class BlockingAdvisor : IResourceRequestAdvisor<Student>
     {
+        #region IResourceRequestAdvisor<Student> Members
+
         public int Order => 0;
 
         public Task<AdviseResult> AdviseAsync(
@@ -74,10 +78,18 @@ public class OperationHandlerBlockShould
         ) {
             return Task.FromResult(AdviseResult.Block);
         }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: HandlingAdvisor
 
     private sealed class HandlingAdvisor(GetResultBase<Student> result) : IResourceRequestAdvisor<Student>
     {
+        #region IResourceRequestAdvisor<Student> Members
+
         public int Order => 0;
 
         public Task<AdviseResult> AdviseAsync(
@@ -89,5 +101,9 @@ public class OperationHandlerBlockShould
             ctx.Set(result);
             return Task.FromResult(AdviseResult.Handle);
         }
+
+        #endregion
     }
+
+    #endregion
 }

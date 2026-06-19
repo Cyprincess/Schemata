@@ -57,7 +57,7 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// <summary>Consent model: <c>"explicit"</c>, <c>"implicit"</c>, or <c>"external"</c>.</summary>
     public virtual string? ConsentType { get; set; } = ConsentTypes.Explicit;
 
-    /// <summary>When non-null, overrides the global PKCE requirement for this application.</summary>
+    /// <summary>Application-specific PKCE requirement override.</summary>
     public virtual bool? RequirePkce { get; set; }
 
     /// <summary>
@@ -75,7 +75,7 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// <summary>Allowed post-logout redirect URIs for RP-Initiated Logout.</summary>
     public virtual ICollection<string>? PostLogoutRedirectUris { get; set; }
 
-    /// <summary>When non-null, overrides the global subject type for this application.</summary>
+    /// <summary>Application-specific subject identifier type override.</summary>
     public virtual string? SubjectType { get; set; }
 
     /// <summary>Required for pairwise subject identifiers to scope the hash.</summary>

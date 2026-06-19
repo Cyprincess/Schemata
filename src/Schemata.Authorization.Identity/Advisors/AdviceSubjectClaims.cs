@@ -11,8 +11,12 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Identity.Advisors;
 
+/// <summary>
+///     Adds Identity user claims for the subject named by the existing <c>sub</c> claim.
+/// </summary>
 public sealed class AdviceSubjectClaims(ISubjectProvider subjects) : IClaimsAdvisor
 {
+    /// <summary>Default advisor order for Identity subject claim enrichment.</summary>
     public const int DefaultOrder = AdviceAudienceClaims.DefaultOrder + 10_000_000;
 
     #region IClaimsAdvisor Members

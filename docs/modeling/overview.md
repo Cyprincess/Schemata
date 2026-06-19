@@ -1,22 +1,28 @@
 # Modeling
 
-The Schemata Modeling Language (SKM) is a domain-specific language for defining entities, traits, and enums in `.skm` files. The `Schemata.Modeling.Generator` Roslyn source generator reads these files at build time and emits C# code.
+The Schemata Modeling Language (SKM) defines entities, traits, and enums in `.skm` files.
+`Schemata.Modeling.Generator` is a Roslyn incremental source generator that parses each
+`.skm` file at build time and emits C#.
 
-## What the generator emits today
+## What the generator emits
 
-The parser accepts a broad grammar, but the generator is intentionally narrow. Only three declaration kinds produce C# output:
+`DocumentGenerator` walks the parsed document and emits three declaration kinds:
 
 | Declaration | Generated C# |
 | --- | --- |
-| `Entity` | `public record Name(...)` with auto-properties; base list includes trait interfaces |
-| `Trait` | `public interface IName` with read/write properties for each field |
-| `Enum` | `public enum Name` with sequential integer values |
+| `Entity` | `public record` with one init-set auto-property per field; trait interfaces in the base list |
+| `Trait` | `public interface I{Name}` with one property per field |
+| `Enum` | `public enum` with one member per value |
 
-Everything else — `Object` blocks, `View` blocks, `Index` declarations, `Pointer` declarations, and field options/properties — is parsed and included in the AST but **not emitted**. These constructs are reserved for future codegen. Do not rely on them producing output today.
+`Object` blocks, `Index` declarations, field options, and field properties are parsed into
+the AST and carried on their declarations, but produce no C# output. The parser accepts them
+so a model can record indexing and projection intent; only entities, traits, and enums reach
+the compiler.
 
 ## Document structure
 
-An SKM file (`.skm`) is a document consisting of an optional namespace declaration followed by any number of top-level declarations:
+An `.skm` file is an optional namespace declaration followed by any number of top-level
+declarations:
 
 ```text
 Namespace My.Project.Models
@@ -37,35 +43,31 @@ Enum EnrollmentStatus {
 }
 ```
 
-The `Namespace` declaration, if present, must be the first non-comment element in the file. Keywords are case-insensitive: `Entity`, `entity`, and `ENTITY` are equivalent. Comments use C-style syntax (`//` line comments and `/* */` block comments).
+The `Namespace` declaration, when present, is the first declaration in the file. Keywords are
+case-insensitive (`Entity`, `entity`, `ENTITY` are equivalent). Comments use `//` for a line
+and `/* */` for a block.
 
 ## Activating the generator
 
-Add the `.skm` file as `<AdditionalFiles>` in your project, or reference a `Complex.Targets` meta-package that sets this up automatically:
+Reference `Schemata.Modeling.Generator` as an analyzer and add each model file as
+`<AdditionalFiles>`. The generator runs on every additional file whose path ends in `.skm`.
 
 ```xml
 <ItemGroup>
+  <PackageReference Include="Schemata.Modeling.Generator" PrivateAssets="all" />
   <AdditionalFiles Include="Models.skm" />
 </ItemGroup>
 ```
-
-The generator only activates when `Schemata.Advice.AdvicePipeline\`1` is present in the compilation, so reference packs alone won't trigger spurious output.
 
 ## Language reference
 
 | Topic | Description |
 | --- | --- |
-| [Types](types.md) | Built-in type mappings, nullable types, custom types |
+| [Types](types.md) | Built-in type tokens, nullable types, custom types |
 | [Fields](fields.md) | Field syntax, options, properties, notes |
 | [Traits](traits.md) | Reusable field groups, interface emission |
-| [Entities](entities.md) | Entity definitions, inheritance, nested elements |
-| [Enums](enums.md) | Named constant types, emission rules |
-| [Objects](objects.md) | Object blocks (parsed, not emitted today) |
+| [Entities](entities.md) | Entity definitions, composition, nested members |
+| [Enums](enums.md) | Named constant types, value assignment |
+| [Objects](objects.md) | `Object` projection blocks (parsed, not emitted) |
 | [Expressions](expressions.md) | Literals, function calls, references |
-| [Grammar](grammar.md) | Complete EBNF reference |
-
-## See also
-
-- [Guides: Getting Started](../guides/getting-started.md) — defines the `Student` entity used throughout the guides
-- [Documents: Entity Traits](../documents/entity/traits.md) — trait interfaces the generator can implement
-- [Cookbook: Module Packaging](../cookbook/module-packaging.md) — packaging generated entities in a module assembly
+| [Grammar](grammar.md) | Complete EBNF, derived from `Parser.cs` |

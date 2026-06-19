@@ -6,8 +6,10 @@ namespace Schemata.Tenancy.Skeleton.Models;
 /// <summary>List item for <see cref="Entities.SchemataTenant" />.</summary>
 public class TenantSummary : IIdentifier, ICanonicalName, ITimestamp
 {
+    /// <summary>Friendly label shown in tenant admin lists.</summary>
     public string? DisplayName { get; set; }
 
+    /// <summary>Free-form long-form description of the tenant.</summary>
     public string? Description { get; set; }
 
     #region ICanonicalName Members

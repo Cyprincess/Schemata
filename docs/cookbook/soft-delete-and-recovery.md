@@ -94,7 +94,6 @@ Create a controller action that does this:
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
 
 [ApiController]
 public class StudentRestoreController(IRepository<Student> repository) : ControllerBase
@@ -104,12 +103,15 @@ public class StudentRestoreController(IRepository<Student> repository) : Control
         string            name,
         CancellationToken ct)
     {
-        // Load the deleted entity — suppress the soft-delete query filter
-        // so the WHERE DeleteTime IS NULL clause is not applied.
-        var student = await repository
-            .Once()
-            .SuppressQuerySoftDelete()
-            .FirstOrDefaultAsync<Student>(s => s.CanonicalName == name, ct);
+        Student? student;
+
+        // Suppress the soft-delete query filter for this read so the
+        // WHERE DeleteTime IS NULL clause is not applied.
+        using (repository.SuppressQuerySoftDelete())
+        {
+            student = await repository.FirstOrDefaultAsync<Student>(
+                q => q.Where(s => s.CanonicalName == name), ct);
+        }
 
         if (student is null)
             return NotFound();
@@ -130,15 +132,14 @@ public class StudentRestoreController(IRepository<Student> repository) : Control
 
 Key points:
 
-- `Once()` creates a fresh repository instance with a fresh `AdviceContext`.
-  This prevents the suppression from leaking into the repository instance
-  used by later operations.
-- `SuppressQuerySoftDelete()` sets `QuerySoftDeleteSuppressed` on the new
-  instance's `AdviceContext`. `AdviceBuildQuerySoftDelete` checks
-  `ctx.Has<QuerySoftDeleteSuppressed>()` and skips the filter when it's
-  present.
-- Setting `DeleteTime = null` and calling `UpdateAsync` is the restore
-  operation. There is no dedicated "undelete" method; it's a plain update.
+- `SuppressQuerySoftDelete()` sets `QuerySoftDeleteSuppressed` in the
+  repository's `AdviceContext` and returns an `IDisposable`. The `using` scope
+  restores the prior state on exit, so the suppression covers only the read.
+  `AdviceBuildQuerySoftDelete` checks `ctx.Has<QuerySoftDeleteSuppressed>()`
+  and skips the filter while the marker is present.
+- Clearing `DeleteTime` and calling `UpdateAsync` is the restore — there is no
+  dedicated repository undelete method; it is a plain update. (The resource
+  layer exposes this as the AIP-164 Undelete operation.)
 - `CommitAsync` flushes the change to the database.
 
 **Verify:** After deleting a student, `POST /students/{name}:restore` returns
@@ -147,44 +148,46 @@ Key points:
 ## Step 4 — Suppress soft delete for physical deletes
 
 Some operations need to permanently remove a row, bypassing the soft-delete
-advisor. Set `SoftDeleteSuppressed` on the `AdviceContext` before calling
-`RemoveAsync`:
+advisor. Scope `SuppressSoftDelete()` around the remove:
 
 ```csharp
 public async Task PurgeAsync(Student student, CancellationToken ct)
 {
-    // ctx is the repository's AdviceContext
-    repository.AdviceContext.Set<SoftDeleteSuppressed>();
-    await repository.RemoveAsync(student, ct);
+    using (repository.SuppressSoftDelete())
+    {
+        await repository.RemoveAsync(student, ct);
+    }
     await repository.CommitAsync(ct);
 }
 ```
 
+`SuppressSoftDelete()` sets `SoftDeleteSuppressed` in the `AdviceContext`.
 `AdviceRemoveSoftDelete` checks `ctx.Has<SoftDeleteSuppressed>()` at the top
-of `AdviseAsync` and returns `Continue` immediately, allowing the physical
-delete to proceed.
+of `AdviseAsync` and returns `Continue`, letting the physical delete proceed.
 
 **Verify:** After calling `PurgeAsync`, the row is gone from the database
 entirely.
 
 ## Step 5 — List deleted entities (admin view)
 
-To list soft-deleted students, suppress the query filter on a fresh repository
-instance:
+To list soft-deleted students, suppress the query filter and add an explicit
+`DeleteTime != null` predicate:
 
 ```csharp
-public IAsyncEnumerable<Student> ListDeletedAsync(CancellationToken ct)
+public async Task<List<Student>> ListDeletedAsync(CancellationToken ct)
 {
-    return repository
-        .Once()
-        .SuppressQuerySoftDelete()
-        .ListAsync<Student>(s => s.DeleteTime != null, null, ct);
+    using (repository.SuppressQuerySoftDelete())
+    {
+        return await repository
+            .ListAsync<Student>(q => q.Where(s => s.DeleteTime != null), ct)
+            .ToListAsync(ct);
+    }
 }
 ```
 
 The explicit `s => s.DeleteTime != null` predicate filters to only deleted
-rows. Without it, `SuppressQuerySoftDelete` would return all rows including
-live ones.
+rows. Without it, suppressing the filter would return live and deleted rows
+together.
 
 **Verify:** `ListDeletedAsync` returns only students with a non-null
 `DeleteTime`.
@@ -198,14 +201,14 @@ runs after `AdviceRemoveSoftDelete` (Order > 900M), it will not be called
 because the pipeline short-circuits on `Handle`. Place custom remove advisors
 at a lower `Order` value.
 
-**`SuppressQuerySoftDelete` must be called on `Once()`.** Calling it on a
-reused repository instance would suppress the filter for later queries made
-through that instance. Always use `Once()` to get an isolated instance.
+**Scope `SuppressQuerySoftDelete` with `using`.** The returned `IDisposable`
+restores the prior state on dispose, so the filter applies normally again after
+the block. Leaving the marker set on a long-lived repository would expose
+tombstoned rows to later queries.
 
-**`AdviceAddSoftDelete` clears `DeleteTime` on insert.** If you try to seed
-data with a pre-set `DeleteTime` (e.g., to import archived records), the
-advisor will clear it. Suppress it by setting `SoftDeleteSuppressed` on the
-context before calling `AddAsync`.
+**`AdviceAddSoftDelete` clears `DeleteTime` on insert.** Seeding data with a
+pre-set `DeleteTime` (e.g., importing archived records) loses it unless you
+scope `SuppressSoftDelete()` around the `AddAsync`.
 
 **`PurgeTime` is not enforced by the framework.** The `PurgeTime` property is
 a convention field. The framework does not automatically purge rows when

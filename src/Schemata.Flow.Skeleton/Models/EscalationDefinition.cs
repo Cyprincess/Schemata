@@ -1,8 +1,8 @@
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Escalation event definition. Unlike <see cref="ErrorDefinition" />,
-///     escalations may be non-interrupting and are typically handled by a parent scope.
+///     A BPMN Escalation event definition that may be interrupting or non-interrupting
+///     and is typically handled by a parent scope.
 /// </summary>
 public sealed class EscalationDefinition : IEventDefinition
 {

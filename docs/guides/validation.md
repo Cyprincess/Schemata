@@ -1,21 +1,31 @@
 # Validation
 
-Add server-side input validation using FluentValidation. Registration goes through `IServiceCollection.AddValidator<TValidator>()` — there is no `UseValidation` method on `SchemataBuilder`. This guide builds on [Object Mapping](object-mapping.md).
+Add server-side input validation with FluentValidation. Registration goes through
+`IServiceCollection.AddValidator<TValidator>()`; there is no `UseValidation` builder method. This
+guide builds on [Object Mapping](object-mapping.md).
 
 ## How it works
 
-`AddValidator<TValidator>()` is an extension method on `IServiceCollection` from `Schemata.Validation.FluentValidation`. It:
+`AddValidator<TValidator>()` is an extension on `IServiceCollection` from
+`Schemata.Validation.FluentValidation`. It:
 
 1. Registers `TValidator` as `IValidator<T>` (scoped by default).
-2. Auto-registers `AdviceValidation<T>` and `AdviceValidationErrors<T>` so the resource pipeline runs validation automatically.
+2. Registers `AdviceValidation<T>` and `AdviceValidationErrors<T>` so the resource pipeline runs
+   validation against any request whose type has a validator.
 
-The resource pipeline runs validation advisors at `Order = 200_000_000` — after authorization and sanitization, before the entity is mapped and persisted. A failed validation throws `ValidationException` (HTTP 422).
+The resource request pipeline runs validation after authorization and sanitization, before the
+request is mapped onto the entity. `AdviceValidation<T>` collects field violations;
+`AdviceValidationErrors<T>` blocks when any were found, which surfaces as a `ValidationException`
+(HTTP 422).
 
-`StudentRequest` implements `IValidation` from [Object Mapping](object-mapping.md). The `ValidateOnly` property enables dry-run validation: when `true`, the pipeline validates and returns HTTP 204 without persisting.
+`StudentRequest` implements `IValidation` from [Object Mapping](object-mapping.md). Its
+`ValidateOnly` property enables a dry run: a valid `validate_only` request returns HTTP 204 without
+persisting.
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Validation.FluentValidation`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already pulls in `Schemata.Validation.FluentValidation`. To
+compose packages by hand:
 
 ```shell
 dotnet add package --prerelease Schemata.Validation.FluentValidation
@@ -23,12 +33,12 @@ dotnet add package --prerelease Schemata.Validation.FluentValidation
 
 ## Create the validator
 
-Create `StudentRequestValidator.cs`:
+`StudentRequestValidator.cs`:
 
 ```csharp
 using FluentValidation;
 
-public class StudentRequestValidator : AbstractValidator<StudentRequest>
+public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
 {
     public StudentRequestValidator()
     {
@@ -42,26 +52,23 @@ public class StudentRequestValidator : AbstractValidator<StudentRequest>
 }
 ```
 
-The validator targets `StudentRequest` — the `TRequest` type in the resource pipeline. Validation runs against the request DTO, not the entity.
+The validator targets `StudentRequest`, the `TRequest` type in the resource pipeline. Validation
+runs against the request DTO, before it is mapped onto the `Student` entity.
 
 ## Register the validator
 
-Inside the `ConfigureServices` block in `Program.cs`:
+Add the validator inside the schema configuration:
 
 ```csharp
-schema.ConfigureServices(services => {
-    services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
-        .UseEntityFrameworkCore<AppDbContext>(
-            (_, opts) => opts.UseSqlite("Data Source=app.db"));
-
-    services.TryAddEnumerable(
-        ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
-
-    services.AddValidator<StudentRequestValidator>();
-});
+schema.Services.AddValidator<StudentRequestValidator>();
 ```
 
-The two-parameter overload `AddValidator<T, TValidator>()` is available when the validator type does not directly reveal its target via generic interfaces.
+When the validator type does not directly reveal its target through its generic interface, name the
+request type explicitly:
+
+```csharp
+schema.Services.AddValidator<StudentRequest, StudentRequestValidator>();
+```
 
 ## Verify
 
@@ -98,7 +105,8 @@ Response (HTTP 422):
 }
 ```
 
-Dry-run validation (validates without persisting):
+The `reason` code is the FluentValidation error code in `snake_case`, with comparison operands
+appended. Dry-run validation validates without persisting:
 
 ```shell
 curl -X POST http://localhost:5000/students \
@@ -106,12 +114,15 @@ curl -X POST http://localhost:5000/students \
      -d '{"full_name":"Alice","age":20,"validate_only":true}'
 ```
 
-A valid request returns HTTP 204. An invalid request returns HTTP 422 with the same error shape.
+A valid `validate_only` request returns HTTP 204; an invalid one returns the same HTTP 422 shape.
+
+## Next steps
+
+- [Identity](identity.md) — add users and login, then validate the identity request bodies
+- [Concurrency and Freshness](concurrency-and-freshness.md) — `StudentRequest` already implements `IFreshness`
+- [Filtering and Pagination](filtering-and-pagination.md) — query the list endpoint
 
 ## See also
 
-- [Query Caching](query-caching.md) — previous in the series: transparent query result caching
-- [Identity](identity.md) — next in the series: user management with ASP.NET Core Identity
-- [Object Mapping](object-mapping.md) — `StudentRequest` with `IValidation`
-- [Validation](../documents/validation.md) — `AddValidator` internals, advisor registration
-- [Error Model](../documents/core/error-model.md) — `ValidationException` and HTTP 422 shape
+- [Validation reference](../documents/validation.md) — `AddValidator` internals, advisor ordering
+- [Error Model](../documents/core/error-model.md) — `ValidationException` and the HTTP 422 shape

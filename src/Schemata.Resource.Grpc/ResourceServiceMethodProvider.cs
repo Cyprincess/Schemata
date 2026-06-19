@@ -12,6 +12,10 @@ using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
 namespace Schemata.Resource.Grpc;
 
+/// <summary>
+///     Adds standard resource RPC methods to generated gRPC services.
+/// </summary>
+/// <typeparam name="TService">The service type being discovered by ASP.NET Core gRPC.</typeparam>
 internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodProvider<TService>
     where TService : class
 {
@@ -34,6 +38,11 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>), method);
     }
 
+    /// <summary>
+    ///     Initializes a method provider for resource gRPC services.
+    /// </summary>
+    /// <param name="config">The resource gRPC binder configuration.</param>
+    /// <param name="options">The registered resource options.</param>
     public ResourceServiceMethodProvider(
         ResourceBinderConfiguration       config,
         IOptions<SchemataResourceOptions> options

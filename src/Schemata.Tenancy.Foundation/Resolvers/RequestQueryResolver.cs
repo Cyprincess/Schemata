@@ -12,16 +12,14 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 ///     Resolves the tenant identifier from the <c>Tenant</c> query string parameter.
 /// </summary>
 /// <remarks>
-///     Returns <see langword="null" /> when no <c>Tenant</c> query parameter is present.
-///     Throws <see cref="TenantResolveException" /> when the value cannot be parsed.
+///     Returns <see langword="null" /> when the <c>Tenant</c> query parameter is absent.
+///     Throws <see cref="TenantResolveException" /> when the value is malformed.
 /// </remarks>
 public class RequestQueryResolver : ITenantResolver
 {
     private readonly IHttpContextAccessor _accessor;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="RequestQueryResolver" /> class.
-    /// </summary>
+    /// <summary>Creates a resolver that reads from the current query string.</summary>
     public RequestQueryResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
     #region ITenantResolver Members

@@ -9,6 +9,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Resource method handler that broadcasts BPMN signals to waiting process instances.</summary>
 public sealed class ThrowSignalHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry

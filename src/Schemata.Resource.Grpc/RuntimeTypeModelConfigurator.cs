@@ -8,8 +8,16 @@ using Schemata.Transport.Grpc.Proto;
 
 namespace Schemata.Resource.Grpc;
 
+/// <summary>
+///     Builds protobuf-net runtime models for resource gRPC services.
+/// </summary>
 internal static class RuntimeTypeModelConfigurator
 {
+    /// <summary>
+    ///     Creates a runtime model containing standard resource messages and registered gRPC-enabled resource DTOs.
+    /// </summary>
+    /// <param name="options">The registered resource options.</param>
+    /// <returns>The configured protobuf-net runtime model.</returns>
     public static RuntimeTypeModel Configure(SchemataResourceOptions options) {
         var model = RuntimeTypeModel.Create();
 

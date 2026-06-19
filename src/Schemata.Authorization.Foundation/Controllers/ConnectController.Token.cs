@@ -8,8 +8,12 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains the token endpoint action.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles token endpoint requests.</summary>
     [HttpPost("Token")]
     public async Task<IActionResult> Token([FromForm] TokenRequest request, CancellationToken ct) {
         var handler = HttpContext.RequestServices.GetService<TokenEndpoint>();

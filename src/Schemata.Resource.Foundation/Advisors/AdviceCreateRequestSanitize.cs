@@ -24,8 +24,8 @@ public static class AdviceCreateRequestSanitize
     public const int DefaultOrder = AdviceCreateRequestAuthorize.DefaultOrder + 10_000_000;
 
     /// <summary>
-    ///     CLR property names of fields that clients MUST NOT populate on a Create request. The server
-    ///     either assigns them (name/canonical_name/uid/owner/etag/timestamps) or derives them from
+    ///     CLR property names of server-managed fields on Create requests. The server
+    ///     assigns them (name/canonical_name/uid/owner/etag/timestamps) or derives them from
     ///     state (state/delete_time/purge_time). <see cref="ICanonicalName.CanonicalName" /> and
     ///     <see cref="IFreshness.EntityTag" /> are the CLR targets of the AIP wire fields <c>name</c>
     ///     and <c>etag</c>, so they are cleared alongside the internal <see cref="ICanonicalName.Name" />.
@@ -69,10 +69,10 @@ public static class AdviceCreateRequestSanitize
 }
 
 /// <summary>
-///     Silently clears server-managed fields on a Create request before validation and authorization. Fields are
-///     matched by their snake_case wire name against properties on <typeparamref name="TRequest" />; properties that do
-///     not exist on the request type are
-///     skipped. Required to satisfy AIP-133 immutability rules without surfacing errors to the client.
+///     Clears server-managed fields on a Create request before validation and authorization. Fields are
+///     matched by their snake_case wire name against properties on <typeparamref name="TRequest" />;
+///     unknown fields are skipped. This satisfies AIP-133 immutability rules while accepting extra
+///     client-supplied field values.
 /// </summary>
 /// <typeparam name="TEntity">The entity type being created.</typeparam>
 /// <typeparam name="TRequest">The request DTO type carrying creation data.</typeparam>

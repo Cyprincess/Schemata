@@ -23,7 +23,10 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
     where TManager : class, ITenantManager<TTenant>
     where TTenant : SchemataTenant
 {
+    /// <summary>Default middleware ordering priority for the tenancy feature.</summary>
     public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 10_000_000;
+
+    /// <summary>Default service-registration order for the tenancy feature.</summary>
     public const int DefaultOrder    = Orders.Max;
 
     public override int Order => DefaultOrder;

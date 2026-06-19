@@ -4,7 +4,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>Create/update request body for <see cref="Entities.SchemataRole" />.</summary>
+/// <summary>Role create or update request body.</summary>
 public class RoleRequest : ICanonicalName, IDescriptive, IFreshness
 {
     #region ICanonicalName Members

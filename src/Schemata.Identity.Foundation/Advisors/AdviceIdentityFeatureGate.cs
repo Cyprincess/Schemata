@@ -10,11 +10,15 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Advisors;
 
+/// <summary>Provides the base order for identity feature-gate advisors.</summary>
 public static class AdviceIdentityFeatureGate
 {
+    /// <summary>Default order for identity feature-gate advisors.</summary>
     public const int DefaultOrder = Orders.Base;
 }
 
+/// <summary>Blocks identity operations disabled by feature options.</summary>
+/// <typeparam name="T">Request type handled by the advisor.</typeparam>
 public sealed class AdviceIdentityFeatureGate<T>(IOptionsMonitor<SchemataIdentityOptions> options) : IIdentityRequestAdvisor<T>
 {
     #region IIdentityRequestAdvisor<T> Members

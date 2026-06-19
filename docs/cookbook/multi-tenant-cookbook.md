@@ -33,7 +33,7 @@ var builder = WebApplication.CreateBuilder(args)
               .UseHeaderResolver();
 
         schema.ConfigureServices(services => {
-            services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+            services.AddRepository(typeof(EfCoreRepository<,>))
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
         });
@@ -65,21 +65,21 @@ Each `UseXxxResolver()` extension calls `services.TryAddScoped<ITenantResolver, 
 public sealed class HeaderOrPathResolver(
     IHttpContextAccessor http) : ITenantResolver
 {
-    public ValueTask<Guid?> ResolveAsync(CancellationToken ct)
+    public Task<Guid?> ResolveAsync(CancellationToken ct = default)
     {
         var headers = http.HttpContext?.Request.Headers;
         if (headers is not null
          && headers.TryGetValue("x-tenant-id", out var raw)
          && Guid.TryParse(raw, out var id)) {
-            return new(id);
+            return Task.FromResult<Guid?>(id);
         }
 
         if (http.HttpContext?.GetRouteValue("Tenant") is string slug
          && Guid.TryParse(slug, out var fromPath)) {
-            return new(fromPath);
+            return Task.FromResult<Guid?>(fromPath);
         }
 
-        return new((Guid?)null);
+        return Task.FromResult<Guid?>(null);
     }
 }
 
@@ -104,18 +104,19 @@ public class AppTenant : SchemataTenant
 }
 ```
 
-Pass the custom type to `UseTenancy<TTenant>()`:
+Pass the custom type to `UseTenancy<TTenant>()` with one resolver — or, to
+combine sources, the composite from Step 1:
 
 ```csharp
 schema.UseTenancy<AppTenant>()
-      .UseHeaderResolver()
-      .UsePathResolver()
-      .UsePrincipalResolver();
+      .UseHeaderResolver();
 ```
 
 `UseTenancy<TTenant>()` uses `SchemataTenantManager<TTenant>` as the default
 manager. To supply a custom manager, use the three-argument overload:
-`UseTenancy<TManager, TTenant>()`.
+`UseTenancy<TManager, TTenant>()`. Only one `ITenantResolver` is active per
+host; stacking `UseHeaderResolver().UsePathResolver()` does not chain them —
+the first wins.
 
 **Verify:** `ITenantContextAccessor<AppTenant>.Tenant` resolves to an
 `AppTenant` instance with the `ConnectionString` property populated.
@@ -188,9 +189,10 @@ route template:
 public class StudentsController : ControllerBase { ... }
 ```
 
-A request to `/acme/students` sets the tenant to `acme` via the path resolver.
-If you also have `UseHeaderResolver()` registered before `UsePathResolver()`,
-a header takes precedence over the path segment.
+A request to `/acme/students` sets the tenant from the `{Tenant}` segment, as
+long as `UsePathResolver()` is the active resolver. To honor both a header and a
+path segment, use the composite resolver from Step 1 — registering both
+extensions does not combine them.
 
 **Verify:** `GET /acme/students` and `GET /beta/students` return data from
 different tenant databases.
@@ -199,22 +201,24 @@ different tenant databases.
 
 **Only one resolver is ever active.** `UseXxxResolver()` calls `TryAddScoped<ITenantResolver, X>()`; the first wins and every subsequent `UseXxxResolver()` is a no-op. The middleware does not iterate resolvers. To layer multiple sources (header → path → claim), register a composite `ITenantResolver` directly and skip the `UseXxxResolver()` extensions.
 
-**`TenantResolveException` at startup** — this is thrown when
-`SchemataTenantServiceProviderFactory` is asked to build a per-tenant provider
-but `accessor.Tenant` is null. This happens if you try to resolve a
-tenant-scoped service outside a request (e.g., in a background service that
-doesn't go through the tenancy middleware). Use `ITenantServiceScopeFactory`
-to create a scope with an explicit tenant.
+**`TenantResolveException` per request** — the accessor throws it when a
+resolver yields a tenant id that `ITenantManager.FindByTenantId` cannot find,
+when a resolver parses a malformed Guid, and when the provider factory is asked
+to build a container with no bound tenant. To run a tenant-scoped service
+outside a request (a background job that skips the middleware), bind a tenant
+explicitly through `ITenantContextInitializer` / `ITenantServiceScopeFactory`.
 
-**Non-singleton overrides are rejected.** The factory calls
-`EnforceSingletonOverride` after each `DynamicOverrides` delegate runs. Any
-`Scoped` or `Transient` descriptor added to the overrides collection causes an
-`InvalidOperationException`. Register only singletons in `DynamicOverrides`.
+**Non-singleton overrides are rejected.** The factory validates each override
+delegate's registrations and throws `InvalidOperationException` for any `Scoped`
+or `Transient` descriptor, naming the offending service type. Register only
+singletons in `TenantOverrides` and `DynamicOverrides`; put request-scoped
+services in `ForAll`.
 
 **`UseHostResolver` requires tenant host names in the database.** The host
-resolver queries `ITenantManager<TTenant>` to find a tenant whose host name
-matches the incoming `Host` header. If no tenant has a matching host name, the
-resolver returns null and the next resolver in the chain is tried.
+resolver queries `ITenantManager<TTenant>.FindByHost` for a tenant whose host
+matches the incoming `Host` header, and throws `TenantResolveException` when
+none matches. Only one resolver is active per host — there is no fall-through
+chain.
 
 ## See also
 

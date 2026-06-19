@@ -11,8 +11,7 @@ internal static class TenantId
 {
     /// <summary>
     ///     Parses an extracted tenant identifier, throwing <see cref="TenantResolveException" /> when the
-    ///     value is missing, blank, or not a well-formed <see cref="Guid" />. Callers that treat an absent
-    ///     source as "no tenant" must short-circuit before calling this.
+    ///     value is missing, blank, or malformed. Callers should skip parsing when the request source is absent.
     /// </summary>
     /// <param name="value">The raw identifier extracted from the request.</param>
     /// <returns>The parsed tenant identifier.</returns>

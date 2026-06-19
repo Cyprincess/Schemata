@@ -12,5 +12,8 @@ namespace Schemata.Abstractions.Resource;
 /// <typeparam name="TItem">The resource DTO type carried by the result.</typeparam>
 public interface IEntitiesResult<TItem>
 {
+    /// <summary>
+    ///     Resource items carried by the result.
+    /// </summary>
     IList<TItem>? Entities { get; set; }
 }

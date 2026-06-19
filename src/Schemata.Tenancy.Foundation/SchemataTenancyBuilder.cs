@@ -10,9 +10,7 @@ namespace Schemata.Tenancy.Foundation;
 public sealed class SchemataTenancyBuilder<TTenant>
     where TTenant : SchemataTenant
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenancyBuilder{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates a builder over the application's service collection.</summary>
     public SchemataTenancyBuilder(IServiceCollection services) { Services = services; }
 
     /// <summary>Gets the service collection for registering tenant-related services.</summary>

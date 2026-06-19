@@ -47,7 +47,7 @@ public class EventContext
     /// <summary>
     ///     Whether delivery goes through a durable broker that can fail after the audit row is
     ///     written. The bus sets this so the audit observer records the row as
-    ///     <see cref="EventState.Pending" /> (outbox) rather than <see cref="EventState.Recorded" />.
+    ///     <see cref="EventState.Pending" /> for outbox delivery.
     /// </summary>
     public bool RequiresOutboxDelivery { get; set; }
 
@@ -57,8 +57,8 @@ public class EventContext
     ///     The audit observer captures its
     ///     <see cref="Schemata.Abstractions.Entities.ICanonicalName.CanonicalName" /> and
     ///     <see cref="Schemata.Abstractions.Entities.IConcurrency.Timestamp" /> into the
-    ///     persisted <see cref="SchemataEvent" /> row so consumers can verify the source has
-    ///     not changed since publish.
+    ///     persisted <see cref="SchemataEvent" /> row so consumers can compare the current source
+    ///     state with the publish snapshot.
     /// </summary>
     public object? Source { get; set; }
 

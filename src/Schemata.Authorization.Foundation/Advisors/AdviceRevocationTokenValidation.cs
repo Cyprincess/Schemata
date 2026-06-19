@@ -11,6 +11,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceRevocationTokenValidation{TApp, TToken}" />.</summary>
 public static class AdviceRevocationTokenValidation
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceRevocationEndpointPermission.DefaultOrder + 10_000_000;
 }
 
@@ -37,7 +38,6 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
 {
     #region IRevocationAdvisor<TApp,TToken> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceRevocationTokenValidation.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

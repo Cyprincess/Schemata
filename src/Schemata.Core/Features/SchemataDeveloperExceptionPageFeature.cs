@@ -13,6 +13,9 @@ namespace Schemata.Core.Features;
 [Information("Developer Exception Page will only be enabled in Development environment.", Level = LogLevel.Debug)]
 public sealed class SchemataDeveloperExceptionPageFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for the developer exception page.
+    /// </summary>
     public const int DefaultPriority = SchemataForwardedHeadersFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

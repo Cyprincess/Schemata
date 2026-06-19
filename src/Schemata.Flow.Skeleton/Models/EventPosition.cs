@@ -19,8 +19,7 @@ public enum EventPosition
     IntermediateCatch,
 
     /// <summary>
-    ///     An intermediate event that fires when the token reaches it,
-    ///     without waiting for an external trigger.
+    ///     An intermediate event that fires immediately when the token reaches it.
     /// </summary>
     IntermediateThrow,
 

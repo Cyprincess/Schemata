@@ -17,7 +17,7 @@ public sealed class AuthorizeContext<TApplication>
     /// <summary>Resolved client application.</summary>
     public TApplication? Application { get; set; }
 
-    /// <summary>Authenticated resource owner principal. Non-null after successful authentication.</summary>
+    /// <summary>Authenticated resource owner principal after successful authentication.</summary>
     public ClaimsPrincipal? Principal { get; set; }
 
     /// <summary>Negotiated response mode, e.g. <c>"query"</c>, <c>"fragment"</c>, or <c>"form_post"</c>.</summary>

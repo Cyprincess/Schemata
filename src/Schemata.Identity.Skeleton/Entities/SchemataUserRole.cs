@@ -6,6 +6,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Link entity between Schemata identity users and roles.
+/// </summary>
 [Table("SchemataUserRole")]
 [PrimaryKey(nameof(UserId), nameof(RoleId))]
 public class SchemataUserRole : IdentityUserRole<Guid>, ITimestamp

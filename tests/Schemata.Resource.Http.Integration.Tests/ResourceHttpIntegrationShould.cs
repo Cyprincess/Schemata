@@ -58,6 +58,7 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         var response = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
+
     [Fact]
     public async Task Delete_MissingStudent_WithoutAllowMissing_Returns404() {
         var client   = _factory.CreateClient();
@@ -74,10 +75,10 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task GetCustomMethod_Preview_Returns200WithBody() {
-        var client  = _factory.CreateClient();
-        var created = await client.PostAsync(
-            "/v1/students",
-            new StringContent("""{"full_name":"Previewable"}""", Encoding.UTF8, "application/json"));
+        var client = _factory.CreateClient();
+        var created = await client.PostAsync("/v1/students",
+                                             new StringContent("""{"full_name":"Previewable"}""", Encoding.UTF8,
+                                                               "application/json"));
         var body = await created.Content.ReadFromJsonAsync<Student>();
 
         var response = await client.GetAsync($"/v1/{body!.Name}:preview");
@@ -102,9 +103,9 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
     public async Task SoftDeleteUndeleteAndExpunge_Lifecycle_ReturnsExpectedStates() {
         var client = _factory.CreateClient();
 
-        var created = await client.PostAsync(
-            "/v1/trashes",
-            new StringContent("""{"full_name":"Disposable"}""", Encoding.UTF8, "application/json"));
+        var created = await client.PostAsync("/v1/trashes",
+                                             new StringContent("""{"full_name":"Disposable"}""", Encoding.UTF8,
+                                                               "application/json"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var createBody = await created.Content.ReadFromJsonAsync<JsonElement>();
         var name       = createBody.GetProperty("name").GetString()!;
@@ -114,21 +115,18 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         var deleteBody = await deleted.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(JsonValueKind.String, deleteBody.GetProperty("delete_time").ValueKind);
 
-        var undeleted = await client.PostAsync(
-            $"/v1/{name}:undelete",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+        var undeleted = await client.PostAsync($"/v1/{name}:undelete",
+                                               new StringContent("{}", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.OK, undeleted.StatusCode);
         var undeleteBody = await undeleted.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.True(
-            !undeleteBody.TryGetProperty("delete_time", out var restoredDeleteTime)
-         || restoredDeleteTime.ValueKind == JsonValueKind.Null);
+        Assert.True(!undeleteBody.TryGetProperty("delete_time", out var restoredDeleteTime)
+                 || restoredDeleteTime.ValueKind == JsonValueKind.Null);
 
         var deletedAgain = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.OK, deletedAgain.StatusCode);
 
-        var expunged = await client.PostAsync(
-            $"/v1/{name}:expunge",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+        var expunged = await client.PostAsync($"/v1/{name}:expunge",
+                                              new StringContent("{}", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.OK, expunged.StatusCode);
 
         var fetched = await client.GetAsync($"/v1/{name}");

@@ -12,6 +12,12 @@ using Schemata.Common;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Reserves idempotency cache entries for request advisors and replays finalized responses.
+/// </summary>
+/// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TRequest">The request DTO type.</typeparam>
+/// <typeparam name="TPayload">The cached response DTO type.</typeparam>
 public abstract class AdviceRequestIdempotencyBase<TEntity, TRequest, TPayload>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -20,17 +26,34 @@ public abstract class AdviceRequestIdempotencyBase<TEntity, TRequest, TPayload>
     private readonly ICacheProvider _cache;
     private readonly TimeProvider   _time;
 
+    /// <summary>
+    ///     Initializes a new instance with the idempotency store and clock.
+    /// </summary>
+    /// <param name="cache">The idempotency cache.</param>
+    /// <param name="timeProvider">The clock used for pending reservation timeouts.</param>
     protected AdviceRequestIdempotencyBase(ICacheProvider cache, TimeProvider? timeProvider = null) {
         _cache = cache;
         _time  = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>
+    ///     Gets the operation token used in the idempotency cache key.
+    /// </summary>
     protected abstract string? Operation(AdviceContext ctx);
 
+    /// <summary>
+    ///     Indicates whether the current context disables idempotency checks.
+    /// </summary>
     protected abstract bool IsSuppressed(AdviceContext ctx);
 
+    /// <summary>
+    ///     Stores a replayed response payload in the advice context.
+    /// </summary>
     protected abstract void StoreReplay(AdviceContext ctx, TPayload payload);
 
+    /// <summary>
+    ///     Handles request idempotency by returning a cached response, reserving a new key, or rejecting conflicting work.
+    /// </summary>
     protected async Task<AdviseResult> AdviseCoreAsync(
         AdviceContext     ctx,
         TRequest          request,

@@ -1,101 +1,151 @@
 # Flow HTTP Transport
 
-`Schemata.Flow.Http` exposes `IProcessRuntime` as a REST surface. Calling `UseFlowHttp()` on `SchemataBuilder` registers `SchemataFlowHttpFeature` (Priority `SchemataFlowFeature.DefaultPriority + 100_000` = 480,100,000), which adds the assembly containing `ProcessController` as an `ApplicationPart` so MVC picks it up.
+`Schemata.Flow.Http` exposes process execution over HTTP. It registers `SchemataProcess` and
+`SchemataProcessTransition` as Schemata resources — so process operations ride the standard Resource
+pipeline as AIP-136 custom methods — and adds a small controller that lists registered process
+definitions. `MapHttp()` activates `SchemataFlowHttpFeature` (priority
+`SchemataFlowFeature.DefaultPriority + 100_000` = `480_100_000`).
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
-| `Schemata.Flow.Http` | `Features/SchemataFlowHttpFeature.cs` |
-| `Schemata.Flow.Http` | `Controllers/ProcessController.cs` |
-| `Schemata.Flow.Http` | `Extensions/SchemataBuilderExtensions.cs` |
+| --- | --- |
+| `Schemata.Flow.Http` | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`, `Extensions/SchemataBuilderExtensions.cs` |
+| `Schemata.Flow.Skeleton` | `StartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs` |
 | `Schemata.Flow.Foundation` | `ProcessRuntime.cs`, `ProcessRegistry.cs` |
 
-## Setup
+## Activation
+
+`MapHttp()` chains off the `SchemataFlowBuilder` that `UseFlow` returns:
 
 ```csharp
 builder.UseSchemata(schema => {
     schema.UseLogging();
     schema.UseRouting();
     schema.UseControllers();
-    schema.UseFlow(flow => flow.Use<OrderProcess>())
-          .UseFlowHttp();
+    schema.UseFlow()
+          .MapHttp()
+          .Use<OrderProcess>();
 });
 ```
 
-`UseFlowHttp()` adds `SchemataFlowHttpFeature`. The feature declares `[DependsOn<SchemataFlowFeature>]` and `[DependsOn<SchemataTransportHttpFeature>]`, so the flow runtime and the shared HTTP transport plumbing (canonical-name wire rewrites, `ETag` projection, JSON traits) are auto-pulled when either is missing.
+`SchemataFlowHttpFeature` declares `[DependsOn<SchemataFlowFeature>]` and
+`[DependsOn<SchemataHttpResourceFeature>]`, so the flow runtime and the HTTP resource transport
+(canonical-name wire rewrites, ETag projection, JSON traits) are pulled in when missing.
 
-## `SchemataFlowHttpFeature`
+## Feature registration
 
-`ConfigureServices` is empty: the feature exists for ordering, dependency resolution, and as the marker type passed to `SchemataBuilder.AddSchemataApplicationPart<SchemataFlowHttpFeature>()` inside `UseFlowHttp`. The extension method adds the assembly containing `SchemataFlowHttpFeature` (which is the assembly that also contains `ProcessController`) as an `ApplicationPart` so MVC discovers the controller. This bypasses the blanket `Schemata.*` assembly-part stripping performed by `SchemataControllersFeature`.
+`SchemataFlowHttpFeature.ConfigureServices`:
 
-## `ProcessController`
+1. Adds the assembly containing the feature as an MVC `ApplicationPart` (via
+   `AddSchemataApplicationPart<SchemataFlowHttpFeature>()`) so `ProcessDefinitionsController` is
+   discovered. This bypasses the blanket `Schemata.*` assembly-part stripping.
+2. Registers the five resource method handlers as scoped services.
+3. Registers `SchemataProcess` and `SchemataProcessTransition` as resources on the HTTP endpoint.
 
-`ProcessController` is mounted at `~/processes` and projects `IProcessRuntime` onto five custom methods plus four read endpoints.
-
-| HTTP method | Route | Action |
-|---|---|---|
-| `POST` | `/processes` | Start a new process instance |
-| `POST` | `/processes/{name}:complete` | Complete the current activity and auto-advance |
-| `POST` | `/processes/{name}:correlate` | Correlate a named message to the instance |
-| `POST` | `/processes/:throw` | Broadcast a signal to all waiting instances |
-| `POST` | `/processes/{name}:terminate` | Terminate a process instance |
-| `GET` | `/processes` | List process instances |
-| `GET` | `/processes/{name}` | Get a single instance by name segment |
-| `GET` | `/processes/{name}/transitions` | List transition history for an instance |
-| `GET` | `/processes/{name}/transitions/{transition}` | Get a single transition record |
-| `GET` | `/processes/:definitions` | List registered process definition names |
-
-The colon-prefixed paths follow the AIP-136 custom-method convention.
-
-The controller resolves the canonical name by prepending `"processes/"` to the `{name}` route segment, then forwards to `ProcessRuntime`. `HttpContext.User` is passed as the `ClaimsPrincipal`.
-
-## Request bodies
+`SchemataProcess` is registered with `Operations.Get` and `Operations.List` plus five custom methods:
 
 ```csharp
-// POST /processes
-public sealed class StartProcessInstanceRequest
-{
-    public string  DefinitionName { get; set; }
-    public string? DisplayName    { get; set; }
-    public string? Description    { get; set; }
-    public string? Variables      { get; set; }  // JSON
-}
-
-// POST /processes/{name}:complete
-public sealed class CompleteActivityRequest
-{
-    public string? Variables { get; set; }       // JSON, merged into instance
-}
-
-// POST /processes/{name}:correlate
-public sealed class CorrelateMessageRequest
-{
-    public string  MessageName { get; set; }
-    public string? Payload     { get; set; }     // JSON
-}
-
-// POST /processes/:throw
-public sealed class ThrowSignalRequest
-{
-    public string  SignalName { get; set; }
-    public string? Payload    { get; set; }      // JSON
-}
+resource.Operations = [Operations.Get, Operations.List];
+resource.Methods = [
+    new("start",     typeof(StartProcessHandler),    ResourceMethodScope.Collection),
+    new("complete",  typeof(CompleteActivityHandler)),                 // Instance
+    new("correlate", typeof(CorrelateMessageHandler)),                 // Instance
+    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("terminate", typeof(TerminateProcessHandler)),                 // Instance
+];
 ```
+
+`SchemataProcessTransition` is registered read-only (`Get`, `List`).
+
+## Routing and method mapping
+
+### Process operations
+
+The custom methods follow the AIP-136 colon convention. Collection-scoped verbs bind to the
+collection; instance-scoped verbs bind to `{name}`:
+
+| Method | HTTP | Handler | Runtime call |
+| --- | --- | --- | --- |
+| `start` | `POST ~/v1/processes:start` | `StartProcessHandler` | `StartProcessInstanceAsync` |
+| `complete` | `POST ~/v1/processes/{name}:complete` | `CompleteActivityHandler` | `CompleteActivityAsync` |
+| `correlate` | `POST ~/v1/processes/{name}:correlate` | `CorrelateMessageHandler` | `CorrelateMessageAsync` |
+| `signal` | `POST ~/v1/processes:signal` | `ThrowSignalHandler` | `ThrowSignalAsync` |
+| `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler` | `TerminateProcessInstanceAsync` |
+
+Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`. Its
+`InvokeAsync(name, request, entity, principal, ct)` receives the resolved entity (null for
+collection-scoped verbs), checks access via `FlowProcessAuthorization`, deserializes the request's
+JSON `Variables`/`Payload`, and calls the runtime. `principal` is the request's `ClaimsPrincipal`.
+
+### Read operations
+
+The `Get` and `List` operations come from the resource registration, not a hand-written controller:
+
+| HTTP | Action |
+| --- | --- |
+| `GET ~/v1/processes` | List process instances |
+| `GET ~/v1/processes/{name}` | Get one instance |
+| `GET ~/v1/processes/{name}/transitions` | List an instance's transitions |
+| `GET ~/v1/processes/{name}/transitions/{transition}` | Get one transition |
+
+### Definitions endpoint
+
+`ProcessDefinitionsController` is the only hand-written controller. Mounted at
+`~/v1/processes:definitions`, its single `GET` lists registered definition names from
+`IProcessRegistry`, projecting each into a `ProcessDefinitionInfo` with
+`CanonicalName = "definitions/{name}"`.
+
+## Request and response wire format
+
+The Resource HTTP transport's `SchemataJsonTraits` applies to the flow resources: `Name` is
+dropped, `CanonicalName` serializes as `name`, snake_case is applied to remaining properties.
+Custom-method requests live in `Schemata.Flow.Skeleton.Models`:
+
+```csharp
+public sealed class StartProcessInstanceRequest   // POST :start
+{ public string DefinitionName; public string? DisplayName, Description, Variables; }
+
+public sealed class CompleteActivityRequest        // POST {name}:complete
+{ public string? Variables; }
+
+public sealed class CorrelateMessageRequest        // POST {name}:correlate
+{ public string MessageName; public string? Payload; }
+
+public sealed class ThrowSignalRequest             // POST :signal
+{ public string SignalName; public string? Payload; }
+```
+
+`Variables` and `Payload` are JSON strings rehydrated by `VariableSerializer.Deserialize` before the
+runtime call. `:terminate` takes no body.
+
+## Error mapping
+
+The Resource HTTP transport's `UseExceptionHandler` covers every flow endpoint. Runtime errors
+surface as the canonical AIP error model: `NotFoundException` for missing instances or
+definitions, `FailedPreconditionException` for state-machine violations, `ValidationException` for
+malformed `Variables`/`Payload` JSON, and 500 `Internal` for unmapped exceptions.
+
+## Reflection and metadata
+
+The MVC route table is the HTTP surface description. `ProcessDefinitionsController` provides a
+runtime catalog of registered process definitions; there is no separate reflection endpoint.
 
 ## Extension points
 
-- Subclass `ProcessController` and override individual actions to add authorisation, response shaping, or extra validation.
-- Subclass and reach a richer `ProcessRuntime` overload directly — `ProcessRuntime.StartProcessInstanceAsync` accepts `displayName` and `description` arguments that the `IProcessRuntime` interface does not expose, and the default `Start` action uses them.
+- Add `[ResourceMethod]` advisors or replace a handler to change a verb's behavior; the methods ride
+  the same Resource advisor pipeline as any custom method.
+- Add `[Anonymous(Operations.Method)]` on `SchemataProcess` in your own derived registration to
+  bypass authorization for the verbs.
 
 ## Caveats
 
-- `ProcessController` is typed against the concrete `ProcessRuntime`, not `IProcessRuntime`, because it uses the extended `StartProcessInstanceAsync` overload. Subclasses that take `IProcessRuntime` lose that overload.
-- `SchemataExtensionPart<T>` exposes the assembly containing `T`. Adding more controllers in the same assembly will surface them as well.
+- Process execution is resource-driven, not controller-driven. The only controller is the
+  definitions lister; the verbs and read endpoints are synthesized by the Resource transport.
 
 ## See also
 
 - [Overview](overview.md)
 - [Runtime Services](runtime.md)
 - [gRPC Transport](grpc.md)
-- [Resource HTTP Transport](../resource/http-transport.md)
+- [Custom Methods](../resource/custom-methods.md)

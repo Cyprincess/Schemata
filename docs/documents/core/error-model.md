@@ -1,28 +1,36 @@
 # Error Model
 
-Schemata uses a structured error model per [Google AIP-193](https://google.aip.dev/193). Every error response follows the same envelope format regardless of transport, and each exception type maps deterministically to an HTTP status code and a canonical `google.rpc.Code` string. The exception handler middleware converts `SchemataException` instances to structured JSON automatically; unhandled exceptions produce a generic 500 response with a request trace identifier.
+Schemata returns structured errors per [Google AIP-193](https://google.aip.dev/193). Every error
+carries an HTTP status code, a canonical `google.rpc.Code` string, a developer message, and typed
+detail entries on the exception itself. The HTTP exception-handler middleware turns any
+`SchemataException` into the JSON envelope automatically; any other exception becomes a generic
+500 with a request trace identifier.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Abstractions` | `Exceptions/SchemataException.cs` |
+| `Schemata.Abstractions` | `Exceptions/SchemataException.cs` and one file per subclass |
 | `Schemata.Abstractions` | `Errors/ErrorResponse.cs`, `Errors/ErrorBody.cs`, `Errors/IErrorDetail.cs` |
-| `Schemata.Abstractions` | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs` |
-| `Schemata.Abstractions` | `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
-| `Schemata.Abstractions` | `SchemataConstants.cs` (ErrorCodes, ErrorReasons, FieldReasons) |
+| `Schemata.Abstractions` | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs`, `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
+| `Schemata.Abstractions` | `SchemataConstants.cs` (`ErrorCodes`, `ErrorReasons`, `FieldReasons`) |
 | `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs` |
 
-## Error response envelope
+## Envelope
 
-All errors are returned inside an `ErrorResponse` wrapper:
+Errors serialize inside an `ErrorResponse` wrapper:
 
 ```json
 {
   "error": {
-    "code": "NOT_FOUND",
+    "code": 404,
+    "status": "NOT_FOUND",
     "message": "The requested resource was not found.",
     "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "NOT_FOUND"
+      },
       {
         "@type": "type.googleapis.com/google.rpc.RequestInfo",
         "request_id": "0HMVQJ6K1TPKL:00000001"
@@ -32,57 +40,57 @@ All errors are returned inside an `ErrorResponse` wrapper:
 }
 ```
 
-### ErrorResponse
+### ErrorResponse and ErrorBody
 
-`ErrorResponse` is the top-level envelope. Its single property `Error` holds an `ErrorBody`.
-
-### ErrorBody
+`ErrorResponse` holds a single `Error` property of type `ErrorBody`. `ErrorBody` carries:
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `code` | `string?` | Canonical error code from `google.rpc.Code` (e.g. `"NOT_FOUND"`) |
-| `message` | `string?` | Developer-oriented diagnostic message; not localized for end-user display |
-| `details` | `List<IErrorDetail>?` | Typed detail entries; each carries an `@type` discriminator |
+| `code` | `int` | The HTTP status code (mirrors `google.rpc.Status.code`, e.g. `404`) |
+| `status` | `string?` | The canonical `google.rpc.Code` name (e.g. `"NOT_FOUND"`) for client-side branching |
+| `message` | `string?` | Developer-oriented diagnostic message, not localized for display |
+| `details` | `List<IErrorDetail>?` | Typed detail entries; each serializes with an `@type` discriminator |
 
 ### IErrorDetail
 
-`IErrorDetail` is the marker interface for typed error details. It requires a `Type` property (serialized as `@type` in JSON output) containing a fully-qualified type URL.
+`IErrorDetail` is a bare marker interface. Each detail class is registered as a polymorphic derived
+type with `[Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.<Kind>")]`, and
+`PolymorphicTypeResolver` emits that `Name` as the `@type` discriminator. The type URL lives on the
+attribute, not on a property.
 
 ## Exception hierarchy
 
-All Schemata domain exceptions inherit from `SchemataException`:
+Every domain exception derives from `SchemataException`:
 
 ```
 Exception
   SchemataException
-    AlreadyExistsException
-    AuthorizationException
-    ConcurrencyException
-    FailedPreconditionException
-    InvalidArgumentException
-    NoContentException
-    NotFoundException
-    QuotaExceededException
-    TenantResolveException
-    UnauthenticatedException
-    ValidationException
+    AlreadyExistsException        InvalidArgumentException     QuotaExceededException
+    AuthorizationException        NoContentException           TenantResolveException
+    ConcurrencyException          NotFoundException            UnauthenticatedException
+    FailedPreconditionException   OAuthException               ValidationException
 ```
 
 ### SchemataException
 
-The base exception for all Schemata domain errors. Constructor accepts `status`, `code`, and `message`. Subclasses provide defaults for all three.
+The constructor is `SchemataException(int code, string? status = null, string? message = null)`:
 
-| Property | Type | Description |
+| Property | Type | Holds |
 | --- | --- | --- |
-| `Status` | `int` | HTTP response status code |
-| `Code` | `string?` | Canonical error code for client-side branching |
+| `Code` | `int` | The HTTP response status code |
+| `Status` | `string?` | The canonical `google.rpc.Code` string |
 | `Details` | `List<IErrorDetail>?` | Typed detail entries |
 
-`CreateErrorResponse()` builds the `ErrorResponse` envelope. Subclasses may override it to produce protocol-specific envelopes — `OAuthException` returns an `OAuthErrorResponse` per RFC 6749 instead of the default `ErrorResponse`.
+`CreateErrorResponse(requestId, domain)` builds the envelope: it inserts an `ErrorInfoDetail`
+(with `reason` set to `Status`, falling back to `INTERNAL`) at the front of the detail list when
+none is present, appends a `RequestInfoDetail` when a request id is supplied, and returns an
+`ErrorResponse`. Subclasses override it to produce protocol-specific envelopes — `OAuthException`
+returns an `OAuthErrorResponse` per RFC 6749, and `NoContentException` returns `null` so no body is
+written.
 
 ### Exception types
 
-| Exception | HTTP Status | Error Code | Default message |
+| Exception | HTTP code | Canonical status | Default message |
 | --- | --- | --- | --- |
 | `InvalidArgumentException` | 400 | `INVALID_ARGUMENT` | The request contains an invalid argument. |
 | `ValidationException` | 422 | `INVALID_ARGUMENT` | One or more validation errors occurred. |
@@ -96,109 +104,60 @@ The base exception for all Schemata domain errors. Constructor accepts `status`,
 | `QuotaExceededException` | 429 | `RESOURCE_EXHAUSTED` | Rate limit exceeded. |
 | `NoContentException` | 204 | `OK` | _(none)_ |
 
-`NoContentException` is a special case: it signals a successful operation with no response body (used by validate-only requests).
+`ValidationException` takes a set of `ErrorFieldViolation` values and wraps them in a
+`BadRequestDetail`. `NoContentException` signals a successful body-less response, used by
+validate-only requests.
 
-## Error detail types
+## Detail types
 
-### BadRequestDetail
-
-Type URL: `type.googleapis.com/google.rpc.BadRequest`
-
-Describes field-level validation failures. Contains a `List<ErrorFieldViolation>` in `field_violations`.
-
-Each `ErrorFieldViolation` has:
-
-| Property | Type | Description |
+| Detail class | `@type` URL | Carries |
 | --- | --- | --- |
-| `field` | `string` | The field path that failed validation (snake_case) |
-| `description` | `string` | Human-readable description of the violation |
-| `reason` | `string` | Machine-readable reason code |
+| `BadRequestDetail` | `.../google.rpc.BadRequest` | `field_violations`: `List<ErrorFieldViolation>` |
+| `ErrorInfoDetail` | `.../google.rpc.ErrorInfo` | `reason`, `domain`, `metadata` |
+| `PreconditionFailureDetail` | `.../google.rpc.PreconditionFailure` | `violations`: `List<PreconditionViolation>` (`type`, `subject`, `description`) |
+| `QuotaFailureDetail` | `.../google.rpc.QuotaFailure` | `violations`: `List<QuotaViolation>` (`subject`, `description`) |
+| `RequestInfoDetail` | `.../google.rpc.RequestInfo` | `request_id`, `serving_data` |
+| `ResourceInfoDetail` | `.../google.rpc.ResourceInfo` | `resource_type`, `resource_name`, `owner`, `description` |
 
-When FluentValidation is used, the reason is derived from the FluentValidation error code by stripping the `Validator` suffix and converting to `snake_case`. Comparison values are appended as comma-separated parameters (e.g. `maximum_length,100`).
-
-### ErrorInfoDetail
-
-Type URL: `type.googleapis.com/google.rpc.ErrorInfo`
-
-Provides structured information about the error. Properties: `reason` (string), `domain` (string), `metadata` (`Dictionary<string, string>`).
-
-Well-known reason value: `SchemataConstants.ErrorReasons.ConcurrencyMismatch` = `"CONCURRENCY_MISMATCH"`, used by `ConcurrencyException`.
-
-### PreconditionFailureDetail
-
-Type URL: `type.googleapis.com/google.rpc.PreconditionFailure`
-
-Contains a `List<PreconditionViolation>` in `violations`. Each violation has `type`, `subject`, and `description` strings.
-
-Well-known constants: `SchemataConstants.PreconditionTypes.Tenant` = `"TENANT"`, `SchemataConstants.PreconditionSubjects.Request` = `"request"`.
-
-### QuotaFailureDetail
-
-Type URL: `type.googleapis.com/google.rpc.QuotaFailure`
-
-Contains a `List<QuotaViolation>` in `violations`. Each violation has `subject` and `description` strings.
-
-### RequestInfoDetail
-
-Type URL: `type.googleapis.com/google.rpc.RequestInfo`
-
-Contains request identification for debugging. Properties: `request_id` (string), `serving_data` (string).
-
-`SchemataTransportHttpFeature` automatically appends this detail to every error response with `request_id` set to the ASP.NET Core `TraceIdentifier`.
-
-### ResourceInfoDetail
-
-Type URL: `type.googleapis.com/google.rpc.ResourceInfo`
-
-Provides information about the resource involved in the error. Properties: `resource_type`, `resource_name`, `owner`, `description` (all strings).
+Each `ErrorFieldViolation` carries `field` (snake_case path), `description`, and `reason`. With
+FluentValidation, the reason is derived from the validator's error code by stripping the
+`Validator` suffix and converting to `snake_case`; comparison values append as comma-separated
+parameters (`maximum_length,100`). `ErrorInfoDetail.Reason` uses values such as
+`SchemataConstants.ErrorReasons.ConcurrencyMismatch` (`"CONCURRENCY_MISMATCH"`).
 
 ## HTTP transport
 
-`SchemataTransportHttpFeature` (in `Schemata.Transport.Http`) registers a global exception handler middleware in its `ConfigureApplication`. The middleware converts exceptions to structured JSON responses.
+`SchemataTransportHttpFeature` registers a global exception-handler middleware in its
+`ConfigureApplication`:
 
-When a `SchemataException` is caught:
-
-1. The HTTP response status code is set to `SchemataException.Status`.
-2. `http.CreateErrorResponse()` builds the `ErrorResponse` envelope from the exception's `Code`, `Message`, and `Details`.
-3. The response is serialized to JSON with snake_case naming and written to the response body.
-
-When any other exception is caught:
-
-1. The HTTP response status code is set to 500.
-2. An `ErrorBody` with code `INTERNAL` and a generic message is returned.
-3. A `RequestInfoDetail` with the current `TraceIdentifier` is included.
-
-The original exception message is never leaked to the client for unhandled exceptions.
+- A caught `SchemataException` sets the response status to its `Code`, calls
+  `CreateErrorResponse()` with the current `TraceIdentifier`, and writes the snake_case JSON body.
+- Any other exception sets status 500 and returns an `ErrorBody` with status `INTERNAL`, a generic
+  message, and a `RequestInfoDetail` carrying the `TraceIdentifier`. The original exception message
+  stays server-side.
 
 ## Error codes
 
-All error code constants are defined in `SchemataConstants.ErrorCodes`:
+`SchemataConstants.ErrorCodes` defines the canonical strings: `Ok`, `InvalidArgument`, `NotFound`,
+`PermissionDenied`, `Aborted`, `AlreadyExists`, `FailedPrecondition`, `Unauthenticated`,
+`ResourceExhausted`, `Internal` — each mapping to its `google.rpc.Code` name.
 
-| Constant | Value |
-| --- | --- |
-| `Ok` | `OK` |
-| `InvalidArgument` | `INVALID_ARGUMENT` |
-| `NotFound` | `NOT_FOUND` |
-| `PermissionDenied` | `PERMISSION_DENIED` |
-| `Aborted` | `ABORTED` |
-| `AlreadyExists` | `ALREADY_EXISTS` |
-| `FailedPrecondition` | `FAILED_PRECONDITION` |
-| `Unauthenticated` | `UNAUTHENTICATED` |
-| `ResourceExhausted` | `RESOURCE_EXHAUSTED` |
-| `Internal` | `INTERNAL` |
+## Design rationale
 
-## Design motivation
-
-Carrying the HTTP status code, canonical error code, and typed details on the exception itself means the exception handler middleware never needs to catch individual exception types. Any code that throws a `SchemataException` subclass gets a correctly-formatted response automatically. The `CreateErrorResponse` override point lets protocol-specific exceptions (OAuth) produce their own envelope without changing the middleware.
+Carrying the HTTP status, canonical code, and typed details on the exception lets the middleware
+format every response without catching individual types. Any code that throws a `SchemataException`
+subclass produces a correct response. The `CreateErrorResponse` override point lets protocol
+exceptions emit their own envelope.
 
 ## Caveats
 
-- `ValidationException` uses HTTP 422 (Unprocessable Entity), not 400, to distinguish validation failures from malformed requests.
-- `ConcurrencyException` uses HTTP 409 with code `ABORTED` (not `CONFLICT`) to align with the `google.rpc.Code` mapping.
-- `NoContentException` is not an error condition; it is a control-flow mechanism for validate-only requests that return HTTP 204.
+- `ValidationException` uses HTTP 422, not 400, to separate validation failures from malformed
+  requests.
+- `ConcurrencyException` uses HTTP 409 with status `ABORTED`, matching the `google.rpc.Code` table.
+- `NoContentException` is a control-flow signal for validate-only requests; its
+  `CreateErrorResponse` returns `null` and the response is HTTP 204 with no body.
 
 ## See also
 
 - [JSON Serialization](json-serialization.md) — how `IErrorDetail` and `@type` are serialized
-- [Built-in Features](built-in-features.md) — `SchemataTransportHttpFeature` priority (410M)
-- [Feature System](feature-system.md) — `DependsOn` between `Transport.Http` and its dependencies
+- [Built-in Features](built-in-features.md) — `SchemataTransportHttpFeature` (410M)

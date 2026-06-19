@@ -51,11 +51,11 @@ public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? timeProvider =
 
         trash.DeleteTime = _time.GetUtcNow().UtcDateTime;
 
-        // Persist as an update rather than a delete so the row is retained.
+        // Persist as an update so the row is retained.
         await repository.UpdateAsync(entity, ct);
 
         // Handle signals the pipeline that the remove has been handled;
-        // the entity will not be physically deleted.
+        // the provider skips the physical delete.
         return AdviseResult.Handle;
     }
 

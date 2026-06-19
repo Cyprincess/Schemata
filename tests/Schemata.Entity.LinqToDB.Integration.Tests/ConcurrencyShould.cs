@@ -92,16 +92,16 @@ public class ConcurrencyShould : IAsyncLifetime
     }
 
     private async Task<Guid> SeedAsync(string name) {
-        var id                  = Identifiers.NewUid();
+        var id = Identifiers.NewUid();
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {
-                Uid      = id,
-                FullName = name,
-                Name     = name,
-                Age      = 20,
-                Grade    = 1,
-            });
+                                          Uid      = id,
+                                          FullName = name,
+                                          Name     = name,
+                                          Age      = 20,
+                                          Grade    = 1,
+                                      });
             await repository.CommitAsync();
         }
 

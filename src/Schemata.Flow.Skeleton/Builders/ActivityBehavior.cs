@@ -16,14 +16,17 @@ public sealed class ActivityBehavior
 {
     private readonly ProcessDefinition _definition;
 
+    /// <summary>Creates a behavior builder for <paramref name="activity" /> within <paramref name="definition" />.</summary>
     internal ActivityBehavior(ProcessDefinition definition, Activity activity) {
         _definition = definition;
         Activity    = activity;
         LastTarget  = activity;
     }
 
+    /// <summary>The activity whose outgoing behavior is being configured.</summary>
     internal Activity Activity { get; }
 
+    /// <summary>The current tail activity for chained behavior calls.</summary>
     internal Activity LastTarget { get; private set; }
 
     /// <summary>Routes the current activity to another <see cref="Activity" />.</summary>
@@ -50,7 +53,6 @@ public sealed class ActivityBehavior
     }
 
     /// <summary>Connects the current activity to a synthesized anonymous end event.</summary>
-    /// <exception cref="FormatException"></exception>
     public ActivityBehavior End() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
@@ -130,9 +132,8 @@ public sealed class ActivityBehavior
     }
 
     /// <summary>
-    ///     Reserved for the future full BPMN engine. The current state-machine engine rejects
-    ///     <see cref="InclusiveGateway" /> at validation time, so processes using <c>Include</c>
-    ///     will fail to register.
+    ///     Routes the current activity through an inclusive gateway for engines that support
+    ///     <see cref="InclusiveGateway" /> execution. State-machine validation rejects the resulting process.
     /// </summary>
     public InclusiveBranch Include(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
@@ -159,9 +160,8 @@ public sealed class ActivityBehavior
     }
 
     /// <summary>
-    ///     Reserved for the future full BPMN engine. The current state-machine engine rejects
-    ///     <see cref="ParallelGateway" /> at validation time, so processes using <c>Fork</c>
-    ///     will fail to register.
+    ///     Routes the current activity through a parallel fork for engines that support
+    ///     <see cref="ParallelGateway" /> execution. State-machine validation rejects the resulting process.
     /// </summary>
     public ParallelFork Fork(params FlowBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
@@ -212,6 +212,8 @@ public sealed class ActivityBehavior
 
     #region Boundary Events
 
+    /// <summary>Attaches a boundary error catch for exceptions of type <typeparamref name="TException" />.</summary>
+    /// <typeparam name="TException">The exception type represented by the boundary error definition.</typeparam>
     public BoundaryCatch OnError<TException>()
         where TException : Exception {
         return new(this, _definition, Activity,
@@ -252,16 +254,14 @@ public sealed class ActivityBehavior
     }
 
     /// <summary>
-    ///     Reserved for the future full BPMN engine. The current state-machine engine does not
-    ///     implement compensation semantics; configurations relying on this catch will not run.
+    ///     Attaches a boundary compensation catch for engines that support compensation semantics.
     /// </summary>
     public BoundaryCatch OnCompensation() {
         return new(this, _definition, Activity, new CompensationDefinition { Name = $"Compensation_{Activity.Name}" });
     }
 
     /// <summary>
-    ///     Reserved for the future full BPMN engine. The current state-machine engine does not
-    ///     implement transaction cancel semantics; configurations relying on this catch will not run.
+    ///     Attaches a boundary cancel catch for engines that support transaction cancel semantics.
     /// </summary>
     public BoundaryCatch OnCancel() {
         return new(this, _definition, Activity, new CancelDefinition { Name = $"Cancel_{Activity.Name}" });

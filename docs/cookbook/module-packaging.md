@@ -2,12 +2,17 @@
 
 ## What you'll build
 
-A standalone `Catalog` module that the host application picks up through package or project references — no hand-written `[Module]` attribute anywhere. You'll see which targets package each side uses, how MSBuild emits the discovery attributes, and how `DefaultModulesProvider` consumes them at runtime.
+A standalone `Catalog` module that the host application picks up through a package or project
+reference — no hand-written `[Module]` attribute anywhere. You'll see which targets package each
+side uses, how MSBuild stamps the discovery attributes, and how `DefaultModulesProvider` consumes
+them at runtime.
 
 ## Prerequisites
 
-- A working host application from [Getting Started](../guides/getting-started.md) that references `Schemata.Application.Complex.Targets` (or any other Application Targets variant with `UseModularTargets=true`).
-- A `dotnet` SDK that satisfies `global.json` (currently 10.0.201).
+- A working host application from [Getting Started](../guides/getting-started.md) that references
+  `Schemata.Application.Complex.Targets` (or any Application Targets variant with
+  `UseModularTargets=true`).
+- A `dotnet` SDK that satisfies `global.json`.
 
 ## Step 1: Create the module project
 
@@ -18,15 +23,18 @@ dotnet add MyApp.Catalog package --prerelease Schemata.Module.Complex.Targets
 
 The module-side targets variants:
 
-| Package | Purpose |
+| Package | Adds |
 | --- | --- |
-| `Schemata.Module.Targets` | Minimal: `Schemata.Abstractions` + Advice generator |
+| `Schemata.Module.Targets` | `Schemata.Abstractions` + the advice generator |
 | `Schemata.Module.Persisting.Targets` | Base + `Schemata.Entity.Repository` |
-| `Schemata.Module.Complex.Targets` | Persisting + DSL + Authorization/Identity/Mapping/Security/Validation Skeletons |
+| `Schemata.Module.Complex.Targets` | Persisting + DSL + Authorization/Identity/Mapping/Security/Validation skeletons |
 
-The Targets package packs `build/Package.Build.props` (which contributes `ModulePackageNames Include="<package-name>"`) and `build/<package>.targets` (which exposes a `GetModuleProjectName` target). Consuming hosts use those to discover the module at build time.
+The Targets package packs `build/Package.Build.props` (contributing
+`ModulePackageNames Include="<package-name>"`) and `build/<package>.targets` (exposing
+`GetModuleProjectName`). Consuming hosts use those to discover the module at build time.
 
-**Assertion:** `dotnet build MyApp.Catalog` succeeds. The module project compiles against `Schemata.Abstractions` and ships an analyzer reference to `Schemata.Advice.Generator`.
+**Assertion:** `dotnet build MyApp.Catalog` succeeds. The project compiles against
+`Schemata.Abstractions` and ships an analyzer reference to `Schemata.Advice.Generator`.
 
 ## Step 2: Define the module class
 
@@ -52,14 +60,6 @@ public sealed class CatalogModule : ModuleBase
         services.AddScoped<ICatalogService, CatalogService>();
     }
 
-    public override void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
-    ) {
-        // Middleware specific to this module, if any.
-    }
-
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
@@ -71,9 +71,12 @@ public sealed class CatalogModule : ModuleBase
 }
 ```
 
-`ModuleBase` defaults to `Order = 0` and `Priority = Order`. Override `Order` to control where this module sits among other modules for `ConfigureServices`, and `Priority` to split `ConfigureApplication`/`ConfigureEndpoints` ordering. Implement `IModule` directly when the two axes must differ.
+`ModuleBase` defaults `Order` to 0 and `Priority` to `Order`. Override `Order` to position the
+module among others for `ConfigureServices`, and `Priority` to split
+`ConfigureApplication` / `ConfigureEndpoints` ordering. Implement `IModule` directly when the two
+axes must differ.
 
-**Assertion:** `typeof(CatalogModule).IsAssignableTo(typeof(IModule))` is `true`. The class compiles inside the module project.
+**Assertion:** `typeof(CatalogModule).IsAssignableTo(typeof(IModule))` is `true`.
 
 ## Step 3: Reference the module from the host
 
@@ -93,15 +96,23 @@ If the module is already published, add a package reference:
 </ItemGroup>
 ```
 
-That single reference is the only registration step. The host already has `Schemata.Application.Modular.Targets` (or `Schemata.Application.Complex.Targets`, which sets `UseModularTargets=true`). At build time the `ResolveModuleProjectReferences` MSBuild target — packed inside that Application Targets package — runs `AfterResolveReferences`, calls `GetModuleProjectName` against every responding project reference, merges the result with `ModulePackageNames` from referenced module packages, and writes:
+That single reference is the only registration step. The host already has
+`Schemata.Application.Modular.Targets` (or `Schemata.Application.Complex.Targets`, which sets
+`UseModularTargets=true`). At build time the `ResolveModuleProjectReferences` MSBuild target — packed
+inside that Application Targets package — runs after `AfterResolveReferences`, calls
+`GetModuleProjectName` against every responding project reference, merges the result with
+`ModulePackageNames` from referenced module packages, and writes:
 
 ```csharp
 [assembly: Schemata.Abstractions.Modular.ModuleAttribute("MyApp.Catalog")]
 ```
 
-into the host assembly. The string is whichever name MSBuild collected — `$(AssemblyName)` for project references, `$(MSBuildThisFileName)` for package references.
+into the host assembly. The string is whichever name MSBuild collected — `$(AssemblyName)` for
+project references, `$(MSBuildThisFileName)` for package references.
 
-**Assertion:** Rebuild the host. The generated `obj/.../*.AssemblyInfo.cs` contains a `Schemata.Abstractions.Modular.ModuleAttribute("MyApp.Catalog")` entry. No hand-written `[Module]` attribute exists in your sources.
+**Assertion:** Rebuild the host. The generated `obj/.../*.AssemblyInfo.cs` contains a
+`Schemata.Abstractions.Modular.ModuleAttribute("MyApp.Catalog")` entry, with no hand-written
+`[Module]` attribute in your sources.
 
 ## Step 4: Enable the modular feature
 
@@ -115,13 +126,19 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`UseModular()` registers `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at `Priority = 520_000_000`. At `ConfigureServices` time `DefaultModulesProvider` reads the emitted `ModuleAttribute` instances from `Assembly.GetEntryAssembly()`, calls `Assembly.Load(name)` for each, finds the first non-abstract `IModule` type, and stores a `ModuleDescriptor`. `DefaultModulesRunner` then dispatches each lifecycle phase.
+`UseModular()` registers `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at
+`Priority = 520_000_000`. During `ConfigureServices`, `DefaultModulesProvider` reads the stamped
+`ModuleAttribute` instances from `Assembly.GetEntryAssembly()`, calls `Assembly.Load(name)` for
+each, finds the first non-abstract `IModule` type, and stores a `ModuleDescriptor`.
+`DefaultModulesRunner` then dispatches each lifecycle phase.
 
-**Assertion:** The host starts. `GET /catalog/health` returns `"ok"`. `ICatalogService` resolves from the DI container.
+**Assertion:** The host starts. `GET /catalog/health` returns `"ok"`. `ICatalogService` resolves
+from the DI container.
 
 ## Step 5: Provide module metadata
 
-`DefaultModulesProvider` reads standard assembly attributes so tooling and admin UIs can display module information:
+`DefaultModulesProvider` reads standard assembly attributes so tooling and admin UIs can display
+module information:
 
 ```xml
 <!-- MyApp.Catalog.csproj -->
@@ -133,32 +150,48 @@ var builder = WebApplication.CreateBuilder(args)
 </PropertyGroup>
 ```
 
-These map onto `ModuleDescriptor.Display`, `Description`, `Company`, and `Version`. If the version string contains a `+` build-metadata suffix the descriptor trims it to a stable prefix (first 8 characters for a 40-character commit hash, first 12 otherwise).
+These map onto `ModuleDescriptor.DisplayName`, `Description`, `Company`, and `Version`. When the
+version string carries a `+` build-metadata suffix, the descriptor trims it to a stable prefix —
+the first 8 characters of a 40-character commit hash, otherwise the first 12.
 
-**Assertion:** Resolving `IModulesProvider` and calling `GetModules()` returns a descriptor whose `Display` is `"Catalog Module"`.
+**Assertion:** Resolving `IModulesProvider` and calling `GetModules()` returns a descriptor whose
+`DisplayName` is `"Catalog Module"`.
 
 ## Step 6: Plug in a custom provider or runner
 
-For sourcing modules from somewhere other than the entry assembly's emitted attributes, implement `IModulesProvider` and pass it to `UseModular<TRunner, TProvider>`:
+To source modules from somewhere other than the entry assembly's stamped attributes, implement
+`IModulesProvider` and pass it to `UseModular<TRunner, TProvider>`:
 
 ```csharp
 schema.UseModular<DefaultModulesRunner, DatabaseModulesProvider>();
 ```
 
-Custom runners customise how lifecycle methods are invoked (for example, to inject per-module configuration), via the same overload.
+A custom runner customizes how lifecycle methods are invoked through the same overload.
 
-**Assertion:** The custom provider's `GetModules()` runs at startup. Modules it returns flow through the chosen runner's lifecycle.
+**Assertion:** The custom provider's `GetModules()` runs at startup; the modules it returns flow
+through the chosen runner's lifecycle.
 
 ## Common pitfalls
 
-- **Module project references the wrong Targets package.** A module project must reference one of the `Schemata.Module.*.Targets` packages. Referencing `Schemata.Application.*.Targets` from a module is wrong — it pulls Application-tier dependencies into a library that should expose only module-level capability.
-- **Host project missing `UseModularTargets=true`.** Without it the host's MSBuild build never runs `ResolveModuleProjectReferences`, so no `[Module]` attribute is emitted and the runtime sees zero modules. Both `Schemata.Application.Modular.Targets` and `Schemata.Application.Complex.Targets` enable it; the bare `Schemata.Application.Targets` and `Schemata.Application.Persisting.Targets` do not.
-- **Module assembly not on the probing path.** `Assembly.Load(name)` uses the default probing rules. If `MyApp.Catalog.dll` is neither in the application's base directory nor pulled in transitively by a reference, the load fails at startup.
-- **Two `IModule` types in one assembly.** `DefaultModulesProvider` picks the first non-abstract type via `FirstOrDefault`; the rest are silently ignored. Put one module class per assembly, or roll a custom `IModulesProvider`.
-- **Hand-authored `[assembly: Module(...)]` in the host.** The MSBuild target emits its own attributes during build. Adding another by hand works (the attribute is `AllowMultiple = true`), but it bypasses the package-reference path that the rest of the tooling relies on, so the host gets out of sync with the references it actually has.
+- **Module references the wrong Targets package.** A module must reference one of the
+  `Schemata.Module.*.Targets` packages. Referencing `Schemata.Application.*.Targets` pulls
+  Application-tier dependencies into a library that should expose only module-level capability.
+- **Host missing `UseModularTargets=true`.** Without it, the host build never runs
+  `ResolveModuleProjectReferences`, so no `[Module]` attribute is stamped and the runtime sees zero
+  modules. `Schemata.Application.Modular.Targets` and `Schemata.Application.Complex.Targets` enable
+  it; the bare `Schemata.Application.Targets` and `Schemata.Application.Persisting.Targets` do not.
+- **Module assembly off the probing path.** `Assembly.Load(name)` follows the default probing
+  rules. If `MyApp.Catalog.dll` is neither in the application's base directory nor pulled in
+  transitively, the load fails at startup.
+- **Two `IModule` types in one assembly.** `DefaultModulesProvider` takes the first non-abstract
+  type via `FirstOrDefault`; the rest are skipped. Keep one module class per assembly, or supply a
+  custom `IModulesProvider`.
+- **Hand-authored `[assembly: Module(...)]` in the host.** The MSBuild target stamps its own
+  attributes. A hand-written one works (`AllowMultiple = true`) but bypasses the reference path the
+  rest of the tooling relies on, so the host drifts from its actual references.
 
 ## See also
 
 - [Modular guide](../guides/modular.md) — extracting an existing feature into a module
-- [Modules](../documents/modules.md) — build-time wiring + runtime discovery internals
+- [Modules](../documents/modules.md) — build-time wiring and runtime discovery internals
 - [Packages](../documents/packages.md) — the full Application / Business / Module Targets matrix

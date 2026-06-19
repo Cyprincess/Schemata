@@ -5,10 +5,9 @@ namespace Schemata.Event.Skeleton;
 
 /// <summary>
 ///     Low-level broker publisher used by the outbox dispatcher to replay a persisted event.
-///     Unlike <see cref="IEventBus.PublishAsync{TEvent}(TEvent, System.Threading.CancellationToken)" />
-///     it does not run the publish pipeline or write a new audit row, so retries do not duplicate
-///     the outbox record. Provided by a transport that can lose a message after accepting a
-///     publish (e.g. RabbitMQ).
+///     Replays use the serialized outbox payload directly, preserving the existing audit row
+///     across retries. Provided by a transport that can lose a message after accepting a publish
+///     (e.g. RabbitMQ).
 /// </summary>
 public interface IEventOutboxPublisher
 {

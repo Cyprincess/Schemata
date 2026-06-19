@@ -43,13 +43,10 @@ public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ISourceR
 
     #region ISourceReference Members
 
-    /// <inheritdoc />
     public virtual string? SourceType { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Source { get; set; }
 
-    /// <inheritdoc />
     public virtual Guid? SourceTimestamp { get; set; }
 
     #endregion

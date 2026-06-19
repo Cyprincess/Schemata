@@ -57,7 +57,7 @@ public class TokenRequest
     public string? CodeVerifier { get; set; }
 
     /// <summary>
-    ///     Redirect URI that was used in the original authorization request.
+    ///     Redirect URI from the original authorization request.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
     ///         RFC 6749: The OAuth 2.0 Authorization
     ///         Framework §4.1.3: Access Token Request

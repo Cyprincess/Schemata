@@ -39,7 +39,6 @@ public class OperationHandlerListShould
 
         var result = await handler.ListAsync(request, null, null);
 
-        // Only Alice (age 18) should match
         Assert.Equal(1, result.TotalSize);
         Assert.Equal(1, result.Entities?.Count());
     }
@@ -171,12 +170,76 @@ public class OperationHandlerListShould
     public async Task List_LastPageExactlyFull_OmitsNextPageToken() {
         for (var i = 3; i <= 4; i++) {
             _fixture.Students.Add(new() {
-                                      Uid           = Guid.Parse($"{i}{i}{i}{i}{i}{i}{i}{i}-{i}{i}{i}{i}-{i}{i}{i}{i}-{i}{i}{i}{i}-{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}"),
-                                      FullName      = $"Student{i}",
-                                      Age           = 20 + i,
-                                      Name          = $"student-{i}",
-                                      CanonicalName = $"students/student-{i}",
-                                  });
+                Uid = Guid.Parse($"{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }-{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }-{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }-{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }-{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }{
+                    i
+                }"),
+                FullName      = $"Student{i}",
+                Age           = 20 + i,
+                Name          = $"student-{i}",
+                CanonicalName = $"students/student-{i}",
+            });
         }
 
         var handler = _fixture.CreateHandler();
@@ -210,9 +273,7 @@ public class OperationHandlerListShould
     [Fact]
     public async Task List_TotalSizeNone_OmitsTotalAndSkipsCount() {
         var handler = _fixture.CreateHandler(services => {
-            services.AddSingleton(Options.Create(new SchemataResourceOptions {
-                TotalSize = TotalSizeMode.None,
-            }));
+            services.AddSingleton(Options.Create(new SchemataResourceOptions { TotalSize = TotalSizeMode.None }));
         });
 
         var result = await handler.ListAsync(new(), null, null);
@@ -220,8 +281,8 @@ public class OperationHandlerListShould
         Assert.Null(result.TotalSize);
         Assert.Equal(2, result.Entities?.Count());
         _fixture.Repository.Verify(
-            r => r.CountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+            r => r.CountAsync(It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                              It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -232,9 +293,7 @@ public class OperationHandlerListShould
                 .ReturnsAsync(42L);
 
         var handler = _fixture.CreateHandler(services => {
-            services.AddSingleton(Options.Create(new SchemataResourceOptions {
-                TotalSize = TotalSizeMode.Estimated,
-            }));
+            services.AddSingleton(Options.Create(new SchemataResourceOptions { TotalSize = TotalSizeMode.Estimated }));
         });
 
         var result = await handler.ListAsync(new(), null, null);
@@ -247,9 +306,7 @@ public class OperationHandlerListShould
         var options = new SchemataResourceOptions { TotalSize = TotalSizeMode.Exact };
         options.Resources[typeof(Student).TypeHandle] = new(typeof(Student)) { TotalSize = TotalSizeMode.None };
 
-        var handler = _fixture.CreateHandler(services => {
-            services.AddSingleton(Options.Create(options));
-        });
+        var handler = _fixture.CreateHandler(services => { services.AddSingleton(Options.Create(options)); });
 
         var result = await handler.ListAsync(new(), null, null);
 

@@ -14,6 +14,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceDiscoveryTokenExchange{TApp}" />.</summary>
 public static class AdviceDiscoveryTokenExchange
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceDiscoveryRefreshToken.DefaultOrder + 10_000_000;
 }
 
@@ -29,7 +30,6 @@ public sealed class AdviceDiscoveryTokenExchange<TApp>(IEnumerable<ITokenExchang
 {
     #region IDiscoveryAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceDiscoveryTokenExchange.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

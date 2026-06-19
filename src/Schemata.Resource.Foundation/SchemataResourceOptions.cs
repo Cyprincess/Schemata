@@ -55,7 +55,7 @@ public sealed class SchemataResourceOptions
     ///     Gets or sets how long a reserved (pending) or finalized idempotency record is retained,
     ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>.
     ///     The pending reservation must outlive the operation so a replay arriving after a
-    ///     commit-then-crash observes the reservation rather than re-executing the request.
+    ///     commit-then-crash observes the reservation and waits for the finalized result.
     /// </summary>
     public TimeSpan IdempotencyRetention { get; set; } = TimeSpan.FromHours(24);
 

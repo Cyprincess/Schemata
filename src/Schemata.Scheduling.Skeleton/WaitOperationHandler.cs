@@ -19,6 +19,8 @@ public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> execu
     : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation>
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Maximum server-side wait duration accepted by the handler.</summary>
     public static readonly  TimeSpan MaxWait      = TimeSpan.FromSeconds(30);
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -70,6 +72,7 @@ public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> execu
         return state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
     }
 
+    /// <summary>Returns the bounded wait duration used for a request.</summary>
     public static TimeSpan GetEffectiveTimeout(TimeSpan? requested) {
         if (requested is null || requested.Value <= TimeSpan.Zero) {
             return MaxWait;

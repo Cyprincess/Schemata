@@ -33,13 +33,10 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
 
     #region ISourceReference Members
 
-    /// <inheritdoc />
     public virtual string? SourceType { get; set; }
 
-    /// <inheritdoc />
     public virtual string? Source { get; set; }
 
-    /// <inheritdoc />
     public virtual Guid? SourceTimestamp { get; set; }
 
     #endregion

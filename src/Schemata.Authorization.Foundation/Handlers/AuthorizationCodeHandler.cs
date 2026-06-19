@@ -47,7 +47,6 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
 {
     #region IGrantHandler Members
 
-    /// <inheritdoc cref="IGrantHandler.GrantType" />
     public string GrantType => GrantTypes.AuthorizationCode;
 
     /// <summary>

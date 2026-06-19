@@ -11,6 +11,7 @@ namespace Schemata.Identity.Foundation.Controllers;
 public sealed partial class AuthenticateController<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Sends a password-reset code to a confirmed contact address.</summary>
     [HttpPost(nameof(Forgot))]
     public async Task<IActionResult> Forgot([FromBody] ForgetRequest request, CancellationToken ct) {
         var result = await handler.ForgotAsync(request, HttpContext.User, ct);
@@ -21,6 +22,7 @@ public sealed partial class AuthenticateController<TUser>
         };
     }
 
+    /// <summary>Resets a password with a password-reset code.</summary>
     [HttpPost(nameof(Reset))]
     public async Task<IActionResult> Reset([FromBody] ResetRequest request, CancellationToken ct) {
         var result = await handler.ResetAsync(request, HttpContext.User, ct);

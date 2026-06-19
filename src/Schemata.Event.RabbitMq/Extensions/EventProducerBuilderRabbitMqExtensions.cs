@@ -9,8 +9,10 @@ using Schemata.Event.Skeleton;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
+/// <summary><see cref="EventProducerBuilder" /> extensions that enable RabbitMQ publishers.</summary>
 public static class EventProducerBuilderRabbitMqExtensions
 {
+    /// <summary>Registers the RabbitMQ event bus, outbox publisher, and correlation tracker.</summary>
     public static EventProducerBuilder UseRabbitMq(
         this EventProducerBuilder     builder,
         Action<RabbitMqEventOptions>? configure = null
@@ -18,8 +20,8 @@ public static class EventProducerBuilderRabbitMqExtensions
         builder.Services.TryAddSingleton<CorrelationTracker>();
         builder.Services.TryAddScoped<IEventBus, RabbitMqEventBus>();
 
-        // The outbox dispatcher (registered by the Event feature) replays Pending rows through
-        // this publisher when a broker publish fails.
+        // The Event feature's outbox dispatcher replays Pending rows through this publisher after
+        // broker publish failures.
         builder.Services.TryAddSingleton<IEventOutboxPublisher, RabbitMqEventOutboxPublisher>();
 
         if (configure != null) {

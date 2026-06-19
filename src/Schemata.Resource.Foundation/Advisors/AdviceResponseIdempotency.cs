@@ -69,8 +69,8 @@ public sealed class AdviceResponseIdempotency<TEntity, TDetail> : IResourceRespo
         var opts      = new CacheEntryOptions { AbsoluteExpirationRelativeToNow = options.IdempotencyRetention };
 
         // Swap the reserved pending value for the finalized envelope. On a failed swap (the
-        // reservation expired or was taken over) write only when the slot is now free; never
-        // clobber another owner's value, and always return the caller's freshly produced result.
+        // reservation expired or belongs to another owner) write only when the slot is free;
+        // preserve another owner's value and return the caller's freshly produced result.
         var swapped = await _cache.TryReplaceAsync(reservation.Key, reservation.PendingBytes, doneBytes, opts, ct);
         if (!swapped) {
             await _cache.TryAddAsync(reservation.Key, doneBytes, opts, ct);

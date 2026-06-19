@@ -17,6 +17,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants and known prompt values for <see cref="AdviceAuthorizePrompt{TApp}" />.</summary>
 public static class AdviceAuthorizePrompt
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceAuthorizeNonce.DefaultOrder + 10_000_000;
 
     /// <summary>The known prompt values defined by OpenID Connect Core 1.0 §3.1.2.1.</summary>
@@ -49,7 +50,6 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? timeProvider = nul
 
     #region IAuthorizeAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizePrompt.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

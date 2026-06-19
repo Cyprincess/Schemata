@@ -12,6 +12,7 @@ public sealed class HandlerResolver
 {
     private readonly IServiceProvider _services;
 
+    /// <summary>Initializes a resolver over the supplied service provider.</summary>
     public HandlerResolver(IServiceProvider services) { _services = services; }
 
     /// <summary>Invokes every registered event handler for <typeparamref name="TEvent"/> under the given <see cref="EventRouting"/>.</summary>

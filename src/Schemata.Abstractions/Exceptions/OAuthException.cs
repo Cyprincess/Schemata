@@ -10,7 +10,7 @@ namespace Schemata.Abstractions.Exceptions;
 /// <remarks>
 ///     Produces an <see cref="OAuthErrorResponse" /> per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
-///     instead of the default <see cref="ErrorResponse" />.
+///     for protocol-specific error serialization.
 /// </remarks>
 public class OAuthException : SchemataException
 {
@@ -28,8 +28,7 @@ public class OAuthException : SchemataException
     ) : base(code, error, description) { }
 
     /// <summary>
-    ///     When non-<see langword="null" />, the error is delivered via a redirect to this
-    ///     URI rather than a direct JSON response.
+    ///     Redirect target used to deliver the error through the interactive authorization flow.
     /// </summary>
     /// <remarks>
     ///     Used by the interactive authorization endpoint after <c>redirect_uri</c>
@@ -70,10 +69,6 @@ public class OAuthException : SchemataException
     /// </summary>
     public string? ErrorUri { get; set; }
 
-    /// <summary>
-    ///     Returns an <see cref="OAuthErrorResponse" /> instead of the default
-    ///     <see cref="ErrorResponse" />.
-    /// </summary>
     public override object? CreateErrorResponse(string? requestId = null, string? domain = null) {
         var status  = Status ?? ErrorCodes.Internal;
         var details = new List<IErrorDetail>();

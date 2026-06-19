@@ -20,7 +20,7 @@ Add `UseIdentity()` inside the `UseSchemata` block in `Program.cs`:
 schema.UseIdentity();
 ```
 
-`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. It installs `SchemataIdentityFeature` at `Order = Priority = 430_000_000`.
+`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. It installs `SchemataIdentityFeature` at priority 430,000,000 and depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`, which are pulled in automatically.
 
 All four parameters are optional:
 
@@ -85,10 +85,10 @@ The following endpoints are now available:
 | `POST` | `/Authenticate/Refresh` | Exchange refresh token for new bearer token |
 
 ```shell
-# Register
+# Register (snake_case bodies via UseJsonSerializer)
 curl -X POST http://localhost:5000/Authenticate/Register \
      -H "Content-Type: application/json" \
-     -d '{"username":"alice","emailAddress":"alice@example.com","password":"P@ssw0rd!"}'
+     -d '{"username":"alice","email_address":"alice@example.com","password":"P@ssw0rd!"}'
 
 # Login
 curl -X POST http://localhost:5000/Authenticate/Login \
@@ -100,9 +100,12 @@ curl http://localhost:5000/students \
      -H "Authorization: Bearer <access_token>"
 ```
 
+## Next steps
+
+- [Access Control](access-control.md) — gate operations behind permission claims on the new users
+- [Authorization](authorization.md) — issue OAuth 2.0 / OpenID Connect tokens for the same users
+- [Multi-Tenancy](multi-tenancy.md) — scope users to a tenant
+
 ## See also
 
-- [Validation](validation.md) — previous in the series: input validation with FluentValidation
-- [Access Control](access-control.md) — next in the series: role-based authorization and row-level security
-- [Authorization](authorization.md) — OAuth 2.0 / OpenID Connect server
 - [Identity](../documents/identity.md) — `SchemataUser`, `SchemataRole`, store architecture

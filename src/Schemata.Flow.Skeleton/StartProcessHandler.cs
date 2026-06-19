@@ -9,6 +9,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Resource method handler that starts process instances from registered definitions.</summary>
 public sealed class StartProcessHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry

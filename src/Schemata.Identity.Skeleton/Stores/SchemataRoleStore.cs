@@ -11,9 +11,16 @@ using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Skeleton.Stores;
 
+/// <summary>
+///     Repository-backed role store using the default Schemata role claim and user-role entities.
+/// </summary>
+/// <typeparam name="TRole">The role entity type.</typeparam>
 public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleClaim, SchemataUserRole>
     where TRole : SchemataRole
 {
+    /// <summary>
+    ///     Initializes a role store with the default Schemata role claim and user-role entities.
+    /// </summary>
     public SchemataRoleStore(
         IRepository<TRole>             roles,
         IRepository<SchemataRoleClaim> roleClaims,
@@ -22,19 +29,31 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
     ) : base(roles, roleClaims, userRole, describer) { }
 }
 
+/// <summary>
+///     Repository-backed role store for ASP.NET Identity roles.
+/// </summary>
+/// <typeparam name="TRole">The role entity type.</typeparam>
+/// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
+/// <typeparam name="TUserRole">The user-role link entity type.</typeparam>
 public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<TRole>
     where TRole : SchemataRole
     where TRoleClaim : SchemataRoleClaim, new()
     where TUserRole : SchemataUserRole, new()
 {
+    /// <summary>Repository for role claims.</summary>
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
 
+    /// <summary>Repository for roles.</summary>
     protected readonly IRepository<TRole> RolesRepository;
 
+    /// <summary>Repository for user-role links.</summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
     private bool _disposed;
 
+    /// <summary>
+    ///     Initializes a role store with repositories for roles, role claims, and user-role links.
+    /// </summary>
     public SchemataRoleStore(
         IRepository<TRole>      roles,
         IRepository<TRoleClaim> roleClaims,
@@ -219,6 +238,9 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
 
     #endregion
 
+    /// <summary>
+    ///     Throws when the store has been disposed.
+    /// </summary>
     protected virtual void ThrowIfDisposed() {
         if (!_disposed) {
             return;

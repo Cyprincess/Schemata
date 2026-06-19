@@ -35,7 +35,7 @@ public class TokenService
     ///     validation parameters.
     /// </summary>
     /// <param name="options">Server authorization options.</param>
-    /// <param name="timeProvider">Clock used to stamp token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
+    /// <param name="timeProvider">Clock for token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
     public TokenService(IOptions<SchemataAuthorizationOptions> options, TimeProvider? timeProvider = null) {
         _options   = options.Value;
         _time      = timeProvider ?? TimeProvider.System;

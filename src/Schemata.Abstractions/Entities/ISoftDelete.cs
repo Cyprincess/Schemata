@@ -10,13 +10,13 @@ namespace Schemata.Abstractions.Entities;
 public interface ISoftDelete
 {
     /// <summary>
-    ///     The time at which the entity was soft-deleted.
-    ///     A non-null value indicates the entity is logically deleted.
+    ///     The time at which the entity entered the soft-deleted state.
+    ///     A value indicates the entity is logically deleted.
     /// </summary>
     DateTime? DeleteTime { get; set; }
 
     /// <summary>
-    ///     The time at which the soft-deleted entity will be permanently purged.
+    ///     The time scheduled for permanent purge of the soft-deleted entity.
     /// </summary>
     DateTime? PurgeTime { get; set; }
 }

@@ -15,7 +15,7 @@ public sealed class SchemataOptions
     private          ILogger<SchemataBuilder>?  _logger;
 
     /// <summary>
-    ///     Logger factory used to create loggers for features and infrastructure
+    ///     Logger factory that creates loggers for features and infrastructure
     ///     components.
     /// </summary>
     public ILoggerFactory Logging { get; private set; } = LoggerFactory.Create(_ => { });
@@ -61,7 +61,7 @@ public sealed class SchemataOptions
     /// </summary>
     /// <typeparam name="TOptions">Expected option type.</typeparam>
     /// <param name="name">
-    ///     The key under which the option was stored via <see cref="Set{TOptions}" />.
+    ///     The key passed to <see cref="Set{TOptions}" />.
     /// </param>
     /// <returns>The option value, or <see langword="null" />.</returns>
     public TOptions? Pop<TOptions>(string name)
@@ -83,7 +83,7 @@ public sealed class SchemataOptions
     /// </summary>
     /// <typeparam name="TOptions">Expected option type.</typeparam>
     /// <param name="name">
-    ///     The key under which the option was stored via <see cref="Set{TOptions}" />.
+    ///     The key passed to <see cref="Set{TOptions}" />.
     /// </param>
     /// <returns>The option value, or <see langword="null" />.</returns>
     public TOptions? Get<TOptions>(string name)

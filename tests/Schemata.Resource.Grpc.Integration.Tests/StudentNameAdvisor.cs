@@ -8,9 +8,6 @@ using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 
 namespace Schemata.Resource.Grpc.Integration.Tests;
 
-/// <summary>
-///     Assigns a canonical name to every new Student so that GetByCanonicalNameAsync works.
-/// </summary>
 internal sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
 {
     #region IRepositoryAddAdvisor<Student> Members
@@ -24,8 +21,6 @@ internal sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
         CancellationToken    ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {
-            // Set just the leaf slug; AdviceAddCanonicalName will resolve the full
-            // canonical name "students/{slug}" using the [CanonicalName] attribute.
             entity.Name = Identifiers.NewUid().ToString("n");
         }
 

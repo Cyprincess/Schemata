@@ -1,147 +1,126 @@
 # Read Pipeline
 
-The resource system provides two read operations: **List** and **Get**. Both run through the advisor pipeline and share the `IResourceRequestAdvisor<TEntity>` gate. Neither operation writes to the repository; both use `_repository.Once()` to get a fresh, isolated repository instance that doesn't pollute the caller's repository state.
+The resource system has two read operations, List and Get, both on `ResourceOperationHandler`. Neither writes to
+the repository. The stage order is fixed; advisor `Order` only sequences advisors within a stage.
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` (lines 105-318) |
-| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceGetRequestAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceListResponseAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceResponseAdvisor.cs` |
+| --- | --- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceOperationHandler.Get.cs` |
+| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `KeyOrdering.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs`, `Advisors/IResourceGetRequestAdvisor.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceListResponseReadMask.cs`, `Advisors/AdviceResponseReadMask.cs` |
+| `Schemata.Abstractions` | `Resource/ListRequest.cs`, `Resource/GetRequest.cs`, `Resource/ListResultBase.cs` |
 
-## List operation
+## List
 
-`ListAsync` accepts a `ListRequest` and returns a `ListResultBase<TSummary>`.
+`ListAsync` takes a `ListRequest` and returns a `ListResultBase<TSummary>`.
 
-### Stage 1: Gate check
+### 1. Gate — `IResourceRequestAdvisor<TEntity>`
 
-```
-IResourceRequestAdvisor<TEntity>
-```
+Receives the principal and the token `nameof(Operations.List)`. `Block` throws `CollectionNotFound()`. The
+request's `read_mask`, when set and not `*`, is stashed on `AdviceContext` as `ReadMaskRequested` before the gate.
 
-Receives the principal and the operation token `nameof(Operations.List)`. A `Block` throws `NotFoundException`.
+### 2. List request — `IResourceListRequestAdvisor<TEntity>`
 
-### Stage 2: List request advisors
+Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run
+here when `WithAuthorization()` is configured; an entitlement advisor adds predicates via
+`container.ApplyModification`.
 
-```
-IResourceListRequestAdvisor<TEntity>
-```
+### 3. Parent scoping
 
-Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run here when `WithAuthorization()` is configured.
+When `request.Parent` is set, `ResourceNameDescriptor.ParseParent` matches it against the entity's pattern. A
+parent that fails to match throws `ValidationException` (`InvalidParent`). A `-` wildcard segment on an entity
+without `[ReadAcross]` throws `ValidationException` (`CrossParentUnsupported`). Otherwise
+`BuildParentPredicate` produces a `Where` predicate applied via `container.ApplyModification`.
 
-### Stage 3: Parent scoping
+### 4. Page token and paging parameters
 
-If `request.Parent` is non-empty, `ResourceNameDescriptor.ParseParent` parses it against the entity's pattern and calls `container.ApplyModification(predicate)` to scope the query to that parent. If any parent segment is `"-"` (AIP-159 wildcard) and the entity does not have `[ReadAcross]`, a `ValidationException` is thrown.
+`PageToken.FromStringAsync` decodes `request.PageToken`; a token that fails to decode throws `ValidationException`
+(`InvalidPageToken`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the
+current request throws `ValidationException` (`InvalidPageToken`). A negative `page_size` throws
+`ValidationException` (`InvalidPageSize`); `<= 0` defaults to 25 and `> 100` is capped at 100. `Skip` accumulates
+onto the token and is floored at 0.
 
-### Stage 4: Page token validation
+### 5. Filter compilation
 
-The page token is decrypted from `request.PageToken` (Brotli-compressed JSON sealed with ASP.NET Core Data Protection, so clients can neither read nor alter it). A token that fails to decode throws `ValidationException` with reason `FieldReasons.InvalidPageToken`. If a token is present, its `Parent`, `Filter`, `OrderBy`, and `ShowDeleted` fields must match the current request — mismatches throw `ValidationException` with reason `FieldReasons.InvalidPageToken`. A negative `page_size` throws `ValidationException` with reason `FieldReasons.InvalidPageSize`; zero or absent falls back to 25; values above 100 are capped at 100. A deterministic key ordering (primary key, falling back to `Uid`, then `Name`) is always appended after any `order_by`, keeping page boundaries stable.
+When `request.Filter` is set, the handler resolves `IExpressionCompiler` keyed by `AipLanguage.Name` (`"aip"`),
+parses and compiles the filter to `Expression<Func<TEntity, bool>>`, and applies it via
+`container.ApplyFiltering`. A `ParseException` or `ArgumentException` becomes `ValidationException`
+(`InvalidFilter`). The key is fixed to AIP; see [Filtering](filtering.md).
 
-### Stage 5: Filter compilation
+### 6. Order compilation
 
-If `request.Filter` is non-empty, `ListAsync` resolves `IExpressionCompiler` keyed by `AipLanguage.Name` ("aip") and compiles the filter string to an `Expression<Func<TEntity, bool>>`. The compiled predicate is applied via `container.ApplyFiltering(filter)`.
+When `request.OrderBy` is set, the handler resolves `IOrderCompiler` keyed by `AipLanguage.Name` and compiles to
+`Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>`. A parse failure becomes `ValidationException`
+(`InvalidOrderBy`). `KeyOrdering<TEntity>.Compose` appends a deterministic key ordering after any `order_by`,
+keeping page boundaries stable.
 
-This key is hard-wired to `AipLanguage.Name`. Registering a different `IExpressionCompiler` under a custom key does not affect `ListAsync`. See [Filtering](filtering.md) for details.
+### 7. Count and fetch
 
-### Stage 6: Order compilation
+`ResolveTotalSizeMode()` selects the count strategy: `None` skips counting (`TotalSize` is null), `Estimated`
+calls `_repository.EstimateCountAsync`, otherwise `_repository.CountAsync`. The query fetches one look-ahead row
+beyond `page_size`; `_mapper.EachAsync<TEntity, TSummary>` maps the stream to summaries. The extra row sets
+`hasMore` and is then removed; `next_page_token` is sealed only when `hasMore`, so an exactly-full last page
+omits it per AIP-158. When `request.ShowDeleted` is true the repository is wrapped with
+`SuppressQuerySoftDelete()` so tombstoned rows are included.
 
-If `request.OrderBy` is non-empty, `ListAsync` resolves `IOrderCompiler` keyed by `AipLanguage.Name` and compiles the order expression to a `Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>`. Applied via `container.ApplyOrdering(order)`.
+### 8. List response — `IResourceListResponseAdvisor<TSummary>`
 
-### Stage 7: Soft-delete suppression
+Receives the immutable summary array and the principal. `AdviceListResponseReadMask` trims each summary to the
+requested AIP-157 fields.
 
-If `request.ShowDeleted` is `true`, the repository instance is wrapped with `SuppressQuerySoftDelete()` so tombstoned rows are included.
+## Get
 
-### Stage 8: Count and fetch
+`GetAsync` accepts a name string or a `GetRequest` and returns a `GetResultBase<TDetail>`.
 
-```csharp
-var totalSize = ResolveTotalSizeMode() switch {
-    TotalSizeMode.None      => (int?)null,
-    TotalSizeMode.Estimated => (int)Math.Min(await repository.EstimateCountAsync(q => container.Query(q), ct), int.MaxValue),
-    var _                   => await repository.CountAsync(q => container.Query(q), ct),
-};
-container.ApplyPaginating(token);
-var entities = repository.ListAsync(q => container.Query(q), ct);
-var summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct).ToListAsync(ct);
-```
+### 1. Gate — `IResourceRequestAdvisor<TEntity>`
 
-The total count is fetched before pagination is applied. Pagination (skip/take) is then added to the container and the entity stream is mapped to summaries.
+Receives the principal and the token `nameof(Operations.Get)`. `Block` throws `ResourceNotFound(name)`. A
+`read_mask` on the `GetRequest` is stashed as `ReadMaskRequested` first.
 
-### Stage 9: Next page token
+### 2. Name predicates
 
-The query fetches one look-ahead row beyond the page size; a next page token is produced only when that extra row exists, so the exactly-full last page omits `next_page_token` per AIP-158. The token advances `token.Skip` by `token.PageSize` before sealing.
+`ApplyIdentifierPredicates` resolves the name (`request.CanonicalName ?? request.Name`) into leaf and parent
+`Where` predicates on the container.
 
-### Stage 10: List response advisors
+### 3. Get request — `IResourceGetRequestAdvisor<TEntity>`
 
-```
-IResourceListResponseAdvisor<TSummary>
-```
+Receives the `GetRequest`, the container, and the principal. Authorization advisors run here when configured.
 
-Receives the immutable summary array and the principal. Use this stage to post-process the list (e.g., redact fields, add computed properties).
+### 4. Entity load
 
-## Get operation
+The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so Get returns tombstoned rows and the
+caller can inspect `DeleteTime`. A null result throws `ResourceNotFound(name)` carrying a `ResourceInfoDetail`.
 
-`GetAsync` accepts a canonical name string and returns a `GetResultBase<TDetail>`.
+### 5. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
-### Stage 1: Gate check
-
-```
-IResourceRequestAdvisor<TEntity>
-```
-
-Receives the principal and the operation token `nameof(Operations.Get)`.
-
-### Stage 2: Name parsing
-
-`ApplyIdentifierPredicates` calls `ResourceNameDescriptor.ForType<TEntity>().ParseCanonicalName(name)` to split the name into parent values and a leaf name. Both are applied as `Where` predicates on the container. An empty or unparseable name throws `ValidationException`.
-
-### Stage 3: Get request advisors
-
-```
-IResourceGetRequestAdvisor<TEntity>
-```
-
-Receives a `GetRequest { Name = name }`, the container, and the principal.
-
-### Stage 4: Entity load
-
-```csharp
-var entity = await _repository.Once()
-                              .SuppressQuerySoftDelete()
-                              .SingleOrDefaultAsync(q => container.Query(q), ct)
-          ?? throw ResourceNotFound(name);
-```
-
-Get always suppresses soft-delete filtering so it can return tombstoned rows (the caller can inspect `DeleteTime`). If no entity matches, a `NotFoundException` is thrown with a `ResourceInfoDetail` payload.
-
-### Stage 5: Response mapping and advisors
-
-The entity is mapped to `TDetail`, then `IResourceResponseAdvisor<TEntity, TDetail>` runs. `AdviceResponseFreshness` writes the ETag onto the detail if it implements `IFreshness`.
+The entity is mapped to `TDetail`, then the response chain runs: `AdviceResponseFreshness` sets the ETag,
+`AdviceResponseReadMask` trims to the `read_mask` fields, `AdviceResponseIdempotency` is a no-op for reads.
 
 ## Extension points
 
-- Implement `IResourceListRequestAdvisor<TEntity>` to add pre-query logic (e.g., entitlement filtering via `container.ApplyModification`).
-- Implement `IResourceGetRequestAdvisor<TEntity>` to add per-get logic (e.g., audit logging).
-- Implement `IResourceListResponseAdvisor<TSummary>` to post-process the list.
-- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process individual detail DTOs.
+- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyModification`
+  (entitlement, tenant scoping).
+- Implement `IResourceGetRequestAdvisor<TEntity>` for per-get logic.
+- Implement `IResourceListResponseAdvisor<TSummary>` or `IResourceResponseAdvisor<TEntity, TDetail>` to
+  post-process responses.
 
-## Design motivation
+## Design rationale
 
-`_repository.Once()` creates a fresh repository instance with a fresh `AdviceContext` for each read. This prevents read-side state (e.g., `SuppressQuerySoftDelete`) from leaking into the repository instance used by write operations. Get always suppresses soft-delete so callers can inspect tombstoned resources; List only suppresses it when `ShowDeleted = true`.
+Get always suppresses soft-delete filtering so a caller can read and inspect a tombstoned resource; List
+suppresses it only when `ShowDeleted` is true. The look-ahead row makes `next_page_token` exact without relying
+on `total_size`, which is optional under `TotalSizeMode.None`.
 
 ## Caveats
 
-- The filter and order compilers are resolved as keyed singletons. They are registered by `SchemataResourceFeature` via `services.AddAipExpressions()`. If the AIP package is not referenced, `ListAsync` will throw `InvalidOperationException` on any request with a non-empty filter or order.
-- `ListAsync` does not support server-side cursors beyond skip/take. For large datasets, use `PageSize` and `PageToken` to paginate.
-- `CountAsync` runs a separate query before pagination. On large tables this can be expensive; consider caching the count or using approximate counts.
+- The filter and order compilers are resolved by the fixed key `AipLanguage.Name`. Registering a compiler under
+  a different key does not change List behavior.
+- `CountAsync` runs a separate query before paging. On large tables, use `TotalSizeMode.Estimated` or `None`.
 
 ## See also
 
 - [Resource Overview](overview.md)
 - [Filtering](filtering.md)
 - [Resource Naming](resource-naming.md)
-- [Advice Pipeline](../core/advice-pipeline.md)
-- [Repository Query Pipeline](../repository/query-pipeline.md)

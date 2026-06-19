@@ -10,9 +10,8 @@ namespace Schemata.Entity.Repository;
 
 /// <summary>
 ///     Non-generic repository contract carrying the entity-agnostic surface (advisor
-///     context, unit-of-work enlistment, commit, and suppression scopes). Framework code
-///     that coordinates repositories without knowing the concrete entity type takes a
-///     dependency on this interface; entity-specific work uses
+///     context, unit-of-work enlistment, commit, and suppression scopes). Entity-agnostic
+///     coordination code depends on this interface; entity-specific work uses
 ///     <see cref="IRepository{TEntity}" />.
 /// </summary>
 public interface IRepository : IAsyncDisposable, IDisposable
@@ -114,8 +113,8 @@ public interface IRepository<TEntity> : IRepository
     ///     entity instance.
     /// </summary>
     /// <param name="entity">
-    ///     An entity whose key properties are used to build the lookup. Only key values
-    ///     are considered; other fields are ignored.
+    ///     An entity whose key properties provide the lookup values. The lookup ignores
+    ///     non-key fields.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The matching entity or <see langword="null" />.</returns>
@@ -125,7 +124,7 @@ public interface IRepository<TEntity> : IRepository
     ///     Retrieves an entity by its keys and projects it to <typeparamref name="TResult" />.
     /// </summary>
     /// <typeparam name="TResult">The projected result type.</typeparam>
-    /// <param name="entity">An entity whose key properties are used to build the lookup.</param>
+    /// <param name="entity">An entity whose key properties provide the lookup values.</param>
     /// <param name="ct">A cancellation token.</param>
     ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default);
 

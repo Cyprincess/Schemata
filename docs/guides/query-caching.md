@@ -35,7 +35,7 @@ var builder = WebApplication.CreateBuilder(args)
             services.AddDistributedMemoryCache();
             services.AddDistributedCache();
 
-            services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+            services.AddRepository(typeof(EfCoreRepository<,>))
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"))
                 .UseQueryCache();
@@ -65,12 +65,13 @@ Pass an optional delegate to `UseQueryCache` to customize behavior:
 ## Suppress caching for a single query
 
 ```csharp
-var fresh = await repository.Once()
-    .SuppressQueryCache()
-    .FirstOrDefaultAsync(q => q.Where(s => s.Uid == id), ct);
+using (repository.SuppressQueryCache())
+{
+    var fresh = await repository.FirstOrDefaultAsync<Student>(q => q.Where(s => s.Uid == id), ct);
+}
 ```
 
-`SuppressQueryCache()` sets `QueryCacheSuppressed` in the `AdviceContext`. `Once()` creates a fresh repository instance so the suppression doesn't affect later operations on the caller's repository.
+`SuppressQueryCache()` sets `QueryCacheSuppressed` in the `AdviceContext` and returns an `IDisposable`. The `using` scope restores the prior state on exit, so later operations on the same repository cache normally.
 
 ## Commit-time eviction
 
@@ -114,10 +115,13 @@ curl -X PATCH "http://localhost:5000/students/<name>" \
 curl http://localhost:5000/students
 ```
 
+## Next steps
+
+- [Validation](validation.md) — add input validation with FluentValidation
+- [Unit of Work](unit-of-work.md) — committed advisors batch their evictions per commit
+- [Concurrency and Freshness](concurrency-and-freshness.md) — ETags pair naturally with cached reads
+
 ## See also
 
-- [Filtering and Pagination](filtering-and-pagination.md) - previous in the series: AIP-160 filter and AIP-132 order
-- [Validation](validation.md) - next in the series: input validation with FluentValidation
-- [Unit of Work](unit-of-work.md) - explicit enlistment and committed advisors
-- [Query Cache](../documents/caching/query-cache.md) - cache advisors, reverse index, eviction design
-- [Distributed Cache](../documents/caching/distributed.md) - `ICacheProvider`, `IndexLocks`
+- [Query Cache](../documents/entity/query-cache.md) — cache advisors, reverse index, eviction design
+- [Distributed Cache](../documents/caching/distributed.md) — `ICacheProvider`, `IndexLocks`

@@ -1,10 +1,13 @@
 # Event Bus
 
-Add an in-process event bus to the Student CRUD app. This guide shows how to register an event type, wire up a producer and consumer, and handle events with a typed handler. This guide builds on [Getting Started](getting-started.md).
+Add an in-process event bus to the Student CRUD app: register an event type, wire a producer and
+consumer, and handle the event with a typed handler. This guide builds on
+[Getting Started](getting-started.md).
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Event.Foundation`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already includes `Schemata.Event.Foundation`. To compose
+packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Event.Foundation
@@ -12,7 +15,7 @@ dotnet add package --prerelease Schemata.Event.Foundation
 
 ## Enable the event bus
 
-`UseEvent()` takes no delegate and returns an `EventBuilder` for chaining. `SchemataEventFeature` runs at `Order = Priority = 440_000_000`:
+`UseEvent()` takes no delegate and returns an `EventBuilder`. Chain the configuration:
 
 ```csharp
 schema.UseEvent()
@@ -22,11 +25,11 @@ schema.UseEvent()
       .UseHandler<StudentEnrolled, StudentEnrolledHandler>();
 ```
 
-Each method on `EventBuilder` returns the same builder for chaining.
+Each `EventBuilder` method returns the same builder.
 
 ## Define the event
 
-Create `StudentEnrolled.cs`. Event types must implement `IEvent`:
+Create `StudentEnrolled.cs`. Event types implement `IEvent`:
 
 ```csharp
 using Schemata.Event.Skeleton;
@@ -40,24 +43,29 @@ public sealed class StudentEnrolled : IEvent
 
 ## Register the event
 
-`RegisterEvent<TEvent>(string name)` maps the CLR type to a wire name. The wire name is a distributed contract — publishers and consumers use it to route payloads. Unregistered types throw on publish:
+`RegisterEvent<TEvent>(string name)` maps the CLR type to a wire name — the routing string that
+publishers and consumers share. The wire name lands in `EventContext.EventType` and the
+`SchemataEvent.EventType` audit column, the same string everywhere. An unregistered type throws when
+you publish it:
 
 ```csharp
 .RegisterEvent<StudentEnrolled>("students/student-enrolled")
 ```
 
-The wire name is stored in `EventContext.EventType` and in the `SchemataEvent.EventType` audit column — the same string everywhere.
-
 ## Configure producer and consumer
 
-`UseProducer(p => p.UseInProcess())` registers `InProcessEventBus` as `IEventBus` (scoped). `UseConsumer(c => c.UseInProcess())` registers `InMemoryEventSubscriptionStore` and `HandlerResolver` for in-process dispatch:
+`UseProducer(p => p.UseInProcess())` registers `InProcessEventBus` as `IEventBus`.
+`UseConsumer(c => c.UseInProcess())` registers the subscription store, handler resolver, and dispatch
+context for in-process delivery:
 
 ```csharp
 .UseProducer(p => p.UseInProcess())
 .UseConsumer(c => c.UseInProcess())
 ```
 
-For RabbitMQ in production, see the [RabbitMQ Event Bus](../cookbook/rabbitmq-event-bus.md) cookbook recipe.
+The in-process consumer persists subscriptions through `IRepository<SchemataEventSubscription>`, so a
+persistence provider (the EF Core setup from Getting Started) must be configured. For RabbitMQ in
+production, see the [RabbitMQ Event Bus](../cookbook/rabbitmq-event-bus.md) recipe.
 
 ## Create the handler
 
@@ -82,7 +90,7 @@ Register it with `UseHandler<TEvent, THandler>()`:
 .UseHandler<StudentEnrolled, StudentEnrolledHandler>()
 ```
 
-`UseHandler` registers `StudentEnrolledHandler` as `IEventHandler<StudentEnrolled>` (scoped). `IRequestHandler<TRequest, TResponse>` is also supported for request/reply patterns — note that only a single handler per request type is supported; multiple registrations will fail.
+The handler is registered as scoped.
 
 ## Publish an event
 
@@ -105,6 +113,11 @@ public sealed class EnrollmentService(IEventBus bus)
 }
 ```
 
+`PublishAsync` records the event in a durable outbox and returns immediately — it does not run the
+handler inline. A background dispatcher drains the outbox and invokes `StudentEnrolledHandler` a
+moment later. The handler may run after `EnrollAsync` has already returned, so write handlers to be
+idempotent.
+
 ## Verify
 
 ```shell
@@ -117,16 +130,20 @@ curl -X POST http://localhost:5000/students \
      -d '{"full_name":"Alice","age":20}'
 ```
 
-If you publish from an advisor or service wired to the create pipeline, the console should print:
+If you publish `StudentEnrolled` from a service wired to the create pipeline, the console prints,
+shortly after the response, once the outbox dispatcher drains the row:
 
 ```text
 Student enrolled: Alice, age 20
 ```
 
+## Next steps
+
+- [Scheduling](scheduling.md) — scheduled jobs publish lifecycle events through this bus
+- [Flow](flow.md) — BPMN `Message`/`Signal` catches correlate against the same bus
+- [Modular](modular.md) — package the handler in a self-contained module
+
 ## See also
 
-- [Flow](flow.md) — previous in the series: BPMN catch events that bridge to this bus
-- [Scheduling](scheduling.md) — next in the series: scheduled jobs publish lifecycle events here
-- [Event Overview](../documents/event/overview.md) — wire names, `IEventTypeRegistry`, dispatch pipeline
-- [Event Providers](../documents/event/providers.md) — InProcess and RabbitMQ details
-- [RabbitMQ Event Bus](../cookbook/rabbitmq-event-bus.md) — production-ready RabbitMQ setup
+- [Event Overview](../documents/event/overview.md) — wire names, the outbox, `IEventTypeRegistry`
+- [Domain Events](../cookbook/domain-events.md) — publish an event after a repository commit

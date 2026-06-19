@@ -9,6 +9,7 @@ using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Scheduling.Foundation.Internal;
 
+/// <summary>Dispatches resource operations through durable scheduler executions.</summary>
 internal sealed class SchedulerOperationDispatcher(
     IScheduler         scheduler,
     IOperationRegistry registry,

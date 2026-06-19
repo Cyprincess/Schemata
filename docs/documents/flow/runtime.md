@@ -1,111 +1,162 @@
 # Flow Runtime Services
 
-`ProcessRuntime` and `ProcessRegistry` are the two services that bridge the BPMN engine to the rest of the framework. `ProcessRegistry` holds the compiled process definitions and resolves the correct engine for each. `ProcessRuntime` keeps live instances in an in-process cache, drives engine calls, and notifies observers. Persistence is delegated entirely to `IProcessLifecycleObserver` implementations.
+`ProcessRegistry` and `ProcessRuntime` bridge the BPMN engine to the rest of the framework.
+`ProcessRegistry` holds the compiled definitions and resolves the engine for each. `ProcessRuntime`
+is the public entry point: it loads instances, drives the engine, runs the pre-commit advisor
+pipeline, persists the result, and notifies observers. Both are singletons registered by
+`SchemataFlowFeature`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Foundation` | `ProcessRuntime.cs`, `ProcessRegistry.cs` |
-| `Schemata.Flow.Skeleton` | `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs` |
+| `Schemata.Flow.Foundation` | `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessRuntime.Events.cs`, `ProcessRuntime.Cache.cs`, `ProcessRuntime.Lifecycle.cs`, `ProcessPersistence.cs`, `ProcessInitializer.cs` |
+| `Schemata.Flow.Skeleton` | `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Runtime/IProcessLifecycleObserver.cs` |
 
 ## ProcessRegistry
 
-`ProcessRegistry` implements `IProcessRegistry` and is registered as a **singleton** by `SchemataFlowFeature`.
+`ProcessRegistry` implements `IProcessRegistry` and is a **singleton**. It stores registrations in a
+`ConcurrentDictionary<string, ProcessRegistration>` keyed case-insensitively by process name.
 
-### Registration flow
+Registering a configuration:
 
-1. `ProcessConfiguration` is constructed (name, engine, `DefinitionType`).
-2. The `ProcessDefinition` subclass is instantiated via `ActivatorUtilities.CreateInstance` — the constructor runs the DSL.
-3. All registered `IFlowEngineValidator` services whose `EngineName` matches are called.
-4. The keyed `IFlowRuntime` service is resolved to confirm the engine exists.
-5. The registration is stored in a `ConcurrentDictionary<string, ProcessRegistration>` keyed by name (case-insensitive).
-
-### Key methods
+1. Instantiates the `ProcessDefinition` subclass, running its DSL constructor.
+2. Calls `Validate` on every `IFlowEngineValidator` whose `EngineName` matches the configuration's
+   engine.
+3. Resolves the keyed `IFlowRuntime` for that engine; a missing engine throws `NotSupportedException`.
+4. Adds the `ProcessRegistration`; a duplicate name throws `AlreadyExistsException`.
 
 ```csharp
-ValueTask RegisterAsync<TProcess>(string? engine = null, Action<ProcessConfiguration>? configure = null, CancellationToken ct = default)
-ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default)
-ValueTask UnregisterAsync(string processName, CancellationToken ct = default)
-IReadOnlyCollection<string> GetRegisteredProcesses()
-bool IsRegistered(string name)
-ProcessRegistration? GetRegistration(string name)
+ValueTask RegisterAsync<TProcess>(string? engine = null,
+    Action<ProcessConfiguration>? configure = null, CancellationToken ct = default)
+    where TProcess : ProcessDefinition;
+ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default);
+ValueTask UnregisterAsync(string processName, CancellationToken ct = default);
+IReadOnlyCollection<string> GetRegisteredProcesses();
+bool IsRegistered(string processName);
+ProcessRegistration? GetRegistration(string processName);
 ```
-
-Registering the same name twice throws `AlreadyExistsException`.
 
 ## ProcessRuntime
 
-`ProcessRuntime` implements `IProcessRuntime` and is registered as **scoped** by `SchemataFlowFeature`.
+`ProcessRuntime` implements `IProcessRuntime` and is a **singleton**. It keeps live instances in an
+in-process cache keyed by canonical name, opens its own DI scope per call, and delegates persistence
+to `ProcessPersistence`.
 
-### IProcessRuntime methods
+```csharp
+ValueTask<SchemataProcess>  StartProcessInstanceAsync(string processName,
+    IReadOnlyDictionary<string, object?>? variables = null, ClaimsPrincipal? principal = null,
+    string? displayName = null, string? description = null, object? sourceEntity = null,
+    CancellationToken ct = default);
 
-| Method | Description |
+ValueTask<ProcessInstance>  CompleteActivityAsync(string instanceName,
+    IReadOnlyDictionary<string, object?>? variables = null, ClaimsPrincipal? principal = null,
+    CancellationToken ct = default);
+
+ValueTask<ProcessInstance>  CorrelateMessageAsync(string instanceName, string messageName,
+    object? payload = null, ClaimsPrincipal? principal = null, CancellationToken ct = default);
+
+ValueTask                   ThrowSignalAsync(string signalName,
+    object? payload = null, ClaimsPrincipal? principal = null, CancellationToken ct = default);
+
+ValueTask<ProcessInstance>  TriggerEventAsync(string instanceName, IEventDefinition trigger,
+    object? payload = null, ClaimsPrincipal? principal = null, CancellationToken ct = default);
+
+ValueTask<ProcessInstance>  TerminateProcessInstanceAsync(string instanceName,
+    ClaimsPrincipal? principal = null, CancellationToken ct = default);
+```
+
+| Method | What it does |
 | --- | --- |
-| `StartProcessInstanceAsync(processName, variables, principal, ct)` | Creates a `SchemataProcess`, calls `engine.StartAsync`, persists |
-| `CompleteActivityAsync(instanceName, variables, principal, ct)` | Merges variables, calls `engine.AdvanceAsync`, persists |
-| `CorrelateMessageAsync(instanceName, messageName, payload, principal, ct)` | Resolves the `Message` definition, calls `engine.TriggerAsync`, persists |
-| `ThrowSignalAsync(signalName, payload, principal, ct)` | Broadcasts to all instances with `WaitingAtId != null` that match the signal |
-| `TriggerEventAsync(instanceName, trigger, payload, principal, ct)` | Calls `engine.TriggerAsync` with an explicit `IEventDefinition`, persists |
-| `TerminateProcessInstanceAsync(instanceName, principal, ct)` | Sets state to `"terminated"`, marks `IsComplete = true`, persists |
+| `StartProcessInstanceAsync` | Creates a `SchemataProcess` for the named definition, calls `engine.StartAsync`, persists, returns the instance row. |
+| `CompleteActivityAsync` | Merges variables, calls `engine.AdvanceAsync`, persists. |
+| `CorrelateMessageAsync` | Resolves the `Message` definition by name, calls `engine.TriggerAsync`, persists. |
+| `ThrowSignalAsync` | Finds every waiting instance matching the signal (cached plus persisted), triggers each. |
+| `TriggerEventAsync` | Calls `engine.TriggerAsync` with an explicit `IEventDefinition` (the timer bridge uses this). |
+| `TerminateProcessInstanceAsync` | Drives a synthetic terminal result (`State = "Terminated"`, `IsComplete = true`), persists. |
 
-### Per-call sequence
+`StartProcessInstanceAsync` accepts `displayName`, `description`, and `sourceEntity` that the
+`IProcessRuntime` interface exposes but the transport requests do not necessarily carry;
+`sourceEntity` stamps an `ISourceReference` onto the instance so a process can be traced back to the
+domain row that started it.
 
-Each runtime method (`Complete`, `Correlate`, `Throw`, `Trigger`, `Terminate`) shares the same `ApplyAsync` core:
+### Per-transition core: ApplyAsync
 
-1. Snapshot `previousState`, `previousWaitingAtId`, `previousWaitingAt` from the cached `SchemataProcess`.
-2. Invoke the `IFlowRuntime` driver to compute the new `ProcessInstance`.
-3. Copy the driver's result onto the cached `SchemataProcess`.
-4. Build a `FlowTransitionContext` and dispatch it to every `IFlowTransitionObserver`. Each observer call is wrapped in its own try/catch; a thrown observer is logged at warning and the next observer still runs.
-5. Build a `SchemataProcessTransition` record (no DB write happens in `ApplyAsync` itself):
-   - `Process`: the instance's canonical name
-   - `Previous`: the state before the engine call
-   - `Posterior`: the state after
-   - `Event`: the event name that triggered the transition
-   - `UpdatedBy`: subject claim as `users/{sub}`, or `Identity.Name`
-6. Hand both the `ProcessInstance` and the transition record back to the caller, which dispatches `IProcessLifecycleObserver.OnTransitionedAsync`. Terminal results additionally evict the cached instance and dispatch `OnTerminatedAsync`.
+Every state-changing method routes through a shared `ApplyAsync` step:
 
-`StartProcessInstance` follows the same `ApplyAsync` core, then dispatches `OnStartedAsync` before `OnTransitionedAsync`.
+1. Snapshot the previous `State`, `WaitingAtId`, and `WaitingAt` from the cached `SchemataProcess`.
+2. Invoke the engine driver to compute the new `ProcessInstance`.
+3. Copy the engine result onto a clone of the process and build a `SchemataProcessTransition`
+   (`Previous`, `Posterior`, `Event`, `UpdatedBy`).
+4. Build a `FlowTransitionContext` and run the **`IFlowTransitionAdvisor` pipeline** against it.
+   This runs in the pre-commit window: an advisor that throws aborts the transition before anything
+   is persisted.
+5. Persist the instance row and the transition row in one unit of work (`ProcessPersistence`).
+6. Sync the persisted fields back onto the caller's process and hand back the instance and transition.
+
+After `ApplyAsync` returns, the calling method publishes the relevant lifecycle notification (see
+below). A failing engine call publishes a `ProcessFailedEvent` and rethrows.
+
+`UpdatedBy` is resolved from the `ClaimsPrincipal`: the subject claim becomes `users/{sub}`, falling
+back to `Identity.Name`.
 
 ## SchemataProcess entity
 
 ```csharp
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
-public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive, ISoftDelete, ITimestamp, IStateful
+[PrimaryKey(nameof(Uid))]
+public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive,
+                               ISourceReference, ISoftDelete, ITimestamp, IStateful
 {
-    public string  DefinitionName { get; set; }  // registered process definition name
-    public string? Variables      { get; set; }  // JSON-serialized variables
-    public string? StateId        { get; set; }  // current element ID
-    public string? State          { get; set; }  // current element name
-    public string? WaitingAtId    { get; set; }  // element ID the instance is waiting at
-    public string? WaitingAt      { get; set; }  // element name the instance is waiting at
+    public string  DefinitionName { get; set; }  // registered definition name
+    public string? Variables      { get; set; }  // JSON variables
+    public string? StateId        { get; set; }  // current element id
+    public string? State          { get; set; }  // current element name (IStateful)
+    public string? WaitingAtId    { get; set; }  // element id the instance waits at
+    public string? WaitingAt      { get; set; }  // element name the instance waits at
+    // ISourceReference: SourceType, Source, SourceTimestamp
 }
 ```
 
-`SchemataProcess` implements `ISoftDelete`, so soft-deleted instances are filtered out by default. Use `repository.Once().SuppressQuerySoftDelete()` to query tombstoned instances.
+It implements `ISoftDelete`, so the default query filter hides tombstoned instances; read them
+inside a `using (repository.SuppressQuerySoftDelete())` scope. `IConcurrency` carries the optimistic
+`Timestamp`.
 
 ## SchemataProcessTransition entity
 
 ```csharp
 [Table("SchemataProcessTransitions")]
 [CanonicalName("processes/{process}/transitions/{transition}")]
-public class SchemataProcessTransition : IIdentifier, ICanonicalName, ITimestamp
+[PrimaryKey(nameof(Uid))]
+public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurrency,
+                                         ITransition, ITimestamp
 {
-    public string? Process   { get; set; }  // canonical name of the process instance
-    public string? Previous  { get; set; }  // state before transition
-    public string? Posterior { get; set; }  // state after transition
-    public string? Event     { get; set; }  // event name that triggered the transition
-    public string? UpdatedBy { get; set; }  // principal canonical name
+    public string? Process   { get; set; }  // canonical name of the instance
+    public string? Previous  { get; set; }  // state before
+    public string? Posterior { get; set; }  // state after
+    // ITransition: Event (trigger name), Note, UpdatedBy
 }
 ```
 
-## IFlowTransitionObserver
+One transition row is written per state change, in the same unit of work as the instance update.
+
+## Persistence
+
+`ProcessPersistence` owns the database. `PersistTransitionAsync` opens a unit of work over
+`IRepository<SchemataProcess>`, joins `IRepository<SchemataProcessTransition>`, upserts the instance
+row, adds the transition row, and commits; a failure rolls back. There is no persistence observer —
+durability is built into the runtime's commit path, and `IProcessLifecycleObserver` is purely a
+post-commit notification surface.
+
+`ProcessInitializer` (a hosted service) hydrates every persisted instance with `WaitingAtId != null`
+into the runtime cache at startup, so waiting instances are addressable after a restart.
+
+## IFlowTransitionAdvisor
 
 ```csharp
-public interface IFlowTransitionObserver
+public interface IFlowTransitionAdvisor : IAdvisor<FlowTransitionContext>
 {
-    Task OnTransitionedAsync(FlowTransitionContext context, CancellationToken ct = default);
 }
 
 public class FlowTransitionContext
@@ -120,9 +171,16 @@ public class FlowTransitionContext
 }
 ```
 
-`PreviousState` / `PreviousWaitingAtId` / `PreviousWaitingAt` are snapshotted before the engine result is copied onto `Process`. By the time observers see the context, `Process.WaitingAtId` already equals `Instance.WaitingAtId`; the snapshot fields are the only source for the pre-transition values.
+A transition advisor is an `IAdvisor<FlowTransitionContext>`: its `AdviseAsync` returns an
+`AdviseResult`, and it runs in the pre-commit window. The built-in advisors provision wake-up
+infrastructure for the new waiting state and return `AdviseResult.Continue`; a throwing advisor
+aborts the transition so an instance never persists into a state whose timer job or event
+subscription was never created. The `Previous*` fields are the only source of the pre-transition
+values, because `Process` already reflects the engine result by the time the advisor runs.
 
-`Schemata.Flow.Event` registers `FlowEventTransitionObserver` to manage `Message` / `Signal` subscriptions in `IEventSubscriptionStore`. `Schemata.Flow.Scheduling` registers `FlowTimerTransitionObserver` to schedule and cancel timer jobs through `IScheduler`. Both register through `TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionObserver, ...>())`, so additional observers stack alongside.
+`Schemata.Flow.Event` registers `FlowEventTransitionAdvisor` to maintain `IEventSubscriptionStore`
+entries; `Schemata.Flow.Scheduling` registers `FlowTimerTransitionAdvisor` to schedule and cancel
+timer jobs. Both register through `TryAddEnumerable`, so additional advisors stack alongside.
 
 ## IProcessLifecycleObserver
 
@@ -130,33 +188,40 @@ public class FlowTransitionContext
 public interface IProcessLifecycleObserver
 {
     Task OnStartedAsync(SchemataProcess process, CancellationToken ct = default);
-    Task OnTransitionedAsync(SchemataProcess process, SchemataProcessTransition transition, CancellationToken ct = default);
+    Task OnTransitionedAsync(SchemataProcess process, SchemataProcessTransition transition,
+        CancellationToken ct = default);
     Task OnTerminatedAsync(SchemataProcess process, CancellationToken ct = default);
 }
 ```
 
-The built-in `SchemataProcessAuditObserver` owns persistence: it writes the `SchemataProcess` row on `OnStartedAsync`, an audit `SchemataProcessTransition` row plus updated process state on `OnTransitionedAsync`, and the terminal state on `OnTerminatedAsync`. Replace or augment it by stacking additional `IProcessLifecycleObserver` implementations through `TryAddEnumerable`.
+Lifecycle observers run after the commit. Each is invoked in its own try/catch — a thrown observer
+is logged at warning and does not affect the committed transition. The runtime also publishes flow
+lifecycle events on `IEventBus` alongside the observer calls: `ProcessStartedEvent`,
+`TransitionMadeEvent`, `ProcessCompletedEvent`, and `ProcessFailedEvent`.
 
 ## Extension points
 
-- Implement `IFlowTransitionObserver` and register via `TryAddEnumerable` to react to per-transition state (notifications, external syncs).
-- Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to own persistence or react to start / transition / terminate.
-- Call `IProcessRegistry.RegisterAsync` at runtime to add process definitions after startup.
+- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to provision infrastructure
+  or veto a transition before it commits.
+- Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to react after the commit.
+- Call `IProcessRegistry.RegisterAsync` to add a definition after startup.
 
-## Design motivation
+## Design rationale
 
-`ProcessRuntime` takes `ClaimsPrincipal?`. Keeping the foundation layer free of `HttpContext` lets the HTTP and gRPC transports project their own request surfaces into a principal before calling in.
+`ProcessRuntime` takes a `ClaimsPrincipal?` rather than reading `HttpContext`, so the foundation
+layer stays free of the transport. The HTTP and gRPC surfaces project their own request into a
+principal before calling in.
 
 ## Caveats
 
-- `ProcessRegistry` is a singleton and calls `RegisterAsync(...).AsTask().GetAwaiter().GetResult()` during construction. Avoid registering processes with expensive constructors.
-- `ThrowSignalAsync` loads all instances with `WaitingAtId != null` into memory to check signal compatibility. For large deployments, consider indexing `WaitingAtId`.
+- `ProcessRegistry` is materialized synchronously during singleton construction, which runs each
+  `ProcessDefinition` constructor. Keep those constructors cheap.
+- `ThrowSignalAsync` enumerates cached instances and persisted instances with `WaitingAtId != null`
+  to find signal matches. For large deployments, index `WaitingAtId`.
 
 ## See also
 
 - [Engine](engine.md)
-- [State Machine](state-machine.md)
 - [HTTP Transport](http.md)
-- [gRPC Transport](grpc.md)
 - [Event Integration](event.md)
 - [Scheduling Integration](scheduling.md)

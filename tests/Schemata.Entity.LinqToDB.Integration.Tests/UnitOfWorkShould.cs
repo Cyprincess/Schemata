@@ -97,7 +97,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                                         Grade    = 1,
                                         Name     = "dispose-alice",
                                     });
-                // intentionally no commit/rollback
+                // Scope disposal rolls back the enlisted unit of work.
             }
         }
 
@@ -172,7 +172,7 @@ public class UnitOfWorkShould : IAsyncLifetime
     public async Task Standalone_ReadsSeeOwnUncommittedWrites() {
         // LinqToDB's standalone path executes mutations immediately inside the lazy
         // transaction, so subsequent reads on the same repository observe the
-        // not-yet-committed row (read-your-own-writes within the active transaction).
+        // pending row (read-your-own-writes within the active transaction).
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
@@ -219,7 +219,7 @@ public class UnitOfWorkShould : IAsyncLifetime
             await repo.FirstOrDefaultAsync(q => q.Where(s => s.Name == "rebind"));
 
             // Joining disposes that context; the cached table must be dropped so subsequent reads
-            // bind to the unit of work's connection rather than querying the disposed one.
+            // bind to the unit of work's connection.
             repo.Join(uow);
             await repo.AddAsync(new() {
                                     Uid      = Identifiers.NewUid(),
@@ -268,15 +268,15 @@ public class UnitOfWorkShould : IAsyncLifetime
                                     });
                 await repo.CommitAsync();
 
-                // The unit of work has completed; a further write must fail fast rather than run in
-                // autocommit outside the committed transaction.
+                // The unit of work has completed; a further write must fail fast before any
+                // autocommit path can persist it.
                 await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.AddAsync(new() {
-                                                                        Uid      = Identifiers.NewUid(),
-                                                                        FullName = "After-Commit",
-                                                                        Age      = 1,
-                                                                        Grade    = 1,
-                                                                        Name     = "after-commit-canary",
-                                                                    }));
+                    Uid      = Identifiers.NewUid(),
+                    FullName = "After-Commit",
+                    Age      = 1,
+                    Grade    = 1,
+                    Name     = "after-commit-canary",
+                }));
             }
         }
 

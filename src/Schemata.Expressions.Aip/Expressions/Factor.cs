@@ -6,8 +6,14 @@ using Schemata.Expressions.Aip.Operations;
 
 namespace Schemata.Expressions.Aip.Expressions;
 
+/// <summary>
+///     Represents one or more AIP terms joined by OR.
+/// </summary>
 public class Factor : LogicalBase
 {
+    /// <summary>
+    ///     Creates an OR factor from the first term and additional terms.
+    /// </summary>
     public Factor(TextPosition position, Term term, IReadOnlyCollection<Term>? terms) {
         Position = position;
         Terms.Add(term);
@@ -17,6 +23,9 @@ public class Factor : LogicalBase
         }
     }
 
+    /// <summary>
+    ///     Gets the terms joined by this factor.
+    /// </summary>
     public List<Term> Terms { get; } = [];
 
     public override IEnumerable<IToken> Tokens => Terms;

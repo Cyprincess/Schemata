@@ -73,7 +73,7 @@ public class AddRangeShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 await repository.AddRangeAsync(batch);
-                // No commit: disposing the scope must roll back the staged bulk insert.
+                // Scope disposal rolls back the staged bulk insert.
             }
         }
 
@@ -92,12 +92,12 @@ public class AddRangeShould : IAsyncLifetime
         var batch = new List<Student>();
         for (var i = 0; i < count; i++) {
             batch.Add(new() {
-                Uid      = Identifiers.NewUid(),
-                FullName = $"{prefix}-{i}",
-                Name     = $"{prefix}-{i}",
-                Age      = 20 + i,
-                Grade    = 1,
-            });
+                          Uid      = Identifiers.NewUid(),
+                          FullName = $"{prefix}-{i}",
+                          Name     = $"{prefix}-{i}",
+                          Age      = 20 + i,
+                          Grade    = 1,
+                      });
         }
 
         return batch;

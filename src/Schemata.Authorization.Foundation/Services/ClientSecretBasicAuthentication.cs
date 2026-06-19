@@ -35,12 +35,6 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
 {
     #region IClientAuthentication<TApp> Members
 
-    /// <summary>
-    ///     Authenticates the client using HTTP Basic.  Returns <c>null</c> when
-    ///     Basic auth is not configured as an allowed method, skipping to the
-    ///     next authenticator in the chain.
-    /// </summary>
-    /// <inheritdoc cref="IClientAuthentication{TApp}.AuthenticateAsync" />
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,

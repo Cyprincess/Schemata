@@ -1,6 +1,6 @@
 # Query Pipeline
 
-Every query method on `IRepository<TEntity>` — `ListAsync`, `FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, `LongCountAsync` — passes through a three-stage advisor pipeline before results are returned. The two raw accessors `AsQueryable` and `AsAsyncEnumerable` bypass the pipeline entirely.
+Every query method on `IRepository<TEntity>` — `ListAsync`, `FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, `LongCountAsync` — passes through a three-stage advisor pipeline before results are returned.
 
 ## Where the code lives
 
@@ -92,10 +92,13 @@ container.ApplyModification(q =>
      .OfType<TEntity>());
 ```
 
-Entities with a non-null `DeleteTime` are invisible by default. To include them:
+Entities with a non-null `DeleteTime` are invisible by default. To include them, scope the suppression:
 
 ```csharp
-var all = repository.Once().SuppressQuerySoftDelete().ListAsync<Book>(null);
+using (repository.SuppressQuerySoftDelete())
+{
+    var all = await repository.ListAsync<Book>(null, ct).ToListAsync(ct);
+}
 ```
 
 ### AdviceBuildQueryOwner
@@ -146,7 +149,5 @@ services.TryAddEnumerable(ServiceDescriptor.Scoped(
 ## See also
 
 - [mutation-pipeline.md](mutation-pipeline.md) — add/update/remove advisor chains
-- [caching.md](caching.md) — `AdviceQueryCache` and `AdviceResultCache`
+- [caching.md](caching.md) — `AdviceQueryCache` and `AdviceResultCache` in this pipeline
 - [ownership.md](ownership.md) — `AdviceBuildQueryOwner` and `IOwnerResolver`
-- [entity/traits.md](../entity/traits.md) — `ISoftDelete` and `IOwnable` trait definitions
-- [core/advice-pipeline.md](../core/advice-pipeline.md) — `AdviseResult` semantics

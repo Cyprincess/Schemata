@@ -11,6 +11,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataCookiePolicyFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for cookie policy.
+    /// </summary>
     public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 20_000_000;
 
     public override int Priority => DefaultPriority;

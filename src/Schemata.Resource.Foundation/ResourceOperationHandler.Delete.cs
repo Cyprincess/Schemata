@@ -46,6 +46,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return result;
     }
 
+    /// <summary>
+    ///     Runs delete processing and returns both the wire result and the affected entity.
+    /// </summary>
+    /// <param name="name">The resource name.</param>
+    /// <param name="etag">The optional ETag for optimistic concurrency.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
+    /// <param name="allowMissing">Whether a missing resource should produce an empty successful delete result.</param>
+    /// <returns>The delete result and the entity that was removed or soft-deleted.</returns>
     internal async Task<(DeleteResultBase<TDetail> Result, TEntity? Entity)> DeleteAsync(
         string             name,
         string?            etag,
@@ -89,7 +99,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity == null) {
-            // AIP-135 allow_missing: deleting an absent resource is a success, not NOT_FOUND.
+            // AIP-135 allow_missing treats deletion of an absent resource as a successful empty result.
             if (req.AllowMissing) {
                 return (new(), null);
             }

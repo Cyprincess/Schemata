@@ -30,18 +30,22 @@ public class CommitFailureShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 // Suppress the optimistic pre-check so the duplicate primary key reaches the database;
-                // EF Core buffers the insert and the collision surfaces only at commit time.
+                // EF Core buffers the insert and the collision surfaces at commit time.
                 using (repository.AdviceContext.Use<UniquenessSuppressed>()) {
                     await repository.AddAsync(new() {
-                        Uid = existing, FullName = "duplicate", Name = "duplicate", Age = 1, Grade = 1,
-                    });
+                                                  Uid      = existing,
+                                                  FullName = "duplicate",
+                                                  Name     = "duplicate",
+                                                  Age      = 1,
+                                                  Grade    = 1,
+                                              });
                 }
 
                 await Assert.ThrowsAsync<DbUpdateException>(() => repository.CommitAsync());
             }
         }
 
-        // The failed commit must roll back its transaction: a fresh scope sees only the seeded row.
+        // The failed commit must roll back its transaction: a fresh scope sees the seeded row.
         {
             var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
             using (verifyScope) {
@@ -52,16 +56,16 @@ public class CommitFailureShould : IAsyncLifetime
     }
 
     private async Task<Guid> SeedAsync(string name) {
-        var id                  = Identifiers.NewUid();
+        var id = Identifiers.NewUid();
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {
-                Uid      = id,
-                FullName = name,
-                Name     = name,
-                Age      = 20,
-                Grade    = 1,
-            });
+                                          Uid      = id,
+                                          FullName = name,
+                                          Name     = name,
+                                          Age      = 20,
+                                          Grade    = 1,
+                                      });
             await repository.CommitAsync();
         }
 

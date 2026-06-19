@@ -3,9 +3,7 @@ using System;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
-///     A BPMN Signal event definition representing broadcast communication.
-///     Unlike <see cref="Message" />, a signal is delivered to all subscribing
-///     process instances, not just one.
+///     A BPMN Signal event definition for broadcasts delivered to subscribing process instances.
 /// </summary>
 public sealed class Signal : IEventDefinition
 {

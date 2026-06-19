@@ -15,6 +15,7 @@ namespace Schemata.Identity.Foundation.Controllers;
 public sealed partial class AuthenticateController<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Registers a user and signs in the created account.</summary>
     [HttpPost(nameof(Register))]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken ct) {
         var result = await handler.RegisterAsync(request, HttpContext.User, ct);
@@ -25,6 +26,7 @@ public sealed partial class AuthenticateController<TUser>
         };
     }
 
+    /// <summary>Authenticates a user and issues sign-in credentials.</summary>
     [HttpPost(nameof(Login))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct) {
         var result = await handler.LoginAsync(request, HttpContext.User, ct);
@@ -35,6 +37,7 @@ public sealed partial class AuthenticateController<TUser>
         };
     }
 
+    /// <summary>Refreshes bearer credentials from a refresh token.</summary>
     [HttpPost(nameof(Refresh))]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request, CancellationToken ct) {
         var protector = bearer.Get(IdentityConstants.BearerScheme).RefreshTokenProtector;
@@ -51,6 +54,7 @@ public sealed partial class AuthenticateController<TUser>
         };
     }
 
+    /// <summary>Signs out the authenticated user from cookie and bearer schemes.</summary>
     [Authorize]
     [HttpPost(nameof(SignOut))]
     public async Task<IActionResult> SignOut(CancellationToken ct) {

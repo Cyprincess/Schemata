@@ -25,6 +25,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     where TDetail : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
+    /// <summary>
+    ///     Handles resource operations for this controller.
+    /// </summary>
     protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
 
     /// <summary>
@@ -40,6 +43,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         JsonOptions = json.Value;
     }
 
+    /// <summary>
+    ///     Gets the JSON serializer options used for controller responses.
+    /// </summary>
     protected JsonSerializerOptions JsonOptions { get; }
 
     private string BuildFullName(string name) {

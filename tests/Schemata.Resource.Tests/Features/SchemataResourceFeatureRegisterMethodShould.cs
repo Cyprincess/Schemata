@@ -34,9 +34,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         SchemataResourceFeature.RegisterResource(services, resource);
 
         var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftEntity).TypeHandle]
-                             .OrderBy(m => m.Verb)
-                             .ToArray();
+        var methods = options.Methods[typeof(SoftEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(3, methods.Length);
         Assert.Equal("expunge", methods[0].Verb);
@@ -70,9 +68,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         SchemataResourceFeature.RegisterResource(services, resource);
 
         var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftOverrideEntity).TypeHandle]
-                             .OrderBy(m => m.Verb)
-                             .ToArray();
+        var methods = options.Methods[typeof(SoftOverrideEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(3, methods.Length);
         Assert.Equal("expunge", methods[0].Verb);
@@ -94,9 +90,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         SchemataResourceFeature.RegisterResource(services, resource);
 
         var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftEntity).TypeHandle]
-                             .OrderBy(m => m.Verb)
-                             .ToArray();
+        var methods = options.Methods[typeof(SoftEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
 
         Assert.DoesNotContain(methods, m => m.Verb == "purge");
     }
@@ -109,8 +103,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         SchemataResourceFeature.RegisterResource(services, resource);
 
         var options = BuildOptions(services);
-        var method = options.Methods[typeof(SoftPurgeOverrideEntity).TypeHandle]
-                            .Single(m => m.Verb == "purge");
+        var method  = options.Methods[typeof(SoftPurgeOverrideEntity).TypeHandle].Single(m => m.Verb == "purge");
 
         Assert.Equal(typeof(SoftPurgeHandler), method.Handler);
         Assert.Equal(ResourceMethodScope.Collection, method.Scope);
@@ -151,17 +144,18 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreSameMethodMetadata_ForAttributeAndProgrammaticRegistration() {
         var attributeServices = new ServiceCollection();
-        SchemataResourceFeature.RegisterResource(attributeServices, new ResourceAttribute<SingleVerbEntity, RunRequest>());
+        SchemataResourceFeature.RegisterResource(attributeServices,
+                                                 new ResourceAttribute<SingleVerbEntity, RunRequest>());
 
         var programmaticServices = new ServiceCollection();
-        SchemataResourceFeature.RegisterResource(
-            programmaticServices,
-            new ResourceAttribute<PlainEntity, RunRequest> {
-                Methods = [new("run", typeof(PlainRunHandler))],
-            });
+        SchemataResourceFeature.RegisterResource(programmaticServices,
+                                                 new ResourceAttribute<PlainEntity, RunRequest> {
+                                                     Methods = [new("run", typeof(PlainRunHandler))],
+                                                 });
 
-        var attributeMethod = Assert.Single(BuildOptions(attributeServices).Methods[typeof(SingleVerbEntity).TypeHandle]);
-        var explicitMethod  = Assert.Single(BuildOptions(programmaticServices).Methods[typeof(PlainEntity).TypeHandle]);
+        var attributeMethod
+            = Assert.Single(BuildOptions(attributeServices).Methods[typeof(SingleVerbEntity).TypeHandle]);
+        var explicitMethod = Assert.Single(BuildOptions(programmaticServices).Methods[typeof(PlainEntity).TypeHandle]);
 
         Assert.Equal(attributeMethod.Verb, explicitMethod.Verb);
         Assert.Equal(attributeMethod.Scope, explicitMethod.Scope);
@@ -176,9 +170,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         SchemataResourceFeature.RegisterResource(services, resource);
 
         var options = BuildOptions(services);
-        var methods = options.Methods[typeof(MultiVerbEntity).TypeHandle]
-                             .OrderBy(m => m.Verb)
-                             .ToArray();
+        var methods = options.Methods[typeof(MultiVerbEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(2, methods.Length);
         Assert.Equal("archive", methods[0].Verb);
@@ -206,18 +198,19 @@ public class SchemataResourceFeatureRegisterMethodShould
         var services = new ServiceCollection();
         var resource = new ResourceAttribute<InvalidHandlerEntity>();
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            SchemataResourceFeature.RegisterResource(services, resource));
+        var ex
+            = Assert.Throws<InvalidOperationException>(() => SchemataResourceFeature.RegisterResource(
+                                                           services, resource));
 
         Assert.Contains("IResourceMethodHandler", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("badVerb",                ex.Message, StringComparison.Ordinal);
+        Assert.Contains("badVerb", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void PreserveLatestDeclaration_WhenSameVerbReRegistered() {
-        var services    = new ServiceCollection();
-        var firstPass   = new ResourceAttribute<SingleVerbEntity, RunRequest>();
-        var secondPass  = new ResourceAttribute<SingleVerbEntity, RunRequest>();
+        var services   = new ServiceCollection();
+        var firstPass  = new ResourceAttribute<SingleVerbEntity, RunRequest>();
+        var secondPass = new ResourceAttribute<SingleVerbEntity, RunRequest>();
 
         SchemataResourceFeature.RegisterResource(services, firstPass);
         SchemataResourceFeature.RegisterResource(services, secondPass);
@@ -245,122 +238,262 @@ public class SchemataResourceFeatureRegisterMethodShould
         return provider.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
     }
 
-    public sealed class PlainEntity : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
-
-    [Resource<ScanResource>]
-    public sealed class ScanResource : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
-
-    public sealed class SoftEntity : ICanonicalName, ISoftDelete
-    {
-        public string?   Name          { get; set; }
-        public string?   CanonicalName { get; set; }
-        public DateTime? DeleteTime    { get; set; }
-        public DateTime? PurgeTime     { get; set; }
-    }
-
-    [ResourceMethod("undelete", typeof(SoftUndeleteHandler))]
-    public sealed class SoftOverrideEntity : ICanonicalName, ISoftDelete
-    {
-        public string?   Name          { get; set; }
-        public string?   CanonicalName { get; set; }
-        public DateTime? DeleteTime    { get; set; }
-        public DateTime? PurgeTime     { get; set; }
-    }
-
-    [ResourceMethod("purge", typeof(SoftPurgeHandler), ResourceMethodScope.Collection)]
-    public sealed class SoftPurgeOverrideEntity : ICanonicalName, ISoftDelete
-    {
-        public string?   Name          { get; set; }
-        public string?   CanonicalName { get; set; }
-        public DateTime? DeleteTime    { get; set; }
-        public DateTime? PurgeTime     { get; set; }
-    }
-
-    [ResourceMethod("run", typeof(RunHandler))]
-    public sealed class SingleVerbEntity : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
-
-    [ResourceMethod("archive",     typeof(RunHandler))]
-    [ResourceMethod("batchCreate", typeof(RunHandler), ResourceMethodScope.Collection)]
-    public sealed class MultiVerbEntity : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+    #region Nested type: InvalidHandlerEntity
 
     [ResourceMethod("badVerb", typeof(NotAHandler))]
     public sealed class InvalidHandlerEntity : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
-    public sealed class RunRequest : ICanonicalName
+    #endregion
+
+    #region Nested type: MultiVerbEntity
+
+    [ResourceMethod("archive", typeof(RunHandler))]
+    [ResourceMethod("batchCreate", typeof(RunHandler), ResourceMethodScope.Collection)]
+    public sealed class MultiVerbEntity : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
-    public sealed class RunResponse : ICanonicalName
+    #endregion
+
+    #region Nested type: NotAHandler
+
+    public sealed class NotAHandler;
+
+    #endregion
+
+    #region Nested type: PlainEntity
+
+    public sealed class PlainEntity : ICanonicalName
     {
+        #region ICanonicalName Members
+
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+
+        #endregion
     }
 
-    public sealed class RunHandler : IResourceMethodHandler<SingleVerbEntity, RunRequest, RunResponse>
-    {
-        public ValueTask<RunResponse> InvokeAsync(
-            string?           name,
-            RunRequest        request,
-            SingleVerbEntity? entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
-        ) => ValueTask.FromResult(new RunResponse());
-    }
+    #endregion
+
+    #region Nested type: PlainRunHandler
 
     public sealed class PlainRunHandler : IResourceMethodHandler<PlainEntity, RunRequest, RunResponse>
     {
+        #region IResourceMethodHandler<PlainEntity,RunRequest,RunResponse> Members
+
         public ValueTask<RunResponse> InvokeAsync(
             string?           name,
             RunRequest        request,
             PlainEntity?      entity,
             ClaimsPrincipal?  principal,
             CancellationToken ct
-        ) => ValueTask.FromResult(new RunResponse());
+        ) {
+            return ValueTask.FromResult(new RunResponse());
+        }
+
+        #endregion
     }
 
-    public sealed class SoftUndeleteHandler : IResourceMethodHandler<SoftOverrideEntity, EmptyResourceRequest, SoftOverrideEntity>
+    #endregion
+
+    #region Nested type: RunHandler
+
+    public sealed class RunHandler : IResourceMethodHandler<SingleVerbEntity, RunRequest, RunResponse>
     {
-        public ValueTask<SoftOverrideEntity> InvokeAsync(
-            string?              name,
-            EmptyResourceRequest request,
-            SoftOverrideEntity?  entity,
-            ClaimsPrincipal?     principal,
-            CancellationToken    ct
-        ) => ValueTask.FromResult(entity ?? new SoftOverrideEntity());
+        #region IResourceMethodHandler<SingleVerbEntity,RunRequest,RunResponse> Members
+
+        public ValueTask<RunResponse> InvokeAsync(
+            string?           name,
+            RunRequest        request,
+            SingleVerbEntity? entity,
+            ClaimsPrincipal?  principal,
+            CancellationToken ct
+        ) {
+            return ValueTask.FromResult(new RunResponse());
+        }
+
+        #endregion
     }
+
+    #endregion
+
+    #region Nested type: RunRequest
+
+    public sealed class RunRequest : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: RunResponse
+
+    public sealed class RunResponse : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: ScanResource
+
+    [Resource<ScanResource>]
+    public sealed class ScanResource : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SingleVerbEntity
+
+    [ResourceMethod("run", typeof(RunHandler))]
+    public sealed class SingleVerbEntity : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SoftEntity
+
+    public sealed class SoftEntity : ICanonicalName, ISoftDelete
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region ISoftDelete Members
+
+        public DateTime? DeleteTime { get; set; }
+        public DateTime? PurgeTime  { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SoftOverrideEntity
+
+    [ResourceMethod("undelete", typeof(SoftUndeleteHandler))]
+    public sealed class SoftOverrideEntity : ICanonicalName, ISoftDelete
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region ISoftDelete Members
+
+        public DateTime? DeleteTime { get; set; }
+        public DateTime? PurgeTime  { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SoftPurgeHandler
 
     public sealed class SoftPurgeHandler : IResourceMethodHandler<SoftPurgeOverrideEntity, PurgeRequest, PurgeResponse>
     {
+        #region IResourceMethodHandler<SoftPurgeOverrideEntity,PurgeRequest,PurgeResponse> Members
+
         public ValueTask<PurgeResponse> InvokeAsync(
             string?                  name,
             PurgeRequest             request,
             SoftPurgeOverrideEntity? entity,
             ClaimsPrincipal?         principal,
             CancellationToken        ct
-        ) => ValueTask.FromResult(new PurgeResponse());
+        ) {
+            return ValueTask.FromResult(new PurgeResponse());
+        }
+
+        #endregion
     }
 
-    public sealed class NotAHandler;
+    #endregion
+
+    #region Nested type: SoftPurgeOverrideEntity
+
+    [ResourceMethod("purge", typeof(SoftPurgeHandler), ResourceMethodScope.Collection)]
+    public sealed class SoftPurgeOverrideEntity : ICanonicalName, ISoftDelete
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+
+        #region ISoftDelete Members
+
+        public DateTime? DeleteTime { get; set; }
+        public DateTime? PurgeTime  { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SoftUndeleteHandler
+
+    public sealed class
+        SoftUndeleteHandler : IResourceMethodHandler<SoftOverrideEntity, EmptyResourceRequest, SoftOverrideEntity>
+    {
+        #region IResourceMethodHandler<SoftOverrideEntity,EmptyResourceRequest,SoftOverrideEntity> Members
+
+        public ValueTask<SoftOverrideEntity> InvokeAsync(
+            string?              name,
+            EmptyResourceRequest request,
+            SoftOverrideEntity?  entity,
+            ClaimsPrincipal?     principal,
+            CancellationToken    ct
+        ) {
+            return ValueTask.FromResult(entity ?? new SoftOverrideEntity());
+        }
+
+        #endregion
+    }
+
+    #endregion
 }

@@ -21,7 +21,7 @@ public interface ITenantProviderCache
 {
     /// <summary>
     ///     Returns a lease over the cached provider for <paramref name="id" />, building one via
-    ///     <paramref name="factory" /> if no entry exists. The caller must dispose the returned
+    ///     <paramref name="factory" /> for a cache miss. The caller must dispose the returned
     ///     lease when the tenant scope it backs is disposed.
     /// </summary>
     ITenantProviderLease Lease(string id, Func<IServiceProvider> factory);

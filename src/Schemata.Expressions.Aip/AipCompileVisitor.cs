@@ -14,29 +14,53 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Aip;
 
+/// <summary>
+///     Converts AIP filter AST nodes into LINQ expression tree nodes.
+/// </summary>
 internal sealed class AipCompileVisitor
 {
     private readonly ExpressionCompileOptions? _options;
     private          Expression?               _guard;
 
+    /// <summary>
+    ///     Creates a visitor for expressions evaluated against the supplied context type.
+    /// </summary>
     public AipCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
         _options  = options;
         Parameter = Expression.Parameter(contextType, LowerFirst(contextType.Name));
     }
 
+    /// <summary>
+    ///     Gets the root parameter used by generated expressions.
+    /// </summary>
     public ParameterExpression Parameter { get; }
 
+    /// <summary>
+    ///     Visits a complete AIP filter.
+    /// </summary>
     public Expression Visit(Filter node) { return Combine(node.Sequences.Select(Visit), Expression.AndAlso); }
 
+    /// <summary>
+    ///     Visits an AND sequence in an AIP filter.
+    /// </summary>
     public Expression Visit(Sequence node) { return Combine(node.Factors.Select(Visit), Expression.AndAlso); }
 
+    /// <summary>
+    ///     Visits an OR factor in an AIP filter.
+    /// </summary>
     public Expression Visit(Factor node) { return Combine(node.Terms.Select(Visit), Expression.OrElse); }
 
+    /// <summary>
+    ///     Visits a possibly negated AIP term.
+    /// </summary>
     public Expression Visit(Term node) {
         var expression = Visit(node.Simple);
         return node.Modifier is null ? expression : Expression.Not(ToBoolean(expression));
     }
 
+    /// <summary>
+    ///     Visits a simple AIP expression.
+    /// </summary>
     public Expression Visit(ISimple node) {
         return node switch {
             Restriction restriction => Visit(restriction),
@@ -45,6 +69,9 @@ internal sealed class AipCompileVisitor
         };
     }
 
+    /// <summary>
+    ///     Visits an AIP restriction and applies null-chain guards when needed.
+    /// </summary>
     public Expression Visit(Restriction node) {
         var outerGuard = _guard;
         _guard = null;
@@ -91,6 +118,9 @@ internal sealed class AipCompileVisitor
         return false;
     }
 
+    /// <summary>
+    ///     Visits an AIP function or comparison argument.
+    /// </summary>
     public Expression Visit(IArg node) {
         return node switch {
             IComparableArg comparable => Visit(comparable),
@@ -99,6 +129,9 @@ internal sealed class AipCompileVisitor
         };
     }
 
+    /// <summary>
+    ///     Visits an AIP argument that can appear on the left side of a comparator.
+    /// </summary>
     public Expression Visit(IComparableArg node) {
         return node switch {
             Member member     => Visit(member),
@@ -107,6 +140,9 @@ internal sealed class AipCompileVisitor
         };
     }
 
+    /// <summary>
+    ///     Visits an AIP member path or literal value.
+    /// </summary>
     public Expression Visit(Member node) {
         var expression = VisitValue(node.Value, true);
         foreach (var field in node.Fields) {
@@ -116,6 +152,9 @@ internal sealed class AipCompileVisitor
         return expression;
     }
 
+    /// <summary>
+    ///     Visits an AIP function call.
+    /// </summary>
     public Expression Visit(Function node) {
         var names = GetSegments(node.Member);
         var name  = string.Join(".", names);
@@ -213,8 +252,8 @@ internal sealed class AipCompileVisitor
         var item = Expression.Parameter(elementType, "item");
 
         // Isolate inner-lambda guards: GuardAccess accumulations on `item` reference a
-        // parameter that lives only inside the inner Any(...) lambda, so they must wrap
-        // the lambda body rather than leak into the outer comparison guard.
+        // parameter that lives only inside the inner Any(...) lambda, so they wrap
+        // the lambda body and stay out of the outer comparison guard.
         var outerGuard = _guard;
         _guard = null;
 
@@ -296,7 +335,7 @@ internal sealed class AipCompileVisitor
             (true, false) => Expression.Call(left, nameof(string.EndsWith), null, literalExpr),
             (true, true)  => Expression.Call(left, nameof(string.Contains), null, literalExpr),
             // Unsupported pattern shape (e.g. "A*B"): fall back to literal equality after stripping
-            // wildcards so the result is well-defined rather than throwing at compile time.
+            // wildcards, producing a stable comparison result.
             var _ => Expression.Equal(left, literalExpr),
         };
     }

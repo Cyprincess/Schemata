@@ -32,7 +32,7 @@ public sealed class Map<TSource, TDestination>
     }
 
     /// <summary>
-    ///     Registers a whole-object converter expression instead of field-by-field mapping.
+    ///     Registers a whole-object converter expression for the source-to-destination mapping.
     /// </summary>
     /// <param name="with">An expression that converts the source to the destination.</param>
     /// <returns>This map for chaining.</returns>

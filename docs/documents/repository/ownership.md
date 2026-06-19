@@ -60,7 +60,7 @@ public interface IOwnerResolver<TEntity>
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+services.AddRepository(typeof(EfCoreRepository<,>))
         .UseOwner();
 ```
 
@@ -96,15 +96,23 @@ public sealed class PrincipalOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 
 ```csharp
 // Add without assigning ownership
-await repository.Once().SuppressOwner().AddAsync(entity, ct);
+using (repository.SuppressOwner())
+{
+    await repository.AddAsync(entity, ct);
+}
 
 // List all entities regardless of owner
-var all = repository.Once().SuppressQueryOwner().ListAsync<Document>(null);
+using (repository.SuppressQueryOwner())
+{
+    var all = await repository.ListAsync<Document>(null, ct).ToListAsync(ct);
+}
 ```
 
-## Interaction with the resource layer
+## Override and bypass
 
-When the resource layer is active, the request sanitization advisors clear `IOwnable.Owner` on create and update requests, preventing clients from claiming ownership. `AdviceAddOwner` then assigns the correct owner during persistence. If you bypass the resource layer and create entities directly via the repository, `AdviceAddOwner` still fires.
+`AdviceAddOwner` leaves an already-set `Owner` untouched, so a caller that pre-assigns ownership keeps
+control. To create an entity with no owner stamping at all, scope `SuppressOwner()`. `AdviceAddOwner`
+fires whether the entity reaches the repository through the resource layer or directly.
 
 ## Extension points
 
@@ -120,4 +128,3 @@ Ownership filtering is simple equality (`Owner == resolvedOwner`). It requires n
 - [entity/traits.md](../entity/traits.md) — `IOwnable` interface definition
 - [query-pipeline.md](query-pipeline.md) — `AdviceBuildQueryOwner` in the build-query stage
 - [mutation-pipeline.md](mutation-pipeline.md) — `AdviceAddOwner` in the add pipeline
-- [overview.md](overview.md) — `SuppressOwner()` and `SuppressQueryOwner()` in the suppression table

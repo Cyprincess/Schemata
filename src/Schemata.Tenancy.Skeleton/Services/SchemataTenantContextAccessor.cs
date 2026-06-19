@@ -17,9 +17,7 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
     private readonly ITenantResolver         _resolver;
     private readonly IServiceProvider        _sp;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantContextAccessor{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates an accessor that resolves tenants through the registered resolver and manager.</summary>
     public SchemataTenantContextAccessor(
         IServiceProvider        sp,
         ITenantResolver         resolver,

@@ -4,11 +4,14 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Shared ETag construction for freshness advisors.
+/// </summary>
 internal static class FreshnessHelper
 {
     /// <summary>
     ///     Builds a weak ETag (<c>W/"..."</c>) from the entity's <see cref="IConcurrency.Timestamp" />.
-    ///     Returns <see langword="false" /> when freshness is suppressed, the entity is not
+    ///     Returns <see langword="false" /> when freshness is suppressed, the entity lacks
     ///     <see cref="IConcurrency" />, or the timestamp is null/empty.
     /// </summary>
     public static bool TryGetEntityTag<TEntity>(AdviceContext ctx, TEntity? entity, out string? tag)

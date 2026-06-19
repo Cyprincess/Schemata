@@ -1,6 +1,7 @@
 # Entities
 
-Entities are the primary declaration type in SKM. The generator emits each entity as a `public record` with auto-properties for every declared field. Trait interfaces from `Use` declarations and base lists appear in the record's base list.
+The generator emits each entity as a `public record` with one init-set auto-property per field.
+Trait interfaces from `Use` declarations and the base list appear in the record's base list.
 
 ## Syntax
 
@@ -16,25 +17,25 @@ Entity <Name> [: <bases>] {
 }
 ```
 
-Members may appear in any order and can be freely intermixed.
+Members may appear in any order.
 
-## Allowed members
+## Members
 
-| Member          | Description                                          | Emitted? |
-| --------------- | ---------------------------------------------------- | -------- |
-| `Note`          | Documentation string                                 | No       |
-| `Use`           | Incorporate trait interfaces into the base list      | Yes (base list only) |
-| `Enum`          | Nested enum declaration                              | Yes      |
-| `Trait`         | Nested trait declaration                             | No       |
-| `Object`        | DTO projection block (parsed as `View` AST node)     | No       |
-| `Index`         | Index declaration (parsed as `Pointer` AST node)     | No       |
-| Field           | Property declaration                                 | Yes      |
-
-Nested `Trait` declarations, `Object` blocks, and `Index` declarations are parsed and stored in the AST but **not emitted as C# today**. See [Objects](objects.md) for the Object block story.
+| Member   | Emitted                          |
+| -------- | -------------------------------- |
+| `Note`   | No                               |
+| `Use`    | Base list only                   |
+| `Enum`   | Yes (inline, via `EnumGenerator`) |
+| `Trait`  | No                               |
+| `Object` | No (stored as a `View` node)     |
+| `Index`  | No (stored as a `Pointer` node)  |
+| Field    | Yes                              |
 
 ## Composition
 
-Entities use the same `Use` and base-list syntax as traits. `EntityGenerator.GenerateUses` collects names from both `Uses` and `Bases`, resolves any name that matches a known trait to its `I`-prefixed interface form, deduplicates, and writes them as the record's base list.
+Entities use the same `Use` and base-list syntax as traits. `EntityGenerator.GenerateUses`
+collects names from `Uses` and `Bases`, resolves any name matching a declared trait to its
+`I`-prefixed interface, and deduplicates.
 
 ```text
 Entity Student : Entity, SoftDelete {
@@ -42,19 +43,16 @@ Entity Student : Entity, SoftDelete {
 }
 ```
 
-## What the generator emits
+## Emission
 
-`EntityGenerator.Generate` emits a `public record` for each entity:
+`EntityGenerator` emits a `public record` whose name matches the entity name. Each field becomes
+a `public <CLRType> <PascalCaseName> { get; set; } = <default>;` property:
 
-- The record name matches the entity name exactly.
-- Each field becomes a `public <CLRType> <PascalCaseName> { get; set; } = <default>;` property.
-- Non-nullable `string` fields default to `string.Empty`. All other non-nullable fields default to `default`. Nullable fields default to `null`.
-- Field options and field properties are **not consumed** — parsed but not emitted.
-- `Note` members are **not emitted**.
-- Nested `Trait`, `Object`, and `Index` members are **not emitted**.
-- Nested `Enum` declarations are emitted inline via `EnumGenerator`.
+- Non-nullable `string` defaults to `string.Empty`.
+- Nullable fields default to `null`.
+- Every other field defaults to `default`.
 
-Given:
+Nested `Enum` declarations are emitted inline before the entity's fields.
 
 ```text
 Namespace My.Models
@@ -69,8 +67,6 @@ Entity Student : Identifier {
 }
 ```
 
-The generator produces:
-
 ```csharp
 namespace My.Models {
     public record Student : IIdentifier {
@@ -81,46 +77,14 @@ namespace My.Models {
 }
 ```
 
-## Nested enums
+## Index and Object members
 
-Enums declared inside an entity body are emitted by `EnumGenerator` and appear before the entity's own fields in the generated source:
-
-```text
-Entity Post {
-    Enum Status {
-        Draft
-        Published
-        Archived
-    }
-
-    Status status { Default 'Draft' }
-    string title [not null]
-}
-```
-
-## Index declarations
-
-Index declarations (`Index col1 col2 [options]`) are parsed as `Pointer` AST nodes and stored on the entity. They are **not emitted as C# today** and are reserved for future EF Core fluent-API generation.
+`Index col1 col2 [options]` is stored as a `Pointer` node and `Object name { ... }` as a `View`
+node on the entity. Both record intent for tooling and produce no C# output.
 
 ```text
 Entity Post {
-    long user_id [b tree]
-    long category_id
-
-    Index user_id [b tree]
-    Index user_id category_id [unique]
-}
-```
-
-## Object blocks
-
-Object blocks (`Object name { ... }`) are parsed as `View` AST nodes and stored on the entity. They are **not emitted as C# today**. See [Objects](objects.md).
-
-## Complete example
-
-```text
-Entity Post {
-    Use Entity, SoftDelete
+    Use Entity
 
     Enum Status {
         Draft
@@ -135,30 +99,18 @@ Entity Post {
     text body
 
     Index user_id [b tree]
-    Index category_id [b tree]
-
-    Object request {
-        title
-        body
-        status
-    }
+    Index user_id category_id [unique]
 
     Object response {
         id
         title
         body
         status
-        create_time
-        update_time
     }
 }
 ```
 
 ## See also
 
-- [Fields](fields.md) — field syntax and name conversion
-- [Types](types.md) — built-in type token table
-- [Traits](traits.md) — trait body and interface emission
-- [Enums](enums.md) — enum syntax and emission rules
-- [Objects](objects.md) — Object block syntax (parsed, not emitted today)
-- [Grammar](grammar.md) — entity production rule
+- [Traits](traits.md) — trait composition and interface emission
+- [Objects](objects.md) — `Object` block syntax

@@ -9,6 +9,7 @@ public sealed class InclusiveMerge
     private readonly ProcessDefinition _definition;
     private readonly InclusiveGateway  _gateway;
 
+    /// <summary>Creates an inclusive merge continuation for <paramref name="gateway" />.</summary>
     internal InclusiveMerge(ProcessDefinition definition, InclusiveGateway gateway) {
         _definition = definition;
         _gateway    = gateway;

@@ -1,6 +1,7 @@
 # Getting Started
 
-This guide walks through building a Student CRUD API with auto-generated HTTP endpoints. By the end you'll have a running application that supports creating, listing, reading, updating, and soft-deleting students.
+This guide builds a Student CRUD API with auto-generated HTTP endpoints. By the end you have a
+running application that creates, lists, reads, updates, and soft-deletes students.
 
 ## Prerequisites
 
@@ -15,11 +16,12 @@ cd StudentApp
 dotnet add package --prerelease Schemata.Application.Complex.Targets
 ```
 
-`Schemata.Application.Complex.Targets` bundles the core framework, Entity Framework Core, Mapster, resource services, and commonly used packages. See [Packages](../documents/packages.md) for the full package matrix.
+`Schemata.Application.Complex.Targets` bundles the core framework, Entity Framework Core, Mapster,
+resource services, and the common packages.
 
 ## Define the entity
 
-Create `Student.cs`. Implement the trait interfaces that match the capabilities you need:
+Create `Student.cs`. Implement the trait interfaces for the capabilities you want:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -49,18 +51,18 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 }
 ```
 
-Each trait enables behavior through built-in advisors:
+Each trait enables behavior through built-in repository advisors:
 
 | Trait | Behavior |
 | --- | --- |
 | `IIdentifier` | Supplies a `Guid` primary key via the `Uid` property |
 | `ICanonicalName` | Provides `Name` (short identifier) and `CanonicalName` (fully-qualified resource name) |
-| `ITimestamp` | Sets `CreateTime` on add and `UpdateTime` on update automatically |
+| `ITimestamp` | Sets `CreateTime` on add and `UpdateTime` on update |
 | `ISoftDelete` | Sets `DeleteTime` on delete instead of removing the row; queries exclude soft-deleted rows |
 
-The `[CanonicalName("students/{student}")]` attribute defines the resource name pattern. `students` is the collection segment (the HTTP route prefix) and `{student}` is a variable segment resolved from the entity's `Name` property.
-
-For a complete reference of all available traits, see [Traits](../documents/entity/traits.md).
+`[CanonicalName("students/{student}")]` defines the resource-name pattern: `students` is the
+collection segment (the HTTP route prefix) and `{student}` is a variable resolved from the entity's
+`Name` property.
 
 ## Create the DbContext
 
@@ -75,11 +77,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 }
 ```
 
-The class-level `[PrimaryKey(nameof(Uid))]` attribute declares `Uid` as the primary key.
+The class-level `[PrimaryKey(nameof(Uid))]` declares `Uid` as the primary key.
 
-## Create the Name advisor
+## Create the name advisor
 
-The resource pipeline clears `Name` on create requests to prevent client injection. Since `[CanonicalName]` requires `Name` to be non-null when the canonical name advisor runs, create an advisor that populates `Uid` and `Name` before that happens:
+The resource pipeline clears `Name` on create requests so a client cannot inject it. Because
+`[CanonicalName]` needs a non-null `Name` when the canonical-name advisor runs, add an advisor that
+populates `Uid` and `Name` first:
 
 ```csharp
 using Schemata.Abstractions.Advisors;
@@ -94,7 +98,7 @@ public sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
         AdviceContext        ctx,
         IRepository<Student> repository,
         Student              entity,
-        CancellationToken    ct)
+        CancellationToken    ct = default)
     {
         if (entity.Uid == Guid.Empty)
             entity.Uid = Guid.CreateVersion7();
@@ -107,13 +111,13 @@ public sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
 }
 ```
 
-`Guid.CreateVersion7()` produces a time-ordered UUID that works well as a primary key. `Order = 0` puts this advisor at the front of the pipeline.
-
-The `Order` property controls where each advisor runs in the pipeline; lower values execute first. See [Mutation Pipeline](../documents/repository/mutation-pipeline.md) for the full advisor execution order.
+`Guid.CreateVersion7()` produces a time-ordered UUID that sorts well as a primary key. `Order = 0`
+runs this advisor ahead of every built-in repository advisor, the lowest of which is at
+100,000,000.
 
 ## Configure the application
 
-Replace the contents of `Program.cs`:
+Replace `Program.cs`:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -129,7 +133,7 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseJsonSerializer();
 
         schema.ConfigureServices(services => {
-            services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+            services.AddRepository(typeof(EfCoreRepository<,>))
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
@@ -145,22 +149,29 @@ var builder = WebApplication.CreateBuilder(args)
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
-    await scope.ServiceProvider
-               .GetRequiredService<AppDbContext>()
-               .Database.EnsureCreatedAsync();
+{
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+    await using var context = await factory.CreateDbContextAsync();
+    await context.Database.EnsureCreatedAsync();
+}
 
 app.Run();
 ```
 
 The key pieces:
 
-- `UseSchemata` registers all Schemata services and middleware on the `WebApplicationBuilder`
-- `UseJsonSerializer()` configures System.Text.Json with snake_case naming and 53-bit integer handling
-- `AddRepository(typeof(EntityFrameworkCoreRepository<,>))` registers the EF Core repository as an open generic and all built-in advisors (timestamp, concurrency, soft-delete, canonical name, validation)
-- `UseEntityFrameworkCore<AppDbContext>(...)` registers the DbContext with the specified provider
-- `UseResource().MapHttp().Use<Student>()` exposes the entity as HTTP endpoints
+- `UseSchemata` registers Schemata services and middleware on the `WebApplicationBuilder`.
+- `UseJsonSerializer()` configures `System.Text.Json` with snake_case names and long-as-string
+  output.
+- `AddRepository(typeof(EfCoreRepository<,>))` registers the EF Core repository as an open generic
+  and adds the built-in advisors (timestamp, concurrency, canonical name, validation, uniqueness,
+  soft-delete).
+- `UseEntityFrameworkCore<AppDbContext>(...)` registers an `IDbContextFactory<AppDbContext>` for the
+  chosen provider.
+- `UseResource().MapHttp().Use<Student>()` exposes the entity as HTTP endpoints.
 
-`Use<Student>()` is shorthand for `Use<Student, Student, Student, Student>()` — the entity type is used for all four type parameters (entity, request, detail, summary). The [Object Mapping](object-mapping.md) guide shows how to introduce separate request and response types.
+`Use<Student>()` is shorthand for `Use<Student, Student, Student, Student>()` — the entity type
+fills all four type parameters (entity, request, detail, summary).
 
 ## Verify
 
@@ -168,11 +179,11 @@ The key pieces:
 dotnet run
 ```
 
-The following endpoints are now available:
+These endpoints are now available:
 
 | Method | Path | AIP | Description |
 | --- | --- | --- | --- |
-| `GET` | `/students` | AIP-132 | List all students |
+| `GET` | `/students` | AIP-132 | List students |
 | `POST` | `/students` | AIP-133 | Create a student |
 | `GET` | `/{name=students/*}` | AIP-131 | Get a student by name |
 | `PATCH` | `/{name=students/*}` | AIP-134 | Update a student |
@@ -185,7 +196,7 @@ curl -X POST http://localhost:5000/students \
      -d '{"full_name":"Alice","age":20}'
 # Response includes "name" (e.g. "students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6")
 
-# List all students
+# List students
 curl http://localhost:5000/students
 
 # Get by name (copy the "name" value from the create response)
@@ -203,21 +214,19 @@ curl -X DELETE http://localhost:5000/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
 curl http://localhost:5000/students
 ```
 
-The `name` field in responses is the full qualified resource name (e.g. `"students/a1b2c3d4..."`). The route pattern `{name=students/*}` captures the full name as a single route parameter, constrained to the `students/` prefix.
-
-Request and response bodies use `snake_case` property names (`full_name`, `create_time`, etc.). This is configured automatically by `UseJsonSerializer()` — see [JSON Serialization](../documents/core/json-serialization.md) for details.
+The `name` field is the full resource name (`"students/a1b2c3d4..."`). The route pattern
+`{name=students/*}` captures it as one parameter constrained to the `students/` prefix. Request and
+response bodies use `snake_case` property names (`full_name`, `create_time`).
 
 ## Next steps
 
 - [Unit of Work](unit-of-work.md) — wrap batch mutations in a transaction
-- [Object Mapping](object-mapping.md) — introduce separate request/response DTOs
-- [Concurrency and Freshness](concurrency-and-freshness.md) — add optimistic concurrency and ETags
-- [Filtering and Pagination](filtering-and-pagination.md) — query the student list with filters and pagination
+- [Object Mapping](object-mapping.md) — split request and response DTOs
+- [Concurrency and Freshness](concurrency-and-freshness.md) — optimistic concurrency and ETags
+- [Filtering and Pagination](filtering-and-pagination.md) — filter and page the student list
 
 ## See also
 
-- [Traits](../documents/entity/traits.md) — complete trait interface reference
+- [Traits](../documents/entity/traits.md) — the complete trait interface reference
 - [Mutation Pipeline](../documents/repository/mutation-pipeline.md) — advisor execution order
-- [Resource Overview](../documents/resource/overview.md) — four type parameters and handler stages
-- [JSON Serialization](../documents/core/json-serialization.md) — snake_case and wire format details
-- [Packages](../documents/packages.md) — full meta-package matrix
+- [Resource Overview](../documents/resource/overview.md) — the four type parameters and handler stages

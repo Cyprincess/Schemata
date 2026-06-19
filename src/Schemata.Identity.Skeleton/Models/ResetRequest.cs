@@ -2,13 +2,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Schemata.Identity.Skeleton.Models;
 
+/// <summary>
+///     Password reset request body.
+/// </summary>
 public class ResetRequest
 {
-    /// <summary>Email address of the account to reset; mutually exclusive with PhoneNumber.</summary>
+    /// <summary>Email address of the account receiving the reset.</summary>
     [EmailAddress]
     public string? EmailAddress { get; set; }
 
-    /// <summary>Phone number of the account to reset; mutually exclusive with EmailAddress.</summary>
+    /// <summary>Phone number of the account receiving the reset.</summary>
     [Phone]
     public string? PhoneNumber { get; set; }
 

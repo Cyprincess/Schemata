@@ -33,7 +33,7 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var keys     = json.RootElement.GetProperty("keys");
 
-        // RFC 7517: private key fields must not appear in a public JWK Set
+        // RFC 7517 public JWK Sets expose public key material only.
         string[] privateFields = ["d", "p", "q", "dp", "dq", "qi"];
 
         foreach (var key in keys.EnumerateArray()) {

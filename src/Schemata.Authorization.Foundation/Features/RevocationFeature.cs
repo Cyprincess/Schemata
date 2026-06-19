@@ -26,7 +26,6 @@ public sealed class RevocationFeature<TApp, TToken> : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 5_000;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

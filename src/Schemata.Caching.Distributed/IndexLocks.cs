@@ -12,13 +12,12 @@ namespace Schemata.Caching.Distributed;
 /// <remarks>
 ///     <para>
 ///         Bounded to <see cref="StripeCount" /> semaphores regardless of the number of distinct keys, so
-///         memory stays constant. Unrelated keys may share a stripe and serialize incidentally — this is
-///         intentional; the lock exists to prevent lost writes, not to maximize throughput.
+///         memory stays constant. Unrelated keys may share a stripe and serialize incidentally; the lock
+///         favors write safety over maximum throughput.
 ///     </para>
 ///     <para>
-///         When multiple processes share a distributed cache backend, this lock does not provide
-///         cross-process serialization. Use Redis or NCache implementations of
-///         <see cref="ICacheProvider" /> for cluster-safe collection operations.
+///         Multiple processes sharing a distributed cache backend require Redis or NCache implementations
+///         of <see cref="ICacheProvider" /> for cluster-safe collection operations.
 ///     </para>
 /// </remarks>
 public static class IndexLocks

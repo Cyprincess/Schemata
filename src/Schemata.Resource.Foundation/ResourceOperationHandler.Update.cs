@@ -49,6 +49,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return UpdateCoreAsync(ctx, name, request, principal, ct.Value, true);
     }
 
+    /// <summary>
+    ///     Runs update processing with an existing advisor context.
+    /// </summary>
+    /// <param name="ctx">The advisor context shared with the caller.</param>
+    /// <param name="name">The resource name.</param>
+    /// <param name="request">The update request DTO.</param>
+    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
+    /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     internal async Task<UpdateResultBase<TDetail>> UpdateCoreAsync(
         AdviceContext     ctx,
         string            name,
@@ -88,11 +98,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity == null) {
-            // TODO: Creates the resource addressed by an update whose target does not exist,
-            //     per https://google.aip.dev/134 <c>allow_missing</c>:
-            //     create-stage advisors run, every field applies, the update mask is ignored, and
-            //     the resource name comes from the request URI.
-
             throw ResourceNotFound(name);
         }
 
@@ -129,11 +134,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return responseResult ?? new() { Detail = detail };
     }
 
-    /// <summary>
-    ///     Maps AIP-161 field-mask paths to CLR member dot paths. Unknown paths and collection traversal fail
-    ///     with <c>INVALID_ARGUMENT</c>; empty segments (paths cleared by
-    ///     <see cref="Advisors.AdviceUpdateRequestSanitize" />) are skipped.
-    /// </summary>
     private static List<string> ResolveMaskFields(string mask) {
         try {
             return MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireMask.Convert).LeafPaths().ToList();

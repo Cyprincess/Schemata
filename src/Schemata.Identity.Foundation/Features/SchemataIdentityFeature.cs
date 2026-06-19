@@ -30,6 +30,10 @@ namespace Schemata.Identity.Foundation.Features;
 /// <summary>
 ///     Wires Schemata's Identity-backed API endpoints, controllers, and request advisors.
 /// </summary>
+/// <typeparam name="TUser">User entity type.</typeparam>
+/// <typeparam name="TRole">Role entity type.</typeparam>
+/// <typeparam name="TUserStore">User store implementation type.</typeparam>
+/// <typeparam name="TRoleStore">Role store implementation type.</typeparam>
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataTransportHttpFeature>]
 public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore> : FeatureBase
@@ -38,6 +42,7 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
     where TUserStore : class, IUserStore<TUser>
     where TRoleStore : class, IRoleStore<TRole>
 {
+    /// <summary>Default priority for identity feature startup.</summary>
     public const int DefaultPriority = Orders.Extension + 30_000_000;
 
     public override int Priority => DefaultPriority;

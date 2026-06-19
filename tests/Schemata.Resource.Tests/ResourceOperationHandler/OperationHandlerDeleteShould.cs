@@ -59,7 +59,7 @@ public class OperationHandlerDeleteShould
         var handler = _fixture.CreateHandler(services => {
             services.TryAddScoped<IResourceDeleteAdvisor<Student>, AdviceDeleteFreshness<Student>>();
         });
-        var entity = _fixture.Students[0]; // already has Timestamp set
+        var entity = _fixture.Students[0];
 
         await Assert.ThrowsAsync<ConcurrencyException>(() => handler.DeleteAsync(
                                                            entity.CanonicalName!, "W/\"wrongtag\"", null, null));
@@ -80,8 +80,7 @@ public class OperationHandlerDeleteShould
                              It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
                              It.IsAny<CancellationToken>()))
                   .ReturnsAsync(entity);
-        // Mirrors AdviceRemoveSoftDelete: removal of an ISoftDelete entity marks it
-        // deleted instead of deleting the row.
+        // Soft-delete removal stamps DeleteTime for ISoftDelete entities.
         repository.Setup(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()))
                   .Returns((TrashStudent e, CancellationToken _) => {
                        e.DeleteTime = DateTime.UtcNow;

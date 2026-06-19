@@ -7,6 +7,9 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Cel;
 
+/// <summary>
+///     Parses and compiles Common Expression Language expressions.
+/// </summary>
 public sealed class CelCompiler : IExpressionCompiler
 {
     #region IExpressionCompiler Members

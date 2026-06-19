@@ -4,7 +4,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     The tenant could not be resolved from the incoming request.
+///     The incoming request lacks a resolvable tenant.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.FAILED_PRECONDITION</c> (HTTP 400), per

@@ -24,6 +24,9 @@ namespace Schemata.Resource.Http.Features;
 [DependsOn<SchemataTransportHttpFeature>]
 public sealed class SchemataHttpResourceFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default endpoint priority for resource HTTP endpoints.
+    /// </summary>
     public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
@@ -71,7 +74,7 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
 
         // The CRUD provider is the IActionDescriptorChangeProvider; its Commit()
         // signals MVC to repopulate ALL controller feature providers, including
-        // the method provider just configured above.
+        // the method provider configured above.
         provider.Commit();
     }
 }

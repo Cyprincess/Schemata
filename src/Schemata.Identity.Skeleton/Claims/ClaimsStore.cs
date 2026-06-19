@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Schemata.Identity.Skeleton.Claims;
 
 /// <summary>
-///     A dictionary that maps claim types to their associated <see cref="ClaimStore" /> values.
+///     Maps claim types to their associated <see cref="ClaimStore" /> values.
 /// </summary>
 public sealed class ClaimsStore : Dictionary<string, ClaimStore>
 {

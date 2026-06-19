@@ -36,5 +36,4 @@ public class AdviceAddConcurrencyShould
 
         Assert.Equal(AdviseResult.Continue, result);
     }
-
 }

@@ -30,7 +30,6 @@ public sealed class ClientCredentialsFlowFeature<TApp> : IAuthorizationFlowFeatu
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_300;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

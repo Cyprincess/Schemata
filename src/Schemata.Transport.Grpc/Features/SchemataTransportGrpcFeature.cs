@@ -33,11 +33,11 @@ namespace Schemata.Transport.Grpc.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataTransportGrpcFeature : FeatureBase
 {
-    // protobuf-net code-first services expose their reflection descriptor through a
-    // generated static property with this fixed name.
     private const string DescriptorProperty = "Descriptor";
 
-    /// <summary>Second slot of the Extension priority range, adjacent to HTTP transport.</summary>
+    /// <summary>
+    ///     Default priority for the shared gRPC transport feature.
+    /// </summary>
     public const int DefaultPriority = Orders.Extension + 20_000_000;
 
     public override int Priority => DefaultPriority;

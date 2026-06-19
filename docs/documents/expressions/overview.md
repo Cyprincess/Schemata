@@ -1,11 +1,15 @@
 # Expressions Overview
 
-The expression compiler stack translates filter strings (AIP-160) and order-by strings (AIP-132) into LINQ `Expression<Func<TContext, TResult>>` trees that can be applied directly to `IQueryable<T>` queries. Three packages form the stack: `Schemata.Expressions.Skeleton` defines the contracts and shared cache; `Schemata.Expressions.Aip` implements the AIP language; `Schemata.Expressions.Cel` implements the CEL language. Additional languages can be registered via keyed DI.
+The expression stack compiles filter strings (AIP-160, CEL) into LINQ `Expression<Func<TContext, TResult>>` trees
+that apply directly to `IQueryable<T>` queries, and order-by strings (AIP-132) into ordering functions. Three
+packages form the stack: `Schemata.Expressions.Skeleton` holds the contracts and shared cache,
+`Schemata.Expressions.Aip` implements the AIP language, and `Schemata.Expressions.Cel` implements CEL. Each
+language registers as a keyed DI service.
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
+| --- | --- |
 | `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs`, `IExpressionTree.cs` |
 | `Schemata.Expressions.Skeleton` | `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `LruCache.cs` |
 | `Schemata.Expressions.Skeleton` | `ExpressionRuntime.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs` |
@@ -22,12 +26,13 @@ public interface IExpressionCompiler
     string Language { get; }
     IExpressionTree Parse(string source);
     Expression<Func<TContext, TResult>> Compile<TContext, TResult>(
-        IExpressionTree tree,
-        ExpressionCompileOptions? options = null);
+        IExpressionTree tree, ExpressionCompileOptions? options = null);
 }
 ```
 
-`Parse` produces an `IExpressionTree` (the AST). `Compile` converts the tree to a typed lambda. Both steps are cached independently so a tree parsed once can be compiled for multiple context types without re-parsing.
+`Parse` produces an `IExpressionTree` (the AST); `Compile` turns it into a typed lambda. The two steps are cached
+independently, so a tree parsed once can be compiled for several context types without re-parsing. `Language` is
+the DI registration key.
 
 ### `IOrderCompiler`
 
@@ -36,12 +41,23 @@ public interface IOrderCompiler
 {
     string Language { get; }
     Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(
-        string source,
-        ExpressionCompileOptions? options = null);
+        string source, ExpressionCompileOptions? options = null);
 }
 ```
 
-`CompileOrder` parses and compiles an order-by string directly to a `Func` that applies `OrderBy`/`ThenBy` chains to an `IQueryable<T>`.
+`CompileOrder` parses and compiles an order-by string into a function that applies an `OrderBy`/`ThenBy` chain.
+
+### `IExpressionTree`
+
+```csharp
+public interface IExpressionTree
+{
+    string Language { get; }
+}
+```
+
+The AST root type implements it. `AipParser`'s `Filter` and `CelNode` both carry a `Source` string used as the
+cache key on `Compile`.
 
 ### `ExpressionCompileOptions`
 
@@ -52,90 +68,74 @@ public sealed class ExpressionCompileOptions
 }
 ```
 
-Allows injecting custom named functions into the compiler. The AIP compiler checks `options.Functions` before falling back to built-ins (`timestamp`, `duration`). CEL does not currently support custom functions via this mechanism.
+`Functions` injects named `ExpressionFunction` factories into a compiler. Both the AIP and CEL compilers consult
+`options.Functions` and fold the function set into the cache key, so two option sets binding the same name to
+different delegates do not share a compiled result.
 
 ## `ExpressionCache`
 
-`ExpressionCache` is a process-wide static class with three LRU caches:
+`ExpressionCache` is a process-wide static with three LRU caches:
 
-| Cache | Capacity | Key type | Value type |
-|---|---|---|---|
+| Cache | Capacity | Key | Value |
+| --- | --- | --- | --- |
 | `Trees` | 500 | `ExpressionCacheKey` | `IExpressionTree` |
 | `Expressions` | 500 | `ExpressionCacheKey` | `LambdaExpression` |
-| `Delegates` | 200 | `LambdaExpression` (by reference) | `Delegate` |
-
-All three caches are process-wide singletons. They are not scoped to a request or a DI container.
+| `Delegates` | 200 | `LambdaExpression` (reference identity) | `Delegate` |
 
 ### Cache key
 
-`ExpressionCacheKey` is a SHA-256 hash of five inputs joined by the unit separator (`\u001f`):
+`ExpressionCacheKey.Create` joins five inputs with the unit separator (``) and returns their SHA-256 hash:
 
 ```
 language + source + contextType.AssemblyQualifiedName + resultType.AssemblyQualifiedName + options
 ```
 
-The `options` component is produced by `AipBuiltInFunctions.Fingerprint(options)`, which encodes the names and identity hash codes of any custom functions. Two compilations with the same source but different custom functions produce different keys.
+The `options` component is a fingerprint of the custom functions. `Parse` keys with null context/result/options;
+`Compile` keys with the full tuple.
 
 ### `LruCache<TKey, TValue>`
 
-`LruCache` is a thread-safe doubly-linked-list + dictionary LRU eviction cache. It uses a double-checked lock pattern: the first lock checks for a hit; if missed, the factory runs outside the lock; the second lock re-checks before inserting to handle concurrent compilation of the same key. The winner's value is stored; the loser's value is discarded.
+`LruCache` is a thread-safe doubly-linked-list plus dictionary with LRU eviction. `GetOrAdd` locks to check for a
+hit, runs the factory outside the lock on a miss, then re-checks under lock before inserting, so concurrent
+compilations of the same key produce one stored value.
 
 ### `ExpressionRuntime`
 
 ```csharp
 public static TResult Evaluate<TContext, TResult>(
-    Expression<Func<TContext, TResult>> expression,
-    TContext context)
+    Expression<Func<TContext, TResult>> expression, TContext context);
 ```
 
-`ExpressionRuntime.Evaluate` compiles the lambda to a delegate (via `ExpressionCache.GetOrAddDelegate`) and invokes it. Use this when you need to evaluate a compiled expression against a single object rather than an `IQueryable`.
+`Evaluate` resolves a compiled delegate from `ExpressionCache.GetOrAddDelegate` (keyed by lambda reference) and
+invokes it against one object.
 
 ## Registration
 
-### AIP
-
 ```csharp
-services.AddAipExpressions();
-// Registers:
-//   IExpressionCompiler keyed "aip" -> AipCompiler (singleton)
-//   IOrderCompiler keyed "aip"      -> AipOrderCompiler (singleton)
+services.AddAipExpressions();  // IExpressionCompiler + IOrderCompiler keyed "aip"
+services.AddCelExpressions();  // IExpressionCompiler keyed "cel"
 ```
 
-`SchemataResourceFeature` calls `services.AddAipExpressions()` automatically. You don't need to call it manually unless you're using the AIP compiler outside the resource system.
-
-### CEL
+`SchemataResourceFeature` calls `AddAipExpressions()` automatically. CEL is opt-in. Resolve a compiler by key:
 
 ```csharp
-services.AddCelExpressions();
-// Registers:
-//   IExpressionCompiler keyed "cel" -> CelCompiler (singleton)
+var aip = sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name); // "aip"
+var cel = sp.GetRequiredKeyedService<IExpressionCompiler>(CelLanguage.Name); // "cel"
 ```
 
-CEL has no `IOrderCompiler`. See [CEL](cel.md) for details.
+## Design rationale
 
-## Resolving compilers
-
-Compilers are registered as keyed singletons. Resolve them via:
-
-```csharp
-var compiler = sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
-var order    = sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name);
-```
-
-`AipLanguage.Name` is the string constant `"aip"`. `CelLanguage.Name` is `"cel"`.
-
-## Design motivation
-
-Separating `Parse` from `Compile` allows the tree cache to be shared across compilations for different context types. A filter string like `"grade > 3"` is parsed once and cached as an AST; it can then be compiled for `Student`, `Teacher`, or any other entity type without re-parsing.
-
-The delegate cache (capacity 200) is keyed by lambda reference identity, not by content. This is intentional: two structurally identical lambdas compiled from the same source will share the same `LambdaExpression` instance (because the expression cache returns the same object), so the delegate cache hit rate is high.
+Splitting `Parse` from `Compile` lets the tree cache serve many context types from one parse. The delegate
+cache is keyed by lambda reference identity: the expression cache returns the same `LambdaExpression`
+instance for identical inputs, so the delegate cache hit rate stays high.
 
 ## Caveats
 
-- All three caches are process-wide statics. They are never cleared. In long-running processes with many distinct filter strings, the caches will fill and evict older entries. The LRU eviction policy ensures the most recently used entries are retained.
-- `ExpressionCache` is not thread-safe for the factory call itself — two threads can race to compile the same key. The winner's result is stored; the loser's result is discarded. This is safe but means the factory may be called more than once for the same key under high concurrency.
-- CEL does not implement `IOrderCompiler`. Calling `GetRequiredKeyedService<IOrderCompiler>(CelLanguage.Name)` will throw `InvalidOperationException`.
-- `ResourceOperationHandler.ListAsync` is hard-wired to `AipLanguage.Name`. Registering a custom compiler under a different key does not affect the resource system's filter/order behavior.
+- The three caches are process-wide statics with LRU eviction; they are never explicitly cleared.
+- CEL implements `IExpressionCompiler` only, not `IOrderCompiler`. Resolving `IOrderCompiler` keyed by
+  `CelLanguage.Name` throws.
+- `ResourceOperationHandler.ListAsync` resolves both compilers by the fixed key `AipLanguage.Name`; a compiler
+  registered under another key does not affect the resource system.
 
 ## See also
 

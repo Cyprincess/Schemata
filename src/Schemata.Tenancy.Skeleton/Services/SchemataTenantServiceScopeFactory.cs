@@ -8,8 +8,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 /// <summary>
 ///     Creates service scopes using the tenant-isolated service provider when a tenant is resolved,
 ///     or the root provider otherwise. Tenant scopes hold an <see cref="ITenantProviderLease" />
-///     that is released on scope disposal so the underlying cached provider is never disposed
-///     out from under an active scope.
+///     that is released on scope disposal so active scopes keep their cached provider.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFactory<TTenant>
@@ -19,9 +18,7 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
     private readonly ITenantServiceProviderFactory<TTenant> _factory;
     private readonly IServiceProvider                       _root;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenantServiceScopeFactory{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates a scope factory that switches between root and tenant providers.</summary>
     public SchemataTenantServiceScopeFactory(
         IServiceProvider                       root,
         ITenantContextAccessor<TTenant>        accessor,

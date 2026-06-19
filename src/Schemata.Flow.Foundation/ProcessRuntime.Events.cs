@@ -16,14 +16,15 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>Coordinates process runtime operations against registered Flow engines.</summary>
 public sealed partial class ProcessRuntime
 {
     private async Task ProvisionFlowTransitionAsync(IServiceProvider services, FlowTransitionContext context, CancellationToken ct) {
         var advice = new AdviceContext(services);
 
         // Runs inside the transition's pre-commit window: each advisor provisions the wake-up
-        // infrastructure the new waiting state needs, and any failure propagates to abort the
-        // transition rather than leave the instance stranded.
+        // infrastructure the new waiting state needs. A failure aborts the transition before the
+        // instance can become stranded.
         await Advisor.For<IFlowTransitionAdvisor>()
                      .RunAsync(advice, context, ct);
     }

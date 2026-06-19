@@ -60,7 +60,9 @@ public class ClientSecretBasicHandlerShould
 
     [Fact]
     public async Task Authenticates_WithUrlEncodedValues() {
-        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "my client", ClientType = "confidential" };
+        var app = new SchemataApplication {
+            Uid = Identifiers.NewUid(), ClientId = "my client", ClientType = "confidential",
+        };
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
         manager.Setup(m => m.FindByClientIdAsync("my client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
         manager.Setup(m => m.ValidateClientSecretAsync(app, "my:secret", It.IsAny<CancellationToken>()))

@@ -14,7 +14,7 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
 ///     Looks up the tenant via <see cref="ITenantManager{TTenant}.FindByHost" />.
-///     Throws <see cref="TenantResolveException" /> when no matching tenant is found.
+///     Throws <see cref="TenantResolveException" /> when host lookup misses.
 /// </remarks>
 public class RequestHostResolver<TTenant> : ITenantResolver
     where TTenant : SchemataTenant
@@ -22,9 +22,7 @@ public class RequestHostResolver<TTenant> : ITenantResolver
     private readonly IHttpContextAccessor    _accessor;
     private readonly ITenantManager<TTenant> _manager;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="RequestHostResolver{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates a resolver that maps the current request host through tenant storage.</summary>
     public RequestHostResolver(IHttpContextAccessor accessor, ITenantManager<TTenant> manager) {
         _accessor = accessor;
         _manager  = manager;

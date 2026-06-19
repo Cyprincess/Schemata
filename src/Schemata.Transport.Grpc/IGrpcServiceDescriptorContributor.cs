@@ -10,6 +10,10 @@ namespace Schemata.Transport.Grpc;
 /// </summary>
 public interface IGrpcServiceDescriptorContributor
 {
-    /// <summary>Returns the descriptors to surface via gRPC server reflection.</summary>
+    /// <summary>
+    ///     Returns descriptors to surface via gRPC server reflection.
+    /// </summary>
+    /// <param name="serviceProvider">The application service provider.</param>
+    /// <returns>The contributed service descriptors.</returns>
     IReadOnlyList<ServiceDescriptor> GetServiceDescriptors(IServiceProvider serviceProvider);
 }

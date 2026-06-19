@@ -13,8 +13,18 @@ using WellKnownReflection = Google.Protobuf.WellKnownTypes;
 
 namespace Schemata.Resource.Grpc;
 
+/// <summary>
+///     Builds protobuf reflection descriptors for generated resource gRPC services.
+/// </summary>
 internal static class FileDescriptorBridge
 {
+    /// <summary>
+    ///     Builds service descriptors for the supplied closed resource service types.
+    /// </summary>
+    /// <param name="model">The protobuf-net model for inspecting serializable members.</param>
+    /// <param name="serviceTypes">Closed <see cref="IResourceService{TEntity,TRequest,TDetail,TSummary}" /> service types.</param>
+    /// <param name="options">Registered resource and custom-method metadata.</param>
+    /// <returns>The generated protobuf service descriptors.</returns>
     public static IReadOnlyList<ServiceDescriptor> BuildServiceDescriptors(
         RuntimeTypeModel model,
         Type[]           serviceTypes,

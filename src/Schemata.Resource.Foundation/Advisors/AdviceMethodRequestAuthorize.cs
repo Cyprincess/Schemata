@@ -38,6 +38,10 @@ public sealed class AdviceMethodRequestAuthorize<TEntity, TRequest> : IResourceM
 {
     private readonly IAccessProvider<TEntity, TRequest> _access;
 
+    /// <summary>
+    ///     Initializes a new instance with the access provider.
+    /// </summary>
+    /// <param name="access">The custom-method access provider.</param>
     public AdviceMethodRequestAuthorize(IAccessProvider<TEntity, TRequest> access) { _access = access; }
 
     #region IResourceMethodRequestAdvisor<TEntity,TRequest> Members

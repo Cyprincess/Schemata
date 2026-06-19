@@ -1,17 +1,13 @@
 # Multi-Engine Mapping
 
-## What you'll build
+Run one application against either mapping engine and switch between them with a single call. The
+`ISimpleMapper` surface, the mapping declarations, and the field-mask behavior are identical across
+AutoMapper and Mapster, so handler code never changes.
 
-A Schemata application that starts with Mapster as the mapping engine, then switches to AutoMapper with a single call change. You'll also configure an `UpdateMask` so partial updates only overwrite the fields the client explicitly sends.
+This recipe assumes the DTOs and `Map<,>` declarations from
+[Object Mapping](../guides/object-mapping.md).
 
-## Prerequisites
-
-- The Student example from [Getting Started](../guides/getting-started.md) is running.
-- NuGet packages: `Schemata.Mapping.Foundation`, plus either `Schemata.Mapping.Mapster` or `Schemata.Mapping.AutoMapper`.
-
-## Step 1: Enable the mapping subsystem with Mapster
-
-Call `UseMapster()` on the `SchemataBuilder`. This is a shorthand that calls `UseMapping().UseMapster()` internally.
+## Start with Mapster
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -19,82 +15,92 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseLogging();
         schema.UseRouting();
         schema.UseControllers();
-        schema.UseMapster();
-        schema.UseResource().MapHttp().Use<Student, StudentRequest, StudentDetail, StudentSummary>();
+        schema.UseMapster()
+              .Map<Student, StudentDetail>()
+              .Map<Student, StudentSummary>()
+              .Map<StudentRequest, Student>();
+        schema.UseResource()
+              .MapHttp()
+              .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
     });
 ```
 
-`UseMapster()` registers a `TypeAdapterConfig` singleton with `IgnoreNullValues(true)` and `PreserveReference(true)` applied globally, then adds `SchemataMappingFeature<SimpleMapper>`.
+`UseMapster()` clones `TypeAdapterConfig.GlobalSettings`, applies
+`Default.IgnoreNullValues(true).PreserveReference(true)`, runs `MapsterConfigurator.Configure`, and
+registers the result as a singleton. It then adds `SchemataMappingFeature<SimpleMapper>`, which
+registers `ISimpleMapper` as scoped.
 
-**Assertion:** Start the app and `POST /students` with a partial body. Fields absent from the request body are not overwritten on the entity because Mapster skips null source values.
+## Switch to AutoMapper
 
-## Step 2: Switch to AutoMapper
-
-Replace `UseMapster()` with `UseAutoMapper()`. No other code changes are required.
-
-```csharp
-schema.UseAutoMapper();
-```
-
-`UseAutoMapper()` registers a `MapperConfiguration` singleton built from `SchemataMappingOptions`, then adds the same `SchemataMappingFeature<SimpleMapper>`. The `ISimpleMapper` abstraction is identical from the handler's perspective.
-
-**Assertion:** The app starts and maps correctly. AutoMapper logs its configuration at startup via the `ILoggerFactory` passed to `MapperConfiguration`.
-
-## Step 3: Define explicit field maps
-
-Both engines read from `SchemataMappingOptions`. Register field maps before calling `UseAutoMapper()` or `UseMapster()`:
+Replace the engine call. The `Map<,>` declarations move onto `UseAutoMapper()` unchanged:
 
 ```csharp
-schema.Services.Configure<SchemataMappingOptions>(o => {
-    o.Add<StudentRequest, Student>()
-     .For(dest => dest.DisplayName)
-     .From(src => src.FullName);
-});
-schema.UseAutoMapper();
+schema.UseAutoMapper()
+      .Map<Student, StudentDetail>()
+      .Map<Student, StudentSummary>()
+      .Map<StudentRequest, Student>();
 ```
 
-`Map<TSource, TDestination>.Compile()` validates that every non-ignored, non-converter field mapping has a source expression. It throws `InvalidOperationException` at startup if a destination field is declared without a source.
+`UseAutoMapper()` builds a `MapperConfiguration` singleton from the same `SchemataMappingOptions`,
+applying a global null-skip `Condition` and `PreserveReferences()`, then adds the same feature. Both
+engines satisfy `ISimpleMapper`, so the resource handler is unaffected.
 
-**Assertion:** Rename a field in the map and restart. The app throws at startup rather than silently producing wrong data at runtime.
+> AutoMapper validates its configuration when the singleton is built at startup. A field mapping
+> that lacks a source expression throws `InvalidOperationException` from `Map<,>.Compile()` before
+> the first request, naming the destination type.
 
-## Step 4: Apply an UpdateMask for partial updates
+## Custom field mappings carry over
 
-`SimpleMapperHelper.MapWithMask` is the mechanism behind partial updates. The resource handler calls it when the request carries an `UpdateMask`. You don't need to call it directly, but understanding it helps when writing custom advisors.
+Declarations use the engine-agnostic `For`/`From`/`Ignore`/`With` surface, so the same block works
+on either engine:
 
 ```csharp
-// Illustrative: what the handler does internally
-SimpleMapperHelper.MapWithMask(
-    source:      request,
-    destination: entity,
-    mask:        request.UpdateMask.Paths,   // e.g. ["display_name", "description"]
-    mapAction:   (src, dest) => mapper.Map(src, dest)
-);
+.Map<StudentRequest, Student>(map => {
+    map.For(d => d.FullName).From(s => s.FullName);
+    map.For(d => d.Nickname).Ignore((s, _) => s.FullName == "Hidden");
+})
 ```
 
-The helper saves the current values of all writable properties on `destination` that are **not** in the mask, runs the full map, then restores the saved values. Only the masked fields end up changed.
+`AutoMapperConfigurator` and `MapsterConfigurator` translate these to `ForMember`/`ConvertUsing`
+and `Map`/`Ignore`/`MapWith` respectively. A field with no source expression, ignore, or converter
+fails `Compile()` at startup on both engines.
 
-**Assertion:** Send a `PATCH /students/{name}` with `update_mask: { paths: ["display_name"] }`. Inspect the entity after the call. Only `DisplayName` changed; all other fields retain their pre-update values.
+## Field masks behave identically
 
-## Step 5: Verify the engine is active
+A `PATCH` carrying `update_mask` flows through `ISimpleMapper.Map(request, entity, fields)`, which
+both adapters route through `SimpleMapperHelper.MapWithMask`. The resource handler converts the
+wire-format mask (`update_mask: "full_name"`) to CLR property paths with `MaskTree.FromWire` before
+the call, so the mask you send is `snake_case` and the mapper receives CLR names. An unknown mask
+path is rejected as an invalid `update_mask`.
 
-Both engines register `ICacheProvider` under the same `ISimpleMapper` interface. To confirm which engine is active at runtime:
+```shell
+curl -X PATCH http://localhost:5000/students/<name> \
+     -H "Content-Type: application/json" \
+     -d '{"full_name":"Updated","update_mask":"full_name"}'
+```
+
+Only `full_name` changes. Masked fields are authoritative — a null source value for a masked field
+clears the destination — while unmasked fields keep their pre-update values. Nested paths such as
+`profile.display_name` traverse one level of objects; collection-element traversal is rejected.
+
+## Confirm the active engine
 
 ```csharp
 app.MapGet("/debug/mapper", (ISimpleMapper mapper) => mapper.GetType().FullName);
 ```
 
-**Assertion:** The response contains `AutoMapper.SimpleMapper` or `Mapster.SimpleMapper` depending on which `Use*` call is in startup.
+The response is `Schemata.Mapping.AutoMapper.SimpleMapper` or `Schemata.Mapping.Mapster.SimpleMapper`,
+matching the `Use*` call in startup.
 
-## Common pitfalls
+## Pitfalls
 
-- **Calling both `UseAutoMapper()` and `UseMapster()`** registers two `SchemataMappingFeature<SimpleMapper>` instances. The second `TryAddSingleton` call for the engine config is silently ignored, so whichever engine was registered first wins. Call only one.
-- **`Map.Compile()` throws at startup, not at map time.** A missing source expression on a non-ignored field is a startup error, not a runtime null. Check the exception message for the destination type name.
-- **`IgnoreNullValues` is Mapster-only.** AutoMapper skips null source members only when you configure `AllowNullCollections` or use `Condition`. If you rely on null-skip behavior, test after switching engines.
-- **`UpdateMask` paths are wire names (snake_case).** The mask paths arrive as `display_name`, not `DisplayName`. `SimpleMapperHelper` uses `StringComparer.OrdinalIgnoreCase` against the CLR property name, so the casing mismatch is handled, but the underscore-to-PascalCase conversion is not. Pass CLR property names in the mask or use the `SchemataNaming.ToClrMemberName` helper before calling `MapWithMask`.
+- `SchemataMappingFeature<T>` registers `ISimpleMapper` with `TryAddScoped`, so the first engine
+  added wins. Call exactly one of `UseAutoMapper()` and `UseMapster()`.
+- A masked field overwrites even when the request omits it: an absent JSON field deserializes to
+  null, and a masked null leaf clears the destination. Mask only the fields the client means to set.
 
 ## See also
 
-- [Object Mapping guide](../guides/object-mapping.md)
 - [Mapping overview](../documents/mapping/overview.md)
 - [AutoMapper adapter](../documents/mapping/automapper.md)
 - [Mapster adapter](../documents/mapping/mapster.md)

@@ -7,9 +7,8 @@ namespace Schemata.Tenancy.Skeleton.Services;
 
 /// <summary>
 ///     <see cref="ITenantContextAccessor{TTenant}" /> implementation used inside per-tenant
-///     service providers. The tenant value is bound at construction; HTTP-based resolution
-///     is skipped because the tenant has already been resolved by the request pipeline before
-///     the tenant scope was created.
+///     service providers. The tenant value is bound at construction after request-pipeline
+///     resolution.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 public sealed class TenantBoundContextAccessor<TTenant> : ITenantContextAccessor<TTenant>

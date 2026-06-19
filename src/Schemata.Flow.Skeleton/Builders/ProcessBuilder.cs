@@ -79,6 +79,10 @@ public static class ProcessBuilder
         return new(definition, mergeGateway);
     }
 
+    /// <summary>Creates a branch guarded by a typed variable predicate.</summary>
+    /// <typeparam name="T">The variable type resolved from the condition context.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="predicate">The predicate evaluated against the typed variable value.</param>
     public static Branch When<T>(this ProcessDefinition definition, Func<T, bool> predicate)
         where T : class {
         var key = typeof(T).Name.Underscore().ToLowerInvariant();

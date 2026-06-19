@@ -7,6 +7,8 @@ using Schemata.Identity.Skeleton.Services;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
+/// <summary>Coordinates identity operations with ASP.NET Core Identity managers and Schemata advisors.</summary>
+/// <typeparam name="TUser">User entity type handled by the identity manager.</typeparam>
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
@@ -16,6 +18,12 @@ public sealed partial class IdentityHandler<TUser>
     private readonly IServiceProvider           _sp;
     private readonly SchemataUserManager<TUser> _users;
 
+    /// <summary>Creates an identity operation handler.</summary>
+    /// <param name="users">User manager for account operations.</param>
+    /// <param name="sign">Sign-in manager for credential operations.</param>
+    /// <param name="mail">Mail sender for email codes.</param>
+    /// <param name="message">Message sender for phone codes.</param>
+    /// <param name="sp">Service provider used by advisor contexts.</param>
     public IdentityHandler(
         SchemataUserManager<TUser> users,
         SignInManager<TUser>       sign,

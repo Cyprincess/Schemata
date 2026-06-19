@@ -3,7 +3,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     One or more request arguments were invalid or malformed.
+///     One or more request arguments are invalid or malformed.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.INVALID_ARGUMENT</c> (HTTP 400), per

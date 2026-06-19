@@ -19,6 +19,9 @@ namespace Schemata.Core.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for MVC controller endpoints.
+    /// </summary>
     public const int DefaultPriority = SchemataSessionFeature<ISessionStore>.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

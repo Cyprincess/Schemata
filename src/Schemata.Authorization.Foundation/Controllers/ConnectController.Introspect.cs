@@ -8,8 +8,12 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains the token introspection endpoint action.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles token introspection requests.</summary>
     [HttpPost("Introspect")]
     public async Task<IActionResult> Introspect([FromForm] IntrospectRequest request, CancellationToken ct) {
         var handler = HttpContext.RequestServices.GetService<IntrospectionEndpoint>();

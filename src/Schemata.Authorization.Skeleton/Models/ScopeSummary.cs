@@ -6,8 +6,10 @@ namespace Schemata.Authorization.Skeleton.Models;
 /// <summary>List item for <see cref="Entities.SchemataScope" />.</summary>
 public class ScopeSummary : IIdentifier, ICanonicalName, ITimestamp
 {
+    /// <summary>Display name shown for the scope.</summary>
     public string? DisplayName { get; set; }
 
+    /// <summary>Description shown for the scope.</summary>
     public string? Description { get; set; }
 
     #region ICanonicalName Members

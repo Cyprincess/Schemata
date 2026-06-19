@@ -13,6 +13,7 @@ public static class OperationMapper
     private const int CodeCancelled = 1;
     private const int CodeUnknown   = 2;
 
+    /// <summary>Creates an AIP-151 operation envelope from a scheduler execution row.</summary>
     public static Operation FromExecution(SchemataJobExecution execution) {
         var operation = new Operation {
             Name          = execution.Name ?? execution.Uid.ToString("n"),

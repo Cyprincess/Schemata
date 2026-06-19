@@ -9,7 +9,7 @@ namespace Schemata.Scheduling.Skeleton;
 public sealed class PeriodicSchedule : IScheduleDefinition
 {
     /// <summary>Creates a periodic schedule with the given <paramref name="interval" /> and optional UTC-normalized anchor.</summary>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="interval" /> is not positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="interval" /> is zero or negative.</exception>
     public PeriodicSchedule(TimeSpan interval, DateTime? startTime = null) {
         if (interval <= TimeSpan.Zero) {
             throw new ArgumentOutOfRangeException(nameof(interval), interval, "Periodic interval must be positive.");
@@ -22,7 +22,7 @@ public sealed class PeriodicSchedule : IScheduleDefinition
     /// <summary>Fire interval.</summary>
     public TimeSpan Interval { get; }
 
-    /// <summary>UTC anchor used to compute interval boundaries; falls back to first registration time when <c>null</c>.</summary>
+    /// <summary>UTC anchor for interval boundaries; <c>null</c> uses the first registration time.</summary>
     public DateTime? StartTime { get; }
 
     #region IScheduleDefinition Members

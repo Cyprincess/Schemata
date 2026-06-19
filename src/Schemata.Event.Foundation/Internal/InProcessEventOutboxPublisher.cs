@@ -19,6 +19,9 @@ using Schemata.Event.Skeleton.Advisors;
 namespace Schemata.Event.Foundation.Internal;
 
 /// <summary>Replays outbox rows through in-process event handlers.</summary>
+/// <param name="services">Root service provider for creating replay scopes.</param>
+/// <param name="json">JSON options for deserializing event payloads.</param>
+/// <param name="logger">Logger for observer failures.</param>
 public sealed class InProcessEventOutboxPublisher(
     IServiceProvider                        services,
     IOptions<JsonSerializerOptions>         json,
@@ -63,8 +66,7 @@ public sealed class InProcessEventOutboxPublisher(
             eventCtx.Result = true;
         } catch (Exception ex) {
             // An in-process replay handler failure is terminal: the consume path records the row as
-            // Failed and the outbox does not retry application logic, so the exception is captured
-            // rather than rethrown.
+            // Failed and the outbox leaves application logic failures to the audit record.
             eventCtx.Exception = ex;
         } finally {
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
@@ -148,13 +150,6 @@ public sealed class InProcessEventOutboxPublisher(
         };
     }
 
-    /// <summary>
-    ///     Replay-time stand-in for the originating business entity. Exposes the persisted source
-    ///     fields through <see cref="ISourceReference" />, and projects them onto
-    ///     <see cref="ICanonicalName" /> and <see cref="IConcurrency" /> so observers and handlers
-    ///     can read the canonical name and concurrency timestamp through the same interfaces
-    ///     they use on live entities.
-    /// </summary>
     private sealed class SourceSnapshot : ISourceReference, ICanonicalName, IConcurrency
     {
         #region ICanonicalName Members

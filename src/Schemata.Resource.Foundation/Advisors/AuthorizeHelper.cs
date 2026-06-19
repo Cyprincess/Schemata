@@ -26,8 +26,8 @@ internal static class AuthorizeHelper
     /// <summary>
     ///     Executes the AIP-211 check. If primary access is granted, returns silently. Otherwise performs a
     ///     parent-read probe by re-asking the same access provider with <see cref="Operations.Get" /> —
-    ///     this lets implementations distinguish "can see existence" from "cannot see existence" without
-    ///     requiring the advisor to know the parent's entity type. Parent pass throws
+    ///     this lets implementations distinguish "can see existence" from "cannot see existence" while
+    ///     the advisor stays independent of the parent's entity type. Parent pass throws
     ///     <see cref="AuthorizationException" /> (visible existence → disclose the missing permission);
     ///     parent fail throws <see cref="NotFoundException" /> (hide existence entirely).
     /// </summary>

@@ -28,7 +28,6 @@ public sealed class BackChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowF
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 60_200;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

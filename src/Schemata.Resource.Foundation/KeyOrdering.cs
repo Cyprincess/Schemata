@@ -12,9 +12,8 @@ namespace Schemata.Resource.Foundation;
 /// <summary>
 ///     Appends a deterministic key ordering to list queries so skip/take pagination
 ///     is stable per <seealso href="https://google.aip.dev/132">AIP-132</seealso> and
-///     <seealso href="https://google.aip.dev/158">AIP-158</seealso>: providers return rows in an
-///     unspecified order when no <c>ORDER BY</c> is present, drifting page boundaries
-///     between calls. Key properties come from
+///     <seealso href="https://google.aip.dev/158">AIP-158</seealso>: provider-default row order
+///     can drift page boundaries between calls. Key properties come from
 ///     <see cref="RepositoryBase.KeyPropertiesCache" /> (class-level primary key
 ///     attribute, then <see cref="IIdentifier.Uid" />), falling back to
 ///     <see cref="ICanonicalName.Name" />.

@@ -7,7 +7,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Security.Foundation;
 
-/// <summary>No-op entitlement provider; returns null (no row-level filtering).</summary>
+/// <summary>Provides the default entitlement expression that leaves repository queries unfiltered.</summary>
 public sealed class DefaultEntitlementProvider<T, TRequest> : IEntitlementProvider<T, TRequest>
 {
     #region IEntitlementProvider<T,TRequest> Members

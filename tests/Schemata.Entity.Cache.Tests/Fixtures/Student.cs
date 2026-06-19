@@ -11,6 +11,7 @@ public class Student : IIdentifier
     public int     Age      { get; set; }
 
     #region IIdentifier Members
+
     public Guid Uid { get; set; }
 
     #endregion

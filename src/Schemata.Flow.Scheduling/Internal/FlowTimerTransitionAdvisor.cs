@@ -17,16 +17,17 @@ namespace Schemata.Flow.Scheduling.Internal;
 /// <summary>
 ///     Schedules and cancels jobs for BPMN intermediate timer catches as instances transition.
 ///     Only timer-catch transitions touch the scheduler; such a transition raises
-///     <c>FAILED_PRECONDITION</c> when no <see cref="IScheduler" /> is registered, while
-///     transitions that involve no timer pass through untouched. Boundary timer events are not
-///     bridged because the single-token state machine waits at the host activity, not the
-///     boundary catch. Multi-token engines plugged in via keyed <c>IFlowRuntime</c> may bridge
-///     boundary timers by following the intermediate-catch scheduling pattern.
+///     <c>FAILED_PRECONDITION</c> when the <see cref="IScheduler" /> service is absent, while
+///     transitions outside timer catches pass through untouched. The single-token state machine
+///     waits at the host activity for boundary timer events. Multi-token engines plugged in via
+///     keyed <c>IFlowRuntime</c> may bridge boundary timers by following the intermediate-catch
+///     scheduling pattern.
 /// </summary>
 public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
 {
     private readonly IServiceProvider _services;
 
+    /// <summary>Creates an advisor that schedules Flow timer jobs through the service provider.</summary>
     public FlowTimerTransitionAdvisor(IServiceProvider services) {
         _services = services;
     }
@@ -41,8 +42,8 @@ public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
         var definition = context.Definition;
 
         // Resolve the timer-catch job left behind (if any), keyed by its id so sibling timers
-        // in the same instance do not unschedule one another. A non-timer element has no job,
-        // so there is nothing to remove and no need for a scheduler.
+        // in the same instance keep distinct scheduled jobs. Non-timer elements leave the
+        // scheduler untouched.
         string? previousTimerJob = null;
         if (!string.IsNullOrEmpty(context.PreviousWaitingAtId)
          && context.PreviousWaitingAtId != instance.WaitingAtId

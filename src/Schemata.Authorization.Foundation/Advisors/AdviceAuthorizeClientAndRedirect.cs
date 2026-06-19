@@ -17,6 +17,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceAuthorizeClientAndRedirect{TApp}" />.</summary>
 public static class AdviceAuthorizeClientAndRedirect
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 }
 
@@ -55,7 +56,6 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
 {
     #region IAuthorizeAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeClientAndRedirect.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

@@ -1,128 +1,136 @@
 # HTTP Transport
 
-The HTTP transport exposes resources as REST endpoints via dynamically generated MVC controllers. Calling `MapHttp()` on `SchemataResourceBuilder` registers `SchemataHttpResourceFeature` (Priority `SchemataResourceFeature.DefaultPriority + 100_000` = 490,100,000), which synthesizes a `ResourceController<TEntity, TRequest, TDetail, TSummary>` instance for each registered resource at application startup.
+The HTTP transport exposes resources as REST endpoints through MVC controllers synthesized per resource at
+startup. `MapHttp()` on `SchemataResourceBuilder` adds `SchemataHttpResourceFeature`, which builds a
+`ResourceController<TEntity, TRequest, TDetail, TSummary>` for each registered resource.
 
 ## Where the code lives
 
 | Package | Key files |
-|---|---|
-| `Schemata.Resource.Http` | `SchemataHttpResourceBuilder.cs` |
-| `Schemata.Resource.Http` | `Features/SchemataHttpResourceFeature.cs` |
-| `Schemata.Resource.Http` | `Extensions/SchemataResourceBuilderExtensions.cs` |
-| `Schemata.Resource.Http` | `Extensions/SchemataHttpResourceBuilderExtensions.cs` |
-| `Schemata.Resource.Http` | `ResourceController.cs` |
-| `Schemata.Resource.Http` | `ResourceControllerConvention.cs` |
-| `Schemata.Resource.Http` | `ResourceControllerFeatureProvider.cs` |
-| `Schemata.Resource.Http` | `ResourceMethodController.cs` |
-| `Schemata.Resource.Http` | `ResourceMethodControllerConvention.cs` |
-| `Schemata.Resource.Http` | `ResourceMethodControllerFeatureProvider.cs` |
+| --- | --- |
+| `Schemata.Resource.Http` | `Features/SchemataHttpResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs` |
+| `Schemata.Resource.Http` | `ResourceController.cs`, `ResourceControllerConvention.cs`, `ResourceControllerFeatureProvider.cs` |
+| `Schemata.Resource.Http` | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs` |
+| `Schemata.Resource.Http` | `Internal/ResourceHttpConventionHelper.cs` |
+| `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`, `SchemataJsonTraits.cs` |
 
-## Setup
+## Activation
 
 ```csharp
-builder.UseSchemata(schema => {
-    schema.UseLogging();
-    schema.UseRouting();
-    schema.UseControllers();
-    schema.UseResource()
-          .MapHttp()
-          .Use<Student>();
-});
+schema.UseResource()
+      .MapHttp()
+      .Use<Student>();
 ```
 
-`MapHttp()` is an extension on `SchemataResourceBuilder` that adds `SchemataHttpResourceFeature` and returns a `SchemataHttpResourceBuilder`. Subsequent `Use<...>()` calls on the HTTP builder register resources tagged with `HttpResourceAttribute.Name` so the HTTP feature provider knows to synthesize controllers for them.
+`MapHttp()` adds `SchemataHttpResourceFeature` (`DefaultPriority = SchemataResourceFeature.DefaultPriority +
+100_000`) and returns the same `SchemataResourceBuilder`, so registrations and transports chain without an
+intermediate builder. A plain `Use<...>()` exposes the resource on every active transport; to restrict it to
+HTTP, pass a selector — `Use<Student>(r => r.MapHttp())` — which tags the resource with
+`HttpResourceAttribute.Name` (`"HTTP"`) so the feature provider synthesizes a controller for it.
 
-## `SchemataHttpResourceFeature`
-
-`SchemataHttpResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportHttpFeature` via `[DependsOn<T>]`. The transport feature carries the MVC exception handler, the JSON wire-name traits (`SchemataJsonTraits`), and `SchemataControllersFeature` (transitively); the resource HTTP feature focuses on dynamic controller synthesis on top of it.
-
-`ConfigureServices` registers:
-
-- `ResourceControllerFeatureProvider` as a singleton `IApplicationFeatureProvider<ControllerFeature>` and `IActionDescriptorChangeProvider`.
-- `ResourceControllerConvention` via `MvcOptions.Conventions`, passing the configured authentication scheme.
-
-`ConfigureApplication` reads `SchemataResourceOptions.Resources`, assigns it to `ResourceControllerFeatureProvider.Resources`, and calls `provider.Commit()` to signal MVC that the controller set has changed. MVC rebuilds its action descriptor cache before the first request is served.
+`SchemataHttpResourceFeature` declares `[DependsOn]` on `SchemataResourceFeature` and `SchemataTransportHttpFeature`.
+The transport feature (`DefaultPriority = Orders.Extension + 10_000_000`) installs the exception handler and the
+JSON wire-name traits. `ConfigureServices` registers `ResourceControllerFeatureProvider` and
+`ResourceMethodControllerFeatureProvider`, and adds `ResourceControllerConvention` and
+`ResourceMethodControllerConvention` to `MvcOptions.Conventions`. `ConfigureApplication` assigns the discovered
+resources and methods to the providers and calls `Commit()` so MVC rebuilds its action-descriptor cache before
+the first request.
 
 ## Controller synthesis
 
-`ResourceControllerFeatureProvider.PopulateFeature` iterates `Resources` and, for each resource whose `Endpoints` list includes `HttpResourceAttribute.Name` (or is `null`, meaning all transports), calls:
+`ResourceControllerFeatureProvider.PopulateFeature` iterates the registered resources and, for each whose
+`Endpoints` includes `HttpResourceAttribute.Name` (or is `null`, meaning all transports), adds a closed
+controller type:
 
 ```csharp
-var controller = typeof(ResourceController<,,,>)
-    .MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
-    .GetTypeInfo();
-feature.Controllers.Add(controller);
+typeof(ResourceController<,,,>).MakeGenericType(resource.Entity, resource.Request, resource.Detail, resource.Summary);
 ```
 
-A controller is skipped if a controller with the same name (the resource's `Plural` form) or the entity's `{Name}Controller` already exists in the feature — this lets you provide a hand-written controller that overrides the generated one.
+`Commit()` cancels and replaces a `CancellationTokenSource`, firing the `IActionDescriptorChangeProvider` change
+token so MVC refreshes its route table. Adding the closed types directly to `ControllerFeature` is how they escape
+the `Schemata.*` application-part stripping done by `SchemataControllersFeature`.
 
-`Commit()` cancels the current `CancellationTokenSource` and creates a new one, which triggers `IActionDescriptorChangeProvider.GetChangeToken()` to fire and causes MVC to refresh its route table.
+## Routing and method mapping
 
-## Route conventions
+`ResourceControllerConvention` rewrites only `ResourceController<,,,>` instances. For each it sets
+`ControllerName` to the descriptor's `Plural`, builds the route from `ResourceHttpConventionHelper.BuildControllerRoute`
+— `~/v1/{package}/{collectionPath}` when a package is set, otherwise `~/v1/{collectionPath}` — and drops actions
+for verbs excluded by `ResourceAttribute.Operations`.
 
-`ResourceControllerConvention` implements `IControllerModelConvention` and rewrites routes only for `ResourceController<,,,>` instances. For each such controller:
+| Method | Route | Action | AIP |
+| --- | --- | --- | --- |
+| `GET` | `/v1/{collectionPath}` | `ListAsync([FromQuery] ListRequest)` | AIP-132 |
+| `POST` | `/v1/{collectionPath}` | `CreateAsync([FromBody] TRequest)` → `201 Created` | AIP-133 |
+| `GET` | `/v1/{collectionPath}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)` | AIP-131 |
+| `PATCH` | `/v1/{collectionPath}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | AIP-134 |
+| `DELETE` | `/v1/{collectionPath}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery(Name = "allow_missing")] bool allowMissing)` | AIP-135 |
 
-1. `controller.ControllerName` is set to `descriptor.Plural` (e.g., `"Students"`).
-2. The route template is set to `~/{package}/{collectionPath}` when a package is configured, or `~/{collectionPath}` otherwise. A `Book` entity with pattern `"publishers/{publisher}/books/{book}"` and package `"library"` gets route `~/library/publishers/{publisher}/books`.
-3. If the entity has `[RateLimitPolicy]`, `EnableRateLimitingAttribute` is added to the controller's selectors.
-4. If an authentication scheme is configured via `WithAuthorization(scheme)`, an `AuthorizeFilter` with an always-pass assertion policy is added. This forces ASP.NET Core to run the authentication middleware for the scheme before the controller action executes; actual authorization decisions happen in the advisor pipeline.
+For a flat resource `CollectionPath` is the plural (`students`), so the routes are `/v1/students` and
+`/v1/students/{name}`. For a nested pattern such as `publishers/{publisher}/books/{book}` the route is
+`/v1/publishers/{publisher}/books` and `{publisher}` becomes a route parameter.
 
-## `ResourceController<TEntity, TRequest, TDetail, TSummary>`
+Each action passes `HttpContext.User` and `HttpContext.RequestAborted` to the handler. `ListAsync` fills
+`request.Parent` from route values; `CreateAsync` calls `SetParentFromRouteValues`; `UpdateAsync` reads the ETag
+from `request.EntityTag`, then the `etag` query parameter, then the `If-Match` header; `DeleteAsync` reads the
+ETag from the `etag` query parameter, then `If-Match`. A soft delete returns `200` with the detail; a hard delete
+returns `204`.
 
-The generated controller exposes five actions:
+### Custom methods
 
-| HTTP method | Route | Action | Returns |
-|---|---|---|---|
-| `GET` | `/{collection}` | `ListAsync([FromQuery] ListRequest)` | `JsonResult(ListResultBase<TSummary>)` |
-| `GET` | `/{collection}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)` | `JsonResult(TDetail)` |
-| `POST` | `/{collection}` | `CreateAsync([FromBody] TRequest)` | `JsonResult(TDetail)` with `201 Created` |
-| `PATCH` | `/{collection}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | `JsonResult(TDetail)` |
-| `DELETE` | `/{collection}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag)` | `200` with the updated resource for soft deletes, `204 No Content` for hard deletes |
+`ResourceMethodControllerFeatureProvider` synthesizes one closed
+`ResourceMethodController<TEntity, TRequest, TResponse, THandler>` per declared method.
+`ResourceMethodControllerConvention` sets each action's absolute route template:
 
-All actions delegate to `ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>`, passing `HttpContext.User` as the principal and `HttpContext.RequestAborted` as the cancellation token.
+| Scope | Route |
+| --- | --- |
+| `Instance` | `~/v1/{package}/{collectionPath}/{name}:{verb}` |
+| `Collection` | `~/v1/{package}/{collectionPath}:{verb}` |
 
-`ListAsync` auto-populates `request.Parent` from route values so nested resources (`/publishers/{publisher}/books`) are scoped to the parent without the client supplying it.
+Methods are `POST` by default; a `ResourceMethodAttribute.Method` of `ResourceHttpMethod.Get` rebinds the request
+from the body to the query string and constrains the verb to `GET`. The verb is carried to runtime as
+`ResourceMethodVerbMetadata`, and the controller dispatches through `ResourceMethodOperationHandler`. See
+[Custom Methods](custom-methods.md).
 
-`CreateAsync` calls `ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(request, routeValues)` to populate parent properties on the request from the route.
+## Request and response wire format
 
-`UpdateAsync` reads the ETag from `request.EntityTag`, then falls back to the `etag` query parameter, then to the `If-Match` request header.
+`SchemataJsonTraits.Apply` is applied to `JsonSerializerOptions`, `Microsoft.AspNetCore.Http.Json.JsonOptions`,
+and `Microsoft.AspNetCore.Mvc.JsonOptions` by `SchemataTransportHttpFeature`. It adds a type-info modifier that
+runs each property through `ResourceWireNameRules.Resolve`: `ICanonicalName.Name` is dropped, `CanonicalName`
+serializes as `name`, `IFreshness.EntityTag` as `etag`, and `IEntitiesResult<T>.Entities` as the resource plural
+(e.g. `students`). The configured `PropertyNamingPolicy` (snake_case) then applies to the remaining names.
+`ResourceController` serializes through MVC's `JsonResult`, which picks up these options.
 
-`DeleteAsync` reads the ETag from the `etag` query parameter, then falls back to the `If-Match` header.
+## Error mapping
 
-## Custom methods
+`SchemataTransportHttpFeature.ConfigureApplication` registers `app.UseExceptionHandler`. The handler reads
+`IExceptionHandlerPathFeature.Error`; a non-`SchemataException` is wrapped as a 500
+`SchemataException(ErrorCodes.Internal)`. It sets `Response.StatusCode = ex.Code`, content type
+`application/json`, and writes the body from `ex.CreateErrorResponse(context.TraceIdentifier)`. A handler that
+returns `Block` without throwing surfaces as `NotFoundException` (404), hiding the resource's existence per
+AIP-211.
 
-Each `[ResourceMethod(verb, handler, scope)]` on the entity yields one synthesized closed `ResourceMethodController<TEntity, TRequest, TResponse, THandler>` through `ResourceMethodControllerFeatureProvider`. `ResourceMethodControllerConvention` rewrites its route to `~/v1/{package}/{collectionPath}` and the action template to `{name}:{verb}` for `ResourceMethodScope.Instance` or `:{verb}` for `ResourceMethodScope.Collection`. All custom methods are `POST` and dispatch through `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>` before reaching the registered `IResourceMethodHandler<TEntity, TRequest, TResponse>`.
+## Reflection and metadata
 
-| Scope | HTTP method | Route |
-|---|---|---|
-| `Instance` | `POST` | `~/v1/{package}/{collectionPath}/{name}:{verb}` |
-| `Collection` | `POST` | `~/v1/{package}/{collectionPath}:{verb}` |
-
-The `{package}/` segment is dropped when the entity has no `[ResourcePackage]`. `[RateLimitPolicy]` and `WithAuthorization(scheme)` propagate to custom-method controllers identically to the CRUD controller.
-
-See [Custom Methods](custom-methods.md) for the verb-scoped advisor pipeline.
-
-## JSON serialization
-
-The wire-format conventions (snake_case property naming, `long`-as-string, AIP `@type` discriminator) live in `Schemata.Transport.Http`'s `SchemataJsonTraits` and are applied to `JsonSerializerOptions`, `Microsoft.AspNetCore.Http.Json.JsonOptions`, and `Microsoft.AspNetCore.Mvc.JsonOptions` by `SchemataTransportHttpFeature`. `ResourceController` and `ResourceMethodController` both serialize responses through MVC's `JsonResult`, which picks up the configured options.
+The MVC route table itself is the HTTP surface description; there is no separate reflection endpoint. Hand-written
+controllers are honored: when a controller with the resource's `Plural` name already exists, the feature provider
+skips synthesizing the generated one.
 
 ## Extension points
 
-- Subclass `ResourceController<TEntity, TRequest, TDetail, TSummary>` and override individual action methods. Register the subclass as a regular MVC controller; the feature provider skips synthesizing a duplicate when a matching controller name or `{Entity}Controller` already exists.
-- Implement `IControllerModelConvention` and add it to `MvcOptions.Conventions` to further customize route templates or filters.
-- Use `[RateLimitPolicy("my-policy")]` on the entity type to apply rate limiting to all HTTP endpoints for that resource.
+- Subclass `ResourceController<TEntity, TRequest, TDetail, TSummary>` and override actions; register the subclass
+  as a normal MVC controller.
+- Add an `IControllerModelConvention` to `MvcOptions.Conventions` to customize templates or filters.
+- `[RateLimitPolicy("my-policy")]` on the entity adds `EnableRateLimitingAttribute` to every endpoint.
 
 ## Caveats
 
-- `ResourceControllerFeatureProvider` adds the synthesized closed-generic controller types directly to `ControllerFeature.Controllers`, which is how they escape the `Schemata.*` assembly-part stripping performed by `SchemataControllersFeature`.
-- The HTTP transport is unary. For streaming use cases, use the gRPC transport.
-- When an advisor returns `Block` without throwing, the operation handler throws `NotFoundException` (404), hiding the resource's existence per AIP-211. Advisors that want a different HTTP status throw the matching `SchemataException` subtype instead.
+- The HTTP transport is unary. For streaming, use gRPC.
+- `WithAuthorization(scheme)` adds an always-pass `AuthorizeFilter` so the authentication middleware runs for the
+  scheme; the actual authorization decision happens in the advisor pipeline.
 
 ## See also
 
 - [Resource Overview](overview.md)
-- [Custom Methods](custom-methods.md)
 - [gRPC Transport](grpc-transport.md)
+- [Custom Methods](custom-methods.md)
 - [Resource Naming](resource-naming.md)
-- [Filtering](filtering.md)
-- [Advice Pipeline](../core/advice-pipeline.md)

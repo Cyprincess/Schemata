@@ -23,9 +23,7 @@ public sealed class PurgeResponse : ICanonicalName
     /// <summary>Preview sample of matching canonical names, capped at 100.</summary>
     public IList<string> PurgeSample { get; set; } = [];
 
-    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
     public string? CanonicalName { get; set; }
 }

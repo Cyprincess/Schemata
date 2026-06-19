@@ -9,8 +9,14 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Aip;
 
+/// <summary>
+///     Resolves built-in and custom functions used by the AIP compiler.
+/// </summary>
 public static class AipBuiltInFunctions
 {
+    /// <summary>
+    ///     Resolves a function binding by name from compile options or the built-in AIP function set.
+    /// </summary>
     public static ExpressionFunction? Resolve(string name, ExpressionCompileOptions? options) {
         if (options?.Functions.TryGetValue(name, out var custom) is true) {
             return custom;
@@ -23,6 +29,9 @@ public static class AipBuiltInFunctions
         };
     }
 
+    /// <summary>
+    ///     Creates a cache-key fragment for option-dependent function bindings.
+    /// </summary>
     public static string Fingerprint(ExpressionCompileOptions? options) {
         if (options is null || options.Functions.Count == 0) {
             return "builtins:v1;functions:none";

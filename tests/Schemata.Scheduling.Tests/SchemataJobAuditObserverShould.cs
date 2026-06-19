@@ -14,9 +14,8 @@ namespace Schemata.Scheduling.Tests;
 
 public class SchemataJobAuditObserverShould
 {
-    private static (SchemataJobAuditObserver observer,
-                    Mock<IRepository<SchemataJob>> jobs,
-                    Mock<IRepository<SchemataJobExecution>> executions) Build() {
+    private static (SchemataJobAuditObserver observer, Mock<IRepository<SchemataJob>> jobs,
+        Mock<IRepository<SchemataJobExecution>> executions) Build() {
         var jobs       = new Mock<IRepository<SchemataJob>>();
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         var uow        = new Mock<IUnitOfWork>();
@@ -31,9 +30,8 @@ public class SchemataJobAuditObserverShould
     [Fact]
     public async Task InsertSchemataJob_WhenOnScheduledAndNoExistingRow() {
         var (observer, jobs, _) = Build();
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>((SchemataJob?)null));
 
         var job = new SchemataJob {
@@ -59,9 +57,8 @@ public class SchemataJobAuditObserverShould
             ScheduleType = ScheduleType.OneTime,
             State        = JobState.Active,
         };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existing));
 
         var incoming = new SchemataJob {
@@ -83,9 +80,8 @@ public class SchemataJobAuditObserverShould
     public async Task MarkExistingPaused_WhenOnUnscheduledFindsRow() {
         var (observer, jobs, _) = Build();
         var existing = new SchemataJob { Name = "test/job", State = JobState.Active };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existing));
 
         await observer.OnUnscheduledAsync(new() { Name = "test/job", State = JobState.Paused });
@@ -98,9 +94,8 @@ public class SchemataJobAuditObserverShould
     [Fact]
     public async Task DoNothing_WhenOnUnscheduledAndNoExistingRow() {
         var (observer, jobs, _) = Build();
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>((SchemataJob?)null));
 
         await observer.OnUnscheduledAsync(new() { Name = "test/missing" });
@@ -131,7 +126,8 @@ public class SchemataJobAuditObserverShould
         var outcome = await observer.OnTriggeredAsync(job, ctx);
 
         Assert.Equal(JobTriggerOutcome.Proceed, outcome);
-        executions.Verify(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()), Times.Never);
+        executions.Verify(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()),
+                          Times.Never);
         executions.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -139,7 +135,7 @@ public class SchemataJobAuditObserverShould
     public async Task NoOp_WhenOnTriggeredWithoutContextExecution() {
         var (observer, _, executions) = Build();
         var job = new SchemataJob { Name = "test/job" };
-        var ctx = new JobContext { Job = "test/job", ExecutionUid = Identifiers.NewUid() };
+        var ctx = new JobContext { Job   = "test/job", ExecutionUid = Identifiers.NewUid() };
 
         var outcome = await observer.OnTriggeredAsync(job, ctx);
 
@@ -154,20 +150,15 @@ public class SchemataJobAuditObserverShould
         var (observer, jobs, executions) = Build();
 
         var existingJob = new SchemataJob {
-            Name          = "test/job",
-            State         = JobState.Active,
-            RecentRunTime = null,
+            Name = "test/job", State = JobState.Active, RecentRunTime = null,
         };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existingJob));
 
         var execUid = Identifiers.NewUid();
         var existingExec = new SchemataJobExecution {
-            Uid     = execUid,
-            Job = "test/job",
-            State   = ExecutionState.Running,
+            Uid = execUid, Job = "test/job", State = ExecutionState.Running,
         };
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
@@ -175,9 +166,7 @@ public class SchemataJobAuditObserverShould
                   .Returns(new ValueTask<SchemataJobExecution?>(existingExec));
 
         var ctx = new JobContext {
-            Job      = "test/job",
-            ExecutionUid = execUid,
-            StartTime    = DateTime.UtcNow.AddSeconds(-5),
+            Job = "test/job", ExecutionUid = execUid, StartTime = DateTime.UtcNow.AddSeconds(-5),
         };
         var incoming = new SchemataJob {
             Name          = "test/job",
@@ -188,7 +177,7 @@ public class SchemataJobAuditObserverShould
 
         await observer.OnSucceededAsync(incoming, ctx);
 
-        Assert.Equal(JobState.Completed,    existingJob.State);
+        Assert.Equal(JobState.Completed, existingJob.State);
         Assert.Null(existingJob.NextRunTime);
         Assert.Equal(ExecutionState.Succeeded, existingExec.State);
         Assert.NotNull(existingExec.EndTime);
@@ -204,9 +193,8 @@ public class SchemataJobAuditObserverShould
         var next = DateTime.UtcNow.AddMinutes(15);
 
         var existingJob = new SchemataJob { Name = "test/job", State = JobState.Active };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existingJob));
 
         var existingExec = new SchemataJobExecution { Uid = Identifiers.NewUid(), Job = "test/job" };
@@ -215,9 +203,8 @@ public class SchemataJobAuditObserverShould
                              It.IsAny<CancellationToken>()))
                   .Returns(new ValueTask<SchemataJobExecution?>(existingExec));
 
-        await observer.OnSucceededAsync(
-            new() { Name = "test/job", State = JobState.Active, NextRunTime = next },
-            new() { Job = "test/job", ExecutionUid = existingExec.Uid });
+        await observer.OnSucceededAsync(new() { Name = "test/job", State        = JobState.Active, NextRunTime = next },
+                                        new() { Job  = "test/job", ExecutionUid = existingExec.Uid });
 
         Assert.Equal(next, existingJob.NextRunTime);
         jobs.Verify(r => r.UpdateAsync(existingJob, It.IsAny<CancellationToken>()), Times.Once);
@@ -235,11 +222,12 @@ public class SchemataJobAuditObserverShould
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var existingJob = new SchemataJob { Name = "test/job", State = JobState.Active };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existingJob));
-        var existingExec = new SchemataJobExecution { Uid = Identifiers.NewUid(), Job = "test/job", State = ExecutionState.Running };
+        var existingExec = new SchemataJobExecution {
+            Uid = Identifiers.NewUid(), Job = "test/job", State = ExecutionState.Running,
+        };
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
                              It.IsAny<CancellationToken>()))
@@ -247,9 +235,8 @@ public class SchemataJobAuditObserverShould
 
         var observer = new SchemataJobAuditObserver(jobs.Object, executions.Object);
 
-        await observer.OnSucceededAsync(
-            new() { Name = "test/job", State = JobState.Completed },
-            new() { Job = "test/job", ExecutionUid = existingExec.Uid });
+        await observer.OnSucceededAsync(new() { Name = "test/job", State        = JobState.Completed },
+                                        new() { Job  = "test/job", ExecutionUid = existingExec.Uid });
 
         jobs.Verify(r => r.Begin(), Times.Once);
         executions.Verify(r => r.Join(uow.Object), Times.Once);
@@ -262,15 +249,12 @@ public class SchemataJobAuditObserverShould
     public async Task RecordFailedStateAndError_WhenOnFailed() {
         var (observer, jobs, executions) = Build();
 
-        var existingJob  = new SchemataJob { Name = "test/job", State = JobState.Active };
+        var existingJob = new SchemataJob { Name = "test/job", State = JobState.Active };
         var existingExec = new SchemataJobExecution {
-            Uid     = Identifiers.NewUid(),
-            Job = "test/job",
-            State   = ExecutionState.Running,
+            Uid = Identifiers.NewUid(), Job = "test/job", State = ExecutionState.Running,
         };
-        jobs.Setup(r => r.FirstOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
-                       It.IsAny<CancellationToken>()))
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>?>(),
+                                              It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>(existingJob));
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
@@ -278,9 +262,7 @@ public class SchemataJobAuditObserverShould
                   .Returns(new ValueTask<SchemataJobExecution?>(existingExec));
 
         var ctx = new JobContext {
-            Job      = "test/job",
-            ExecutionUid = existingExec.Uid,
-            StartTime    = DateTime.UtcNow.AddSeconds(-2),
+            Job = "test/job", ExecutionUid = existingExec.Uid, StartTime = DateTime.UtcNow.AddSeconds(-2),
         };
         var incoming = new SchemataJob {
             Name          = "test/job",
@@ -292,8 +274,8 @@ public class SchemataJobAuditObserverShould
 
         await observer.OnFailedAsync(incoming, ctx, exception);
 
-        Assert.Equal(JobState.Failed,      existingJob.State);
-        Assert.Equal("Boom",               existingJob.RecentError);
+        Assert.Equal(JobState.Failed, existingJob.State);
+        Assert.Equal("Boom", existingJob.RecentError);
         Assert.Equal(ExecutionState.Failed, existingExec.State);
         Assert.NotNull(existingExec.EndTime);
         Assert.Contains("Boom", existingExec.RecentError);

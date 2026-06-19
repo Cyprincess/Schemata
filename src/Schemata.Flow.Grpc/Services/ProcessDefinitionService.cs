@@ -7,6 +7,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Grpc.Services;
 
+/// <summary>Lists registry-backed Flow process definitions for gRPC clients.</summary>
 public sealed class ProcessDefinitionService(IProcessRegistry registry) : IProcessDefinitionService
 {
     #region IProcessDefinitionService Members

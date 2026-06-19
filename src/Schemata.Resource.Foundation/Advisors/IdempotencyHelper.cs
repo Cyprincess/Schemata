@@ -12,6 +12,9 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Shared cache, caller, and payload helpers for request idempotency advisors.
+/// </summary>
 internal static class IdempotencyHelper
 {
     /// <summary>Resolves the resource options from the advisor pipeline's service provider, falling back to defaults.</summary>

@@ -7,7 +7,7 @@ namespace Schemata.Security.Foundation;
 
 /// <summary>
 ///     Composes IPermissionResolver and IPermissionMatcher into a claims-based access check.
-///     A null or unauthenticated principal is always denied.
+///     Anonymous principals fail access checks.
 /// </summary>
 public sealed class DefaultAccessProvider<T, TRequest>(IPermissionResolver resolver, IPermissionMatcher matcher) : IAccessProvider<T, TRequest>
 {

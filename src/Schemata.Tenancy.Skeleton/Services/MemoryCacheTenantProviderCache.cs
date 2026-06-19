@@ -8,8 +8,7 @@ namespace Schemata.Tenancy.Skeleton.Services;
 /// <summary>
 ///     LRU <see cref="ITenantProviderCache" /> with capacity-bound synchronous eviction
 ///     and sliding expiration. Disposal of retired providers is deferred until every
-///     outstanding lease has been released so active tenant scopes are never disposed
-///     out from under their callers.
+///     outstanding lease has been released so active tenant scopes keep their provider.
 /// </summary>
 public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisposable
 {
@@ -82,8 +81,8 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                     hit.Value.ActiveLeases++;
                     entry = hit.Value;
                 } else {
-                    // Build the replacement before evicting so a factory failure cannot retire a
-                    // healthy provider for an entry that never gets added.
+                    // Build the replacement before eviction so factory failure leaves the
+                    // existing provider available.
                     var provider = factory();
 
                     while (_index.Count >= _capacity) {

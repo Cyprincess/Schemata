@@ -11,29 +11,39 @@ The Schemata caching subsystem provides a unified `ICacheProvider` abstraction o
 | `DistributedCacheProvider` | `src/Schemata.Caching.Distributed/DistributedCacheProvider.cs` |
 | `IndexLocks` | `src/Schemata.Caching.Distributed/IndexLocks.cs` |
 | `RedisCacheProvider` | `src/Schemata.Caching.Redis/RedisCacheProvider.cs` |
-| Query cache advisors | `src/Schemata.Entity.Cache/Advisors/` |
 
 ## ICacheProvider
 
 ```csharp
 public interface ICacheProvider
 {
-    Task<byte[]?>              GetAsync(string key, CancellationToken ct = default);
-    Task                       SetAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default);
-    Task<bool>                 TryAddAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default);
-    Task                       RemoveAsync(string key, CancellationToken ct = default);
-    Task                       CollectionAddAsync(string key, string member, CacheEntryOptions options, CancellationToken ct = default);
+    Task<byte[]?>                GetAsync(string key, CancellationToken ct = default);
+    Task                         SetAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default);
+    Task<bool>                   TryAddAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default);
+    Task<bool>                   TryReplaceAsync(string key, byte[] expected, byte[] replacement, CacheEntryOptions options, CancellationToken ct = default);
+    Task<bool>                   TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default);
+    Task                         RemoveAsync(string key, CancellationToken ct = default);
+    Task                         CollectionAddAsync(string key, string member, CacheEntryOptions options, CancellationToken ct = default);
     Task<IReadOnlyList<string>?> CollectionMembersAsync(string key, CancellationToken ct = default);
-    Task                       CollectionRemoveAsync(string key, ICollection<string> members, CancellationToken ct = default);
-    Task                       CollectionRemoveAsync(string key, string member, CancellationToken ct = default);
-    Task                       CollectionClearAsync(string key, CancellationToken ct = default);
+    Task                         CollectionRemoveAsync(string key, ICollection<string> members, CancellationToken ct = default);
+    Task                         CollectionRemoveAsync(string key, string member, CancellationToken ct = default);
+    Task                         CollectionClearAsync(string key, CancellationToken ct = default);
 }
 ```
 
 The interface has two surfaces:
 
-- **Key-value**: `GetAsync`, `SetAsync`, `TryAddAsync`, `RemoveAsync` — standard cache operations on raw byte arrays.
-- **Collection**: `CollectionAddAsync`, `CollectionMembersAsync`, `CollectionRemoveAsync`, `CollectionClearAsync` — set semantics used by the reverse index for query cache eviction.
+- **Key-value** — `GetAsync`, `SetAsync`, `RemoveAsync` for plain reads and writes over raw byte arrays;
+  `TryAddAsync` (atomic insert-if-absent), `TryReplaceAsync` (atomic compare-and-swap), and
+  `TryRemoveAsync` (atomic compare-and-delete) for the atomic operations an idempotency or lock pattern
+  needs.
+- **Collection** — `CollectionAddAsync`, `CollectionMembersAsync`, `CollectionRemoveAsync`,
+  `CollectionClearAsync` provide set semantics for consumers that need atomic reverse-index
+  bookkeeping.
+
+The atomic operations are where the providers diverge: `RedisCacheProvider` implements all three;
+`DistributedCacheProvider` throws `NotSupportedException` for `TryAddAsync`, `TryReplaceAsync`, and
+`TryRemoveAsync`, because `IDistributedCache` exposes no atomic compare-and-swap.
 
 ## CacheEntryOptions
 
@@ -60,12 +70,7 @@ The key difference is collection safety. `DistributedCacheProvider` uses a 64-st
 ## Layer stack
 
 ```text
-Application code / ResourceOperationHandler
-        |
-IRepository<TEntity>
-        |
-AdviceQueryCache / AdviceResultCache        (query pipeline)
-AdviceCommittedEvictCache                 (committed pipeline)
+Consumer (query cache, idempotency, custom)
         |
 ICacheProvider
         |
@@ -76,18 +81,22 @@ IDistributedCache / Redis
 
 ## Extension points
 
-- **Custom provider**: implement `ICacheProvider` and register it as a singleton or scoped service. The query cache advisors resolve `ICacheProvider` from DI.
-- **Custom key format**: the `ToCacheKey` extension on `QueryContext` serializes the LINQ expression tree via `Stringizing` and hashes the result. Override `Stringizing` or provide a custom `IRepositoryQueryAdvisor` to change key generation.
+- **Custom provider**: implement `ICacheProvider` and register it as a singleton or scoped service.
+  Consumers resolve `ICacheProvider` from DI.
+- **Custom serializer**: a custom provider can layer compression or alternate serialization on top of
+  the byte-array surface without changing the consumer.
 
-## Design motivation
+## Design rationale
 
-`ICacheProvider` is intentionally narrow. It exposes only the operations the query cache needs: key-value reads/writes and set membership for the reverse index. This keeps the abstraction implementable over any backend without requiring atomic compare-and-swap or Lua scripting.
+The collection surface exists because reverse-index bookkeeping requires set semantics; a plain
+key-value store would force a read-modify-write cycle. `DistributedCacheProvider` guards it with
+in-process locks, and `RedisCacheProvider` delegates to native Redis sets.
 
-The collection surface exists because the reverse index (mapping entity primary keys to query cache keys) requires set semantics. A plain key-value store would require a read-modify-write cycle, which is why `DistributedCacheProvider` uses in-process locks and `RedisCacheProvider` uses native Redis sets.
+The atomic compare-and-swap operations are an optional capability. Providers that throw
+`NotSupportedException` (as `DistributedCacheProvider` does) still serve any consumer that does not
+exercise CAS. Patterns that need atomic reserve-and-swap require `RedisCacheProvider`.
 
 ## See also
 
 - [distributed.md](distributed.md) — `DistributedCacheProvider` and `IndexLocks` details
 - [redis.md](redis.md) — `RedisCacheProvider` and sliding expiration via metadata key
-- [query-cache.md](query-cache.md) — query cache advisors, reverse index, and committed eviction
-- [repository/caching.md](../repository/caching.md) — `UseQueryCache()` registration and options

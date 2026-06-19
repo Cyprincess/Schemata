@@ -144,8 +144,9 @@ public class AdviceResultCacheShould
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new[] { new Student { Uid = Identifiers.NewUid(), FullName = "Alice" } }.AsQueryable()
-                                                                                     .Select(s => new StudentDto(
-                                                                                                 s.Uid, s.FullName));
+                                                                                           .Select(s => new StudentDto(
+                                                                                                       s.Uid,
+                                                                                                       s.FullName));
         var context = new QueryContext<Student, StudentDto, StudentDto>(repository, data) {
             Result = new(Identifiers.NewUid(), "Alice"),
         };

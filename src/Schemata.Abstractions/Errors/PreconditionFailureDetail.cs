@@ -12,7 +12,7 @@ namespace Schemata.Abstractions.Errors;
 public class PreconditionFailureDetail : IErrorDetail
 {
     /// <summary>
-    ///     The set of preconditions that were not met.
+    ///     The preconditions that blocked the operation.
     /// </summary>
     public virtual List<PreconditionViolation>? Violations { get; set; }
 }

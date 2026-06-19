@@ -28,6 +28,7 @@ public class Course : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
     #endregion
 
     #region IIdentifier Members
+
     public Guid Uid { get; set; }
 
     #endregion

@@ -8,8 +8,12 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains the OAuth 2.0 device authorization endpoint action.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles device authorization requests.</summary>
     [HttpPost("Device")]
     public async Task<IActionResult> Device([FromForm] DeviceAuthorizeRequest request, CancellationToken ct) {
         var handler = HttpContext.RequestServices.GetService<DeviceAuthorizeEndpoint>();

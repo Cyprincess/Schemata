@@ -9,9 +9,8 @@ namespace Schemata.Abstractions.Errors;
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 /// <remarks>
-///     An extension detail payload: the framework defines and serializes the shape, but the
-///     application layer decides when to attach it to an error. The framework core never
-///     populates it on its own.
+///     Extension detail payload whose shape is defined by the framework and attached by
+///     the application layer.
 /// </remarks>
 [Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.Help")]
 public class HelpDetail : IErrorDetail

@@ -8,7 +8,7 @@ namespace Schemata.Abstractions.Resource;
 ///     <see cref="ArgsType" /> is resolved from this descriptor at execution time, so
 ///     no CLR type is ever loaded from persisted data.
 /// </summary>
-/// <param name="Key">Stable key used to resolve the handler (e.g. <c>purge:books</c>).</param>
+/// <param name="Key">Stable key that resolves the handler (e.g. <c>purge:books</c>).</param>
 /// <param name="Method">API method verb surfaced as operation metadata (e.g. <c>purge</c>).</param>
-/// <param name="ArgsType">Concrete argument type used to deserialize the persisted arguments.</param>
+/// <param name="ArgsType">Concrete argument type for deserializing the persisted arguments.</param>
 public sealed record OperationDescriptor(string Key, string Method, Type ArgsType);

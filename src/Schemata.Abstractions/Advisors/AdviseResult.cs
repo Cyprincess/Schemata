@@ -17,7 +17,7 @@ public enum AdviseResult
     Block,
 
     /// <summary>
-    ///     The operation was handled by this advisor. No further advisors execute.
+    ///     The advisor handles the operation and stops the pipeline.
     /// </summary>
     Handle,
 }

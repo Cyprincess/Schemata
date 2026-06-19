@@ -15,6 +15,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdvicePairwiseProjection{TApp}" />.</summary>
 public static class AdvicePairwiseProjection
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
@@ -42,7 +43,6 @@ public sealed class AdvicePairwiseProjection<TApp>(
 {
     #region IClaimsAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdvicePairwiseProjection.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {

@@ -76,9 +76,7 @@ public class AdviceSanitizeShould
     [Fact]
     public async Task Create_Sanitize_ClearsCanonicalNameAndEntityTag() {
         var request = new ManagedRequest {
-            CanonicalName = "managed/forged",
-            EntityTag     = "forged-etag",
-            DisplayName   = "keep-me",
+            CanonicalName = "managed/forged", EntityTag = "forged-etag", DisplayName = "keep-me",
         };
 
         var advisor = new AdviceCreateRequestSanitize<ManagedEntity, ManagedRequest>();
@@ -96,9 +94,7 @@ public class AdviceSanitizeShould
 
     [Fact]
     public async Task Update_Sanitize_StripsWireNameAndEtagFromMask() {
-        var request = new ManagedRequest {
-            UpdateMask = "display_name,etag,canonical_name,name",
-        };
+        var request = new ManagedRequest { UpdateMask = "display_name,etag,canonical_name,name" };
 
         var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());

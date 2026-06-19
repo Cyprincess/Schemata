@@ -29,14 +29,20 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
     ///     Initializes a new instance of the <see cref="EfCoreRepository{TContext,TEntity}" /> class.
     /// </summary>
     /// <param name="sp">The service provider.</param>
-    /// <param name="factory">The factory used to create a dedicated EF Core database context.</param>
+    /// <param name="factory">The factory that creates a dedicated EF Core database context.</param>
     public EfCoreRepository(IServiceProvider sp, IDbContextFactory<TContext> factory) : base(sp) {
         _factory = factory;
         _context = factory.CreateDbContext();
     }
 
+    /// <summary>
+    ///     The active EF Core context used by repository operations.
+    /// </summary>
     protected virtual TContext Context => _context;
 
+    /// <summary>
+    ///     The EF Core set for <typeparamref name="TEntity" /> on the active context.
+    /// </summary>
     protected virtual DbSet<TEntity> DbSet => _context.Set<TEntity>();
 
     protected override IQueryable<TEntity> AsQueryable() { return DbSet.AsQueryable(); }

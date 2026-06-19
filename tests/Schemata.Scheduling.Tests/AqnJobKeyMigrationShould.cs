@@ -16,8 +16,8 @@ public class AqnJobKeyMigrationShould
 {
     [Fact]
     public async Task Migration_PopulatesJobKey_FromValidAqn() {
-        var row = JobWithAqn(typeof(MigrationJob).AssemblyQualifiedName!);
-        var jobs = Repository([row]);
+        var row      = JobWithAqn(typeof(MigrationJob).AssemblyQualifiedName!);
+        var jobs     = Repository([row]);
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<MigrationJob>("jobs:migration");
 
@@ -29,8 +29,8 @@ public class AqnJobKeyMigrationShould
 
     [Fact]
     public async Task Migration_SkipsUnresolvableAqn() {
-        var row = JobWithAqn("Missing.Type, Missing.Assembly");
-        var jobs = Repository([row]);
+        var row      = JobWithAqn("Missing.Type, Missing.Assembly");
+        var jobs     = Repository([row]);
         var registry = new DefaultScheduledJobRegistry();
 
         await AqnJobKeyMigration.RunAsync(jobs.Object, registry, CancellationToken.None);
@@ -43,7 +43,7 @@ public class AqnJobKeyMigrationShould
     public async Task Migration_SkipsRowWithJobKeySet() {
         var row = JobWithAqn(typeof(MigrationJob).AssemblyQualifiedName!);
         row.JobKey = "already-migrated";
-        var jobs = Repository([row]);
+        var jobs     = Repository([row]);
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<MigrationJob>("jobs:migration");
 
@@ -55,11 +55,10 @@ public class AqnJobKeyMigrationShould
 
     [Fact]
     public async Task Migration_ResolvableTypeMissingRegistryKey_Skips() {
-        var row = JobWithAqn(typeof(MigrationJob).AssemblyQualifiedName!);
-        var jobs = Repository([row]);
+        var row      = JobWithAqn(typeof(MigrationJob).AssemblyQualifiedName!);
+        var jobs     = Repository([row]);
         var registry = new DefaultScheduledJobRegistry();
-        // Intentionally NOT registering MigrationJob: AQN resolves to a real CLR type,
-        // but the registry has no key for it.
+        // The AQN resolves to a real CLR type while the registry omits its key.
 
         await AqnJobKeyMigration.RunAsync(jobs.Object, registry, CancellationToken.None);
 
@@ -70,10 +69,10 @@ public class AqnJobKeyMigrationShould
     private static Mock<IRepository<SchemataJob>> Repository(IReadOnlyCollection<SchemataJob> rows) {
         var repository = new Mock<IRepository<SchemataJob>>();
         repository.Setup(r => r.ListAsync(
-                            It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                            It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _) =>
-                      ToAsync(query(rows.AsQueryable())));
+                             It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _)
+                               => ToAsync(query(rows.AsQueryable())));
         repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
                   .Returns(Task.CompletedTask);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -93,10 +92,16 @@ public class AqnJobKeyMigrationShould
         }
     }
 
+    #region Nested type: MigrationJob
+
     private sealed class MigrationJob : IScheduledJob
     {
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
+
+        #endregion
     }
+
+    #endregion
 }

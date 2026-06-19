@@ -69,8 +69,7 @@ public static class SimpleMapperHelper
                 interior.Property.SetValue(destination, interior.Value);
                 CopyMaskedLeaves(source, destination, [interior.Property], interior.Node, static _ => true);
             } else if (current is not null && interior.Value is null) {
-                // The interior was null before the map and the wholesale map populated it, so unmasked
-                // nested fields would otherwise leak in. Trim it back to the masked leaves only.
+                // A newly populated interior can carry unmasked nested values; keep the masked leaves only.
                 MaskWalker.WalkUnmasked(current, interior.Node.Children, false, static (_, target, prop) => SetDefault(target, prop));
             }
         }
@@ -81,7 +80,7 @@ public static class SimpleMapperHelper
     /// <summary>
     ///     Maps source onto destination treating null and whitespace-only source members as
     ///     unpopulated: their destination values are preserved. This gives merge mapping the
-    ///     AIP-134 implicit-mask semantics — an update without an <c>update_mask</c> only
+    ///     AIP-134 implicit-mask semantics — an update that omits <c>update_mask</c>
     ///     touches populated fields, while <see cref="MapWithMask{TSource, TDestination}" />
     ///     stays authoritative and can clear fields.
     /// </summary>
@@ -103,7 +102,10 @@ public static class SimpleMapperHelper
         MapMergingCore(source, destination, typeof(TSource), typeof(TDestination), () => mapAction(source, destination));
     }
 
-    /// <inheritdoc cref="MapMerging{TSource, TDestination}" />
+    /// <summary>
+    ///     Maps source onto destination using runtime source and destination types while preserving
+    ///     destination values for unpopulated source members.
+    /// </summary>
     /// <param name="source">The source object.</param>
     /// <param name="destination">The destination object.</param>
     /// <param name="sourceType">The runtime source type.</param>
@@ -160,10 +162,6 @@ public static class SimpleMapperHelper
         property.SetValue(target, @default);
     }
 
-    /// <summary>
-    ///     Copies masked leaf values from <paramref name="source" /> into the interior reached by
-    ///     <paramref name="prefix" /> on <paramref name="destination" />, honouring <paramref name="shouldCopy" />.
-    /// </summary>
     private static void CopyMaskedLeaves(
         object                      source,
         object                      destination,
@@ -180,12 +178,6 @@ public static class SimpleMapperHelper
         CopyMaskedLeaves(srcRoot, dstRoot, srcRoot.GetType(), dstRoot.GetType(), node.Children, shouldCopy);
     }
 
-    /// <summary>
-    ///     Walks the masked nodes and copies each masked leaf from source to destination when
-    ///     <paramref name="shouldCopy" /> accepts the source value. With an always-true predicate this
-    ///     restores masked leaves onto a freshly created interior; with an "unpopulated" predicate it
-    ///     applies AIP-134 clears (a masked leaf whose source is blank clears the destination).
-    /// </summary>
     private static void CopyMaskedLeaves(
         object                                         source,
         object                                         destination,

@@ -25,7 +25,7 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
     /// <summary>
     ///     Initializes the built-in purge handler.
     /// </summary>
-    /// <param name="services">Service provider used to resolve the dispatcher and compiler.</param>
+    /// <param name="services">Service provider for resolving the dispatcher and compiler.</param>
     public PurgeHandler(IServiceProvider services) { _services = services; }
 
     public async ValueTask<Operation> InvokeAsync(
@@ -36,9 +36,8 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         CancellationToken ct
     ) {
         // Validate the filter up front so a malformed request fails fast with
-        // INVALID_ARGUMENT instead of dispatching a doomed operation. The compiled
-        // expression is discarded; the durable handler recompiles it from the
-        // persisted filter string at execution time.
+        // INVALID_ARGUMENT. The compiled expression is discarded; the durable
+        // handler recompiles it from the persisted filter string at execution time.
         _ = PurgeFilter.Compile<TEntity>(_services, request.Filter);
 
         var dispatcher = _services.GetService<IOperationDispatcher>()

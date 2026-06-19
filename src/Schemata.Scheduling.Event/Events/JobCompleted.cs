@@ -6,7 +6,7 @@ namespace Schemata.Scheduling.Event.Events;
 
 /// <summary>
 ///     Published after a scheduled job's <see cref="Schemata.Scheduling.Skeleton.IScheduledJob.ExecuteAsync" />
-///     returned without throwing. Pairs with <see cref="JobTriggered" /> (before) and
+///     completes successfully. Pairs with <see cref="JobTriggered" /> (before) and
 ///     <see cref="JobFailed" /> (failure).
 /// </summary>
 public sealed class JobCompleted : IEvent

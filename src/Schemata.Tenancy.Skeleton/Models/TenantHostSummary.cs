@@ -6,6 +6,7 @@ namespace Schemata.Tenancy.Skeleton.Models;
 /// <summary>List item for <see cref="Entities.SchemataTenantHost" />.</summary>
 public class TenantHostSummary : IIdentifier, ICanonicalName, ITimestamp
 {
+    /// <summary>HTTP Host header value that routes requests to the parent tenant.</summary>
     public string? Host { get; set; }
 
     #region ICanonicalName Members

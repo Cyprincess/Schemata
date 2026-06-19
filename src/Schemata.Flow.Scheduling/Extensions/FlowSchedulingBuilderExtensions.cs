@@ -1,4 +1,5 @@
 using Schemata.Core;
+using Schemata.Flow.Foundation.Builders;
 using Schemata.Flow.Scheduling.Features;
 
 // ReSharper disable once CheckNamespace
@@ -8,7 +9,7 @@ namespace Microsoft.AspNetCore.Builder;
 public static class FlowSchedulingBuilderExtensions
 {
     /// <summary>Registers <see cref="Schemata.Flow.Scheduling.Features.SchemataFlowSchedulingFeature"/>.</summary>
-    public static SchemataBuilder UseFlowScheduling(this SchemataBuilder builder) {
+    public static SchemataFlowBuilder UseScheduling(this SchemataFlowBuilder builder) {
         builder.AddFeature<SchemataFlowSchedulingFeature>();
         return builder;
     }

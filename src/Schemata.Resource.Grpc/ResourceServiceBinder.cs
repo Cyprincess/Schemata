@@ -6,6 +6,9 @@ using Schemata.Resource.Grpc.Internal;
 
 namespace Schemata.Resource.Grpc;
 
+/// <summary>
+///     Maps generic resource service contracts and operations to AIP-style gRPC names.
+/// </summary>
 internal sealed class ResourceServiceBinder : ServiceBinder
 {
     private static readonly Type OpenServiceInterface      = typeof(IResourceService<,,,>);

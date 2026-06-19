@@ -2,143 +2,159 @@
 
 ## What you'll build
 
-A BPMN process that pauses at an intermediate timer catch event and resumes automatically after a delay. You'll wire `UseFlowScheduling()` so the scheduler fires `FlowTimerJob` when the timer expires, advancing the process to the next activity.
+A BPMN process that parks at an intermediate timer catch and resumes automatically after a delay.
+`UseScheduling()` on the flow builder wires `FlowTimerTransitionAdvisor`, which schedules a one-shot
+job as the instance starts waiting. When the job fires, `FlowTimerJob` triggers the timer event and
+the instance advances.
 
 ## Prerequisites
 
-- A working Flow setup from [guides/flow.md](../guides/flow.md).
-- `Schemata.Flow.Scheduling` NuGet package added to your project.
-- A persistence provider (EF Core or LinqToDB) configured so `SchemataJob` and `SchemataProcess` rows can be stored.
+- A working Flow setup from [flow.md](../guides/flow.md).
+- A working scheduler from [scheduling.md](../guides/scheduling.md).
+- `Schemata.Flow.Scheduling` added to the project.
+- A persistence provider so `SchemataJob` and `SchemataProcess` rows can be stored.
 
-## Step 1: Define the process with an intermediate timer
+## Step 1: Model the process with a timer catch
+
+Wait for a timer with `.Await(this.OnTimer(...))`. This builds an event-based gateway feeding a timer
+intermediate catch — the shape the state-machine validator allows and the scheduler bridge reacts to.
+A bare intermediate catch in a linear flow is rejected at registration, because the validator
+requires every intermediate catch to be reached from an event-based gateway.
 
 ```csharp
+using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Models;
 
-public sealed class ApprovalProcess : IProcessDefinition
+public sealed class ApprovalProcess : ProcessDefinition
 {
-    public string Name => "approval";
+    public NoneTask Review  { get; } = null!;
+    public NoneTask Approve { get; } = null!;
 
-    public ProcessDefinition Build()
+    public ApprovalProcess()
     {
-        var start    = new StartEvent   { Id = "start" };
-        var review   = new Activity     { Id = "review",   Name = "Review request" };
-        var wait     = new FlowEvent    {
-            Id       = "wait-24h",
-            Position = EventPosition.IntermediateCatch,
-            Definition = new TimerDefinition {
-                TimerType      = TimerType.Duration,
-                TimeExpression = "PT24H",   // ISO 8601 duration — 24 hours
-            },
-        };
-        var approve  = new Activity     { Id = "approve",  Name = "Auto-approve" };
-        var end      = new EndEvent     { Id = "end" };
+        this.Start().Go(Review);
 
-        return new ProcessDefinition {
-            Name     = "approval",
-            Elements = [start, review, wait, approve, end],
-            Flows    = [
-                new SequenceFlow { Source = start,  Target = review  },
-                new SequenceFlow { Source = review, Target = wait    },
-                new SequenceFlow { Source = wait,   Target = approve },
-                new SequenceFlow { Source = approve, Target = end    },
-            ],
-        };
+        // Review -> [event gateway] -> timer catch (24h) -> Approve -> end
+        this.During(Review).Await(
+            this.OnTimer(TimeSpan.FromHours(24)).Go(Approve));
+
+        this.During(Approve).End();
     }
 }
 ```
 
-`TimerType.Duration` uses an ISO 8601 duration string (`PT24H` = 24 hours). `TimerType.Date` accepts an ISO 8601 date-time string. `TimerType.Cycle` accepts a Cronos 5-field cron expression (see [cookbook/cron-jobs.md](cron-jobs.md) for syntax rules).
+`OnTimer(TimeSpan)` builds a `TimerDefinition` with `TimerType.Duration`, its `TimeExpression` an ISO
+8601 duration (`XmlConvert.ToString`). `TimerType.Date` takes an ISO 8601 datetime and
+`TimerType.Cycle` a cron expression; `TimerDefinitionConverter.ToSchedule` maps Date and Duration to a
+`OneTimeSchedule` and Cycle to a `CronSchedule`.
 
-`TimerDefinitionConverter.ToSchedule` maps these to `OneTimeSchedule` (Date/Duration) or `CronSchedule` (Cycle) when `FlowTimerTransitionObserver` schedules the job.
+## Step 2: Register and enable scheduling
 
-**Assertion:** the process definition compiles and `Build()` returns a `ProcessDefinition` with five elements.
-
-## Step 2: Register the process and enable scheduling
+The scheduler is configured at the top level with `schema.UseScheduling()`. The flow bridge is a
+separate `UseScheduling()` chained off the `SchemataFlowBuilder` that `UseFlow` returns:
 
 ```csharp
 builder.UseSchemata(schema => {
-    schema.UseFlow(flow => flow.Use<ApprovalProcess>());
-    schema.UseScheduling();
-    schema.UseFlowScheduling();
+    schema.UseScheduling();          // the scheduler itself
+
+    schema.UseFlow()
+          .UseScheduling()           // the flow timer bridge
+          .Use<ApprovalProcess>();
 });
 ```
 
-`UseFlowScheduling()` adds `SchemataFlowSchedulingFeature` (priority `SchemataFlowFeature.DefaultPriority + 400_000` = 480,400,000). It declares `[DependsOn<SchemataFlowFeature>]` and `[DependsOn<SchemataSchedulingFeature>]`, so explicit `UseFlow()` and `UseScheduling()` calls are convenient but optional.
+The flow-builder `UseScheduling()` adds `SchemataFlowSchedulingFeature` (priority `480_400_000`). It
+depends on `SchemataFlowFeature` and `SchemataSchedulingFeature`, so both are pulled in if missing.
+The feature registers `FlowTimerTransitionAdvisor` as a scoped `IFlowTransitionAdvisor`.
 
-`SchemataFlowSchedulingFeature.ConfigureServices` registers `FlowTimerTransitionObserver` as a scoped `IFlowTransitionObserver`. The observer runs on every transition and checks whether the new waiting element is an `IntermediateCatch` timer event.
+**Check:** the app starts with no missing-feature errors.
 
-**Assertion:** the application starts and logs no missing-feature errors.
-
-## Step 3: Start a process instance
+## Step 3: Start an instance
 
 ```csharp
-public sealed class ApprovalsController : ControllerBase
+public sealed class ApprovalsController(IProcessRuntime runtime) : ControllerBase
 {
-    private readonly IProcessRuntime _runtime;
-
-    public ApprovalsController(IProcessRuntime runtime) { _runtime = runtime; }
-
     [HttpPost("approvals")]
     public async Task<IActionResult> Start(CancellationToken ct)
     {
-        var instance = await _runtime.StartProcessInstanceAsync(
-            "approval", variables: null, principal: User, ct);
-        return Accepted(new { instance.StateId });
+        var process = await runtime.StartProcessInstanceAsync(
+            "ApprovalProcess", variables: null, principal: User, ct: ct);
+        return Accepted(new { process.State });
     }
 }
 ```
 
-After `StartProcessInstanceAsync` the engine advances through `start` and `review` automatically (both are activities with no blocking condition). When the engine reaches `wait-24h`, it stops and sets `SchemataProcess.WaitingAtId = "wait-24h"`.
+The engine advances through `Review` and stops at the timer catch, setting `WaitingAtId`. In the
+transition's pre-commit window, `FlowTimerTransitionAdvisor` resolves `IScheduler`, converts the
+`TimerDefinition` to a schedule, and schedules a `SchemataJob`:
 
-`FlowTimerTransitionObserver.OnTransitionedAsync` then runs. It always calls `IScheduler.UnscheduleJobAsync(jobName, ct)` with `jobName = flow-{process.CanonicalName}`, then resolves the `TimerDefinition`, converts it to an `IScheduleDefinition` via `TimerDefinitionConverter.ToSchedule`, builds a `SchemataJob`, and hands it to `IScheduler.ScheduleJobAsync(job, ct)`. The scheduler owns the `SchemataJob` row; the observer does not persist directly.
+- `Name` = `flow-{process.CanonicalName}-{timerCatchElementId}`.
+- `JobKey` = `FlowTimerJob`'s full type name.
+- `State` = `JobState.Active`.
+- Job variables carry `processName` (the canonical name) and `timerDef`.
 
-**Assertion:** `POST /approvals` returns `202 Accepted` with `stateId` equal to `"wait-24h"`. The scheduler reports a `SchemataJob` named `flow-processes/<process-name>` in the active set.
+A timer catch with no scheduler registered throws `FailedPreconditionException`, aborting the
+transition rather than parking on a timer nothing will fire.
 
-## Step 4: Observe the timer fire
+**Check:** `POST /approvals` returns `202` and the instance waits at the timer catch; the scheduler
+holds a job named `flow-{canonicalName}-{timerCatchElementId}`.
 
-When the scheduled time arrives, `DefaultScheduler` activates `FlowTimerJob` via DI auto-activation (`scope.ServiceProvider.GetRequiredService(jobType)`). `FlowTimerJob` reads `processName` and `timerDef` from `JobContext.Variables`, loads the process instance, and calls `_runtime.TriggerEventAsync(processName, timerDef, ct: ct)`.
+## Step 4: Watch the timer fire
 
-The runtime advances the process from `wait-24h` to `approve` and then to `end`. `FlowTimerTransitionObserver.OnTransitionedAsync` runs again, calls `UnscheduleJobAsync` to clean up the now-fired timer entry, and skips the schedule step because `instance.IsComplete` is true.
+When the scheduled time arrives, the scheduler activates `FlowTimerJob` from the DI scope by its job
+key. `FlowTimerJob.ExecuteAsync` reads `processName` and `timerDef` from `JobContext.Variables` and
+calls `runtime.TriggerEventAsync(processName, timerDef, ct: ct)`.
 
-To test without waiting 24 hours, set a short duration:
+The runtime advances the instance from the timer catch to `Approve` and on to the end event. The
+advisor runs again, cancels the now-fired job, and adds nothing because the instance is complete.
+
+To test without waiting a day, shorten the duration:
 
 ```csharp
-TimeExpression = "PT5S",   // 5 seconds
+this.During(Review).Await(
+    this.OnTimer(TimeSpan.FromSeconds(5)).Go(Approve));
 ```
 
-**Assertion:** 5 seconds after `POST /approvals`, the `SchemataProcess` row has `WaitingAtId = null` and `IsComplete = true`. The `SchemataJob` row transitions to `JobState.Completed`.
+**Check:** about 5 seconds after `POST /approvals`, the `SchemataProcess` row has `WaitingAtId = null`
+and reaches its end state.
 
-## Step 5: Handle a cycle timer
+## Step 5: Date and cycle timers
 
-For a recurring check (e.g., poll every hour until a condition is met), use `TimerType.Cycle`:
+`OnTimer(TimeSpan)` only builds Duration timers. For an absolute `Date` timer or a recurring `Cycle`
+timer, build the `EventBranch` from an explicit `TimerDefinition` and place it behind an event
+gateway with `.Await(...)`:
 
 ```csharp
-Definition = new TimerDefinition {
+// A cron-driven catch: top of every hour, Cronos 5-field.
+new TimerDefinition {
+    Name           = "hourly-check",
     TimerType      = TimerType.Cycle,
-    TimeExpression = "0 * * * *",   // top of every hour, 5-field Cronos
-},
+    TimeExpression = "0 * * * *",
+};
 ```
 
-`TimerDefinitionConverter.ToSchedule` wraps this in `CronSchedule`, which calls `CronExpression.Parse(expression)` using the Cronos default format (5 fields: minute hour day month weekday). Do not use a seconds field or Quartz-style `?` — Cronos rejects both.
-
-Each time the job fires, `FlowTimerJob` calls `TriggerEventAsync`. If the process is still waiting at the timer element, the engine re-evaluates the outgoing sequence flows. To exit the cycle, add an exclusive gateway after the timer that checks a process variable.
-
-**Assertion:** with `TimeExpression = "* * * * *"` (every minute), the process transitions once per minute. Removing the process instance stops further firings because `FlowTimerJob` returns early when `SingleOrDefaultAsync` finds no matching row.
+`TimerDefinitionConverter.ToSchedule` wraps a `Cycle` expression in `CronSchedule`, which parses it
+with Cronos's default 5-field format (`minute hour day-of-month month day-of-week`). A seconds field
+or a Quartz-style `?` throws `CronFormatException`. A cycle timer fires repeatedly; route an exclusive
+gateway after the catch to leave the cycle once a process variable says so.
 
 ## Common pitfalls
 
-**`FlowTimerJob` is not registered explicitly.** The scheduler resolves it via `scope.ServiceProvider.GetRequiredService(jobType)` using the assembly-qualified name from the job row. The default DI container constructs `FlowTimerJob` from its registered dependencies (`IProcessRuntime`, `IProcessRegistry`); any missing dependency surfaces at execution time. Containers that refuse `GetRequiredService` for unregistered types need `services.AddScoped<FlowTimerJob>()`.
+**`FlowTimerJob` is activated by key, not pre-registered.** The scheduler resolves it from the DI
+scope when the job fires. The default container constructs it from its `IProcessRuntime` dependency;
+a container that refuses unregistered types needs `services.AddScoped<FlowTimerJob>()`.
 
-**Audit failure leaves the scheduler ahead of the audit row.** `FlowTimerTransitionObserver` calls `IScheduler` directly inside `OnTransitionedAsync`, before `SchemataProcessAuditObserver.OnTransitionedAsync` persists the new state. If the audit write fails, the scheduler already holds the new job (or has unscheduled the previous one) while the persisted `SchemataProcess` row still points at the old state. Reconciliation is the application's responsibility — either retry the audit observer or run a sweep that drops scheduler jobs without a matching active process.
+**The job is scheduled before the transition commits.** `FlowTimerTransitionAdvisor` runs in the
+pre-commit window. If the commit later fails, the scheduled job outlives the rolled-back instance;
+reconcile by dropping scheduler jobs with no matching waiting instance.
 
-**ISO 8601 duration vs. cron.** `PT24H` is a duration (relative to now). `0 0 * * *` is a cron (absolute schedule). Mixing them up produces a `CronSchedule` that tries to parse `PT24H` as a cron expression and throws `CronFormatException` at schedule time.
+**Duration is not cron.** `PT24H` is a duration relative to now; `0 0 * * *` is an absolute cron.
+Passing a duration string with `TimerType.Cycle` builds a `CronSchedule` that fails to parse it.
 
 ## See also
 
-- [guides/flow.md](../guides/flow.md) — BPMN process basics and `UseFlow`
-- [guides/scheduling.md](../guides/scheduling.md) — `UseScheduling` and `WithJob`
-- [cookbook/cron-jobs.md](cron-jobs.md) — Cronos cron syntax and missed-fire policy
-- [cookbook/flow-with-events.md](flow-with-events.md) — event-based gateway and message correlation
-- [documents/flow/scheduling.md](../documents/flow/scheduling.md) — `FlowTimerTransitionObserver` and `FlowTimerJob` internals
-- [documents/scheduling/overview.md](../documents/scheduling/overview.md) — scheduler architecture
+- [flow.md](../guides/flow.md) — BPMN basics and `UseFlow`
+- [scheduling.md](../guides/scheduling.md) — `UseScheduling` and `WithJob`
+- [cron-jobs.md](cron-jobs.md) — Cronos cron syntax and missed-fire policy
+- [flow-with-events.md](flow-with-events.md) — event-based gateway and message correlation
+- [scheduling.md (reference)](../documents/flow/scheduling.md) — the advisor and job internals

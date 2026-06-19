@@ -22,10 +22,8 @@ public sealed class RunJobRequest : ICanonicalName
 
     #region ICanonicalName Members
 
-    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
-    /// <inheritdoc cref="ICanonicalName.CanonicalName" />
     public string? CanonicalName { get; set; }
 
     #endregion

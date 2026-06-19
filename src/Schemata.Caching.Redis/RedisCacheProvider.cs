@@ -58,7 +58,6 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     #region ICacheProvider Members
 
-    /// <inheritdoc />
     public async Task<byte[]?> GetAsync(string key, CancellationToken ct = default) {
         var result = await _db.StringGetAsync(key);
         if (!result.IsNull) {
@@ -68,7 +67,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         return (byte[]?)result;
     }
 
-    /// <inheritdoc />
     public async Task SetAsync(
         string            key,
         byte[]            value,
@@ -88,7 +86,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         await tx.ExecuteAsync();
     }
 
-    /// <inheritdoc />
     public async Task<bool> TryAddAsync(
         string            key,
         byte[]            value,
@@ -109,7 +106,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         return true;
     }
 
-    /// <inheritdoc />
     public async Task<bool> TryReplaceAsync(
         string            key,
         byte[]            expected,
@@ -129,7 +125,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         return (long)result == 1;
     }
 
-    /// <inheritdoc />
     public async Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
         var result = await _db.ScriptEvaluateAsync(
             RemoveScript,
@@ -139,7 +134,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         return (long)result == 1;
     }
 
-    /// <inheritdoc />
     public async Task RemoveAsync(string key, CancellationToken ct = default) {
         var tx = _db.CreateTransaction();
         await tx.KeyDeleteAsync(key);
@@ -147,7 +141,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         await tx.ExecuteAsync();
     }
 
-    /// <inheritdoc />
     public async Task CollectionAddAsync(
         string            key,
         string            member,
@@ -167,7 +160,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         await tx.ExecuteAsync();
     }
 
-    /// <inheritdoc />
     public async Task<IReadOnlyList<string>?> CollectionMembersAsync(string key, CancellationToken ct = default) {
         var members = await _db.SetMembersAsync(key);
         if (members.Length == 0) {
@@ -179,7 +171,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         return members.Select(m => m.ToString()).ToList();
     }
 
-    /// <inheritdoc />
     public async Task CollectionRemoveAsync(string key, ICollection<string> members, CancellationToken ct = default) {
         await _db.SetRemoveAsync(key, members.Select(m => (RedisValue)m).ToArray());
 
@@ -191,7 +182,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         await RefreshAsync(key);
     }
 
-    /// <inheritdoc />
     public async Task CollectionRemoveAsync(string key, string member, CancellationToken ct = default) {
         await _db.SetRemoveAsync(key, member);
 
@@ -203,7 +193,6 @@ public sealed class RedisCacheProvider : ICacheProvider
         await RefreshAsync(key);
     }
 
-    /// <inheritdoc />
     public Task CollectionClearAsync(string key, CancellationToken ct = default) { return RemoveAsync(key, ct); }
 
     #endregion
@@ -248,8 +237,8 @@ public sealed class RedisCacheProvider : ICacheProvider
         try {
             options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes)!;
         } catch (JsonException) {
-            // Corrupt metadata cannot drive a sliding-expiration refresh; drop it so the next
-            // write re-establishes a readable companion key.
+            // Corrupt metadata is unusable for sliding-expiration refresh; drop it so the next
+            // write creates a readable companion key.
             await _db.KeyDeleteAsync(meta);
             return;
         }

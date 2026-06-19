@@ -38,20 +38,36 @@ public class ScheduledJobRegistryShould
         Assert.Null(registry.ResolveKey(typeof(NonJob)));
     }
 
-    private sealed class DefaultKeyJob : IScheduledJob
-    {
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
-    }
+    #region Nested type: AttributeKeyJob
 
     [ScheduledJob("jobs:attribute")]
     private sealed class AttributeKeyJob : IScheduledJob
     {
-        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
+
+        #endregion
     }
 
+    #endregion
+
+    #region Nested type: DefaultKeyJob
+
+    private sealed class DefaultKeyJob : IScheduledJob
+    {
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: NonJob
+
     private sealed class NonJob;
+
+    #endregion
 }

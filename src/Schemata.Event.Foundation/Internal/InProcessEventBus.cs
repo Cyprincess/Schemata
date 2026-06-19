@@ -23,6 +23,7 @@ public sealed class InProcessEventBus : IEventBus
     private readonly ILogger<InProcessEventBus>? _logger;
     private readonly IServiceProvider            _services;
 
+    /// <summary>Initializes an in-process event bus using scoped handlers and lifecycle observers.</summary>
     public InProcessEventBus(
         IServiceProvider             services,
         IOptions<JsonSerializerOptions> json,
@@ -87,8 +88,8 @@ public sealed class InProcessEventBus : IEventBus
             eventCtx.Exception = ex;
             throw;
         } finally {
-            // Same contract as PublishAsync: consume advisors are observational; the
-            // handler has either returned or thrown, so all three results converge.
+            // PublishAsync uses the same observational consume-advisor contract; the
+            // handler has either returned or thrown, so all three advice results converge.
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
             switch (await Advisor.For<IEventConsumeAdvisor>()
                                  .RunAsync(consumeAdviceCtx, eventCtx, ct)) {

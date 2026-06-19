@@ -8,5 +8,8 @@ namespace Schemata.Abstractions.Resource;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class GrpcResourceAttribute() : ResourceEndpointAttributeBase(Name)
 {
+    /// <summary>
+    ///     Endpoint protocol name used for gRPC resource exposure.
+    /// </summary>
     public const string Name = "gRPC";
 }

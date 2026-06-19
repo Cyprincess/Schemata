@@ -1,24 +1,49 @@
 # Modules
 
-`Schemata.Modular` is the runtime that loads and orchestrates application modules. Modules are themselves declared by package and project references — `Schemata.Application.Modular.Targets.targets` emits the `[assembly: ModuleAttribute("<name>")]` markers on the host during build, so application authors never write the attribute by hand. The runtime feature, `SchemataModulesFeature`, runs at priority 500,000,000 and drives a three-phase lifecycle on every discovered module.
+`Schemata.Modular` loads and orchestrates application modules. A module is wired in by a package or
+project reference: `Schemata.Application.Modular.Targets.targets` stamps an
+`[assembly: ModuleAttribute("<name>")]` onto the host during build, so application authors never
+write the attribute by hand. The runtime feature, `SchemataModulesFeature<TProvider, TRunner>`,
+runs at Priority 520,000,000 and drives a three-phase lifecycle on every discovered module.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Abstractions` | `Modular/IModule.cs`, `Modular/ModuleBase.cs`, `Modular/ModuleAttribute.cs`, `Modular/ModuleDescriptor.cs` |
-| `Schemata.Modular` | `Extensions/SchemataBuilderExtensions.cs` (three `UseModular` overloads), `Features/SchemataModulesFeature.cs`, `DefaultModulesProvider.cs`, `DefaultModulesRunner.cs`, `IModulesProvider.cs`, `IModulesRunner.cs` |
-| `targets/Schemata.Application.Targets` | `Schemata.Application.Modular.Targets.targets` — emits the discovery attributes during host build |
-| `targets/Schemata.Module.Targets` | `Schemata.Module.Targets.targets` (project-side `GetModuleProjectName` target), `Package.Build.props` (NuGet-side `ModulePackageNames` contribution) |
+| `Schemata.Abstractions` | `Modular/IModule.cs`, `Modular/ModuleBase.cs`, `Modular/ModuleAttribute.cs` |
+| `Schemata.Modular` | `Extensions/SchemataBuilderExtensions.cs` (three `UseModular` overloads), `Features/SchemataModulesFeature.cs`, `DefaultModulesProvider.cs`, `DefaultModulesRunner.cs`, `ModuleDescriptor.cs`, `IModulesProvider.cs`, `IModulesRunner.cs` |
+| `targets/Schemata.Application.Targets` | `Schemata.Application.Modular.Targets.targets` — stamps the discovery attributes |
+| `targets/Schemata.Module.Targets` | `Schemata.Module.Targets.targets` (`GetModuleProjectName`), `Package.Build.props` (`ModulePackageNames`) |
+
+## IModule and ModuleBase
+
+`Schemata.Abstractions.Modular.IModule` extends `IFeature`, so it carries `Order` and `Priority`.
+`ModuleBase` defaults `Order` to 0 and `Priority` to `Order`. The lifecycle methods mirror a
+feature's:
+
+```csharp
+public abstract class ModuleBase : IModule
+{
+    public virtual int Order    => 0;
+    public virtual int Priority => Order;
+    // ConfigureServices / ConfigureApplication / ConfigureEndpoints overrides
+}
+```
+
+Implement `IModule` directly only when `Order` and `Priority` must differ.
 
 ## Build-time wiring
 
-Module discovery is a build-time concern. There are two roles:
+Module discovery is a build-time concern with two roles:
 
-1. **Module project.** Adds one of the `Schemata.Module.*.Targets` packages. That package packs `build/Package.Build.props` (which adds `ModulePackageNames Include="<package-name>"`) and `build/<package>.targets` (which exposes `GetModuleProjectName`, returning `$(AssemblyName)`).
-2. **Host project.** Adds one of the `Schemata.Application.*.Targets` packages with `UseModularTargets=true`. That package adds a `<ProjectReference>` to `Schemata.Modular` and packs `Schemata.Application.Modular.Targets.targets`.
+1. **Module project.** References one of the `Schemata.Module.*.Targets` packages. That package
+   packs `build/Package.Build.props` (adding `ModulePackageNames Include="<package-name>"`) and
+   `build/<package>.targets` (exposing `GetModuleProjectName`, which returns `$(AssemblyName)`).
+2. **Host project.** References an `Schemata.Application.*.Targets` package with
+   `UseModularTargets=true`. That package adds a `ProjectReference` to `Schemata.Modular` and packs
+   `Schemata.Application.Modular.Targets.targets`.
 
-During the host build, the packed target runs `AfterResolveReferences`:
+During the host build, the packed target runs after `AfterResolveReferences`:
 
 ```xml
 <Target Name="ResolveModuleProjectReferences" AfterTargets="AfterResolveReferences">
@@ -42,34 +67,45 @@ During the host build, the packed target runs `AfterResolveReferences`:
 </Target>
 ```
 
-The result is one `[assembly: Schemata.Abstractions.Modular.ModuleAttribute("<name>")]` per discovered module, emitted into the generated assembly-info source. `<name>` is `$(AssemblyName)` for project references and `$(MSBuildThisFileName)` for packaged modules — in both cases the value is the assembly name the runtime will pass to `Assembly.Load`.
+The result is one `[assembly: Schemata.Abstractions.Modular.ModuleAttribute("<name>")]` per
+discovered module in the generated assembly-info source. `<name>` is `$(AssemblyName)` for project
+references and `$(MSBuildThisFileName)` for packaged modules — in both cases the assembly name the
+runtime passes to `Assembly.Load`.
 
-A bare `Schemata.Application.Targets` or `Schemata.Application.Persisting.Targets` host package does not set `UseModularTargets=true`, so the emission step is skipped and no module attributes appear in the host assembly.
+A bare `Schemata.Application.Targets` or `Schemata.Application.Persisting.Targets` host package does
+not set `UseModularTargets=true`, so no module attributes are stamped.
 
 ## Runtime sequence
 
-`UseModular()` adds `SchemataModulesFeature<TProvider, TRunner>` at `Priority = SchemataConstants.Orders.Extension + 120_000_000` (520,000,000). The three lifecycle phases are:
+`UseModular()` adds `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at
+`Priority = SchemataConstants.Orders.Extension + 120_000_000` (520,000,000).
 
 **ConfigureServices.**
-1. `Utilities.CreateInstance<IModulesProvider>(TProvider, logger, configuration, environment)` constructs the provider.
-2. `provider.GetModules()` returns module descriptors. The default implementation scans the entry assembly for `ModuleAttribute` instances, calls `Assembly.Load(name)` for each, finds the first non-abstract type implementing `IModule`, harvests assembly metadata (`AssemblyProductAttribute`, `AssemblyDescriptionAttribute`, `AssemblyCompanyAttribute`, `AssemblyCopyrightAttribute`, `AssemblyInformationalVersionAttribute`), and adds a `ModuleDescriptor` to a process-wide `ConcurrentBag`.
-3. The result is stored on `SchemataOptions` through `SetModules`.
-4. `Utilities.CreateInstance<IModulesRunner>(TRunner, logger, schemata, configuration, environment)` constructs the runner.
-5. `runner.ConfigureServices(services, configuration, environment)` runs. The default runner instantiates each module via `Utilities.CreateInstance` (so module constructors may take DI-resolved parameters), sorts the list by `Order`, registers each instance as a singleton (both as the concrete type and as `IModule`), then calls each module's `ConfigureServices` through reflection (`Utilities.CallMethod`).
-6. The runner is registered as a singleton `IModulesRunner`.
+1. `Utilities.CreateInstance<IModulesProvider>(TProvider, logger, configuration, environment)`
+   builds the provider.
+2. `provider.GetModules()` returns descriptors. `DefaultModulesProvider` scans the entry assembly
+   for `ModuleAttribute` instances, calls `Assembly.Load(name)` for each, finds the first
+   non-abstract `IModule` type, harvests assembly metadata
+   (`AssemblyProductAttribute` → `DisplayName`, `AssemblyDescriptionAttribute`,
+   `AssemblyCompanyAttribute`, `AssemblyCopyrightAttribute`, `AssemblyInformationalVersionAttribute`,
+   falling back to `AssemblyVersionAttribute`), and adds a `ModuleDescriptor` to a static
+   `ConcurrentBag`.
+3. The descriptors are stored on `SchemataOptions` via `SetModules`.
+4. `Utilities.CreateInstance<IModulesRunner>(TRunner, logger, schemata, configuration, environment)`
+   builds the runner.
+5. `runner.ConfigureServices(...)` instantiates each module via `Utilities.CreateInstance`, sorts by
+   `Order`, registers each as a singleton (concrete type and `IModule`), then invokes each module's
+   `ConfigureServices` by reflection (`Utilities.CallMethod`) when the method exists.
+6. The runner registers as a singleton `IModulesRunner`.
 
-**ConfigureApplication.** Resolves the runner from DI, which sorts the in-memory module list by `Priority` and calls each module's `ConfigureApplication` via reflection.
-
-**ConfigureEndpoints.** Same flow as `ConfigureApplication`, against the module's `ConfigureEndpoints` method.
-
-Late-arriving features added during another feature's `ConfigureServices` are only invoked for the lifecycle phases that have not yet started; module additions during `ConfigureServices` are picked up only if they entered the dictionary before the sorted snapshot.
+**ConfigureApplication / ConfigureEndpoints.** Resolve the registered `IModule` instances, sort by
+`Priority`, and invoke the corresponding lifecycle method by reflection when it exists.
 
 ## Writing a module
 
-A typical module inherits `ModuleBase` and overrides whichever lifecycle methods it needs:
+A module inherits `ModuleBase` and overrides the lifecycle methods it needs:
 
 ```csharp
-// In MyCompany.MyModule
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
@@ -82,73 +118,63 @@ public sealed class MyModule : ModuleBase
     public override int Order => 100;
 
     public override void ConfigureServices(
-        IServiceCollection  services,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
+        IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment
     ) {
         services.AddScoped<IMyService, MyService>();
     }
 
-    public override void ConfigureApplication(
-        IApplicationBuilder app,
-        IConfiguration      configuration,
-        IWebHostEnvironment environment
-    ) {
-        app.UseMiddleware<MyMiddleware>();
-    }
-
     public override void ConfigureEndpoints(
-        IApplicationBuilder   app,
-        IEndpointRouteBuilder endpoints,
-        IConfiguration        configuration,
-        IWebHostEnvironment   environment
+        IApplicationBuilder app, IEndpointRouteBuilder endpoints,
+        IConfiguration configuration, IWebHostEnvironment environment
     ) {
         endpoints.MapGet("/my-module/health", () => "ok");
     }
 }
 ```
 
-`ModuleBase` defaults to `Order = 0` and `Priority = Order`. Implement `IModule` directly when the two axes must differ.
-
-The host project then adds the module as a `<ProjectReference>` or `<PackageReference>`. No `[assembly: Module("MyCompany.MyModule")]` is needed in the host source — the build target emits it automatically.
+The host then references the module as a `ProjectReference` or `PackageReference`. No
+`[assembly: Module(...)]` in the host source — the build target stamps it.
 
 ## Extension points
 
 | Interface | Purpose |
 | --- | --- |
 | `IModulesProvider` | Replace `DefaultModulesProvider` to discover modules from a non-attribute source (database, plugin directory, custom configuration). |
-| `IModulesRunner` | Replace `DefaultModulesRunner` to customise how lifecycle methods are invoked. |
-| `IModule` | Implement directly for full control over `Order` and `Priority`; use `ModuleBase` for the common case where they match. |
+| `IModulesRunner` | Replace `DefaultModulesRunner` to change how lifecycle methods are invoked. |
+| `IModule` | Implement directly for independent `Order` and `Priority`; use `ModuleBase` when they match. |
 
-`UseModular` exposes three overloads to cover the combinations:
+`UseModular` has three overloads (runner first, provider second):
 
 ```csharp
-builder.UseSchemata(schema => schema.UseModular());                          // default provider + runner
-schema.UseModular<MyRunner>();                                               // custom runner, default provider
-schema.UseModular<MyRunner, MyProvider>();                                   // both custom
+builder.UseSchemata(schema => schema.UseModular());        // default provider + runner
+schema.UseModular<MyRunner>();                             // custom runner, default provider
+schema.UseModular<MyRunner, MyProvider>();                 // both custom
 ```
 
-## Design motivation
+## Design rationale
 
-Pushing module discovery into MSBuild keeps the host source free of per-module bookkeeping. Adding or removing a module is a single `<ProjectReference>` or `<PackageReference>` change; the host build picks up the new attribute on its own, and the rest of the toolchain (the targets matrix, the analyzer pack, the version metadata) follows from the package layer.
-
-`DefaultModulesProvider` resolves module assemblies through `Assembly.Load(name)` rather than `Type.GetType("Namespace.Type, Assembly")` so that authors do not have to expose a specific entry type name. The provider then scans the loaded assembly for the first concrete `IModule` implementation. This indirection allows a module assembly to rename its module class without changing anything in the host's build configuration.
-
-The static `ConcurrentBag` cache inside `DefaultModulesProvider` prevents repeated assembly scanning when the provider is instantiated multiple times in the same process (typical inside integration test hosts).
+Pushing discovery into MSBuild keeps the host source free of per-module bookkeeping: adding or
+removing a module is a single reference change, and the build stamps the matching attribute on its
+own. `DefaultModulesProvider` resolves module assemblies with `Assembly.Load(name)` and then scans
+for the first concrete `IModule`, so a module assembly can rename its module class without touching
+the host's build configuration. The static `ConcurrentBag` cache avoids rescanning when the
+provider is constructed several times in one process (typical in integration-test hosts).
 
 ## Caveats
 
-- `[Module]` attributes appearing in the host source are tolerated (`AllowMultiple = true`), but they bypass the build-time emission path and are easy to drift from the actual reference graph. Author modules through `<ProjectReference>` or `<PackageReference>` only.
-- `Schemata.Application.Targets` and `Schemata.Application.Persisting.Targets` do not enable `UseModularTargets`. Hosts that need modular discovery must reference `Schemata.Application.Modular.Targets` or `Schemata.Application.Complex.Targets`.
-- `DefaultModulesProvider` caches descriptors in a static `ConcurrentBag`. Multiple test hosts that share the same process see the same cache; use a custom `IModulesProvider` in tests when isolation matters.
-- Module lifecycle methods are invoked via reflection through `Utilities.CallMethod`. A method whose name does not match one of the three lifecycle hooks is silently ignored — there is no compile-time enforcement.
-- `DefaultModulesRunner.ConfigureServices` sorts modules by `Order`; `ConfigureApplication` and `ConfigureEndpoints` sort by `Priority`. These are independent axes matching the same `Order` / `Priority` split used by features.
-- `ModuleAttribute.Name` is the assembly name `Assembly.Load` will use. The XML doc on the attribute uses the phrase "fully-qualified type name", which predates the build-time emission path and is misleading; the code itself uses `Assembly.Load`, so an assembly name is what flows in at runtime.
+- `ModuleAttribute.Name` is the assembly name `Assembly.Load` consumes. Its XML doc still reads
+  "fully-qualified type name", which predates the build-time stamping path; the code uses
+  `Assembly.Load`, so an assembly name is what flows in.
+- A hand-authored `[assembly: Module(...)]` in the host is tolerated (`AllowMultiple = true`) but
+  bypasses the build-time path and drifts from the reference graph. Author modules through
+  references only.
+- `DefaultModulesProvider` caches descriptors in a static `ConcurrentBag`. Test hosts sharing a
+  process share the cache; supply a custom `IModulesProvider` when test isolation matters.
+- A module method whose name does not match one of the three lifecycle hooks is never invoked;
+  there is no compile-time check.
 
 ## See also
 
-- [Built-in Features](core/built-in-features.md) — full feature priority table
-- [Feature System](core/feature-system.md) — `Order` vs `Priority` semantics
-- [Packages](packages.md) — `Schemata.Application.*.Targets` and `Schemata.Module.*.Targets` matrix
 - [Modular guide](../guides/modular.md) — extracting an entity into a module
+- [Packages](packages.md) — the `Schemata.Application.*.Targets` / `Schemata.Module.*.Targets` matrix
 - [Module Packaging](../cookbook/module-packaging.md) — packaging a module for downstream hosts

@@ -79,8 +79,7 @@ public class OperationHandlerUpdateShould
         var entity  = _fixture.Students[0];
         entity.Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" };
         var request = new Student {
-            Profile    = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" },
-            UpdateMask = "profile.display_name",
+            Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" }, UpdateMask = "profile.display_name",
         };
 
         await handler.UpdateAsync(entity.CanonicalName!, request, null, null);
@@ -124,8 +123,7 @@ public class OperationHandlerUpdateShould
         var handler = _fixture.CreateHandler();
         var request = new Student { FullName = "Ghost" };
 
-        await Assert.ThrowsAsync<NotFoundException>(() => handler.UpdateAsync(
-                                                        "students/zoe-9", request, null, null));
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.UpdateAsync("students/zoe-9", request, null, null));
     }
 
     [Fact]

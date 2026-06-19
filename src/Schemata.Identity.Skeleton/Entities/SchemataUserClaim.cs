@@ -6,6 +6,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     Identity user claim entity with Schemata identifiers and timestamps.
+/// </summary>
 [Table("SchemataUserClaims")]
 [PrimaryKey(nameof(Uid))]
 public class SchemataUserClaim : IdentityUserClaim<Guid>, IIdentifier, ITimestamp

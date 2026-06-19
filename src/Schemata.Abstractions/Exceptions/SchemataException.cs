@@ -14,7 +14,7 @@ namespace Schemata.Abstractions.Exceptions;
 ///     detail entries per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 ///     Middleware produces structured error responses from this information
-///     without catching individual exception types.
+///     through the common exception base type.
 /// </remarks>
 public class SchemataException : Exception
 {
@@ -29,7 +29,7 @@ public class SchemataException : Exception
     ///     (e.g. <c>"NOT_FOUND"</c>).
     /// </param>
     /// <param name="message">
-    ///     Developer-oriented diagnostic message; not localized for end-user display.
+    ///     Developer-oriented diagnostic message for logs and API clients.
     /// </param>
     public SchemataException(int code, string? status = null, string? message = null) : base(message) {
         Code   = code;
@@ -59,9 +59,9 @@ public class SchemataException : Exception
     ///     Subclasses may override to produce protocol-specific envelopes — for example,
     ///     <see cref="OAuthException" /> returns an <see cref="OAuthErrorResponse" /> per
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
-    ///     instead of the default <see cref="ErrorResponse" />.
+    ///     for protocol-specific error serialization.
     /// </remarks>
-    /// <param name="requestId">Optional request identifier; same semantics as the typed overload.</param>
+    /// <param name="requestId">Optional request identifier included in <see cref="RequestInfoDetail" />.</param>
     /// <param name="domain">Optional ErrorInfo domain.</param>
     public virtual object? CreateErrorResponse(string? requestId = null, string? domain = null) {
         var status  = Status ?? ErrorCodes.Internal;
@@ -84,6 +84,12 @@ public class SchemataException : Exception
         };
     }
 
+    /// <summary>
+    ///     Adds an <see cref="ErrorInfoDetail" /> when the detail list lacks one.
+    /// </summary>
+    /// <param name="details">Mutable detail list for the response.</param>
+    /// <param name="reason">Canonical reason code assigned to the inserted detail.</param>
+    /// <param name="domain">Logical service domain assigned to the inserted detail.</param>
     protected static void EnsureErrorInfo(List<IErrorDetail> details, string reason, string? domain) {
         if (details.Any(d => d is ErrorInfoDetail)) {
             return;
@@ -92,6 +98,11 @@ public class SchemataException : Exception
         details.Insert(0, new ErrorInfoDetail { Reason = reason, Domain = domain, });
     }
 
+    /// <summary>
+    ///     Adds a <see cref="RequestInfoDetail" /> when a request identifier is available.
+    /// </summary>
+    /// <param name="details">Mutable detail list for the response.</param>
+    /// <param name="requestId">Request identifier to include in the detail list.</param>
     protected static void EnsureRequestInfo(List<IErrorDetail> details, string? requestId) {
         if (string.IsNullOrWhiteSpace(requestId)) {
             return;

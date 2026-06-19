@@ -45,7 +45,6 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
 
     #region IInteractionHandler Members
 
-    /// <inheritdoc cref="IInteractionHandler.CodeType" />
     public string CodeType => TokenTypeUris.UserCode;
 
     /// <summary>

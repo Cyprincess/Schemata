@@ -78,7 +78,6 @@ public class ConfiguratorsShould
         var action = configurators.PopOrDefault<string>();
 
         Assert.NotNull(action);
-        // Should not throw when invoked
         action("test");
     }
 
@@ -89,7 +88,6 @@ public class ConfiguratorsShould
         var action = configurators.PopOrDefault<string, int>();
 
         Assert.NotNull(action);
-        // Should not throw when invoked
         action("test", 42);
     }
 }

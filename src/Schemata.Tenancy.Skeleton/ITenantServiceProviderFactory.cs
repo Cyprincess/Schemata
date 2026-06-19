@@ -14,9 +14,8 @@ namespace Schemata.Tenancy.Skeleton;
 ///         Service providers are cached per tenant via <see cref="ITenantProviderCache" />.
 ///     </para>
 ///     <para>
-///         The returned <see cref="ITenantProviderLease" /> pins the cached provider so it
-///         cannot be disposed while in use; callers must dispose the lease when the tenant
-///         scope it backs is disposed.
+    ///         The returned <see cref="ITenantProviderLease" /> pins the cached provider while in use;
+    ///         callers must dispose the lease when the tenant scope it backs is disposed.
 ///     </para>
 /// </remarks>
 public interface ITenantServiceProviderFactory<TTenant>

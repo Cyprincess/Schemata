@@ -10,7 +10,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class ErrorDefinition : IEventDefinition
 {
     /// <summary>
-    ///     An optional BPMN error code for matching without relying on the exception type.
+    ///     An optional BPMN error code used alongside the exception type for matching.
     /// </summary>
     public string? ErrorCode { get; set; }
 

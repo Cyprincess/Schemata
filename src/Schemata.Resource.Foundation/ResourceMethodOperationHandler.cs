@@ -36,6 +36,11 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     private readonly IRepository<TEntity> _repository;
     private readonly IServiceProvider     _sp;
 
+    /// <summary>
+    ///     Initializes the custom-method operation handler.
+    /// </summary>
+    /// <param name="repository">The repository for loading instance-scoped resources.</param>
+    /// <param name="sp">The service provider for resolving advisors and options.</param>
     public ResourceMethodOperationHandler(IRepository<TEntity> repository, IServiceProvider sp) {
         _repository = repository;
         _sp         = sp;

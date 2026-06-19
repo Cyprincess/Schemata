@@ -28,7 +28,7 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string SubjectType { get; set; } = SubjectTypes.Public;
 
-    /// <summary>Salt used to compute pairwise subject identifiers; ignored when SubjectType is "public".</summary>
+    /// <summary>Salt for pairwise subject identifier computation when <see cref="SubjectType" /> is <c>pairwise</c>.</summary>
     public string? PairwiseSalt { get; set; }
 
     /// <summary>Serialization format for access tokens (JWT, JWE, or opaque reference).</summary>
@@ -96,13 +96,13 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string? Issuer { get; set; }
 
-    /// <summary>Asymmetric or symmetric key used to sign JWTs.</summary>
+    /// <summary>Asymmetric or symmetric key for JWT signatures.</summary>
     public SecurityKey? SigningKey { get; set; }
 
     /// <summary>JWS algorithm identifier (e.g., "RS256"); auto-detected from the key when null.</summary>
     public string? SigningAlgorithm { get; set; }
 
-    /// <summary>Key used to encrypt JWE access tokens; null disables JWE.</summary>
+    /// <summary>Key for JWE access token encryption; <see langword="null" /> selects signed JWT or reference tokens.</summary>
     public SecurityKey? EncryptionKey { get; set; }
 
     /// <summary>JWE key-management algorithm (e.g., "RSA-OAEP"); required when EncryptionKey is set.</summary>
@@ -125,14 +125,14 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string? DeviceVerificationUri { get; set; }
 
-    /// <summary>Authentication scheme name used to register the bearer token handler.</summary>
+    /// <summary>Authentication scheme name for the bearer token handler.</summary>
     public string BearerScheme { get; set; } = SchemataAuthorizationSchemes.Bearer;
 
-    /// <summary>Authentication scheme name used to register the authorization-code handler for authorization-endpoint flows.</summary>
+    /// <summary>Authentication scheme name for the authorization-code handler.</summary>
     public string CodeScheme { get; set; } = SchemataAuthorizationSchemes.Code;
 
     /// <summary>
-    ///     Claim type used to read the OP session identifier from the authenticated user principal.
+    ///     Claim type for the OP session identifier on the authenticated user principal.
     ///     Defaults to "sid". Framework users who use a different claim type for their authentication
     ///     session can override this,
     ///     per

@@ -33,6 +33,9 @@ namespace Schemata.Resource.Grpc.Features;
 [DependsOn<SchemataTransportGrpcFeature>]
 public sealed class SchemataGrpcResourceFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default endpoint priority for resource gRPC endpoints.
+    /// </summary>
     public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 200_000;
 
     private static readonly MethodInfo? MapGrpcServiceMethod = typeof(GrpcEndpointRouteBuilderExtensions)

@@ -3,8 +3,8 @@ using Schemata.Abstractions.Json;
 namespace Schemata.Abstractions.Errors;
 
 /// <summary>
-///     Error detail identifying the resource that was the target or subject of a
-///     failed operation, per
+///     Error detail identifying the resource targeted by or involved in a failed
+///     operation, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 [Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.ResourceInfo")]

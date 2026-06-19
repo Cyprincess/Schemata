@@ -1,118 +1,157 @@
 # Flow
 
-Schemata Flow is a BPMN 2.0.2 process engine that lets you model business processes as strongly-typed C# classes and execute them against a persistent state store. A process definition declares the graph of activities, gateways, and events; the engine advances a token through that graph in response to external triggers. Every state transition is persisted as a `SchemataProcessTransition` row, giving you a full audit trail without extra instrumentation.
+Schemata Flow models business processes as strongly-typed C# classes and runs them against a
+persistent store. A `Schemata.Flow.Skeleton.Models.ProcessDefinition` subclass declares a BPMN
+graph; an engine advances a single token through it in response to external triggers. Every
+transition is written as a `SchemataProcessTransition` row, and the live instance state lives on
+a `SchemataProcess` row, so the audit trail is a byproduct of execution. The default engine
+`StateMachineEngine` runs a single-token subset of the BPMN 2.0 AST; richer engines plug in as
+keyed `IFlowRuntime` services.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Skeleton` | `Models/ProcessDefinition.cs`, `Models/FlowElement.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessRuntime.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Observers/IFlowTransitionObserver.cs`, `Observers/FlowTransitionContext.cs` |
-| `Schemata.Flow.Foundation` | `Features/SchemataFlowFeature.cs`, `Builders/FlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessInitializer.cs`, `Observers/SchemataProcessAuditObserver.cs` |
+| `Schemata.Flow.Skeleton` | `Models/ProcessDefinition.cs`, `Models/FlowElement.cs`, `Builders/ProcessBuilder.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Runtime/IFlowRuntime.cs`, `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs` |
+| `Schemata.Flow.Foundation` | `Features/SchemataFlowFeature.cs`, `Builders/SchemataFlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessPersistence.cs`, `ProcessInitializer.cs` |
 | `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs` |
-| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionObserver.cs` |
-| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerTransitionObserver.cs` |
-| `Schemata.Flow.Http` | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessController.cs` |
-| `Schemata.Flow.Grpc` | `Features/SchemataFlowGrpcFeature.cs`, `Services/ProcessService.cs` |
+| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionAdvisor.cs`, `Internal/FlowEventHandler.cs` |
+| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerTransitionAdvisor.cs`, `Internal/FlowTimerJob.cs` |
+| `Schemata.Flow.Http` | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs` |
+| `Schemata.Flow.Grpc` | `Features/SchemataFlowGrpcFeature.cs`, `Services/ProcessDefinitionService.cs` |
 
 ## Package structure
 
-```
-Schemata.Flow.Skeleton        contracts, AST types, entity definitions, observer interfaces
-Schemata.Flow.Foundation      DI wiring, ProcessRegistry, ProcessRuntime, ProcessInitializer, audit observer
-Schemata.Flow.StateMachine    default engine (registered by Foundation, not a separate feature)
-Schemata.Flow.Event           event-based gateway integration (UseFlowEvent)
-Schemata.Flow.Scheduling      timer event integration (UseFlowScheduling)
-Schemata.Flow.Http            HTTP transport (UseFlowHttp)
-Schemata.Flow.Grpc            gRPC transport (UseFlowGrpc)
-```
+| Package | Role |
+| --- | --- |
+| `Schemata.Flow.Skeleton` | AST, entity types, builders, runtime and observer contracts |
+| `Schemata.Flow.Foundation` | `UseFlow` feature, registry, runtime coordinator, persistence |
+| `Schemata.Flow.StateMachine` | Default single-token engine and its validator |
+| `Schemata.Flow.Event` | `UseEvent` (on the flow builder) — message/signal catches bridge to the event bus |
+| `Schemata.Flow.Scheduling` | `UseScheduling` (on the flow builder) — timer catches bridge to the scheduler |
+| `Schemata.Flow.Http` | `MapHttp` — process execution and read endpoints over HTTP |
+| `Schemata.Flow.Grpc` | `MapGrpc` — process execution and read endpoints over gRPC |
+
+`StateMachineEngine` ships in its own package but is wired by `SchemataFlowFeature`; there is no
+separate `Use*` call to activate it. `Schemata.Flow.Foundation` depends on the Event feature:
+`SchemataFlowFeature` carries `[DependsOn<SchemataEventFeature>]` and publishes process lifecycle
+events on the bus.
 
 ## Startup
 
-`UseFlow` on `SchemataBuilder` activates `SchemataFlowFeature` (Priority `Orders.Extension + 80_000_000` = 480,000,000). The optional delegate pre-registers process definitions at startup:
+`UseFlow` on `SchemataBuilder` activates `SchemataFlowFeature` and returns a `SchemataFlowBuilder`
+that registers process definitions:
 
 ```csharp
 builder.UseSchemata(schema => {
-    schema.UseFlow(flow => {
-        flow.Use<OrderProcess>();
-        flow.Use<OrderProcess, Order>(); // with entity type
-    });
+    schema.UseFlow()
+          .Use<OrderProcess>()                          // default StateMachine engine
+          .Use<ComplexProcess>("my-engine")             // custom keyed engine
+          .Use<AuditedProcess>(c => c.WithAuthorization());
 });
 ```
 
-`SchemataFlowFeature.ConfigureServices` does the following:
+`Use<TProcess>()` returns the builder, so definitions chain. An optional
+`Action<ProcessConfiguration>` configures the individual definition without breaking the chain.
 
-1. Pops the `Action<FlowBuilder>` from `Configurators`, runs it, and stores the resulting `ProcessConfiguration` list in `SchemataFlowOptions`.
-2. Registers `IProcessRegistry` as a singleton. On first resolution the registry loads every configuration, validates it against the matching engine validator, and resolves the keyed `IFlowRuntime` service.
-3. Registers `IProcessRuntime` as scoped (`ProcessRuntime`).
-4. Registers `StateMachineEngine` as a keyed singleton under `SchemataConstants.FlowEngines.StateMachine`.
-5. Registers `StateMachineFlowEngineValidator` as `IFlowEngineValidator`.
-6. Registers `SchemataProcessAuditObserver` as `IProcessLifecycleObserver` (scoped). The observer persists the `SchemataProcess` row on start, the `SchemataProcessTransition` row plus updated process state on each transition, and the terminal state on terminate.
-7. Registers `ProcessInitializer` so process definitions configured through `flow.Use<T>()` are materialized into the registry at startup.
+`SchemataFlowFeature.Priority` is `SchemataConstants.Orders.Extension + 80_000_000` = `480_000_000`.
+Its `ConfigureServices`:
+
+1. Registers four flow lifecycle events in `EventTypeRegistryConfiguration`:
+   `ProcessStartedEvent` (`flow.process.started`), `ProcessCompletedEvent`
+   (`flow.process.completed`), `ProcessFailedEvent` (`flow.process.failed`), `TransitionMadeEvent`
+   (`flow.transition.made`).
+2. Registers `IProcessRegistry` (`ProcessRegistry`) as a singleton. The factory eagerly registers
+   every configuration, which validates the definition and resolves its keyed engine.
+3. Registers `IProcessRuntime` (`ProcessRuntime`) as a singleton.
+4. Registers `StateMachineEngine` as a keyed singleton `IFlowRuntime` under
+   `SchemataConstants.FlowEngines.StateMachine` (the string `"statemachine"`).
+5. Registers `StateMachineFlowEngineValidator` as an enumerable `IFlowEngineValidator` singleton.
+6. Adds `ProcessInitializer` as a hosted service. On startup it loads every persisted instance with
+   `WaitingAtId != null` back into the runtime cache so waiting instances survive a restart.
 
 ## Feature priority table
 
-| Feature | Priority |
-| --- | --- |
-| `SchemataFlowFeature` | 480,000,000 |
-| `SchemataFlowHttpFeature` | 480,100,000 |
-| `SchemataFlowGrpcFeature` | 480,200,000 |
-| `SchemataFlowEventFeature` | 480,300,000 |
-| `SchemataFlowSchedulingFeature` | 480,400,000 |
+| Feature | Activation | Priority |
+| --- | --- | --- |
+| `SchemataFlowFeature` | `schema.UseFlow()` | 480,000,000 |
+| `SchemataFlowHttpFeature` | `.MapHttp()` | 480,100,000 |
+| `SchemataFlowGrpcFeature` | `.MapGrpc()` | 480,200,000 |
+| `SchemataFlowEventFeature` | `.UseEvent()` | 480,300,000 |
+| `SchemataFlowSchedulingFeature` | `.UseScheduling()` | 480,400,000 |
+
+The four chained methods hang off the `SchemataFlowBuilder` that `UseFlow` returns. Note the
+asymmetry: the transports are `MapHttp`/`MapGrpc`, while the bridges are `UseEvent` and
+`UseScheduling`. Each feature declares `[DependsOn<SchemataFlowFeature>]`, so `UseFlow` is pulled in
+when missing.
 
 ## Architecture
 
 ```
 ProcessDefinition (C# class, DSL in constructor)
     |
-    v validated by
-IFlowEngineValidator (StateMachineFlowEngineValidator)
+    | validated by IFlowEngineValidator (StateMachineFlowEngineValidator)
+    | held by      IProcessRegistry (ProcessRegistry, singleton)
+    v
+IProcessRuntime (ProcessRuntime, singleton)
+    |  drives the keyed engine, persists, dispatches advisors and observers
+    v
+IFlowRuntime (StateMachineEngine, keyed singleton) -- computes the next ProcessInstance
     |
-    v registered in
-IProcessRegistry (ProcessRegistry, singleton)
-    |
-    v executed by
-IFlowRuntime (StateMachineEngine, keyed singleton)
-    |
-    v coordinated by
-IProcessRuntime (ProcessRuntime, scoped)
-    |
-    v persisted to
-IRepository<SchemataProcess> + IRepository<SchemataProcessTransition>
-    |
-    v observed by
-IFlowTransitionObserver (FlowEventTransitionObserver, FlowTimerTransitionObserver, custom)
-IProcessLifecycleObserver (SchemataProcessAuditObserver, custom)
+    | pre-commit: IFlowTransitionAdvisor pipeline (provisions timers / subscriptions)
+    | commit:     IRepository<SchemataProcess> + IRepository<SchemataProcessTransition>
+    | post-commit: IProcessLifecycleObserver + flow lifecycle events on IEventBus
+    v
+persisted instance + transition row
 ```
+
+## Roles
+
+- **`IProcessRegistry`** holds the compiled definitions and resolves the engine for each. Validation
+  runs once, at registration.
+- **`IProcessRuntime`** is the public surface for callers. It loads instances, invokes the engine,
+  runs the transition advisor pipeline before the commit, writes the `SchemataProcess` and
+  `SchemataProcessTransition` rows in one unit of work, then notifies lifecycle observers and
+  publishes events.
+- **`IFlowRuntime`** is the engine contract. The default `StateMachineEngine` is stateless: all
+  state arrives on the `SchemataProcess` argument and leaves on the returned `ProcessInstance`.
 
 ## Extension points
 
-- **Custom engine**: implement `IFlowRuntime` and register it as a keyed singleton under your engine name. Pass the name to `flow.Use<TProcess>(engine: "my-engine")`.
-- **Transition observers**: implement `IFlowTransitionObserver` and register via `TryAddEnumerable`. Observers run on every state transition with a `FlowTransitionContext` that exposes pre- and post-transition state.
-- **Lifecycle observers**: implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to hook `OnStartedAsync`, `OnTransitionedAsync`, or `OnTerminatedAsync`. Replacing `SchemataProcessAuditObserver` is the path to a custom persistence backend.
-- **Transport**: add `UseFlowHttp()` or `UseFlowGrpc()` for HTTP/gRPC endpoints.
-- **Event integration**: add `UseFlowEvent()` to wire event-based gateways to the event bus.
-- **Timer integration**: add `UseFlowScheduling()` to wire intermediate timer events to the scheduler.
+- **Custom engine** — implement `IFlowRuntime`, register it as a keyed singleton under your engine
+  name, and pass that name to `flow.Use<TProcess>(engine: "...")`.
+- **Transition advisors** — implement `IFlowTransitionAdvisor` (an `IAdvisor<FlowTransitionContext>`)
+  and register via `TryAddEnumerable`. They run in the pre-commit window and provision the
+  infrastructure a new waiting state depends on; a thrown advisor aborts the transition.
+- **Lifecycle observers** — implement `IProcessLifecycleObserver` and register via `TryAddEnumerable`
+  to react to `OnStartedAsync`, `OnTransitionedAsync`, and `OnTerminatedAsync` after the commit.
+- **Transport** — add `MapHttp()` or `MapGrpc()`.
+- **Integrations** — chain `.UseEvent()` to bridge message/signal catches to the event bus, and
+  `.UseScheduling()` to bridge timer catches to the scheduler, off the `UseFlow` builder.
 
-## Design motivation
+## Design rationale
 
-The process definition (a C# class) is separated from the runtime (a keyed service) so engines can be swapped without touching business logic. The default state machine engine covers the majority of BPMN patterns; custom engines plug in without changing `ProcessRuntime` or the observer pipeline.
+The definition (a C# class) is decoupled from the engine (a keyed service), so the execution model
+can be swapped without rewriting business logic. Persistence is one unit of work per transition,
+covering both the instance row and its transition row, so the audit history never diverges from the
+live state. The transition advisor pipeline runs *before* the commit precisely so that a process
+never persists into a waiting state whose wake-up infrastructure (a timer job, an event
+subscription) failed to be created.
 
 ## Caveats
 
-- `SchemataFlowFeature` calls `RegisterAsync(...).AsTask().GetAwaiter().GetResult()` during singleton construction. This is a one-time startup cost; avoid registering processes with expensive constructors.
-- The `StateMachineEngine` rejects `ParallelGateway` and `InclusiveGateway` at runtime with `FailedPreconditionException`. Use the full BPMN AST against a custom `IFlowRuntime` if these gateways are required.
-- Process instances implement `ISoftDelete`. The default repository query filter hides tombstoned rows; use `repository.Once().SuppressQuerySoftDelete()` to read them.
+- `SchemataFlowFeature` materializes `IProcessRegistry` by running `RegisterAsync(...)` synchronously
+  during singleton construction. Registration instantiates each `ProcessDefinition`, which runs its
+  DSL constructor; keep those constructors cheap.
+- `StateMachineEngine` runs a subset of the AST. The validator rejects unsupported elements
+  (parallel/inclusive/complex gateways, sub-processes, multi-instance loops, non-interrupting
+  boundary events) at registration, so a definition that uses them fails fast at startup.
+- `SchemataProcess` implements `ISoftDelete`; the default query filter hides tombstoned instances.
+  Read them inside a `using (repository.SuppressQuerySoftDelete())` scope.
 
 ## See also
 
 - [AST Reference](ast.md)
 - [DSL Reference](dsl.md)
 - [Engine](engine.md)
-- [Validator](validator.md)
 - [Runtime Services](runtime.md)
-- [State Machine](state-machine.md)
-- [Event Integration](event.md)
-- [Scheduling Integration](scheduling.md)
-- [HTTP Transport](http.md)
-- [gRPC Transport](grpc.md)
-

@@ -11,6 +11,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.StateMachine;
 
+/// <summary>Runs supported BPMN process definitions as single-token state machines.</summary>
 public sealed class StateMachineEngine : IFlowRuntime
 {
     #region IFlowRuntime Members

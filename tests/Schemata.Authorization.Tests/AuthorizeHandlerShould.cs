@@ -44,7 +44,7 @@ public class AuthorizeHandlerShould
 
     [Fact]
     public async Task ThrowInvalidClient_WhenApplicationMissing() {
-        // No advisors registered => pipeline returns Continue, but SchemataApplication is never set in context.
+        // An empty advisor pipeline leaves the application unresolved.
         var handler = CreateHandler();
         var request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
 

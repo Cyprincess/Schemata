@@ -6,7 +6,12 @@ using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Advice;
 
-/// <inheritdoc cref="AdviceRunner{TAdvisor, T1}" />
+/// <summary>
+///     Runs advisor pipelines that pass two arguments to each advisor.
+/// </summary>
+/// <typeparam name="TAdvisor">An advisor interface implementing <see cref="IAdvisor{T1, T2}" />.</typeparam>
+/// <typeparam name="T1">The type of the first advisor argument.</typeparam>
+/// <typeparam name="T2">The type of the second advisor argument.</typeparam>
 public static class AdviceRunner<TAdvisor, T1, T2>
     where TAdvisor : IAdvisor<T1, T2>
 {

@@ -29,13 +29,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return GetAsync(new GetRequest { Name = name }, principal, ct);
     }
 
-    /// <inheritdoc cref="GetAsync(string, ClaimsPrincipal?, CancellationToken?)" />
+    /// <summary>
+    ///     Gets a resource from a request object that may include a read mask.
+    /// </summary>
     /// <param name="request">
     ///     The <see cref="GetRequest" /> carrying the resource name and optional
     ///     <c>read_mask</c> per <seealso href="https://google.aip.dev/157">AIP-157: Partial responses</seealso>.
     /// </param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <returns>A <see cref="GetResultBase{TDetail}" /> containing the detail DTO.</returns>
     public async Task<GetResultBase<TDetail>> GetAsync(
         GetRequest         request,
         ClaimsPrincipal?   principal,

@@ -6,6 +6,7 @@ using Schemata.Common;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
+/// <summary>Tracks in-flight RabbitMQ request/response calls by correlation identifier.</summary>
 public sealed class CorrelationTracker : IDisposable
 {
     private readonly ConcurrentDictionary<string, Pending> _pending = new();
@@ -23,6 +24,7 @@ public sealed class CorrelationTracker : IDisposable
 
     #endregion
 
+    /// <summary>Registers a pending response and returns the broker correlation identifier.</summary>
     public string Track<TResponse>(TaskCompletionSource<TResponse> tcs, TimeSpan timeout) {
         var correlationId = Identifiers.NewUid().ToString("n");
         var wrapper       = new TaskCompletionSource<object?>();
@@ -31,8 +33,8 @@ public sealed class CorrelationTracker : IDisposable
         _pending[correlationId] = new(wrapper, cts);
 
         _ = Task.Delay(timeout, cts.Token).ContinueWith(task => {
-            // A reply (or disposal) cancels the delay before it elapses; only an elapsed timeout
-            // should fail the request, and only if it wins the race to remove the entry.
+            // Replies and disposal cancel the delay before it elapses; an elapsed timeout fails
+            // the request if it wins the race to remove the entry.
             if (task.IsCanceled) {
                 return;
             }
@@ -78,12 +80,13 @@ public sealed class CorrelationTracker : IDisposable
         return correlationId;
     }
 
+    /// <summary>Completes the tracked request for <paramref name="correlationId" /> with a response payload.</summary>
     public bool Complete(string correlationId, object? result) {
         if (!_pending.TryRemove(correlationId, out var pending)) {
             return false;
         }
 
-        // Cancel the pending timeout so its delay timer is released instead of lingering.
+        // Release the pending timeout's delay timer.
         pending.Timeout.Cancel();
         pending.Timeout.Dispose();
         pending.Source.TrySetResult(result);

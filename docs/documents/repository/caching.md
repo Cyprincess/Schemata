@@ -2,7 +2,7 @@
 
 The `Schemata.Entity.Cache` package adds distributed query caching and automatic eviction to the repository layer. It is opt-in: call `UseQueryCache()` on the repository builder to activate it.
 
-For the full caching subsystem reference, see [caching/query-cache.md](../caching/query-cache.md).
+For the full query-cache reference, see [entity/query-cache.md](../entity/query-cache.md).
 
 ## Where the code lives
 
@@ -16,7 +16,7 @@ For the full caching subsystem reference, see [caching/query-cache.md](../cachin
 ## Enabling query caching
 
 ```csharp
-services.AddRepository(typeof(EntityFrameworkCoreRepository<,>))
+services.AddRepository(typeof(EfCoreRepository<,>))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
@@ -46,12 +46,13 @@ A concrete `ICacheProvider` must be registered separately. Use `DistributedCache
 | `repository.SuppressQueryCache()` | `QueryCacheSuppressed` | Skips `AdviceQueryCache` and `AdviceResultCache` for this instance. |
 | `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache` for this instance. |
 
-Use `Once()` to scope suppression to a single call:
+Scope a suppression with `using`:
 
 ```csharp
-var fresh = await repository.Once()
-    .SuppressQueryCache()
-    .FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id));
+using (repository.SuppressQueryCache())
+{
+    var fresh = await repository.FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id), ct);
+}
 ```
 
 ## Commit-time eviction
@@ -60,8 +61,6 @@ var fresh = await repository.Once()
 
 ## See also
 
-- [caching/query-cache.md](../caching/query-cache.md) - full advisor reference, reverse index, and cache key generation
-- [caching/overview.md](../caching/overview.md) - `ICacheProvider` abstraction and provider selection
-- [caching/distributed.md](../caching/distributed.md) - `DistributedCacheProvider` (single-process safe)
-- [caching/redis.md](../caching/redis.md) - `RedisCacheProvider` (cluster-safe)
-- [unit-of-work.md](unit-of-work.md) - explicit enlistment and committed advisors
+- [entity/query-cache.md](../entity/query-cache.md) — full advisor reference, reverse index, and cache key generation
+- [caching/overview.md](../caching/overview.md) — `ICacheProvider` abstraction and provider selection
+- [unit-of-work.md](unit-of-work.md) — the committed pipeline that drives eviction

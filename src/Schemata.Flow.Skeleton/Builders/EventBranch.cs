@@ -11,6 +11,7 @@ public sealed class EventBranch
     private          Branch[]?        _decisionBranches;
     private          FlowElement?     _target;
 
+    /// <summary>Creates an event branch waiting on <paramref name="eventDefinition" />.</summary>
     internal EventBranch(IEventDefinition eventDefinition) { _eventDefinition = eventDefinition; }
 
     /// <summary>Routes the branch to <paramref name="target" /> when the event fires.</summary>
@@ -43,6 +44,7 @@ public sealed class EventBranch
         return this;
     }
 
+    /// <summary>Adds the catch event and outgoing branch flows to <paramref name="definition" />.</summary>
     internal void Build(ProcessDefinition definition, EventBasedGateway gateway) {
         var catchEvent = new FlowEvent {
             Id         = $"catch_{Identifiers.NewUid():n}",

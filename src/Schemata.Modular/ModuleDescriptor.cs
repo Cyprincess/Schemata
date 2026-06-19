@@ -35,8 +35,7 @@ public class ModuleDescriptor
         DisplayName  = display ?? name;
         Description  = description;
         Company      = company;
-        // A copyright year is descriptive assembly metadata, not a domain clock driving behavior, so
-        // it reads the ambient local year rather than an injected TimeProvider.
+        // A copyright year is descriptive assembly metadata, so the ambient local year is sufficient.
         Copyright    = copyright ?? $"\u00a9 {DateTime.Now.Year} {company}";
         Version      = version;
         Assembly     = assembly;

@@ -6,9 +6,8 @@ namespace Schemata.Abstractions.Resource;
 
 /// <summary>
 ///     Serializes a string that already contains a JSON document as structured JSON
-///     instead of an escaped string literal, avoiding double encoding of operation
-///     results on the HTTP wire. A value that is not valid JSON falls back to a
-///     plain string.
+///     to avoid double encoding of operation results on the HTTP wire. Invalid JSON
+///     is emitted as a plain string.
 /// </summary>
 public sealed class RawJsonConverter : JsonConverter<string>
 {

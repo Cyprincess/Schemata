@@ -10,13 +10,18 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains RP-initiated logout endpoint actions.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles RP-initiated logout requests submitted through the query string.</summary>
     [HttpGet("EndSession")]
     public Task<IActionResult> EndSessionGet([FromQuery] EndSessionRequest request, CancellationToken ct) {
         return HandleEndSession(request, ct);
     }
 
+    /// <summary>Handles RP-initiated logout requests submitted as form posts.</summary>
     [HttpPost("EndSession")]
     public Task<IActionResult> EndSessionPost([FromForm] EndSessionRequest request, CancellationToken ct) {
         return HandleEndSession(request, ct);

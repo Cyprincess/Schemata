@@ -16,6 +16,7 @@ public sealed class BoundaryCatch
     private readonly IEventDefinition  _eventDefinition;
     private          bool              _nonInterrupting;
 
+    /// <summary>Creates a boundary catch builder for <paramref name="eventDefinition" /> on <paramref name="activity" />.</summary>
     internal BoundaryCatch(
         ActivityBehavior  behavior,
         ProcessDefinition definition,

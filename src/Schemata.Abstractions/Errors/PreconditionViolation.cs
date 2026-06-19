@@ -1,7 +1,7 @@
 namespace Schemata.Abstractions.Errors;
 
 /// <summary>
-///     A single precondition that was required for the operation but was not satisfied, per
+///     A required precondition that blocked the operation, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 public class PreconditionViolation
@@ -12,13 +12,13 @@ public class PreconditionViolation
     public virtual string? Type { get; set; }
 
     /// <summary>
-    ///     Entity or resource whose precondition was violated
+    ///     Entity or resource associated with the failed precondition
     ///     (e.g. <c>"request"</c>, <c>"project:123"</c>).
     /// </summary>
     public virtual string? Subject { get; set; }
 
     /// <summary>
-    ///     Human-readable explanation of why the precondition was not met.
+    ///     Human-readable explanation of the failed precondition.
     /// </summary>
     public virtual string? Description { get; set; }
 }

@@ -28,6 +28,11 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitO
     private          bool                                _completed;
     private          bool                                _disposed;
 
+    /// <summary>
+    ///     Initializes a unit of work with a data-connection factory and optional logging services.
+    /// </summary>
+    /// <param name="factory">The factory that creates the data connection when the unit of work opens.</param>
+    /// <param name="sp">The service provider that resolves optional infrastructure services.</param>
     public LinqToDbUnitOfWork(Func<TContext> factory, IServiceProvider sp) {
         _factory = factory;
         _logger  = sp.GetService<ILogger<LinqToDbUnitOfWork<TContext>>>();

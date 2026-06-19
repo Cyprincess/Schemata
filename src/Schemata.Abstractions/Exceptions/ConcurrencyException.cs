@@ -4,7 +4,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     An optimistic concurrency check failed, indicating the resource was modified between
+///     An optimistic concurrency check failed because the resource changed between
 ///     read and write.
 /// </summary>
 /// <remarks>

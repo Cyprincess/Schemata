@@ -88,13 +88,11 @@ public class AutoMapperFieldSelectiveShould
         var mapper = CreateMapper();
 
         var source = new Source {
-            Age     = 30,
-            Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
+            Age = 30, Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
         };
 
         var destination = new Destination {
-            Age     = 99,
-            Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
+            Age = 99, Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
         };
 
         mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
@@ -111,21 +109,17 @@ public class AutoMapperFieldSelectiveShould
         var mapper = CreateMapper();
 
         var source = new Source {
-            Age     = 30,
-            Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
+            Age = 30, Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
         };
 
-        var destination = new Destination {
-            Age     = 99,
-            Profile = null,
-        };
+        var destination = new Destination { Age = 99, Profile = null };
 
         mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
 
         Assert.Equal(99, destination.Age);
         Assert.NotNull(destination.Profile);
         Assert.Equal("New Name", destination.Profile.DisplayName);
-        // The interior was null before mapping; unmasked nested fields must not leak from the source.
+        // A newly created nested destination keeps unmasked fields empty.
         Assert.Null(destination.Profile.Bio);
         Assert.Null(destination.Profile.Locale);
     }
@@ -134,9 +128,7 @@ public class AutoMapperFieldSelectiveShould
     public void Map_WithNestedFieldList_ClearsMaskedNullLeaf() {
         var mapper = CreateMapper();
 
-        var source = new Source {
-            Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" },
-        };
+        var source = new Source { Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" } };
 
         var destination = new Destination {
             Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },

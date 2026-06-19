@@ -5,7 +5,7 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Tenancy.Skeleton.Models;
 
-/// <summary>Get response body for <see cref="Entities.SchemataTenant" />.</summary>
+/// <summary>Detailed response body for <see cref="Entities.SchemataTenant" />.</summary>
 public class TenantDetail : IIdentifier, ICanonicalName, IDescriptive, ITimestamp, IFreshness
 {
     #region ICanonicalName Members

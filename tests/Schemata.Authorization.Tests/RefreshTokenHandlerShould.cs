@@ -37,14 +37,14 @@ public class RefreshTokenHandlerShould
         var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
-            Uid               = Identifiers.NewUid(),
-            Type              = TokenTypes.RefreshToken,
-            Status            = TokenStatuses.Valid,
-            ReferenceId       = "rt-ref",
-            Payload           = jwt,
-            Subject           = "user-1",
-            Authorization     = authName,
-            SessionId         = sessionId,
+            Uid           = Identifiers.NewUid(),
+            Type          = TokenTypes.RefreshToken,
+            Status        = TokenStatuses.Valid,
+            ReferenceId   = "rt-ref",
+            Payload       = jwt,
+            Subject       = "user-1",
+            Authorization = authName,
+            SessionId     = sessionId,
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();

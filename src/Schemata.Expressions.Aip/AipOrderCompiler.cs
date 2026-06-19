@@ -6,6 +6,9 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Aip;
 
+/// <summary>
+///     Compiles AIP-132 order-by expressions into query ordering functions.
+/// </summary>
 public sealed class AipOrderCompiler : IOrderCompiler
 {
     #region IOrderCompiler Members

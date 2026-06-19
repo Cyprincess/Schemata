@@ -8,8 +8,12 @@ using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains the token revocation endpoint action.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Handles token revocation requests.</summary>
     [HttpPost("Revoke")]
     public async Task<IActionResult> Revoke([FromForm] RevokeRequest request, CancellationToken ct) {
         var headers = CollectHeaders();

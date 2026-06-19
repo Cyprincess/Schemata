@@ -101,11 +101,6 @@ public sealed class ResourceMethodControllerConvention(
 
     #endregion
 
-    /// <summary>
-    ///     Rebinds a read-only custom method to HTTP GET per AIP-136: replaces the
-    ///     action's POST constraint and metadata, and binds the request DTO from the
-    ///     query string since GET requests carry no body.
-    /// </summary>
     private static void ApplyGetBinding(ActionModel action) {
         foreach (var selector in action.Selectors) {
             for (var i = selector.ActionConstraints.Count - 1; i >= 0; i--) {

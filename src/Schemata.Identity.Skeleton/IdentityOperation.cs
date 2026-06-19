@@ -1,5 +1,8 @@
 namespace Schemata.Identity.Skeleton;
 
+/// <summary>
+///     Identifies an identity operation handled by the identity advisor pipeline.
+/// </summary>
 public enum IdentityOperation
 {
     Register,

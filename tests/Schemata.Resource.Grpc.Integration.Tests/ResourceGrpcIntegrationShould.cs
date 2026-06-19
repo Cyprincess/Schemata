@@ -42,7 +42,10 @@ public class ResourceGrpcIntegrationShould
 
         // A hard-delete resource maps a missing allow_missing delete to an empty success response.
         var exception = await Record.ExceptionAsync(() => client
-                                                         .DeleteAsync(new() { CanonicalName = "students/does-not-exist", AllowMissing = true })
+                                                         .DeleteAsync(new() {
+                                                              CanonicalName = "students/does-not-exist",
+                                                              AllowMissing  = true,
+                                                          })
                                                          .AsTask());
 
         Assert.Null(exception);

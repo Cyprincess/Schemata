@@ -14,6 +14,7 @@ public static class ResourceMethodNaming
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.</param>
     /// <param name="singular">The resource's singular form
     ///     (e.g. <c>Job</c>, <c>Book</c>).</param>
+    /// <returns>The RPC method name.</returns>
     public static string GetRpcName(string verb, string singular) {
         if (string.IsNullOrEmpty(verb)) {
             return singular;

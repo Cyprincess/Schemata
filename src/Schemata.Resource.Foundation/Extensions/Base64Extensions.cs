@@ -3,7 +3,7 @@
 namespace System;
 
 /// <summary>
-///     Base64 URL-safe encoding and decoding (no padding; <c>-</c>/<c>_</c> in place of <c>+</c>/<c>/</c>).
+///     Base64 URL-safe encoding and decoding with padding removed and <c>-</c>/<c>_</c> in place of <c>+</c>/<c>/</c>.
 /// </summary>
 public static class Base64Extensions
 {

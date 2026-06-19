@@ -25,8 +25,7 @@ builder.UseSchemata(schema => {
     schema.Services.AddDistributedCache();
 
     var dbName = "integration-" + Identifiers.NewUid();
-    schema.Services.AddDbContextFactory<TestDbContext>(
-        opts => opts.UseInMemoryDatabase(dbName));
+    schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
 
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
     schema.Services.AddRepository<Trash, EfCoreRepository<TestDbContext, Trash>>();
@@ -40,4 +39,7 @@ var app = builder.Build();
 
 app.Run();
 
-public partial class Program;
+namespace Schemata.Resource.Http.Integration.Tests
+{
+    public partial class Program;
+}

@@ -8,8 +8,14 @@ using Schemata.Expressions.Cel.Expressions;
 
 namespace Schemata.Expressions.Cel;
 
+/// <summary>
+///     Provides a parser for Common Expression Language syntax.
+/// </summary>
 public static class CelParser
 {
+    /// <summary>
+    ///     Parses CEL expressions.
+    /// </summary>
     public static readonly Parser<CelNode> Expression;
 
     static CelParser() {

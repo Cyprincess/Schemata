@@ -5,6 +5,9 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Aip;
 
+/// <summary>
+///     Parses and compiles AIP-160 filter expressions.
+/// </summary>
 public sealed class AipCompiler : IExpressionCompiler
 {
     #region IExpressionCompiler Members

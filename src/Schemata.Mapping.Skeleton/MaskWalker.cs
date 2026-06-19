@@ -8,15 +8,14 @@ namespace Schemata.Mapping.Skeleton;
 
 /// <summary>
 ///     Shared traversal of an object graph against a parsed <see cref="MaskTree" />. Visits every
-///     writable property the mask does <em>not</em> name (the "unmasked" properties), recursing into
-///     masked interior objects. Response read-mask trimming and field-selective mapping share this so
-///     the traversal lives in one place instead of being re-implemented per call site.
+///     writable property outside the supplied mask nodes, recursing into masked interior objects.
+///     Response read-mask trimming and field-selective mapping share this traversal.
 /// </summary>
 public static class MaskWalker
 {
     /// <summary>
     ///     Invokes <paramref name="onUnmasked" /> for every writable property of <paramref name="target" />
-    ///     (and of its masked-interior descendants) that <paramref name="nodes" /> does not name.
+    ///     and its masked-interior descendants outside <paramref name="nodes" />.
     /// </summary>
     /// <param name="target">The object to walk; its runtime type drives property discovery.</param>
     /// <param name="nodes">Mask nodes for <paramref name="target" />, keyed by CLR property name.</param>
@@ -32,9 +31,8 @@ public static class MaskWalker
     }
 
     /// <summary>
-    ///     As <see cref="WalkUnmasked(object, IReadOnlyDictionary{string, MaskTree.MaskNode}, bool, Action{IReadOnlyList{PropertyInfo}, object, PropertyInfo})" />,
-    ///     but seeded with the path of <paramref name="target" /> relative to a larger graph so callers
-    ///     that record root-relative paths see the full chain.
+    ///     Invokes <paramref name="onUnmasked" /> with a path prefix for <paramref name="target" />
+    ///     relative to a larger graph.
     /// </summary>
     /// <param name="target">The object to walk.</param>
     /// <param name="nodes">Mask nodes for <paramref name="target" />.</param>

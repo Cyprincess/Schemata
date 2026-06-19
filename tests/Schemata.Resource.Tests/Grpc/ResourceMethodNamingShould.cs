@@ -6,9 +6,9 @@ namespace Schemata.Resource.Tests.Grpc;
 public class ResourceMethodNamingShould
 {
     [Theory]
-    [InlineData("run",          "Job",      "RunJob")]
-    [InlineData("archive",      "Book",     "ArchiveBook")]
-    [InlineData("batchCreate",  "Book",     "BatchCreateBook")]
+    [InlineData("run", "Job", "RunJob")]
+    [InlineData("archive", "Book", "ArchiveBook")]
+    [InlineData("batchCreate", "Book", "BatchCreateBook")]
     [InlineData("signDocument", "Document", "SignDocumentDocument")]
     public void Concat_PascalCasedVerbWithSingular(string verb, string singular, string expected) {
         Assert.Equal(expected, ResourceMethodNaming.GetRpcName(verb, singular));

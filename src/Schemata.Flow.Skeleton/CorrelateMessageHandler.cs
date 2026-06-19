@@ -10,6 +10,7 @@ using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Resource method handler that correlates a message to a process instance.</summary>
 public sealed class CorrelateMessageHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry

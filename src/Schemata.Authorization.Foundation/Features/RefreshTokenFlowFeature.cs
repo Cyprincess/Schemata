@@ -32,7 +32,6 @@ public sealed class RefreshTokenFlowFeature<TApp, TToken> : IAuthorizationFlowFe
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 10_200;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

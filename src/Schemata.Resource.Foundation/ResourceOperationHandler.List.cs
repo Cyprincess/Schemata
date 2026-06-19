@@ -69,8 +69,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (!string.IsNullOrWhiteSpace(request.Parent)) {
             var parent = descriptor.ParseParent(request.Parent);
             if (parent is null) {
-                // A supplied parent that does not match the resource's pattern is a client error,
-                // not a request to list the top-level collection.
+                // A supplied parent that misses the resource's pattern is a client error.
                 throw new ValidationException([new() {
                     Field       = nameof(ListRequest.Parent).Underscore(),
                     Description = SchemataResources.GetResourceString(SchemataResources.ST2009),

@@ -57,7 +57,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
                                               Grade    = 5,
                                               Name     = "tx-rollback",
                                           });
-                // intentionally no CommitAsync -- disposing scope should roll back
+                // Scope disposal rolls back the pending transaction.
             }
         }
 
@@ -74,7 +74,7 @@ public class RepositoryTransactionShould : IAsyncLifetime
     public async Task CommitAsync_NoOperations_IsNoOp() {
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
-            // No mutation means no transaction was opened; commit must complete without throwing.
+            // An empty repository scope commits successfully.
             var exception = await Record.ExceptionAsync(() => repository.CommitAsync());
 
             Assert.Null(exception);

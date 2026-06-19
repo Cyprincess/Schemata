@@ -74,7 +74,7 @@ public class AdviceIdempotencyShould
 
     [Fact]
     public async Task Create_ConcurrentRequestId_ThrowsConcurrencyException() {
-        // No completed result yet, but the atomic reservation loses to a concurrent request.
+        // The atomic reservation loses to a concurrent request before a completed result exists.
         var cache = new Mock<ICacheProvider>();
         cache.Setup(s => s.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((byte[]?)null);
         cache.Setup(s => s.TryAddAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
@@ -129,8 +129,9 @@ public class AdviceIdempotencyShould
         var first = await RunCreateAsync(cache, new() { RequestId = "req-1", FullName = "Alice" }, null);
         await PersistResponseAsync(cache, first.Ctx, new() { FullName = "Created" });
 
-        await Assert.ThrowsAsync<ConcurrencyException>(
-            () => RunCreateAsync(cache, new() { RequestId = "req-1", FullName = "Mallory" }, null));
+        await Assert.ThrowsAsync<ConcurrencyException>(() => RunCreateAsync(
+                                                           cache, new() { RequestId = "req-1", FullName = "Mallory" },
+                                                           null));
     }
 
     [Fact]
@@ -143,7 +144,7 @@ public class AdviceIdempotencyShould
         var other = await RunCreateAsync(cache, new() { RequestId = "req-1", FullName = "Alice" }, Principal("user-2"));
 
         Assert.Equal(AdviseResult.Continue, other.Result);
-        Assert.False(other.Ctx.TryGet<CreateResultBase<Student>>(out _));
+        Assert.False(other.Ctx.TryGet<CreateResultBase<Student>>(out var _));
     }
 
     [Fact]
@@ -160,25 +161,23 @@ public class AdviceIdempotencyShould
         var result = await advisor.AdviseAsync(ctx, new() { RequestId = "req-1", FullName = "Alice" }, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
-        Assert.False(ctx.TryGet<CreateResultBase<Teacher>>(out _));
+        Assert.False(ctx.TryGet<CreateResultBase<Teacher>>(out var _));
     }
 
     [Fact]
     public async Task SameRequestId_DifferentResource_NoCollision() {
         var cache = new FakeCache();
 
-        var first = await RunUpdateAsync(cache,
-                                         new() { RequestId = "req-shared", CanonicalName = "students/a", FullName = "Alice" },
-                                         null);
+        var first = await RunUpdateAsync(
+            cache, new() { RequestId = "req-shared", CanonicalName = "students/a", FullName = "Alice" }, null);
         Assert.Equal(AdviseResult.Continue, first.Result);
         await PersistResponseAsync(cache, first.Ctx, new() { FullName = "ResourceA" });
 
-        var other = await RunUpdateAsync(cache,
-                                         new() { RequestId = "req-shared", CanonicalName = "students/b", FullName = "Bob" },
-                                         null);
+        var other = await RunUpdateAsync(
+            cache, new() { RequestId = "req-shared", CanonicalName = "students/b", FullName = "Bob" }, null);
 
         Assert.Equal(AdviseResult.Continue, other.Result);
-        Assert.False(other.Ctx.TryGet<UpdateResultBase<Student>>(out _));
+        Assert.False(other.Ctx.TryGet<UpdateResultBase<Student>>(out var _));
     }
 
     [Fact]
@@ -230,16 +229,16 @@ public class AdviceIdempotencyShould
         var first = await RunUpdateAsync(cache, new() { RequestId = "req-neutral", FullName = "Alice" }, null);
         await PersistResponseAsync(cache, first.Ctx, new() { FullName = "Updated" });
 
-        var bytes = await cache.GetRawAsync();
+        var       bytes    = await cache.GetRawAsync();
         using var document = JsonDocument.Parse(bytes);
         Assert.True(document.RootElement.TryGetProperty("Payload", out var payload));
         Assert.Equal("Updated", payload.GetProperty(nameof(Student.FullName)).GetString());
-        Assert.False(document.RootElement.TryGetProperty("Result", out _));
+        Assert.False(document.RootElement.TryGetProperty("Result", out var _));
     }
 
     private static async Task<(AdviseResult Result, AdviceContext Ctx)> RunCreateAsync(
-        ICacheProvider          cache,
-        StudentRequest          request,
+        ICacheProvider   cache,
+        StudentRequest   request,
         ClaimsPrincipal? principal
     ) {
         var advisor   = new AdviceCreateRequestIdempotency<Student, StudentRequest, Student>(cache);
@@ -251,8 +250,8 @@ public class AdviceIdempotencyShould
     }
 
     private static async Task<(AdviseResult Result, AdviceContext Ctx)> RunUpdateAsync(
-        ICacheProvider                          cache,
-        StudentRequest                          request,
+        ICacheProvider   cache,
+        StudentRequest   request,
         ClaimsPrincipal? principal
     ) {
         var advisor   = new AdviceUpdateRequestIdempotency<Student, StudentRequest, Student>(cache);
@@ -264,8 +263,8 @@ public class AdviceIdempotencyShould
     }
 
     private static async Task<(AdviseResult Result, AdviceContext Ctx)> RunMethodAsync(
-        ICacheProvider                          cache,
-        StudentRequest                          request,
+        ICacheProvider   cache,
+        StudentRequest   request,
         ClaimsPrincipal? principal
     ) {
         var advisor   = new AdviceMethodRequestIdempotency<Student, StudentRequest, Student>(cache);
@@ -305,11 +304,7 @@ public class AdviceIdempotencyShould
         return new(identity);
     }
 
-    private sealed class Teacher : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+    #region Nested type: FakeCache
 
     private sealed class FakeCache : ICacheProvider
     {
@@ -317,25 +312,39 @@ public class AdviceIdempotencyShould
 
         public int TryAddCount { get; private set; }
 
+        #region ICacheProvider Members
+
         public Task<byte[]?> GetAsync(string key, CancellationToken ct = default) {
             return Task.FromResult(_store.TryGetValue(key, out var value) ? value : null);
         }
 
-        public Task SetAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default) {
+        public Task SetAsync(
+            string            key,
+            byte[]            value,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             _store[key] = value;
             return Task.CompletedTask;
         }
 
-        public Task<bool> TryAddAsync(string key, byte[] value, CacheEntryOptions options, CancellationToken ct = default) {
+        public Task<bool> TryAddAsync(
+            string            key,
+            byte[]            value,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             TryAddCount++;
             return Task.FromResult(_store.TryAdd(key, value));
         }
 
-        public Task<byte[]> GetRawAsync() {
-            return Task.FromResult(Assert.Single(_store.Values));
-        }
-
-        public Task<bool> TryReplaceAsync(string key, byte[] expected, byte[] replacement, CacheEntryOptions options, CancellationToken ct = default) {
+        public Task<bool> TryReplaceAsync(
+            string            key,
+            byte[]            expected,
+            byte[]            replacement,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             if (_store.TryGetValue(key, out var current) && current.AsSpan().SequenceEqual(expected)) {
                 _store[key] = replacement;
                 return Task.FromResult(true);
@@ -358,7 +367,12 @@ public class AdviceIdempotencyShould
             return Task.CompletedTask;
         }
 
-        public Task CollectionAddAsync(string key, string member, CacheEntryOptions options, CancellationToken ct = default) {
+        public Task CollectionAddAsync(
+            string            key,
+            string            member,
+            CacheEntryOptions options,
+            CancellationToken ct = default
+        ) {
             throw new NotSupportedException();
         }
 
@@ -377,5 +391,25 @@ public class AdviceIdempotencyShould
         public Task CollectionClearAsync(string key, CancellationToken ct = default) {
             throw new NotSupportedException();
         }
+
+        #endregion
+
+        public Task<byte[]> GetRawAsync() { return Task.FromResult(Assert.Single(_store.Values)); }
     }
+
+    #endregion
+
+    #region Nested type: Teacher
+
+    private sealed class Teacher : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
 }

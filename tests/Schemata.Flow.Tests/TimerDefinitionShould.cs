@@ -14,8 +14,7 @@ public class TimerDefinitionShould
         // The builders write the duration via XmlConvert.ToString, which the converter reads
         // via XmlConvert.ToTimeSpan; a TimeSpan.ToString() value would fail that read.
         var timer = new TimerDefinition {
-            TimerType      = TimerType.Duration,
-            TimeExpression = XmlConvert.ToString(TimeSpan.FromMinutes(5)),
+            TimerType = TimerType.Duration, TimeExpression = XmlConvert.ToString(TimeSpan.FromMinutes(5)),
         };
 
         var schedule = Assert.IsType<OneTimeSchedule>(TimerDefinitionConverter.ToSchedule(timer));
@@ -26,10 +25,7 @@ public class TimerDefinitionShould
 
     [Fact]
     public void DateTimer_PreservesUtcKind() {
-        var timer = new TimerDefinition {
-            TimerType      = TimerType.Date,
-            TimeExpression = "2030-06-15T10:30:00Z",
-        };
+        var timer = new TimerDefinition { TimerType = TimerType.Date, TimeExpression = "2030-06-15T10:30:00Z" };
 
         var schedule = Assert.IsType<OneTimeSchedule>(TimerDefinitionConverter.ToSchedule(timer));
 

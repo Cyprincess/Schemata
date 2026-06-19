@@ -9,11 +9,18 @@ using Schemata.Identity.Skeleton.Stores;
 
 namespace Schemata.Identity.Skeleton.Managers;
 
+/// <summary>
+///     User manager with Schemata identity store extensions.
+/// </summary>
+/// <typeparam name="TUser">The user entity type.</typeparam>
 public class SchemataUserManager<TUser> : UserManager<TUser>
     where TUser : class
 {
     private readonly IServiceProvider _sp;
 
+    /// <summary>
+    ///     Initializes a user manager with Schemata store extension support.
+    /// </summary>
     public SchemataUserManager(
         IServiceProvider                       sp,
         IUserStore<TUser>                      store,
@@ -28,6 +35,9 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         _sp = sp;
     }
 
+    /// <summary>
+    ///     Gets the display name for a user.
+    /// </summary>
     public virtual Task<string?> GetDisplayNameAsync(TUser user) {
         ThrowIfDisposed();
         var store = GetDisplayNameStore();
@@ -39,6 +49,9 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return store.GetDisplayNameAsync(user, CancellationToken);
     }
 
+    /// <summary>
+    ///     Gets the principal name for a user.
+    /// </summary>
     public virtual Task<string?> GetUserPrincipalNameAsync(TUser user) {
         ThrowIfDisposed();
         var store = GetUserPrincipalNameStore();
@@ -50,6 +63,9 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return store.GetUserPrincipalNameAsync(user, CancellationToken);
     }
 
+    /// <summary>
+    ///     Finds a user by canonical resource name.
+    /// </summary>
     public virtual Task<TUser?> FindByCanonicalNameAsync(string canonicalName) {
         ThrowIfDisposed();
         var store = GetCanonicalNameStore();
@@ -61,6 +77,9 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         return store.FindByCanonicalNameAsync(canonicalName, CancellationToken);
     }
 
+    /// <summary>
+    ///     Finds a user by phone number.
+    /// </summary>
     public virtual async Task<TUser?> FindByPhoneAsync(string phone) {
         ThrowIfDisposed();
         var store = GetPhoneNumberStore();
@@ -75,7 +94,7 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
             return user;
         }
 
-        // Need to potentially check all keys
+        // Protected personal data can be encrypted with older lookup keys.
 
         var keyring   = _sp.GetService<ILookupProtectorKeyRing>();
         var protector = _sp.GetService<ILookupProtector>();

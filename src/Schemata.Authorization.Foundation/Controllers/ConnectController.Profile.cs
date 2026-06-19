@@ -9,8 +9,12 @@ using Schemata.Authorization.Skeleton.Handlers;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
+/// <summary>
+///     Contains the OpenID Connect UserInfo endpoint action.
+/// </summary>
 public partial class ConnectController
 {
+    /// <summary>Returns UserInfo claims for the authenticated bearer token.</summary>
     [HttpGet("Profile")]
     [HttpPost("Profile")]
     [Authorize(AuthenticationSchemes = SchemataAuthorizationSchemes.Bearer)]

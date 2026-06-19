@@ -49,8 +49,7 @@ public interface IScheduler
     ///     business transaction: if the outer transaction rolls back, the orphaned
     ///     Pending row is still drained by the dispatcher (and typically fails with
     ///     a missing handler when the business context that produced it never landed).
-    ///     A future revision may add an overload accepting an <c>IUnitOfWork</c>;
-    ///     today the contract is eventual-consistency, not transactional.
+    ///     The contract provides eventual consistency.
     /// </remarks>
     Task<SchemataJobExecution> TriggerAsync<TJob>(JobContext context, CancellationToken ct)
         where TJob : class, IScheduledJob;

@@ -1,84 +1,112 @@
 # Entity Overview
 
-Schemata entities are plain C# classes or records that carry their persistence and API semantics through marker interfaces called traits. A trait is a small interface that declares one or more properties. Traits do nothing on their own — behavior comes from advisors registered alongside the repository pipeline, and each advisor checks for the matching trait with a plain `is`-test inside its `AdviseAsync` method (or via a constrained generic type parameter). The repository setup wires the built-in trait advisors automatically; custom traits require a matching custom advisor registration. No base class or code generation is needed for the traits themselves.
+A Schemata entity is a plain C# class or record. Persistence and API behavior attach through trait
+interfaces — small interfaces declaring one or more properties. A trait carries no logic; behavior
+comes from advisors registered with the repository pipeline, each of which checks for its trait with
+an `is`-test or a constrained generic parameter and acts only when the entity matches.
+`AddRepository` wires every built-in trait advisor, so implementing a trait is the whole opt-in.
+
+Two opt-in packages extend the entity layer with the same advisor pattern: `Schemata.Entity.Owner`
+(`UseOwner()`) wires ownership traits and per-owner query filtering, and `Schemata.Entity.Cache`
+(`UseQueryCache()`) wires transparent query caching and committed eviction — see
+[query-cache.md](query-cache.md).
 
 ## Where the code lives
 
 | Item | Path |
-|---|---|
+| --- | --- |
 | Trait interfaces | `src/Schemata.Abstractions/Entities/` |
-| `IFreshness` (HTTP ETag) | `src/Schemata.Abstractions/Resource/IFreshness.cs` |
 | `CanonicalNameAttribute` | `src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs` |
-| Repository advisor implementations | `src/Schemata.Entity.Repository/Advisors/` |
+| Built-in repository advisors | `src/Schemata.Entity.Repository/Advisors/` |
+| Key resolution | `src/Schemata.Entity.Repository/RepositoryBase.cs` |
 
 ## How traits activate behavior
 
-Each trait interface is a contract between the entity and the advisor pipeline. When a repository operation runs, the advisor checks `entity is ITrait` (or `typeof(ITrait).IsAssignableFrom(typeof(TEntity))`). If the check passes, the advisor performs its work; otherwise it returns `AdviseResult.Continue` immediately.
-
-The full trait-to-advisor mapping is documented in [traits.md](traits.md).
+Each trait is a contract between the entity and the advisor pipeline. When a repository operation
+runs, the matching advisor tests `entity is ITrait` (or `typeof(ITrait).IsAssignableFrom(typeof(TEntity))`).
+A passing test runs the advisor's logic; a failing test returns `AdviseResult.Continue` in constant
+time without touching the entity. The full trait-to-advisor mapping, with order numbers, lives in
+[traits.md](traits.md).
 
 ## Defining an entity
 
-A minimal entity with timestamps, soft-delete, and a canonical name looks like this:
+An entity with timestamps, soft-delete, and a canonical name:
 
 ```csharp
+using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
+
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("publishers/{publisher}/books/{book}")]
 public class Book : IIdentifier, ITimestamp, ISoftDelete, ICanonicalName
 {
-    public Guid      Uid          { get; set; }
-    public string?   Name         { get; set; }
+    public Guid      Uid           { get; set; }
+    public string?   Name          { get; set; }
     public string?   CanonicalName { get; set; }
-    public DateTime? CreateTime   { get; set; }
-    public DateTime? UpdateTime   { get; set; }
-    public DateTime? DeleteTime   { get; set; }
-    public DateTime? PurgeTime    { get; set; }
+    public DateTime? CreateTime    { get; set; }
+    public DateTime? UpdateTime    { get; set; }
+    public DateTime? DeleteTime    { get; set; }
+    public DateTime? PurgeTime     { get; set; }
 }
 ```
 
-No registration step is needed for the traits. Calling `services.AddRepository(typeof(MyRepository<,>))` registers all built-in advisors as open-generic scoped services, so every entity type that implements a trait gets the matching behavior automatically.
+Traits need no registration. `services.AddRepository(typeof(EfCoreRepository<,>))` registers the
+built-in advisors as open-generic scoped services, so any entity implementing a trait receives the
+matching behavior.
 
 ## Primary key convention
 
-`RepositoryBase` resolves primary keys in two steps:
+`Schemata.Entity.Repository.RepositoryBase.ResolveKeyProperties` resolves keys in two steps:
 
-1. Read the class-level `[PrimaryKey(nameof(A), nameof(B))]` attribute (EF Core 7+).
-2. Fall back to the `IIdentifier.Uid` property when no attribute is present.
+1. Read the class-level `[PrimaryKey(nameof(A), nameof(B))]` attribute (EF Core 7+). The named
+   properties become the key, in declaration order.
+2. Fall back to the `IIdentifier.Uid` property when no attribute resolves.
 
-`IIdentifier` uses `Guid` rather than `long` for AIP alignment and to support decentralized inserts without a database sequence. The `SchemataUser` identity entity bridges ASP.NET Core Identity's `IdentityUser<Guid>` by mapping `Id` to `Uid` via a `[NotMapped]` override.
+`IIdentifier` uses `Guid` for AIP alignment and to support client-assigned inserts without a database
+sequence. `Schemata.Entity.LinqToDB` recognizes the same class-level `[PrimaryKey]` through its
+metadata reader, so a single declaration keys both providers.
 
 ## Trait composition
 
-Traits are independent and compose freely. A single entity can implement any combination:
+Traits are independent and compose freely:
 
 ```csharp
 public class Order : IIdentifier, ITimestamp, IConcurrency, ISoftDelete,
-                     ICanonicalName, IOwnable, IDescriptive, ITransition
+                     ICanonicalName, IOwnable, IDescriptive
 {
     // ...
 }
 ```
 
-The advisor pipeline runs each advisor in `Order` sequence. Advisors that don't apply to the entity return `Continue` in O(1) without touching the entity.
+The pipeline runs each advisor in `Order` sequence. Advisors that do not apply to the entity return
+`Continue` without modifying it.
 
 ## Extension points
 
-- **Custom advisors**: implement `IRepositoryAddAdvisor<TEntity>`, `IRepositoryUpdateAdvisor<TEntity>`, or `IRepositoryRemoveAdvisor<TEntity>` and register with `TryAddEnumerable`. Pick an `Order` outside the reserved range `[100_000_000, 900_000_000]`.
-- **Custom traits**: define a marker interface, write an advisor that checks `entity is IMyTrait`, and register it. No framework changes required.
-- **Suppression**: call the matching `Suppress*()` method on the repository before a mutation to skip a specific advisor for that operation. See [repository/overview.md](../repository/overview.md) for the full suppression table.
+- **Custom advisor** — implement `IRepositoryAddAdvisor<TEntity>`, `IRepositoryUpdateAdvisor<TEntity>`,
+  `IRepositoryRemoveAdvisor<TEntity>`, or `IRepositoryBuildQueryAdvisor<TEntity>` and register with
+  `TryAddEnumerable`. Pick an `Order` outside the built-in chain's `[100_000_000, 900_000_000]` window.
+- **Custom trait** — define a marker interface, write an advisor that checks `entity is IMyTrait`, and
+  register it. No framework change is required.
+- **Suppression** — call the matching `Suppress*()` scope on the repository before a mutation to skip a
+  specific advisor for the duration of the returned handle. See
+  [repository/overview.md](../repository/overview.md) for the full table.
 
-## Design motivation
+## Design rationale
 
-Traits keep entity classes free of framework dependencies beyond the interface declarations. The advisor pipeline is the only place where framework logic runs; the entity itself is a plain data container. This makes entities easy to test, serialize, and share across assembly boundaries without pulling in the full framework.
+Traits keep entity classes free of framework dependencies beyond the interface declarations. The
+advisor pipeline is the only place framework logic runs; the entity stays a plain data container,
+which keeps it easy to test, serialize, and share across assembly boundaries.
 
 ## Caveats
 
-- `IFreshness` lives in `Schemata.Abstractions/Resource/` alongside the resource contracts. It carries an HTTP ETag (AIP-154) on request and response DTOs.
-- Trait interfaces declare properties with `get; set;`. Implementing them as `init`-only properties breaks the advisors that write to them at runtime.
+- Trait interfaces declare `get; set;` properties. Implementing one as an `init`-only property breaks
+  the advisor that writes to it at runtime.
+- `IConcurrency.Timestamp` is a non-nullable `Guid`; `Guid.Empty` denotes an unstamped entity.
 
 ## See also
 
 - [traits.md](traits.md) — full trait reference with advisor order numbers
-- [repository/overview.md](../repository/overview.md) — how the repository surfaces these traits
+- [query-cache.md](query-cache.md) — `Schemata.Entity.Cache` advisors, reverse index, committed eviction
 - [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains
 - [repository/query-pipeline.md](../repository/query-pipeline.md) — build-query/query/result advisor chains
-- [core/advice-pipeline.md](../core/advice-pipeline.md) — advisor runtime mechanics

@@ -81,23 +81,20 @@ public class MemoryCacheTenantProviderCacheShould
         var disposed        = 0;
         firstDisposable.Setup(d => d.Dispose()).Callback(() => disposed++);
 
-        // t1 is held by an active lease.
         var firstLease = cache.Lease("t1", () => firstMock.Object);
 
         // Adding t2 with capacity=1 retires t1 even though pinned; disposal is deferred.
         var secondLease = cache.Lease("t2", () => new Mock<IServiceProvider>().Object);
 
-        // The outstanding lease still points to the original provider.
         Assert.Same(firstMock.Object, firstLease.Provider);
         Assert.Equal(0, disposed);
 
-        // After retirement, a fresh request for the same tenant id rebuilds a new provider.
         var rebuiltMock = new Mock<IServiceProvider>();
         var rebuilt     = cache.Lease("t1", () => rebuiltMock.Object);
         Assert.Same(rebuiltMock.Object, rebuilt.Provider);
         Assert.NotSame(firstLease.Provider, rebuilt.Provider);
 
-        // Releasing the retired lease disposes its provider; the rebuilt one stays alive.
+        // Releasing the retired lease disposes its provider while the rebuilt one stays alive.
         firstLease.Dispose();
         Assert.Equal(1, disposed);
 
@@ -120,16 +117,14 @@ public class MemoryCacheTenantProviderCacheShould
 
         cache.Lease("t1", () => mock.Object).Dispose();
 
-        // Advancing past the sliding window makes the next lease sweep the stale entry; its provider
-        // is disposed because no lease still holds it.
+        // Advancing past the sliding window makes the next lease sweep the stale entry.
         clock.Advance(TimeSpan.FromMinutes(31));
         cache.Lease("t2", () => new Mock<IServiceProvider>().Object).Dispose();
 
         Assert.Equal(1, disposed);
 
-        // The swept tenant rebuilds from scratch instead of returning the evicted provider.
-        var rebuilt = new Mock<IServiceProvider>();
-        using var lease = cache.Lease("t1", () => rebuilt.Object);
+        var       rebuilt = new Mock<IServiceProvider>();
+        using var lease   = cache.Lease("t1", () => rebuilt.Object);
         Assert.Same(rebuilt.Object, lease.Provider);
     }
 
@@ -157,16 +152,16 @@ public class MemoryCacheTenantProviderCacheShould
         return new(options);
     }
 
+    #region Nested type: MutableClock
+
     private sealed class MutableClock(DateTimeOffset start) : TimeProvider
     {
         private DateTimeOffset _now = start;
 
-        public override DateTimeOffset GetUtcNow() {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() { return _now; }
 
-        public void Advance(TimeSpan delta) {
-            _now += delta;
-        }
+        public void Advance(TimeSpan delta) { _now += delta; }
     }
+
+    #endregion
 }

@@ -1,10 +1,12 @@
 # Scheduling
 
-Add background job scheduling to the Student CRUD app. This guide shows how to register a recurring job using a 5-field Cronos cron expression. This guide builds on [Getting Started](getting-started.md).
+Add background job scheduling to the Student CRUD app: register a recurring job on a 5-field Cronos
+cron expression. This guide builds on [Getting Started](getting-started.md).
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Scheduling.Foundation`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already includes `Schemata.Scheduling.Foundation`. To compose
+packages manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Scheduling.Foundation
@@ -12,27 +14,34 @@ dotnet add package --prerelease Schemata.Scheduling.Foundation
 
 ## Enable scheduling
 
-`UseScheduling()` takes no delegate and returns a `SchedulingBuilder` for chaining. `SchemataSchedulingFeature` runs at `Order = Priority = 470_000_000`:
+`UseScheduling()` takes no delegate and returns a `SchedulingBuilder`. `SchemataSchedulingFeature`
+runs at Priority 470,000,000:
 
 ```csharp
 schema.UseScheduling()
       .WithJob<StudentReportJob>("*/5 * * * *");
 ```
 
-`WithJob<T>(string cronExpression)` wraps the expression in a `CronSchedule`, which calls `CronExpression.Parse(expression)` from the Cronos library. Cronos defaults to 5-field cron (`minute hour day-of-month month day-of-week`). Do not use 6-field Quartz syntax (e.g., `"0/30 * * * * ?"`) — that throws at runtime.
+`WithJob<T>(string cronExpression)` wraps the expression in a `CronSchedule`, which calls
+`CronExpression.Parse(expression)` from the Cronos library. Cronos uses 5-field cron
+(`minute hour day-of-month month day-of-week`); a 6-field Quartz expression such as
+`"0/30 * * * * ?"` throws at parse time.
 
-For sub-minute cadence, use the `TimeSpan` overload:
+For a one-time job, use the `DateTime` or `TimeSpan` overload — both schedule a single fire:
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<StudentReportJob>(TimeSpan.FromSeconds(30));
+      .WithJob<StudentReportJob>(DateTime.UtcNow.AddMinutes(5));  // absolute UTC time
+schema.UseScheduling()
+      .WithJob<StudentReportJob>(TimeSpan.FromMinutes(5));        // UtcNow + 5 minutes
 ```
 
-For a one-time job, use the `DateTime` overload:
+For a recurring sub-minute cadence, pass a `PeriodicSchedule` through the `IScheduleDefinition`
+overload:
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<StudentReportJob>(DateTime.UtcNow.AddMinutes(5));
+      .WithJob<StudentReportJob>(new PeriodicSchedule(TimeSpan.FromSeconds(30)));
 ```
 
 ## Create the job
@@ -52,7 +61,12 @@ public sealed class StudentReportJob : IScheduledJob
 }
 ```
 
-`IScheduledJob` has a single method: `Task ExecuteAsync(JobContext context, CancellationToken ct)`. `JobContext.JobName` is the `SchemataJob.Name` and `JobContext.Variables` carries the deserialised `SchemataJob.Variables` JSON. The scheduler resolves the job from DI as a transient service on each execution.
+`IScheduledJob` has one method. `JobContext.Job` is the `SchemataJob.Name`; `JobContext.Variables` is
+the dictionary deserialized from `SchemataJob.Variables`. The scheduler resolves the job from DI as a
+transient on each fire.
+
+The scheduler persists each definition and run, so configure a persistence provider (the EF Core
+setup from Getting Started) for the `SchemataJob` and `SchemataJobExecution` rows.
 
 ## Cron expression syntax
 
@@ -61,39 +75,42 @@ public sealed class StudentReportJob : IScheduledJob
 ```cron
 *    *    *    *    *
 |    |    |    |    |
-|    |    |    |    +-- day of week (0-7, Sunday=0 or 7)
+|    |    |    |    +-- day of week (0-7, Sunday = 0 or 7)
 |    |    |    +------- month (1-12)
 |    |    +------------ day of month (1-31)
 |    +----------------- hour (0-23)
-+--------------------- minute (0-59)
++---------------------- minute (0-59)
 ```
 
-Common examples:
-
 | Expression | Meaning |
-| ---------- | ------- |
+| --- | --- |
 | `*/5 * * * *` | Every 5 minutes |
 | `0 * * * *` | Every hour |
-| `0 9 * * 1-5` | 9:00 AM on weekdays |
+| `0 9 * * 1-5` | 09:00 on weekdays |
 | `0 0 1 * *` | Midnight on the first of each month |
+
+Occurrences are computed in UTC.
 
 ## Job lifecycle
 
-The scheduler publishes lifecycle events via `IJobLifecycleObserver`:
+The scheduler drives `IJobLifecycleObserver` around each fire:
 
-- `OnTriggeredAsync` — called before `ExecuteAsync`. Return `JobTriggerOutcome.Proceed` to run, `JobTriggerOutcome.Skip` to skip (advances the schedule, marks the execution row `Cancelled`), or `JobTriggerOutcome.Block` to skip without advancing the schedule.
-- `OnSucceededAsync` — called after `ExecuteAsync` completes successfully.
-- `OnFailedAsync` — called if `ExecuteAsync` throws.
+- `OnTriggeredAsync` — before `ExecuteAsync`. Return `JobTriggerOutcome.Proceed` to run, `Skip` to
+  skip (marks the execution row `Skipped` and advances the schedule), or `Block` to skip without
+  advancing (marks the row `Blocked`).
+- `OnSucceededAsync` — after `ExecuteAsync` returns.
+- `OnFailedAsync` — when `ExecuteAsync` throws.
 
-To integrate with the event bus, add `UseSchedulingEvent()`:
+To publish those transitions to the event bus, chain `UseEvent()`:
 
 ```csharp
 schema.UseScheduling()
       .WithJob<StudentReportJob>("*/5 * * * *")
-      .UseSchedulingEvent();
+      .UseEvent();
 ```
 
-This registers `EventPublishingJobLifecycleObserver`, which publishes `JobTriggered`, `JobCompleted`, and `JobFailed` events via `IEventBus`.
+This registers `EventPublishingJobLifecycleObserver`, which publishes `JobScheduled`,
+`JobUnscheduled`, `JobTriggered`, `JobCompleted`, and `JobFailed` events through `IEventBus`.
 
 ## Verify
 
@@ -101,16 +118,19 @@ This registers `EventPublishingJobLifecycleObserver`, which publishes `JobTrigge
 dotnet run
 ```
 
-Every 5 minutes the console should print:
+Every 5 minutes the console prints:
 
 ```text
 [2026-06-04 12:00:00Z] Running student report...
 ```
 
+## Next steps
+
+- [Event Bus](event-bus.md) — subscribe to `JobTriggered` / `JobCompleted` / `JobFailed`
+- [Flow](flow.md) — BPMN timer catches fire through this scheduler
+- [Modular](modular.md) — package jobs in a self-contained module
+
 ## See also
 
-- [Event Bus](event-bus.md) — previous in the series: where job lifecycle events are published
-- [Modular](modular.md) — next in the series: package scheduled jobs inside a module
 - [Scheduling Overview](../documents/scheduling/overview.md) — `IScheduler`, `IScheduledJob`, schedule kinds
-- [Scheduling Triggers](../documents/scheduling/triggers.md) — Cronos cron, periodic, one-shot, missed-fire policy
-- [Scheduling Jobs](../documents/scheduling/jobs.md) — `IJobLifecycleObserver`, `JobTriggerOutcome`
+- [Cron Jobs](../cookbook/cron-jobs.md) — missed-fire policy and lifecycle gating in depth

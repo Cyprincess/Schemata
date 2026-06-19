@@ -6,6 +6,9 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Entities;
 
+/// <summary>
+///     External login entity for Schemata identity users.
+/// </summary>
 [Table("SchemataUserLogins")]
 [PrimaryKey(nameof(LoginProvider), nameof(ProviderKey))]
 public class SchemataUserLogin : IdentityUserLogin<Guid>, ITimestamp

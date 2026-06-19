@@ -10,7 +10,7 @@ namespace Schemata.Authorization.Skeleton;
 /// <remarks>
 ///     <see cref="SignIn" /> is the success path — the pipeline continues.
 ///     <see cref="Redirect" /> and <see cref="Content" /> are final for the HTTP layer.
-///     <see cref="Challenge" /> means the client could not be authenticated.
+///     <see cref="Challenge" /> means client authentication failed.
 /// </remarks>
 public sealed class AuthorizationResult
 {
@@ -27,7 +27,7 @@ public sealed class AuthorizationResult
     /// <summary>Outcome that drives downstream handling.</summary>
     public AuthorizationStatus Status { get; }
 
-    /// <summary>Non-null when <see cref="Status" /> is <see cref="AuthorizationStatus.SignIn" />.</summary>
+    /// <summary>Authenticated principal for <see cref="AuthorizationStatus.SignIn" /> results.</summary>
     public ClaimsPrincipal? Principal { get; }
 
     /// <summary>
@@ -36,10 +36,10 @@ public sealed class AuthorizationResult
     /// </summary>
     public Dictionary<string, string?>? Properties { get; }
 
-    /// <summary>Non-null when <see cref="Status" /> is <see cref="AuthorizationStatus.Redirect" />.</summary>
+    /// <summary>Redirect target for <see cref="AuthorizationStatus.Redirect" /> results.</summary>
     public string? RedirectUri { get; set; }
 
-    /// <summary>Non-null when <see cref="Status" /> is <see cref="AuthorizationStatus.Content" />.</summary>
+    /// <summary>Response payload for <see cref="AuthorizationStatus.Content" /> and <see cref="AuthorizationStatus.Challenge" /> results.</summary>
     public object? Data { get; set; }
 
     /// <summary>Creates a result indicating the principal is authenticated.</summary>
@@ -59,7 +59,7 @@ public sealed class AuthorizationResult
 
     /// <summary>
     ///     Creates a result that instructs the HTTP layer to challenge the client.
-    ///     When <paramref name="scheme" /> is non-null it specifies the authentication scheme.
+    ///     The optional <paramref name="scheme" /> specifies the authentication scheme.
     /// </summary>
     public static AuthorizationResult Challenge(string? scheme = null) {
         return new(AuthorizationStatus.Challenge, null, null) { Data = scheme };

@@ -9,6 +9,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton;
 
+/// <summary>Resource method handler that terminates process instances.</summary>
 public sealed class TerminateProcessHandler(
     IProcessRuntime  runtime,
     IProcessRegistry registry

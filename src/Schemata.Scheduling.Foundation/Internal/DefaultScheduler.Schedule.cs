@@ -40,7 +40,7 @@ public sealed partial class DefaultScheduler
             return;
         }
 
-        ScheduledEntry? entry = null;
+        ScheduledEntry? entry;
 
         await _lock.WaitAsync(ct);
         try {
@@ -61,10 +61,6 @@ public sealed partial class DefaultScheduler
             _entries[job.Name] = entry;
         } finally {
             _lock.Release();
-        }
-
-        if (entry is null) {
-            return;
         }
 
         await NotifyScheduledAsync(entry.Job, ct);
@@ -89,8 +85,7 @@ public sealed partial class DefaultScheduler
             return;
         }
 
-        // No-replay jobs ignore the missed-fire policy: they fire exactly once,
-        // the audit row stays terminal, and crashed in-flight runs are not replayed.
+        // Single-fire audit jobs ignore the missed-fire policy and keep terminal audit rows stable.
         if (!entry.Job.Replay) {
             _ = Task.Run(() => FireAsync(entry, entry.Cts.Token), entry.Cts.Token);
             return;

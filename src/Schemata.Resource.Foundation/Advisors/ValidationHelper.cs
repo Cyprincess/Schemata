@@ -11,6 +11,9 @@ using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
+/// <summary>
+///     Shared request validation execution for create and update advisors.
+/// </summary>
 internal static class ValidationHelper
 {
     /// <summary>

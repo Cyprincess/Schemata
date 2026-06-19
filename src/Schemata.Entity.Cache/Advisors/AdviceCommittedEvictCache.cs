@@ -5,21 +5,33 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Cache.Advisors;
 
+/// <summary>Order constants for <see cref="AdviceCommittedEvictCache{TEntity}" />.</summary>
 public static class AdviceCommittedEvictCache
 {
+    /// <summary>Default execution order: <see cref="Orders.Max" /> (900_000_000).</summary>
     public const int DefaultOrder = Orders.Max;
 }
 
+/// <summary>
+///     Evicts query-cache entries for updated and removed entities after a repository commit.
+/// </summary>
+/// <typeparam name="TEntity">The entity type whose committed changes invalidate cached queries.</typeparam>
 public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdvisor<TEntity>
     where TEntity : class
 {
     private readonly ICacheProvider                      _cache;
     private readonly IOptions<SchemataQueryCacheOptions> _options;
 
+    /// <summary>
+    ///     Initializes a cache-eviction advisor with the cache provider and query-cache options.
+    /// </summary>
+    /// <param name="cache">The cache provider containing query results and reverse indexes.</param>
+    /// <param name="options">The query-cache options controlling eviction.</param>
     public AdviceCommittedEvictCache(ICacheProvider cache, IOptions<SchemataQueryCacheOptions> options) {
         _cache   = cache;
         _options = options;

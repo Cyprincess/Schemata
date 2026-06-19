@@ -19,7 +19,10 @@ namespace Schemata.Transport.Http;
 /// </summary>
 internal static class SchemataJsonTraits
 {
-    /// <summary>Installs the trait modifier on top of <paramref name="options" />.</summary>
+    /// <summary>
+    ///     Installs the trait modifier on the supplied serializer options.
+    /// </summary>
+    /// <param name="options">The JSON serializer options to update.</param>
     public static void Apply(JsonSerializerOptions options) {
         options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()).WithAddedModifier(info => {
             foreach (var property in info.Properties.ToArray()) {

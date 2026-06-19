@@ -12,10 +12,7 @@ public class MapsterMergeShould
     private static ISimpleMapper CreateMapper() {
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => {
-            schema.UseMapster()
-                  .Map<Source, Destination>(map => {
-                       map.For(d => d.Sex).From(s => s.Sex.ToString());
-                   });
+            schema.UseMapster().Map<Source, Destination>(map => { map.For(d => d.Sex).From(s => s.Sex.ToString()); });
         });
 
         var app   = builder.Build();
@@ -28,7 +25,7 @@ public class MapsterMergeShould
         var mapper = CreateMapper();
 
         var source      = new Source { Age      = 31, Nickname = null };
-        var destination = new Destination { Age = 1, Nickname = "Kept" };
+        var destination = new Destination { Age = 1, Nickname  = "Kept" };
 
         mapper.Map(source, destination);
 
@@ -41,7 +38,7 @@ public class MapsterMergeShould
         var mapper = CreateMapper();
 
         var source      = new Source { Age      = 31, Nickname = "   " };
-        var destination = new Destination { Age = 1, Nickname = "Kept" };
+        var destination = new Destination { Age = 1, Nickname  = "Kept" };
 
         mapper.Map(source, destination);
 

@@ -1,14 +1,18 @@
 # Object Mapping
 
-Introduce separate request and response DTOs so the API exposes only the fields clients need, while the persistent `Student` entity remains unchanged. This guide builds on [Getting Started](getting-started.md).
+Split the API surface from the stored entity. Introduce a request DTO and two response DTOs so
+clients see only the fields they need, while the `Student` entity stays the database shape. This
+guide builds on [Getting Started](getting-started.md).
 
 ## What you have
 
-The `Student` entity from [Getting Started](getting-started.md) uses the entity type for all four resource type parameters. This guide splits that into three dedicated DTOs.
+The `Student` from [Getting Started](getting-started.md) uses the entity type for all four resource
+type parameters. This guide replaces three of them with dedicated DTOs and maps between them.
 
 ## Add the mapping package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Mapping.Mapster`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already pulls in `Schemata.Mapping.Mapster`. To compose
+packages by hand:
 
 ```shell
 dotnet add package --prerelease Schemata.Mapping.Foundation
@@ -17,7 +21,8 @@ dotnet add package --prerelease Schemata.Mapping.Mapster
 
 ## Create the DTOs
 
-Create `StudentRequest.cs` — the input type for `POST` (create) and `PATCH` (update). `IUpdateMask` enables partial updates; `IValidation` enables dry-run validation:
+`StudentRequest.cs` is the input for `POST` (create) and `PATCH` (update). `IUpdateMask` carries a
+field mask for partial updates; `IValidation` enables dry-run requests:
 
 ```csharp
 using Schemata.Abstractions.Entities;
@@ -36,7 +41,7 @@ public record StudentRequest : ICanonicalName, IFreshness, IUpdateMask, IValidat
 }
 ```
 
-Create `StudentDetail.cs` — the output type for single-entity responses:
+`StudentDetail.cs` is the output for single-entity responses:
 
 ```csharp
 using Schemata.Abstractions.Entities;
@@ -55,7 +60,7 @@ public record StudentDetail : ICanonicalName, IFreshness, ITimestamp
 }
 ```
 
-Create `StudentSummary.cs` — the output type for list responses:
+`StudentSummary.cs` is the output for list responses:
 
 ```csharp
 using Schemata.Abstractions.Entities;
@@ -71,7 +76,9 @@ public record StudentSummary : ICanonicalName
 
 ## Configure mappings
 
-`UseMapping()` returns a `SchemataMappingBuilder`. Chain `UseMapster()` to select the Mapster engine, then register each mapping pair with `Map<TSource, TDestination>()`. When source and destination properties share the same name and type, Mapster maps them automatically:
+`UseMapping()` returns a `SchemataMappingBuilder`. Chain `UseMapster()` to select the engine, then
+register each pair with `Map<TSource, TDestination>()`. Same-named, same-typed properties map
+automatically:
 
 ```csharp
 schema.UseMapping()
@@ -81,11 +88,19 @@ schema.UseMapping()
       .Map<StudentRequest, Student>();
 ```
 
-`Map<S, D>()` accepts an optional `Action<Map<S, D>>` for custom field mappings.
+For a field whose names differ, pass a configure action and pair `For` with `From`:
+
+```csharp
+schema.UseMapping()
+      .UseMapster()
+      .Map<StudentRequest, Student>(map => {
+          map.For(d => d.FullName).From(s => s.FullName);
+      });
+```
 
 ## Update the resource registration
 
-Change the `Use<>()` call to reference the new types:
+Point `Use<>()` at the new types:
 
 ```csharp
 schema.UseResource()
@@ -102,7 +117,13 @@ schema.UseResource()
 
 ## How UpdateMask works
 
-When a `PATCH` request includes `update_mask`, the handler calls `ISimpleMapper.Map(request, entity, fields)`. `SimpleMapperHelper.MapWithMask` saves the values of all non-masked writable properties before mapping, then restores them afterward. Only the listed fields are written to the entity:
+A `PATCH` request maps through `ISimpleMapper`. The update handler reads `IUpdateMask.UpdateMask`:
+
+- No mask, or the `*` wildcard, maps with `ISimpleMapper.Map(request, entity)` — a merge that keeps
+  the destination value for any null or blank source field.
+- A mask resolves its `snake_case` paths to CLR property paths, then maps with
+  `ISimpleMapper.Map(request, entity, fields)`. Listed fields are written authoritatively;
+  everything else keeps its current value.
 
 ```shell
 curl -X PATCH http://localhost:5000/students/<name> \
@@ -110,7 +131,9 @@ curl -X PATCH http://localhost:5000/students/<name> \
      -d '{"age":21,"update_mask":"age"}'
 ```
 
-Only `age` is updated. `full_name` retains its previous value. The mask is a comma-separated list of `snake_case` field names.
+Only `age` changes; `full_name` keeps its previous value. A masked field is authoritative, so
+masking `full_name` with a null body value clears it. The mask is a comma-separated list of
+`snake_case` field names.
 
 ## Verify
 
@@ -124,7 +147,7 @@ curl -X POST http://localhost:5000/students \
      -d '{"full_name":"Alice","age":20}'
 ```
 
-The response is now a `StudentDetail`:
+The response is a `StudentDetail`:
 
 ```json
 {
@@ -137,11 +160,15 @@ The response is now a `StudentDetail`:
 }
 ```
 
-List responses return `StudentSummary` items without timestamps or ETags.
+List responses return `StudentSummary` items, without timestamps or ETags.
+
+## Next steps
+
+- [Concurrency and Freshness](concurrency-and-freshness.md) — `StudentRequest`/`StudentDetail` already implement `IFreshness`
+- [Validation](validation.md) — `StudentRequest` already implements `IValidation`
+- [Filtering and Pagination](filtering-and-pagination.md) — list endpoint returns `StudentSummary`
 
 ## See also
 
-- [Unit of Work](unit-of-work.md) — previous in the series: transactional batch mutations
-- [Concurrency and Freshness](concurrency-and-freshness.md) — next in the series: optimistic concurrency and ETags
-- [Validation](validation.md) — add input validation with FluentValidation
-- [Mapping Overview](../documents/mapping/overview.md) — `ISimpleMapper`, `SimpleMapperHelper`, mask semantics
+- [Mapping overview](../documents/mapping/overview.md) — `ISimpleMapper`, merge and mask semantics
+- [Multi-engine mapping](../cookbook/multi-engine-mapping.md) — switching engines and field masks

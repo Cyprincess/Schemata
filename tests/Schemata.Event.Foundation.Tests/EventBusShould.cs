@@ -70,10 +70,7 @@ public class EventBusShould
         registry.Register(typeof(DerivedEvent), "derived.event");
 
         var observer = new CapturingObserver();
-        var source = new SourceEntity {
-            CanonicalName = "widgets/1",
-            Timestamp = Identifiers.NewUid(),
-        };
+        var source   = new SourceEntity { CanonicalName = "widgets/1", Timestamp = Identifiers.NewUid() };
 
         var services = new ServiceCollection();
         services.AddSingleton<IEventTypeRegistry>(registry);
@@ -92,23 +89,27 @@ public class EventBusShould
         Assert.Same(source, observer.Captured?.Source);
     }
 
-    private interface ITestEvent : IEvent;
+    #region Nested type: CapturingObserver
 
-    private sealed class DerivedEvent : ITestEvent
+    private sealed class CapturingObserver : IEventLifecycleObserver
     {
-        public string? Value { get; set; }
-    }
+        public EventContext? Captured { get; private set; }
 
-    private sealed class NoopHandler : IEventHandler<IEvent>
-    {
-        #region IEventHandler<IEvent> Members
+        #region IEventLifecycleObserver Members
 
-        public Task HandleAsync(IEvent @event, CancellationToken ct = default) {
+        public Task OnPublishedAsync(EventContext context, CancellationToken ct = default) {
+            Captured = context;
             return Task.CompletedTask;
         }
 
+        public Task OnConsumedAsync(EventContext context, CancellationToken ct = default) { return Task.CompletedTask; }
+
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: CountingHandler
 
     private sealed class CountingHandler : IEventHandler<IEvent>
     {
@@ -124,23 +125,37 @@ public class EventBusShould
         #endregion
     }
 
-    private sealed class CapturingObserver : IEventLifecycleObserver
+    #endregion
+
+    #region Nested type: DerivedEvent
+
+    private sealed class DerivedEvent : ITestEvent
     {
-        public EventContext? Captured { get; private set; }
+        public string? Value { get; set; }
+    }
 
-        #region IEventLifecycleObserver Members
+    #endregion
 
-        public Task OnPublishedAsync(EventContext context, CancellationToken ct = default) {
-            Captured = context;
-            return Task.CompletedTask;
-        }
+    #region Nested type: ITestEvent
 
-        public Task OnConsumedAsync(EventContext context, CancellationToken ct = default) {
-            return Task.CompletedTask;
-        }
+    private interface ITestEvent : IEvent;
+
+    #endregion
+
+    #region Nested type: NoopHandler
+
+    private sealed class NoopHandler : IEventHandler<IEvent>
+    {
+        #region IEventHandler<IEvent> Members
+
+        public Task HandleAsync(IEvent @event, CancellationToken ct = default) { return Task.CompletedTask; }
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: SourceEntity
 
     private sealed class SourceEntity : ICanonicalName, IConcurrency
     {
@@ -158,4 +173,6 @@ public class EventBusShould
 
         #endregion
     }
+
+    #endregion
 }

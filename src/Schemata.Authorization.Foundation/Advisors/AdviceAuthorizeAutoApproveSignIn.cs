@@ -19,12 +19,12 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceAuthorizeAutoApproveSignIn{TApp, TAuth}" />.</summary>
 public static class AdviceAuthorizeAutoApproveSignIn
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceAuthorizeConsent.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
-///     Handles auto-approval of authorization when the user has previously granted consent and reauthentication is
-///     not required.
+///     Handles auto-approval of authorization when existing consent covers the request and the current session is reusable.
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <typeparam name="TAuth">The authorization entity type.</typeparam>
@@ -42,7 +42,6 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 {
     #region IAuthorizeAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceAuthorizeAutoApproveSignIn.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

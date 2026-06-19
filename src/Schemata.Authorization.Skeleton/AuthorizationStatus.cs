@@ -14,6 +14,6 @@ public enum AuthorizationStatus
     /// <summary>The caller must return <see cref="AuthorizationResult.Data" /> as the response body.</summary>
     Content,
 
-    /// <summary>The caller must issue an authentication challenge (e.g. WWW-Authenticate header).</summary>
+    /// <summary>The caller must issue an authentication challenge, such as a WWW-Authenticate header.</summary>
     Challenge,
 }

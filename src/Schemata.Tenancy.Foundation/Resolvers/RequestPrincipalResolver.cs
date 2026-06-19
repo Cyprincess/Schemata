@@ -11,16 +11,14 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 ///     Resolves the tenant identifier from the <c>Tenant</c> claim on the authenticated principal.
 /// </summary>
 /// <remarks>
-///     Returns <see langword="null" /> when no <c>Tenant</c> claim is present.
-///     Throws <see cref="TenantResolveException" /> when the claim value cannot be parsed.
+///     Returns <see langword="null" /> when the <c>Tenant</c> claim is absent.
+///     Throws <see cref="TenantResolveException" /> when the claim value is malformed.
 /// </remarks>
 public class RequestPrincipalResolver : ITenantResolver
 {
     private readonly IHttpContextAccessor _accessor;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="RequestPrincipalResolver" /> class.
-    /// </summary>
+    /// <summary>Creates a resolver that reads from the current authenticated principal.</summary>
     public RequestPrincipalResolver(IHttpContextAccessor accessor) { _accessor = accessor; }
 
     #region ITenantResolver Members

@@ -15,6 +15,7 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>Confirms an email address or phone number with a confirmation code.</summary>
     public async Task<IdentityResult<Unit>> ConfirmAsync(
         ConfirmRequest    request,
         ClaimsPrincipal   principal,
@@ -33,9 +34,8 @@ public sealed partial class IdentityHandler<TUser>
                 throw new AuthorizationException();
         }
 
-        // Match ForgotAsync's enumeration-safe response shape: missing accounts and invalid
-        // confirmation codes both surface as NoContentException so unauthenticated callers
-        // cannot distinguish the two cases by error code.
+        // Missing accounts and invalid confirmation codes share one response shape for
+        // unauthenticated callers.
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (found is null) {
             throw new NoContentException();
@@ -65,6 +65,7 @@ public sealed partial class IdentityHandler<TUser>
         return IdentityResult<Unit>.Success(null);
     }
 
+    /// <summary>Sends an account-confirmation code to a contact address.</summary>
     public async Task<IdentityResult<Unit>> CodeAsync(
         ForgetRequest     request,
         ClaimsPrincipal   principal,

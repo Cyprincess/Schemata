@@ -14,8 +14,7 @@ namespace Schemata.Event.Skeleton;
 public interface IEventBus
 {
     /// <summary>
-    ///     Broadcasts <paramref name="event" /> to all subscribed handlers with no source
-    ///     entity association.
+    ///     Broadcasts <paramref name="event" /> to all subscribed handlers using payload metadata.
     /// </summary>
     Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent;
@@ -24,9 +23,7 @@ public interface IEventBus
     ///     Broadcasts <paramref name="event" /> with an optimistic-snapshot reference to
     ///     <paramref name="sourceEntity" />. The source entity must implement both
     ///     <see cref="ICanonicalName" /> and <see cref="IConcurrency" /> so consumers can
-    ///     validate the event against the current state of the source row. Implementations
-    ///     that ignore the source association fall through to the no-source overload via the
-    ///     default body.
+    ///     compare the event with the current state of the source row.
     /// </summary>
     /// <typeparam name="TEvent">The event type.</typeparam>
     /// <param name="event">The event instance.</param>
@@ -49,7 +46,7 @@ public interface IEventBus
     /// <summary>
     ///     Validates that <paramref name="sourceEntity" /> satisfies the source-snapshot
     ///     contract (<see cref="ICanonicalName" /> + <see cref="IConcurrency" />). Throws
-    ///     <see cref="InvalidOperationException" /> with the offending type name otherwise.
+    ///     <see cref="InvalidOperationException" /> with the offending type name for invalid sources.
     /// </summary>
     /// <remarks>
     ///     The contract activates only when a publisher chooses to attach a source entity;

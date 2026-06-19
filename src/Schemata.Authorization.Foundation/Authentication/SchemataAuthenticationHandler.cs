@@ -63,8 +63,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
     /// <summary>
     ///     Returns <c>true</c> when the grant type indicates a user-present flow
-    ///     (authorization_code, refresh_token, or token exchange).
-    ///     Used to decide whether an ID token should be issued.
+    ///     that can receive an ID token.
     /// </summary>
     public static bool IsUserGrant(IDictionary<string, string?> items) {
         items.TryGetValue(Properties.GrantType, out var grant);
@@ -73,9 +72,9 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
     /// <summary>
     ///     Determines whether a refresh token should be issued.
-    ///     Always <c>true</c> for the <c>refresh_token</c> grant (rotation),
-    ///     never for <c>client_credentials</c>, and for all other grants
-    ///     depends on the presence of the <c>offline_access</c> scope.
+    ///     Returns <c>true</c> for the <c>refresh_token</c> grant (rotation),
+    ///     <c>false</c> for <c>client_credentials</c>, and otherwise follows
+    ///     the presence of the <c>offline_access</c> scope.
     /// </summary>
     public static bool ShouldIssueRefreshToken(IDictionary<string, string?> items) {
         if (!items.TryGetValue(Properties.GrantType, out var grant) || string.IsNullOrWhiteSpace(grant)) {
@@ -145,7 +144,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <param name="application">Issuing client application name.</param>
     /// <param name="authorization">Linked authorization/consent record name.</param>
     /// <param name="session">OP session identifier.</param>
-    /// <param name="time">Clock used to stamp the token's create and expiry times.</param>
+    /// <param name="time">Clock for the token's create and expiry timestamps.</param>
     /// <param name="ct">Cancellation token.</param>
     public static async Task<string> CreateTokenAsync(
         ITokenManager<TToken> tokens,

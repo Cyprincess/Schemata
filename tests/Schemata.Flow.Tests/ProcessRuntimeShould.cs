@@ -34,9 +34,8 @@ public class ProcessRuntimeShould
         uow.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
         fixture.Processes.Verify(r => r.Begin(), Times.Once);
         fixture.Transitions.Verify(r => r.Join(uow.Object), Times.Once);
-        fixture.Processes.Verify(
-            r => r.AddAsync(It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        fixture.Processes.Verify(r => r.AddAsync(It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()),
+                                 Times.Once);
         fixture.Transitions.Verify(
             r => r.AddAsync(It.Is<SchemataProcessTransition>(t => t.Event == "Start"), It.IsAny<CancellationToken>()),
             Times.Once);
@@ -66,16 +65,16 @@ public class ProcessRuntimeShould
     public async SystemTask FlowTransitionAdvisorFailure_AbortsBeforeCommit() {
         var advisor = new Mock<IFlowTransitionAdvisor>();
         advisor.SetupGet(a => a.Order).Returns(0);
-        advisor.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+        advisor.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<FlowTransitionContext>(),
+                                         It.IsAny<CancellationToken>()))
                .ThrowsAsync(new InvalidOperationException("provisioning failed"));
 
-        var fixture = new RuntimeFixture(transitionAdvisor: advisor.Object);
+        var fixture = new RuntimeFixture(advisor.Object);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Runtime.StartProcessInstanceAsync("approval").AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval")
+                                                                         .AsTask());
 
-        // Provisioning runs before the transition is persisted, so a failure leaves the unit of
-        // work (and thus the commit) untouched rather than stranding a committed instance.
+        // Provisioning runs before transition persistence, so a failure leaves the unit of work untouched.
         Assert.Empty(fixture.UnitOfWorks);
     }
 
@@ -84,7 +83,8 @@ public class ProcessRuntimeShould
         var fixture = new RuntimeFixture();
         fixture.FailCommit = true;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval").AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval")
+                                                                         .AsTask());
 
         var canonicalName = fixture.StartedCanonicalName;
         Assert.NotNull(canonicalName);
@@ -92,7 +92,8 @@ public class ProcessRuntimeShould
         uow.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
 
         fixture.FailCommit = false;
-        await Assert.ThrowsAsync<NotFoundException>(() => fixture.Runtime.CompleteActivityAsync(canonicalName!).AsTask());
+        await Assert.ThrowsAsync<NotFoundException>(() => fixture.Runtime.CompleteActivityAsync(canonicalName!)
+                                                                 .AsTask());
     }
 
     [Fact]
@@ -110,13 +111,11 @@ public class ProcessRuntimeShould
 
         await fixture.Runtime.ThrowSignalAsync("paid");
 
-        fixture.Engine.Verify(e => e.TriggerAsync(
-                                  It.IsAny<ProcessDefinition>(),
-                                  It.Is<SchemataProcess>(p => p.CanonicalName == "processes/persisted"),
-                                  It.IsAny<IEventDefinition>(),
-                                  It.IsAny<object?>(),
-                                  It.IsAny<CancellationToken>()),
-                              Times.Once);
+        fixture.Engine.Verify(
+            e => e.TriggerAsync(It.IsAny<ProcessDefinition>(),
+                                It.Is<SchemataProcess>(p => p.CanonicalName == "processes/persisted"),
+                                It.IsAny<IEventDefinition>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
         fixture.Processes.Verify(
             r => r.UpdateAsync(It.Is<SchemataProcess>(p => p.StateId == "done"), It.IsAny<CancellationToken>()),
             Times.Once);
@@ -125,17 +124,10 @@ public class ProcessRuntimeShould
             Times.Once);
     }
 
+    #region Nested type: RuntimeFixture
+
     private sealed class RuntimeFixture
     {
-        public Mock<IFlowRuntime> Engine { get; } = new();
-        public bool FailCommit { get; set; }
-        public List<SchemataProcess> Persisted { get; } = [];
-        public Mock<IRepository<SchemataProcess>> Processes { get; } = new();
-        public ProcessRuntime Runtime { get; }
-        public string? StartedCanonicalName { get; private set; }
-        public Mock<IRepository<SchemataProcessTransition>> Transitions { get; } = new();
-        public List<Mock<IUnitOfWork>> UnitOfWorks { get; } = [];
-
         public RuntimeFixture(IFlowTransitionAdvisor? transitionAdvisor = null) {
             var definition = CreateSignalDefinition();
             var registration = new ProcessRegistration {
@@ -151,28 +143,35 @@ public class ProcessRuntimeShould
             registry.Setup(r => r.GetRegisteredProcesses()).Returns([definition.Name]);
 
             Engine.SetupGet(e => e.EngineName).Returns(SchemataConstants.FlowEngines.StateMachine);
-            Engine.Setup(e => e.StartAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
-                  .Callback((ProcessDefinition _, SchemataProcess process, CancellationToken _) => StartedCanonicalName = process.CanonicalName)
-                  .ReturnsAsync(new ProcessInstance { StateId = "draft", State = "Draft" });
-            Engine.Setup(e => e.TriggerAsync(
-                             It.IsAny<ProcessDefinition>(),
-                             It.IsAny<SchemataProcess>(),
-                             It.IsAny<IEventDefinition>(),
-                             It.IsAny<object?>(),
-                             It.IsAny<CancellationToken>()))
+            Engine
+               .Setup(e => e.StartAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
+                                        It.IsAny<CancellationToken>()))
+               .Callback((ProcessDefinition _, SchemataProcess process, CancellationToken _)
+                             => StartedCanonicalName = process.CanonicalName)
+               .ReturnsAsync(new ProcessInstance { StateId = "draft", State = "Draft" });
+            Engine.Setup(e => e.TriggerAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
+                                             It.IsAny<IEventDefinition>(), It.IsAny<object?>(),
+                                             It.IsAny<CancellationToken>()))
                   .ReturnsAsync(new ProcessInstance { StateId = "done", State = "Done" });
-            Engine.Setup(e => e.AdvanceAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(), It.IsAny<CancellationToken>()))
+            Engine.Setup(e => e.AdvanceAsync(It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
+                                             It.IsAny<CancellationToken>()))
                   .ReturnsAsync(new ProcessInstance { StateId = "review", State = "Review" });
 
             Processes.Setup(r => r.FirstOrDefaultAsync(
                                 It.IsAny<Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>>>(),
                                 It.IsAny<CancellationToken>()))
-                     .Returns((Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate, CancellationToken _)
+                     .Returns((
+                                      Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate,
+                                      CancellationToken                                              _
+                                  )
                                   => ValueTask.FromResult(predicate(Persisted.AsQueryable()).FirstOrDefault()));
             Processes.Setup(r => r.ListAsync(
                                 It.IsAny<Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>>>(),
                                 It.IsAny<CancellationToken>()))
-                     .Returns((Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate, CancellationToken _)
+                     .Returns((
+                                      Func<IQueryable<SchemataProcess>, IQueryable<SchemataProcess>> predicate,
+                                      CancellationToken                                              _
+                                  )
                                   => ToAsyncEnumerable(predicate(Persisted.AsQueryable()).ToList()));
             Processes.Setup(r => r.Begin()).Returns(() => CreateUnitOfWork().Object);
 
@@ -188,6 +187,15 @@ public class ProcessRuntimeShould
 
             Runtime = new(registry.Object, services.BuildServiceProvider());
         }
+
+        public Mock<IFlowRuntime>                           Engine               { get; } = new();
+        public bool                                         FailCommit           { get; set; }
+        public List<SchemataProcess>                        Persisted            { get; } = [];
+        public Mock<IRepository<SchemataProcess>>           Processes            { get; } = new();
+        public ProcessRuntime                               Runtime              { get; }
+        public string?                                      StartedCanonicalName { get; private set; }
+        public Mock<IRepository<SchemataProcessTransition>> Transitions          { get; } = new();
+        public List<Mock<IUnitOfWork>>                      UnitOfWorks          { get; } = [];
 
         private Mock<IUnitOfWork> CreateUnitOfWork() {
             var uow = new Mock<IUnitOfWork>();
@@ -207,7 +215,7 @@ public class ProcessRuntimeShould
         }
 
         private static ProcessDefinition CreateSignalDefinition() {
-            var signal = new Signal { Name = "paid" };
+            var signal  = new Signal { Name          = "paid" };
             var gateway = new EventBasedGateway { Id = "gateway", Name = "Gateway" };
             var catchEvent = new FlowEvent {
                 Id         = "catch-paid",
@@ -218,9 +226,9 @@ public class ProcessRuntimeShould
             var done = new NoneTask { Id = "done", Name = "Done" };
 
             return new() {
-                Name = "approval",
+                Name     = "approval",
                 Elements = { gateway, catchEvent, done },
-                Signals = { signal },
+                Signals  = { signal },
                 Flows = {
                     new() { Id = "f1", Source = gateway, Target    = catchEvent },
                     new() { Id = "f2", Source = catchEvent, Target = done },
@@ -228,4 +236,6 @@ public class ProcessRuntimeShould
             };
         }
     }
+
+    #endregion
 }

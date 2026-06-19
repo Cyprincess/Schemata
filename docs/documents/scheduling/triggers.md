@@ -1,25 +1,29 @@
 # Scheduling Triggers
 
-A trigger defines when a job fires. Three schedule kinds ship with Schemata: cron (recurring, calendar-based), periodic (recurring, fixed interval), and one-time. All three implement `IScheduleDefinition` and are stored in `SchemataJob` rows so the scheduler can reconstruct them after a restart.
+A trigger defines when a job fires. Three schedule kinds ship: cron (recurring, calendar-based),
+periodic (recurring, fixed interval), and one-time. All three implement
+`Schemata.Scheduling.Skeleton.IScheduleDefinition` and round-trip through `SchemataJob` columns so the
+scheduler can reconstruct them after a restart.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `Entities/ScheduleType.cs` |
-| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.cs`, `SchemataSchedulingOptions.cs` |
+| `Schemata.Scheduling.Skeleton` | `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `Entities/ScheduleType.cs` |
+| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Execute.cs` |
 
 ## IScheduleDefinition
 
 ```csharp
 public interface IScheduleDefinition
 {
-    bool      IsRecurring  { get; }
+    bool      IsRecurring { get; }
     DateTime? GetNextRunTime(DateTime from);
 }
 ```
 
-`GetNextRunTime` returns the next fire time after `from`, or `null` if the schedule has no more fires (one-time schedules after they fire).
+`GetNextRunTime` returns the next fire time strictly after `from`, or `null` when no future
+occurrence exists.
 
 ## CronSchedule
 
@@ -27,7 +31,7 @@ public interface IScheduleDefinition
 public sealed class CronSchedule : IScheduleDefinition
 {
     public CronSchedule(string expression) { Expression = expression; }
-    public string Expression { get; }
+    public string Expression  { get; }
     public bool   IsRecurring => true;
 
     public DateTime? GetNextRunTime(DateTime from) {
@@ -37,14 +41,10 @@ public sealed class CronSchedule : IScheduleDefinition
 }
 ```
 
-`CronExpression.Parse` uses the Cronos library with the **5-field default format** (`minute hour day-of-month month day-of-week`). Cronos does not accept:
-
-- A seconds field (6-field Quartz-style cron).
-- The `?` wildcard used by Quartz.
-
-For sub-minute cadence, use `PeriodicSchedule` with a `TimeSpan` interval instead.
-
-### Example
+`CronExpression.Parse` uses the Cronos library with the 5-field default format
+(`minute hour day-of-month month day-of-week`). Cronos does not accept a seconds field (6-field
+Quartz-style cron) or the Quartz `?` wildcard. Occurrences are computed in UTC. For sub-minute
+cadence use `PeriodicSchedule`.
 
 ```csharp
 schema.UseScheduling()
@@ -56,20 +56,24 @@ schema.UseScheduling()
 ```csharp
 public sealed class PeriodicSchedule : IScheduleDefinition
 {
-    public PeriodicSchedule(TimeSpan interval, DateTime? startTime = null) { ... }
+    public PeriodicSchedule(TimeSpan interval, DateTime? startTime = null);
     public TimeSpan  Interval  { get; }
     public DateTime? StartTime { get; }
     public bool      IsRecurring => true;
 }
 ```
 
-`GetNextRunTime` computes the next occurrence by aligning to the interval grid from `StartTime` (or `from` if `StartTime` is null). This means the schedule stays aligned even if a fire is delayed.
+The constructor throws `ArgumentOutOfRangeException` for a non-positive interval and normalizes
+`startTime` to UTC. `GetNextRunTime` aligns to the interval grid anchored at `StartTime` (or `from`
+when `StartTime` is null), so the schedule stays on the grid even after a delayed fire. The interval
+and anchor persist as `IntervalTicks` and `AnchorTime` on the job row.
 
-### Example
+`SchedulingBuilder` has no direct periodic overload; pass a `PeriodicSchedule` through the
+`IScheduleDefinition` overload:
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<HeartbeatJob>(TimeSpan.FromSeconds(30));
+      .WithJob<HeartbeatJob>(new PeriodicSchedule(TimeSpan.FromSeconds(30)));
 ```
 
 ## OneTimeSchedule
@@ -78,24 +82,22 @@ schema.UseScheduling()
 public sealed class OneTimeSchedule : IScheduleDefinition
 {
     public OneTimeSchedule(DateTime runTime) { RunTime = runTime; }
-    public DateTime RunTime    { get; }
+    public DateTime RunTime     { get; }
     public bool     IsRecurring => false;
 
-    public DateTime? GetNextRunTime(DateTime from) =>
-        from < RunTime ? RunTime : null;
+    public DateTime? GetNextRunTime(DateTime from) => RunTime > from ? RunTime : null;
 }
 ```
 
-After the job fires, `GetNextRunTime` returns `null` and the job transitions to `JobState.Completed`.
-
-### Example
+After the fire, `GetNextRunTime` returns `null` and the job transitions to `JobState.Completed`. The
+`SchedulingBuilder` `DateTime` overload schedules at an absolute UTC time; the `TimeSpan` overload
+schedules a single fire at `UtcNow + delay` (it is one-time, not recurring):
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<MigrationJob>(DateTime.UtcNow.AddMinutes(5));
-// or
+      .WithJob<MigrationJob>(DateTime.UtcNow.AddMinutes(5));  // absolute
 schema.UseScheduling()
-      .WithJob<MigrationJob>(TimeSpan.FromMinutes(5));
+      .WithJob<MigrationJob>(TimeSpan.FromMinutes(5));        // UtcNow + 5 minutes, fires once
 ```
 
 ## ScheduleDefinitionMapper
@@ -103,41 +105,44 @@ schema.UseScheduling()
 `ScheduleDefinitionMapper` converts between `IScheduleDefinition` and `SchemataJob` columns:
 
 ```csharp
-// Write schedule to job row:
-ScheduleDefinitionMapper.ApplyToJob(schedule, job);
-
-// Read schedule from job row:
-IScheduleDefinition schedule = ScheduleDefinitionMapper.ToDefinition(job);
+ScheduleDefinitionMapper.ApplyToJob(schedule, job);      // write schedule onto the row
+IScheduleDefinition schedule = ScheduleDefinitionMapper.ToDefinition(job);  // read it back
 ```
 
-`ApplyToJob` sets `ScheduleType`, `NextRunTime`, `IntervalTicks`, and `CronExpression` on the job. `ToDefinition` reconstructs the `IScheduleDefinition` from those columns.
+`ApplyToJob` sets `ScheduleType`, `NextRunTime`, and the kind-specific fields (`IntervalTicks` +
+`AnchorTime` for periodic, `CronExpression` for cron), clearing the others. `ToDefinition`
+reconstructs the matching `IScheduleDefinition`. `DefaultScheduler` uses this round-trip to advance
+`NextRunTime` after each fire.
 
 ## Missed-fire policy
 
-When `DefaultScheduler.ScheduleJobAsync` is called and `NextRunTime` is in the past, the missed-fire policy in `SchemataSchedulingOptions.MissedFirePolicy` determines what happens:
+When the scheduler arms a timer and `NextRunTime` is already in the past, the policy on
+`SchemataSchedulingOptions.MissedFirePolicy` decides the response. The policy applies only to
+replayable jobs (`SchemataJob.Replay == true`); single-fire audit jobs from `TriggerAsync` ignore it
+and fire immediately.
 
 | Policy | Behavior |
 | --- | --- |
-| `Skip` (default) | Advance `NextRunTime` without firing. Log at `Information`. |
-| `FireOnce` | Fire once immediately, then advance. |
-| `FireAll` | Replay every missed fire in sequence (capped at 1024 iterations). |
+| `Skip` | Advance `NextRunTime` without firing; log at `Information`. |
+| `FireOnce` (default) | Fire once immediately, then advance to the next occurrence. |
+| `FireAll` | Replay every missed occurrence in sequence, capped at 1024 iterations. |
 
-`Skip` is the safest default for most jobs. Use `FireOnce` for jobs where at least one execution must happen (e.g., a daily report). Use `FireAll` only for jobs where every missed execution has independent business value.
+`FireOnce` is the default. Use `Skip` for snapshots where a missed window is acceptable, and `FireAll`
+only when every missed occurrence has independent business value — a 1-minute job paused for a day
+queues a thousand-plus sequential replays on startup.
 
 ## Extension points
 
-- Implement `IScheduleDefinition` to define a custom schedule kind (e.g., business-hours-only, holiday-aware).
-- Extend `ScheduleDefinitionMapper` to persist and reconstruct custom schedule kinds.
-
-## Design motivation
-
-Storing the schedule in `SchemataJob` columns rather than in memory means the scheduler can reconstruct the full schedule after a restart without re-running startup configuration. `ScheduleDefinitionMapper` is the bridge between the in-memory `IScheduleDefinition` abstraction and the persisted representation.
+- Implement `IScheduleDefinition` for a custom schedule kind (business-hours-only, holiday-aware).
+- Extend `ScheduleDefinitionMapper` to persist and reconstruct that custom kind.
 
 ## Caveats
 
-- `CronSchedule` uses Cronos 5-field format. Do not pass a 6-field (seconds) expression or a Quartz-style `?` wildcard.
-- `PeriodicSchedule` aligns to the interval grid from `StartTime`. If `StartTime` is null, the grid is anchored to the first `GetNextRunTime` call, which may drift slightly across restarts.
-- `OneTimeSchedule` jobs transition to `JobState.Completed` after firing. They are not automatically removed from the database.
+- `CronSchedule` is Cronos 5-field. A 6-field or `?`-wildcard expression throws `CronFormatException`
+  at parse time.
+- Cron occurrences are computed against `TimeZoneInfo.Utc`. A cron string meant for a local time zone
+  stores the wrong `NextRunTime`.
+- `OneTimeSchedule` jobs transition to `JobState.Completed` after firing; the row is not auto-removed.
 
 ## See also
 

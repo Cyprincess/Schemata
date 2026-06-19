@@ -24,7 +24,8 @@ public class PurgeOperationHandlerShould
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(querySuppression.Object);
         var handler = new PurgeOperationHandler<TrashStudent>(Services(repository.Object));
 
-        var result = Assert.IsType<PurgeResponse>(await handler.RunAsync(new() { Filter = "*" }, CancellationToken.None));
+        var result = Assert.IsType<PurgeResponse>(
+            await handler.RunAsync(new() { Filter = "*" }, CancellationToken.None));
 
         Assert.Equal(2, result.PurgeCount);
         Assert.Equal(["trashStudents/alice-1", "trashStudents/bob-1"], result.PurgeSample);
@@ -41,7 +42,8 @@ public class PurgeOperationHandlerShould
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         var handler = new PurgeOperationHandler<TrashStudent>(Services(repository.Object));
 
-        var result = Assert.IsType<PurgeResponse>(await handler.RunAsync(new() { Filter = "*" }, CancellationToken.None));
+        var result = Assert.IsType<PurgeResponse>(
+            await handler.RunAsync(new() { Filter = "*" }, CancellationToken.None));
 
         Assert.Equal(1, result.PurgeCount);
         Assert.Equal(["trashStudents/deleted-1"], result.PurgeSample);
@@ -55,7 +57,8 @@ public class PurgeOperationHandlerShould
         var repository        = Repository(rows);
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(querySuppression.Object);
         repository.Setup(r => r.SuppressSoftDelete()).Returns(removeSuppression.Object);
-        repository.Setup(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var handler = new PurgeOperationHandler<TrashStudent>(Services(repository.Object));
 
@@ -81,7 +84,8 @@ public class PurgeOperationHandlerShould
         var repository = Repository(rows);
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SuppressSoftDelete()).Returns(Mock.Of<IDisposable>());
-        repository.Setup(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.RemoveAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var handler = new PurgeOperationHandler<TrashStudent>(Services(repository.Object));
 
@@ -92,10 +96,7 @@ public class PurgeOperationHandlerShould
     }
 
     private static IServiceProvider Services(IRepository<TrashStudent> repository) {
-        return new ServiceCollection()
-              .AddAipExpressions()
-              .AddSingleton(repository)
-              .BuildServiceProvider();
+        return new ServiceCollection().AddAipExpressions().AddSingleton(repository).BuildServiceProvider();
     }
 
     private static TrashStudent Student(string name) {
@@ -108,12 +109,16 @@ public class PurgeOperationHandlerShould
 
     private static Mock<IRepository<TrashStudent>> Repository(IReadOnlyCollection<TrashStudent> rows) {
         var repository = new Mock<IRepository<TrashStudent>>();
-        repository.Setup(r => r.LongCountAsync(It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> predicate, CancellationToken _) =>
-                      new(predicate(rows.AsQueryable()).LongCount()));
-        repository.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> predicate, CancellationToken _) =>
-                      ToAsync(predicate(rows.AsQueryable())));
+        repository
+           .Setup(r => r.LongCountAsync(It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
+                                        It.IsAny<CancellationToken>()))
+           .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> predicate, CancellationToken _)
+                        => new(predicate(rows.AsQueryable()).LongCount()));
+        repository
+           .Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
+                                   It.IsAny<CancellationToken>()))
+           .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> predicate, CancellationToken _)
+                        => ToAsync(predicate(rows.AsQueryable())));
         return repository;
     }
 

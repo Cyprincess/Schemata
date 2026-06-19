@@ -26,11 +26,11 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <seealso cref="CodeFlowOptions" />
 public sealed class AdviceDiscoveryCodeFlow(IOptions<CodeFlowOptions> codeOptions) : IDiscoveryAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceDiscoveryUserInfo.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

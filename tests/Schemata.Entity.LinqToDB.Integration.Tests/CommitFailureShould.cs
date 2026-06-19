@@ -30,14 +30,18 @@ public class CommitFailureShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 // LinqToDB executes inserts immediately, so the suppressed-pre-check duplicate fails
-                // against the database here rather than at commit time.
+                // against the database during AddAsync.
                 using (repository.AdviceContext.Use<UniquenessSuppressed>()) {
                     await Assert.ThrowsAsync<SqliteException>(() => repository.AddAsync(new() {
-                        Uid = existing, FullName = "duplicate", Name = "duplicate", Age = 1, Grade = 1,
+                        Uid      = existing,
+                        FullName = "duplicate",
+                        Name     = "duplicate",
+                        Age      = 1,
+                        Grade    = 1,
                     }));
                 }
 
-                // No commit: disposing the scope rolls back the implicit unit of work's transaction.
+                // Scope disposal rolls back the implicit unit of work's transaction.
             }
         }
 
@@ -51,16 +55,16 @@ public class CommitFailureShould : IAsyncLifetime
     }
 
     private async Task<Guid> SeedAsync(string name) {
-        var id                  = Identifiers.NewUid();
+        var id = Identifiers.NewUid();
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {
-                Uid      = id,
-                FullName = name,
-                Name     = name,
-                Age      = 20,
-                Grade    = 1,
-            });
+                                          Uid      = id,
+                                          FullName = name,
+                                          Name     = name,
+                                          Age      = 20,
+                                          Grade    = 1,
+                                      });
             await repository.CommitAsync();
         }
 

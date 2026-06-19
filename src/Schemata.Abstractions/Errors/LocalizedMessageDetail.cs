@@ -6,14 +6,12 @@ namespace Schemata.Abstractions.Errors;
 ///     Error detail carrying a localized end-user message per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 ///     Use this alongside the developer-facing <c>message</c> in <see cref="ErrorBody" />
-///     when the caller asked for a specific locale or when the service wants to provide a
-///     consistently-shaped message that can evolve over time without breaking clients that
-///     parsed <c>ErrorBody.Message</c>.
+///     when the caller requested a specific locale or the service publishes a stable
+///     message shape for clients.
 /// </summary>
 /// <remarks>
-///     An extension detail payload: the framework defines and serializes the shape, but the
-///     application layer decides when to attach it to an error. The framework core never
-///     populates it on its own.
+///     Extension detail payload whose shape is defined by the framework and attached by
+///     the application layer.
 /// </remarks>
 [Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.LocalizedMessage")]
 public class LocalizedMessageDetail : IErrorDetail
@@ -25,9 +23,9 @@ public class LocalizedMessageDetail : IErrorDetail
     public virtual string? Locale { get; set; }
 
     /// <summary>
-    ///     Localized message intended for end-user display. Any dynamic substitutions
-    ///     must also appear under <see cref="ErrorInfoDetail.Metadata" /> so machine
-    ///     consumers do not have to parse the text.
+    ///     Localized message intended for end-user display.
+    ///     <see cref="ErrorInfoDetail.Metadata" /> carries dynamic substitutions for
+    ///     machine consumers.
     /// </summary>
     public virtual string? Message { get; set; }
 }

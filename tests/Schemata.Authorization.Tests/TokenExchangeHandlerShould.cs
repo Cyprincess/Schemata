@@ -19,7 +19,8 @@ namespace Schemata.Authorization.Tests;
 
 public class TokenExchangeHandlerShould
 {
-    private static readonly SchemataApplication TestApp = new() { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+    private static readonly SchemataApplication
+        TestApp = new() { Uid = Identifiers.NewUid(), ClientId = "test-client" };
 
     private static TokenExchangeHandler<SchemataApplication> CreateHandler(
         Mock<IClientAuthenticationService<SchemataApplication>>                            clientAuth,

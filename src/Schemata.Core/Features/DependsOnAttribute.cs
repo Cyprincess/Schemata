@@ -12,6 +12,9 @@ namespace Schemata.Core.Features;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DependsOnAttribute : Attribute
 {
+    /// <summary>
+    ///     Initializes a dependency declaration for a feature type name.
+    /// </summary>
     /// <param name="name">Assembly-qualified type name of the dependency.</param>
     public DependsOnAttribute(string name) { Name = name; }
 

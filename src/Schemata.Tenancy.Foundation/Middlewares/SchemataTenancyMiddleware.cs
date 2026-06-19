@@ -7,9 +7,9 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Schemata.Tenancy.Foundation.Middlewares;
 
 /// <summary>
-///     Consolidated tenancy middleware: resolves the tenant through
-///     <see cref="ITenantContextInitializer{TTenant}" /> and replaces the request
-///     <see cref="IServiceProvidersFeature" /> with the tenant-scoped provider.
+///     Consolidated tenancy middleware that resolves the tenant through
+///     <see cref="ITenantContextInitializer{TTenant}" /> and installs the tenant-scoped
+///     provider on the request <see cref="IServiceProvidersFeature" />.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 public class SchemataTenancyMiddleware<TTenant>
@@ -17,9 +17,7 @@ public class SchemataTenancyMiddleware<TTenant>
 {
     private readonly RequestDelegate _next;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="SchemataTenancyMiddleware{TTenant}" /> class.
-    /// </summary>
+    /// <summary>Creates middleware with the next request delegate.</summary>
     public SchemataTenancyMiddleware(RequestDelegate next) { _next = next; }
 
     /// <summary>Initializes the tenant context and swaps the request services for the scoped duration.</summary>

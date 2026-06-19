@@ -30,7 +30,6 @@ public sealed class FrontChannelLogoutFeature<TApp, TToken> : IAuthorizationFlow
 {
     #region IAuthorizationFlowFeature Members
 
-    /// <inheritdoc cref="IAuthorizationFlowFeature.Order" />
     public int Order => 60_100;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {

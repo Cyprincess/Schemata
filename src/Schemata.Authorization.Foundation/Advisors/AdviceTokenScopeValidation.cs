@@ -2,7 +2,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
@@ -15,6 +14,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceTokenScopeValidation{TApp}" />.</summary>
 public static class AdviceTokenScopeValidation
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceDeviceCodePolling.DefaultOrder + 10_000_000;
 }
 
@@ -34,7 +34,6 @@ public sealed class AdviceTokenScopeValidation<TApp>(IApplicationManager<TApp> a
 {
     #region ITokenRequestAdvisor<TApp> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceTokenScopeValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

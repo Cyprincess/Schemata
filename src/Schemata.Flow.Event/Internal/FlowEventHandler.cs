@@ -12,6 +12,7 @@ public sealed class FlowEventHandler : IEventHandler<IEvent>
     private readonly IEventDispatchContext _context;
     private readonly IProcessRuntime       _runtime;
 
+    /// <summary>Creates an event handler that wakes matching Flow process waits.</summary>
     public FlowEventHandler(IProcessRuntime runtime, IEventDispatchContext context) {
         _runtime = runtime;
         _context = context;

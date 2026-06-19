@@ -6,8 +6,16 @@ using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
 
+/// <summary>
+///     Creates advisor contexts populated with resource-wide suppression markers from options.
+/// </summary>
 internal static class ResourceAdviceContext
 {
+    /// <summary>
+    ///     Builds an <see cref="AdviceContext" /> for a resource operation.
+    /// </summary>
+    /// <param name="sp">The service provider for resolving resource options.</param>
+    /// <returns>The advisor context carrying configured suppression markers.</returns>
     public static AdviceContext Create(IServiceProvider sp) {
         var ctx = new AdviceContext(sp);
 

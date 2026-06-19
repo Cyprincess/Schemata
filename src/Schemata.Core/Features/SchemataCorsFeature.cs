@@ -12,6 +12,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataCorsFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for CORS.
+    /// </summary>
     public const int DefaultPriority = SchemataQuotaFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

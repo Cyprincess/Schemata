@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -78,7 +77,8 @@ public class SchemataTenantServiceProviderFactoryShould
         services.AddSingleton<IDependency, RootDependency>();
 
         var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IConsumer, TenantConsumer>()];
+        options.TenantOverrides[DeterministicGuid("alpha").ToString()]
+            = [s => s.AddSingleton<IConsumer, TenantConsumer>()];
 
         var       factory = Build(options, services);
         using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));
@@ -134,12 +134,10 @@ public class SchemataTenantServiceProviderFactoryShould
         using var secondAcc = AccessorScope(AccessorFor("alpha"));
         using var second    = factory.CreateServiceProvider(secondAcc.Accessor);
 
-        // Both requests share the cached tenant provider.
         Assert.Same(first.Provider, second.Provider);
 
         // Inside the cached provider, ITenantContextAccessor<TTenant> resolves to a
-        // tenant-bound implementation — not the request-scoped accessor instance that
-        // happened to win the cache race.
+        // tenant-bound implementation tied to the tenant id.
         var resolved = second.Provider.GetRequiredService<ITenantContextAccessor<SchemataTenant>>();
         Assert.IsType<TenantBoundContextAccessor<SchemataTenant>>(resolved);
         Assert.NotSame(firstAcc.Accessor, resolved);
@@ -193,6 +191,18 @@ public class SchemataTenantServiceProviderFactoryShould
 
     #endregion
 
+    #region Nested type: IConsumer
+
+    private interface IConsumer;
+
+    #endregion
+
+    #region Nested type: IDependency
+
+    private interface IDependency;
+
+    #endregion
+
     #region Nested type: IMarker
 
     private interface IMarker;
@@ -217,21 +227,9 @@ public class SchemataTenantServiceProviderFactoryShould
 
     #endregion
 
-    #region Nested type: IDependency
-
-    private interface IDependency;
-
-    #endregion
-
     #region Nested type: RootDependency
 
     private sealed class RootDependency : IDependency;
-
-    #endregion
-
-    #region Nested type: IConsumer
-
-    private interface IConsumer;
 
     #endregion
 

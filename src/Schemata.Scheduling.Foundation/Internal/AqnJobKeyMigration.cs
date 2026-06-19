@@ -12,17 +12,15 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation.Internal;
 
 /// <summary>
-///     Backfills <see cref="SchemataJob.JobKey" /> on rows persisted under the legacy
-///     assembly-qualified-name model. Reads the obsolete <c>JobType</c> column via reflection
-///     to avoid emitting obsolete warnings, resolves the CLR type through
-///     <see cref="Type.GetType(string, bool)" />, and writes the registry-resolved stable
-///     key. Idempotent: rows that already carry <see cref="SchemataJob.JobKey" /> are filtered
-///     out by the query and never re-written.
+///     Backfills <see cref="SchemataJob.JobKey" /> from the assembly-qualified job type
+///     column. Reflection reads the hidden column, resolves the CLR type through
+///     <see cref="Type.GetType(string, bool)" />, and writes the registry-resolved stable key.
 /// </summary>
 public static class AqnJobKeyMigration
 {
     private static readonly PropertyInfo JobTypeProperty = typeof(SchemataJob).GetProperty("JobType")!;
 
+    /// <summary>Updates persisted job rows that can be resolved through the scheduled job registry.</summary>
     public static async Task RunAsync(
         IRepository<SchemataJob> jobs,
         IScheduledJobRegistry    registry,

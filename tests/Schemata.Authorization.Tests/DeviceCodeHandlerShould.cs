@@ -35,17 +35,17 @@ public class DeviceCodeHandlerShould
                                                jsonOpts.Value);
 
         var device = new SchemataToken {
-            Uid               = Identifiers.NewUid(),
-            Name              = "device-1",
-            Type              = TokenTypes.DeviceCode,
-            Status            = TokenStatuses.Authorized,
-            Application       = app.Name,
-            Subject           = "user-1",
-            ReferenceId       = "dev-ref",
-            Payload           = payload,
-            Authorization     = "auth-approved",
-            SessionId         = "sess-approved",
-            ExpireTime        = DateTime.UtcNow.AddMinutes(10),
+            Uid           = Identifiers.NewUid(),
+            Name          = "device-1",
+            Type          = TokenTypes.DeviceCode,
+            Status        = TokenStatuses.Authorized,
+            Application   = app.Name,
+            Subject       = "user-1",
+            ReferenceId   = "dev-ref",
+            Payload       = payload,
+            Authorization = "auth-approved",
+            SessionId     = "sess-approved",
+            ExpireTime    = DateTime.UtcNow.AddMinutes(10),
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();

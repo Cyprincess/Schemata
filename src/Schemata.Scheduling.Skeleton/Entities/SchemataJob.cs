@@ -15,7 +15,7 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [Index(nameof(Name), IsUnique = true)]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    /// <summary>Legacy assembly-qualified <see cref="IScheduledJob" /> type retained for JobKey migration read-back.</summary>
+    /// <summary>Assembly-qualified <see cref="IScheduledJob" /> type for <see cref="JobKey" /> backfill.</summary>
     [Obsolete("Migrated to JobKey. Will be removed after AQN→JobKey migration completes.")]
     [EditorBrowsable(EditorBrowsableState.Never)]
     public virtual string? JobType { get; set; }

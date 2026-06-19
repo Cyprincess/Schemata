@@ -101,8 +101,8 @@ An extension feature can be activated in the same way as a built-in feature.
 | 470_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
 | 470_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
 | 480_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
-| 480_100_000 | Schemata.Flow.Http                 | Flow (`UseFlowHttp`)     | HTTP resource bridge for process instances and transitions         |
-| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`UseFlowGrpc`)     | gRPC resource bridge for process instances and transitions         |
+| 480_100_000 | Schemata.Flow.Http                 | Flow (`MapHttp`)     | HTTP resource bridge for process instances and transitions         |
+| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
 | 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
 | 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
 | 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |

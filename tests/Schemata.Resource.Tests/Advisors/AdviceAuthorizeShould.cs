@@ -28,8 +28,8 @@ public class AdviceAuthorizeShould
                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(true);
 
-        var advisor   = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object);
-        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object);
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new ResourceMethodVerb(Verbs.Expunge));
         var request   = new EmptyResourceRequest();
         var container = new ResourceRequestContainer<Student>();
@@ -37,12 +37,15 @@ public class AdviceAuthorizeShould
         var result = await advisor.AdviseAsync(ctx, request, container, null);
 
         Assert.Equal(AdviseResult.Continue, result);
-        access.Verify(a => a.HasAccessAsync(It.IsAny<Student?>(),
-                                            It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == Verbs.Expunge),
-                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Once);
-        access.Verify(a => a.HasAccessAsync(It.IsAny<Student?>(),
-                                            It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == nameof(Operations.Delete)),
-                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
+        access.Verify(
+            a => a.HasAccessAsync(It.IsAny<Student?>(),
+                                  It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == Verbs.Expunge),
+                                  It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Once);
+        access.Verify(
+            a => a.HasAccessAsync(It.IsAny<Student?>(),
+                                  It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation
+                                                                               == nameof(Operations.Delete)),
+                                  It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

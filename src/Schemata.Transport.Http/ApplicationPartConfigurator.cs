@@ -11,7 +11,9 @@ internal sealed class ApplicationPartConfigurator<T> : IApplicationPartConfigura
 {
     private readonly SchemataExtensionPart<T> _part = new();
 
-    /// <summary>The part name, used by the caller for idempotency checks.</summary>
+    /// <summary>
+    ///     Gets the application part name.
+    /// </summary>
     public string PartName => _part.Name;
 
     #region IApplicationPartConfigurator Members

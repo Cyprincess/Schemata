@@ -1,10 +1,13 @@
 # Access Control
 
-Gate CRUD operations behind claims and filter query results per user using `UseSecurity`. This guide builds on [Identity](identity.md).
+Gate the Student CRUD operations behind permission claims and filter list results per user, using
+`UseSecurity()` and the resource builder's `WithAuthorization()`. This guide builds on
+[Identity](identity.md).
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Security.Foundation`. If you are composing packages manually:
+`Schemata.Application.Complex.Targets` already includes `Schemata.Security.Foundation`. To compose
+manually:
 
 ```shell
 dotnet add package --prerelease Schemata.Security.Foundation
@@ -12,13 +15,15 @@ dotnet add package --prerelease Schemata.Security.Foundation
 
 ## Enable security
 
-Add `UseSecurity()` in `Program.cs`. `SchemataSecurityFeature` runs at `Order = Priority = 400_000_000`:
+Add `UseSecurity()` in `Program.cs`:
 
 ```csharp
 schema.UseSecurity();
 ```
 
-Then chain `.WithAuthorization()` on the resource builder to activate the authorize advisors:
+`SchemataSecurityFeature` registers four scoped services with `TryAdd`: an access provider, an
+entitlement provider, a permission resolver, and a permission matcher. Then opt the `Student`
+resource into authorization on the resource builder:
 
 ```csharp
 schema.UseResource()
@@ -27,26 +32,33 @@ schema.UseResource()
       .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
-`WithAuthorization()` registers `AdviceXxxRequestAnonymous` (Order 80M) and `AdviceXxxRequestAuthorize` (Order 100M) for all five CRUD operations. The authorize advisor calls `IAccessProvider<TEntity, TRequest>.HasAccessAsync` on every request.
+`WithAuthorization()` registers two advisor families per operation: the anonymous advisors at
+`Order` 100,000,000 (which mark operations allowed by an entity's `[Anonymous]` attribute) and the
+authorize advisors at 110,000,000 (which call the access and entitlement providers). Without
+`WithAuthorization()`, the providers are never invoked.
 
 ## How permissions work
 
-`DefaultPermissionResolver` produces permissions in the format `{entity}.{operation}` (both kebab-cased). For `Student`:
+`DefaultAccessProvider` denies any unauthenticated caller, then resolves a permission and asks the
+matcher whether the principal holds it. `DefaultPermissionResolver` produces `{entity}.{operation}`
+in kebab-case. For `Student`:
 
 | Operation | Permission |
-| --------- | ---------- |
+| --- | --- |
 | List | `student.list` |
 | Get | `student.get` |
 | Create | `student.create` |
 | Update | `student.update` |
 | Delete | `student.delete` |
 
-`DefaultPermissionMatcher` checks claims of type `"role"`. It supports exact match and wildcards:
+`DefaultPermissionMatcher` reads claims of the type in `SchemataSecurityOptions.PermissionClaimType`
+(default `"role"`) and supports exact matches plus a single `*` wildcard segment:
 
-- `student.*` — grants all operations on Student
-- `*.list` — grants List on any entity
+- `student.*` grants every operation on `Student`.
+- `*.list` grants `List` on any single-word entity.
+- A bare `*` matches nothing.
 
-## Assign claims to users
+## Assign permission claims
 
 ```csharp
 var user = await userManager.FindByEmailAsync("alice@example.com");
@@ -55,10 +67,13 @@ await userManager.AddClaimAsync(user!, new Claim("role", "student.*"));
 
 ## Custom access provider
 
-Replace the default open-generic `IAccessProvider<,>` with a concrete implementation:
+Register a closed-generic `IAccessProvider<Student, StudentRequest>` to authorize one entity; the
+open-generic default covers the rest:
 
 ```csharp
 using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Security.Skeleton;
 
 public sealed class StudentAccessProvider : IAccessProvider<Student, StudentRequest>
@@ -67,50 +82,57 @@ public sealed class StudentAccessProvider : IAccessProvider<Student, StudentRequ
         Student?                      entity,
         AccessContext<StudentRequest> context,
         ClaimsPrincipal?              principal,
-        CancellationToken             ct)
+        CancellationToken             ct = default)
     {
-        // custom logic
-        return Task.FromResult(true);
+        // context.Operation is "List" / "Get" / "Create" / "Update" / "Delete"
+        return Task.FromResult(principal?.Identity?.IsAuthenticated == true);
     }
 }
 ```
 
-Register it before `UseSecurity()` — `SchemataSecurityFeature` uses `TryAddScoped` for the open-generic fallback, so any concrete registration made first takes precedence:
+Register it before `UseSecurity()`, since the feature uses `TryAddScoped` for the open-generic
+default:
 
 ```csharp
-schema.ConfigureServices(services => {
-    services.AddScoped<IAccessProvider<Student, StudentRequest>, StudentAccessProvider>();
-});
+schema.ConfigureServices(services =>
+    services.AddScoped<IAccessProvider<Student, StudentRequest>, StudentAccessProvider>());
 schema.UseSecurity();
 ```
 
 ## Row-level filtering
 
-`IEntitlementProvider<T, TRequest>` generates LINQ expressions composed into repository queries. The default returns `_ => true`. To restrict each user to their own records:
+`IEntitlementProvider<T, TRequest>` returns a LINQ predicate composed into the repository query, or
+`null` for no filter. The default returns `null`. To restrict each user to the rows they created:
 
 ```csharp
+using System;
+using System.Linq.Expressions;
+using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Security.Skeleton;
+
 public sealed class StudentEntitlementProvider
     : IEntitlementProvider<Student, StudentRequest>
 {
     public Task<Expression<Func<Student, bool>>?> GenerateEntitlementExpressionAsync(
-        AccessContext<StudentRequest>? context,
-        ClaimsPrincipal?               principal,
-        CancellationToken              ct = default)
+        AccessContext<StudentRequest> context,
+        ClaimsPrincipal?              principal,
+        CancellationToken             ct = default)
     {
         var id = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(id))
-        {
-            Expression<Func<Student, bool>> deny = _ => false;
-            return Task.FromResult<Expression<Func<Student, bool>>?>(deny);
-        }
 
-        Expression<Func<Student, bool>> filter = s => s.CreatedBy == id;
+        Expression<Func<Student, bool>> filter = string.IsNullOrEmpty(id)
+            ? _ => false
+            : s => s.CreatedBy == id;
+
         return Task.FromResult<Expression<Func<Student, bool>>?>(filter);
     }
 }
 ```
 
-Register it before `UseSecurity()` in the same way as the access provider.
+Register it the same way as the access provider. Entitlement filtering applies to List, Get, Update,
+and Delete; Create has no entitlement step.
 
 ## Verify
 
@@ -119,24 +141,28 @@ dotnet run
 ```
 
 ```shell
-# Login as Alice
+# Login as Alice (Identity guide)
 curl -X POST http://localhost:5000/Authenticate/Login \
      -H "Content-Type: application/json" \
      -d '{"username":"alice@example.com","password":"P@ssw0rd!"}'
 
-# Create a student (succeeds with student.* claim)
+# Create a student — succeeds with the student.* claim
 curl -X POST http://localhost:5000/students \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer <alice_token>" \
      -d '{"full_name":"Bob","age":22}'
 
-# Without a token, returns 403
+# Without a token the access provider denies the request: 403
 curl http://localhost:5000/students
 ```
 
+## Next steps
+
+- [Authorization](authorization.md) — issue OAuth 2.0 / OpenID Connect tokens that carry the same claims
+- [Multi-Tenancy](multi-tenancy.md) — combine row-level security with per-tenant isolation
+- [gRPC Transport](grpc-transport.md) — the same authorization advisors apply to gRPC
+
 ## See also
 
-- [Identity](identity.md) — user registration and login
-- [Authorization](authorization.md) — OAuth 2.0 / OpenID Connect server
-- [Security](../documents/security.md) — `IAccessProvider`, `IEntitlementProvider`, permission resolution
-- [Ownership](../documents/repository/ownership.md) — `UseOwner()` for automatic row-level ownership filtering
+- [Security](../documents/security.md) — providers, permission resolution, advisor orders
+- [Ownership](../documents/repository/ownership.md) — `UseOwner()` for automatic ownership filtering

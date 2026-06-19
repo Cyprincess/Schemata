@@ -3,9 +3,10 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Identity.Skeleton.Models;
 
-/// <summary>List item for <see cref="Entities.SchemataRole" />.</summary>
+/// <summary>Role summary response body.</summary>
 public class RoleSummary : IIdentifier, ICanonicalName, ITimestamp
 {
+    /// <summary>Friendly label shown when assigning roles; falls back to <see cref="Name" /> when blank.</summary>
     public string? DisplayName { get; set; }
 
     #region ICanonicalName Members

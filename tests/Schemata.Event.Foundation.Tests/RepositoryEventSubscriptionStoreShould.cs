@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -72,8 +73,18 @@ public class RepositoryEventSubscriptionStoreShould
     [Fact]
     public async Task FindAsync_WithCorrelationKey_FiltersByBoth() {
         var rows = new List<SchemataEventSubscription> {
-            new() { SubscriptionId = "sub-1", EventType = "invoice.paid", CorrelationKey = "invoices/1", Target = "processes/1" },
-            new() { SubscriptionId = "sub-2", EventType = "invoice.paid", CorrelationKey = "invoices/2", Target = "processes/2" },
+            new() {
+                SubscriptionId = "sub-1",
+                EventType      = "invoice.paid",
+                CorrelationKey = "invoices/1",
+                Target         = "processes/1",
+            },
+            new() {
+                SubscriptionId = "sub-2",
+                EventType      = "invoice.paid",
+                CorrelationKey = "invoices/2",
+                Target         = "processes/2",
+            },
         };
         var store = new RepositoryEventSubscriptionStore(Repository(rows).Object);
 
@@ -95,21 +106,28 @@ public class RepositoryEventSubscriptionStoreShould
                .Callback((SchemataEventSubscription row, CancellationToken _) => rows.Remove(row))
                .Returns(Task.CompletedTask);
         records.Setup(r => r.FirstOrDefaultAsync(
-                         It.IsAny<System.Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>>(),
-                         It.IsAny<CancellationToken>()))
-               .Returns((System.Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>> predicate,
-                         CancellationToken _) => new(
-                   predicate(rows.AsQueryable()).FirstOrDefault()));
+                          It.IsAny<Func<IQueryable<SchemataEventSubscription>,
+                              IQueryable<SchemataEventSubscription>>>(), It.IsAny<CancellationToken>()))
+               .Returns((
+                            Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>
+                                predicate,
+                            CancellationToken _
+                        ) => new(predicate(rows.AsQueryable()).FirstOrDefault()));
         records.Setup(r => r.ListAsync(
-                         It.IsAny<System.Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>>(),
-                         It.IsAny<CancellationToken>()))
-               .Returns((System.Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>> predicate,
-                         CancellationToken _) => ToAsync(predicate(rows.AsQueryable()).ToList()));
+                          It.IsAny<Func<IQueryable<SchemataEventSubscription>,
+                              IQueryable<SchemataEventSubscription>>>(), It.IsAny<CancellationToken>()))
+               .Returns((
+                            Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>
+                                predicate,
+                            CancellationToken _
+                        ) => ToAsync(predicate(rows.AsQueryable()).ToList()));
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         return records;
     }
 
-    private static async IAsyncEnumerable<SchemataEventSubscription> ToAsync(IEnumerable<SchemataEventSubscription> rows) {
+    private static async IAsyncEnumerable<SchemataEventSubscription> ToAsync(
+        IEnumerable<SchemataEventSubscription> rows
+    ) {
         foreach (var row in rows) {
             yield return row;
             await Task.Yield();

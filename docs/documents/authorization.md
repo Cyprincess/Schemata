@@ -1,125 +1,244 @@
 # Authorization
 
-`Schemata.Authorization.Foundation` provides an OAuth 2.0 / OpenID Connect authorization server compliant with [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749.html) and [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html). The core feature is generic over four entity types (`TApp`, `TAuth`, `TScope`, `TToken`) and runs at priority 450,000,000. A bridge feature (`SchemataAuthorizationIdentityFeature`) wires Identity's `ISubjectProvider` into the claims pipeline at priority 450,100,000.
+`Schemata.Authorization.Foundation` is a hand-rolled OAuth 2.0 / OpenID Connect authorization
+server. It builds on `Microsoft.IdentityModel` for key material and JWT handling but pulls in no
+external server framework. The core feature is generic over four entity types — `TApp`, `TAuth`,
+`TScope`, `TToken` — and runs at priority 450,000,000. Flows are opt-in: `UseAuthorization()`
+registers the core, and each `Use*Flow` / `Use*` call on the returned builder adds one
+`IAuthorizationFlowFeature`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Authorization.Skeleton` | `Entities/` — `SchemataApplication`, `SchemataAuthorization`, `SchemataScope`, `SchemataToken` |
-| `Schemata.Authorization.Skeleton` | `Advisors/` — advisor interfaces (`ITokenRequestAdvisor`, `IClaimsAdvisor`, `IDestinationAdvisor`, etc.) |
-| `Schemata.Authorization.Foundation` | `Extensions/SchemataBuilderExtensions.cs` — two `UseAuthorization` overloads |
-| `Schemata.Authorization.Foundation` | `Features/SchemataAuthorizationFeature.cs` — priority 450,000,000 |
-| `Schemata.Authorization.Identity` | `Features/SchemataAuthorizationIdentityFeature.cs` — priority 450,100,000 (bridge) |
+| `Schemata.Authorization.Skeleton` | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope,SchemataToken}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs` |
+| `Schemata.Authorization.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseAuthorization`), `Extensions/SchemataAuthorizationBuilderExtensions.cs` (flow methods), `Features/`, `Controllers/ConnectController*.cs`, `Authentication/SchemataAuthorizationOptions.cs`, `Managers/`, `Services/`, `Advisors/` |
+| `Schemata.Authorization.Identity` | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceSubjectClaims.cs`, the `UseIdentity()` builder extension |
 
-## Mechanism walkthrough
-
-### 1. Enable the feature
-
-Two overloads are available:
+## Enabling the server
 
 ```csharp
-// Default entity types
 builder.UseSchemata(schema => {
     schema.UseIdentity();
-    var auth = schema.UseAuthorization(o => {
-        o.Issuer          = "https://auth.example.com";
-        o.SigningKey       = myRsaKey;
-        o.SigningAlgorithm = "RS256";
-    });
-    auth.UseCodeFlow();
-    auth.UseRefreshTokenFlow();
-    auth.UseEndSession();
-});
 
-// Custom entity types
-schema.UseAuthorization<MyApp, MyAuth, MyScope, MyToken>(configure);
+    schema.UseAuthorization(o => {
+              o.Issuer = "https://auth.example.com";
+              o.AddEphemeralSigningKey();        // dev only; load a persisted key in production
+          })
+          .UseIdentity()                          // bridge in the Identity subject provider
+          .UseCodeFlow()
+          .UseRefreshTokenFlow()
+          .UseUserInfo();
+});
 ```
 
-`UseAuthorization` stores the `Action<SchemataAuthorizationOptions>` in `Configurators`, registers the OIDC discovery and JWKS endpoints via `WellKnownOptions`, calls `builder.AddFeature<SchemataAuthorizationFeature<...>>()`, and returns a `SchemataAuthorizationBuilder` for chaining flow extensions.
+`UseAuthorization` has two overloads: a default one over `SchemataApplication`,
+`SchemataAuthorization`, `SchemataScope`, `SchemataToken`, and a generic one for custom subclasses.
+Both take an optional `Action<SchemataAuthorizationOptions>`, store it, map the discovery and JWKS
+endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`, and return a
+`SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>` for chaining.
 
-### 2. What the feature registers
+## What the core feature registers
 
-`SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>` (priority 450,000,000) depends on `SchemataAuthenticationFeature`, `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`. It:
+`SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>` (`Priority = Orders.Extension +
+50_000_000 = 450_000_000`) depends on `SchemataAuthenticationFeature`,
+`SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`. `ConfigureServices`:
 
-- Validates `SchemataAuthorizationOptions` at startup (`SigningKey`, `SigningAlgorithm`, and `Issuer` are required).
-- Collects and sorts `IAuthorizationFlowFeature` instances from `Configurators`, then calls `ConfigureServices` on each.
-- Adds a `SchemataExtensionPart` and inserts `OAuthRequestBinderProvider` into MVC's model binder chain.
-- Registers `IDiscoveryAdvisor`, `IClientAuthentication<TApp>` (Basic + Post), `IClientAuthenticationService<TApp>`.
-- Registers `ITokenRequestAdvisor<TApp>` for endpoint permission, grant permission, and scope validation.
-- Registers `IClaimsAdvisor` for audience claims and pairwise subject projection.
-- Registers `IDestinationAdvisor` for subject, profile, email, phone, address, and role claim routing.
-- Registers `DiscoveryHandler<TScope>`, `TokenService`, `ISubjectIdentifierService`.
-- Registers managers: `IApplicationManager<TApp>`, `IScopeManager<TScope>`, `IAuthorizationManager<TAuth>`, `ITokenManager<TToken>`.
-- Adds two authentication schemes (bearer and authorization code) via `services.AddAuthentication()`.
-- Registers `TokenCleanupJob<TToken>` as a transient `IScheduledJob` and adds an hourly `CronSchedule("0 * * * *")` entry to `SchemataSchedulingOptions.Jobs`.
-- Registers `BackChannelLogoutJob` as a transient `IScheduledJob`. `BackChannelLogoutService<TApp, TToken>` builds the per-RP claim set, signs the logout JWT, and triggers `BackChannelLogoutJob` through `IScheduler.TriggerAsync`.
+- Validates `SchemataAuthorizationOptions` in `PostConfigure`: `SigningKey`, `SigningAlgorithm`,
+  and `Issuer` are required, and `EncryptionAlgorithm` is required when `EncryptionKey` is set.
+  Any missing value throws `InvalidOperationException`.
+- Collects the registered `IAuthorizationFlowFeature` instances, sorts them by `Order`, and calls
+  `ConfigureServices` on each — this is how flow methods contribute their handlers and advisors.
+- Adds the controller as a `SchemataApplicationPart` and inserts `OAuthRequestBinderProvider` at
+  the front of the MVC model-binder chain so OAuth form/query parameters bind to the OAuth model
+  types instead of the default MVC binders.
+- Registers the four managers (scoped): `IApplicationManager<TApp>`, `IScopeManager<TScope>`,
+  `IAuthorizationManager<TAuth>`, `ITokenManager<TToken>`.
+- Registers client authentication: `ClientSecretBasicAuthentication<TApp>` and
+  `ClientSecretPostAuthentication<TApp>` as `IClientAuthentication<TApp>`, plus
+  `IClientAuthenticationService<TApp>`.
+- Registers the advisor families (see below), `DiscoveryHandler<TScope>`, `TokenService`, and
+  `ISubjectIdentifierService`.
+- Adds two authentication schemes via `AddAuthentication()`: `BearerScheme`
+  (`SchemataAuthenticationHandler<TApp, TToken>`) and `CodeScheme`
+  (`SchemataAuthorizationCodeHandler<TApp, TToken>`).
+- Registers `TokenCleanupJob<TToken>` and schedules it through the Scheduling job model — see
+  below.
 
-### 3. Identity bridge
+## Endpoints
 
-`SchemataAuthorizationIdentityFeature` (priority 450,100,000) bridges Identity into the authorization pipeline. It depends on both `SchemataAuthorizationFeature` and `SchemataIdentityFeature` via string-based `[DependsOn]` attributes (soft dependencies across assemblies). When both are present, it registers `IdentitySubjectProvider<TUser>` as `ISubjectProvider` and adds `AdviceSubjectClaims` to the `IClaimsAdvisor` pipeline.
+`ConnectController` is routed at `~/Connect`. The actions a deployment actually serves depend on
+which flow methods are enabled, but the routes are fixed:
 
-### 4. Flow extensions
+| Method | Route | Action | Spec |
+| --- | --- | --- | --- |
+| `GET` / `POST` | `/Connect/Authorize` | `AuthorizeGet` / `AuthorizePost` | RFC 6749 §4.1 |
+| `POST` | `/Connect/Token` | `Token` | RFC 6749 §3.2 |
+| `POST` | `/Connect/Device` | `Device` | RFC 8628 |
+| `GET` / `POST` / `DELETE` | `/Connect/Interact` | `Interact` / `ApproveInteraction` / `DenyInteraction` | consent interaction |
+| `POST` | `/Connect/Introspect` | `Introspect` | RFC 7662 |
+| `POST` | `/Connect/Revoke` | `Revoke` | RFC 7009 |
+| `GET` / `POST` | `/Connect/Profile` | `Profile` (bearer-authorized) | OIDC Core §5.3 UserInfo |
+| `GET` / `POST` | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost` | OIDC RP-Initiated Logout |
 
-Each flow is enabled by calling a method on the `SchemataAuthorizationBuilder` returned by `UseAuthorization()`:
+`GET /.well-known/openid-configuration` and `GET /.well-known/jwks` are mapped through
+`WellKnownOptions` (the `SchemataWellKnownFeature` pipeline), backed by `DiscoveryHandler<TScope>`.
+Each `IDiscoveryAdvisor` contributes a slice of the discovery document, so the advertised grant
+types and endpoints reflect exactly which flows are enabled.
 
-| Method | Grant type / endpoint |
+## Flows
+
+Each method on `SchemataAuthorizationBuilder` adds one or more flow features. The grant types and
+endpoints below are the ones the code implements:
+
+| Builder method | Grant type / endpoint | Flow feature |
+| --- | --- | --- |
+| `UseCodeFlow()` | `authorization_code` (+ PKCE), `/Connect/Authorize` | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
+| `UseClientCredentialsFlow()` | `client_credentials` | `ClientCredentialsFlowFeature` |
+| `UseRefreshTokenFlow()` | `refresh_token` | `RefreshTokenFlowFeature` |
+| `UseDeviceFlow()` | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` | `DeviceFlowFeature` (+ `InteractionFeature`) |
+| `UseTokenExchange()` | `urn:ietf:params:oauth:grant-type:token-exchange` | `TokenExchangeFeature` |
+| `UseIntrospection()` | `/Connect/Introspect` (RFC 7662) | `IntrospectionFeature` |
+| `UseRevocation()` | `/Connect/Revoke` (RFC 7009) | `RevocationFeature` |
+| `UseUserInfo()` | `/Connect/Profile` (OIDC UserInfo) | `UserInfoFeature` |
+| `UseEndSession()` | `/Connect/EndSession` (RP-Initiated Logout) | `EndSessionFeature` |
+| `UseFrontChannelLogout()` | front-channel logout metadata | `FrontChannelLogoutFeature` |
+| `UseBackChannelLogout()` | back-channel logout queue + notifier | `BackChannelLogoutFeature` |
+
+`UseCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
+`Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
+`/Connect/Token` pulls it in.
+
+`POST /Connect/Token` dispatches by `grant_type` to the registered `IGrantHandler`. Before the
+grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request:
+
+| Advisor | Checks |
 | --- | --- |
-| `UseCodeFlow()` | `authorization_code`, `GET|POST /Connect/Authorize` |
-| `UseClientCredentialsFlow()` | `client_credentials` |
-| `UseRefreshTokenFlow()` | `refresh_token` |
-| `UseDeviceFlow()` | `urn:ietf:params:oauth:grant-type:device_code`, `POST /Connect/Device` |
-| `UseIntrospection()` | `POST /Connect/Introspect` (RFC 7662) |
-| `UseRevocation()` | `POST /Connect/Revoke` (RFC 7009) |
-| `UseEndSession()` | `GET|POST /Connect/EndSession` (OIDC RP-Initiated Logout) |
+| `AdviceTokenEndpointPermission<TApp>` | The client holds the `e:/Connect/Token` permission |
+| `AdviceTokenGrantPermission<TApp>` | The client holds `g:{grant_type}` |
+| `AdviceTokenScopeValidation<TApp>` | Requested scopes are within the client's `s:{scope}` grants |
 
-### 5. Discovery endpoints
+## Advisor families
 
-`GET /.well-known/openid-configuration` and `GET /.well-known/jwks` are registered as Minimal API routes via `SchemataWellKnownFeature`, independent of MVC. `IDiscoveryAdvisor` populates the document; each flow feature adds its own entries (grant types, endpoints, capabilities).
+Six advisor families extend the pipeline; all are registered via `TryAddEnumerable` and run as
+ordered chains.
 
-### 6. Token endpoint pipeline
+| Interface | Generic params | Role | Built-ins |
+| --- | --- | --- | --- |
+| `IDiscoveryAdvisor` | — | Populate the discovery document | `AdviceDiscoveryBase` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …) |
+| `IClaimsAdvisor` | — | Enrich the principal before token issuance | `AdviceAudienceClaims`, `AdvicePairwiseProjection<TApp>`, and `AdviceSubjectClaims` (Identity bridge) |
+| `IDestinationAdvisor` | — | Route each claim to access token, ID token, and/or UserInfo | `AdviceSubjectClaimDestination`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination` |
+| `ITokenRequestAdvisor<TApp>` | `TApp` | Validate the token request | `AdviceTokenEndpointPermission`, `AdviceTokenGrantPermission`, `AdviceTokenScopeValidation` |
+| `IAuthorizeAdvisor<TApp>` | `TApp` | Validate the authorize request | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
+| `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp`(, `TToken`) | Validate each endpoint's request | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*` |
 
-`POST /Connect/Token` dispatches by `grant_type` to `IGrantHandler` implementations. Before each handler, `ITokenRequestAdvisor<TApp>` runs three advisors in order:
+## Permissions
 
-| Advisor | Responsibility |
-| --- | --- |
-| `AdviceTokenEndpointPermission` | Validates the client has endpoint permission |
-| `AdviceTokenGrantPermission` | Verifies the client has permission for the requested grant type |
-| `AdviceTokenScopeValidation` | Validates requested scopes against client permissions |
+A client's capabilities are a list of permission strings on `SchemataApplication.Permissions`,
+prefixed per `SchemataConstants.PermissionPrefixes`:
 
-### 7. Claims pipeline
+| Prefix | Constant | Example |
+| --- | --- | --- |
+| `e:` | `Endpoint` | `e:/Connect/Token`, `e:/Connect/Authorize` |
+| `g:` | `GrantType` | `g:authorization_code`, `g:client_credentials`, `g:refresh_token` |
+| `s:` | `Scope` | `s:openid`, `s:profile` |
 
-After grant-specific processing, `IClaimsAdvisor` enriches the principal and `IDestinationAdvisor` routes each claim to access tokens, identity tokens, or both.
+`IApplicationManager<TApp>.HasPermissionAsync(app, permission, ct)` is the lookup the permission
+advisors use.
+
+## Managers
+
+The managers are open-generic over their entity type and take a `CancellationToken` on every
+method. Key lookups:
+
+- `IApplicationManager<TApp>`: `FindByClientIdAsync`, `ValidateClientSecretAsync`,
+  `HasPermissionAsync`.
+- `IScopeManager<TScope>`: `FindByNameAsync`, `ListAsync`.
+- `IAuthorizationManager<TAuth>`: `CreateAsync` and lifecycle queries.
+- `ITokenManager<TToken>`: `FindByReferenceIdAsync`, `FindByNameAsync`, `ListBySubjectAsync`,
+  `ListBySessionAsync`, `CreateAsync`, `RevokeByAuthorizationAsync`, and `PruneAsync(threshold,
+  ct)` for cleanup.
+
+## Background jobs
+
+Token cleanup runs through the Scheduling job model. The core feature registers
+`TokenCleanupJob<TToken>` and adds a `JobRegistration` to `SchemataSchedulingOptions.Jobs` with a
+`CronSchedule("0 * * * *")` — hourly at minute 0. The job calls
+`ITokenManager<TToken>.PruneAsync`. This needs `SchemataSchedulingFeature` and the `TToken`
+repository registered.
+
+`UseBackChannelLogout()` registers `BackChannelLogoutFeature`, which wires
+`BackChannelLogoutService<TApp, TToken>` as the `ILogoutNotifier`, an `HttpClient`, and a transient
+`BackChannelLogoutJob`. The service builds the per-RP logout token, signs it, and triggers the job;
+there is no cron schedule on it.
+
+## Identity bridge
+
+`Schemata.Authorization.Identity` connects the authorization server to ASP.NET Core Identity. It is
+not automatic — you opt in by calling `.UseIdentity()` on the `SchemataAuthorizationBuilder`, which
+adds `SchemataAuthorizationIdentityFeature` (`Priority = Orders.Extension + 50_100_000 =
+450_100_000`). The feature uses string-based `[DependsOn]` attributes naming
+`SchemataAuthorizationFeature`4` and `SchemataIdentityFeature`4` (it cannot reference the open
+generics directly across assemblies). At configure time it discovers the registered user type from
+the `IUserValidator<>` descriptor, registers `IdentitySubjectProvider<TUser>` as `ISubjectProvider`,
+and adds `AdviceSubjectClaims` to the `IClaimsAdvisor` chain. `IdentitySubjectProvider` projects
+`sub`, `preferred_username`, `email` (+`email_verified`), `phone_number` (+`phone_number_verified`),
+`nickname`, and `role` claims from the user.
+
+## Entity types
+
+All four entities use `Guid Uid` as the primary key and carry `[PrimaryKey(nameof(Uid))]`:
+
+| Entity | Table | Canonical name | Notable properties |
+| --- | --- | --- | --- |
+| `SchemataApplication` | `SchemataApplications` | `applications/{application}` | `ClientId`, `ClientSecret`, `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
+| `SchemataAuthorization` | `SchemataAuthorizations` | `authorizations/{authorization}` | `Application`, `Subject`, `Type`, `Status`, `Scopes`, `CodeChallengeMethod` |
+| `SchemataScope` | `SchemataScopes` | `scopes/{scope}` | `Name`, `Resources` |
+| `SchemataToken` | `SchemataTokens` | `tokens/{token}` | `Application`, `Authorization`, `Subject`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `ExpireTime` |
+
+## SchemataAuthorizationOptions
+
+Key material is required; lifetimes and formats have defaults:
+
+| Property | Default | Notes |
+| --- | --- | --- |
+| `Issuer` | — | Required (`iss` claim, discovery base URL) |
+| `SigningKey` / `SigningAlgorithm` | — | Required; `AddEphemeralSigningKey(alg)` generates a dev key |
+| `EncryptionKey` / `EncryptionAlgorithm` | `null` | Optional JWE; `AddEphemeralEncryptionKey(alg)` available |
+| `AccessTokenFormat` | `Jwe` | `Jwt`, `Jwe`, or `Reference` |
+| `RefreshTokenFormat` | `Reference` | |
+| `AccessTokenLifetime` / `IdTokenLifetime` | 1 hour | |
+| `RefreshTokenLifetime` | 14 days | |
+| `AuthorizationCodeLifetime` | 10 minutes | |
+| `DeviceCodeLifetime` / `DeviceCodeInterval` | 15 minutes / 5 s | |
+| `SubjectType` | `Public` | `Public` or `Pairwise` (with `PairwiseSalt`) |
+| `DeviceVerificationUri` | `null` | Required by the device flow |
+| `BearerScheme` / `CodeScheme` | scheme constants | Authentication scheme names |
+
+`PermitResponseType(...)` and `AddEphemeral*Key(...)` are fluent helpers on the options object.
 
 ## Extension points
 
 | Interface | Purpose |
 | --- | --- |
-| `IAuthorizationFlowFeature` | Add a new grant type or endpoint. Register via `SchemataAuthorizationBuilder`. |
-| `IGrantHandler` | Implement a custom grant type. Register via `services.TryAddEnumerable`. |
-| `IClaimsAdvisor` | Add or transform claims before token issuance. |
-| `IDestinationAdvisor` | Control which tokens receive a given claim. |
-| `IDiscoveryAdvisor` | Populate the OIDC discovery document. |
-| `IClientAuthentication<TApp>` | Add a custom client authentication method. |
-| `ISubjectProvider` | Provide the subject identifier for a principal (wired by the Identity bridge). |
-
-## Design motivation
-
-The four-entity generic design (`TApp`, `TAuth`, `TScope`, `TToken`) lets you replace any entity with a domain-specific subclass without forking the feature. The bridge feature (`SchemataAuthorizationIdentityFeature`) is a separate assembly so that `Schemata.Authorization.Foundation` has no compile-time dependency on `Schemata.Identity.Foundation` — the bridge uses string-based `[DependsOn]` and resolves the user type at runtime.
-
-The `IAuthorizationFlowFeature` pattern keeps each grant type isolated. Adding a new flow does not require modifying the core feature.
+| `IAuthorizationFlowFeature` | Add a grant type or endpoint as an ordered flow feature. |
+| `IGrantHandler` | Implement a token-endpoint grant. |
+| `IClaimsAdvisor` / `IDestinationAdvisor` | Add claims and route them to tokens. |
+| `IDiscoveryAdvisor` | Add discovery-document entries. |
+| `IClientAuthentication<TApp>` | Add a client authentication method. |
+| `ISubjectProvider` | Provide the subject identifier (wired by the Identity bridge). |
 
 ## Caveats
 
-- `SchemataAuthorizationFeature` has `Priority = Orders.Extension + 50_000_000 = 450_000_000`. The Identity bridge sits at `450_100_000`. See [Built-in Features](core/built-in-features.md) for the full priority table.
-- `SchemataAuthorizationOptions.SigningKey`, `SigningAlgorithm`, and `Issuer` are validated at startup via `PostConfigure`. Missing any of them throws `InvalidOperationException` before the host starts.
-- The feature depends on `SchemataWellKnownFeature` for the discovery and JWKS endpoints. This feature is pulled in automatically via `[DependsOn<SchemataWellKnownFeature>]`.
-- `SchemataAuthorizationIdentityFeature` uses string-based `[DependsOn]` attributes because it cannot reference `SchemataAuthorizationFeature<...>` or `SchemataIdentityFeature<...>` directly (different assemblies, open generics). If either dependency is absent, the bridge silently does nothing.
-- Token pruning and back-channel logout run as `IScheduledJob` implementations. Both require `IScheduler` and `SchemataSchedulingFeature` to be registered. The `TToken` / `TApp` repositories must be registered before the authorization feature runs.
+- The options validation runs in `PostConfigure`, so a missing `SigningKey`, `SigningAlgorithm`, or
+  `Issuer` surfaces as an `InvalidOperationException` when the options are first resolved.
+- The bridge is opt-in. Without `.UseIdentity()` on the authorization builder, tokens carry only
+  the base claims; user claims do not appear.
+- The device flow requires `DeviceVerificationUri`.
+- Token cleanup needs `SchemataSchedulingFeature` and a registered `TToken` repository.
 
 ## See also
 
-- [Built-in Features](core/built-in-features.md) — feature priority table
-- [Identity](identity.md) — ASP.NET Core Identity integration
-- [Security](security.md) — access providers and row-level filtering
-- [Advice Pipeline](core/advice-pipeline.md) — how advisor pipelines execute and short-circuit
+- [OIDC Server cookbook](../cookbook/oidc-server.md) — seed a client and drive the code + PKCE flow
+- [Identity](identity.md) — the user store the bridge reads
+- [Authorization guide](../guides/authorization.md) — a minimal client-credentials smoke test

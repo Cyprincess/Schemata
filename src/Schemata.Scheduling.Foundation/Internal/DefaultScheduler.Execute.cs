@@ -42,8 +42,8 @@ public sealed partial class DefaultScheduler
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             _logger?.LogInformation("Job '{JobName}' execution cancelled.", job.Name);
         } catch (Exception ex) {
-            // Advisor, observer, job resolution, or scheduling failed: a system error, not a job
-            // failure, so the job keeps its current state for the next occurrence.
+            // Advisor, observer, job resolution, or scheduling failure is a system error;
+            // the job keeps its current state for the next occurrence.
             _logger?.LogError(ex, "Scheduler failed to run job '{JobName}'; leaving it unfailed (system error).",
                               job.Name);
         }
@@ -107,8 +107,7 @@ public sealed partial class DefaultScheduler
             return;
         }
 
-        // Resolving the job instance is a system / configuration concern; a failure here is
-        // surfaced by the outer catch rather than marking the job Failed.
+        // Resolving the job instance is a system / configuration concern handled by the outer catch.
         var scheduledJob = (IScheduledJob)scope.ServiceProvider.GetRequiredService(jobType);
 
         if (!await TryRunJobBodyAsync(scheduledJob, observers, job, context, ct)) {
@@ -127,8 +126,7 @@ public sealed partial class DefaultScheduler
     ) {
         // Collect observer outcomes; take the most restrictive (Block > Skip > Proceed).
         // For TriggerAsync-driven fires the OnTriggeredAsync call already happened in
-        // TriggerAsync; honour its captured outcome here rather than re-invoking observers,
-        // which would double-persist the audit row.
+        // TriggerAsync; honour its captured outcome here to keep one audit row per trigger.
         if (triggeredByCaller) {
             return context.TriggerOutcome ?? JobTriggerOutcome.Proceed;
         }
@@ -251,8 +249,8 @@ public sealed partial class DefaultScheduler
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             // Expected when the entry is unscheduled or the host shuts down.
         } catch (Exception ex) {
-            // Last-resort guard for an immediate fire so the Task.Run does not swallow a failure
-            // raised before the per-fire try (scope creation, observer resolution, context build).
+            // Last-resort guard for immediate fires before the per-fire try starts
+            // (scope creation, observer resolution, context build).
             _logger?.LogError(ex, "Unhandled error firing job '{JobName}'.", entry.Job.Name);
         }
     }

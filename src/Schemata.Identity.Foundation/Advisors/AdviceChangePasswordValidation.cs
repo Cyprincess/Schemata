@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Humanizer;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
@@ -10,15 +8,18 @@ using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Advisors;
 
+/// <summary>Provides the order for password-change request validation.</summary>
 public static class AdviceChangePasswordValidation
 {
+    /// <summary>Default order for password-change request validation.</summary>
     public const int DefaultOrder = AdviceChangePhoneValidation.DefaultOrder + 10_000_000;
 }
 
+/// <summary>Validates password-change profile requests.</summary>
+/// <typeparam name="TUser">User entity type handled by the user manager.</typeparam>
 public sealed class AdviceChangePasswordValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest>
     where TUser : SchemataUser, new()
 {

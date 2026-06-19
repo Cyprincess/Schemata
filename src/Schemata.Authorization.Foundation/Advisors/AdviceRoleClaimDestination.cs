@@ -11,17 +11,16 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Authorization.Foundation.Advisors;
 
 /// <summary>
-///     Claim destination advisor for role/permission claims.
-///     Ensures that role claims (used by <see cref="IPermissionMatcher" />) are included in access tokens
-///     so that downstream resource authorization checks can evaluate them.
+///     Claim destination advisor for role/permission claims used by <see cref="IPermissionMatcher" />.
+///     Role claims are included in access tokens for downstream resource authorization checks.
 /// </summary>
 public sealed class AdviceRoleClaimDestination : IDestinationAdvisor
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = AdviceAddressClaimDestination.DefaultOrder + 10_000_000;
 
     #region IDestinationAdvisor Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(

@@ -10,12 +10,10 @@ namespace Schemata.Entity.Cache;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Used by <see cref="Stringizing" /> to stabilise cache keys for queries that
-///         capture local variables. Without this step,
-///         <c>var min = 18; q.Where(s =&gt; s.Age &gt; min)</c> stringises as
-///         <c>&lt;closure&gt;.min</c> — identical key for every value of <c>min</c>.
-///         After partial evaluation, the captured access becomes
-///         <c>ConstantExpression(18)</c> and stringises distinctly per value.
+///         Used by <see cref="Stringizing" /> to stabilize cache keys for queries that
+///         capture local variables. Partial evaluation turns
+///         <c>var min = 18; q.Where(s =&gt; s.Age &gt; min)</c> into an expression containing
+///         <c>ConstantExpression(18)</c>, producing distinct strings per captured value.
 ///     </para>
 ///     <para>
 ///         Implementation follows the classic two-pass algorithm: a nominator marks

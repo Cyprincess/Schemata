@@ -4,7 +4,10 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Abstractions.Resource;
 
-/// <inheritdoc cref="ResourceAttribute{TEntity,TRequest,TDetail,TSummary}" />
+/// <summary>
+///     Declares a resource API by mapping runtime types to entity, request,
+///     detail, and summary roles.
+/// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class ResourceAttribute : Attribute
 {

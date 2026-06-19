@@ -17,6 +17,9 @@ namespace Schemata.Core.Features;
 /// </summary>
 public sealed class SchemataAuthenticationFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default middleware priority for authentication and authorization.
+    /// </summary>
     public const int DefaultPriority = SchemataCorsFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

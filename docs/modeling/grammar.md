@@ -1,6 +1,8 @@
 # Grammar
 
-The complete grammar for the Schemata Modeling Language (SKM), derived from `Parser.cs`. Whitespace (spaces, tabs, newlines) and comments are freely permitted between any two tokens and are not shown in the production rules. At least one whitespace character is required between adjacent identifier or keyword tokens. Keywords are matched case-insensitively.
+The complete grammar for SKM, derived from `Parser.cs`. Whitespace and comments are permitted
+between any two tokens and are not shown in the production rules; at least one whitespace
+character separates adjacent identifier or keyword tokens. Keywords are case-insensitive.
 
 ## Document structure
 
@@ -12,7 +14,8 @@ declaration = entity
             | enumeration ;
 ```
 
-The `Namespace` declaration, if present, must be the first non-comment element in the file. Only `Entity`, `Trait`, and `Enum` are top-level declarations. `Object` blocks and `Index` declarations are nested inside entity bodies; they are not top-level constructs.
+`Namespace`, when present, is the first declaration. `Entity`, `Trait`, and `Enum` are the only
+top-level declarations; `Object` blocks and `Index` declarations are nested inside entity bodies.
 
 ## Declarations
 
@@ -40,7 +43,8 @@ enum value = identifier,
              [ "{", { note }, "}" ] ;
 ```
 
-Base lists and `Use` declarations are semantically equivalent. `Entity Foo : Bar, Baz` is sugar for `Use Bar, Baz` at the top of the body. Both resolve through the same field-incorporation mechanism in `EntityGenerator`.
+A base list is equivalent to a `Use` declaration: `Entity Foo : Bar, Baz` is sugar for
+`Use Bar, Baz`. Both resolve through `EntityGenerator.GenerateUses`.
 
 ## Field
 
@@ -52,11 +56,9 @@ field = type specifier, identifier,
 type specifier = qualified name, [ "?" ] ;
 ```
 
-Field names are written in `snake_case` and converted to PascalCase by the generator (`Utilities.ToCamelCase`).
+Field names are written in `snake_case` and converted to PascalCase by `Utilities.ToCamelCase`.
 
 ## View (Object block)
-
-Object blocks are parsed as `View` AST nodes. They are **not emitted as C# types today**. See [Objects](objects.md).
 
 ```ebnf
 view = "Object", identifier,
@@ -83,11 +85,10 @@ untyped view field = qualified name,
                      [ "=", expression ] ;
 ```
 
-The parser disambiguates typed from untyped by peeking at the token after the second identifier: if it is `[`, `{`, or `=`, the first qualified name is the type and the second identifier is the field name. Otherwise the qualified name is the field name with no explicit type.
+The parser distinguishes typed from untyped by the token after the second identifier: `[`, `{`,
+or `=` confirms the first qualified name is the type.
 
 ## Pointer (Index declaration)
-
-Index declarations are parsed as `Pointer` AST nodes. They are **not emitted as C# today**. See [Entities](entities.md).
 
 ```ebnf
 pointer = "Index", identifier, { identifier },
@@ -95,7 +96,7 @@ pointer = "Index", identifier, { identifier },
           [ "{", { note }, "}" ] ;
 ```
 
-Identifiers after `Index` name the indexed columns.
+The identifiers after `Index` name the indexed columns.
 
 ## Annotations
 
@@ -105,7 +106,8 @@ note = "Note", string ;
 property = identifier, expression ;
 ```
 
-Recognized property keys: `Default`, `Length`, `Precision`, `Algorithm`. Arbitrary keys are accepted syntactically but are not consumed by the generator today.
+Recognized property keys are `Default`, `Length`, `Precision`, and `Algorithm`; any other key is
+accepted syntactically.
 
 ## Options
 
@@ -131,7 +133,8 @@ pointer option = "Unique"
                | "Hash" ;
 ```
 
-All options are case-insensitive. Multi-word forms and their concatenated CamelCase equivalents are interchangeable. The parser normalizes by lowercasing and stripping spaces and underscores before matching.
+The parser lowercases each option and strips spaces and underscores before matching, so a
+multi-word form and its concatenated form are interchangeable.
 
 ## Composition
 
@@ -153,7 +156,8 @@ function call = qualified name, "(", [ expression, { ",", expression } ], ")" ;
 reference = qualified name ;
 ```
 
-Disambiguation: literals are tested first; then function call (qualified name followed by `(`); then reference. There are no operators or precedence rules.
+Literals are tested first, then function call, then reference. There are no operators or
+precedence.
 
 ## Literals
 
@@ -173,7 +177,8 @@ number = Terms.Decimal() ;
 boolean = "true" | "false" ;
 ```
 
-String parsing delegates to Parlot's `Terms.String()` (handles standard single- and double-quoted strings). Number parsing delegates to Parlot's `Terms.Decimal()`. Triple-quoted forms are tried before standard quoted forms.
+Standard quoting delegates to Parlot's `Terms.String()` and numbers to `Terms.Decimal()`. The
+triple-quoted forms are tried first.
 
 ## Lexical
 
@@ -187,14 +192,5 @@ line comment = "//", { any character except newline }, ( newline | end of input 
 block comment = "/*", { any character }, "*/" ;
 ```
 
-Comments are registered on the `Entity` and `Document` parsers via Parlot's `.WithComments(...)`. They are skipped transparently during parsing.
-
-## See also
-
-- [Types](types.md) — built-in type token table
-- [Fields](fields.md) — field syntax and options reference
-- [Traits](traits.md) — trait body and generator emission
-- [Entities](entities.md) — entity body and generator emission
-- [Enums](enums.md) — enum syntax and emission rules
-- [Objects](objects.md) — Object block syntax (parsed, not emitted today)
-- [Expressions](expressions.md) — literal, function call, and reference forms
+Comments are registered on the `Entity` and `Document` parsers through Parlot's `.WithComments`
+and skipped during parsing.

@@ -88,13 +88,11 @@ public class MapsterFieldSelectiveShould
         var mapper = CreateMapper();
 
         var source = new Source {
-            Age     = 30,
-            Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
+            Age = 30, Profile = new() { DisplayName = "New Name", Bio = "New Bio", Locale = "fr" },
         };
 
         var destination = new Destination {
-            Age     = 99,
-            Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
+            Age = 99, Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },
         };
 
         mapper.Map(source, destination, new List<string> { "Profile.DisplayName" });
@@ -110,9 +108,7 @@ public class MapsterFieldSelectiveShould
     public void Map_WithNestedFieldList_ClearsMaskedNullLeaf() {
         var mapper = CreateMapper();
 
-        var source = new Source {
-            Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" },
-        };
+        var source = new Source { Profile = new() { DisplayName = null, Bio = "New Bio", Locale = "fr" } };
 
         var destination = new Destination {
             Profile = new() { DisplayName = "Old Name", Bio = "Old Bio", Locale = "en" },

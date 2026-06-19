@@ -13,9 +13,7 @@ public class AutoMapperMergeShould
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => {
             schema.UseAutoMapper()
-                  .Map<Source, Destination>(map => {
-                       map.For(d => d.Sex).From(s => s.Sex.ToString());
-                   });
+                  .Map<Source, Destination>(map => { map.For(d => d.Sex).From(s => s.Sex.ToString()); });
         });
 
         var app   = builder.Build();
@@ -28,7 +26,7 @@ public class AutoMapperMergeShould
         var mapper = CreateMapper();
 
         var source      = new Source { Age      = 31, Nickname = null };
-        var destination = new Destination { Age = 1, Nickname = "Kept" };
+        var destination = new Destination { Age = 1, Nickname  = "Kept" };
 
         mapper.Map(source, destination);
 
@@ -41,7 +39,7 @@ public class AutoMapperMergeShould
         var mapper = CreateMapper();
 
         var source      = new Source { Age      = 31, Nickname = "   " };
-        var destination = new Destination { Age = 1, Nickname = "Kept" };
+        var destination = new Destination { Age = 1, Nickname  = "Kept" };
 
         mapper.Map(source, destination);
 

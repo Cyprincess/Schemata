@@ -17,7 +17,7 @@ public class IntrospectionResponse
     /// <summary>Space-delimited scopes associated with the token.</summary>
     public string? Scope { get; set; }
 
-    /// <summary>Client identifier the token was issued to.</summary>
+    /// <summary>Client identifier that receives the token.</summary>
     public string? ClientId { get; set; }
 
     /// <summary>Human-readable identifier for the resource owner.</summary>

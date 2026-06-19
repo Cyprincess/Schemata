@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Event.Skeleton;
@@ -22,34 +23,40 @@ public class FlowEventObserverShould
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
-            Id = "catch-a", Position = EventPosition.IntermediateCatch, Definition = new Message { Name = "invoice_paid" },
+            Id         = "catch-a",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Message { Name = "invoice_paid" },
         });
         definition.Elements.Add(new FlowEvent {
-            Id = "catch-b", Position = EventPosition.IntermediateCatch, Definition = new Message { Name = "invoice_paid" },
+            Id         = "catch-b",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Message { Name = "invoice_paid" },
         });
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(advice, new() {
-            Process    = process,
-            Definition = definition,
-            Instance   = new() { WaitingAtId = "catch-a" },
-        });
+        await advisor.AdviseAsync(
+            advice, new() {
+                Process = process, Definition = definition, Instance = new() { WaitingAtId = "catch-a" },
+            });
 
-        await advisor.AdviseAsync(advice, new() {
-            Process    = process,
-            Definition = definition,
-            Instance   = new() { WaitingAtId = "catch-b" },
-        });
+        await advisor.AdviseAsync(
+            advice, new() {
+                Process = process, Definition = definition, Instance = new() { WaitingAtId = "catch-b" },
+            });
 
         Assert.Equal(2, store.Added.Count);
         Assert.Equal(2, store.Added.Select(s => s.Id).Distinct().Count());
         Assert.All(store.Added, s => Assert.Equal("invoice_paid", s.EventType));
     }
 
+    #region Nested type: RecordingSubscriptionStore
+
     private sealed class RecordingSubscriptionStore : IEventSubscriptionStore
     {
         public List<IEventSubscription> Added { get; } = [];
+
+        #region IEventSubscriptionStore Members
 
         public SystemTask AddAsync(IEventSubscription subscription, CancellationToken ct = default) {
             Added.Add(subscription);
@@ -60,12 +67,16 @@ public class FlowEventObserverShould
             return SystemTask.CompletedTask;
         }
 
-        public System.Threading.Tasks.Task<IReadOnlyList<IEventSubscription>> FindAsync(
+        public Task<IReadOnlyList<IEventSubscription>> FindAsync(
             string            eventType,
             string?           correlationKey = null,
             CancellationToken ct             = default
         ) {
-            return System.Threading.Tasks.Task.FromResult<IReadOnlyList<IEventSubscription>>([]);
+            return Task.FromResult<IReadOnlyList<IEventSubscription>>([]);
         }
+
+        #endregion
     }
+
+    #endregion
 }

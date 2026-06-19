@@ -23,7 +23,7 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
     }
 
     private static List<JsonElement> GetStudents(JsonElement body) {
-        // The JSON uses "students" (pluralized, lowercase) instead of "entities"
+        // Resource list responses use the pluralized, lowercase collection name.
         if (body.TryGetProperty("students", out var arr)) {
             var list = new List<JsonElement>();
             foreach (var elem in arr.EnumerateArray()) {
@@ -41,7 +41,6 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
         var client = _factory.CreateClient();
         await SeedAsync(client);
 
-        // filter=age < 20 (URL encoded; field names are snake_case)
         var response = await client.GetAsync("/v1/students?filter=age%20%3C%2020");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -69,12 +68,12 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
 
         Assert.Equal(2, students.Count);
 
-        // next_page_token should be present when results were limited
         var hasToken = body.TryGetProperty("next_page_token", out var tokenProp)
                     || body.TryGetProperty("nextPageToken", out tokenProp);
         Assert.True(hasToken, "Response should contain a next_page_token");
         Assert.False(string.IsNullOrWhiteSpace(tokenProp.GetString()), "next_page_token should be non-empty");
     }
+
     [Fact]
     public async Task ReadMask_TrimsUnlistedFields() {
         var client = _factory.CreateClient();
@@ -88,7 +87,7 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
 
         Assert.NotEmpty(students);
         foreach (var student in students) {
-            Assert.True(student.TryGetProperty("age", out _));
+            Assert.True(student.TryGetProperty("age", out var _));
             var hasName = student.TryGetProperty("full_name", out var fullName)
                        && fullName.ValueKind != JsonValueKind.Null;
             Assert.False(hasName);

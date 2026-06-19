@@ -2,7 +2,7 @@ namespace Schemata.Abstractions.Resource;
 
 /// <summary>
 ///     Marks a request as capable of dry-run validation: the server validates
-///     the input but does not execute side effects.
+///     the input and skips side effects.
 /// </summary>
 public interface IValidation
 {

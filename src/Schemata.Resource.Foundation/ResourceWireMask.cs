@@ -1,6 +1,5 @@
 using System;
 using Humanizer;
-using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
 namespace Schemata.Resource.Foundation;

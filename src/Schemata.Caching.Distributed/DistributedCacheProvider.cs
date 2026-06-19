@@ -16,9 +16,8 @@ namespace Schemata.Caching.Distributed;
 /// <remarks>
 ///     <para>
 ///         Collection operations simulate set semantics by serializing a
-///         <c>HashSet&lt;string&gt;</c> as JSON. Because <see cref="IDistributedCache" />
-///         does not expose atomic read-modify-write operations, a striped in-process
-///         lock (<see cref="IndexLocks" />) is used to prevent lost writes in single-process
+///         <c>HashSet&lt;string&gt;</c> as JSON. A striped in-process lock
+///         (<see cref="IndexLocks" />) serializes read-modify-write cycles in single-process
 ///         deployments. Multi-process deployments sharing the same backend remain subject
 ///         to the race condition documented in <see cref="IndexLocks" />.
 ///     </para>

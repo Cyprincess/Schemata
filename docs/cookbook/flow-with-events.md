@@ -2,88 +2,75 @@
 
 ## What you'll build
 
-A BPMN process that pauses at an `eventBasedGateway` and resumes when either a message or a signal arrives from the event bus. You'll wire `UseFlowEvent()` so `FlowEventTransitionObserver` keeps `IEventSubscriptionStore` in sync as the process transitions, then publish events through `IEventBus` and watch `FlowEventHandler` correlate them back to the waiting instance.
+A BPMN process that parks at an event-based gateway and resumes when either a message or a signal
+arrives on the event bus. `UseEvent()` on the flow builder wires `FlowEventTransitionAdvisor`, which
+keeps `IEventSubscriptionStore` in sync as the instance waits and advances. Publishing through
+`IEventBus` then lets `FlowEventHandler` correlate the event back to the waiting instance.
 
 ## Prerequisites
 
-- A working Flow setup from [guides/flow.md](../guides/flow.md).
-- A working event bus setup from [guides/event-bus.md](../guides/event-bus.md).
-- `Schemata.Flow.Event` NuGet package added to your project.
-- Both `UseEvent()` and `UseFlowEvent()` called during startup (see Step 2).
+- A working Flow setup from [flow.md](../guides/flow.md).
+- A working event bus from [event-bus.md](../guides/event-bus.md).
+- `Schemata.Flow.Event` added to the project.
 
 ## Step 1: Define the event types
 
 ```csharp
 using Schemata.Event.Skeleton;
 
-// Sent to one specific process instance (message semantics)
-public sealed class PaymentReceived : IEvent
-{
-    public string OrderId { get; init; } = string.Empty;
-}
+// Correlated to one instance (message semantics).
+public sealed class PaymentReceived : IEvent { public string OrderId { get; init; } = ""; }
 
-// Broadcast to all waiting instances (signal semantics)
-public sealed class SystemShutdown : IEvent { }
+// Broadcast to all waiting instances (signal semantics).
+public sealed class SystemShutdown : IEvent;
 ```
 
-The distinction between message and signal is determined by the BPMN element type, not the CLR type. A `Message` element in the process definition creates a one-to-one subscription keyed by the process instance's canonical name. A `Signal` element creates a broadcast subscription with no correlation key.
+Message versus signal is a property of the BPMN element, not the CLR type. A `Message` catch creates
+a subscription correlated by the instance's canonical name; a `Signal` catch creates a broadcast
+subscription with no correlation key.
 
-**Assertion:** both types compile and implement `IEvent`.
+## Step 2: Model the process
 
-## Step 2: Define the process with an event-based gateway
+Declare the catches as magic properties and wire them with `.Await(...)`. The first event to fire
+wins; the other subscription is removed as the instance advances.
 
 ```csharp
+using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Models;
 
-public sealed class OrderProcess : IProcessDefinition
+public sealed class OrderProcess : ProcessDefinition
 {
-    public string Name => "order";
+    public NoneTask New      { get; } = null!;
+    public NoneTask Fulfill  { get; } = null!;
+    public NoneTask Cancel   { get; } = null!;
 
-    public ProcessDefinition Build()
+    public Message Pay      { get; } = null!;
+    public Signal  Shutdown { get; } = null!;
+
+    public OrderProcess()
     {
-        var start   = new StartEvent { Id = "start" };
-        var gateway = new EventBasedGateway { Id = "wait-for-event" };
+        Pay.Name      = "payment-received";
+        Shutdown.Name = "system-shutdown";
 
-        var catchPayment = new FlowEvent {
-            Id       = "catch-payment",
-            Position = EventPosition.IntermediateCatch,
-            Definition = new Message { Name = "payment-received" },
-        };
+        this.Start().Go(New);
 
-        var catchShutdown = new FlowEvent {
-            Id       = "catch-shutdown",
-            Position = EventPosition.IntermediateCatch,
-            Definition = new Signal { Name = "system-shutdown" },
-        };
+        this.During(New).Await(
+            this.On(Pay).Go(Fulfill),
+            this.On(Shutdown).Go(Cancel));
 
-        var fulfill  = new Activity { Id = "fulfill",  Name = "Fulfill order" };
-        var cancel   = new Activity { Id = "cancel",   Name = "Cancel order" };
-        var end      = new EndEvent { Id = "end" };
-
-        return new ProcessDefinition {
-            Name     = "order",
-            Elements = [start, gateway, catchPayment, catchShutdown, fulfill, cancel, end],
-            Flows    = [
-                new SequenceFlow { Source = start,        Target = gateway      },
-                new SequenceFlow { Source = gateway,      Target = catchPayment  },
-                new SequenceFlow { Source = gateway,      Target = catchShutdown },
-                new SequenceFlow { Source = catchPayment, Target = fulfill       },
-                new SequenceFlow { Source = catchShutdown, Target = cancel       },
-                new SequenceFlow { Source = fulfill,      Target = end           },
-                new SequenceFlow { Source = cancel,       Target = end           },
-            ],
-            Messages = [new Message { Name = "payment-received" }],
-            Signals  = [new Signal  { Name = "system-shutdown"  }],
-        };
+        this.During(Fulfill).End();
+        this.During(Cancel).End();
     }
 }
 ```
 
-The `EventBasedGateway` has two outgoing flows, each targeting an `IntermediateCatch` event. When the process reaches the gateway, `FlowEventTransitionObserver` writes subscriptions for both `payment-received` and `system-shutdown` to `IEventSubscriptionStore`. Whichever event arrives first wins; the other subscription is removed when the process advances.
+`.Await(...)` builds an event-based gateway with one intermediate catch per branch. The
+`Definition.Name` (`payment-received`, `system-shutdown`) is the BPMN-level name the subscription
+carries as its `EventType`.
 
-**Assertion:** `Build()` returns a `ProcessDefinition` with seven elements, two messages, and one signal.
+## Step 3: Register and enable flow events
 
-## Step 3: Register the process and enable flow events
+`UseEvent()` chains off the `SchemataFlowBuilder` that `UseFlow` returns:
 
 ```csharp
 builder.UseSchemata(schema => {
@@ -93,112 +80,106 @@ builder.UseSchemata(schema => {
           .UseProducer(p => p.UseInProcess())
           .UseConsumer(c => c.UseInProcess());
 
-    schema.UseFlow(flow => flow.Use<OrderProcess>());
-    schema.UseFlowEvent();
+    schema.UseFlow()
+          .UseEvent()
+          .Use<OrderProcess>();
 });
 ```
 
-`UseFlowEvent()` adds `SchemataFlowEventFeature` (priority `SchemataFlowFeature.DefaultPriority + 300_000` = 480,300,000). It depends on both `SchemataFlowFeature` and `SchemataEventFeature` via `[DependsOn<T>]`, so the order of `UseFlow` and `UseEvent` calls does not matter.
+`UseEvent()` (the flow-builder overload) adds `SchemataFlowEventFeature` (priority `480_300_000`). It
+depends on both `SchemataFlowFeature` and `SchemataEventFeature`, so call order does not matter — but
+the event bus still needs a producer and consumer for events to flow.
 
-`SchemataFlowEventFeature.ConfigureServices` registers two services:
+`SchemataFlowEventFeature.ConfigureServices` registers `FlowEventTransitionAdvisor` (a scoped
+`IFlowTransitionAdvisor`) and `FlowEventHandler` (a scoped `IEventHandler<IEvent>`, the fallback
+handler).
 
-- `FlowEventTransitionObserver` as a scoped `IFlowTransitionObserver` — adds or removes subscriptions whenever the engine reports a transition.
-- `FlowEventHandler` as a scoped `IEventHandler<IEvent>` — the fallback handler that receives every dispatched event and routes it to `CorrelateMessageAsync` or `ThrowSignalAsync`.
+**Check:** the app starts and `IEventSubscriptionStore` resolves from DI.
 
-`FlowEventHandler` reads `IEventDispatchContext.MatchedSubscriptions` to find which process instances are waiting for the arriving event. Subscriptions with a non-null `CorrelationKey` use message semantics (one-to-one); subscriptions without one use signal semantics (broadcast).
-
-**Assertion:** the application starts and `IEventSubscriptionStore` is resolvable from DI.
-
-## Step 4: Start a process instance
+## Step 4: Start an instance
 
 ```csharp
-public sealed class OrdersController : ControllerBase
+public sealed class OrdersController(IProcessRuntime runtime, IEventBus bus) : ControllerBase
 {
-    private readonly IProcessRuntime _runtime;
-    private readonly IEventBus       _bus;
-
-    public OrdersController(IProcessRuntime runtime, IEventBus bus)
-    {
-        _runtime = runtime;
-        _bus     = bus;
-    }
-
     [HttpPost("orders")]
     public async Task<IActionResult> Start(CancellationToken ct)
     {
-        var instance = await _runtime.StartProcessInstanceAsync(
-            "order", variables: null, principal: User, ct);
-        return Accepted(new { instance.StateId, instanceName = instance.CanonicalName });
+        var process = await runtime.StartProcessInstanceAsync(
+            "OrderProcess", variables: null, principal: User, ct: ct);
+        return Accepted(new { process.State, name = process.CanonicalName });
     }
 }
 ```
 
-After `StartProcessInstanceAsync`, the engine advances through `start` and stops at `wait-for-event`. `FlowEventTransitionObserver` calls `IEventSubscriptionStore.AddAsync` twice:
+After `StartProcessInstanceAsync`, the engine advances through the start event and parks at the
+event-based gateway. In the transition's pre-commit window, `FlowEventTransitionAdvisor` adds two
+subscriptions:
 
-- `flow:<instanceName>:payment-received` with `CorrelationKey = <instanceName>` (message).
-- `flow:<instanceName>:system-shutdown` with `CorrelationKey = null` (signal).
+- `flow:{name}:{payElementId}` with `CorrelationKey = {name}` (message).
+- `flow:{name}:{shutdownElementId}` with `CorrelationKey = null` (signal).
 
-**Assertion:** `POST /orders` returns `202 Accepted` with `stateId = "wait-for-event"`. Two rows appear in the `IEventSubscriptionStore` backing table.
+The registered process name is the type name, `OrderProcess`.
+
+**Check:** `POST /orders` returns `202`; two rows appear in `IEventSubscriptionStore`.
 
 ## Step 5: Correlate a message to advance one instance
 
 ```csharp
-[HttpPost("orders/{instanceName}/pay")]
-public async Task<IActionResult> Pay(string instanceName, CancellationToken ct)
+[HttpPost("orders/{name}/pay")]
+public async Task<IActionResult> Pay(string name, CancellationToken ct)
 {
-    var evt = new PaymentReceived { OrderId = instanceName };
-    await _bus.PublishAsync(evt, ct);
+    await bus.PublishAsync(new PaymentReceived { OrderId = name }, ct);
     return Accepted();
 }
 ```
 
-When `IEventBus.PublishAsync` dispatches `PaymentReceived`, the consumer resolves `IEventDispatchContext` and calls `context.SetSubscriptions(subscriptions)` with the matching rows from `IEventSubscriptionStore`. `FlowEventHandler.HandleAsync` iterates the subscriptions. Because `CorrelationKey` is non-null, it calls:
+When the consumer dispatches `PaymentReceived`, the bus populates
+`IEventDispatchContext.MatchedSubscriptions`. `FlowEventHandler.HandleAsync` iterates them; because
+the subscription's `CorrelationKey` is non-null, it calls
+`runtime.CorrelateMessageAsync(sub.Target, sub.EventType, @event, ct: ct)`. The runtime resolves the
+`Message` named `payment-received` and triggers the instance from the gateway to `Fulfill`, then to
+the end event.
 
-```csharp
-await _runtime.CorrelateMessageAsync(sub.Target, sub.EventType, @event, ct: ct);
-```
+**Check:** the `SchemataProcess` row for that instance ends with `WaitingAtId = null`; both of its
+subscriptions are gone.
 
-`ProcessRuntime.CorrelateMessageAsync` loads the process instance by `instanceName`, finds the `Message` definition named `payment-received`, and calls `runtime.TriggerAsync` to advance the process from `catch-payment` to `fulfill` and then to `end`.
-
-**Assertion:** after `POST /orders/{instanceName}/pay`, the `SchemataProcess` row has `WaitingAtId = null` and `IsComplete = true`. The `payment-received` and `system-shutdown` subscriptions for this instance are removed.
-
-## Step 6: Throw a signal to advance all waiting instances
+## Step 6: Throw a signal to advance every waiting instance
 
 ```csharp
 [HttpPost("system/shutdown")]
 public async Task<IActionResult> Shutdown(CancellationToken ct)
 {
-    var evt = new SystemShutdown();
-    await _bus.PublishAsync(evt, ct);
+    await bus.PublishAsync(new SystemShutdown(), ct);
     return Accepted();
 }
 ```
 
-`FlowEventHandler` finds all subscriptions for `system-shutdown`. Because `CorrelationKey` is null, it calls:
+For signal subscriptions (`CorrelationKey == null`), `FlowEventHandler` calls
+`runtime.ThrowSignalAsync(sub.EventType, @event, ct: ct)` — once per distinct event type, even if
+many instances are subscribed. `ProcessRuntime.ThrowSignalAsync` finds every waiting instance that
+matches `system-shutdown` and advances each through `Cancel` to its end.
 
-```csharp
-await _runtime.ThrowSignalAsync(sub.EventType, @event, ct: ct);
-```
-
-`ProcessRuntime.ThrowSignalAsync` queries all `SchemataProcess` rows where `WaitingAtId != null`, checks each against the signal definition, and advances every matching instance from `catch-shutdown` to `cancel` and then to `end`.
-
-**Assertion:** after `POST /system/shutdown`, every process instance waiting at `wait-for-event` transitions to `IsComplete = true` via the `cancel` path.
+**Check:** every instance parked at the gateway transitions to complete via the `Cancel` path.
 
 ## Common pitfalls
 
-**Both `UseEvent` and `UseFlowEvent` are required.** `SchemataFlowEventFeature` depends on `SchemataEventFeature` via `[DependsOn<SchemataEventFeature>]`. If you call only `UseFlowEvent()` without `UseEvent()`, the dependency resolver pulls in `SchemataEventFeature` automatically, but no producer or consumer transport is registered. Events published via `IEventBus` will be silently dropped unless you also call `UseProducer` and `UseConsumer`.
+**The event bus needs a producer and consumer.** `SchemataFlowEventFeature` pulls in
+`SchemataEventFeature` through `[DependsOn]`, but without `UseProducer` and `UseConsumer` published
+events are dropped. Configure the transports on `UseEvent()`.
 
-**`IEventDispatchContext` is scoped.** `FlowEventHandler` receives `IEventDispatchContext` via constructor injection. The bus populates `MatchedSubscriptions` before handler dispatch. Calling `CorrelateMessageAsync` or `ThrowSignalAsync` directly from application code bypasses the dispatch path; `MatchedSubscriptions` stays empty and `FlowEventHandler` short-circuits. Drive `IProcessRuntime` directly for out-of-band correlation.
+**`FlowEventHandler` works off the dispatch context.** It reads
+`IEventDispatchContext.MatchedSubscriptions`, which the bus fills before handler dispatch. Calling
+`CorrelateMessageAsync` or `ThrowSignalAsync` directly bypasses that context; drive `IProcessRuntime`
+yourself for out-of-band correlation.
 
-**Subscription cleanup on process completion.** `FlowEventTransitionObserver` removes the previous subscription when `PreviousWaitingAtId` differs from the current `WaitingAtId`. A `TerminateProcessInstanceAsync` call goes through the same observer dispatch and the subscription disappears with the transition. Orphans only appear when the audit observer fails persistence after the subscription store has been mutated; reconcile by reading the subscription store and removing entries whose `Target` resolves to a completed process.
-
-**Message vs. signal naming.** The `Definition.Name` on the BPMN element (`"payment-received"`) is the subscription `EventType`, not the wire name registered with `RegisterEvent<T>`. The wire name (`"orders/payment-received"`) is the routing key used by the transport. `FlowEventHandler` receives the event after the transport has already routed it; it uses `IEventDispatchContext.MatchedSubscriptions` to find the BPMN-level name. Keep the two names consistent in your mental model but understand they are separate identifiers.
+**Two names, two layers.** `Definition.Name` (`payment-received`) is the BPMN subscription
+`EventType`. The wire name registered with `RegisterEvent<T>` (`orders/payment-received`) is the
+transport routing key. They are separate identifiers; the handler bridges from the routed event to
+the BPMN-level name through the matched subscription.
 
 ## See also
 
-- [guides/flow.md](../guides/flow.md) — BPMN process basics and `UseFlow`
-- [guides/event-bus.md](../guides/event-bus.md) — `UseEvent`, producers, consumers, handlers
-- [cookbook/flow-with-timers.md](flow-with-timers.md) — intermediate timer events
-- [cookbook/rabbitmq-event-bus.md](rabbitmq-event-bus.md) — RabbitMQ transport for cross-service events
-- [documents/flow/event.md](../documents/flow/event.md) — `FlowEventTransitionObserver` and subscription store internals
-- [documents/event/overview.md](../documents/event/overview.md) — wire-name contract and dispatch pipeline
+- [flow.md](../guides/flow.md) — BPMN basics and `UseFlow`
+- [event-bus.md](../guides/event-bus.md) — `UseEvent`, producers, consumers, handlers
+- [flow-with-timers.md](flow-with-timers.md) — intermediate timer catches
+- [event.md](../documents/flow/event.md) — the advisor and subscription internals

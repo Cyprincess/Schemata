@@ -21,6 +21,6 @@ public sealed class SequenceFlow
     /// <summary>Optional guard expression; when present, the flow is only taken if the condition evaluates to true.</summary>
     public IConditionExpression? Condition { get; set; }
 
-    /// <summary>When true, this flow is taken if no other outgoing condition from the same gateway matches.</summary>
+    /// <summary>Indicates that this flow is the gateway fallback after sibling conditions fail.</summary>
     public bool IsDefault { get; set; }
 }

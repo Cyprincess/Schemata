@@ -8,6 +8,9 @@ namespace Schemata.Core.Features;
 /// <summary>Configures ASP.NET Core logging via the deferred <see cref="ILoggingBuilder" />.</summary>
 public sealed class SchemataLoggingFeature : FeatureBase
 {
+    /// <summary>
+    ///     Default service-configuration priority for logging.
+    /// </summary>
     public const int DefaultPriority = SchemataDeveloperExceptionPageFeature.DefaultPriority + 10_000_000;
 
     public override int Priority => DefaultPriority;

@@ -87,10 +87,8 @@ public class ClientSecretPostHandlerShould
     public async Task ReturnsNull_WhenFormLacksClientId() {
         var handler = CreateHandler();
 
-        // A client authenticating with HTTP Basic carries no client_id in the form, so
-        // client_secret_post is not attempted and must defer to the next authenticator.
-        var result = await handler.AuthenticateAsync(
-            null, new Dictionary<string, List<string?>>(), null, CancellationToken.None);
+        // HTTP Basic authentication carries the client identity in the Authorization header.
+        var result = await handler.AuthenticateAsync(null, new(), null, CancellationToken.None);
 
         Assert.Null(result);
     }

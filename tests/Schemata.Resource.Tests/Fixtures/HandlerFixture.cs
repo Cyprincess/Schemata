@@ -21,21 +21,20 @@ namespace Schemata.Resource.Tests.Fixtures;
 /// <summary>
 ///     Shared fixture for ResourceOperationHandler unit tests.
 ///     Wires a real handler with Moq-backed repository and mapper.
-///     No advisors are registered by default — add via Services as needed.
+///     Advisor registration is explicit through <see cref="CreateHandler" />.
 /// </summary>
 public class HandlerFixture
 {
     public HandlerFixture() {
-        // Identity mapper: returns the input object cast to destination type
         Mapper.Setup(m => m.Map<Student>(It.IsAny<object>())).Returns<object>(src => src as Student ?? new Student());
         Mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>())).Returns<Student>(src => src);
 
         Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>(), It.IsAny<IEnumerable<string>>()))
               .Callback<Student, Student, IEnumerable<string>>((src, dst, fields)
-                   => SimpleMapperHelper.MapWithMask(src, dst, fields, CopyAll));
+                                                                   => SimpleMapperHelper.MapWithMask(
+                                                                       src, dst, fields, CopyAll));
 
-        Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>()))
-              .Callback<Student, Student>(CopyAll);
+        Mapper.Setup(m => m.Map(It.IsAny<Student>(), It.IsAny<Student>())).Callback<Student, Student>(CopyAll);
 
         Repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
 
@@ -84,12 +83,6 @@ public class HandlerFixture
         Repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
     }
 
-    private static void CopyAll(Student src, Student dst) {
-        foreach (var prop in AppDomainTypeCache.GetWritableProperties(typeof(Student))) {
-            prop.SetValue(dst, prop.GetValue(src));
-        }
-    }
-
     public Mock<IRepository<Student>> Repository { get; } = new();
     public Mock<ISimpleMapper>        Mapper     { get; } = new();
 
@@ -113,6 +106,12 @@ public class HandlerFixture
             Timestamp     = Identifiers.NewUid(),
         },
     ];
+
+    private static void CopyAll(Student src, Student dst) {
+        foreach (var prop in AppDomainTypeCache.GetWritableProperties(typeof(Student))) {
+            prop.SetValue(dst, prop.GetValue(src));
+        }
+    }
 
     public ResourceOperationHandler<Student, Student, Student, Student> CreateHandler(
         Action<IServiceCollection>? configure = null

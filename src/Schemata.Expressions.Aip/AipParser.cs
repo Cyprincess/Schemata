@@ -9,10 +9,19 @@ using Schemata.Expressions.Aip.Values;
 
 namespace Schemata.Expressions.Aip;
 
+/// <summary>
+///     Provides parsers for Google AIP filter and order-by syntax.
+/// </summary>
 public static class AipParser
 {
+    /// <summary>
+    ///     Parses AIP-160 filter expressions.
+    /// </summary>
     public static readonly Parser<Filter> Filter;
 
+    /// <summary>
+    ///     Parses AIP-132 order-by expressions.
+    /// </summary>
     public static readonly Parser<IReadOnlyList<KeyValuePair<Member, Ordering>>> Order;
 
     static AipParser() {

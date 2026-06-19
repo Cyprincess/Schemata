@@ -22,7 +22,7 @@ public static class AdviceAddUniqueness
 ///     values and throws <see cref="AlreadyExistsException" /> when a row already
 ///     exists, so duplicates surface as <c>ALREADY_EXISTS</c>
 ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>
-///     without provider-specific error-code translation.
+///     and avoid provider-specific error-code translation.
 /// </summary>
 /// <remarks>
 ///     <para>

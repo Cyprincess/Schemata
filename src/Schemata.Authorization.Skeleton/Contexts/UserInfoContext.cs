@@ -19,8 +19,8 @@ public sealed class UserInfoContext
     public HashSet<string> GrantedScopes { get; set; } = new();
 
     /// <summary>
-    ///     Whether the access token was issued to the end-user (as opposed to a machine client via token exchange).
-    ///     Some claims should only be returned for end-user tokens.
+    ///     Whether the access token represents an end-user.
+    ///     Some claims are returned only for end-user tokens.
     /// </summary>
     public bool IsEndUserToken { get; set; }
 }

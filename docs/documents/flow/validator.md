@@ -1,6 +1,9 @@
 # Flow Validator
 
-The `StateMachineValidator` ensures a `ProcessDefinition` only uses BPMN elements supported by the single-token state machine engine. It is called automatically during process registration when the engine is `"StateMachine"`, via `StateMachineFlowEngineValidator` which implements `IFlowEngineValidator`.
+`StateMachineValidator` checks that a `ProcessDefinition` uses only what the single-token engine can
+execute. `StateMachineFlowEngineValidator` adapts it to the `IFlowEngineValidator` contract and is
+invoked during registration for every process whose engine is `"statemachine"`. All violations throw
+`FailedPreconditionException`.
 
 ## Where the code lives
 
@@ -15,62 +18,72 @@ The `StateMachineValidator` ensures a `ProcessDefinition` only uses BPMN element
 public interface IFlowEngineValidator
 {
     string EngineName { get; }
-    void Validate(ProcessDefinition definition);
+    void   Validate(ProcessDefinition definition);
 }
 ```
 
-`ProcessRegistry.RegisterAsync` iterates all registered `IFlowEngineValidator` services and calls `Validate` on any whose `EngineName` matches the process configuration's engine. `StateMachineFlowEngineValidator.EngineName` returns `SchemataConstants.FlowEngines.StateMachine`.
+`ProcessRegistry.RegisterAsync` calls `Validate` on every registered `IFlowEngineValidator` whose
+`EngineName` matches the configuration's engine. `StateMachineFlowEngineValidator.EngineName` returns
+`SchemataConstants.FlowEngines.StateMachine`, and its `Validate` delegates to the static
+`StateMachineValidator.Validate(definition)`.
 
 ## Validation rules
 
-All violations throw `FailedPreconditionException`.
+`StateMachineValidator.Validate` runs these checks in order:
 
-| # | Rule | Reasoning |
-| --- | --- | --- |
-| 1 | Exactly one start event | A process must have one entry point |
-| 2 | Start event has exactly one outgoing `SequenceFlow` | The initial token follows a single path |
-| 3 | At least one end event | Every path must eventually terminate |
-| 4 | Only `ExclusiveGateway` or `EventBasedGateway` | Parallel/Inclusive gateways require multi-token semantics |
-| 5 | `EventBasedGateway` has at least one outgoing flow, each targeting `IntermediateCatchEvent` | Event gateways branch on catch events |
-| 6 | No non-interrupting boundary events (`Interrupting == true` required) | Non-interrupting events fire concurrently, requiring a second token |
-| 7 | Boundary event `AttachedTo` resolves to an existing `Activity` | Dangling references produce runtime errors |
-| 8 | Boundary event has exactly one outgoing flow | A boundary event represents a single escape path |
-| 9 | No `SubProcess`, `CallActivity`, or `EventSubProcess` | Sub-processes require their own execution context |
-| 10 | No `LoopCharacteristics` on activities | Loops require iteration-over-instance management |
-| 11 | Each activity has at most one outgoing path type | Mixing `Go` and `Decide`/`Fork`/`Await` creates ambiguous routing |
+| Area | Rule |
+| --- | --- |
+| Start | Exactly one start event, with exactly one outgoing flow. |
+| End | At least one end event; end events have no outgoing flows. |
+| Names | Element names are unique (they are the persisted state labels). |
+| Flows | Every flow has a source and target that both exist in the definition. |
+| Gateways | Only `ExclusiveGateway` and `EventBasedGateway` are allowed. |
+| Event gateway | `Parallel == false`; at least one outgoing flow; every outgoing flow targets an intermediate catch event. |
+| Exclusive gateway | At least one outgoing flow. |
+| Boundary events | Attached to an existing activity; interrupting; exactly one outgoing flow. |
+| Intermediate catch | At least one outgoing flow; reachable only from an event-based gateway. |
+| Activities | Exactly one outgoing path type (no mixing direct flow, gateway, and end-event edges); at most one direct flow to another activity. |
+| Sub-processes / loops | No `SubProcess`, `CallActivity`, or `LoopCharacteristics`. |
+| Reachability | Every element is reachable from the start event; boundary events count as reachable through their host activity. |
+
+The messages name the offending element by its `Name` rather than its CLR type, so a modeling error
+points at the graph node the author wrote.
 
 ## Usage
 
-Validation runs automatically during `IProcessRegistry.RegisterAsync`:
+Validation runs automatically when a process is registered, whether at startup or at runtime:
 
 ```csharp
-// Called automatically at startup via SchemataFlowFeature:
+// Startup, via SchemataFlowFeature:
 flow.Use<ApprovalProcess>();
 
-// Or at runtime via IProcessRegistry:
-await registry.RegisterAsync<ApprovalProcess>(engine: "StateMachine");
+// Runtime, via IProcessRegistry:
+await registry.RegisterAsync<ApprovalProcess>();
 ```
 
-For programmatic validation outside the DI container:
+The static entry point validates a definition without the DI container, which is convenient in unit
+tests:
 
 ```csharp
-var definition = new ApprovalProcess();
-StateMachineValidator.Validate(definition); // throws on violation
+StateMachineValidator.Validate(new ApprovalProcess());   // throws on violation
 ```
 
 ## Extension points
 
-- Implement `IFlowEngineValidator` and register via `TryAddEnumerable` to add validation rules for a custom engine or to extend the state machine rules.
-- The validator is keyed by `EngineName`, so custom validators only run for the engine they declare.
+- Implement `IFlowEngineValidator` and register via `TryAddEnumerable`. A custom validator runs only
+  for the engine named in its `EngineName`.
 
-## Design motivation
+## Design rationale
 
-Running validation at registration time (startup) rather than at execution time means invalid process definitions fail fast and loudly, before any user request reaches the engine. This is preferable to discovering a modeling error only when a specific code path is exercised in production.
+Validating at registration — startup for `flow.Use<T>()` — means an invalid definition fails fast at
+startup, before any request reaches the engine. Modeling errors surface in the build/boot loop instead
+of at runtime on a specific path.
 
 ## Caveats
 
-- The validator checks structural rules only. It does not verify that condition expressions are syntactically valid or that variable keys referenced in `When<T>` actually exist at runtime.
-- `StateMachineValidator.Validate` is a static method and can be called without DI, which is useful in unit tests for process definitions.
+- The validator checks structure only. It does not verify that guard expressions are sound or that
+  the variable keys a `When<T>` reads exist at runtime.
+- `StateMachineValidator.Validate` is static; it can be called without DI.
 
 ## See also
 

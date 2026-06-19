@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Models;
@@ -83,7 +82,7 @@ public class PageToken
     /// </summary>
     /// <param name="token">The encoded token string, or <see langword="null" />.</param>
     /// <param name="protector">The <see cref="IDataProtector" /> that sealed the token.</param>
-    /// <returns>The decoded token, or <see langword="null" /> when no token was supplied.</returns>
+    /// <returns>The decoded token, or <see langword="null" /> for empty input.</returns>
     /// <exception cref="ValidationException">The token cannot be decoded.</exception>
     public static async Task<PageToken?> FromStringAsync(string? token, IDataProtector protector) {
         if (string.IsNullOrWhiteSpace(token)) {

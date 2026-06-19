@@ -19,7 +19,7 @@ public interface IMapping
     Type DestinationType { get; }
 
     /// <summary>
-    ///     Whether this mapping is a whole-object converter rather than a field mapping.
+    ///     Whether this mapping uses a whole-object converter expression.
     /// </summary>
     bool IsConverter { get; }
 

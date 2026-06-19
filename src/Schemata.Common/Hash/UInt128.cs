@@ -43,8 +43,10 @@ namespace Schemata.Common.Hash;
 /// </summary>
 public struct Uint128 : IEquatable<Uint128> {
     /// <summary>
-    /// Initializes a new instance of the <see cref="T:Uint128"/> struct.
+    /// Initializes a 128-bit unsigned integer from its low and high 64-bit halves.
     /// </summary>
+    /// <param name="low">The low-order 64 bits.</param>
+    /// <param name="high">The high-order 64 bits.</param>
     public Uint128(ulong low, ulong high)
         : this() {
         Low  = low;
@@ -72,24 +74,10 @@ public struct Uint128 : IEquatable<Uint128> {
     #endregion
 
     #region . Equals .
-    /// <summary>
-    /// Indicates whether the current object is equal to another object of the same type.
-    /// </summary>
-    /// <returns>
-    /// true if the current object is equal to the <paramref name="other"/> parameter; otherwise, false.
-    /// </returns>
-    /// <param name="other">An object to compare with this object.</param>
     public bool Equals(Uint128 other) {
         return Low == other.Low && High == other.High;
     }
 
-    /// <summary>
-    /// Indicates whether this instance and a specified object are equal.
-    /// </summary>
-    /// <returns>
-    /// true if <paramref name="obj"/> and this instance are the same type and represent the same value; otherwise, false.
-    /// </returns>
-    /// <param name="obj">Another object to compare to. </param>
     public override bool Equals(object? obj) {
         if (ReferenceEquals(null, obj)) return false;
         return obj is Uint128 uint128 && Equals(uint128);
@@ -97,12 +85,6 @@ public struct Uint128 : IEquatable<Uint128> {
     #endregion
 
     #region . GetHashCode .
-    /// <summary>
-    /// Returns the hash code for this instance.
-    /// </summary>
-    /// <returns>
-    /// A 32-bit signed integer that is the hash code for this instance.
-    /// </returns>
     public override int GetHashCode() {
         unchecked {
             return (Low.GetHashCode() * 397) ^ High.GetHashCode();

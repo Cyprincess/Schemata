@@ -9,8 +9,8 @@ namespace Schemata.Tenancy.Skeleton.Services;
 ///     <see cref="IServiceProvider" /> that resolves services from a tenant-specific singleton
 ///     container first, falling back to the host root provider for everything else.
 ///     <see cref="IServiceScopeFactory" /> is intercepted so scopes created from this provider
-///     compose the tenant overrides on top of a fresh host scope, ensuring Scoped and Transient
-///     services come from the host's normal request-scope lifecycle while tenant singletons
+///     compose the tenant overrides on top of a fresh host scope. Scoped and Transient
+///     services come from the host's request-scope lifecycle while tenant singletons
 ///     stay pinned to the cached per-tenant container.
 /// </summary>
 internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDisposable
@@ -19,12 +19,16 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
     private readonly IServiceProvider _root;
     private          bool             _disposed;
 
+    /// <summary>Initializes a provider that resolves tenant overrides before host services.</summary>
     public TenantCompositeServiceProvider(ServiceProvider overrides, IServiceProvider root) {
         _overrides = overrides;
         _root      = root;
     }
 
+    /// <summary>Gets the tenant override provider.</summary>
     internal ServiceProvider  Overrides => _overrides;
+
+    /// <summary>Gets the host root provider.</summary>
     internal IServiceProvider Root      => _root;
 
     #region IDisposable Members

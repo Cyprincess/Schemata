@@ -11,7 +11,7 @@
 
 ## Mechanism
 
-Key-value operations (`GetAsync`, `SetAsync`, `TryAddAsync`, `RemoveAsync`) delegate directly to the underlying `IDistributedCache`. No additional logic is applied.
+Key-value operations (`GetAsync`, `SetAsync`, `RemoveAsync`) delegate directly to the underlying `IDistributedCache`, mapping `CacheEntryOptions` onto `DistributedCacheEntryOptions`. An absolute-relative expiration is normalized against the injected `TimeProvider` before storage.
 
 Collection operations (`CollectionAddAsync`, `CollectionMembersAsync`, `CollectionRemoveAsync`, `CollectionClearAsync`) simulate set semantics by serializing a `HashSet<string>` as JSON and storing it under the collection key. Because `IDistributedCache` does not expose atomic read-modify-write operations, a striped in-process lock (`IndexLocks`) serializes concurrent access to the same collection key.
 
@@ -28,15 +28,22 @@ await WriteSetAsync(key, payload.Members, options, ct);
 
 The stripe count is fixed at 64 regardless of the number of distinct keys, so memory stays constant. Unrelated keys may share a stripe and serialize incidentally; this is intentional — the lock exists to prevent lost writes, not to maximize throughput.
 
-## Single-process safety only
+## Concurrency safety
 
-`IndexLocks` provides in-process serialization only. When multiple processes share the same `IDistributedCache` backend (e.g., a shared SQL Server cache or a shared Redis instance accessed via the `IDistributedCache` adapter), concurrent collection writes from different processes are not serialized and can produce lost updates.
+**Scope: single-process.** `IndexLocks` provides in-process serialization for collection
+operations. When multiple processes share the same `IDistributedCache` backend (a shared SQL Server
+cache, or a Redis instance accessed via the `IDistributedCache` adapter), concurrent collection
+writes from different processes are not serialized and can produce lost updates.
 
-For multi-process or cluster deployments, use `RedisCacheProvider` instead. It uses native Redis Set commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`) which are atomic at the Redis server level.
+For multi-process or cluster deployments, use `RedisCacheProvider`. It uses native Redis Set
+commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`) which are atomic at the Redis server level.
 
-## TryAddAsync
+## Unsupported atomic operations
 
-`TryAddAsync` acquires the in-process lock for the key, reads the existing value, and returns `false` if a non-empty value already exists. If absent, it writes the new value and returns `true`. This provides insert-if-absent semantics within a single process.
+`TryAddAsync`, `TryReplaceAsync`, and `TryRemoveAsync` throw `NotSupportedException`. `IDistributedCache`
+exposes no atomic compare-and-swap, and emulating one with the in-process lock would still be unsafe
+across processes sharing the backend. Patterns that need atomic reserve-and-swap require
+`RedisCacheProvider`.
 
 ## Extension points
 
@@ -63,12 +70,11 @@ services.AddDistributedCache();
 
 ## Caveats
 
-- Collection operations are single-process safe only. Multi-process deployments sharing the same backend are subject to lost-write races on collection keys. Use `RedisCacheProvider` for cluster-safe collection operations.
-- `TryAddAsync` is also single-process safe only for the same reason.
-- The JSON serialization of `HashSet<string>` adds overhead compared to native set commands. For high-throughput eviction workloads, prefer `RedisCacheProvider`.
+- Collection operations are single-process safe. Multi-process deployments sharing the same backend are subject to lost-write races on collection keys; use `RedisCacheProvider` for cluster-safe collection operations.
+- The atomic operations (`TryAddAsync`, `TryReplaceAsync`, `TryRemoveAsync`) throw `NotSupportedException`. Use `RedisCacheProvider` when a pattern needs them.
+- JSON serialization of `HashSet<string>` adds overhead compared to native set commands. For high-throughput eviction workloads, prefer `RedisCacheProvider`.
 
 ## See also
 
 - [overview.md](overview.md) — `ICacheProvider` abstraction and provider selection
 - [redis.md](redis.md) — `RedisCacheProvider` for cluster-safe collection operations
-- [query-cache.md](query-cache.md) — how collection operations are used by the reverse index

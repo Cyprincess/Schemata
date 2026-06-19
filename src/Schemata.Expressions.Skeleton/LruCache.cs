@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace Schemata.Expressions.Skeleton;
 
+/// <summary>
+///     Stores a bounded set of values and evicts the least recently used entry when capacity is exceeded.
+/// </summary>
 internal sealed class LruCache<TKey, TValue>
     where TKey : notnull
 {
@@ -11,6 +14,9 @@ internal sealed class LruCache<TKey, TValue>
     private readonly LinkedList<Entry>                       _list = new();
     private readonly Dictionary<TKey, LinkedListNode<Entry>> _map;
 
+    /// <summary>
+    ///     Creates a cache with the supplied entry capacity and key comparer.
+    /// </summary>
     public LruCache(int capacity, IEqualityComparer<TKey>? comparer = null) {
         if (capacity <= 0) {
             throw new ArgumentOutOfRangeException(nameof(capacity));
@@ -20,6 +26,9 @@ internal sealed class LruCache<TKey, TValue>
         _map      = new(comparer);
     }
 
+    /// <summary>
+    ///     Gets a cached value or creates and stores one for the key.
+    /// </summary>
     public TValue GetOrAdd(TKey key, Func<TValue> factory) {
         if (factory is null) {
             throw new ArgumentNullException(nameof(factory));
@@ -58,6 +67,9 @@ internal sealed class LruCache<TKey, TValue>
         }
     }
 
+    /// <summary>
+    ///     Attempts to get a cached value and promotes the entry when found.
+    /// </summary>
     public bool TryGet(TKey key, out TValue value) {
         lock (_gate) {
             if (_map.TryGetValue(key, out var node)) {

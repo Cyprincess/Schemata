@@ -19,7 +19,7 @@ schema.UseTenancy()
       .UseHeaderResolver();
 ```
 
-`UseTenancy()` uses `SchemataTenant` as the default tenant entity. `SchemataTenancyMiddleware` resolves the tenant on each request, initializes `ITenantContextAccessor<SchemataTenant>`, and swaps `HttpContext.Features.Get<IServiceProvidersFeature>()` with a tenant-scoped provider for the duration of the request.
+`UseTenancy()` uses `SchemataTenant` as the default tenant entity. On each request, `SchemataTenancyMiddleware` calls `ITenantContextInitializer<SchemataTenant>.InitializeAsync` to resolve the tenant, then swaps the request's `IServiceProvidersFeature` for a tenant-scoped provider for the duration of the request and restores the original afterward.
 
 ## Choose a resolver
 
@@ -119,9 +119,13 @@ curl http://localhost:5000/students \
 
 Requests without the `x-tenant-id` header skip tenant resolution; `accessor.Tenant` stays `null` and the request runs against the host root provider.
 
+## Next steps
+
+- [Flow](flow.md) — add a BPMN process to the tenant-scoped Student entity
+- [Event Bus](event-bus.md) — publish events from per-tenant services
+- [gRPC Transport](grpc-transport.md) — tenant resolution works the same on gRPC
+
 ## See also
 
-- [gRPC Transport](grpc-transport.md) — previous in the series: gRPC endpoints alongside HTTP
-- [Flow](flow.md) — next in the series: add a BPMN process to the Student entity
 - [Tenancy](../documents/tenancy.md) — per-tenant DI, resolver architecture, `ITenantContextAccessor`
 - [Multi-Tenant Setup](../cookbook/multi-tenant-cookbook.md) — combined resolvers and per-tenant DI overrides

@@ -1,7 +1,7 @@
 namespace Schemata.Abstractions.Errors;
 
 /// <summary>
-///     A single field-level validation failure describing which field was rejected and why, per
+///     A single field-level validation failure describing the rejected field and reason, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 public class ErrorFieldViolation
@@ -17,7 +17,7 @@ public class ErrorFieldViolation
     public virtual string? Description { get; set; }
 
     /// <summary>
-    ///     Machine-readable reason code identifying the constraint that was violated
+    ///     Machine-readable reason code identifying the violated constraint
     ///     (e.g. <c>"REQUIRED"</c>, <c>"PATTERN"</c>).
     /// </summary>
     public virtual string? Reason { get; set; }

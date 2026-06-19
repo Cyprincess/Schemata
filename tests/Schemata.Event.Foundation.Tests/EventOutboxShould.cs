@@ -23,17 +23,16 @@ public class EventOutboxShould
     [Fact]
     public async Task PublishFails_RowStaysPending() {
         var records = new Mock<IRepository<SchemataEvent>>();
-        records.Setup(r => r.AddAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        records.Setup(r => r.AddAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.CompletedTask);
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var observer = new SchemataEventAuditObserver(records.Object, Options.Create(new JsonSerializerOptions()));
         var context = new EventContext(new SampleEvent(), "sample") {
-            Payload                = "{}",
-            CorrelationId          = "c1",
-            RequiresOutboxDelivery = true,
+            Payload = "{}", CorrelationId = "c1", RequiresOutboxDelivery = true,
         };
 
-        // OnPublished records the outbox row; a broker failure means OnDelivered never runs.
+        // OnPublished records the outbox row; broker delivery controls the terminal callback.
         await observer.OnPublishedAsync(context);
 
         Assert.NotNull(context.Record);
@@ -65,7 +64,7 @@ public class EventOutboxShould
             CorrelationId = "c1",
             State         = EventState.Pending,
         };
-        var publisher = new RecordingPublisher();
+        var publisher  = new RecordingPublisher();
         var dispatcher = Dispatcher(record, publisher);
 
         await dispatcher.DispatchPendingAsync(CancellationToken.None);
@@ -76,13 +75,13 @@ public class EventOutboxShould
 
     [Fact]
     public async Task DispatchPendingAsync_DrainsInProcessOutboxWithSourceSnapshot() {
-        var json = new JsonSerializerOptions();
-        var rows = new List<SchemataEvent>();
-        var records = Repository(rows);
+        var json     = new JsonSerializerOptions();
+        var rows     = new List<SchemataEvent>();
+        var records  = Repository(rows);
         var registry = new DefaultEventTypeRegistry();
         registry.Register(typeof(SampleEvent), "sample");
 
-        var handler = new CountingHandler();
+        var handler  = new CountingHandler();
         var observer = new CapturingObserver();
         var services = new ServiceCollection();
         services.AddSingleton<IRepository<SchemataEvent>>(records.Object);
@@ -93,17 +92,15 @@ public class EventOutboxShould
         services.AddSingleton(Options.Create(new SchemataEventOptions()));
         services.AddSingleton<IEventHandler<SampleEvent>>(handler);
         services.AddSingleton<IEventLifecycleObserver>(sp => new SchemataEventAuditObserver(
-            sp.GetRequiredService<IRepository<SchemataEvent>>(), Options.Create(json)));
+                                                           sp.GetRequiredService<IRepository<SchemataEvent>>(),
+                                                           Options.Create(json)));
         services.AddSingleton<IEventLifecycleObserver>(observer);
         var sp = services.BuildServiceProvider();
 
-        var publisher = new InProcessEventOutboxPublisher(sp, Options.Create(json));
+        var publisher  = new InProcessEventOutboxPublisher(sp, Options.Create(json));
         var dispatcher = new EventOutboxDispatcher(sp, publisher);
-        var bus = new InProcessEventBus(sp, Options.Create(json), dispatcher: dispatcher);
-        var source = new SourceEntity {
-            CanonicalName = "sources/1",
-            Timestamp = Identifiers.NewUid(),
-        };
+        var bus        = new InProcessEventBus(sp, Options.Create(json), dispatcher: dispatcher);
+        var source     = new SourceEntity { CanonicalName = "sources/1", Timestamp = Identifiers.NewUid() };
 
         await bus.PublishAsync(new SampleEvent { Value = "payload" }, source);
 
@@ -116,10 +113,10 @@ public class EventOutboxShould
         Assert.Equal(1, handler.Count);
 
         // In-process replay consumes synchronously; the audit observer commits the terminal state,
-        // and the dispatcher no longer overwrites it back to Recorded.
+        // and the dispatcher preserves it.
         Assert.Equal(EventState.Succeeded, rows[0].State);
-        var snapshot = Assert.IsAssignableFrom<ICanonicalName>(observer.Consumed?.Source);
-        var stamped = Assert.IsAssignableFrom<IConcurrency>(observer.Consumed?.Source);
+        var snapshot  = Assert.IsAssignableFrom<ICanonicalName>(observer.Consumed?.Source);
+        var stamped   = Assert.IsAssignableFrom<IConcurrency>(observer.Consumed?.Source);
         var reference = Assert.IsAssignableFrom<ISourceReference>(observer.Consumed?.Source);
         Assert.Equal("sources/1", snapshot.CanonicalName);
         Assert.Equal(source.Timestamp, stamped.Timestamp);
@@ -169,9 +166,10 @@ public class EventOutboxShould
         records.Setup(r => r.ListAsync(
                           It.IsAny<Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>?>(),
                           It.IsAny<CancellationToken>()))
-               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _) =>
-                   ToAsync(predicate!(new[] { record }.AsQueryable())));
-        records.Setup(r => r.UpdateAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _)
+                            => ToAsync(predicate!(new[] { record }.AsQueryable())));
+        records.Setup(r => r.UpdateAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.CompletedTask);
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var services = new ServiceCollection().AddSingleton(records.Object).BuildServiceProvider();
@@ -183,17 +181,17 @@ public class EventOutboxShould
         records.Setup(r => r.AddAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
                .Callback((SchemataEvent row, CancellationToken _) => rows.Add(row))
                .Returns(Task.CompletedTask);
-        records.Setup(r => r.ListAsync(
-                          It.IsAny<Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>?>(),
-                          It.IsAny<CancellationToken>()))
-               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _) =>
-                   ToAsync(predicate!(rows.AsQueryable())));
+        records.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>?>(),
+                                       It.IsAny<CancellationToken>()))
+               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _)
+                            => ToAsync(predicate!(rows.AsQueryable())));
         records.Setup(r => r.FirstOrDefaultAsync(
                           It.IsAny<Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>?>(),
                           It.IsAny<CancellationToken>()))
-               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _) =>
-                   ValueTask.FromResult(predicate!(rows.AsQueryable()).FirstOrDefault()));
-        records.Setup(r => r.UpdateAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+               .Returns((Func<IQueryable<SchemataEvent>, IQueryable<SchemataEvent>>? predicate, CancellationToken _)
+                            => ValueTask.FromResult(predicate!(rows.AsQueryable()).FirstOrDefault()));
+        records.Setup(r => r.UpdateAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.CompletedTask);
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         return records;
     }
@@ -205,41 +203,7 @@ public class EventOutboxShould
         }
     }
 
-    private sealed class SampleEvent : IEvent
-    {
-        public string? Value { get; set; }
-    }
-
-    private sealed class ThrowingPublisher : IEventOutboxPublisher
-    {
-        public Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
-            throw new InvalidOperationException("publish boom");
-        }
-    }
-
-    private sealed class RecordingPublisher : IEventOutboxPublisher
-    {
-        public EventOutboxMessage? Published { get; private set; }
-
-        public Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
-            Published = message;
-            return Task.FromResult(EventOutboxDelivery.Delivered);
-        }
-    }
-
-    private sealed class CountingHandler : IEventHandler<SampleEvent>
-    {
-        public int Count { get; private set; }
-
-        #region IEventHandler<SampleEvent> Members
-
-        public Task HandleAsync(SampleEvent @event, CancellationToken ct = default) {
-            Count++;
-            return Task.CompletedTask;
-        }
-
-        #endregion
-    }
+    #region Nested type: CapturingObserver
 
     private sealed class CapturingObserver : IEventLifecycleObserver
     {
@@ -259,6 +223,28 @@ public class EventOutboxShould
         #endregion
     }
 
+    #endregion
+
+    #region Nested type: CountingHandler
+
+    private sealed class CountingHandler : IEventHandler<SampleEvent>
+    {
+        public int Count { get; private set; }
+
+        #region IEventHandler<SampleEvent> Members
+
+        public Task HandleAsync(SampleEvent @event, CancellationToken ct = default) {
+            Count++;
+            return Task.CompletedTask;
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: DeliveryRecordingObserver
+
     private sealed class DeliveryRecordingObserver : IEventLifecycleObserver
     {
         public int           DeliveredCount { get; private set; }
@@ -276,12 +262,41 @@ public class EventOutboxShould
             return Task.CompletedTask;
         }
 
-        public Task OnConsumedAsync(EventContext context, CancellationToken ct = default) {
-            return Task.CompletedTask;
+        public Task OnConsumedAsync(EventContext context, CancellationToken ct = default) { return Task.CompletedTask; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: RecordingPublisher
+
+    private sealed class RecordingPublisher : IEventOutboxPublisher
+    {
+        public EventOutboxMessage? Published { get; private set; }
+
+        #region IEventOutboxPublisher Members
+
+        public Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
+            Published = message;
+            return Task.FromResult(EventOutboxDelivery.Delivered);
         }
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: SampleEvent
+
+    private sealed class SampleEvent : IEvent
+    {
+        public string? Value { get; set; }
+    }
+
+    #endregion
+
+    #region Nested type: SourceEntity
 
     private sealed class SourceEntity : ICanonicalName, IConcurrency
     {
@@ -299,4 +314,21 @@ public class EventOutboxShould
 
         #endregion
     }
+
+    #endregion
+
+    #region Nested type: ThrowingPublisher
+
+    private sealed class ThrowingPublisher : IEventOutboxPublisher
+    {
+        #region IEventOutboxPublisher Members
+
+        public Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
+            throw new InvalidOperationException("publish boom");
+        }
+
+        #endregion
+    }
+
+    #endregion
 }

@@ -15,7 +15,7 @@ namespace Schemata.Event.Foundation.Features;
 /// <summary>Feature that wires the event subsystem: type registry and lifecycle observers.</summary>
 public sealed class SchemataEventFeature : FeatureBase
 {
-    /// <summary>Default <see cref="Schemata.Core.Features.FeatureBase.Priority"/> slot for the event feature.</summary>
+    /// <summary>Default priority slot for the event feature.</summary>
     public const int DefaultPriority = SchemataConstants.Orders.Extension + 40_000_000;
 
     public override int Priority => DefaultPriority;

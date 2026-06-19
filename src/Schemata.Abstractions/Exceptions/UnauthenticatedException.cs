@@ -3,7 +3,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Abstractions.Exceptions;
 
 /// <summary>
-///     The request does not have valid authentication credentials.
+///     The request lacks valid authentication credentials.
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.UNAUTHENTICATED</c> (HTTP 401), per

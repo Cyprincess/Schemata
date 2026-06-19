@@ -9,7 +9,7 @@ public static class ScheduleDefinitionMapper
     /// <summary>Copies the schedule kind and timing fields from <paramref name="schedule" /> onto <paramref name="job" />.</summary>
     /// <param name="schedule">The source schedule definition.</param>
     /// <param name="job">The job whose timing fields are written.</param>
-    /// <param name="time">Clock used to seed the first run time; defaults to the system clock.</param>
+    /// <param name="time">Clock that seeds the first run time; <c>null</c> uses the system clock.</param>
     public static void ApplyToJob(IScheduleDefinition schedule, SchemataJob job, TimeProvider? time = null) {
         var now = (time ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         switch (schedule) {

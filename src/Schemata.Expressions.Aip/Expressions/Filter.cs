@@ -7,8 +7,14 @@ using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Expressions.Aip.Expressions;
 
+/// <summary>
+///     Represents a complete AIP-160 filter expression.
+/// </summary>
 public class Filter : LogicalBase, IArg, ISimple, IExpressionTree
 {
+    /// <summary>
+    ///     Creates a filter from the first sequence and additional AND sequences.
+    /// </summary>
     public Filter(TextPosition position, Sequence sequence, IReadOnlyCollection<Sequence>? sequences) {
         Position = position;
         Sequences.Add(sequence);
@@ -18,6 +24,9 @@ public class Filter : LogicalBase, IArg, ISimple, IExpressionTree
         }
     }
 
+    /// <summary>
+    ///     Gets the sequences joined by this filter.
+    /// </summary>
     public List<Sequence> Sequences { get; } = [];
 
     /// <summary>

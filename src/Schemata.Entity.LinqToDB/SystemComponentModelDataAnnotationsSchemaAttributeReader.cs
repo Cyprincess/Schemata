@@ -33,20 +33,12 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="global::LinqToDB.Mapping.OptimisticLockPropertyAttribute" /> with
 ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
 ///     concurrency token drives LINQ to DB's optimistic-update predicate.
-///     <see cref="System.ComponentModel.DataAnnotations.KeyAttribute" /> is intentionally NOT
-///     translated; declare keys with class-level <c>[PrimaryKey]</c> on the entity.
+///     Key discovery uses class-level <c>[PrimaryKey]</c> declarations on the entity.
 /// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
     #region IMetadataReader Members
 
-    /// <summary>
-    ///     Returns LINQ to DB mapping attributes for the specified type by reading
-    ///     <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" /> and the
-    ///     EF Core class-level <c>PrimaryKeyAttribute</c>.
-    /// </summary>
-    /// <param name="type">The type to inspect.</param>
-    /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type) {
         var attributes = new List<MappingAttribute>();
 
@@ -85,14 +77,6 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         return attributes.ToArray();
     }
 
-    /// <summary>
-    ///     Returns LINQ to DB mapping attributes for the specified member by reading
-    ///     <c>System.ComponentModel.DataAnnotations</c> attributes, and the EF Core 7+ class-level
-    ///     <c>PrimaryKeyAttribute</c> when the member name appears in its <c>PropertyNames</c> list.
-    /// </summary>
-    /// <param name="type">The declaring type.</param>
-    /// <param name="member">The member to inspect.</param>
-    /// <returns>An array of mapping attributes, or an empty array if no relevant attributes are found.</returns>
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
         if (member.HasAttribute<NotMappedAttribute>()) {
             return [new NotColumnAttribute()];
@@ -135,13 +119,8 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         return attributes.ToArray();
     }
 
-    /// <inheritdoc cref="IMetadataReader.GetDynamicColumns" />
     public MemberInfo[] GetDynamicColumns(Type type) { return []; }
 
-    /// <summary>
-    ///     Returns a unique identifier for this metadata reader instance.
-    /// </summary>
-    /// <returns>A string identifier.</returns>
     public string GetObjectID() { return $".{nameof(SystemComponentModelDataAnnotationsSchemaAttributeReader)}."; }
 
     #endregion

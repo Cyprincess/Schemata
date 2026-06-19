@@ -18,6 +18,7 @@ public sealed class ProcessInitializer : BackgroundService
     private readonly IProcessRuntime  _runtime;
     private readonly IServiceProvider _services;
 
+    /// <summary>Creates the hosted service that hydrates the process runtime at startup.</summary>
     public ProcessInitializer(IProcessRuntime runtime, IServiceProvider services) {
         _runtime  = runtime;
         _services = services;

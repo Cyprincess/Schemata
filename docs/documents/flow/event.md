@@ -1,91 +1,120 @@
 # Flow Event Integration
 
-`Schemata.Flow.Event` bridges the Flow engine with the event bus. When a process instance reaches an `IntermediateCatchEvent` or an `EventBasedGateway`, `FlowEventTransitionObserver` registers subscriptions in `IEventSubscriptionStore`. When a matching event arrives on the bus, `FlowEventHandler` resolves the waiting instance and calls `IProcessRuntime.CorrelateMessageAsync` (for `Message`) or `ThrowSignalAsync` (for `Signal`).
+`Schemata.Flow.Event` bridges intermediate message and signal catches to the event bus. As a process
+transitions, `FlowEventTransitionAdvisor` keeps `IEventSubscriptionStore` in sync with the catches
+the instance is waiting on. When a matching event is dispatched, `FlowEventHandler` correlates it
+back to the waiting instance through `IProcessRuntime`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionObserver.cs`, `FlowEventHandler.cs`, `Models/FlowEventSubscription.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
-| `Schemata.Flow.Skeleton` | `Observers/IFlowTransitionObserver.cs`, `Observers/FlowTransitionContext.cs` |
-| `Schemata.Event.Skeleton` | `IEventSubscriptionStore.cs`, `IEventSubscription.cs`, `IEventHandler.cs` |
+| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionAdvisor.cs`, `Internal/FlowEventHandler.cs`, `Models/FlowEventSubscription.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
+| `Schemata.Flow.Skeleton` | `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs` |
+| `Schemata.Event.Skeleton` | `IEventSubscriptionStore.cs`, `IEventHandler.cs`, `IEventDispatchContext.cs` |
 
 ## Activation
 
+`UseEvent()` chains off the `SchemataFlowBuilder` that `UseFlow` returns:
+
 ```csharp
 builder.UseSchemata(schema => {
-    schema.UseFlow(flow => flow.Use<OrderProcess>());
-    schema.UseFlowEvent();
+    schema.UseEvent().UseProducer(p => p.UseInProcess()).UseConsumer(c => c.UseInProcess());
+    schema.UseFlow()
+          .UseEvent()
+          .Use<OrderProcess>();
 });
 ```
 
-`UseFlowEvent` adds `SchemataFlowEventFeature` (Priority `SchemataFlowFeature.DefaultPriority + 300_000` = 480,300,000). The feature declares `[DependsOn<SchemataFlowFeature>]` and `[DependsOn<SchemataEventFeature>]`, so both are auto-pulled if not already registered.
+`UseEvent()` adds `SchemataFlowEventFeature`, priority `SchemataFlowFeature.DefaultPriority + 300_000`
+= `480_300_000`. The feature declares `[DependsOn<SchemataFlowFeature>]` and
+`[DependsOn<SchemataEventFeature>]`, so both are pulled in if missing; you still need a producer and
+consumer transport on the event bus for events to flow.
 
 ## What gets registered
 
 `SchemataFlowEventFeature.ConfigureServices` registers two services:
 
 ```csharp
-services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionObserver, FlowEventTransitionObserver>());
+services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowEventTransitionAdvisor>());
 services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 ```
 
-`IEventHandler<IEvent>` is the fallback handler path: any event that has no more specific handler registered will be routed here. `FlowEventHandler` looks up subscriptions by event type and correlates the event to the matching process instance.
+`IEventHandler<IEvent>` is the fallback handler path: a dispatched event with no more specific
+handler reaches `FlowEventHandler`.
 
-## FlowEventTransitionObserver
+## FlowEventTransitionAdvisor
 
-`FlowEventTransitionObserver` implements `IFlowTransitionObserver` and keeps `IEventSubscriptionStore` in sync with the waiting state on every transition.
+`FlowEventTransitionAdvisor` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
+`AdviseAsync` runs in the transition's pre-commit window and reconciles `IEventSubscriptionStore`
+against the new waiting state, returning `AdviseResult.Continue`.
 
 ### Subscription lifecycle
 
-`OnTransitionedAsync` calls `IEventSubscriptionStore` directly. Each step is conditional:
-
-1. **Remove old subscriptions** when `context.PreviousWaitingAtId` is set and differs from `context.Instance.WaitingAtId`. The observer resolves the previous element from the definition and calls `store.RemoveAsync(...)` with the subscription id `flow:{processCanonicalName}:{definition.Name}`. An `EventBasedGateway` previous element removes the subscription for every outgoing intermediate catch.
-2. **Skip the add step** when `context.Instance.IsComplete` is true or the new `WaitingAtId` is empty.
-3. **Add new subscriptions** when the new waiting element is an `IntermediateCatchEvent` with a non-null `Definition`: the observer calls `store.AddAsync(...)` with `EventType = definition.Name` and `CorrelationKey = process.CanonicalName` for `Message`, `null` for `Signal`. An `EventBasedGateway` adds one subscription per outgoing catch event.
+1. **Remove the old subscription** when `PreviousWaitingAtId` is set and differs from the new
+   `WaitingAtId`. The advisor resolves the previous element and calls `store.RemoveAsync`. An
+   event-based gateway removes the subscription for every outgoing intermediate catch.
+2. **Skip the add** when the instance is complete or the new `WaitingAtId` is empty.
+3. **Add the new subscription** when the new waiting element is an intermediate catch with a
+   definition, or an event-based gateway (one subscription per outgoing catch).
 
 ### Subscription format
 
+A subscription is keyed by the waiting element id, so two catches that share an event name in one
+process keep distinct subscriptions:
+
 ```csharp
-// For a Message event (point-to-point):
-var subscription = new EventSubscription(
-    id:             $"flow:{process.CanonicalName}:{definition.Name}",
-    eventType:      definition.Name,   // BPMN message/signal name
+// Message catch (point-to-point):
+new EventSubscription(
+    id:             $"flow:{process.CanonicalName}:{elementId}",
+    eventType:      definition.Name,         // BPMN message/signal name
     correlationKey: process.CanonicalName,
     target:         process.CanonicalName);
 
-// For a Signal event (broadcast):
-var subscription = new EventSubscription(
-    id:             $"flow:{process.CanonicalName}:{definition.Name}",
+// Signal catch (broadcast):
+new EventSubscription(
+    id:             $"flow:{process.CanonicalName}:{elementId}",
     eventType:      definition.Name,
-    correlationKey: null,              // no correlation for signals
+    correlationKey: null,                    // signals do not correlate
     target:         process.CanonicalName);
 ```
 
-`EventType` carries the BPMN message/signal name so consumers correlate by the domain identifier the model defines, not by the CLR type implementing it.
+The difference between message and signal is the `CorrelationKey`: a `Message` sets it to the
+instance's canonical name (one-to-one); a `Signal` leaves it null (broadcast). `EventType` carries
+the BPMN-level name from the model, not the CLR type that implements the event.
 
 ## FlowEventHandler
 
-`FlowEventHandler` implements `IEventHandler<IEvent>` and is the fallback handler for all events. It reads `IEventDispatchContext.MatchedSubscriptions` (populated by the bus before handler dispatch) and, for each subscription whose `Target` is set:
+`FlowEventHandler` implements `IEventHandler<IEvent>`. It reads `IEventDispatchContext`'s matched
+subscriptions (populated by the bus before handler dispatch) and, for each subscription with a
+`Target`:
 
-- Calls `IProcessRuntime.CorrelateMessageAsync(sub.Target, sub.EventType, @event, ct)` when `CorrelationKey` is non-null (message semantics).
-- Calls `IProcessRuntime.ThrowSignalAsync(sub.EventType, @event, ct)` otherwise (signal semantics).
+- `CorrelationKey` set → `IProcessRuntime.CorrelateMessageAsync(target, eventType, @event, ...)`
+  (message: one instance).
+- `CorrelationKey` null → `IProcessRuntime.ThrowSignalAsync(eventType, @event, ...)` (signal:
+  broadcast). Signal throws are de-duplicated by event type, so one dispatched signal raises one
+  `ThrowSignalAsync` per distinct name regardless of how many subscriptions matched.
 
 ## Extension points
 
-- Implement `IFlowTransitionObserver` and register via `TryAddEnumerable` to add custom subscription management logic.
-- Implement `IEventSubscriptionStore` to back subscriptions with a durable store. The default `InMemoryEventSubscriptionStore` is dropped on restart.
+- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to add subscription logic.
+- Implement `IEventSubscriptionStore` to back subscriptions with a durable store; the default
+  in-memory store is dropped on restart.
 
 ## Caveats
 
-- `IEventSubscriptionStore` mutations run inside `OnTransitionedAsync` before `IProcessLifecycleObserver` dispatch. A throwing audit observer leaves the subscription store ahead of the audit row.
-- `IEventHandler<IEvent>` is the fallback path. A more specific `IEventHandler<TEvent>` registration wins and `FlowEventHandler` is not invoked.
-- Subscription IDs use the format `flow:{processCanonicalName}:{eventDefinitionName}`. Reserve the `flow:` prefix for the integration.
+- Subscription reconciliation runs inside the pre-commit advisor pipeline. A subscription is created
+  before the transition commits, so a failed commit would roll back the instance row while the
+  subscription persists; reconcile by dropping subscriptions whose `Target` resolves to no waiting
+  instance.
+- `IEventHandler<IEvent>` is the fallback. A more specific `IEventHandler<TEvent>` registration wins
+  and `FlowEventHandler` is not invoked for that type.
+- Subscription ids use the `flow:{processCanonicalName}:{elementId}` format. Reserve the `flow:`
+  prefix for this integration.
 
 ## See also
 
 - [Overview](overview.md)
 - [Runtime Services](runtime.md)
-- [Event Overview](../event/overview.md)
-- [Event Providers](../event/providers.md)
 - [Scheduling Integration](scheduling.md)
+- [Event Overview](../event/overview.md)

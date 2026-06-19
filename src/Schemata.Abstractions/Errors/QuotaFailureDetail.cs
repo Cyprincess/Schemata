@@ -5,7 +5,7 @@ namespace Schemata.Abstractions.Errors;
 
 /// <summary>
 ///     Error detail listing one or more <see cref="QuotaViolation" /> entries describing
-///     quota limits that were exceeded, per
+///     exceeded quota limits, per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
 [Polymorphic(typeof(IErrorDetail), Name = "type.googleapis.com/google.rpc.QuotaFailure")]

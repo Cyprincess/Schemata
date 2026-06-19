@@ -14,6 +14,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <summary>Order constants for <see cref="AdviceIntrospectionProtectedResource{TApp, TToken}" />.</summary>
 public static class AdviceIntrospectionProtectedResource
 {
+    /// <summary>The default advisor ordering value.</summary>
     public const int DefaultOrder = Orders.Base;
 }
 
@@ -38,7 +39,6 @@ public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicat
 {
     #region IIntrospectionAdvisor<TApp,TToken> Members
 
-    /// <inheritdoc cref="AdviseResult" />
     public int Order => AdviceIntrospectionProtectedResource.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(

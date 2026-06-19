@@ -67,4 +67,7 @@ app.Run();
 static async IAsyncEnumerable<T> EmptyAsync<T>() { yield break; }
 #pragma warning restore CS1998
 
-public partial class Program;
+namespace Schemata.Authorization.Integration.Tests
+{
+    public partial class Program;
+}

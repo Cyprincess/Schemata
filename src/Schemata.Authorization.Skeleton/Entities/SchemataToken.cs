@@ -16,10 +16,10 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
-    /// <summary>Canonical name of the application this token was issued to.</summary>
+    /// <summary>Canonical name of the application that receives this token.</summary>
     public virtual string? Application { get; set; }
 
-    /// <summary>Canonical name of the authorization record this token was derived from.</summary>
+    /// <summary>Canonical name of the authorization record that grants this token.</summary>
     public virtual string? Authorization { get; set; }
 
     /// <summary>Identifier of the resource owner this token represents.</summary>
@@ -41,13 +41,13 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     public virtual string? Status { get; set; }
 
     /// <summary>
-    ///     Serialization format used when the token was issued: <c>"reference"</c>, <c>"jwt"</c>, or <c>"jwe"</c>.
+    ///     Serialization format for this token: <c>"reference"</c>, <c>"jwt"</c>, or <c>"jwe"</c>.
     /// </summary>
     public virtual string? Format { get; set; }
 
     /// <summary>
     ///     Opaque reference used for token lookup.
-    ///     The raw token value is never stored; only this reference persists.
+    ///     Only this reference persists for opaque tokens.
     /// </summary>
     public virtual string? ReferenceId { get; set; }
 

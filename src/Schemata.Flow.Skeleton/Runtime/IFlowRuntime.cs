@@ -50,7 +50,7 @@ public interface IFlowRuntime
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The updated process instance with the new state.</returns>
     /// <exception cref="Abstractions.Exceptions.InvalidArgumentException">
-    ///     Thrown when the trigger does not match any waiting event or boundary event.
+    ///     Thrown when the current state cannot accept the trigger.
     /// </exception>
     ValueTask<ProcessInstance> TriggerAsync(
         ProcessDefinition definition,

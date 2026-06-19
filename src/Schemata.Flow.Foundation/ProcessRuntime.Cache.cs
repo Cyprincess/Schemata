@@ -5,16 +5,17 @@ using Schemata.Flow.Skeleton.Entities;
 
 namespace Schemata.Flow.Foundation;
 
+/// <summary>Coordinates process runtime operations against registered Flow engines.</summary>
 public sealed partial class ProcessRuntime
 {
-    /// <summary>Adds an already-materialised process to the cache without raising lifecycle events.</summary>
+    /// <summary>Adds an already-materialised process to the cache while leaving lifecycle observers silent.</summary>
     public void Hydrate(SchemataProcess process) {
         if (!string.IsNullOrEmpty(process.CanonicalName)) {
             _instances[process.CanonicalName] = process;
         }
     }
 
-    /// <summary>Removes a process from the cache without raising lifecycle events.</summary>
+    /// <summary>Removes a process from the cache while leaving lifecycle observers silent.</summary>
     public bool Evict(string canonicalName) {
         return _instances.TryRemove(canonicalName, out var _);
     }

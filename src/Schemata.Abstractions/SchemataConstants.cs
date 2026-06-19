@@ -45,8 +45,8 @@ public static class SchemataConstants
 
         /// <summary>
         ///     Single-grant anchor produced by the device flow's user_code approval.
-        ///     NOT reusable for silent consent because the verifying user agent is not
-        ///     the requesting device — the consent advisor must skip these records.
+        ///     The consent advisor skips these records during silent consent because
+        ///     the verifying user agent differs from the requesting device.
         /// </summary>
         public const string Device = "device";
 
@@ -85,42 +85,115 @@ public static class SchemataConstants
     /// </summary>
     public static class Claims
     {
+        /// <summary>End-user postal address claim.</summary>
         public const string Address             = "address";
+
+        /// <summary>Access token hash claim.</summary>
         public const string AtHash              = "at_hash";
+
+        /// <summary>Audience claim.</summary>
         public const string Audience            = "aud";
+
+        /// <summary>End-user birthdate claim.</summary>
         public const string Birthdate           = "birthdate";
+
+        /// <summary>Authorization code hash claim.</summary>
         public const string CHash               = "c_hash";
+
+        /// <summary>OAuth client identifier claim.</summary>
         public const string ClientId            = "client_id";
+
+        /// <summary>End-user email address claim.</summary>
         public const string Email               = "email";
+
+        /// <summary>Email verification status claim.</summary>
         public const string EmailVerified       = "email_verified";
+
+        /// <summary>Security events claim.</summary>
         public const string Events              = "events";
+
+        /// <summary>Expiration time claim.</summary>
         public const string Expiration          = "exp";
+
+        /// <summary>End-user family name claim.</summary>
         public const string FamilyName          = "family_name";
+
+        /// <summary>End-user gender claim.</summary>
         public const string Gender              = "gender";
+
+        /// <summary>End-user given name claim.</summary>
         public const string GivenName           = "given_name";
+
+        /// <summary>Issued-at time claim.</summary>
         public const string IssuedAt            = "iat";
+
+        /// <summary>Issuer claim.</summary>
         public const string Issuer              = "iss";
+
+        /// <summary>JWT identifier claim.</summary>
         public const string JwtId               = "jti";
+
+        /// <summary>End-user locale claim.</summary>
         public const string Locale              = "locale";
+
+        /// <summary>End-user middle name claim.</summary>
         public const string MiddleName          = "middle_name";
+
+        /// <summary>End-user display name claim.</summary>
         public const string Name                = "name";
+
+        /// <summary>End-user nickname claim.</summary>
         public const string Nickname            = "nickname";
+
+        /// <summary>OpenID Connect nonce claim.</summary>
         public const string Nonce               = "nonce";
+
+        /// <summary>Not-before time claim.</summary>
         public const string NotBefore           = "nbf";
+
+        /// <summary>End-user phone number claim.</summary>
         public const string PhoneNumber         = "phone_number";
+
+        /// <summary>Phone number verification status claim.</summary>
         public const string PhoneNumberVerified = "phone_number_verified";
+
+        /// <summary>End-user profile picture URL claim.</summary>
         public const string Picture             = "picture";
+
+        /// <summary>End-user preferred username claim.</summary>
         public const string PreferredUsername   = "preferred_username";
+
+        /// <summary>End-user profile page URL claim.</summary>
         public const string Profile             = "profile";
+
+        /// <summary>Role claim.</summary>
         public const string Role                = "role";
+
+        /// <summary>OAuth scope claim.</summary>
         public const string Scope               = "scope";
+
+        /// <summary>Security stamp claim.</summary>
         public const string SecurityStamp       = "security_stamp";
+
+        /// <summary>Session identifier claim.</summary>
         public const string SessionId           = "sid";
+
+        /// <summary>Subject claim.</summary>
         public const string Subject             = "sub";
+
+        /// <summary>Token usage claim.</summary>
         public const string TokenUse            = "token_use";
+
+        /// <summary>End-user profile update time claim.</summary>
         public const string UpdatedAt           = "updated_at";
+
+        /// <summary>End-user website URL claim.</summary>
         public const string Website             = "website";
+
+        /// <summary>End-user time zone claim.</summary>
         public const string Zoneinfo            = "zoneinfo";
+
+        /// <summary>End-user authentication time claim.</summary>
         public const string AuthTime            = "auth_time";
     }
 
@@ -171,7 +244,7 @@ public static class SchemataConstants
         /// <summary>A confidential client that can maintain the confidentiality of its credentials.</summary>
         public const string Confidential = "confidential";
 
-        /// <summary>A public client that cannot maintain the confidentiality of its credentials.</summary>
+        /// <summary>A public client with credentials exposed to the user agent.</summary>
         public const string Public = "public";
     }
 
@@ -438,25 +511,25 @@ public static class SchemataConstants
         /// <summary>The request contained invalid arguments.</summary>
         public const string InvalidArgument = "INVALID_ARGUMENT";
 
-        /// <summary>The requested resource was not found.</summary>
+        /// <summary>The requested resource is missing.</summary>
         public const string NotFound = "NOT_FOUND";
 
-        /// <summary>The caller does not have permission.</summary>
+        /// <summary>The caller lacks permission.</summary>
         public const string PermissionDenied = "PERMISSION_DENIED";
 
-        /// <summary>The operation was aborted (e.g., concurrency conflict).</summary>
+        /// <summary>The operation aborts because of a conflict.</summary>
         public const string Aborted = "ABORTED";
 
         /// <summary>The resource already exists.</summary>
         public const string AlreadyExists = "ALREADY_EXISTS";
 
-        /// <summary>A precondition for the operation was not met.</summary>
+        /// <summary>A precondition for the operation failed.</summary>
         public const string FailedPrecondition = "FAILED_PRECONDITION";
 
-        /// <summary>The caller is not authenticated.</summary>
+        /// <summary>The caller lacks authentication.</summary>
         public const string Unauthenticated = "UNAUTHENTICATED";
 
-        /// <summary>A quota or rate limit was exceeded.</summary>
+        /// <summary>A quota or rate limit is exceeded.</summary>
         public const string ResourceExhausted = "RESOURCE_EXHAUSTED";
 
         /// <summary>An internal server error occurred.</summary>
@@ -472,7 +545,7 @@ public static class SchemataConstants
     /// </summary>
     public static class ErrorReasons
     {
-        /// <summary>The concurrency token did not match.</summary>
+        /// <summary>The concurrency token mismatches the stored value.</summary>
         public const string ConcurrencyMismatch = "CONCURRENCY_MISMATCH";
     }
 
@@ -505,7 +578,7 @@ public static class SchemataConstants
     /// </summary>
     public static class FieldReasons
     {
-        /// <summary>The field must not be empty.</summary>
+        /// <summary>The field requires a value.</summary>
         public const string NotEmpty = "not_empty";
 
         /// <summary>The request payload is invalid.</summary>
@@ -532,7 +605,7 @@ public static class SchemataConstants
         /// <summary>The page_size is negative.</summary>
         public const string InvalidPageSize = "invalid_page_size";
 
-        /// <summary>Cross-parent operations are not supported.</summary>
+        /// <summary>Cross-parent operation rejection reason.</summary>
         public const string CrossParentUnsupported = "cross_parent_unsupported";
 
         /// <summary>The parent is malformed or unsupported.</summary>
@@ -669,7 +742,7 @@ public static class SchemataConstants
     public static class OAuthErrors
     {
         /// <summary>
-        ///     The provided authorization grant or refresh token is invalid, expired, revoked, or does not match, per
+        ///     The provided authorization grant or refresh token is invalid, expired, revoked, or mismatched, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
         ///         RFC 6749: The OAuth 2.0 Authorization
         ///         Framework §5.2: Error Response
@@ -689,7 +762,7 @@ public static class SchemataConstants
         public const string InvalidClient = "invalid_client";
 
         /// <summary>
-        ///     The client is not authorized to request an authorization code using this method, per
+        ///     The client lacks authorization to request an authorization code using this method, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
         ///         RFC 6749: The OAuth 2.0 Authorization
         ///         Framework §4.1.2.1: Error Response
@@ -729,7 +802,7 @@ public static class SchemataConstants
         public const string AccessDenied = "access_denied";
 
         /// <summary>
-        ///     The authorization server does not support the requested grant type, per
+        ///     The authorization server rejects the requested grant type, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-5.2">
         ///         RFC 6749: The OAuth 2.0 Authorization
         ///         Framework §5.2: Error Response
@@ -739,7 +812,7 @@ public static class SchemataConstants
         public const string UnsupportedGrantType = "unsupported_grant_type";
 
         /// <summary>
-        ///     The authorization server does not support the requested response type, per
+        ///     The authorization server rejects the requested response type, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.2.1">
         ///         RFC 6749: The OAuth 2.0 Authorization
         ///         Framework §4.1.2.1: Error Response
@@ -748,7 +821,7 @@ public static class SchemataConstants
         /// </summary>
         public const string UnsupportedResponseType = "unsupported_response_type";
 
-        /// <summary>The redirect URI is invalid or does not match a registered URI.</summary>
+        /// <summary>The redirect URI is invalid or mismatched with the registered URI.</summary>
         public const string InvalidRedirectUri = "invalid_redirect_uri";
 
         /// <summary>
@@ -812,7 +885,7 @@ public static class SchemataConstants
         public const string ConsentRequired = "consent_required";
 
         /// <summary>
-        ///     The authorization server does not support the presented token type, per
+        ///     The authorization server rejects the presented token type, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2.1">
         ///         RFC 7009: OAuth 2.0 Token Revocation
         ///         §2.2.1: Error Response
@@ -1187,7 +1260,7 @@ public static class SchemataConstants
     #region Nested type: PermissionPrefixes
 
     /// <summary>
-    ///     Prefix strings used to namespace permission entries stored on clients.
+        ///     Prefix strings for permission entries stored on clients.
     /// </summary>
     public static class PermissionPrefixes
     {
@@ -1284,19 +1357,46 @@ public static class SchemataConstants
     /// </summary>
     public static class Properties
     {
+        /// <summary>Serialized grant type property key.</summary>
         public const string GrantType           = ".grant_type";
+
+        /// <summary>Serialized scope property key.</summary>
         public const string Scope               = ".scope";
+
+        /// <summary>Serialized issued token type property key.</summary>
         public const string IssuedTokenType     = ".issued_token_type";
+
+        /// <summary>Serialized response type property key.</summary>
         public const string ResponseType        = ".response_type";
+
+        /// <summary>Serialized nonce property key.</summary>
         public const string Nonce               = ".nonce";
+
+        /// <summary>Serialized redirect URI property key.</summary>
         public const string RedirectUri         = ".redirect_uri";
+
+        /// <summary>Serialized response mode property key.</summary>
         public const string ResponseMode        = ".response_mode";
+
+        /// <summary>Serialized state property key.</summary>
         public const string State               = ".state";
+
+        /// <summary>Serialized PKCE code challenge property key.</summary>
         public const string CodeChallenge       = ".code_challenge";
+
+        /// <summary>Serialized PKCE code challenge method property key.</summary>
         public const string CodeChallengeMethod = ".code_challenge_method";
+
+        /// <summary>Serialized authorization name property key.</summary>
         public const string AuthorizationName   = ".authorization_name";
+
+        /// <summary>Serialized session identifier property key.</summary>
         public const string SessionId           = ".session_id";
+
+        /// <summary>Serialized max_age property key.</summary>
         public const string MaxAge              = ".max_age";
+
+        /// <summary>Serialized authentication time property key.</summary>
         public const string AuthTime            = ".auth_time";
     }
 
@@ -1569,6 +1669,9 @@ public static class SchemataConstants
     /// </summary>
     public static class StandardScopes
     {
+        /// <summary>
+        ///     Maps standard OpenID Connect scopes to the claims they request.
+        /// </summary>
         public static readonly IReadOnlyDictionary<string, string[]> ScopeClaims = new Dictionary<string, string[]> {
             [Scopes.Profile] = [
                 Claims.Name, Claims.FamilyName, Claims.GivenName, Claims.MiddleName, Claims.Nickname,
@@ -1632,16 +1735,16 @@ public static class SchemataConstants
     /// </summary>
     public static class TokenStatuses
     {
-        /// <summary>The token is valid and has not been revoked or redeemed.</summary>
+        /// <summary>The token is valid and available for use.</summary>
         public const string Valid = "valid";
 
         /// <summary>The token has been revoked.</summary>
         public const string Revoked = "revoked";
 
-        /// <summary>The token has been redeemed (e.g., an authorization code that was exchanged).</summary>
+        /// <summary>The token is redeemed (e.g., an exchanged authorization code).</summary>
         public const string Redeemed = "redeemed";
 
-        /// <summary>The token represents an authorized but not yet completed request.</summary>
+        /// <summary>The token represents an authorized pending request.</summary>
         public const string Authorized = "authorized";
 
         /// <summary>The token has been denied by the user.</summary>
@@ -1761,7 +1864,7 @@ public static class SchemataConstants
 
         /// <summary>
         ///     Indicates whether <paramref name="uri" /> is a standard RFC 8693 §3 token type
-        ///     identifier. Schemata-internal token type URIs are not standard exchange types.
+        ///     identifier. Standard exchange types are interoperable token exchange URIs.
         /// </summary>
         /// <param name="uri">The token type URI to test.</param>
         /// <returns><see langword="true" /> for a standard RFC 8693 token type URI.</returns>

@@ -26,6 +26,9 @@ namespace Schemata.Resource.Foundation.Features;
 [DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
+    /// <summary>
+    ///     The default feature priority for resource service registration.
+    /// </summary>
     public const int DefaultPriority = Orders.Extension + 90_000_000;
 
     public override int Priority => DefaultPriority;
@@ -69,7 +72,7 @@ public sealed class SchemataResourceFeature : FeatureBase
             try {
                 types = assembly.GetExportedTypes();
             } catch (ReflectionTypeLoadException ex) {
-                // A load failure for some types must not silently drop the whole assembly;
+                // A partial type-load failure still leaves usable exported types;
                 // discover resources from the types that did load. Any other exception surfaces.
                 types = ex.Types;
             }

@@ -14,7 +14,6 @@ public class AnonymousAccessShould
 
     [Fact]
     public void IsAnonymous_AttributeWithMatchingOperation_ReturnsTrue() {
-        // PublicProduct has [Anonymous(Operations.Create, Operations.List)]
         Assert.True(AnonymousAccess.IsAnonymous<PublicProduct>(nameof(Operations.Create)));
         Assert.True(AnonymousAccess.IsAnonymous<PublicProduct>(nameof(Operations.List)));
     }
@@ -26,7 +25,6 @@ public class AnonymousAccessShould
 
     [Fact]
     public void IsAnonymous_AttributeWithNoOperations_AllOperationsAnonymous() {
-        // FullyPublicProduct has [Anonymous] (no specific operations)
         Assert.True(AnonymousAccess.IsAnonymous<FullyPublicProduct>(nameof(Operations.Create)));
         Assert.True(AnonymousAccess.IsAnonymous<FullyPublicProduct>(nameof(Operations.Delete)));
         Assert.True(AnonymousAccess.IsAnonymous<FullyPublicProduct>(nameof(Operations.Get)));
@@ -34,7 +32,6 @@ public class AnonymousAccessShould
 
     [Fact]
     public void IsAnonymous_StringConstructor_MatchingEvent_ReturnsTrue() {
-        // EventWorkflow has [Anonymous("Approve", "Reject")]
         Assert.True(AnonymousAccess.IsAnonymous<EventWorkflow>("Approve"));
         Assert.True(AnonymousAccess.IsAnonymous<EventWorkflow>("Reject"));
     }
