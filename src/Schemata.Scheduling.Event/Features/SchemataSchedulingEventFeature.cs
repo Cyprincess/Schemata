@@ -34,11 +34,11 @@ public sealed class SchemataSchedulingEventFeature : FeatureBase
 
         // Wire names are kebab-case resource-style so they survive renames and cross-service deploys.
         services.Configure<EventTypeRegistryConfiguration>(options => {
-            options.Registrations.Add((typeof(JobScheduled), "schemata/scheduling/job-scheduled"));
-            options.Registrations.Add((typeof(JobUnscheduled), "schemata/scheduling/job-unscheduled"));
-            options.Registrations.Add((typeof(JobTriggered), "schemata/scheduling/job-triggered"));
-            options.Registrations.Add((typeof(JobCompleted), "schemata/scheduling/job-completed"));
-            options.Registrations.Add((typeof(JobFailed), "schemata/scheduling/job-failed"));
+            options.Registrations.Add((typeof(JobScheduled), "schemata/scheduling/job.scheduled"));
+            options.Registrations.Add((typeof(JobUnscheduled), "schemata/scheduling/job.unscheduled"));
+            options.Registrations.Add((typeof(JobTriggered), "schemata/scheduling/job.triggered"));
+            options.Registrations.Add((typeof(JobCompleted), "schemata/scheduling/job.completed"));
+            options.Registrations.Add((typeof(JobFailed), "schemata/scheduling/job.failed"));
         });
     }
 }

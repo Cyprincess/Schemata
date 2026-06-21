@@ -71,7 +71,7 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     /// </summary>
     /// <param name="name">Optional resource-relative name segment; <see langword="null" /> for collection-scoped verbs.</param>
     /// <param name="request">The request DTO.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     [HttpPost]
     public virtual async Task<IActionResult> InvokeAsync(
         [FromRoute] string?  name,

@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Event.Foundation.Features;
+using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
 using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Skeleton.Events;
 using Schemata.Flow.Skeleton.Observers;
 
 namespace Schemata.Flow.Event.Features;
@@ -31,5 +33,12 @@ public sealed class SchemataFlowEventFeature : FeatureBase
     ) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowEventTransitionAdvisor>());
         services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
+
+        services.Configure<EventTypeRegistryConfiguration>(options => {
+            options.Registrations.Add((typeof(ProcessStartedEvent), "schemata/flow/process.started"));
+            options.Registrations.Add((typeof(ProcessCompletedEvent), "schemata/flow/process.completed"));
+            options.Registrations.Add((typeof(ProcessFailedEvent), "schemata/flow/process.failed"));
+            options.Registrations.Add((typeof(TransitionMadeEvent), "schemata/flow/transition.made"));
+        });
     }
 }

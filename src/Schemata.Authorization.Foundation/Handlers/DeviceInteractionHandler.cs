@@ -53,7 +53,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     /// </summary>
     /// <param name="request">Interaction request containing the user code.</param>
     /// <param name="issuer">Token issuer URI.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> GetDetailsAsync(
         InteractRequest   request,
         string            issuer,
@@ -136,7 +136,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     /// <param name="request">Interaction request containing the user code.</param>
     /// <param name="principal">The authenticated resource owner.</param>
     /// <param name="issuer">Token issuer URI.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> ApproveAsync(
         InteractRequest   request,
         ClaimsPrincipal   principal,
@@ -224,7 +224,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     ///     to <see cref="TokenStatuses.Denied" /> and revokes the user code.
     /// </summary>
     /// <param name="request">Interaction request containing the user code.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
         if (token?.Type != TokenTypes.UserCode || string.IsNullOrWhiteSpace(token.Payload)) {

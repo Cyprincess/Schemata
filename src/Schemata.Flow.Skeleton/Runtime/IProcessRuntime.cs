@@ -17,7 +17,7 @@ public interface IProcessRuntime
     /// <param name="displayName">Optional display name persisted with the instance in the start transaction.</param>
     /// <param name="description">Optional description persisted with the instance in the start transaction.</param>
     /// <param name="sourceEntity">Optional source entity captured by reference on the persisted process row.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask<SchemataProcess> StartProcessInstanceAsync(
         string                                processName,
         IReadOnlyDictionary<string, object?>? variables   = null,
@@ -32,7 +32,7 @@ public interface IProcessRuntime
     /// <param name="instanceName">The canonical name of the process instance.</param>
     /// <param name="variables">Optional variables merged into the process instance.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask<ProcessInstance> CompleteActivityAsync(
         string                                instanceName,
         IReadOnlyDictionary<string, object?>? variables = null,
@@ -45,7 +45,7 @@ public interface IProcessRuntime
     /// <param name="messageName">The name of the <see cref="Message" /> definition.</param>
     /// <param name="payload">Optional payload merged into process variables.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask<ProcessInstance> CorrelateMessageAsync(
         string            instanceName,
         string            messageName,
@@ -58,7 +58,7 @@ public interface IProcessRuntime
     /// <param name="signalName">The name of the <see cref="Signal" /> definition.</param>
     /// <param name="payload">Optional payload merged into matched process variables.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask ThrowSignalAsync(
         string            signalName,
         object?           payload   = null,
@@ -71,7 +71,7 @@ public interface IProcessRuntime
     /// <param name="trigger">The event definition being triggered.</param>
     /// <param name="payload">Optional payload merged into process variables.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask<ProcessInstance> TriggerEventAsync(
         string            instanceName,
         IEventDefinition  trigger,
@@ -83,7 +83,7 @@ public interface IProcessRuntime
     /// <summary>Terminates a process instance immediately.</summary>
     /// <param name="instanceName">The canonical name of the process instance.</param>
     /// <param name="principal">Optional authenticated principal recorded in the audit log.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     ValueTask<ProcessInstance> TerminateProcessInstanceAsync(
         string            instanceName,
         ClaimsPrincipal?  principal = null,

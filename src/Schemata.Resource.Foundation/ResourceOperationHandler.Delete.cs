@@ -29,7 +29,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <param name="allowMissing">Whether a missing resource should produce an empty successful delete result.</param>
     /// <returns>
     ///     A <see cref="DeleteResultBase{TDetail}" /> carrying the soft-deleted resource detail,
@@ -52,7 +52,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="name">The resource name.</param>
     /// <param name="etag">The optional ETag for optimistic concurrency.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
     /// <param name="allowMissing">Whether a missing resource should produce an empty successful delete result.</param>
     /// <returns>The delete result and the entity that was removed or soft-deleted.</returns>

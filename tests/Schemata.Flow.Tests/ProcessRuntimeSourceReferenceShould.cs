@@ -10,14 +10,14 @@ public class ProcessRuntimeSourceReferenceShould
     [Fact]
     public async Task StartProcess_WithSource_CapturesSourceReferenceColumns() {
         var fixture = new ProcessRuntimeFixture();
-        var source = new ProcessRuntimeFixture.SourceEntity {
+        var source = new FlowSourceEntity {
             CanonicalName = "orders/1", Timestamp = Identifiers.NewUid(),
         };
 
         await fixture.Runtime.StartProcessInstanceAsync("approval", sourceEntity: source);
 
         var row = Assert.Single(fixture.Persisted);
-        Assert.Equal(typeof(ProcessRuntimeFixture.SourceEntity).FullName, row.SourceType);
+        Assert.Equal(typeof(FlowSourceEntity).FullName, row.SourceType);
         Assert.Equal("orders/1", row.Source);
         Assert.Equal(source.Timestamp, row.SourceTimestamp);
     }

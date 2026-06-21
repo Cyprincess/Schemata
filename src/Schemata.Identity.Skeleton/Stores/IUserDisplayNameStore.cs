@@ -14,7 +14,7 @@ public interface IUserDisplayNameStore<TUser>
     ///     Gets the display name for a user.
     /// </summary>
     /// <param name="user">The user whose display name is requested.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The user's display name.</returns>
     Task<string?> GetDisplayNameAsync(TUser user, CancellationToken ct);
 }

@@ -45,7 +45,7 @@ public static class AdviceRunner<TAdvisor, T1, T2, T3, T4, T5, T6, T7, T8, T9, T
     /// <param name="a10">The tenth argument.</param>
     /// <param name="a11">The eleventh argument.</param>
     /// <param name="a12">The twelfth argument.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>
     ///     The first non-<see cref="AdviseResult.Continue" /> result, or
     ///     <see cref="AdviseResult.Continue" /> if all advisors continue.

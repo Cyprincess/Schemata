@@ -17,7 +17,7 @@ public interface IEntitlementProvider<T, TRequest>
     /// <summary>Returns a filter expression for repository queries.</summary>
     /// <param name="context">Operation and request details.</param>
     /// <param name="principal">Principal requesting access.</param>
-    /// <param name="ct">Token that cancels expression generation.</param>
+    /// <param name="ct">A cancellation token.</param>
     Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
         AccessContext<TRequest> context,
         ClaimsPrincipal?        principal,

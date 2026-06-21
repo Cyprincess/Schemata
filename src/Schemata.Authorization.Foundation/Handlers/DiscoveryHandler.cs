@@ -46,7 +46,7 @@ public sealed class DiscoveryHandler<TScope>(
     ///     Runs the <see cref="IDiscoveryAdvisor" /> pipeline for extensibility.
     /// </summary>
     /// <param name="issuer">The issuer URI for this OP instance.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> GetDiscoveryDocumentAsync(string issuer, CancellationToken ct) {
         var config = options.Value;
 

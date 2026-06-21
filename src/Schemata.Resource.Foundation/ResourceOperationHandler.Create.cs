@@ -25,7 +25,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the new resource's detail DTO.</returns>
     public Task<CreateResultBase<TDetail>> CreateAsync(
         TRequest           request,
@@ -43,7 +43,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="ctx">The advisor context shared with the caller.</param>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
     /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the resource detail DTO.</returns>
     internal async Task<CreateResultBase<TDetail>> CreateCoreAsync(

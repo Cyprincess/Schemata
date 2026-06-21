@@ -39,7 +39,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
     /// </summary>
     /// <param name="request">Token exchange request.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,

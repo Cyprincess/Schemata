@@ -145,7 +145,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <param name="authorization">Linked authorization/consent record name.</param>
     /// <param name="session">OP session identifier.</param>
     /// <param name="time">Clock for the token's create and expiry timestamps.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public static async Task<string> CreateTokenAsync(
         ITokenManager<TToken> tokens,
         TokenService          token,

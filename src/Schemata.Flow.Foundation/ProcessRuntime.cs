@@ -99,7 +99,10 @@ public sealed partial class ProcessRuntime : IProcessRuntime
         // before persistence can strand the instance.
         await ProvisionFlowTransitionAsync(services, context, ct);
 
-        await _persistence.PersistTransitionAsync(services, persisted, transition, ct);
+        var engine    = _registry.GetRegistration(persisted.DefinitionName)?.Engine;
+        var writeback = ProcessWriteback.Build(services, persisted, instance, engine);
+
+        await _persistence.PersistTransitionAsync(services, persisted, transition, writeback, ct);
 
         ProcessPersistence.SyncProcessFields(process, persisted);
 

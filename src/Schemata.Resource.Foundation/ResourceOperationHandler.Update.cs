@@ -36,7 +36,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="name">The resource name.</param>
     /// <param name="request">The update request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     public Task<UpdateResultBase<TDetail>> UpdateAsync(
         string             name,
@@ -56,7 +56,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="name">The resource name.</param>
     /// <param name="request">The update request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
     /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     internal async Task<UpdateResultBase<TDetail>> UpdateCoreAsync(

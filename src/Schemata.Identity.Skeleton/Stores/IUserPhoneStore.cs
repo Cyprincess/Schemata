@@ -15,7 +15,7 @@ public interface IUserPhoneStore<TUser> : IUserPhoneNumberStore<TUser>
     ///     Finds a user by phone number.
     /// </summary>
     /// <param name="phone">The phone number to match.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The matching user, or <see langword="null" /> when the phone number is unknown.</returns>
     Task<TUser?> FindByPhoneAsync(string phone, CancellationToken ct);
 }

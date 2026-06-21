@@ -23,7 +23,7 @@ public static class PermissionAdvice
     /// <param name="manager">The application manager that evaluates the permission.</param>
     /// <param name="application">The application to check; may be <see langword="null" />.</param>
     /// <param name="permission">The fully-qualified permission entry (prefix + value).</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <param name="error">The OAuth error code; defaults to <c>unauthorized_client</c>.</param>
     /// <param name="resource">The resource string key for the error description; defaults to <c>ST4007</c>.</param>
     /// <param name="code">The HTTP status code; defaults to 400.</param>

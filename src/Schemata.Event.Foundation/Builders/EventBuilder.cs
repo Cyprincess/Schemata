@@ -22,8 +22,7 @@ public sealed class EventBuilder
     ///     throw on publish.
     /// </summary>
     public EventBuilder RegisterEvent<TEvent>(string name) {
-        Services.AddSingleton<IPostConfigureOptions<EventTypeRegistryConfiguration>>(
-            new RegisterEventConfiguration(typeof(TEvent), name));
+        Services.AddSingleton<IPostConfigureOptions<EventTypeRegistryConfiguration>>(new RegisterEventConfiguration(typeof(TEvent), name));
         return this;
     }
 

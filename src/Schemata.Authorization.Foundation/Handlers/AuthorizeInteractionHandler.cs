@@ -80,7 +80,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     /// </summary>
     /// <param name="request">Interaction request containing the reference token code.</param>
     /// <param name="issuer">Token issuer URI.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> GetDetailsAsync(
         InteractRequest   request,
         string            issuer,
@@ -151,7 +151,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     /// <param name="request">Interaction request containing the reference token code.</param>
     /// <param name="principal">The authenticated resource owner.</param>
     /// <param name="issuer">Token issuer URI.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> ApproveAsync(
         InteractRequest   request,
         ClaimsPrincipal   principal,
@@ -243,7 +243,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     ///     No consent record is created.
     /// </summary>
     /// <param name="request">Interaction request containing the reference token code.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);
         if (interaction is null) {

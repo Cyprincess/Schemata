@@ -13,7 +13,7 @@ public interface IAccessProvider<T, TRequest>
     /// <param name="entity">Entity instance being authorized.</param>
     /// <param name="context">Operation and request details.</param>
     /// <param name="principal">Principal requesting access.</param>
-    /// <param name="ct">Token that cancels the authorization check.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns><see langword="true"/> when access is allowed; otherwise, <see langword="false"/>.</returns>
     Task<bool> HasAccessAsync(
         T?                      entity,

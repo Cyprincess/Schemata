@@ -67,7 +67,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
     /// </summary>
     /// <param name="request">Token request containing the refresh token.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,

@@ -29,7 +29,7 @@ public static class IndexLocks
     ///     Acquires the lock semaphore for <paramref name="key" /> and returns a release handle.
     /// </summary>
     /// <param name="key">The key to lock on.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>A disposable handle that releases the semaphore when disposed.</returns>
     public static async Task<IDisposable> AcquireAsync(string key, CancellationToken ct) {
         var slot = (int)((uint)key.GetHashCode() % StripeCount);

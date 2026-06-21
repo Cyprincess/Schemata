@@ -25,7 +25,7 @@ public static class AdviceRunner<TAdvisor, T1, T2>
     /// <param name="ctx">The <see cref="AdviceContext" /> providing the service scope and shared state.</param>
     /// <param name="a1">The first argument.</param>
     /// <param name="a2">The second argument.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>
     ///     The first non-<see cref="AdviseResult.Continue" /> result, or
     ///     <see cref="AdviseResult.Continue" /> if all advisors continue.

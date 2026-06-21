@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 
@@ -38,11 +39,22 @@ internal sealed class ProcessPersistence
     }
 
     /// <summary>Stores the current process state and appends its transition history entry in one unit of work.</summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="process">Current process row.</param>
+    /// <param name="transition">Current transition.</param>
+    /// <param name="writeback">
+    ///     An optional callback enlisted in the transition's unit of work before the process row is
+    ///     persisted, projecting the transition onto its source business entity. Running it first lets
+    ///     the refreshed <see cref="ISourceReference.SourceTimestamp" /> land in the same write; a
+    ///     throw aborts the whole transition.
+    /// </param>
+    /// <param name="ct">A cancellation token.</param>
     public async Task PersistTransitionAsync(
-        IServiceProvider          services,
-        SchemataProcess           process,
-        SchemataProcessTransition transition,
-        CancellationToken         ct
+        IServiceProvider                            services,
+        SchemataProcess                             process,
+        SchemataProcessTransition                   transition,
+        Func<IUnitOfWork, CancellationToken, Task>? writeback,
+        CancellationToken                           ct
     ) {
         if (string.IsNullOrWhiteSpace(process.CanonicalName)) {
             throw new InvalidOperationException("Process canonical name is required before persistence.");
@@ -55,6 +67,10 @@ internal sealed class ProcessPersistence
         transitions.Join(uow);
 
         try {
+            if (writeback is not null) {
+                await writeback(uow, ct);
+            }
+
             var existing = await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
 
             if (existing is null) {

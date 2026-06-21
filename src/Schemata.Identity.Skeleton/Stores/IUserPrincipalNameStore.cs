@@ -14,7 +14,7 @@ public interface IUserPrincipalNameStore<TUser>
     ///     Gets the principal name for a user.
     /// </summary>
     /// <param name="user">The user whose principal name is requested.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The user's principal name.</returns>
     Task<string?> GetUserPrincipalNameAsync(TUser user, CancellationToken ct);
 }

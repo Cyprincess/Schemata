@@ -14,7 +14,7 @@ public interface IUserCanonicalNameStore<TUser>
     ///     Finds a user by canonical resource name.
     /// </summary>
     /// <param name="canonicalName">The canonical resource name.</param>
-    /// <param name="ct">The cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The matching user, or <see langword="null" /> when the canonical name is unknown.</returns>
     Task<TUser?> FindByCanonicalNameAsync(string canonicalName, CancellationToken ct);
 }

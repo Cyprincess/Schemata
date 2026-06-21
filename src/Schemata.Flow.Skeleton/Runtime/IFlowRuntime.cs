@@ -25,7 +25,7 @@ public interface IFlowRuntime
     /// </summary>
     /// <param name="definition">The process definition to instantiate.</param>
     /// <param name="process">The entity representing the new instance.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>
     ///     A <see cref="ProcessInstance" /> set to the initial activity state.
     /// </returns>
@@ -47,7 +47,7 @@ public interface IFlowRuntime
     ///     <see cref="ErrorDefinition" />).
     /// </param>
     /// <param name="payload">Optional payload data merged into process variables.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The updated process instance with the new state.</returns>
     /// <exception cref="Abstractions.Exceptions.InvalidArgumentException">
     ///     Thrown when the current state cannot accept the trigger.
@@ -68,7 +68,7 @@ public interface IFlowRuntime
     /// </summary>
     /// <param name="definition">The process definition.</param>
     /// <param name="process">The entity representing the running instance.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>The process instance after zero or more automatic transitions.</returns>
     ValueTask<ProcessInstance> AdvanceAsync(
         ProcessDefinition definition,

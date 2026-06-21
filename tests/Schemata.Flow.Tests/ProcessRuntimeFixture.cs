@@ -20,7 +20,7 @@ namespace Schemata.Flow.Tests;
 
 internal sealed class ProcessRuntimeFixture
 {
-    public ProcessRuntimeFixture() {
+    public ProcessRuntimeFixture(bool sourceWriteback = true) {
         var definition = CreateDefinition();
         var registration = new ProcessRegistration {
             Name          = definition.Name,
@@ -83,13 +83,26 @@ internal sealed class ProcessRuntimeFixture
         Transitions.Setup(r => r.AddAsync(It.IsAny<SchemataProcessTransition>(), It.IsAny<CancellationToken>()))
                    .Returns(Task.CompletedTask);
 
+        Sources.Setup(r => r.FirstOrDefaultAsync(
+                          It.IsAny<Func<IQueryable<FlowSourceEntity>, IQueryable<FlowSourceEntity>>>(),
+                          It.IsAny<CancellationToken>()))
+               .Returns((Func<IQueryable<FlowSourceEntity>, IQueryable<FlowSourceEntity>> predicate, CancellationToken _)
+                            => ValueTask.FromResult(SourceRow is null
+                                                        ? null
+                                                        : predicate(new[] { SourceRow }.AsQueryable())
+                                                           .FirstOrDefault()));
+        Sources.Setup(r => r.UpdateAsync(It.IsAny<FlowSourceEntity>(), It.IsAny<CancellationToken>()))
+               .Callback((FlowSourceEntity entity, CancellationToken _) => SourceUpdates.Add(entity))
+               .Returns(Task.CompletedTask);
+
         var services = new ServiceCollection();
-        services.AddSingleton(Options.Create(new SchemataFlowOptions()));
+        services.AddSingleton(Options.Create(new SchemataFlowOptions { SourceWriteback = sourceWriteback }));
         services.AddSingleton(registry.Object);
         services.AddSingleton<IEventBus>(EventBus);
         services.AddKeyedSingleton(SchemataConstants.FlowEngines.StateMachine, Engine.Object);
         services.AddSingleton(Processes.Object);
         services.AddSingleton(Transitions.Object);
+        services.AddSingleton(Sources.Object);
 
         Runtime = new(registry.Object, services.BuildServiceProvider());
     }
@@ -104,6 +117,9 @@ internal sealed class ProcessRuntimeFixture
     public ProcessInstance StartResult { get; set; } = new() { StateId = "draft", State = "Draft" };
     public Exception? StartException { get; set; }
     public Mock<IRepository<SchemataProcessTransition>> Transitions { get; } = new();
+    public Mock<IRepository<FlowSourceEntity>> Sources { get; } = new();
+    public FlowSourceEntity? SourceRow { get; set; }
+    public List<FlowSourceEntity> SourceUpdates { get; } = [];
     public List<Mock<IUnitOfWork>> UnitOfWorks { get; } = [];
 
     public string? AdvancedStateId { get; private set; }
@@ -195,24 +211,27 @@ internal sealed class ProcessRuntimeFixture
 
     #endregion
 
-    #region Nested type: SourceEntity
+}
 
-    internal sealed class SourceEntity : ICanonicalName, IConcurrency
-    {
-        #region ICanonicalName Members
+public sealed class FlowSourceEntity : ICanonicalName, IConcurrency, IStateful
+{
+    #region ICanonicalName Members
 
-        public string? Name { get; set; }
+    public string? Name { get; set; }
 
-        public string? CanonicalName { get; set; }
+    public string? CanonicalName { get; set; }
 
-        #endregion
+    #endregion
 
-        #region IConcurrency Members
+    #region IConcurrency Members
 
-        public Guid Timestamp { get; set; }
+    public Guid Timestamp { get; set; }
 
-        #endregion
-    }
+    #endregion
+
+    #region IStateful Members
+
+    public string? State { get; set; }
 
     #endregion
 }

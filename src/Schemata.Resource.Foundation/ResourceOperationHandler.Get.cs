@@ -23,7 +23,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// </summary>
     /// <param name="name">The resource name.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>A <see cref="GetResultBase{TDetail}" /> containing the detail DTO.</returns>
     public Task<GetResultBase<TDetail>> GetAsync(string name, ClaimsPrincipal? principal, CancellationToken? ct) {
         return GetAsync(new GetRequest { Name = name }, principal, ct);
@@ -37,7 +37,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     ///     <c>read_mask</c> per <seealso href="https://google.aip.dev/157">AIP-157: Partial responses</seealso>.
     /// </param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>A <see cref="GetResultBase{TDetail}" /> containing the detail DTO.</returns>
     public async Task<GetResultBase<TDetail>> GetAsync(
         GetRequest         request,

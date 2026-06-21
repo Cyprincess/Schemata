@@ -35,7 +35,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// </summary>
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">The <see cref="CancellationToken" />.</param>
+    /// <param name="ct">A cancellation token.</param>
     /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
     public async Task<ListResultBase<TSummary>> ListAsync(
         ListRequest        request,
