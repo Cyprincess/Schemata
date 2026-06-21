@@ -43,6 +43,10 @@
     <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
     <Project Path="src/Schemata.Identity.Foundation/Schemata.Identity.Foundation.csproj" />
     <Project Path="src/Schemata.Identity.Skeleton/Schemata.Identity.Skeleton.csproj" />
+    <Project Path="src/Schemata.Insight.Foundation/Schemata.Insight.Foundation.csproj" />
+    <Project Path="src/Schemata.Insight.Grpc/Schemata.Insight.Grpc.csproj" />
+    <Project Path="src/Schemata.Insight.Http/Schemata.Insight.Http.csproj" />
+    <Project Path="src/Schemata.Insight.Skeleton/Schemata.Insight.Skeleton.csproj" />
     <Project Path="src/Schemata.Mapping.AutoMapper/Schemata.Mapping.AutoMapper.csproj" />
     <Project Path="src/Schemata.Mapping.Foundation/Schemata.Mapping.Foundation.csproj" />
     <Project Path="src/Schemata.Mapping.Mapster/Schemata.Mapping.Mapster.csproj" />
@@ -98,6 +102,9 @@
     <Project Path="tests/Schemata.Expressions.Skeleton.Tests/Schemata.Expressions.Skeleton.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Tests/Schemata.Flow.Tests.csproj" />
     <Project Path="tests/Schemata.Identity.Tests/Schemata.Identity.Tests.csproj" />
+    <Project Path="tests/Schemata.Insight.Grpc.Integration.Tests/Schemata.Insight.Grpc.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Insight.Http.Integration.Tests/Schemata.Insight.Http.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Insight.Tests/Schemata.Insight.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.AutoMapper.Integration.Tests/Schemata.Mapping.AutoMapper.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.Mapster.Integration.Tests/Schemata.Mapping.Mapster.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Modeling.Generator.Tests/Schemata.Modeling.Generator.Tests.csproj" />

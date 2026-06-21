@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Insight Query Service for HTTP</Description>
+    <PackageTags>application;business;framework;insight;query;rest</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
+  </ItemGroup>
+
+</Project>
