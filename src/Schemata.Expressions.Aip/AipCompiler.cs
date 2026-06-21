@@ -1,5 +1,6 @@
 using System;
 using System.Linq.Expressions;
+using Parlot;
 using Schemata.Expressions.Aip.Expressions;
 using Schemata.Expressions.Skeleton;
 
@@ -21,9 +22,13 @@ public sealed class AipCompiler : IExpressionCompiler
 
         var key = ExpressionCacheKey.Create(Language, source, null, null, null);
         return ExpressionCache.GetOrAddTree(key, () => {
-            var filter = AipParser.Filter.Parse(source) ?? throw new ArgumentException("Invalid AIP filter.", nameof(source));
-            filter.Source = source;
-            return filter;
+            try {
+                var filter = AipParser.Filter.Parse(source) ?? throw new ExpressionException("Invalid AIP filter.");
+                filter.Source = source;
+                return filter;
+            } catch (ParseException ex) {
+                throw new ExpressionException(ex.Message, ex);
+            }
         });
     }
 
@@ -36,16 +41,20 @@ public sealed class AipCompiler : IExpressionCompiler
         }
 
         var key = ExpressionCacheKey.Create(Language, filter.Source, typeof(TContext), typeof(TResult), AipBuiltInFunctions.Fingerprint(options));
-        return ExpressionCache.GetOrAddExpression(key, () => {
-            var visitor = new AipCompileVisitor(typeof(TContext), options);
-            var body    = visitor.Visit(filter);
+        try {
+            return ExpressionCache.GetOrAddExpression(key, () => {
+                var visitor = new AipCompileVisitor(typeof(TContext), options);
+                var body    = visitor.Visit(filter);
 
-            if (body.Type != typeof(TResult)) {
-                body = Expression.Convert(body, typeof(TResult));
-            }
+                if (body.Type != typeof(TResult)) {
+                    body = Expression.Convert(body, typeof(TResult));
+                }
 
-            return Expression.Lambda<Func<TContext, TResult>>(body, visitor.Parameter);
-        });
+                return Expression.Lambda<Func<TContext, TResult>>(body, visitor.Parameter);
+            });
+        } catch (ParseException ex) {
+            throw new ExpressionException(ex.Message, ex);
+        }
     }
 
     #endregion

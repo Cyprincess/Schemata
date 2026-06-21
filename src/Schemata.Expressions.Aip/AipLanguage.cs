@@ -1,3 +1,5 @@
+using Schemata.Expressions.Skeleton;
+
 namespace Schemata.Expressions.Aip;
 
 /// <summary>
@@ -8,5 +10,5 @@ public static class AipLanguage
     /// <summary>
     ///     The AIP language identifier used for keyed compiler registration.
     /// </summary>
-    public const string Name = "aip";
+    public const string Name = ExpressionLanguages.Aip;
 }

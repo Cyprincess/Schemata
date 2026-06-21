@@ -40,7 +40,7 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
             ? JsonSerializer.Deserialize<PurgeOperationArgs>(json, SchemataJson.Default)
             : null;
 
-        var filter = PurgeFilter.Compile<TEntity>(_services, args?.Filter);
+        var filter = PurgeFilter.Compile<TEntity>(_services, args?.Filter, args?.Language);
         var result = await ExecuteAsync(filter, args?.Force ?? false, ct);
 
         if (context.Execution is { } execution) {

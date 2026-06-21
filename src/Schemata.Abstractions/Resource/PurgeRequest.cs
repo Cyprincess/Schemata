@@ -20,6 +20,11 @@ public sealed class PurgeRequest : ICanonicalName, IRequestIdentification
     public string? Filter { get; set; }
 
     /// <summary>
+    ///     The filter expression language; defaults to the resource's first enabled language.
+    /// </summary>
+    public string? Language { get; set; }
+
+    /// <summary>
     ///     When <see langword="true" />, physically removes matching resources; otherwise
     ///     the operation reports a preview count and sample.
     /// </summary>

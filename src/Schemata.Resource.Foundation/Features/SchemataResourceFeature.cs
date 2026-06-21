@@ -10,7 +10,6 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Expressions.Aip;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -42,7 +41,6 @@ public sealed class SchemataResourceFeature : FeatureBase
     ) {
         services.TryAddScoped(typeof(ResourceOperationHandler<,,,>));
         services.TryAddScoped(typeof(ResourceMethodOperationHandler<,,>));
-        services.AddAipExpressions();
 
         services.AddHttpContextAccessor();
         services.AddDataProtection();

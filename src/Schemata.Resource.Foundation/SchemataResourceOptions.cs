@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Resource;
+using Schemata.Expressions.Skeleton;
 
 namespace Schemata.Resource.Foundation;
 
@@ -64,4 +65,10 @@ public sealed class SchemataResourceOptions
     ///     finalize its result before reporting <c>ABORTED</c> so the client retries.
     /// </summary>
     public TimeSpan IdempotencyPendingWait { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    ///     Gets or sets the filter expression languages this resource module enables, in priority
+    ///     order; the first is the default when a request omits an explicit language.
+    /// </summary>
+    public ExpressionLanguageProfile Expressions { get; set; } = new();
 }

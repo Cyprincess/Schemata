@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Parlot;
 using Parlot.Fluent;
@@ -10,7 +9,7 @@ using Schemata.Expressions.Aip.Values;
 namespace Schemata.Expressions.Aip;
 
 /// <summary>
-///     Provides parsers for Google AIP filter and order-by syntax.
+///     Provides parsers for Google AIP filter syntax.
 /// </summary>
 public static class AipParser
 {
@@ -18,11 +17,6 @@ public static class AipParser
     ///     Parses AIP-160 filter expressions.
     /// </summary>
     public static readonly Parser<Filter> Filter;
-
-    /// <summary>
-    ///     Parses AIP-132 order-by expressions.
-    /// </summary>
-    public static readonly Parser<IReadOnlyList<KeyValuePair<Member, Ordering>>> Order;
 
     static AipParser() {
         var filter = Parsers.Deferred<Filter>();
@@ -155,15 +149,6 @@ public static class AipParser
                                 .Then((c, f) => new Filter(c.Scanner.Cursor.Position, f.Item1, f.Item2));
 
         Filter = filter.Compile();
-
-        var asc  = WithWordBoundary(Parsers.Terms.Text("ASC", true)).Then(_ => Ordering.Ascending);
-        var desc = WithWordBoundary(Parsers.Terms.Text("DESC", true)).Then(_ => Ordering.Descending);
-
-        Order = Parsers.Separated(comma, member.And(Parsers.ZeroOrOne(asc.Or(desc))))
-                       .Then<IReadOnlyList<KeyValuePair<Member, Ordering>>>(
-                            o => o.Select(kv => new KeyValuePair<Member, Ordering>(kv.Item1, kv.Item2)).ToList()
-                            )
-                       .Compile();
     }
 
     private static Parser<string> WithWordBoundary(Parser<string> parser) {

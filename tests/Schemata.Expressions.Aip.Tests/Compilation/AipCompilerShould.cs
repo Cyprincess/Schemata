@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using Parlot;
 using Schemata.Expressions.Skeleton;
 using Xunit;
 
@@ -45,7 +44,7 @@ public class AipCompilerShould
     public void Compile_SnakeCaseVariable_DoesNotBindCamelCaseParameter() {
         var tree = _compiler.Parse("student_profile.full_name = 'Alice'");
 
-        Assert.Throws<ParseException>(() => _compiler.Compile<StudentProfile, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<StudentProfile, bool>(tree));
     }
 
     [Fact]
@@ -53,7 +52,7 @@ public class AipCompilerShould
         // Unknown bare terms fail before a vacuous match-all predicate can compile.
         var tree = _compiler.Parse("nonexistent");
 
-        Assert.Throws<ParseException>(() => _compiler.Compile<Student, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<Student, bool>(tree));
     }
 
     [Fact]

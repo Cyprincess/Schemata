@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -9,7 +10,6 @@ using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using Schemata.Expressions.Aip;
 using Schemata.Expressions.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
@@ -92,7 +92,7 @@ public class OperationHandlerListShould
     [Fact]
     public async Task List_WithOrderBy_UsesRegisteredOrderCompiler() {
         var handler = _fixture.CreateHandler(services => {
-            services.AddKeyedSingleton<IOrderCompiler>(AipLanguage.Name, new AscendingAgeOrderCompiler());
+            services.AddSingleton<IOrderCompiler>(new AscendingAgeOrderCompiler());
         });
         var request = new ListRequest { OrderBy = "age desc" };
 
@@ -322,13 +322,133 @@ public class OperationHandlerListShould
         _fixture.Repository.Verify(r => r.SuppressQuerySoftDelete(), Times.AtLeastOnce);
     }
 
+    [Fact]
+    public async Task List_ResidualFilter_AppliesResidualLocally() {
+        SeedLocales();
+        var handler = CreateResidualHandler();
+
+        var result = await handler.ListAsync(new() { Filter = "profile.locale = 'en'" }, null, null);
+
+        Assert.Equal(2, result.Entities?.Count());
+    }
+
+    [Fact]
+    public async Task List_ResidualFilter_ExactTotal_CountsMatches() {
+        SeedLocales();
+        var handler = CreateResidualHandler(TotalSizeMode.Exact);
+
+        var result = await handler.ListAsync(new() { Filter = "profile.locale = 'en'" }, null, null);
+
+        Assert.Equal(2, result.TotalSize);
+    }
+
+    [Fact]
+    public async Task List_ResidualFilter_NoneTotal_OmitsTotal() {
+        SeedLocales();
+        var handler = CreateResidualHandler(TotalSizeMode.None);
+
+        var result = await handler.ListAsync(new() { Filter = "profile.locale = 'en'" }, null, null);
+
+        Assert.Null(result.TotalSize);
+        Assert.Equal(2, result.Entities?.Count());
+    }
+
+    [Fact]
+    public async Task List_ResidualFilter_PaginatesAfterResidual() {
+        SeedLocales();
+        var handler = CreateResidualHandler(TotalSizeMode.None);
+
+        var page1 = await handler.ListAsync(new() { Filter = "profile.locale = 'en'", PageSize = 1 }, null, null);
+        Assert.Single(page1.Entities!);
+        Assert.NotNull(page1.NextPageToken);
+
+        var page2 = await handler.ListAsync(
+            new() { Filter = "profile.locale = 'en'", PageSize = 1, PageToken = page1.NextPageToken }, null, null);
+        Assert.Single(page2.Entities!);
+        Assert.Null(page2.NextPageToken);
+    }
+
+    [Fact]
+    public async Task List_ResidualFilter_ExceedingScanCap_Throws() {
+        SeedLocales();
+        var handler = CreateResidualHandler(cap: 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.ListAsync(new() { Filter = "profile.locale = 'en'" }, null, null));
+    }
+
+    [Fact]
+    public async Task List_ResidualFilter_PushesFlatConjunct_ShrinkingScanBelowCap() {
+        _fixture.Students.Clear();
+        // Without pushing `age = 18`, the residual would scan all 6 students and exceed the cap of 4.
+        // Partial pushdown sends `age = 18` to the backend, so only the 3 age-18 rows are scanned.
+        for (var i = 0; i < 3; i++) {
+            _fixture.Students.Add(NewAgedStudent($"x{i}", 20, "en"));
+        }
+
+        _fixture.Students.Add(NewAgedStudent("a", 18, "en"));
+        _fixture.Students.Add(NewAgedStudent("b", 18, "en"));
+        _fixture.Students.Add(NewAgedStudent("c", 18, "fr"));
+
+        var handler = CreateResidualHandler(cap: 4);
+
+        var result = await handler.ListAsync(
+            new() { Filter = "age = 18 AND profile.locale = 'en'" }, null, null);
+
+        Assert.Equal(2, result.Entities?.Count());
+    }
+
+    private void SeedLocales() {
+        _fixture.Students.Clear();
+        _fixture.Students.Add(NewStudent("a", "en"));
+        _fixture.Students.Add(NewStudent("b", "fr"));
+        _fixture.Students.Add(NewStudent("c", "en"));
+    }
+
+    private static Student NewStudent(string name, string locale) {
+        return new() {
+            Uid           = Identifiers.NewUid(),
+            Name          = name,
+            CanonicalName = $"students/{name}",
+            Profile       = new() { Locale = locale },
+        };
+    }
+
+    private static Student NewAgedStudent(string name, int age, string locale) {
+        return new() {
+            Uid           = Identifiers.NewUid(),
+            Name          = name,
+            CanonicalName = $"students/{name}",
+            Age           = age,
+            Profile       = new() { Locale = locale },
+        };
+    }
+
+    private ResourceOperationHandler<Student, Student, Student, Student> CreateResidualHandler(
+        TotalSizeMode? totalSize = null,
+        int            cap       = 0
+    ) {
+        return _fixture.CreateHandler(services => {
+            var options = new SchemataResourceOptions();
+            if (totalSize is { } mode) {
+                options.TotalSize = mode;
+            }
+
+            var entry = options.Expressions.Enable(ExpressionLanguages.Aip);
+            entry.Filtering = FilteringMode.Residual;
+            if (cap > 0) {
+                entry.MaxResidualScanRows = cap;
+            }
+
+            services.AddSingleton(Options.Create(options));
+        });
+    }
+
     #region Nested type: AscendingAgeOrderCompiler
 
     private sealed class AscendingAgeOrderCompiler : IOrderCompiler
     {
         #region IOrderCompiler Members
-
-        public string Language => AipLanguage.Name;
 
         public Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(
             string                    source,
@@ -338,6 +458,10 @@ public class OperationHandlerListShould
             var body      = Expression.PropertyOrField(parameter, nameof(Student.Age));
             var key       = Expression.Lambda<Func<T, int>>(body, parameter);
             return query => query.OrderBy(key);
+        }
+
+        public IReadOnlyList<OrderKey> Parse(string source) {
+            return [new(["age"], false)];
         }
 
         #endregion

@@ -40,7 +40,7 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         // Validate the filter up front so a malformed request fails fast with INVALID_ARGUMENT.
         // The compiled expression is discarded; the durable job recompiles it from the persisted
         // filter string at execution time.
-        _ = PurgeFilter.Compile<TEntity>(_services, request.Filter);
+        _ = PurgeFilter.Compile<TEntity>(_services, request.Filter, request.Language);
 
         var scheduler = _services.GetService<IScheduler>()
                      ?? throw new InvalidOperationException("Purge requires a scheduler.");
@@ -48,7 +48,7 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         var uid        = Identifiers.NewUid();
         var collection = ResourceNameDescriptor.ForType<SchemataJobExecution>().Collection;
         var argsJson   = JsonSerializer.Serialize(
-            new PurgeOperationArgs { Filter = request.Filter, Force = request.Force },
+            new PurgeOperationArgs { Filter = request.Filter, Language = request.Language, Force = request.Force },
             SchemataJson.Default);
 
         var context = new JobContext {

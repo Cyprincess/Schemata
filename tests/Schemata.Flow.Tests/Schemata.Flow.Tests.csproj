@@ -13,10 +13,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Event\Schemata.Flow.Event.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Scheduling\Schemata.Flow.Scheduling.csproj" />

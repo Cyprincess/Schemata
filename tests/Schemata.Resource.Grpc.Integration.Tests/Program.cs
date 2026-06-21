@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Expressions.Aip;
+using Schemata.Expressions.Order;
 using Schemata.Resource.Grpc.Integration.Tests;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 
@@ -16,6 +18,7 @@ builder.UseSchemata(schema => {
     schema.UseMapster().Map<Student, Student>();
 
     var resource = schema.UseResource();
+    resource.UseAip().UseOrdering();
     resource.MapGrpc().Use<Student, Student, Student, Student>();
 
     // Disable validation so freshness behavior remains isolated.

@@ -7,6 +7,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Expressions.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Features;
 
@@ -16,7 +17,7 @@ namespace Schemata.Resource.Foundation;
 ///     Fluent builder for configuring the resource system: authorization, validation suppression,
 ///     freshness suppression, and per-resource registration.
 /// </summary>
-public sealed class SchemataResourceBuilder
+public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
 {
     /// <summary>
     ///     Initializes a new instance with the Schemata options and service collection.
@@ -26,11 +27,23 @@ public sealed class SchemataResourceBuilder
     public SchemataResourceBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+
+        // Bind only when this builder enables a language so a builder that registers resources
+        // without filtering (e.g. a feature's internal resource) does not clear another's profile.
+        Services.Configure<SchemataResourceOptions>(o => {
+            if (Languages.Languages.Count > 0) {
+                o.Expressions = Languages;
+            }
+        });
     }
 
     private SchemataOptions Schemata { get; }
 
-    private IServiceCollection Services { get; }
+    /// <inheritdoc />
+    public IServiceCollection Services { get; }
+
+    /// <inheritdoc />
+    public ExpressionLanguageProfile Languages { get; } = new();
 
     /// <summary>
     ///     Adds a feature to the Schemata configuration.

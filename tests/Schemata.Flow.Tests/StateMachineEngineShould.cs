@@ -1,6 +1,11 @@
 using System;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Expressions.Aip;
+using Schemata.Expressions.Skeleton;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -143,6 +148,75 @@ public class StateMachineEngineShould
                 new() {
                     Id = "f4", Source = gateway, Target = rejectedEvent,
                 },
+                new() { Id = "f5", Source = reviewActivity, Target = approvedEvent },
+            },
+        };
+    }
+
+    [Fact]
+    public async SystemTask AdvanceAsync_ExpressionCondition_MatchesWhenTrue() {
+        var engine     = new StateMachineEngine(BuildExpressionServices());
+        var definition = CreateExpressionConditionalDefinition();
+        var process    = new SchemataProcess { State = "Draft", Variables = "{\"o\":{\"amount\":10}}" };
+
+        var instance = await engine.AdvanceAsync(definition, process);
+
+        Assert.Equal("Review", instance.State);
+        Assert.False(instance.IsComplete);
+    }
+
+    [Fact]
+    public async SystemTask AdvanceAsync_ExpressionCondition_TakesOtherwisePath() {
+        var engine     = new StateMachineEngine(BuildExpressionServices());
+        var definition = CreateExpressionConditionalDefinition();
+        var process    = new SchemataProcess { State = "Draft", Variables = "{\"o\":{\"amount\":3}}" };
+
+        var instance = await engine.AdvanceAsync(definition, process);
+
+        Assert.Equal("Rejected", instance.State);
+        Assert.True(instance.IsComplete);
+    }
+
+    private static IServiceProvider BuildExpressionServices() {
+        var services = new ServiceCollection();
+        services.AddAipExpressions();
+
+        var options = new SchemataFlowOptions();
+        options.Expressions.Enable(ExpressionLanguages.Aip);
+        services.AddSingleton(Options.Create(options));
+
+        return services.BuildServiceProvider();
+    }
+
+    private static ProcessDefinition CreateExpressionConditionalDefinition() {
+        var startEvent     = new FlowEvent { Id = "start", Name    = "Start", Position = EventPosition.Start };
+        var draftActivity  = new NoneTask { Id  = "draft", Name    = "Draft" };
+        var reviewActivity = new NoneTask { Id  = "review", Name   = "Review" };
+        var rejectedEvent  = new FlowEvent { Id = "rejected", Name = "Rejected", Position = EventPosition.End };
+        var approvedEvent  = new FlowEvent { Id = "approved", Name = "Approved", Position = EventPosition.End };
+
+        var gateway = new ExclusiveGateway { Id = "gateway", Name = "Decision" };
+
+        return new() {
+            Name = "expression-approval",
+            Elements = {
+                startEvent,
+                rejectedEvent,
+                approvedEvent,
+                draftActivity,
+                reviewActivity,
+                gateway,
+            },
+            Flows = {
+                new() { Id = "f1", Source = startEvent, Target    = draftActivity },
+                new() { Id = "f2", Source = draftActivity, Target = gateway },
+                new() {
+                    Id        = "f3",
+                    Source    = gateway,
+                    Target    = reviewActivity,
+                    Condition = new ExpressionConditionExpression("o.amount > 5"),
+                },
+                new() { Id = "f4", Source = gateway, Target        = rejectedEvent },
                 new() { Id = "f5", Source = reviewActivity, Target = approvedEvent },
             },
         };

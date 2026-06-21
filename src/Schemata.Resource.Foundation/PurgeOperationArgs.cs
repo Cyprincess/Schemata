@@ -10,6 +10,9 @@ public sealed class PurgeOperationArgs
     /// <summary>AIP filter expression selecting resources to purge; <c>*</c> selects all.</summary>
     public string? Filter { get; set; }
 
+    /// <summary>The filter expression language; defaults to the resource's first enabled language.</summary>
+    public string? Language { get; set; }
+
     /// <summary>When <see langword="true" />, physically removes matches; otherwise previews.</summary>
     public bool Force { get; set; }
 }

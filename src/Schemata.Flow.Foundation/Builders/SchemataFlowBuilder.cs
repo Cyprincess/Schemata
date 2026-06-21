@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Expressions.Skeleton;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
 
@@ -12,7 +13,7 @@ namespace Schemata.Flow.Foundation.Builders;
 ///     Fluent builder for configuring the flow system. Process definitions registered through
 ///     <c>Use&lt;TProcess&gt;</c> are written directly to <see cref="SchemataFlowOptions" />.
 /// </summary>
-public sealed class SchemataFlowBuilder
+public sealed class SchemataFlowBuilder : IExpressionLanguageBuilder
 {
     /// <summary>Initializes the builder bound to the given options and service collection.</summary>
     /// <param name="schemata">The <see cref="SchemataOptions" />.</param>
@@ -20,12 +21,23 @@ public sealed class SchemataFlowBuilder
     public SchemataFlowBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+
+        // Bind only when this builder enables a language so a builder that registers processes
+        // without conditions does not clear another's profile.
+        Services.Configure<SchemataFlowOptions>(o => {
+            if (Languages.Languages.Count > 0) {
+                o.Expressions = Languages;
+            }
+        });
     }
 
     private SchemataOptions Schemata { get; }
 
     /// <summary>Service collection that receives process registrations.</summary>
     public IServiceCollection Services { get; }
+
+    /// <inheritdoc />
+    public ExpressionLanguageProfile Languages { get; } = new();
 
     /// <summary>
     ///     Adds a feature to the Schemata configuration.

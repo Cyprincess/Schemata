@@ -20,6 +20,11 @@ public class ListRequest
     public virtual string? Filter { get; set; }
 
     /// <summary>
+    ///     The filter expression language; defaults to the resource's first enabled language.
+    /// </summary>
+    public virtual string? Language { get; set; }
+
+    /// <summary>
     ///     Comma-separated field paths with optional <c>asc</c>/<c>desc</c> suffix
     ///     (e.g., <c>"create_time desc,name asc"</c>).
     /// </summary>

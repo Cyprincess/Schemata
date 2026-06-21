@@ -35,6 +35,11 @@ public class PageToken
     public virtual string? Filter { get; set; }
 
     /// <summary>
+    ///     Gets or sets the filter expression language; a different language is a different page.
+    /// </summary>
+    public virtual string? Language { get; set; }
+
+    /// <summary>
     ///     Gets or sets the order-by clause.
     /// </summary>
     public virtual string? OrderBy { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Security.Claims;
@@ -6,14 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
-using Parlot;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
-using Schemata.Expressions.Aip;
 using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
@@ -93,11 +93,13 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                  ?? new PageToken {
                         Parent      = request.Parent,
                         Filter      = request.Filter,
+                        Language    = request.Language,
                         OrderBy     = request.OrderBy,
                         ShowDeleted = request.ShowDeleted,
                     };
         if (token.Parent != request.Parent
          || token.Filter != request.Filter
+         || token.Language != request.Language
          || token.OrderBy != request.OrderBy
          || token.ShowDeleted != request.ShowDeleted) {
             throw new ValidationException([new() {
@@ -133,13 +135,27 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             token.Skip = 0;
         }
 
+        Func<TEntity, bool>? residual = null;
+        ResolvedLanguage?    resolved = null;
         if (!string.IsNullOrWhiteSpace(request.Filter)) {
+            resolved = ResolveFilterLanguage(request.Language);
+            var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(resolved.Language);
             try {
-                var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
-                var tree     = compiler.Parse(request.Filter);
-                var filter   = compiler.Compile<TEntity, bool>(tree);
-                container.ApplyFiltering(filter);
-            } catch (Exception ex) when (ex is ParseException or ArgumentException) {
+                var tree = compiler.Parse(request.Filter);
+                if (resolved.Filtering is FilteringMode.Residual) {
+                    var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
+                    var plan    = planner.Plan(tree, ExpressionCapabilities.Relational);
+                    if (plan.Pushed is not null) {
+                        container.ApplyFiltering(compiler.Compile<TEntity, bool>(plan.Pushed));
+                    }
+
+                    if (plan.Residual is not null) {
+                        residual = compiler.Compile<TEntity, bool>(plan.Residual).Compile();
+                    }
+                } else {
+                    container.ApplyFiltering(compiler.Compile<TEntity, bool>(tree));
+                }
+            } catch (Exception ex) when (ex is ExpressionException or ArgumentException) {
                 throw new ValidationException([new() {
                     Field = nameof(request.Filter).Underscore(),
                     Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "filter"),
@@ -151,9 +167,9 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? order = null;
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
             try {
-                var compiler = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name);
+                var compiler = _sp.GetRequiredService<IOrderCompiler>();
                 order = compiler.CompileOrder<TEntity>(request.OrderBy);
-            } catch (Exception ex) when (ex is ParseException or ArgumentException) {
+            } catch (ArgumentException) {
                 throw new ValidationException([new() {
                     Field = nameof(request.OrderBy).Underscore(),
                     Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "order_by"),
@@ -166,32 +182,61 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         using var suppression = request.ShowDeleted is true ? _repository.SuppressQuerySoftDelete() : null;
 
-        var totalSize = ResolveTotalSizeMode() switch {
-            TotalSizeMode.None => (int?)null,
-            TotalSizeMode.Estimated => (int)Math.Min(
-                await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
-            var _ => await _repository.CountAsync(q => container.Query(q), ct.Value),
-        };
+        List<TSummary> summaries;
+        bool           hasMore;
+        int?           totalSize;
 
-        // The extra look-ahead row detects a following page; AIP-158 forbids a
-        // next_page_token when the collection is exhausted, and counting cannot be
-        // relied on once total_size becomes optional.
-        container.ApplyPaginating(token, 1);
+        if (residual is null) {
+            totalSize = ResolveTotalSizeMode() switch {
+                TotalSizeMode.None => null,
+                TotalSizeMode.Estimated => (int)Math.Min(
+                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
+                var _ => await _repository.CountAsync(q => container.Query(q), ct.Value),
+            };
 
-        var entities  = _repository.ListAsync(q => container.Query(q), ct.Value);
-        var summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct.Value).ToListAsync(ct.Value);
+            // The extra look-ahead row detects a following page; AIP-158 forbids a
+            // next_page_token when the collection is exhausted, and counting cannot be
+            // relied on once total_size becomes optional.
+            container.ApplyPaginating(token, 1);
 
-        var hasMore = summaries.Count > token.PageSize;
-        if (hasMore) {
-            summaries.RemoveAt(summaries.Count - 1);
+            var entities = _repository.ListAsync(q => container.Query(q), ct.Value);
+            summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct.Value).ToListAsync(ct.Value);
+
+            hasMore = summaries.Count > token.PageSize;
+            if (hasMore) {
+                summaries.RemoveAt(summaries.Count - 1);
+            }
+        } else {
+            var mode = ResolveTotalSizeMode();
+
+            // The residual runs locally over the pushed superset, so paging and an exact total are
+            // computed after the residual rather than in the backend query.
+            var superset = _repository.ListAsync(q => container.Query(q), ct.Value);
+            var scan = await ResidualPage.ScanAsync(
+                superset, residual, token.Skip, token.PageSize, resolved!.MaxResidualScanRows,
+                mode is TotalSizeMode.Exact, ct.Value);
+
+            totalSize = mode switch {
+                TotalSizeMode.None => null,
+                TotalSizeMode.Estimated => (int)Math.Min(
+                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
+                var _ => scan.Total,
+            };
+
+            summaries = new(scan.Page.Count);
+            foreach (var entity in scan.Page) {
+                var summary = _mapper.Map<TEntity, TSummary>(entity);
+                if (summary is not null) {
+                    summaries.Add(summary);
+                }
+            }
+
+            hasMore = scan.HasMore;
         }
 
         token.Skip += token.PageSize;
 
-        string? nextPageToken = null;
-        if (hasMore) {
-            nextPageToken = await token.ToStringAsync(Protector);
-        }
+        string? nextPageToken = hasMore ? await token.ToStringAsync(Protector) : null;
 
         var immutable = summaries.ToImmutableArray();
 
@@ -206,5 +251,20 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return new() {
             TotalSize = totalSize, Entities = immutable, NextPageToken = nextPageToken,
         };
+    }
+
+    private ResolvedLanguage ResolveFilterLanguage(string? requested) {
+        var profile = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value.Expressions
+                   ?? new ExpressionLanguageProfile();
+        try {
+            return ExpressionLanguageResolver.Resolve(profile, requested,
+                                                      n => _sp.GetKeyedService<ExpressionLanguageDescriptor>(n));
+        } catch (UnknownExpressionLanguageException) {
+            throw new ValidationException([new() {
+                Field       = nameof(ListRequest.Language).Underscore(),
+                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "language"),
+                Reason      = FieldReasons.InvalidFilter,
+            }]);
+        }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using Parlot;
 using Schemata.Expressions.Cel.Expressions;
 using Schemata.Expressions.Skeleton;
 
@@ -23,10 +24,14 @@ public sealed class CelCompiler : IExpressionCompiler
 
         var key = ExpressionCacheKey.Create(Language, source, null, null, null);
         return ExpressionCache.GetOrAddTree(key, () => {
-            var node = CelParser.Expression.Parse(source)
-                    ?? throw new ArgumentException("Invalid CEL expression.", nameof(source));
-            node.Source = source;
-            return node;
+            try {
+                var node = CelParser.Expression.Parse(source)
+                        ?? throw new ExpressionException("Invalid CEL expression.");
+                node.Source = source;
+                return node;
+            } catch (ParseException ex) {
+                throw new ExpressionException(ex.Message, ex);
+            }
         });
     }
 
@@ -39,15 +44,19 @@ public sealed class CelCompiler : IExpressionCompiler
         }
 
         var key = ExpressionCacheKey.Create(Language, node.Source, typeof(TContext), typeof(TResult), Fingerprint(options));
-        return ExpressionCache.GetOrAddExpression(key, () => {
-            var visitor = new CelCompileVisitor(typeof(TContext), options);
-            var body    = visitor.Visit(node);
-            if (body.Type != typeof(TResult)) {
-                body = Expression.Convert(body, typeof(TResult));
-            }
+        try {
+            return ExpressionCache.GetOrAddExpression(key, () => {
+                var visitor = new CelCompileVisitor(typeof(TContext), options);
+                var body    = visitor.Visit(node);
+                if (body.Type != typeof(TResult)) {
+                    body = Expression.Convert(body, typeof(TResult));
+                }
 
-            return Expression.Lambda<Func<TContext, TResult>>(body, visitor.Parameter);
-        });
+                return Expression.Lambda<Func<TContext, TResult>>(body, visitor.Parameter);
+            });
+        } catch (ParseException ex) {
+            throw new ExpressionException(ex.Message, ex);
+        }
     }
 
     #endregion

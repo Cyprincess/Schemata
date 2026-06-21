@@ -13,12 +13,14 @@
   <ItemGroup>
     <PackageReference Include="Humanizer.Core" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
     <ProjectReference Include="..\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
   </ItemGroup>

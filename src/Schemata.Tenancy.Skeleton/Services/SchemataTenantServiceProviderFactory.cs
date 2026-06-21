@@ -91,7 +91,7 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
         }
 
         var container = overrides.BuildServiceProvider();
-        composite = new TenantCompositeServiceProvider(container, _root);
+        composite = new(container, _root);
         return composite;
     }
 

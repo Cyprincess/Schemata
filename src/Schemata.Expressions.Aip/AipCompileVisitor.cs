@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using Humanizer;
 using Parlot;
 using Schemata.Expressions.Aip.Expressions;
 using Schemata.Expressions.Aip.Operations;
@@ -19,14 +18,29 @@ namespace Schemata.Expressions.Aip;
 /// </summary>
 internal sealed class AipCompileVisitor
 {
+    private static readonly MethodInfo MemberMethod         = Method(nameof(DynamicValues.Member));
+    private static readonly MethodInfo TruthyMethod         = Method(nameof(DynamicValues.Truthy));
+    private static readonly MethodInfo EqualMethod          = Method(nameof(DynamicValues.Equal));
+    private static readonly MethodInfo NotEqualMethod       = Method(nameof(DynamicValues.NotEqual));
+    private static readonly MethodInfo LessMethod           = Method(nameof(DynamicValues.Less));
+    private static readonly MethodInfo LessOrEqualMethod    = Method(nameof(DynamicValues.LessOrEqual));
+    private static readonly MethodInfo GreaterMethod        = Method(nameof(DynamicValues.Greater));
+    private static readonly MethodInfo GreaterOrEqualMethod = Method(nameof(DynamicValues.GreaterOrEqual));
+
     private readonly ExpressionCompileOptions? _options;
-    private          Expression?               _guard;
+
+    // Compiling against a dictionary context evaluates member access and operators through
+    // DynamicValues at run time instead of binding statically-typed members.
+    private readonly bool _dynamic;
+
+    private Expression? _guard;
 
     /// <summary>
     ///     Creates a visitor for expressions evaluated against the supplied context type.
     /// </summary>
     public AipCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
         _options  = options;
+        _dynamic  = typeof(IReadOnlyDictionary<string, object?>).IsAssignableFrom(contextType);
         Parameter = Expression.Parameter(contextType, LowerFirst(contextType.Name));
     }
 
@@ -55,7 +69,11 @@ internal sealed class AipCompileVisitor
     /// </summary>
     public Expression Visit(Term node) {
         var expression = Visit(node.Simple);
-        return node.Modifier is null ? expression : Expression.Not(ToBoolean(expression));
+        if (node.Modifier is null) {
+            return expression;
+        }
+
+        return Expression.Not(_dynamic ? expression : ToBoolean(expression));
     }
 
     /// <summary>
@@ -73,6 +91,10 @@ internal sealed class AipCompileVisitor
     ///     Visits an AIP restriction and applies null-chain guards when needed.
     /// </summary>
     public Expression Visit(Restriction node) {
+        if (_dynamic) {
+            return VisitDynamic(node);
+        }
+
         var outerGuard = _guard;
         _guard = null;
 
@@ -144,6 +166,10 @@ internal sealed class AipCompileVisitor
     ///     Visits an AIP member path or literal value.
     /// </summary>
     public Expression Visit(Member node) {
+        if (_dynamic) {
+            return VisitDynamic(node);
+        }
+
         var expression = VisitValue(node.Value, true);
         foreach (var field in node.Fields) {
             expression = Access(expression, field);
@@ -156,6 +182,10 @@ internal sealed class AipCompileVisitor
     ///     Visits an AIP function call.
     /// </summary>
     public Expression Visit(Function node) {
+        if (_dynamic) {
+            throw new ParseException("AIP functions are not supported in dynamic evaluation.", node.Position);
+        }
+
         var names = GetSegments(node.Member);
         var name  = string.Join(".", names);
         var function = AipBuiltInFunctions.Resolve(name, _options)
@@ -221,19 +251,9 @@ internal sealed class AipCompileVisitor
     }
 
     private static bool TryAccess(Expression source, string name, out Expression expression) {
-        var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
-        if (member is PropertyInfo property) {
-            expression = Expression.Property(source, property);
-            return true;
-        }
-
-        if (member is FieldInfo field) {
-            expression = Expression.Field(source, field);
-            return true;
-        }
-
-        expression = null!;
-        return false;
+        var access = Common.MemberAccess.Resolve(source, name);
+        expression = access!;
+        return access is not null;
     }
 
     private bool TryBuildRepeatedHas(IComparableArg comparable, IArg arg, out Expression expression) {
@@ -430,7 +450,7 @@ internal sealed class AipCompileVisitor
     }
 
     private static bool TryParseSeconds(string text, out TimeSpan duration) {
-        duration = default;
+        duration = TimeSpan.Zero;
         if (!text.EndsWith("s", StringComparison.OrdinalIgnoreCase)) {
             return false;
         }
@@ -488,5 +508,78 @@ internal sealed class AipCompileVisitor
         Func<Expression, Expression, BinaryExpression> merge
     ) {
         return expressions.Aggregate(merge);
+    }
+
+    private static MethodInfo Method(string name) {
+        return typeof(DynamicValues).GetMethod(name)!;
+    }
+
+    private Expression VisitDynamic(Member node) {
+        if (node.Fields.Count == 0) {
+            return DynamicConstant(node.Value);
+        }
+
+        if (node.Value is not Text head) {
+            throw new ParseException("Expected a field name.", node.Position);
+        }
+
+        var expression = MemberAccess(Parameter, head.Value);
+        foreach (var field in node.Fields) {
+            var name = field switch {
+                Text text       => text.Value,
+                Integer integer => integer.Value.ToString(CultureInfo.InvariantCulture),
+                var _           => throw new ParseException("Unsupported AIP field.", field.Position),
+            };
+            expression = MemberAccess(expression, name);
+        }
+
+        return expression;
+    }
+
+    private Expression VisitDynamic(Restriction node) {
+        var left = Visit(node.Comparable);
+
+        if (node.Comparator is null || node.Arg is null) {
+            return Expression.Call(TruthyMethod, ToObject(left));
+        }
+
+        if (node.Comparator is Has) {
+            throw new ParseException("AIP membership is not supported in dynamic evaluation.", node.Position);
+        }
+
+        var right = Visit(node.Arg);
+        var method = node.Comparator switch {
+            Equal              => EqualMethod,
+            NotEqual           => NotEqualMethod,
+            LessThan           => LessMethod,
+            LessThanOrEqual    => LessOrEqualMethod,
+            GreaterThan        => GreaterMethod,
+            GreaterThanOrEqual => GreaterOrEqualMethod,
+            var _              => throw new ParseException("Unsupported AIP comparator in dynamic evaluation.",
+                                                          node.Position),
+        };
+
+        return Expression.Call(method, ToObject(left), ToObject(right));
+    }
+
+    private Expression MemberAccess(Expression container, string name) {
+        return Expression.Call(MemberMethod, ToObject(container), Expression.Constant(name, typeof(string)));
+    }
+
+    private static Expression DynamicConstant(IValue value) {
+        object? constant = value switch {
+            Text text       => text.Value,
+            Integer integer => integer.Value,
+            Number number   => number.Value,
+            Truth truth     => truth.Value,
+            Null            => null,
+            var _           => throw new ParseException("Unsupported AIP value.", value.Position),
+        };
+
+        return Expression.Constant(constant, typeof(object));
+    }
+
+    private static Expression ToObject(Expression expression) {
+        return expression.Type == typeof(object) ? expression : Expression.Convert(expression, typeof(object));
     }
 }

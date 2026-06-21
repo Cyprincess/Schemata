@@ -32,6 +32,7 @@
     <Project Path="src/Schemata.Event.Skeleton/Schemata.Event.Skeleton.csproj" />
     <Project Path="src/Schemata.Expressions.Aip/Schemata.Expressions.Aip.csproj" />
     <Project Path="src/Schemata.Expressions.Cel/Schemata.Expressions.Cel.csproj" />
+    <Project Path="src/Schemata.Expressions.Order/Schemata.Expressions.Order.csproj" />
     <Project Path="src/Schemata.Expressions.Skeleton/Schemata.Expressions.Skeleton.csproj" />
     <Project Path="src/Schemata.Flow.Event/Schemata.Flow.Event.csproj" />
     <Project Path="src/Schemata.Flow.Foundation/Schemata.Flow.Foundation.csproj" />
@@ -83,6 +84,7 @@
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
     <Project Path="tests/Schemata.Caching.Tests/Schemata.Caching.Tests.csproj" />
+    <Project Path="tests/Schemata.Common.Tests/Schemata.Common.Tests.csproj" />
     <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Cache.Tests/Schemata.Entity.Cache.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests.csproj" />
@@ -92,6 +94,7 @@
     <Project Path="tests/Schemata.Event.RabbitMq.Integration.Tests/Schemata.Event.RabbitMq.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Aip.Tests/Schemata.Expressions.Aip.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Cel.Tests/Schemata.Expressions.Cel.Tests.csproj" />
+    <Project Path="tests/Schemata.Expressions.Order.Tests/Schemata.Expressions.Order.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Skeleton.Tests/Schemata.Expressions.Skeleton.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Tests/Schemata.Flow.Tests.csproj" />
     <Project Path="tests/Schemata.Identity.Tests/Schemata.Identity.Tests.csproj" />

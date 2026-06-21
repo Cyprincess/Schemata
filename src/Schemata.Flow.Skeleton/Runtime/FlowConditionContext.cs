@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Schemata.Flow.Skeleton.Models;
 
@@ -31,4 +32,10 @@ public sealed class FlowConditionContext
     ///     evaluated for outgoing transitions.
     /// </summary>
     public string CurrentState { get; set; } = null!;
+
+    /// <summary>
+    ///     The service provider the engine supplies so a condition can resolve the expression
+    ///     language services it needs; <see langword="null" /> when the engine evaluates without DI.
+    /// </summary>
+    public IServiceProvider? Services { get; set; }
 }

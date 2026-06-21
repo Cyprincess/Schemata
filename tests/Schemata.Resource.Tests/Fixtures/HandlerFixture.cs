@@ -12,6 +12,8 @@ using Moq;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Aip;
+using Schemata.Expressions.Order;
+using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Foundation;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
@@ -118,7 +120,10 @@ public class HandlerFixture
     ) {
         var services = new ServiceCollection();
         services.AddAipExpressions();
-        services.AddSingleton(Options.Create(new SchemataResourceOptions()));
+        services.AddOrderExpressions();
+        var options = new SchemataResourceOptions();
+        options.Expressions.Enable(ExpressionLanguages.Aip);
+        services.AddSingleton(Options.Create(options));
         services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider(NullLoggerFactory.Instance));
         configure?.Invoke(services);
         var sp = services.BuildServiceProvider();

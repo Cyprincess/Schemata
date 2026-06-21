@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Parlot;
+using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests;
@@ -47,7 +47,7 @@ public class CelCompilerShould
     public void Has_OnUndeclaredIdentifier_Throws() {
         var tree = _compiler.Parse("has(missing_field)");
 
-        Assert.Throws<ParseException>(() => _compiler.Compile<Student, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<Student, bool>(tree));
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public class CelCompilerShould
     public void Compile_SnakeCaseVariable_DoesNotBindCamelCaseParameter() {
         var tree = _compiler.Parse("student_profile.full_name == 'Alice'");
 
-        Assert.Throws<ParseException>(() => _compiler.Compile<StudentProfile, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<StudentProfile, bool>(tree));
     }
 
     [Theory]
@@ -160,7 +160,7 @@ public class CelCompilerShould
     public void Compile_LogicalOperators_RejectNonBooleanOperands(string source) {
         var tree = _compiler.Parse(source);
 
-        Assert.Throws<ParseException>(() => _compiler.Compile<Student, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<Student, bool>(tree));
     }
 
     [Theory]

@@ -15,6 +15,9 @@ public sealed class ProcessConfiguration
     /// <summary>CLR type of the <see cref="ProcessDefinition" /> subclass.</summary>
     public Type? DefinitionType { get; set; }
 
+    /// <summary>The default expression language for this process's string conditions.</summary>
+    public string? Language { get; set; }
+
     /// <summary>When <c>true</c>, process operations enforce authorization.</summary>
     public bool RequiresAuthorization { get; set; }
 

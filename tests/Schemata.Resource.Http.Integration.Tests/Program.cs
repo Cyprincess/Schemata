@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Expressions.Aip;
+using Schemata.Expressions.Order;
 using Schemata.Resource.Http.Integration.Tests;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 
@@ -17,6 +19,7 @@ builder.UseSchemata(schema => {
     schema.UseMapster().Map<Trash, Trash>();
 
     var resource = schema.UseResource();
+    resource.UseAip().UseOrdering();
     resource.MapHttp().Use<Student, Student, Student, Student>();
     resource.MapHttp().Use<Trash, Trash, Trash, Trash>();
     resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();

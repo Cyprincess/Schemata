@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Parlot;
+using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests.Conformance;
@@ -13,7 +13,7 @@ public class CelSpecShould
         var compiler = new CelCompiler();
         var tree     = compiler.Parse(source);
         if (expected.Value is CelSpecError error) {
-            var ex = Assert.Throws<ParseException>(() => compiler.Compile<object, object?>(tree));
+            var ex = Assert.Throws<ExpressionException>(() => compiler.Compile<object, object?>(tree));
             Assert.Contains(error.Message, ex.Message);
             return;
         }

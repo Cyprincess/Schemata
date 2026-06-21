@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -23,7 +24,7 @@ public class ProcessRuntimeCacheShould
         var process = await fixture.Runtime.StartProcessInstanceAsync("approval");
         ProcessRuntimeFixture.MutatePersisted(fixture.Persisted[0], "external", "External");
 
-        var reloaded = await fixture.Runtime.ReloadAsync(process.CanonicalName!, default);
+        var reloaded = await fixture.Runtime.ReloadAsync(process.CanonicalName!, CancellationToken.None);
         Assert.Equal("external", reloaded?.StateId);
 
         await fixture.Runtime.CompleteActivityAsync(process.CanonicalName!);

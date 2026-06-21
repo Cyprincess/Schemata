@@ -16,12 +16,29 @@ namespace Schemata.Expressions.Cel;
 /// </summary>
 internal sealed class CelCompileVisitor
 {
+    private static readonly MethodInfo MemberMethod         = Method(nameof(DynamicValues.Member));
+    private static readonly MethodInfo TruthyMethod         = Method(nameof(DynamicValues.Truthy));
+    private static readonly MethodInfo IsPresentMethod      = Method(nameof(DynamicValues.IsPresent));
+    private static readonly MethodInfo EqualMethod          = Method(nameof(DynamicValues.Equal));
+    private static readonly MethodInfo NotEqualMethod       = Method(nameof(DynamicValues.NotEqual));
+    private static readonly MethodInfo LessMethod           = Method(nameof(DynamicValues.Less));
+    private static readonly MethodInfo LessOrEqualMethod    = Method(nameof(DynamicValues.LessOrEqual));
+    private static readonly MethodInfo GreaterMethod        = Method(nameof(DynamicValues.Greater));
+    private static readonly MethodInfo GreaterOrEqualMethod = Method(nameof(DynamicValues.GreaterOrEqual));
+    private static readonly MethodInfo AddMethod            = Method(nameof(DynamicValues.Add));
+    private static readonly MethodInfo SubtractMethod       = Method(nameof(DynamicValues.Subtract));
+    private static readonly MethodInfo MultiplyMethod       = Method(nameof(DynamicValues.Multiply));
+    private static readonly MethodInfo DivideMethod         = Method(nameof(DynamicValues.Divide));
+    private static readonly MethodInfo ModuloMethod         = Method(nameof(DynamicValues.Modulo));
+
     private readonly Stack<Dictionary<string, ParameterExpression>> _scopes = new();
+    private readonly bool                                           _dynamic;
 
     /// <summary>
     ///     Creates a visitor for expressions evaluated against the supplied context type.
     /// </summary>
     public CelCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
+        _dynamic  = typeof(IReadOnlyDictionary<string, object?>).IsAssignableFrom(contextType);
         Parameter = Expression.Parameter(contextType, LowerFirst(contextType.Name));
     }
 
@@ -35,21 +52,25 @@ internal sealed class CelCompileVisitor
     /// </summary>
     public Expression Visit(CelNode node) {
         return node switch {
-            CelConstant constant       => Expression.Constant(constant.Value),
+            CelConstant constant       => _dynamic ? DynamicConstant(constant) : Expression.Constant(constant.Value),
             CelIdentifier identifier   => Visit(identifier),
-            CelMember member           => Access(Visit(member.Target), member.Member),
+            CelMember member           => _dynamic ? MemberAccess(Visit(member.Target), member.Member) : Access(Visit(member.Target), member.Member),
             CelUnary unary             => BuildUnary(unary),
             CelBinary binary           => BuildBinary(binary),
             CelCall call               => BuildCall(call),
-            CelMemberCall call         => BuildMemberCall(call),
-            CelConditional conditional => BuildConditional(conditional),
-            CelList list               => BuildList(list),
-            CelMap map                 => BuildMap(map),
+            CelMemberCall call         => _dynamic ? UnsupportedDynamic("CEL member calls") : BuildMemberCall(call),
+            CelConditional conditional => _dynamic ? UnsupportedDynamic("CEL conditional expressions") : BuildConditional(conditional),
+            CelList list               => _dynamic ? UnsupportedDynamic("CEL list literals") : BuildList(list),
+            CelMap map                 => _dynamic ? UnsupportedDynamic("CEL map literals") : BuildMap(map),
             var _                      => throw new ParseException("Unsupported CEL node.", default),
         };
     }
 
     private Expression Visit(CelIdentifier node) {
+        if (_dynamic) {
+            return MemberAccess(Parameter, node.Name);
+        }
+
         foreach (var scope in _scopes) {
             if (scope.TryGetValue(node.Name, out var local)) {
                 return local;
@@ -68,6 +89,10 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildUnary(CelUnary node) {
+        if (_dynamic) {
+            return BuildDynamicUnary(node);
+        }
+
         var operand = Visit(node.Operand);
         return node.Operator switch {
             "!"   => Expression.Not(ToBoolean(operand)),
@@ -77,6 +102,10 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildBinary(CelBinary node) {
+        if (_dynamic) {
+            return BuildDynamicBinary(node);
+        }
+
         var left  = Visit(node.Left);
         var right = Visit(node.Right);
 
@@ -100,6 +129,10 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildCall(CelCall node) {
+        if (_dynamic) {
+            return BuildDynamicCall(node);
+        }
+
         if (node.Name == "has" && node.Args.Count == 1) {
             return BuildHas(node.Args[0]);
         }
@@ -418,6 +451,80 @@ internal sealed class CelCompileVisitor
 
     private static bool IsRegexMatch(string input, string pattern) {
         return Regex.IsMatch(input, pattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
+    }
+
+    private static MethodInfo Method(string name) {
+        return typeof(DynamicValues).GetMethod(name)!;
+    }
+
+    private static Expression DynamicConstant(CelConstant value) {
+        return Expression.Constant(value.Value, typeof(object));
+    }
+
+    private static Expression MemberAccess(Expression container, string name) {
+        return Expression.Call(MemberMethod, ToObject(container), Expression.Constant(name, typeof(string)));
+    }
+
+    private Expression BuildDynamicUnary(CelUnary node) {
+        var operand = Visit(node.Operand);
+        return node.Operator switch {
+            "!"   => Expression.Not(AsBoolean(operand)),
+            "-"   => Expression.Call(MultiplyMethod, Expression.Constant((object)-1.0, typeof(object)), ToObject(operand)),
+            var _ => throw new ParseException($"Unsupported CEL unary operator '{node.Operator}' in dynamic evaluation.",
+                                             default),
+        };
+    }
+
+    private Expression BuildDynamicBinary(CelBinary node) {
+        var left  = Visit(node.Left);
+        var right = Visit(node.Right);
+
+        return node.Operator switch {
+            "&&" => Expression.AndAlso(AsBoolean(left), AsBoolean(right)),
+            "||" => Expression.OrElse(AsBoolean(left), AsBoolean(right)),
+            "+"  => DynamicBinary(AddMethod, left, right),
+            "-"  => DynamicBinary(SubtractMethod, left, right),
+            "*"  => DynamicBinary(MultiplyMethod, left, right),
+            "/"  => DynamicBinary(DivideMethod, left, right),
+            "%"  => DynamicBinary(ModuloMethod, left, right),
+            "==" => DynamicBinary(EqualMethod, left, right),
+            "!=" => DynamicBinary(NotEqualMethod, left, right),
+            "<"  => DynamicBinary(LessMethod, left, right),
+            "<=" => DynamicBinary(LessOrEqualMethod, left, right),
+            ">"  => DynamicBinary(GreaterMethod, left, right),
+            ">=" => DynamicBinary(GreaterOrEqualMethod, left, right),
+            "in" => throw new ParseException("CEL membership is not supported in dynamic evaluation.", default),
+            var _ => throw new ParseException($"Unsupported CEL binary operator '{node.Operator}' in dynamic evaluation.",
+                                             default),
+        };
+    }
+
+    private Expression BuildDynamicCall(CelCall node) {
+        if (node.Name == "has" && node.Args.Count == 1) {
+            return Expression.Call(IsPresentMethod, ToObject(Visit(node.Args[0])));
+        }
+
+        throw new ParseException($"CEL function '{node.Name}' is not supported in dynamic evaluation.", default);
+    }
+
+    private static Expression DynamicBinary(MethodInfo method, Expression left, Expression right) {
+        return Expression.Call(method, ToObject(left), ToObject(right));
+    }
+
+    private static Expression AsBoolean(Expression expression) {
+        if (expression.Type == typeof(bool)) {
+            return expression;
+        }
+
+        return Expression.Call(TruthyMethod, ToObject(expression));
+    }
+
+    private static Expression ToObject(Expression expression) {
+        return expression.Type == typeof(object) ? expression : Expression.Convert(expression, typeof(object));
+    }
+
+    private static Expression UnsupportedDynamic(string construct) {
+        throw new ParseException($"{construct} are not supported in dynamic evaluation.", default);
     }
 
     private static string LowerFirst(string name) {

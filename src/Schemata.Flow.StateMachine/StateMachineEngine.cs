@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,12 @@ namespace Schemata.Flow.StateMachine;
 /// <summary>Runs supported BPMN process definitions as single-token state machines.</summary>
 public sealed class StateMachineEngine : IFlowRuntime
 {
+    private readonly IServiceProvider? _services;
+
+    /// <summary>Creates the engine, optionally bound to a service provider for condition evaluation.</summary>
+    /// <param name="services">The service provider that supplies expression-language services to conditions.</param>
+    public StateMachineEngine(IServiceProvider? services = null) { _services = services; }
+
     #region IFlowRuntime Members
 
     public string EngineName => SchemataConstants.FlowEngines.StateMachine;
@@ -176,7 +183,7 @@ public sealed class StateMachineEngine : IFlowRuntime
 
     #endregion
 
-    private static async ValueTask<SequenceFlow?> ResolveAutoFlowAsync(
+    private async ValueTask<SequenceFlow?> ResolveAutoFlowAsync(
         ProcessDefinition           definition,
         FlowElement                 source,
         Dictionary<string, object?> variables
@@ -207,6 +214,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             Instance     = new() { State = source.Name, Variables = variables },
             Variables    = variables,
             CurrentState = source.Name,
+            Services     = _services,
         };
 
         SequenceFlow? @default = null;
@@ -228,7 +236,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return @default;
     }
 
-    private static async ValueTask<SequenceFlow?> ResolveEventBasedGatewayFlowAsync(
+    private async ValueTask<SequenceFlow?> ResolveEventBasedGatewayFlowAsync(
         ProcessDefinition           definition,
         EventBasedGateway           gateway,
         IEventDefinition            trigger,
@@ -251,7 +259,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return null;
     }
 
-    private static async ValueTask<SequenceFlow?> ResolveCatchEventFlowAsync(
+    private async ValueTask<SequenceFlow?> ResolveCatchEventFlowAsync(
         ProcessDefinition           definition,
         FlowEvent                   catchEvent,
         Dictionary<string, object?> variables
@@ -272,6 +280,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             Instance     = new() { State = catchEvent.Name, Variables = variables },
             Variables    = variables,
             CurrentState = catchEvent.Name,
+            Services     = _services,
         };
 
         SequenceFlow? @default = null;
@@ -313,7 +322,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return null;
     }
 
-    private static async ValueTask<SequenceFlow?> ResolveGatewayFlowAsync(
+    private async ValueTask<SequenceFlow?> ResolveGatewayFlowAsync(
         ProcessDefinition           definition,
         Gateway                     gateway,
         Dictionary<string, object?> variables
@@ -332,6 +341,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             Instance     = new() { State = gateway.Name, Variables = variables },
             Variables    = variables,
             CurrentState = gateway.Name,
+            Services     = _services,
         };
 
         SequenceFlow? @default = null;
@@ -350,7 +360,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return @default;
     }
 
-    private static async
+    private async
         ValueTask<(string stateId, string? stateName, string? waitingAtId, string? waitingAtName, bool isComplete)>
         ResolveTargetStateAsync(ProcessDefinition definition, FlowElement target, ProcessInstance instance, HashSet<FlowElement>? visited = null) {
         visited ??= [];
@@ -396,7 +406,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return string.IsNullOrEmpty(process.Variables) ? new() : VariableSerializer.Deserialize(process.Variables!);
     }
 
-    private static async ValueTask<ProcessInstance> ApplyTargetStateAsync(
+    private async ValueTask<ProcessInstance> ApplyTargetStateAsync(
         ProcessInstance   instance,
         ProcessDefinition definition,
         FlowElement       target

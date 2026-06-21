@@ -67,7 +67,7 @@ public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
                 ["processName"] = process.CanonicalName, ["timerDef"] = timerDef,
             };
 
-            timerJob = new SchemataJob {
+            timerJob = new() {
                 Name   = JobName(process, instance.WaitingAtId),
                 JobKey = typeof(FlowTimerJob).FullName,
                 State  = JobState.Active,
