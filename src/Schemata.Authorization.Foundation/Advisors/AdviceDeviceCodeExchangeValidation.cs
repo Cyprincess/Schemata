@@ -39,11 +39,11 @@ public static class AdviceDeviceCodeExchangeValidation
 ///     <c>access_denied</c> if the user denied, and <c>expired_token</c> if the device code
 ///     has expired. The token must be in <c>Authorized</c> status with a subject to proceed.
 /// </remarks>
-public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken>(TimeProvider? timeProvider = null) : IDeviceCodeExchangeAdvisor<TApp, TToken>
+public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken>(TimeProvider? time = null) : IDeviceCodeExchangeAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IDeviceCodeExchangeAdvisor<TApp,TToken> Members
 

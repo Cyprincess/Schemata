@@ -30,11 +30,11 @@ public static class AdviceRefreshTokenValidation
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <typeparam name="TToken">The token entity type.</typeparam>
 /// <seealso cref="AdviceCodeExchangeValidation{TApp, TToken}" />
-public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? timeProvider = null) : IRefreshTokenAdvisor<TApp, TToken>
+public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? time = null) : IRefreshTokenAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IRefreshTokenAdvisor<TApp,TToken> Members
 

@@ -24,19 +24,19 @@ namespace Schemata.Event.Foundation;
 /// <param name="services">Root service provider for creating dispatcher scopes.</param>
 /// <param name="publisher">Broker replay publisher used for pending outbox rows.</param>
 /// <param name="logger">Logger for dispatch failures.</param>
-/// <param name="timeProvider">Clock used for claim timeout checks.</param>
+/// <param name="time">Clock used for claim timeout checks.</param>
 public sealed class EventOutboxDispatcher(
     IServiceProvider                services,
     IEventOutboxPublisher?          publisher    = null,
     ILogger<EventOutboxDispatcher>? logger       = null,
-    TimeProvider?                   timeProvider = null
+    TimeProvider?                   time = null
 ) : BackgroundService
 {
     private const           int      BatchSize    = 100;
     private static readonly TimeSpan Interval     = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ClaimTimeout = TimeSpan.FromMinutes(5);
     private readonly        SemaphoreSlim _pending = new(0, int.MaxValue);
-    private readonly        TimeProvider  _time    = timeProvider ?? TimeProvider.System;
+    private readonly        TimeProvider  _time    = time ?? TimeProvider.System;
 
     /// <summary>Wakes the dispatch loop after a publisher commits a pending outbox row.</summary>
     public void NotifyPending() {

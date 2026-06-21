@@ -80,7 +80,7 @@ Each is skipped when the `Operations` whitelist excludes it or the entity alread
 | --- | --- | --- | --- |
 | `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException` |
 | `:expunge` | `POST /v1/{collection}/{name}:expunge` | `ExpungeHandler<TEntity>` | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException` |
-| `:purge` | `POST /v1/{collection}:purge` | `PurgeHandler<TEntity>` | Collection-scoped AIP-165 purge through `IOperationDispatcher`; the dispatcher and its `PurgeOperationHandler<TEntity>` are registered only when the built-in purge method is active |
+| `:purge` | `POST /v1/{collection}:purge` | `PurgeHandler<TEntity>` | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the job and its `ScheduledJobBinding` are registered only when the built-in purge method is active, and the handler throws `FAILED_PRECONDITION` when no scheduler is enabled |
 
 ## Extension points
 

@@ -1,12 +1,8 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Schemata.Abstractions;
-using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Scheduling.Foundation.Internal;
@@ -31,23 +27,11 @@ public sealed class SchemataSchedulingFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
-        services.AddSingleton<IHostedService, ScheduledJobRegistryInitializer>();
         services.TryAddSingleton<JobExecutionDispatcher>();
-        services.AddHostedService(sp => sp.GetRequiredService<JobExecutionDispatcher>());
         services.TryAddSingleton<IScheduler, DefaultScheduler>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IJobLifecycleObserver, SchemataJobAuditObserver>());
+
         services.AddHostedService<SchedulingInitializer>();
-    }
-
-    private sealed class ScheduledJobRegistryInitializer(IScheduledJobRegistry registry) : IHostedService
-    {
-        public Task StartAsync(CancellationToken cancellationToken) {
-            registry.RegisterAll(AppDomainTypeCache.Types.Values);
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken) {
-            return Task.CompletedTask;
-        }
+        services.AddHostedService(sp => sp.GetRequiredService<JobExecutionDispatcher>());
     }
 }

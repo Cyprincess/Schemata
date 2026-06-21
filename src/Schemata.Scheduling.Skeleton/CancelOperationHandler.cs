@@ -18,10 +18,10 @@ namespace Schemata.Scheduling.Skeleton;
 public sealed class CancelOperationHandler(
     IRepository<SchemataJobExecution> executions,
     IScheduler                        scheduler,
-    TimeProvider?                     timeProvider = null
+    TimeProvider?                     time = null
 ) : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation>
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation> Members
 

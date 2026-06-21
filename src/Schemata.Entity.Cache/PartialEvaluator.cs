@@ -71,7 +71,7 @@ public static class PartialEvaluator
     {
         private bool _cannotEvaluate;
 
-        public HashSet<Expression> Candidates { get; } = new();
+        public HashSet<Expression> Candidates { get; } = [];
 
         public override Expression? Visit(Expression? node) {
             if (node is null) {

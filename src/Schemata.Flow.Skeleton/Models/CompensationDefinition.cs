@@ -2,14 +2,14 @@ namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
 ///     A BPMN Compensation event definition - triggers or throws compensation
-///     for the activity referenced by <see cref="ActivityRef" />.
+///     for the activity referenced by <see cref="Activity" />.
 /// </summary>
 public sealed class CompensationDefinition : IEventDefinition
 {
     /// <summary>
     ///     The activity whose compensation handler should be invoked.
     /// </summary>
-    public Activity? ActivityRef { get; set; }
+    public Activity? Activity { get; set; }
 
     #region IEventDefinition Members
 

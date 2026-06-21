@@ -15,11 +15,11 @@ public sealed class SchedulingBuilder
     /// <summary>Initializes a new <see cref="SchedulingBuilder" /> bound to the given service collection.</summary>
     /// <param name="schemata">The <see cref="SchemataOptions" />.</param>
     /// <param name="services">The service collection that receives jobs and options.</param>
-    /// <param name="timeProvider">Clock that anchors relative one-time delays; <c>null</c> uses the system clock.</param>
-    public SchedulingBuilder(SchemataOptions schemata, IServiceCollection services, TimeProvider? timeProvider = null) {
+    /// <param name="time">Clock that anchors relative one-time delays; <c>null</c> uses the system clock.</param>
+    public SchedulingBuilder(SchemataOptions schemata, IServiceCollection services, TimeProvider? time = null) {
         Schemata = schemata;
         Services = services;
-        _time    = timeProvider ?? TimeProvider.System;
+        _time    = time ?? TimeProvider.System;
     }
 
     private SchemataOptions Schemata { get; }
@@ -34,6 +34,16 @@ public sealed class SchedulingBuilder
     public void AddFeature<T>()
         where T : ISimpleFeature {
         Schemata.AddFeature<T>();
+    }
+
+    /// <summary>
+    ///     Registers <typeparamref name="T" /> for keying without a schedule, so a job triggered
+    ///     on-demand resolves its stable key after a restart.
+    /// </summary>
+    public SchedulingBuilder WithJob<T>()
+        where T : class, IScheduledJob {
+        Services.AddScheduledJob<T>();
+        return this;
     }
 
     /// <summary>Registers <typeparamref name="T" /> against the supplied <see cref="IScheduleDefinition" />.</summary>

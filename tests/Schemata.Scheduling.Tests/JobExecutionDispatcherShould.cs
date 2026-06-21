@@ -187,6 +187,100 @@ public class JobExecutionDispatcherShould
         Assert.Contains("jobs.missing", execution.RecentError);
     }
 
+    [Fact]
+    public async Task DispatchPendingAsync_JobBodyThrows_MarksFailedAndNotifiesObserver() {
+        var execution = new SchemataJobExecution {
+            Uid       = Identifiers.NewUid(),
+            Job       = "jobs/throwing",
+            JobKey    = typeof(ThrowingJob).FullName,
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionsWith(execution);
+
+        var observer = new Mock<IJobLifecycleObserver>();
+        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                               It.IsAny<CancellationToken>()))
+                .ReturnsAsync(JobTriggerOutcome.Proceed);
+        observer.Setup(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                            It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<ThrowingJob>();
+
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(observer.Object)
+                                              .AddTransient<ThrowingJob>()
+                                              .BuildServiceProvider();
+
+        var dispatcher = new JobExecutionDispatcher(services);
+
+        await dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(ExecutionState.Failed, execution.State);
+        Assert.Contains("job body failed", execution.RecentError);
+        observer.Verify(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(),
+                                             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(JobTriggerOutcome.Block, ExecutionState.Blocked)]
+    [InlineData(JobTriggerOutcome.Skip, ExecutionState.Skipped)]
+    public async Task DispatchPendingAsync_ObserverTerminalOutcome_PersistsStateWithoutRunning(
+        JobTriggerOutcome outcome,
+        ExecutionState    state
+    ) {
+        var execution = new SchemataJobExecution {
+            Uid       = Identifiers.NewUid(),
+            Job       = "jobs/terminal",
+            JobKey    = typeof(RecordingJob).FullName,
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionsWith(execution);
+
+        var observer = new Mock<IJobLifecycleObserver>();
+        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(),
+                                               It.IsAny<CancellationToken>()))
+                .ReturnsAsync(outcome);
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<RecordingJob>();
+
+        var ran = new RunSignal();
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(observer.Object)
+                                              .AddSingleton(ran)
+                                              .AddTransient<RecordingJob>()
+                                              .BuildServiceProvider();
+
+        var dispatcher = new JobExecutionDispatcher(services);
+
+        await dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(state, execution.State);
+        Assert.False(ran.Done.Task.IsCompleted);
+    }
+
+    private static Mock<IRepository<SchemataJobExecution>> ExecutionsWith(SchemataJobExecution execution) {
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        executions.Setup(r => r.ListAsync(
+                             It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns((
+                                   Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
+                                   CancellationToken                                                        _
+                               )
+                               => ToAsync(query(new[] { execution }.AsQueryable())));
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        return executions;
+    }
+
     private static async IAsyncEnumerable<SchemataJobExecution> ToAsync(IEnumerable<SchemataJobExecution> rows) {
         foreach (var row in rows) {
             yield return row;
@@ -263,6 +357,21 @@ public class JobExecutionDispatcherShould
     private sealed class RunSignal
     {
         public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    #endregion
+
+    #region Nested type: ThrowingJob
+
+    private sealed class ThrowingJob : IScheduledJob
+    {
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            throw new InvalidOperationException("job body failed");
+        }
+
+        #endregion
     }
 
     #endregion

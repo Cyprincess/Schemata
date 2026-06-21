@@ -43,10 +43,10 @@ public static class AdviceAuthorizePrompt
 ///     exceeds the specified age.
 /// </remarks>
 /// <seealso cref="AdviceAuthorizeConsent{TApp, TAuth}" />
-public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? timeProvider = null) : IAuthorizeAdvisor<TApp>
+public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IAuthorizeAdvisor<TApp> Members
 

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Push Skeleton</Description>
+    <PackageTags>application;business;framework;push;notification;broadcast</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+    <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
+    <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
+</Project>

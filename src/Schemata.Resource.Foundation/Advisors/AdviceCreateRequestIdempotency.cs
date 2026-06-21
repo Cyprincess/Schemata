@@ -38,8 +38,8 @@ public static class AdviceCreateRequestIdempotency
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
 /// <typeparam name="TDetail">The detail DTO type.</typeparam>
-public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>(ICacheProvider cache, TimeProvider? timeProvider = null)
-    : AdviceRequestIdempotencyBase<TEntity, TRequest, TDetail>(cache, timeProvider), IResourceCreateRequestAdvisor<TEntity, TRequest>
+public sealed class AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>(ICacheProvider cache, TimeProvider? time = null)
+    : AdviceRequestIdempotencyBase<TEntity, TRequest, TDetail>(cache, time), IResourceCreateRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName

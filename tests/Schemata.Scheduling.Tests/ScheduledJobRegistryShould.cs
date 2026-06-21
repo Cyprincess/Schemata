@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Scheduling.Foundation.Internal;
@@ -38,6 +39,37 @@ public class ScheduledJobRegistryShould
         Assert.Null(registry.ResolveKey(typeof(NonJob)));
     }
 
+    [Fact]
+    public void Resolve_ConsultsResolver_OnMiss_AndCachesResult() {
+        var resolver = new CountingResolver();
+        IScheduledJobRegistry registry = new DefaultScheduledJobRegistry([resolver]);
+
+        Assert.Equal(typeof(GenericJob<int>), registry.Resolve("generic:int"));
+        Assert.Equal(typeof(GenericJob<int>), registry.Resolve("generic:int"));
+
+        // The miss is resolved once and cached; the resolver is not consulted again.
+        Assert.Equal(1, resolver.ResolveTypeCalls);
+    }
+
+    [Fact]
+    public void ResolveKey_ConsultsResolver_OnMiss_AndCachesResult() {
+        var resolver = new CountingResolver();
+        IScheduledJobRegistry registry = new DefaultScheduledJobRegistry([resolver]);
+
+        Assert.Equal("generic:int", registry.ResolveKey(typeof(GenericJob<int>)));
+        Assert.Equal("generic:int", registry.ResolveKey(typeof(GenericJob<int>)));
+
+        Assert.Equal(1, resolver.ResolveKeyCalls);
+    }
+
+    [Fact]
+    public void Resolve_ReturnsNull_WhenNoResolverOwnsKey() {
+        IScheduledJobRegistry registry = new DefaultScheduledJobRegistry([new CountingResolver()]);
+
+        Assert.Null(registry.Resolve("unknown:key"));
+        Assert.Null(registry.ResolveKey(typeof(NonJob)));
+    }
+
     #region Nested type: AttributeKeyJob
 
     [ScheduledJob("jobs:attribute")]
@@ -68,6 +100,44 @@ public class ScheduledJobRegistryShould
     #region Nested type: NonJob
 
     private sealed class NonJob;
+
+    #endregion
+
+    #region Nested type: GenericJob
+
+    private sealed class GenericJob<T> : IScheduledJob
+    {
+        #region IScheduledJob Members
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: CountingResolver
+
+    private sealed class CountingResolver : IScheduledJobKeyResolver
+    {
+        public int ResolveTypeCalls { get; private set; }
+
+        public int ResolveKeyCalls { get; private set; }
+
+        #region IScheduledJobKeyResolver Members
+
+        public Type? ResolveType(string key) {
+            ResolveTypeCalls++;
+            return key == "generic:int" ? typeof(GenericJob<int>) : null;
+        }
+
+        public string? ResolveKey(Type jobType) {
+            ResolveKeyCalls++;
+            return jobType == typeof(GenericJob<int>) ? "generic:int" : null;
+        }
+
+        #endregion
+    }
 
     #endregion
 }

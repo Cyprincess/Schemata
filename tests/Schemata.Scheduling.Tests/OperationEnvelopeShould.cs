@@ -1,9 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -97,72 +93,4 @@ public class OperationEnvelopeShould
         Assert.True(output.GetProperty("ok").GetBoolean());
     }
 
-    [Fact]
-    public async Task Dispatch_ReturnsEnvelope() {
-        var execution = new SchemataJobExecution {
-            Name          = "op",
-            CanonicalName = "operations/op",
-            Method        = "purge",
-            State         = ExecutionState.Pending,
-            StartTime     = DateTime.UtcNow,
-        };
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IScheduler>(new EchoScheduler(execution));
-        services.AddSingleton(new OperationDescriptor("purge", "purge", typeof(SampleArgs)));
-        services.AddSchedulerOperationDispatcher();
-
-        var provider   = services.BuildServiceProvider();
-        var dispatcher = provider.GetRequiredService<IOperationDispatcher>();
-
-        var operation = await dispatcher.DispatchAsync("purge", new SampleArgs(), CancellationToken.None);
-
-        Assert.IsType<Operation>(operation);
-        Assert.Equal("operations/op", operation.CanonicalName);
-        Assert.False(operation.Done);
-        Assert.Equal("purge", operation.Metadata?.Method);
-    }
-
-    #region Nested type: EchoScheduler
-
-    private sealed class EchoScheduler(SchemataJobExecution execution) : IScheduler
-    {
-        #region IScheduler Members
-
-        public Task StartAsync(CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task StopAsync(CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task ScheduleAsync(SchemataJob job, CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task ScheduleAsync(
-            SchemataJob                           job,
-            IReadOnlyDictionary<string, object?>? variables,
-            CancellationToken                     ct
-        ) {
-            return Task.CompletedTask;
-        }
-
-        public Task UnscheduleAsync(string job, CancellationToken ct) { return Task.CompletedTask; }
-
-        public Task<SchemataJobExecution> TriggerAsync<TJob>(JobContext context, CancellationToken ct)
-            where TJob : class, IScheduledJob {
-            execution.Method = context.Method;
-            return Task.FromResult(execution);
-        }
-
-        public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
-            return Task.CompletedTask;
-        }
-
-        #endregion
-    }
-
-    #endregion
-
-    #region Nested type: SampleArgs
-
-    private sealed class SampleArgs;
-
-    #endregion
 }

@@ -120,7 +120,6 @@ The broadcast notification fan-out layer.
 | [Overview](push/overview.md) | `IPushService`, `IPushTransport`, targets, startup |
 | [Dispatch](push/dispatch.md) | Fan-out, self-filtering, streaming order, isolation, the advisor |
 | [Subscriptions](push/subscriptions.md) | `SchemataPushSubscription`, the manager, ownership |
-| [Scheduling](push/scheduling.md) | Durable scheduled dispatch over `IOperationDispatcher` |
 
 ## Flow
 

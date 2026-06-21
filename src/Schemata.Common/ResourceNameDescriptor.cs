@@ -77,7 +77,7 @@ public sealed class ResourceNameDescriptor
 
         var placeholderCount = _segments.Count(s => s.IsPlaceholder);
         if (placeholderCount <= 1) {
-            _parentSegments = Array.Empty<Segment>();
+            _parentSegments = [];
         } else if (leaf.IsPlaceholder) {
             _parentSegments = SliceSegments(_segments, 0, _segments.Length - 2);
         } else {
@@ -364,7 +364,7 @@ public sealed class ResourceNameDescriptor
     }
 
     private static Segment[] SliceSegments(Segment[] source, int start, int count) {
-        if (count <= 0) return Array.Empty<Segment>();
+        if (count <= 0) return [];
         var result = new Segment[count];
         Array.Copy(source, start, result, 0, count);
         return result;

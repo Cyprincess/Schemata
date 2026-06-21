@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Push Scheduling Bridge</Description>
+    <PackageTags>application;business;framework;push;notification;schedule;job;lro</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Scheduling.Skeleton;
@@ -10,11 +11,13 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation.Internal;
 
 /// <summary>
-///     In-memory <see cref="IScheduler" />. Cron/periodic fires advance an in-process timer
-///     loop and delegate audit through <see cref="IJobLifecycleObserver" /> implementations.
-///     <see cref="TriggerAsync{TJob}" /> persists a <see cref="SchemataJobExecution" /> row
-///     and hands execution to <see cref="JobExecutionDispatcher" /> when one is registered;
-///     fixture setups that omit a dispatcher fall back to the in-process timer.
+///     In-memory <see cref="IScheduler" /> acting as a materializer and timer. Every fire — cron,
+///     periodic, one-time, <see cref="TriggerAsync{TJob}" />, or durable operation — persists a
+///     <see cref="ExecutionState.Pending" /> <see cref="SchemataJobExecution" /> row up front,
+///     carrying its due time in <see cref="SchemataJobExecution.StartTime" />. An in-memory timer
+///     signals <see cref="JobExecutionDispatcher" /> when a row comes due; the dispatcher is the
+///     single executor that runs the job body and advances recurring schedules. The scheduler never
+///     runs a job body itself.
 /// </summary>
 public sealed partial class DefaultScheduler : IScheduler
 {
@@ -30,12 +33,12 @@ public sealed partial class DefaultScheduler : IScheduler
         IServiceProvider                    services,
         IOptions<SchemataSchedulingOptions> options,
         ILogger<DefaultScheduler>?          logger       = null,
-        TimeProvider?                       timeProvider = null
+        TimeProvider?                       time = null
     ) {
         _services = services;
         _options  = options;
         _logger   = logger;
-        _time     = timeProvider ?? TimeProvider.System;
+        _time     = time ?? TimeProvider.System;
     }
 
     #region IScheduler Members
@@ -69,18 +72,20 @@ public sealed partial class DefaultScheduler : IScheduler
 
     #endregion
 
+    /// <summary>Signals the dispatcher that a row has come due, when one is registered.</summary>
+    private void SignalDispatcher() {
+        _services.GetService<JobExecutionDispatcher>()?.NotifyPending();
+    }
+
     private sealed class ScheduledEntry
     {
-        public ScheduledEntry(SchemataJob job, CancellationTokenSource cts, JobContext? preparedContext = null) {
-            Job             = job;
-            Cts             = cts;
-            PreparedContext = preparedContext;
+        public ScheduledEntry(SchemataJob job, CancellationTokenSource cts) {
+            Job = job;
+            Cts = cts;
         }
 
         public SchemataJob             Job { get; }
 
         public CancellationTokenSource Cts { get; }
-
-        public JobContext?             PreparedContext { get; }
     }
 }

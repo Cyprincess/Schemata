@@ -29,10 +29,10 @@ public sealed class DistributedCacheProvider : ICacheProvider
 
     /// <summary>Initializes a new instance backed by the specified distributed cache.</summary>
     /// <param name="cache">The distributed cache backing store.</param>
-    /// <param name="timeProvider">Clock used to compute absolute expirations; defaults to the system clock.</param>
-    public DistributedCacheProvider(IDistributedCache cache, TimeProvider? timeProvider = null) {
+    /// <param name="time">Clock used to compute absolute expirations; defaults to the system clock.</param>
+    public DistributedCacheProvider(IDistributedCache cache, TimeProvider? time = null) {
         _cache = cache;
-        _time  = timeProvider ?? TimeProvider.System;
+        _time  = time ?? TimeProvider.System;
     }
 
     #region ICacheProvider Members

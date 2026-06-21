@@ -35,10 +35,10 @@ public class TokenService
     ///     validation parameters.
     /// </summary>
     /// <param name="options">Server authorization options.</param>
-    /// <param name="timeProvider">Clock for token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
-    public TokenService(IOptions<SchemataAuthorizationOptions> options, TimeProvider? timeProvider = null) {
+    /// <param name="time">Clock for token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
+    public TokenService(IOptions<SchemataAuthorizationOptions> options, TimeProvider? time = null) {
         _options   = options.Value;
-        _time      = timeProvider ?? TimeProvider.System;
+        _time      = time ?? TimeProvider.System;
         _algorithm = _options.SigningAlgorithm!;
 
         _signing = new(_options.SigningKey!, _algorithm);

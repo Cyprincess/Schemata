@@ -1,9 +1,7 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Skeleton;
@@ -33,53 +31,81 @@ public sealed partial class DefaultScheduler
             Variables    = JobVariableSerializer.Serialize(context.Variables),
         };
 
+        // A trigger is a one-shot occurrence: persist its Pending row synchronously so the returned
+        // execution is immediately addressable as operations/{uid}. StartTime defaults to now (run
+        // ASAP); a future StartTime defers the fire, so the same path schedules a future operation.
         context.ExecutionUid ??= Identifiers.NewUid();
         context.StartTime    ??= _time.GetUtcNow().UtcDateTime;
         context.JobKey       ??= jobKey;
+        job.NextRunTime        = context.StartTime;
         context.Execution      = BuildExecution(job, context);
 
-        await PersistTriggeredExecutionAsync(context.Execution, ct);
-        await NotifyTriggeredAsync(job, context, ct);
+        await PersistExecutionAsync(context.Execution, ct);
 
-        // Single-track execution: when a dispatcher is registered it owns the run; otherwise
-        // the in-process timer fires the job locally. Hosts that register both would otherwise
-        // see double-dispatch (one fire via the in-process timer + one via the dispatcher drain).
-        var dispatcher = _services.GetService<JobExecutionDispatcher>();
-        if (dispatcher is not null) {
-            dispatcher.NotifyPending();
+        if (context.StartTime.Value <= _time.GetUtcNow().UtcDateTime) {
+            // Due now: wake the dispatcher to drain the row immediately.
+            SignalDispatcher();
         } else {
-            await ScheduleAsync(job, context, ct);
+            // Future: arm a timer that signals at the due time. The Pending row is the durable
+            // backstop, so the dispatcher's poll still fires it after a restart that loses the timer.
+            await ArmOneShotTimerAsync(job);
         }
 
         return context.Execution;
     }
 
-    public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
-        // A reloaded operation already has its execution row persisted, so it is armed
-        // with the prepared context (no fresh OnTriggered persist); ordinary jobs reschedule
-        // with no prepared context and build a fresh execution on fire.
-        return ScheduleAsync(job, preparedContext, ct);
+    private async Task ArmOneShotTimerAsync(SchemataJob job) {
+        if (string.IsNullOrWhiteSpace(job.Name)) {
+            // Untracked one-shot: rely on the dispatcher poll to drain it when it comes due.
+            return;
+        }
+
+        ScheduledEntry entry;
+        await _lock.WaitAsync();
+        try {
+            if (_stopped) {
+                return;
+            }
+
+            if (_entries.TryRemove(job.Name, out var existing)) {
+                await existing.Cts.CancelAsync();
+                existing.Cts.Dispose();
+            }
+
+            entry              = new(job, new());
+            _entries[job.Name] = entry;
+        } finally {
+            _lock.Release();
+        }
+
+        StartTimer(entry);
     }
 
-    private static SchemataJobExecution BuildExecution(SchemataJob job, JobContext context) {
+    public Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
+        // A reloaded job re-arms its timer and re-materializes (or adopts) its next Pending row;
+        // the durable execution row, not an in-memory context, is the source of truth on restart.
+        return ScheduleAsync(job, ct);
+    }
+
+    internal static SchemataJobExecution BuildExecution(SchemataJob job, JobContext context) {
         var uid        = context.ExecutionUid!.Value;
         var name       = uid.ToString("n");
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
 
         return new() {
-            Uid               = uid,
-            Name              = name,
-            CanonicalName     = $"{descriptor.Collection}/{name}",
-            Job               = job.Name,
-            Method            = context.Method,
-            JobKey            = context.JobKey ?? job.JobKey,
-            ArgsJson          = context.ArgsJson ?? job.ArgsJson,
-            State             = ExecutionState.Pending,
-            StartTime         = context.StartTime!.Value,
+            Uid           = uid,
+            Name          = name,
+            CanonicalName = $"{descriptor.Collection}/{name}",
+            Job           = job.Name,
+            Method        = context.Method,
+            JobKey        = context.JobKey ?? job.JobKey,
+            ArgsJson      = context.ArgsJson ?? job.ArgsJson,
+            State         = ExecutionState.Pending,
+            StartTime     = context.StartTime!.Value,
         };
     }
 
-    private async Task PersistTriggeredExecutionAsync(SchemataJobExecution execution, CancellationToken ct) {
+    private async Task PersistExecutionAsync(SchemataJobExecution execution, CancellationToken ct) {
         using var scope      = _services.CreateScope();
         var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
         if (executions is null) {
@@ -89,26 +115,5 @@ public sealed partial class DefaultScheduler
         await using var uow = executions.Begin();
         await executions.AddAsync(execution, ct);
         await uow.CommitAsync(ct);
-    }
-
-    private async Task NotifyTriggeredAsync(SchemataJob job, JobContext context, CancellationToken ct) {
-        using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IJobLifecycleObserver>().ToList();
-
-        var outcome = JobTriggerOutcome.Proceed;
-        foreach (var observer in observers) {
-            try {
-                var result = await observer.OnTriggeredAsync(job, context, ct);
-                if (result > outcome) {
-                    outcome = result;
-                }
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IJobLifecycleObserver.OnTriggeredAsync threw while preparing execution '{ExecutionUid}'.",
-                                    context.ExecutionUid);
-            }
-        }
-
-        context.TriggerOutcome = outcome;
     }
 }

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Push.Skeleton\Schemata.Push.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

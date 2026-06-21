@@ -18,28 +18,12 @@ namespace Schemata.Resource.Tests.ResourceMethodHandler;
 
 public class PurgeHandlerShould
 {
-    [Fact]
-    public async Task Invoke_PersistsRequestData_NotClosure() {
-        var dispatcher = new CapturingOperationDispatcher();
-        var services   = Services(dispatcher);
-        var handler    = new PurgeHandler<TrashStudent>(services);
-
-        var operation = await handler.InvokeAsync(null, new() { Filter = "*", Force = true }, null,
-                                                  Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
-
-        Assert.Equal("operations/test-operation", operation.CanonicalName);
-        Assert.Equal($"{Verbs.Purge}:{ResourceNameDescriptor.ForType<TrashStudent>().Collection}", dispatcher.Key);
-        var args = Assert.IsType<PurgeOperationArgs>(dispatcher.Args);
-        Assert.Equal("*", args.Filter);
-        Assert.True(args.Force);
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
     public async Task Invoke_EmptyFilter_ThrowsValidationException(string? filter) {
-        var services = Services(new CapturingOperationDispatcher());
+        var services = Services();
         var handler  = new PurgeHandler<TrashStudent>(services);
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() => handler.InvokeAsync(
@@ -53,7 +37,7 @@ public class PurgeHandlerShould
 
     [Fact]
     public async Task Invoke_InvalidFilter_ThrowsValidationException() {
-        var services = Services(new CapturingOperationDispatcher());
+        var services = Services();
         var handler  = new PurgeHandler<TrashStudent>(services);
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() => handler.InvokeAsync(
@@ -66,22 +50,21 @@ public class PurgeHandlerShould
     }
 
     [Fact]
-    public async Task Invoke_MissingDispatcher_ThrowsBridgeMessage() {
-        var services = new ServiceCollection().AddAipExpressions().BuildServiceProvider();
+    public async Task Invoke_MissingScheduler_ThrowsInvalidOperation() {
+        var services = Services();
         var handler  = new PurgeHandler<TrashStudent>(services);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.InvokeAsync(
-                                                                                       null, new() { Filter = "*" },
-                                                                                       null, null,
-                                                                                       CancellationToken.None)
-                                                                                  .AsTask());
+                                                                                null, new() { Filter = "*" },
+                                                                                null, null,
+                                                                                CancellationToken.None)
+                                                                           .AsTask());
 
-        Assert.Contains("IOperationDispatcher", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("Schemata.Scheduling.Http/Grpc", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("scheduler", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IServiceProvider Services(IOperationDispatcher dispatcher) {
-        return new ServiceCollection().AddAipExpressions().AddSingleton(dispatcher).BuildServiceProvider();
+    private static IServiceProvider Services() {
+        return new ServiceCollection().AddAipExpressions().BuildServiceProvider();
     }
 
     private static void AssertInvalidFilter(ValidationException ex) {
@@ -89,28 +72,4 @@ public class PurgeHandlerShould
         Assert.NotNull(detail.FieldViolations);
         Assert.Contains(detail.FieldViolations, e => e.Reason == FieldReasons.InvalidFilter);
     }
-
-    #region Nested type: CapturingOperationDispatcher
-
-    private sealed class CapturingOperationDispatcher : IOperationDispatcher
-    {
-        public string? Key { get; private set; }
-
-        public object? Args { get; private set; }
-
-        #region IOperationDispatcher Members
-
-        public Task<Operation> DispatchAsync<TArgs>(string operationKey, TArgs args, CancellationToken ct)
-            where TArgs : class {
-            Key  = operationKey;
-            Args = args;
-            return Task.FromResult(new Operation {
-                Name = "test-operation", CanonicalName = "operations/test-operation",
-            });
-        }
-
-        #endregion
-    }
-
-    #endregion
 }

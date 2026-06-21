@@ -15,7 +15,7 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     private readonly int                                       _capacity;
     private readonly object                                    _gate = new();
     private readonly Dictionary<string, LinkedListNode<Entry>> _index;
-    private readonly LinkedList<Entry>                         _order = new();
+    private readonly LinkedList<Entry>                         _order = [];
     private readonly TimeProvider                              _time;
     private readonly TimeSpan                                  _ttl;
     private          bool                                      _disposed;
@@ -24,12 +24,12 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     ///     Initializes a new instance with capacity and sliding expiration sourced from <see cref="SchemataTenancyOptions" />.
     /// </summary>
     /// <param name="options">Tenancy options supplying capacity and sliding expiration.</param>
-    /// <param name="timeProvider">Clock used for sliding-expiration eviction; defaults to the system clock.</param>
-    public MemoryCacheTenantProviderCache(IOptions<SchemataTenancyOptions> options, TimeProvider? timeProvider = null) {
+    /// <param name="time">Clock used for sliding-expiration eviction; defaults to the system clock.</param>
+    public MemoryCacheTenantProviderCache(IOptions<SchemataTenancyOptions> options, TimeProvider? time = null) {
         _ttl      = options.Value.ProviderSlidingExpiration;
         _capacity = options.Value.ProviderMaxCapacity;
         _index    = new(_capacity);
-        _time     = timeProvider ?? TimeProvider.System;
+        _time     = time ?? TimeProvider.System;
     }
 
     #region IDisposable Members

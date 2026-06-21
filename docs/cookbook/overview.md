@@ -10,13 +10,13 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 | --- | --- |
 | [RabbitMQ Event Bus](rabbitmq-event-bus.md) | Producer, consumer, DLX, request/reply with RabbitMQ |
 | [Domain Events](domain-events.md) | Publish from a committed repository advisor |
+| [Push Notifications](push-notifications.md) | A custom transport, a send advisor, and durable scheduled delivery |
 
 ## Scheduling and Flow Integration
 
 | Recipe | What it covers |
 | --- | --- |
 | [Cron Jobs](cron-jobs.md) | A cron schedule with Cronos syntax and a missed-fire policy |
-| [Push Notifications](push-notifications.md) | A custom transport, a send advisor, and durable scheduled delivery |
 | [Flow with Timers](flow-with-timers.md) | A BPMN intermediate timer catch fired through the scheduler |
 | [Flow with Events](flow-with-events.md) | A BPMN event-based gateway correlated through the event bus |
 

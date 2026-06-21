@@ -35,7 +35,7 @@ public sealed class BackChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowF
         services.TryAddScoped<BackChannelLogoutService<TApp, TToken>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, BackChannelLogoutService<TApp, TToken>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBackChannelLogout>());
-        services.TryAddTransient<BackChannelLogoutJob>();
+        services.AddScheduledJob<BackChannelLogoutJob>();
     }
 
     #endregion

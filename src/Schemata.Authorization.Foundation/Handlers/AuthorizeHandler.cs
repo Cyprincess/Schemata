@@ -41,12 +41,12 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     IOptions<SchemataAuthorizationOptions> options,
     IServiceProvider                       sp,
     IOptions<JsonSerializerOptions>        json,
-    TimeProvider?                          timeProvider = null
+    TimeProvider?                          time = null
 ) : AuthorizeEndpoint
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     public override async Task<AuthorizationResult> AuthorizeAsync(
         AuthorizeRequest  request,

@@ -2,16 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Moq;
-using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
 using Schemata.Scheduling.Event;
 using Schemata.Scheduling.Event.Events;
-using Schemata.Scheduling.Event.Features;
 using Schemata.Scheduling.Event.Internal;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
@@ -62,28 +56,6 @@ public class EventPublishingJobLifecycleObserverShould
 
         var @event = Assert.IsType<JobFailed>(bus.Event);
         Assert.Equal("Boom", @event.Error);
-    }
-
-    [Fact]
-    public void RegisterAllPublishedEventTypes_WithStableWireNames() {
-        var services = new ServiceCollection();
-
-        new SchemataSchedulingEventFeature().ConfigureServices(services, new(), new(),
-                                                               new ConfigurationBuilder().Build(),
-                                                               Mock.Of<IWebHostEnvironment>());
-
-        using var provider = services.BuildServiceProvider();
-        var registrations = provider.GetRequiredService<IOptions<EventTypeRegistryConfiguration>>().Value.Registrations;
-
-        Assert.Contains(registrations,
-                        r => r.Type == typeof(JobScheduled) && r.Name == "schemata/scheduling/job-scheduled");
-        Assert.Contains(registrations,
-                        r => r.Type == typeof(JobUnscheduled) && r.Name == "schemata/scheduling/job-unscheduled");
-        Assert.Contains(registrations,
-                        r => r.Type == typeof(JobTriggered) && r.Name == "schemata/scheduling/job-triggered");
-        Assert.Contains(registrations,
-                        r => r.Type == typeof(JobCompleted) && r.Name == "schemata/scheduling/job-completed");
-        Assert.Contains(registrations, r => r.Type == typeof(JobFailed) && r.Name == "schemata/scheduling/job-failed");
     }
 
     private static IScheduledJobRegistry Registry() { return new DefaultScheduledJobRegistry(); }

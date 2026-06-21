@@ -26,10 +26,10 @@ public static class AdviceRemoveSoftDelete
 ///     the physical delete. Only activates for entities implementing <see cref="ISoftDelete" />.
 ///     Suppressed by <see cref="SoftDeleteSuppressed" />.
 /// </remarks>
-public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? timeProvider = null) : IRepositoryRemoveAdvisor<TEntity>
+public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? time = null) : IRepositoryRemoveAdvisor<TEntity>
     where TEntity : class
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IRepositoryRemoveAdvisor<TEntity> Members
 

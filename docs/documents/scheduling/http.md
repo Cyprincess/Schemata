@@ -14,7 +14,6 @@ handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFe
 | --- | --- |
 | `Schemata.Scheduling.Http` | `Features/SchemataSchedulingHttpFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
 | `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
-| `Schemata.Scheduling.Foundation` | `Extensions/ServiceCollectionExtensions.cs` (`AddSchedulerOperationDispatcher`) |
 
 ## Activation
 
@@ -35,8 +34,7 @@ transport (canonical-name routing, JSON traits, exception handler) when missing.
 
 1. Registers the three custom-method handlers as scoped services — `RunJobHandler`,
    `CancelOperationHandler`, `WaitOperationHandler` — plus the mapper that projects
-   `SchemataJobExecution` to the AIP-151 `Operation` DTO (`OperationMapper.FromExecution`), and
-   calls `services.AddSchedulerOperationDispatcher()` to wire the operation dispatcher.
+   `SchemataJobExecution` to the AIP-151 `Operation` DTO (`OperationMapper.FromExecution`).
 2. Registers two resources tagged with `HttpResourceAttribute.Name`:
    - `SchemataJob` (entity = request = detail = summary), with the `:run` custom method on
      `RunJobHandler`.

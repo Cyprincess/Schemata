@@ -16,7 +16,7 @@ public sealed class UserInfoContext
     public string? InternalSubject { get; set; }
 
     /// <summary>Scopes granted to the access token. Advisors check scopes before including claims.</summary>
-    public HashSet<string> GrantedScopes { get; set; } = new();
+    public HashSet<string> GrantedScopes { get; set; } = [];
 
     /// <summary>
     ///     Whether the access token represents an end-user.

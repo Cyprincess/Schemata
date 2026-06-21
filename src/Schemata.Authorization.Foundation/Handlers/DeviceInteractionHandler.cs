@@ -34,14 +34,14 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     IAuthorizationManager<TAuth>           auths,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
-    TimeProvider?                          timeProvider = null
+    TimeProvider?                          time = null
 ) : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
     where TToken : SchemataToken
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IInteractionHandler Members
 

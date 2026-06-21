@@ -15,7 +15,7 @@ namespace Schemata.Scheduling.Skeleton;
 ///     current snapshot once the row reaches a terminal state or the deadline
 ///     elapses.
 /// </summary>
-public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> executions, TimeProvider? timeProvider = null)
+public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> executions, TimeProvider? time = null)
     : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation>
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
@@ -23,7 +23,7 @@ public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> execu
     /// <summary>Maximum server-side wait duration accepted by the handler.</summary>
     public static readonly  TimeSpan MaxWait      = TimeSpan.FromSeconds(30);
 
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation> Members
 

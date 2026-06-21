@@ -39,8 +39,8 @@ public static class AdviceMethodRequestIdempotency
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
-public sealed class AdviceMethodRequestIdempotency<TEntity, TRequest, TResponse>(ICacheProvider cache, TimeProvider? timeProvider = null)
-    : AdviceRequestIdempotencyBase<TEntity, TRequest, TResponse>(cache, timeProvider), IResourceMethodRequestAdvisor<TEntity, TRequest>
+public sealed class AdviceMethodRequestIdempotency<TEntity, TRequest, TResponse>(ICacheProvider cache, TimeProvider? time = null)
+    : AdviceRequestIdempotencyBase<TEntity, TRequest, TResponse>(cache, time), IResourceMethodRequestAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TResponse : class, ICanonicalName

@@ -48,7 +48,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     /// <param name="tokens">Token storage.</param>
     /// <param name="json">JSON serialization options.</param>
     /// <param name="options">Server-level authorization configuration.</param>
-    /// <param name="timeProvider">Clock used for interaction-token expiry; defaults to the system clock.</param>
+    /// <param name="time">Clock used for interaction-token expiry; defaults to the system clock.</param>
     public AuthorizeInteractionHandler(
         IApplicationManager<TApp>              apps,
         IAuthorizationManager<TAuth>           auths,
@@ -56,7 +56,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         ITokenManager<TToken>                  tokens,
         IOptions<JsonSerializerOptions>        json,
         IOptions<SchemataAuthorizationOptions> options,
-        TimeProvider?                          timeProvider = null
+        TimeProvider?                          time = null
     ) {
         _apps    = apps;
         _auths   = auths;
@@ -64,7 +64,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         _tokens  = tokens;
         _json    = json;
         _options = options;
-        _time    = timeProvider ?? TimeProvider.System;
+        _time    = time ?? TimeProvider.System;
     }
 
     #region IInteractionHandler Members

@@ -41,12 +41,12 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     TokenService                                          issuer,
     IApplicationManager<TApp>                             apps,
     ITokenManager<TToken>                                 tokens,
-    TimeProvider?                                         timeProvider = null
+    TimeProvider?                                         time = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() { throw new NotImplementedException(); }
 

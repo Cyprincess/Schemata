@@ -180,20 +180,6 @@ public class SchemataResourceFeatureRegisterMethodShould
     }
 
     [Fact]
-    public void RegisterHandlerInContainer_ForResolution() {
-        var services = new ServiceCollection();
-        var resource = new ResourceAttribute<SingleVerbEntity, RunRequest>();
-
-        SchemataResourceFeature.RegisterResource(services, resource);
-
-        using var provider = services.BuildServiceProvider();
-        using var scope    = provider.CreateScope();
-
-        var handler = scope.ServiceProvider.GetRequiredService<RunHandler>();
-        Assert.NotNull(handler);
-    }
-
-    [Fact]
     public void Throw_WhenHandlerDoesNotImplementResourceMethodHandler() {
         var services = new ServiceCollection();
         var resource = new ResourceAttribute<InvalidHandlerEntity>();

@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -12,8 +15,16 @@ namespace Schemata.Scheduling.Foundation.Internal;
 
 public sealed partial class DefaultScheduler
 {
+    // Bound the missed-window walk so a misconfigured schedule cannot spin forever.
+    private const int MaxMissedWalk = 100_000;
+
     public Task ScheduleAsync(SchemataJob job, CancellationToken ct) {
-        return ScheduleAsync(job, (JobContext?)null, ct);
+        return ScheduleCoreAsync(job, ct);
+    }
+
+    public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
+        job.Variables = JobVariableSerializer.Serialize(variables);
+        return ScheduleCoreAsync(job, ct);
     }
 
     public async Task UnscheduleAsync(string job, CancellationToken ct) {
@@ -21,21 +32,27 @@ public sealed partial class DefaultScheduler
 
         await _lock.WaitAsync(ct);
         try {
-            if (!_entries.TryRemove(job, out entry)) {
-                return;
+            if (_entries.TryRemove(job, out entry)) {
+                await entry.Cts.CancelAsync();
+                entry.Cts.Dispose();
             }
-
-            await entry.Cts.CancelAsync();
-            entry.Cts.Dispose();
         } finally {
             _lock.Release();
+        }
+
+        // A paused/unscheduled job must not leave a future occurrence armed. Strictly-future rows
+        // only; a due-now operation row (StartTime <= now) is owned by its :cancel handler.
+        await CancelFuturePendingAsync(job, ct);
+
+        if (entry is null) {
+            return;
         }
 
         entry.Job.State = JobState.Paused;
         await NotifyUnscheduledAsync(entry.Job, ct);
     }
 
-    private async Task ScheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {
+    private async Task ScheduleCoreAsync(SchemataJob job, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(job.Name)) {
             return;
         }
@@ -57,101 +74,161 @@ public sealed partial class DefaultScheduler
                 return;
             }
 
-            entry              = new(job, new(), preparedContext);
+            // Collapse or skip a missed window per policy before the row is materialized.
+            job.NextRunTime = AdjustForMissedWindow(job, _time.GetUtcNow().UtcDateTime);
+
+            entry              = new(job, new());
             _entries[job.Name] = entry;
         } finally {
             _lock.Release();
         }
 
         await NotifyScheduledAsync(entry.Job, ct);
-        await StartTimerAsync(entry, ct);
+        await EnsurePendingExecutionAsync(entry.Job, ct);
+        StartTimer(entry);
     }
 
-    private async Task StartTimerAsync(ScheduledEntry entry, CancellationToken ct) {
-        var now   = _time.GetUtcNow().UtcDateTime;
-        var delay = entry.Job.NextRunTime!.Value - now;
+    /// <summary>Materializes the Pending execution row for the job's current occurrence, if absent.</summary>
+    private async Task EnsurePendingExecutionAsync(SchemataJob job, CancellationToken ct) {
+        if (job.NextRunTime is not { } due) {
+            return;
+        }
 
-        if (delay > TimeSpan.Zero) {
-            _ = Task.Run(async () => {
-                try {
-                    await Task.Delay(delay, entry.Cts.Token);
-                    if (!entry.Cts.Token.IsCancellationRequested) {
-                        await FireAsync(entry, entry.Cts.Token);
-                    }
-                } catch (OperationCanceledException) {
-                    // Expected when unscheduled or the host shuts down.
+        using var scope      = _services.CreateScope();
+        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
+        if (executions is null) {
+            return;
+        }
+
+        // One unfired occurrence per job: if a Pending row already exists (e.g. the initializer armed
+        // the same job twice), adopt it instead of duplicating the operation.
+        var existing = await executions.FirstOrDefaultAsync(
+            q => q.Where(e => e.Job == job.Name && e.State == ExecutionState.Pending), ct);
+        if (existing is not null) {
+            return;
+        }
+
+        var uid        = Identifiers.NewUid();
+        var name       = uid.ToString("n");
+        var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
+
+        var execution = new SchemataJobExecution {
+            Uid           = uid,
+            Name          = name,
+            CanonicalName = $"{descriptor.Collection}/{name}",
+            Job           = job.Name,
+            JobKey        = job.JobKey,
+            ArgsJson      = job.ArgsJson,
+            State         = ExecutionState.Pending,
+            StartTime     = due,
+        };
+
+        await using var uow = executions.Begin();
+        await executions.AddAsync(execution, ct);
+        await uow.CommitAsync(ct);
+    }
+
+    private async Task CancelFuturePendingAsync(string jobName, CancellationToken ct) {
+        using var scope      = _services.CreateScope();
+        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
+        if (executions is null) {
+            return;
+        }
+
+        var now    = _time.GetUtcNow().UtcDateTime;
+        var future = new List<SchemataJobExecution>();
+        await foreach (var row in executions.ListAsync(
+                           q => q.Where(e => e.Job == jobName
+                                          && e.State == ExecutionState.Pending
+                                          && e.StartTime > now), ct)) {
+            future.Add(row);
+        }
+
+        foreach (var row in future) {
+            row.State   = ExecutionState.Cancelled;
+            row.EndTime = now;
+            try {
+                await executions.UpdateAsync(row, ct);
+            } catch (ConcurrencyException) {
+                // A competing handler already moved the row; nothing to do.
+            }
+        }
+
+        if (future.Count > 0) {
+            await executions.CommitAsync(ct);
+        }
+    }
+
+    private void StartTimer(ScheduledEntry entry) {
+        var due = entry.Job.NextRunTime;
+        if (due is null) {
+            return;
+        }
+
+        var delay = due.Value - _time.GetUtcNow().UtcDateTime;
+        if (delay <= TimeSpan.Zero) {
+            // Already due (or overdue): wake the dispatcher immediately to drain the row.
+            SignalDispatcher();
+            return;
+        }
+
+        _ = Task.Run(async () => {
+            try {
+                await Task.Delay(delay, entry.Cts.Token);
+                if (!entry.Cts.Token.IsCancellationRequested) {
+                    SignalDispatcher();
                 }
-            }, entry.Cts.Token);
-            return;
+            } catch (OperationCanceledException) {
+                // Expected when the entry is unscheduled or the host shuts down.
+            }
+        }, entry.Cts.Token);
+    }
+
+    private DateTime AdjustForMissedWindow(SchemataJob job, DateTime now) {
+        var next = job.NextRunTime!.Value;
+        if (next > now || !job.Replay || job.ScheduleType is not (ScheduleType.Cron or ScheduleType.Periodic)) {
+            // On-time, one-shot, or non-replay: fire the occurrence exactly as declared.
+            return next;
         }
 
-        // Single-fire audit jobs ignore the missed-fire policy and keep terminal audit rows stable.
-        if (!entry.Job.Replay) {
-            _ = Task.Run(() => FireAsync(entry, entry.Cts.Token), entry.Cts.Token);
-            return;
-        }
-
-        // Missed-fire window. Policy determines whether we skip, replay once, or replay all.
         switch (_options.Value.MissedFirePolicy) {
             case MissedFirePolicy.Skip:
-                _logger?.LogInformation("Job '{JobName}' missed its fire window by {Delay}; skipping per policy.",
-                                        entry.Job.Name, -delay);
-                await AdvanceWithoutFiringAsync(entry, now, ct);
-                return;
+                for (var i = 0; i < MaxMissedWalk && next <= now; i++) {
+                    var advanced = ComputeAfter(job, next);
+                    if (advanced <= next) {
+                        break;
+                    }
+
+                    next = advanced;
+                }
+
+                return next;
 
             case MissedFirePolicy.FireOnce:
-                _logger?.LogInformation(
-                    "Job '{JobName}' missed its fire window by {Delay}; firing once per policy.", entry.Job.Name, -delay);
-                _ = Task.Run(() => FireAsync(entry, entry.Cts.Token), entry.Cts.Token);
-                return;
+                for (var i = 0; i < MaxMissedWalk; i++) {
+                    var probe = ComputeAfter(job, next);
+                    if (probe > now || probe <= next) {
+                        break;
+                    }
+
+                    next = probe;
+                }
+
+                return next;
 
             case MissedFirePolicy.FireAll:
-                _logger?.LogInformation(
-                    "Job '{JobName}' missed its fire window by {Delay}; replaying every missed run per policy.",
-                    entry.Job.Name, -delay);
-                _ = Task.Run(() => ReplayMissedAsync(entry, entry.Cts.Token), entry.Cts.Token);
-                return;
+            default:
+                // Keep the oldest missed occurrence; the dispatcher's advance loop replays the rest.
+                return next;
         }
     }
 
-    private async Task AdvanceWithoutFiringAsync(ScheduledEntry entry, DateTime now, CancellationToken ct) {
-        var job = entry.Job;
-
-        if (job.ScheduleType == ScheduleType.OneTime) {
-            job.State       = JobState.Completed;
-            job.NextRunTime = null;
-        } else {
-            var schedule = ScheduleDefinitionMapper.ToDefinition(job);
-            job.NextRunTime = schedule.GetNextRunTime(now);
+    private DateTime ComputeAfter(SchemataJob job, DateTime time) {
+        if (job.ScheduleType == ScheduleType.Periodic && job.IntervalTicks is { } ticks) {
+            return time.AddTicks(ticks);
         }
 
-        await NotifyScheduledAsync(job, ct);
-
-        if (job is { State: JobState.Active, NextRunTime: not null }) {
-            await ScheduleAsync(job, CancellationToken.None);
-        }
-    }
-
-    private async Task ReplayMissedAsync(ScheduledEntry entry, CancellationToken ct) {
-        // Bound the catch-up loop so a misconfigured periodic schedule cannot spin forever.
-        const int maxReplay = 1024;
-        for (var i = 0; i < maxReplay && !ct.IsCancellationRequested; i++) {
-            await ExecuteAsync(entry, ct);
-
-            if (!_entries.TryGetValue(entry.Job.Name!, out var current)
-             || current.Job.State != JobState.Active
-             || current.Job.NextRunTime is null
-             || current.Job.NextRunTime > _time.GetUtcNow().UtcDateTime) {
-                return;
-            }
-
-            entry = current;
-        }
-    }
-
-    public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
-        job.Variables = JobVariableSerializer.Serialize(variables);
-        return ScheduleAsync(job, ct);
+        return ScheduleDefinitionMapper.ToDefinition(job).GetNextRunTime(time) ?? DateTime.MaxValue;
     }
 
     private async Task NotifyScheduledAsync(SchemataJob job, CancellationToken ct) {

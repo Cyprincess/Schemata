@@ -11,7 +11,7 @@ internal sealed class LruCache<TKey, TValue>
 {
     private readonly int                                     _capacity;
     private readonly object                                  _gate = new();
-    private readonly LinkedList<Entry>                       _list = new();
+    private readonly LinkedList<Entry>                       _list = [];
     private readonly Dictionary<TKey, LinkedListNode<Entry>> _map;
 
     /// <summary>

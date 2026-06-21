@@ -50,10 +50,10 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     /// <summary>Initializes a new instance using the default database from the supplied multiplexer.</summary>
     /// <param name="multiplexer">The Redis connection multiplexer.</param>
-    /// <param name="timeProvider">Clock used to compute absolute expirations; defaults to the system clock.</param>
-    public RedisCacheProvider(IConnectionMultiplexer multiplexer, TimeProvider? timeProvider = null) {
+    /// <param name="time">Clock used to compute absolute expirations; defaults to the system clock.</param>
+    public RedisCacheProvider(IConnectionMultiplexer multiplexer, TimeProvider? time = null) {
         _db   = multiplexer.GetDatabase();
-        _time = timeProvider ?? TimeProvider.System;
+        _time = time ?? TimeProvider.System;
     }
 
     #region ICacheProvider Members

@@ -24,10 +24,10 @@ public static class AdviceAddTimestamp
 ///     Runs first in the add pipeline. Only activates for entities implementing
 ///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
 /// </remarks>
-public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? timeProvider = null) : IRepositoryAddAdvisor<TEntity>
+public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? time = null) : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IRepositoryAddAdvisor<TEntity> Members
 

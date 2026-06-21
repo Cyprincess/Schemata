@@ -6,6 +6,8 @@
   href: domain-events.md
 - name: Cron Jobs
   href: cron-jobs.md
+- name: Push Notifications
+  href: push-notifications.md
 - name: Flow with Timers
   href: flow-with-timers.md
 - name: Flow with Events

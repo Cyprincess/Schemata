@@ -15,11 +15,6 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [Index(nameof(Name), IsUnique = true)]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    /// <summary>Assembly-qualified <see cref="IScheduledJob" /> type for <see cref="JobKey" /> backfill.</summary>
-    [Obsolete("Migrated to JobKey. Will be removed after AQN→JobKey migration completes.")]
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public virtual string? JobType { get; set; }
-
     /// <summary>Stable job identifier resolved through <see cref="IScheduledJobRegistry" />.</summary>
     public virtual string? JobKey { get; set; }
 

@@ -10,8 +10,13 @@ namespace Schemata.Scheduling.Foundation.Internal;
 /// <summary>Thread-safe registry that maps scheduled job keys to concrete job types.</summary>
 public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 {
-    private readonly ConcurrentDictionary<string, Type> _byKey = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<Type, string> _byType = new();
+    private readonly ConcurrentDictionary<string, Type>   _byKey  = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Type, string>   _byType = new();
+    private readonly IReadOnlyList<IScheduledJobKeyResolver> _resolvers;
+
+    public DefaultScheduledJobRegistry(IEnumerable<IScheduledJobKeyResolver>? resolvers = null) {
+        _resolvers = resolvers is null ? Array.Empty<IScheduledJobKeyResolver>() : [..resolvers];
+    }
 
     public void Register(Type jobType, string key) {
         ArgumentNullException.ThrowIfNull(jobType);
@@ -32,12 +37,34 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 
     public Type? Resolve(string key) {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return _byKey.TryGetValue(key, out var jobType) ? jobType : null;
+        if (_byKey.TryGetValue(key, out var jobType)) {
+            return jobType;
+        }
+
+        foreach (var resolver in _resolvers) {
+            if (resolver.ResolveType(key) is { } resolved) {
+                Register(resolved, key);
+                return resolved;
+            }
+        }
+
+        return null;
     }
 
     public string? ResolveKey(Type jobType) {
         ArgumentNullException.ThrowIfNull(jobType);
-        return _byType.TryGetValue(jobType, out var key) ? key : null;
+        if (_byType.TryGetValue(jobType, out var key)) {
+            return key;
+        }
+
+        foreach (var resolver in _resolvers) {
+            if (resolver.ResolveKey(jobType) is { } resolved) {
+                Register(jobType, resolved);
+                return resolved;
+            }
+        }
+
+        return null;
     }
 
     public void RegisterAll(IEnumerable<Type> jobTypes) {

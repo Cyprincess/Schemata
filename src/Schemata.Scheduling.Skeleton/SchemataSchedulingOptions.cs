@@ -7,8 +7,13 @@ namespace Schemata.Scheduling.Skeleton;
 /// </summary>
 public class SchemataSchedulingOptions
 {
-    /// <summary>Registered jobs to materialize on startup.</summary>
-    public List<JobRegistration> Jobs { get; } = new();
+    /// <summary>
+    ///     Registered jobs. Entries with a <see cref="JobRegistration.Schedule" /> are materialized
+    ///     and armed on startup; entries with a <see langword="null" /> schedule are keyed only, so a
+    ///     job triggered on-demand via <c>IScheduler.TriggerAsync</c> resolves its stable key after a
+    ///     restart.
+    /// </summary>
+    public List<JobRegistration> Jobs { get; } = [];
 
     /// <summary>
     ///     Policy applied when a job's <c>NextRunTime</c> is in the past at the

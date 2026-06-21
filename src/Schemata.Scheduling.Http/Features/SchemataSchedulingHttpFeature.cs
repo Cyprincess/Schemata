@@ -41,7 +41,6 @@ public sealed class SchemataSchedulingHttpFeature : FeatureBase
         services.TryAddScoped<CancelOperationHandler>();
         services.TryAddScoped<WaitOperationHandler>();
         services.Map<SchemataJobExecution, Operation>(map => map.With(e => OperationMapper.FromExecution(e)));
-        services.AddSchedulerOperationDispatcher();
     }
 
     private static void RegisterResources(SchemataResourceBuilder resources) {

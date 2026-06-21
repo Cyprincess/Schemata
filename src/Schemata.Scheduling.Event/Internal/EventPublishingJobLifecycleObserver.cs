@@ -31,12 +31,12 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         IEventBus                                eventBus,
         IOptions<SchemataSchedulingEventOptions> options,
         IScheduledJobRegistry                    registry,
-        TimeProvider?                            timeProvider = null
+        TimeProvider?                            time = null
     ) {
         _eventBus = eventBus;
         _options  = options.Value;
         _registry = registry;
-        _time     = timeProvider ?? TimeProvider.System;
+        _time     = time ?? TimeProvider.System;
     }
 
     #region IJobLifecycleObserver Members

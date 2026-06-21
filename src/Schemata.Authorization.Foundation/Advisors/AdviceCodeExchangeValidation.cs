@@ -35,11 +35,11 @@ public static class AdviceCodeExchangeValidation
 ///     (RFC 6749 §2.3.1).
 /// </remarks>
 /// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
-public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? timeProvider = null) : ICodeExchangeAdvisor<TApp, TToken>
+public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? time = null) : ICodeExchangeAdvisor<TApp, TToken>
     where TApp : SchemataApplication
     where TToken : SchemataToken
 {
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region ICodeExchangeAdvisor<TApp,TToken> Members
 

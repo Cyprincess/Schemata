@@ -12,5 +12,5 @@ namespace Schemata.Event.Foundation.Internal;
 public sealed class EventTypeRegistryConfiguration
 {
     /// <summary>The accumulated (event type, wire name) pairs registered through <see cref="Builders.EventBuilder.RegisterEvent{TEvent}"/>.</summary>
-    public List<(Type Type, string Name)> Registrations { get; } = new();
+    public List<(Type Type, string Name)> Registrations { get; } = [];
 }

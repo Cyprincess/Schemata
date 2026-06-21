@@ -14,7 +14,6 @@ custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSc
 | --- | --- |
 | `Schemata.Scheduling.Grpc` | `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
 | `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
-| `Schemata.Scheduling.Foundation` | `Extensions/ServiceCollectionExtensions.cs` (`AddSchedulerOperationDispatcher`) |
 
 ## Activation
 
@@ -36,8 +35,7 @@ missing.
 
 1. Registers the three custom-method handlers as scoped services — `RunJobHandler`,
    `CancelOperationHandler`, `WaitOperationHandler` — plus the mapper that projects
-   `SchemataJobExecution` to the AIP-151 `Operation` DTO (`OperationMapper.FromExecution`), and
-   calls `services.AddSchedulerOperationDispatcher()`.
+   `SchemataJobExecution` to the AIP-151 `Operation` DTO (`OperationMapper.FromExecution`).
 2. Registers two resources tagged with `GrpcResourceAttribute.Name`:
    - `SchemataJob` (entity = request = detail = summary), with the `Run` custom method on
      `RunJobHandler`.

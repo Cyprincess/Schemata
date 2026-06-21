@@ -30,10 +30,10 @@ public abstract class AdviceRequestIdempotencyBase<TEntity, TRequest, TPayload>
     ///     Initializes a new instance with the idempotency store and clock.
     /// </summary>
     /// <param name="cache">The idempotency cache.</param>
-    /// <param name="timeProvider">The clock used for pending reservation timeouts.</param>
-    protected AdviceRequestIdempotencyBase(ICacheProvider cache, TimeProvider? timeProvider = null) {
+    /// <param name="time">The clock used for pending reservation timeouts.</param>
+    protected AdviceRequestIdempotencyBase(ICacheProvider cache, TimeProvider? time = null) {
         _cache = cache;
-        _time  = timeProvider ?? TimeProvider.System;
+        _time  = time ?? TimeProvider.System;
     }
 
     /// <summary>

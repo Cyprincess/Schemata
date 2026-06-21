@@ -8,11 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Expressions.Aip;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Features;
@@ -58,6 +58,16 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseReadMask<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListResponseAdvisor<>), typeof(AdviceListResponseReadMask<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseIdempotency<,>)));
+
+        // Reverse-resolves an entity type from a resource name / collection segment.
+        services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
+
+        // The built-in AIP-165 purge runs as the restart-durable PurgeJob<TEntity>. One open-generic
+        // registration resolves the job for any soft-deletable entity, and one resolver maps the
+        // stable purge:{collection} key back to its closed-generic type so a reloaded purge operation
+        // rebuilds after a restart.
+        services.TryAddTransient(typeof(PurgeJob<>));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IScheduledJobKeyResolver, PurgeJobKeyResolver>());
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
             if (assembly.IsDynamic) {
@@ -121,19 +131,6 @@ public sealed class SchemataResourceFeature : FeatureBase
             methods.AddRange(resource.Methods);
         }
         AddBuiltInMethods(resource, methods, entity, detail);
-
-        // When the built-in purge method is active, register its restart-durable executor
-        // and descriptor so a reloaded purge operation rebuilds from the persisted request.
-        // Guarded by ISoftDelete because PurgeHandler/PurgeOperationHandler constrain TEntity.
-        if (typeof(ISoftDelete).IsAssignableFrom(entity)) {
-            var builtInPurge = typeof(PurgeHandler<>).MakeGenericType(entity);
-            if (methods.Any(m => string.Equals(m.Verb, Verbs.Purge, StringComparison.Ordinal) && m.Handler == builtInPurge)) {
-                var purgeKey = $"{Verbs.Purge}:{ResourceNameDescriptor.ForType(entity).Collection}";
-                services.AddKeyedScoped(typeof(IOperationHandler<PurgeOperationArgs>), purgeKey,
-                                        typeof(PurgeOperationHandler<>).MakeGenericType(entity));
-                services.AddSingleton(new OperationDescriptor(purgeKey, Verbs.Purge, typeof(PurgeOperationArgs)));
-            }
-        }
 
         foreach (var method in methods) {
             var handlerInterface = FindResourceMethodHandlerInterface(method.Handler);
