@@ -1,17 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
+using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Features;
-using Schemata.Scheduling.Skeleton;
-using Schemata.Scheduling.Skeleton.Entities;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Scheduling.Http.Features;
 
@@ -32,32 +28,7 @@ public sealed class SchemataSchedulingHttpFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        RegisterHandlers(services);
-        RegisterResources(new(schemata, services));
-    }
-
-    private static void RegisterHandlers(IServiceCollection services) {
-        services.TryAddScoped<RunJobHandler>();
-        services.TryAddScoped<CancelOperationHandler>();
-        services.TryAddScoped<WaitOperationHandler>();
-        services.Map<SchemataJobExecution, Operation>(map => map.With(e => OperationMapper.FromExecution(e)));
-    }
-
-    private static void RegisterResources(SchemataResourceBuilder resources) {
-        resources.Use<SchemataJob, SchemataJob, SchemataJob, SchemataJob>(
-            [HttpResourceAttribute.Name],
-            resource => resource.Methods = [
-                new(Verbs.Run, typeof(RunJobHandler)),
-            ]);
-
-        resources.Use<SchemataJobExecution, Operation, Operation, Operation>(
-            [HttpResourceAttribute.Name],
-            resource => {
-                resource.Operations = [Operations.Get, Operations.List, Operations.Delete];
-                resource.Methods = [
-                    new(Verbs.Cancel, typeof(CancelOperationHandler)),
-                    new(Verbs.Wait,   typeof(WaitOperationHandler)),
-                ];
-            });
+        SchedulingResourceRegistration.RegisterHandlers(services);
+        SchedulingResourceRegistration.RegisterMethods(new(schemata, services), HttpResourceAttribute.Name);
     }
 }

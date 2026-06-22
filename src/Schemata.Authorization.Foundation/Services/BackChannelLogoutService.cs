@@ -62,8 +62,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 
          var scheduler = services.GetService<IScheduler>();
          if (scheduler == null) {
-             throw new FailedPreconditionException(
-                 message: "Back-channel logout requires Scheduling; call UseScheduling() at host bootstrap."
+             throw new FailedPreconditionException(message: "Back-channel logout requires Scheduling."
              );
          }
 

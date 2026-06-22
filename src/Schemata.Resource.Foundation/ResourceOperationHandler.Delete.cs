@@ -82,7 +82,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         };
 
         var container = new ResourceRequestContainer<TEntity>();
-        ApplyIdentifierPredicates(container, name);
+        ResourceIdentifiers.Apply(container, name);
 
         var requestResult = await RunPipelineAsync<DeleteResultBase<TDetail>>(
             ctx,

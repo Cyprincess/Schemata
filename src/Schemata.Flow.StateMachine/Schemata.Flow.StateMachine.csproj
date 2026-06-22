@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
   </ItemGroup>
 

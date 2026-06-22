@@ -9,7 +9,7 @@ using Schemata.Core.Features;
 using Schemata.Tenancy.Foundation.Middlewares;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
-using Schemata.Tenancy.Skeleton.Services;
+using Schemata.Tenancy.Foundation.Services;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Tenancy.Foundation.Features;

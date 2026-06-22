@@ -17,7 +17,7 @@ public static class SchemaBuilder
         if (items.IsDefaultOrEmpty) {
             var fields = new List<FieldDescriptor>();
             foreach (var property in AppDomainTypeCache.GetProperties(entityType).Values) {
-                fields.Add(new FieldDescriptor(property.Name.Underscore(), MapType(property.PropertyType), alias, false, []));
+                fields.Add(new(property.Name.Underscore(), MapType(property.PropertyType), alias, false, []));
             }
 
             return fields;
@@ -27,10 +27,10 @@ public static class SchemaBuilder
         foreach (var item in items) {
             switch (item.Kind) {
                 case SelectionKind.Field when !string.IsNullOrWhiteSpace(item.FieldPath):
-                    selected.Add(new FieldDescriptor(item.Alias, MapType(ResolveType(entityType, StripAlias(item.FieldPath, alias))), alias, false, []));
+                    selected.Add(new(item.Alias, MapType(ResolveType(entityType, StripAlias(item.FieldPath, alias))), alias, false, []));
                     break;
                 case SelectionKind.Expression:
-                    selected.Add(new FieldDescriptor(item.Alias, FieldType.Object, null, false, []));
+                    selected.Add(new(item.Alias, FieldType.Object, null, false, []));
                     break;
                 case SelectionKind.Nested when !string.IsNullOrWhiteSpace(item.FieldPath):
                     selected.Add(NestedDescriptor(entityType, item, alias));
@@ -44,7 +44,7 @@ public static class SchemaBuilder
     private static FieldDescriptor NestedDescriptor(Type parentType, SelectionItem item, string alias) {
         var childType = ElementType(ResolveType(parentType, StripAlias(item.FieldPath!, alias)));
         var children  = childType is null ? [] : For(childType, item.Children, item.Alias);
-        return new FieldDescriptor(item.Alias, FieldType.Object, null, true, [..children]);
+        return new(item.Alias, FieldType.Object, null, true, [..children]);
     }
 
     private static Type? ElementType(Type type) {

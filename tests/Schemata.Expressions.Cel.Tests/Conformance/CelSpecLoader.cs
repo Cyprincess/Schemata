@@ -330,15 +330,15 @@ public static class CelSpecLoader
                     bytes.Add((byte)escaped);
                     break;
                 case 'x':
-                    bytes.Add(byte.Parse(source.Substring(i + 1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                    bytes.Add(byte.Parse(source.AsSpan(i + 1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                     i += 2;
                     break;
                 case 'u':
-                    bytes.AddRange(Encoding.UTF8.GetBytes(char.ConvertFromUtf32(int.Parse(source.Substring(i + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture))));
+                    bytes.AddRange(Encoding.UTF8.GetBytes(char.ConvertFromUtf32(int.Parse(source.AsSpan(i + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture))));
                     i += 4;
                     break;
                 case 'U':
-                    bytes.AddRange(Encoding.UTF8.GetBytes(char.ConvertFromUtf32(int.Parse(source.Substring(i + 1, 8), NumberStyles.HexNumber, CultureInfo.InvariantCulture))));
+                    bytes.AddRange(Encoding.UTF8.GetBytes(char.ConvertFromUtf32(int.Parse(source.AsSpan(i + 1, 8), NumberStyles.HexNumber, CultureInfo.InvariantCulture))));
                     i += 8;
                     break;
                 default:

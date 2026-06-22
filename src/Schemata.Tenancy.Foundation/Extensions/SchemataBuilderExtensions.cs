@@ -4,7 +4,7 @@ using Schemata.Tenancy.Foundation;
 using Schemata.Tenancy.Foundation.Features;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
-using Schemata.Tenancy.Skeleton.Services;
+using Schemata.Tenancy.Foundation.Services;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;

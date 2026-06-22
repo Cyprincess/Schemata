@@ -22,7 +22,7 @@ public static class InsightGrpcMethods
 
     private static Marshaller<T> Marshaller<T>() {
         var model = RuntimeTypeModel.Default;
-        return new Marshaller<T>(
+        return new(
             (value, context) => {
                 model.Serialize(context.GetBufferWriter(), value);
                 context.Complete();

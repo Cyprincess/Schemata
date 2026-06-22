@@ -73,12 +73,6 @@ public sealed class ProcessRegistry : IProcessRegistry
             }
         }
 
-        var runtime = _services.GetKeyedService<IFlowRuntime>(configuration.Engine);
-        if (runtime is null) {
-            throw new NotSupportedException($"Flow engine '{configuration.Engine}' is not registered. "
-                                          + $"Process '{configuration.Name}' cannot be loaded.");
-        }
-
         var registration = new ProcessRegistration {
             Name          = configuration.Name,
             Engine        = configuration.Engine,

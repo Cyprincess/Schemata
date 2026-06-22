@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -72,7 +73,7 @@ public sealed class AdviceUpdateRequestSanitize<TEntity, TRequest> : IResourceUp
 
         var remaining = mask.Split(',')
                             .Select(f => f.Trim())
-                            .Where(f => f.Length != 0 && !AdviceUpdateRequestSanitize.SystemFields.Contains(ResourceWireMask.Convert(typeof(TRequest), f.Split('.')[0])));
+                            .Where(f => f.Length != 0 && !AdviceUpdateRequestSanitize.SystemFields.Contains(ResourceWireNameRules.ResolveClrName(typeof(TRequest), f.Split('.')[0])));
 
         mut.UpdateMask = string.Join(",", remaining);
 

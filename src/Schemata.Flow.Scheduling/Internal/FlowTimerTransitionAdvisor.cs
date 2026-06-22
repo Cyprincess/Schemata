@@ -81,8 +81,10 @@ public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
             return AdviseResult.Continue;
         }
 
-        var scheduler = _services.GetService<IScheduler>()
-                     ?? throw new FailedPreconditionException(message: $"Process '{process.CanonicalName}' reached a timer catch, which requires Scheduling; call UseScheduling() at host bootstrap.");
+        var scheduler = _services.GetService<IScheduler>();
+        if (scheduler == null) {
+            throw new FailedPreconditionException(message: $"Process '{process.CanonicalName}' reached a timer catch, which requires Scheduling.");
+        }
 
         if (previousTimerJob is not null) {
             await scheduler.UnscheduleAsync(previousTimerJob, ct);

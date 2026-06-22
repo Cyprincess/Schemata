@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Tenancy.Skeleton;
-using Schemata.Tenancy.Skeleton.Services;
+using Schemata.Tenancy.Foundation.Services;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;

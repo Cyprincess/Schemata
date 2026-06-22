@@ -45,7 +45,7 @@ public sealed class InProcessEventBus : IEventBus
 
     public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent {
-        IEventBus.EnsureSourceEntityContract(sourceEntity);
+        EventSourceContract.Ensure(sourceEntity);
         await PublishCoreAsync(@event, sourceEntity, ct);
     }
 

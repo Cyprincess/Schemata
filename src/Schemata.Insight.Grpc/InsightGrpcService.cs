@@ -55,6 +55,6 @@ public sealed class InsightGrpcService : IInsightGrpcService
             var _                            => (400, ErrorCodes.InvalidArgument),
         };
 
-        return new SchemataException(code, status, ex.Message);
+        return new(code, status, ex.Message);
     }
 }

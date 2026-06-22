@@ -47,7 +47,6 @@ public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? time = null) : IRe
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        // A single reading keeps CreateTime and UpdateTime equal on create per AIP-148.
         var now = _time.GetUtcNow().UtcDateTime;
         timestamp.CreateTime = now;
         timestamp.UpdateTime = now;

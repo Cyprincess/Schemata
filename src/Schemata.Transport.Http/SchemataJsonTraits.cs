@@ -30,7 +30,7 @@ internal static class SchemataJsonTraits
                     continue;
                 }
 
-                var name = ResourceWireNameRules.Resolve(info.Type, member.Name, static type => ResourceNameDescriptor.ForType(type).Plural);
+                var name = ResourceWireNameRules.ResolveWireName(info.Type, member.Name);
                 if (name is null) {
                     info.Properties.Remove(property);
                 } else if (name != member.Name) {

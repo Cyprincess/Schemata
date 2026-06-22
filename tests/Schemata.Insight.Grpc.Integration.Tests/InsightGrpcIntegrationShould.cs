@@ -15,7 +15,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task Query_AllBuyers_ReturnsDynamicRows() {
-        var response = await Query(new QueryInsightGrpcRequest {
+        var response = await Query(new() {
             Sources = { new() { Alias = "b", Name = "buyers" } },
         });
 
@@ -27,7 +27,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task Query_FilteredAndPaged_ProjectsAndPaginates() {
-        var response = await Query(new QueryInsightGrpcRequest {
+        var response = await Query(new() {
             Sources         = { new() { Alias = "b", Name = "buyers" } },
             Transformations = { new() { Filter = new() { Source = "id > 1", Language = "cel" } } },
             Selections      = { new() { Field = "b.full_name", Alias = "full_name" } },
@@ -40,7 +40,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task Query_UnknownSource_FailsWithNotFound() {
-        var ex = await Assert.ThrowsAsync<RpcException>(() => Query(new QueryInsightGrpcRequest {
+        var ex = await Assert.ThrowsAsync<RpcException>(() => Query(new() {
             Sources = { new() { Alias = "x", Name = "missing" } },
         }));
 
@@ -49,7 +49,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
 
     private async Task<QueryInsightGrpcResponse> Query(QueryInsightGrpcRequest request) {
         var invoker = _factory.CreateGrpcChannel().CreateCallInvoker();
-        using var call = invoker.AsyncUnaryCall(InsightGrpcMethods.Query, null, new CallOptions(), request);
+        using var call = invoker.AsyncUnaryCall(InsightGrpcMethods.Query, null, new(), request);
         return await call.ResponseAsync;
     }
 }

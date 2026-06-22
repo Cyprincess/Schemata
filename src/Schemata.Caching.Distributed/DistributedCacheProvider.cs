@@ -54,8 +54,7 @@ public sealed class DistributedCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
-        throw new NotSupportedException(
-            "AIP-155 idempotency requires a cache provider that supports atomic reserve - use Schemata.Caching.Redis");
+        throw new NotSupportedException("Atomic try-add is not supported over IDistributedCache.");
     }
 
     public Task<bool> TryReplaceAsync(
@@ -65,13 +64,11 @@ public sealed class DistributedCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
-        throw new NotSupportedException(
-            "Atomic compare-and-swap is not supported over IDistributedCache; AIP-155 idempotency requires the Redis cache provider.");
+        throw new NotSupportedException("Atomic compare-and-swap is not supported over IDistributedCache");
     }
 
     public Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
-        throw new NotSupportedException(
-            "Atomic compare-and-delete is not supported over IDistributedCache; AIP-155 idempotency requires the Redis cache provider.");
+        throw new NotSupportedException("Atomic compare-and-delete is not supported over IDistributedCache.");
     }
 
     public Task RemoveAsync(string key, CancellationToken ct = default) { return _cache.RemoveAsync(key, ct); }

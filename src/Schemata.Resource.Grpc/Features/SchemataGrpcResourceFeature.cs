@@ -16,6 +16,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
+using Schemata.Resource.Grpc.Internal;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Features;
 
@@ -68,8 +69,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ResourceServiceMethodProvider<>)));
 
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, ResourceGrpcServiceDescriptorContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, ResourceGrpcServiceDescriptorContributor>());
     }
 
     public override void ConfigureEndpoints(
@@ -82,9 +82,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
         foreach (var (_, resource) in options.Value.Resources) {
-            if (resource.Endpoints is not null
-             && resource.Endpoints.Count != 0
-             && resource.Endpoints.All(e => e != GrpcResourceAttribute.Name)) {
+            if (!GrpcResourceHelper.IsGrpcEnabled(resource)) {
                 continue;
             }
 

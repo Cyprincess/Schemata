@@ -247,7 +247,7 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildMacro(string name, Expression source, IReadOnlyList<CelNode> args) {
-        if (args.Count != 2 || args[0] is not CelIdentifier identifier) {
+        if (args is not [CelIdentifier identifier, _]) {
             throw new ParseException($"CEL macro '{name}' requires an iteration variable and expression.", default);
         }
 
@@ -534,17 +534,17 @@ internal sealed class CelCompileVisitor
 
     private static bool TryKnownType(string name, out CelType type) {
         type = name switch {
-            "bool" => new CelType("bool"),
-            "int" => new CelType("int"),
-            "uint" => new CelType("uint"),
-            "double" => new CelType("double"),
-            "string" => new CelType("string"),
-            "bytes" => new CelType("bytes"),
-            "list" => new CelType("list"),
-            "map" => new CelType("map"),
-            "type" => new CelType("type"),
-            "null_type" => new CelType("null_type"),
-            var _ => default,
+            "bool"      => new("bool"),
+            "int"       => new("int"),
+            "uint"      => new("uint"),
+            "double"    => new("double"),
+            "string"    => new("string"),
+            "bytes"     => new("bytes"),
+            "list"      => new("list"),
+            "map"       => new("map"),
+            "type"      => new("type"),
+            "null_type" => new("null_type"),
+            var _       => default,
         };
         return !string.IsNullOrEmpty(type.Name);
     }
@@ -563,9 +563,9 @@ internal sealed class CelCompileVisitor
 
         var name = string.Join('.', parts);
         type = name switch {
-            "google.protobuf.Timestamp" => new CelType("google.protobuf.Timestamp"),
-            "google.protobuf.Duration" => new CelType("google.protobuf.Duration"),
-            var _ => default,
+            "google.protobuf.Timestamp" => new("google.protobuf.Timestamp"),
+            "google.protobuf.Duration"  => new("google.protobuf.Duration"),
+            var _                       => default,
         };
         return !string.IsNullOrEmpty(type.Name);
     }
@@ -776,7 +776,7 @@ internal sealed class CelCompileVisitor
     }
 
     private static string LowerFirst(string name) {
-        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
+        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
     }
 
     private enum CompileMode

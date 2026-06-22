@@ -363,7 +363,7 @@ public class CityHash {
 
             f += a1;
             f =  Rotate32(f, 19);
-            f =  f * C1;
+            f *= C1;
 
             g += a2;
             g =  Rotate32(g, 18);

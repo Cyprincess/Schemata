@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Security.Foundation;
 using Schemata.Security.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 

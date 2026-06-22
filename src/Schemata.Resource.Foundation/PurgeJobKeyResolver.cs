@@ -15,7 +15,7 @@ namespace Schemata.Resource.Foundation;
 /// </summary>
 public sealed class PurgeJobKeyResolver : IScheduledJobKeyResolver
 {
-    private static readonly string Prefix = $"{Verbs.Purge}:";
+    private const string Prefix = $"{Verbs.Purge}:";
 
     private readonly IResourceTypeResolver _resolver;
 
@@ -30,7 +30,7 @@ public sealed class PurgeJobKeyResolver : IScheduledJobKeyResolver
             return null;
         }
 
-        var collection = key.Substring(Prefix.Length);
+        var collection = key[Prefix.Length..];
         var entity     = _resolver.ResolveCollection(collection);
         if (entity is null || !typeof(ISoftDelete).IsAssignableFrom(entity)) {
             return null;

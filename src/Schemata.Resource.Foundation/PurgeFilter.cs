@@ -47,7 +47,7 @@ internal static class PurgeFilter
         string resolved;
         try {
             resolved = ExpressionLanguageResolver.Resolve(profile, language,
-                                                          n => services.GetKeyedService<ExpressionLanguageDescriptor>(n))
+                                                          services.GetKeyedService<ExpressionLanguageDescriptor>)
                                                  .Language;
         } catch (UnknownExpressionLanguageException) {
             throw InvalidLanguage();

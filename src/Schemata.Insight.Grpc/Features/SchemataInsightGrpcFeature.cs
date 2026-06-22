@@ -34,8 +34,7 @@ public sealed class SchemataInsightGrpcFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddScoped<InsightGrpcService>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IServiceMethodProvider<InsightGrpcService>, InsightServiceMethodProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceMethodProvider<InsightGrpcService>, InsightServiceMethodProvider>());
     }
 
     public override void ConfigureEndpoints(

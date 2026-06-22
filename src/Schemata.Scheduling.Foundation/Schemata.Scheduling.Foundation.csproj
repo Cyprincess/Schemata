@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
   </ItemGroup>
 

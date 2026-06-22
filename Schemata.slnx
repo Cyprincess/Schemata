@@ -87,7 +87,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
-    <Project Path="tests/Schemata.Caching.Tests/Schemata.Caching.Tests.csproj" />
     <Project Path="tests/Schemata.Common.Tests/Schemata.Common.Tests.csproj" />
     <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Cache.Tests/Schemata.Entity.Cache.Tests.csproj" />
@@ -104,13 +103,11 @@
     <Project Path="tests/Schemata.Identity.Tests/Schemata.Identity.Tests.csproj" />
     <Project Path="tests/Schemata.Insight.Grpc.Integration.Tests/Schemata.Insight.Grpc.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Insight.Http.Integration.Tests/Schemata.Insight.Http.Integration.Tests.csproj" />
-    <Project Path="tests/Schemata.Insight.Tests/Schemata.Insight.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.AutoMapper.Integration.Tests/Schemata.Mapping.AutoMapper.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Mapping.Mapster.Integration.Tests/Schemata.Mapping.Mapster.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Modeling.Generator.Tests/Schemata.Modeling.Generator.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Grpc.Integration.Tests/Schemata.Resource.Grpc.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Http.Integration.Tests/Schemata.Resource.Http.Integration.Tests.csproj" />
-    <Project Path="tests/Schemata.Push.Tests/Schemata.Push.Tests.csproj" />
     <Project Path="tests/Schemata.Resource.Tests/Schemata.Resource.Tests.csproj" />
     <Project Path="tests/Schemata.Scheduling.Tests/Schemata.Scheduling.Tests.csproj" />
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />

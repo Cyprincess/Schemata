@@ -37,7 +37,7 @@ public static class AipParser
                                    var s = span.Span.ToString();
                                    return s.EndsWith("s", StringComparison.OrdinalIgnoreCase)
                                        && s.Length > 1
-                                       && s.Substring(0, s.Length - 1).Any(char.IsDigit);
+                                       && s[..^1].Any(char.IsDigit);
                                })
                               .Then((c, t) => new Text(c.Scanner.Cursor.Position, t.Span.ToString()));
         var number = Parsers.Terms.Decimal().Then((c, n) => new Number(c.Scanner.Cursor.Position, n));

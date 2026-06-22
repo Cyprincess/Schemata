@@ -17,7 +17,7 @@ internal sealed class InsightServiceMethodProvider : IServiceMethodProvider<Insi
         context.AddUnaryMethod(
             InsightGrpcMethods.Query,
             [],
-            async (service, request, call) => await service.QueryAsync(request, new CallContext(service, call)));
+            async (service, request, call) => await service.QueryAsync(request, new(service, call)));
     }
 
     #endregion

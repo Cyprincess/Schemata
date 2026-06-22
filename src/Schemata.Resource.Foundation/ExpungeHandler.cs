@@ -35,7 +35,7 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
         ArgumentNullException.ThrowIfNull(entity);
 
         if (entity.DeleteTime is null) {
-            throw new FailedPreconditionException(message: $"Resource '{name ?? entity.CanonicalName ?? entity.Name}' is not deleted.");
+            throw new FailedPreconditionException(message: $"Resource '{name ?? entity.CanonicalName}' is not deleted.");
         }
 
         using (_repository.SuppressSoftDelete()) {
@@ -44,7 +44,6 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
 
         await _repository.CommitAsync(ct);
 
-        // AIP-164 expunge returns an empty response body.
         return new();
     }
 }

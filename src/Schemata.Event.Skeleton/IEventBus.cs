@@ -35,7 +35,7 @@ public interface IEventBus
     /// <param name="ct">A cancellation token.</param>
     Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent {
-        EnsureSourceEntityContract(sourceEntity);
+        EventSourceContract.Ensure(sourceEntity);
         return PublishAsync(@event, ct);
     }
 
@@ -43,30 +43,4 @@ public interface IEventBus
     Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
         where TRequest : IRequest<TResponse>;
 
-    /// <summary>
-    ///     Validates that <paramref name="sourceEntity" /> satisfies the source-snapshot
-    ///     contract (<see cref="ICanonicalName" /> + <see cref="IConcurrency" />). Throws
-    ///     <see cref="InvalidOperationException" /> with the offending type name for invalid sources.
-    /// </summary>
-    /// <remarks>
-    ///     The contract activates only when a publisher chooses to attach a source entity;
-    ///     types that implement <see cref="ICanonicalName" /> for other reasons (DTOs,
-    ///     request bodies, custom-method bindings) remain free of the <see cref="IConcurrency" />
-    ///     requirement until they actually flow into Event/Flow/Scheduling as a source.
-    /// </remarks>
-    public static void EnsureSourceEntityContract(object sourceEntity) {
-        ArgumentNullException.ThrowIfNull(sourceEntity);
-
-        if (sourceEntity is not ICanonicalName) {
-            throw new InvalidOperationException(
-                $"Event source '{sourceEntity.GetType().FullName}' must implement ICanonicalName "
-              + "to be used as a publish source.");
-        }
-
-        if (sourceEntity is not IConcurrency) {
-            throw new InvalidOperationException(
-                $"Event source '{sourceEntity.GetType().FullName}' must implement IConcurrency "
-              + "so the framework can capture an optimistic-snapshot timestamp for consumers.");
-        }
-    }
 }

@@ -62,10 +62,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                                                  .GetRequiredService<IDataProtectionProvider>()
                                                  .CreateProtector(PageToken.ProtectionPurpose);
 
-    private static void ApplyIdentifierPredicates(ResourceRequestContainer<TEntity> container, string? name) {
-        ResourceIdentifiers.Apply(container, name);
-    }
-
     /// <summary>
     ///     Creates the standard missing-resource exception for the target entity type.
     /// </summary>

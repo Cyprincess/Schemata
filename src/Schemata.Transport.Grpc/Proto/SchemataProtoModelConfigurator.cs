@@ -10,7 +10,7 @@ namespace Schemata.Transport.Grpc.Proto;
 
 /// <summary>
 ///     Configures a <see cref="RuntimeTypeModel" /> with the Schemata wire conventions:
-///     property names are resolved through <see cref="SchemataProtoTraits" /> and emitted
+///     property names are resolved through <see cref="ResourceWireNameRules" /> and emitted
 ///     in snake-case via <see cref="InflectorExtensions.Underscore" />.
 /// </summary>
 public static class SchemataProtoModelConfigurator
@@ -39,7 +39,7 @@ public static class SchemataProtoModelConfigurator
 
         var number = 1;
         foreach (var property in properties) {
-            var resolved = SchemataProtoTraits.ResolveWireName(type, property.Name);
+            var resolved = ResourceWireNameRules.ResolveWireName(type, property.Name);
             if (resolved is null) {
                 continue;
             }

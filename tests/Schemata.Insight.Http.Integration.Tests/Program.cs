@@ -49,7 +49,7 @@ using (var scope = app.Services.CreateScope()) {
         new Student { Uid = Guid.NewGuid(), Name = "bob", FullName = "Bob", Age = 19 },
         new Student { Uid = Guid.NewGuid(), Name = "cleo", FullName = "Cleo", Age = 24 });
 
-    context.Customers.Add(new Customer {
+    context.Customers.Add(new() {
         Uid      = Guid.NewGuid(),
         Name     = "ada",
         FullName = "Ada",
@@ -69,7 +69,7 @@ using (var scope = app.Services.CreateScope()) {
         new Purchase { Uid = Guid.NewGuid(), BuyerId = 1, Amount = 50, Status = "open" },
         new Purchase { Uid = Guid.NewGuid(), BuyerId = 2, Amount = 200, Status = "paid" });
 
-    context.InsightSources.Add(new SchemataInsightSource {
+    context.InsightSources.Add(new() {
         Uid    = Guid.NewGuid(),
         Name   = "live_buyers",
         Driver = "repository",

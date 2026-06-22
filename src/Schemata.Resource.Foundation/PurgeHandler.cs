@@ -37,25 +37,26 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         ClaimsPrincipal?  principal,
         CancellationToken ct
     ) {
-        // Validate the filter up front so a malformed request fails fast with INVALID_ARGUMENT.
-        // The compiled expression is discarded; the durable job recompiles it from the persisted
-        // filter string at execution time.
         _ = PurgeFilter.Compile<TEntity>(_services, request.Filter, request.Language);
 
-        var scheduler = _services.GetService<IScheduler>()
-                     ?? throw new InvalidOperationException("Purge requires a scheduler.");
+        var scheduler = _services.GetService<IScheduler>();
+        if (scheduler == null) {
+            throw new InvalidOperationException("Purge requires a scheduler.");
+        }
 
         var uid        = Identifiers.NewUid();
         var collection = ResourceNameDescriptor.ForType<SchemataJobExecution>().Collection;
-        var argsJson   = JsonSerializer.Serialize(
-            new PurgeOperationArgs { Filter = request.Filter, Language = request.Language, Force = request.Force },
-            SchemataJson.Default);
+        var args   = JsonSerializer.Serialize(new PurgeOperationArgs {
+            Filter   = request.Filter,
+            Language = request.Language,
+            Force    = request.Force,
+        }, SchemataJson.Default);
 
         var context = new JobContext {
             Job          = $"{collection}/{uid:n}:{Verbs.Purge}",
             ExecutionUid = uid,
             Method       = Verbs.Purge,
-            ArgsJson     = argsJson,
+            ArgsJson     = args,
         };
 
         var execution = await scheduler.TriggerAsync<PurgeJob<TEntity>>(context, ct);

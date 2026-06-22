@@ -82,10 +82,10 @@ public class AipPushdownPlannerShould
         var pushed   = _compiler.Compile<Row, bool>(plan.Pushed!).Compile();
         var residual = _compiler.Compile<Row, bool>(plan.Residual!).Compile();
 
-        Assert.True(pushed(new Row { Age  = 1 }));
-        Assert.False(pushed(new Row { Age = 2 }));
-        Assert.True(residual(new Row { Profile  = new() { Locale = "en" } }));
-        Assert.False(residual(new Row { Profile = new() { Locale = "fr" } }));
+        Assert.True(pushed(new() { Age        = 1 }));
+        Assert.False(pushed(new() { Age       = 2 }));
+        Assert.True(residual(new() { Profile  = new() { Locale = "en" } }));
+        Assert.False(residual(new() { Profile = new() { Locale = "fr" } }));
     }
 
     [Fact]

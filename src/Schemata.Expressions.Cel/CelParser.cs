@@ -264,12 +264,12 @@ public static class CelParser
                     builder.Append(escaped);
                     break;
                 case 'u':
-                    builder.Append((char)int.Parse(source.Substring(i + 1, 4), NumberStyles.HexNumber,
+                    builder.Append((char)int.Parse(source.AsSpan(i + 1, 4), NumberStyles.HexNumber,
                                                    CultureInfo.InvariantCulture));
                     i += 4;
                     break;
                 case 'U':
-                    builder.Append(char.ConvertFromUtf32(int.Parse(source.Substring(i + 1, 8), NumberStyles.HexNumber,
+                    builder.Append(char.ConvertFromUtf32(int.Parse(source.AsSpan(i + 1, 8), NumberStyles.HexNumber,
                                                                     CultureInfo.InvariantCulture)));
                     i += 8;
                     break;
@@ -327,7 +327,7 @@ public static class CelParser
                     bytes.Add((byte)escaped);
                     break;
                 case 'x':
-                    bytes.Add(byte.Parse(source.Substring(i + 1, 2), NumberStyles.HexNumber,
+                    bytes.Add(byte.Parse(source.AsSpan(i + 1, 2), NumberStyles.HexNumber,
                                          CultureInfo.InvariantCulture));
                     i += 2;
                     break;

@@ -315,7 +315,7 @@ internal sealed class AipCompileVisitor
     }
 
     private static string LowerFirst(string name) {
-        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
+        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
     }
 
     private static Expression BuildBinary(IBinary op, Expression left, Expression right) {
@@ -368,7 +368,7 @@ internal sealed class AipCompileVisitor
         }
 
         var leading  = pattern.Length > 0 && pattern[0] == '*';
-        var trailing = pattern.Length > 0 && pattern[pattern.Length - 1] == '*';
+        var trailing = pattern.Length > 0 && pattern[^1] == '*';
 
         var start = leading ? 1 : 0;
         var end   = trailing ? pattern.Length - 1 : pattern.Length;
@@ -376,11 +376,11 @@ internal sealed class AipCompileVisitor
 
         // Trim any extra leading/trailing wildcards that don't affect semantics: "**foo" ≡ "*foo".
         while (inner.Length > 0 && inner[0] == '*') {
-            inner = inner.Substring(1);
+            inner = inner[1..];
         }
 
-        while (inner.Length > 0 && inner[inner.Length - 1] == '*') {
-            inner = inner.Substring(0, inner.Length - 1);
+        while (inner.Length > 0 && inner[^1] == '*') {
+            inner = inner[..^1];
         }
 
         // Reject inner wildcards — "A*B" is not a supported AIP-160 simple wildcard.
@@ -455,7 +455,7 @@ internal sealed class AipCompileVisitor
             return false;
         }
 
-        if (!double.TryParse(text.Substring(0, text.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)) {
+        if (!double.TryParse(text.AsSpan(0, text.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)) {
             return false;
         }
 

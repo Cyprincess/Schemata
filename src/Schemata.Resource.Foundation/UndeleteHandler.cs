@@ -43,7 +43,7 @@ public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<T
         ArgumentNullException.ThrowIfNull(entity);
 
         if (entity.DeleteTime is null) {
-            throw new AlreadyExistsException(message: $"Resource '{name ?? entity.CanonicalName ?? entity.Name}' is not deleted.");
+            throw new AlreadyExistsException(message: $"Resource '{name ?? entity.CanonicalName}' is not deleted.");
         }
 
         entity.DeleteTime = null;

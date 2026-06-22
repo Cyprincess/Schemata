@@ -32,14 +32,14 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
         }
 
         if (residual.Count == 0) {
-            return new ExpressionPushdownPlan(filter, null);
+            return new(filter, null);
         }
 
         if (pushed.Count == 0) {
-            return new ExpressionPushdownPlan(null, filter);
+            return new(null, filter);
         }
 
-        return new ExpressionPushdownPlan(Rebuild(filter, pushed, "\u0001P"), Rebuild(filter, residual, "\u0001R"));
+        return new(Rebuild(filter, pushed, "\u0001P"), Rebuild(filter, residual, "\u0001R"));
     }
 
     #endregion
@@ -48,7 +48,7 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
     // residual parts on distinct compile-cache keys, since the cache is keyed by Filter.Source.
     private static Filter Rebuild(Filter original, List<Factor> factors, string suffix) {
         var position = factors[0].Position;
-        return new Filter(position, new Sequence(position, factors), null) { Source = original.Source + suffix };
+        return new(position, new(position, factors), null) { Source = original.Source + suffix };
     }
 
     private static bool IsPushable(Filter node, ExpressionCapabilities caps) {

@@ -28,7 +28,7 @@ public sealed partial class ProcessRuntime
         CancellationToken                     ct          = default
     ) {
         if (sourceEntity is not null) {
-            IEventBus.EnsureSourceEntityContract(sourceEntity);
+            EventSourceContract.Ensure(sourceEntity);
         }
 
         var reg = _registry.GetRegistration(processName)

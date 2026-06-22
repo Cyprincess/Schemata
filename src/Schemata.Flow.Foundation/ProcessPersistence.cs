@@ -90,26 +90,26 @@ internal sealed class ProcessPersistence
 
     /// <summary>Copies persisted process fields from <paramref name="source"/> into <paramref name="target"/>.</summary>
     public static void SyncProcessFields(SchemataProcess target, SchemataProcess source) {
-        target.Uid            = source.Uid;
-        target.Name           = source.Name;
-        target.CanonicalName  = source.CanonicalName;
-        target.DefinitionName = source.DefinitionName;
-        target.Variables      = source.Variables;
-        target.StateId        = source.StateId;
-        target.State          = source.State;
-        target.WaitingAtId    = source.WaitingAtId;
-        target.WaitingAt      = source.WaitingAt;
-        target.SourceType    = source.SourceType;
-        target.Source = source.Source;
-        target.SourceTimestamp     = source.SourceTimestamp;
-        target.DisplayName    = source.DisplayName;
-        target.DisplayNames   = source.DisplayNames;
-        target.Description    = source.Description;
-        target.Descriptions   = source.Descriptions;
-        target.Timestamp      = source.Timestamp;
-        target.CreateTime     = source.CreateTime;
-        target.UpdateTime     = source.UpdateTime;
-        target.DeleteTime     = source.DeleteTime;
-        target.PurgeTime      = source.PurgeTime;
+        target.Uid             = source.Uid;
+        target.Name            = source.Name;
+        target.CanonicalName   = source.CanonicalName;
+        target.DefinitionName  = source.DefinitionName;
+        target.Variables       = source.Variables;
+        target.StateId         = source.StateId;
+        target.State           = source.State;
+        target.WaitingAtId     = source.WaitingAtId;
+        target.WaitingAt       = source.WaitingAt;
+        target.SourceType      = source.SourceType;
+        target.Source          = source.Source;
+        target.SourceTimestamp = source.SourceTimestamp;
+        target.DisplayName     = source.DisplayName;
+        target.DisplayNames    = source.DisplayNames;
+        target.Description     = source.Description;
+        target.Descriptions    = source.Descriptions;
+        target.Timestamp       = source.Timestamp;
+        target.CreateTime      = source.CreateTime;
+        target.UpdateTime      = source.UpdateTime;
+        target.DeleteTime      = source.DeleteTime;
+        target.PurgeTime       = source.PurgeTime;
     }
 }

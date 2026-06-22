@@ -146,13 +146,13 @@ public static class CelValues
 
         try {
             return (left, right) switch {
-                (long l, long r) => checked(l - r),
-                (ulong l, ulong r) => checked(l - r),
-                (double l, double r) => l - r,
+                (long l, long r)                 => checked(l - r),
+                (ulong l, ulong r)               => checked(l - r),
+                (double l, double r)             => l - r,
                 (CelTimestamp l, CelTimestamp r) => DurationFromNanos(checked(ToNanos(l) - ToNanos(r))),
-                (CelTimestamp l, CelDuration r) => AddDuration(l, new CelDuration(-r.Seconds, -r.Nanos)),
-                (CelDuration l, CelDuration r) => DurationFromNanos(checked(ToNanos(l) - ToNanos(r))),
-                _ => Error("no matching overload"),
+                (CelTimestamp l, CelDuration r)  => AddDuration(l, new(-r.Seconds, -r.Nanos)),
+                (CelDuration l, CelDuration r)   => DurationFromNanos(checked(ToNanos(l) - ToNanos(r))),
+                _                                => Error("no matching overload"),
             };
         } catch (OverflowException) {
             return Error("overflow");
@@ -972,7 +972,7 @@ public static class CelValues
             return dto.ToUniversalTime();
         }
 
-        if (TimeSpan.TryParse(zone.StartsWith("+", StringComparison.Ordinal) ? zone.Substring(1) : zone, CultureInfo.InvariantCulture, out var offset)) {
+        if (TimeSpan.TryParse(zone.StartsWith("+", StringComparison.Ordinal) ? zone[1..] : zone, CultureInfo.InvariantCulture, out var offset)) {
             if (zone.StartsWith("-", StringComparison.Ordinal) && offset > TimeSpan.Zero) {
                 offset = -offset;
             }

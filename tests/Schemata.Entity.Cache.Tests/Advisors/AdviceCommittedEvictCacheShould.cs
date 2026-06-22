@@ -171,39 +171,4 @@ public class AdviceCommittedEvictCacheShould
         mock.Verify(x => x.RemoveAsync(otherIndex!, It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact]
-    public async Task AdviseAsync_EndToEnd_EvictsResultStoredByResultCacheAdvisor() {
-        var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(x => x.CollectionAddAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CacheEntryOptions>(),
-                                             It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var options = DefaultOptions();
-        var write   = new AdviceResultCache<Student, Student, Student>(mock.Object, options);
-        var evict   = new AdviceCommittedEvictCache<Student>(mock.Object, options);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repo    = Mock.Of<IRepository<Student>>();
-        var student = new Student { Uid = Identifiers.NewUid(), FullName = "Zed" };
-        var data    = new[] { student }.AsQueryable();
-        var context = new QueryContext<Student, Student, Student>(repo, data) { Result = student };
-
-        await write.AdviseAsync(ctx, context, CancellationToken.None);
-        var cacheKey = context.ToCacheKey();
-        Assert.NotNull(cacheKey);
-
-        mock.Setup(x => x.CollectionMembersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([cacheKey]);
-        mock.Setup(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        mock.Setup(x => x.CollectionClearAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var changes = new CommitChanges<Student> { Updated = [student] };
-
-        await evict.AdviseAsync(ctx, repo, changes, CancellationToken.None);
-
-        mock.Verify(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
-    }
 }

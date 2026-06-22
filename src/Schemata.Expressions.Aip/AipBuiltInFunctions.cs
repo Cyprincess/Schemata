@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 using Parlot;
 using Schemata.Expressions.Skeleton;
 
@@ -33,11 +31,7 @@ public static class AipBuiltInFunctions
     ///     Creates a cache-key fragment for option-dependent function bindings.
     /// </summary>
     public static string Fingerprint(ExpressionCompileOptions? options) {
-        if (options is null || options.Functions.Count == 0) {
-            return "builtins:v1;functions:none";
-        }
-
-        return "builtins:v1;functions:" + string.Join(",", options.Functions.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}:{RuntimeHelpers.GetHashCode(kv.Value)}"));
+        return ExpressionCompileOptions.Fingerprint(options);
     }
 
     private static Expression BuildTimestamp(IReadOnlyList<Expression> args) {
@@ -50,7 +44,7 @@ public static class AipBuiltInFunctions
     }
 
     private static string GetStringArg(string name, IReadOnlyList<Expression> args) {
-        if (args.Count != 1 || args[0] is not ConstantExpression { Value: string value }) {
+        if (args is not [ConstantExpression { Value: string value }]) {
             throw new ParseException($"AIP function '{name}' expects one string literal argument.", default);
         }
 
@@ -69,7 +63,7 @@ public static class AipBuiltInFunctions
                 throw new ParseException($"Invalid AIP duration '{source}'.", default);
             }
 
-            var value = double.Parse(source.Substring(start, i - start), CultureInfo.InvariantCulture);
+            var value = double.Parse(source.AsSpan(start, i - start), CultureInfo.InvariantCulture);
             total += source[i++] switch {
                 'h'   => TimeSpan.FromHours(value),
                 'm'   => TimeSpan.FromMinutes(value),

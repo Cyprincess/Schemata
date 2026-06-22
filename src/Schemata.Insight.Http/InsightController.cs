@@ -48,6 +48,6 @@ public sealed class InsightController : ControllerBase
             var _                            => 400,
         };
 
-        return new SchemataException(code, ex.Reason, ex.Message);
+        return new(code, ex.Reason, ex.Message);
     }
 }

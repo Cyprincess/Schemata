@@ -7,10 +7,11 @@ using Schemata.Core.Features;
 using Schemata.Event.Foundation.Features;
 using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
+using Schemata.Flow.Event.Events;
 using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Foundation.Features;
-using Schemata.Flow.Skeleton.Events;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Event.Features;
 
@@ -32,6 +33,7 @@ public sealed class SchemataFlowEventFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowEventTransitionAdvisor>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
         services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 
         services.Configure<EventTypeRegistryConfiguration>(options => {

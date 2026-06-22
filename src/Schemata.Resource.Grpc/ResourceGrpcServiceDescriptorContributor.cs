@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Grpc.Internal;
 using Schemata.Transport.Grpc;
 using ProtoServiceDescriptor = Google.Protobuf.Reflection.ServiceDescriptor;
 
@@ -25,9 +26,7 @@ internal sealed class ResourceGrpcServiceDescriptorContributor : IGrpcServiceDes
         var options = serviceProvider.GetRequiredService<IOptions<SchemataResourceOptions>>();
 
         var types = options.Value.Resources
-                           .Where(r => r.Value.Endpoints is null
-                                    || r.Value.Endpoints.Count == 0
-                                    || r.Value.Endpoints.Any(e => e == GrpcResourceAttribute.Name))
+                           .Where(r => GrpcResourceHelper.IsGrpcEnabled(r.Value))
                            .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
                            .ToArray();
 

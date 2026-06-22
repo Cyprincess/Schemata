@@ -1,7 +1,5 @@
 using System;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 using Parlot;
 using Schemata.Expressions.Cel.Expressions;
 using Schemata.Expressions.Skeleton;
@@ -63,16 +61,7 @@ public sealed class CelCompiler : IExpressionCompiler
 
     #endregion
 
-    // Custom functions are the only options-dependent compile input; their identity must be part of the
-    // cache key so two option sets that bind the same name to different delegates do not share a result.
     private static string Fingerprint(ExpressionCompileOptions? options) {
-        if (options is null || options.Functions.Count == 0) {
-            return "builtins:v1;functions:none";
-        }
-
-        return "builtins:v1;functions:" + string.Join(
-            ",",
-            options.Functions.OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                   .Select(kv => $"{kv.Key}:{RuntimeHelpers.GetHashCode(kv.Value)}"));
+        return ExpressionCompileOptions.Fingerprint(options);
     }
 }

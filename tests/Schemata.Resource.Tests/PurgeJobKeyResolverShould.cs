@@ -41,8 +41,8 @@ public class PurgeJobKeyResolverShould
 
     private static PurgeJobKeyResolver Resolver() {
         var options = new SchemataResourceOptions();
-        options.Resources[typeof(TrashStudent).TypeHandle] = new ResourceAttribute(typeof(TrashStudent));
-        options.Resources[typeof(Student).TypeHandle]      = new ResourceAttribute(typeof(Student));
-        return new PurgeJobKeyResolver(new DefaultResourceTypeResolver(Options.Create(options)));
+        options.Resources[typeof(TrashStudent).TypeHandle] = new(typeof(TrashStudent));
+        options.Resources[typeof(Student).TypeHandle]      = new(typeof(Student));
+        return new(new DefaultResourceTypeResolver(Options.Create(options)));
     }
 }

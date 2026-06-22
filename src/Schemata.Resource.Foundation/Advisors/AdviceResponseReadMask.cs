@@ -8,6 +8,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Mapping.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -35,7 +36,7 @@ public static class AdviceResponseReadMask
     public static void Trim<T>(T target, string mask) where T : class {
         MaskTree tree;
         try {
-            tree = MaskTree.FromWire(typeof(T), mask, true, ResourceWireMask.Convert);
+            tree = MaskTree.FromWire(typeof(T), mask, true, ResourceWireNameRules.ResolveClrName);
         } catch (ArgumentException ex) {
             throw InvalidReadMaskPath(mask, ex.Message);
         }

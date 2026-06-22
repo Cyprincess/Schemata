@@ -148,7 +148,7 @@ public sealed class InsightPlanBuilder
         if (transform.Compute is { } compute) {
             var fields = ImmutableArray.CreateBuilder<ComputedField>(compute.Fields.Length);
             foreach (var field in compute.Fields) {
-                fields.Add(new ComputedField(field.Alias, ParseValue(field.Expression, request)));
+                fields.Add(new(field.Alias, ParseValue(field.Expression, request)));
             }
 
             return new ComputeNode(input, fields.ToImmutable()) { SourceSet = sourceSet };
@@ -157,7 +157,7 @@ public sealed class InsightPlanBuilder
         if (transform.GroupBy is { } group) {
             var aggregations = ImmutableArray.CreateBuilder<Aggregation>(group.Aggregations.Length);
             foreach (var aggregation in group.Aggregations) {
-                aggregations.Add(new Aggregation(aggregation.Alias, aggregation.Function, aggregation.Field));
+                aggregations.Add(new(aggregation.Alias, aggregation.Function, aggregation.Field));
             }
 
             return new GroupNode(input, group.Keys, aggregations.ToImmutable()) { SourceSet = sourceSet };
@@ -201,7 +201,7 @@ public sealed class InsightPlanBuilder
         }
 
         try {
-            return new ParsedExpression(compiler.Parse(expression.Source), language, kind);
+            return new(compiler.Parse(expression.Source), language, kind);
         } catch (Exception ex) when (ex is ExpressionException or ArgumentException) {
             throw new InsightValidationException(InsightReasons.InvalidExpression, $"Invalid expression '{expression.Source}'.");
         }
@@ -229,7 +229,7 @@ public sealed class InsightPlanBuilder
                 var alias = selection.Alias
                          ?? throw new InsightValidationException(InsightReasons.InvalidArgument,
                                                                 "A computed selection requires an alias.");
-                items.Add(new SelectionItem(alias, SelectionKind.Expression, null, ParseValue(expression, request), [], null));
+                items.Add(new(alias, SelectionKind.Expression, null, ParseValue(expression, request), [], null));
                 continue;
             }
 
@@ -238,7 +238,7 @@ public sealed class InsightPlanBuilder
             }
 
             var fieldAlias = selection.Alias ?? LastSegment(selection.Field);
-            items.Add(new SelectionItem(fieldAlias, SelectionKind.Field, selection.Field, null, [], null));
+            items.Add(new(fieldAlias, SelectionKind.Field, selection.Field, null, [], null));
         }
 
         return items.ToImmutable();
@@ -271,7 +271,7 @@ public sealed class InsightPlanBuilder
         node = new SelectionNode(node, childItems) { SourceSet = childSet };
 
         var alias = selection.Alias ?? LastSegment(selection.Field);
-        return new SelectionItem(alias, SelectionKind.Nested, selection.Field, null, childItems, node);
+        return new(alias, SelectionKind.Nested, selection.Field, null, childItems, node);
     }
 
     private static SourceConfig ParentConfig(string field, IReadOnlyDictionary<string, SourceConfig> configs) {

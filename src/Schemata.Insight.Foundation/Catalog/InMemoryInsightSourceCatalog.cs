@@ -29,11 +29,11 @@ public sealed class InMemoryInsightSourceCatalog : IInsightSourceCatalog
     #region IInsightSourceCatalog Members
 
     public ValueTask<SourceConfig?> ResolveAsync(string name, CancellationToken ct) {
-        return new ValueTask<SourceConfig?>(_sources.GetValueOrDefault(name));
+        return new(_sources.GetValueOrDefault(name));
     }
 
     public ValueTask<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct) {
-        return new ValueTask<IReadOnlyList<string>>(_sources.Keys.ToList());
+        return new(_sources.Keys.ToList());
     }
 
     #endregion

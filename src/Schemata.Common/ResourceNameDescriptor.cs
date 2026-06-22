@@ -56,7 +56,7 @@ public sealed class ResourceNameDescriptor
         _segments = new Segment[parts.Length];
         for (var i = 0; i < parts.Length; i++) {
             var p = parts[i];
-            if (p.Length > 2 && p[0] == '{' && p[p.Length - 1] == '}') {
+            if (p.Length > 2 && p[0] == '{' && p[^1] == '}') {
                 var name = p.Substring(1, p.Length - 2);
                 _segments[i] = new(p, name, ResolvePropertyName(name.Pascalize()));
             } else {
@@ -64,10 +64,10 @@ public sealed class ResourceNameDescriptor
             }
         }
 
-        var leaf = _segments[_segments.Length - 1];
+        var leaf = _segments[^1];
         if (leaf.IsPlaceholder) {
             _leafSegment   = leaf;
-            Collection     = _segments.Length >= 2 ? _segments[_segments.Length - 2].Raw : "";
+            Collection     = _segments.Length >= 2 ? _segments[^2].Raw : "";
             CollectionPath = string.Join("/", SliceSegments(_segments, 0, _segments.Length - 1).Select(s => s.Raw));
         } else {
             _leafSegment   = null;

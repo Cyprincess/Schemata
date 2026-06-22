@@ -156,7 +156,6 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     }
 
     private static NotFoundException Blocked(string? name) {
-        return ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(
-            name ?? ResourceNameDescriptor.ForType<TEntity>().Collection);
+        return ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name ?? ResourceNameDescriptor.ForType<TEntity>().Collection);
     }
 }

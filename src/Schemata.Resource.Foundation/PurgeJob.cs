@@ -57,11 +57,6 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
     ) {
         var repository = _services.GetRequiredService<IRepository<TEntity>>();
 
-        IQueryable<TEntity> Query(IQueryable<TEntity> q) {
-            var eligible = q.Where(row => row.DeleteTime != null);
-            return filter is null ? eligible : eligible.Where(filter);
-        }
-
         var result = new PurgeResponse();
         using (repository.SuppressQuerySoftDelete()) {
             result.PurgeCount = await repository.LongCountAsync(Query, ct);
@@ -70,7 +65,7 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
         if (!force) {
             using (repository.SuppressQuerySoftDelete()) {
                 await foreach (var row in repository.ListAsync(q => Query(q).Take(SampleLimit), ct)) {
-                    var item = row.CanonicalName ?? row.Name;
+                    var item = row.CanonicalName;
                     if (!string.IsNullOrWhiteSpace(item)) {
                         result.PurgeSample.Add(item);
                     }
@@ -90,5 +85,10 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
         await repository.CommitAsync(ct);
 
         return result;
+
+        IQueryable<TEntity> Query(IQueryable<TEntity> q) {
+            var eligible = q.Where(row => row.DeleteTime != null);
+            return filter is null ? eligible : eligible.Where(filter);
+        }
     }
 }

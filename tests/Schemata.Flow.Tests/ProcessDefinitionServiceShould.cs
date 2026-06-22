@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Moq;
+using Schemata.Flow.Foundation;
 using Schemata.Flow.Grpc.Services;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -25,7 +26,7 @@ public class ProcessDefinitionServiceShould
         registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
         registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
 
-        var service = new ProcessDefinitionService(registry.Object);
+        var service = new ProcessDefinitionService(new(registry.Object));
 
         var result = await service.ListProcessDefinitionsAsync(new());
 

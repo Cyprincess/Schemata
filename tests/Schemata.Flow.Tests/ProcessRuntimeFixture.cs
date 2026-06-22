@@ -10,6 +10,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
+using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
@@ -95,10 +96,16 @@ internal sealed class ProcessRuntimeFixture
                .Callback((FlowSourceEntity entity, CancellationToken _) => SourceUpdates.Add(entity))
                .Returns(Task.CompletedTask);
 
+        EventBus.Setup(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+        EventBus.Setup(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<object>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
         var services = new ServiceCollection();
         services.AddSingleton(Options.Create(new SchemataFlowOptions { SourceWriteback = sourceWriteback }));
         services.AddSingleton(registry.Object);
-        services.AddSingleton<IEventBus>(EventBus);
+        services.AddSingleton(EventBus.Object);
+        services.AddSingleton<IProcessLifecycleObserver, ProcessEventLifecycleObserver>();
         services.AddKeyedSingleton(SchemataConstants.FlowEngines.StateMachine, Engine.Object);
         services.AddSingleton(Processes.Object);
         services.AddSingleton(Transitions.Object);
@@ -108,7 +115,7 @@ internal sealed class ProcessRuntimeFixture
     }
 
     public Mock<IFlowRuntime> Engine { get; } = new();
-    public RecordingEventBus EventBus { get; } = new();
+    public Mock<IEventBus> EventBus { get; } = new();
     public ProcessInstance AdvanceResult { get; set; } = new() { StateId = "review", State = "Review" };
     public Exception? AdvanceException { get; set; }
     public List<SchemataProcess> Persisted { get; } = [];
@@ -174,37 +181,6 @@ internal sealed class ProcessRuntimeFixture
         public string? Name { get; set; }
 
         public string? CanonicalName { get; set; }
-
-        #endregion
-    }
-
-    #endregion
-
-    #region Nested type: RecordingEventBus
-
-    internal sealed class RecordingEventBus : IEventBus
-    {
-        public List<(IEvent Event, object? Source)> Published { get; } = [];
-
-        #region IEventBus Members
-
-        public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
-            where TEvent : IEvent {
-            Published.Add((@event, null));
-            return Task.CompletedTask;
-        }
-
-        public Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
-            where TEvent : IEvent {
-            IEventBus.EnsureSourceEntityContract(sourceEntity);
-            Published.Add((@event, sourceEntity));
-            return Task.CompletedTask;
-        }
-
-        public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-            where TRequest : IRequest<TResponse> {
-            throw new NotSupportedException();
-        }
 
         #endregion
     }

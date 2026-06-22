@@ -31,7 +31,7 @@ public static class DynamicValues
     public static object? Member(object? container, string name) {
         switch (container) {
             case IReadOnlyDictionary<string, object?> typed:
-                return typed.TryGetValue(name, out var value) ? value : Missing;
+                return typed.GetValueOrDefault(name, Missing);
             case IDictionary<string, object?> mutable:
                 return mutable.TryGetValue(name, out var entry) ? entry : Missing;
             case IDictionary untyped:

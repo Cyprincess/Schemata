@@ -152,11 +152,7 @@ public static class AppDomainTypeCache
     public static PropertyInfo? GetProperty(Type type, string name) {
         var properties = GetProperties(type);
 
-        if (properties.TryGetValue(name, out var value)) {
-            return value;
-        }
-
-        return null;
+        return properties.GetValueOrDefault(name);
     }
 
     /// <summary>
@@ -173,10 +169,6 @@ public static class AppDomainTypeCache
                               .ToDictionary(p => p.Name, StringComparer.Ordinal),
             type);
 
-        if (properties.TryGetValue(name, out var value)) {
-            return value;
-        }
-
-        return null;
+        return properties.GetValueOrDefault(name);
     }
 }

@@ -65,29 +65,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return requestResult;
         }
 
-        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        if (!string.IsNullOrWhiteSpace(request.Parent)) {
-            var parent = descriptor.ParseParent(request.Parent);
-            if (parent is null) {
-                // A supplied parent that misses the resource's pattern is a client error.
-                throw new ValidationException([new() {
-                    Field       = nameof(ListRequest.Parent).Underscore(),
-                    Description = SchemataResources.GetResourceString(SchemataResources.ST2009),
-                    Reason      = FieldReasons.InvalidParent,
-                }]);
-            }
-
-            if (parent.Any(kv => kv.Value == "-") && !descriptor.SupportsReadAcross) {
-                throw new ValidationException([new() {
-                    Field       = nameof(ListRequest.Parent).Underscore(),
-                    Description = SchemataResources.GetResourceString(SchemataResources.ST2002),
-                    Reason      = FieldReasons.CrossParentUnsupported,
-                }]);
-            }
-
-            var predicate = descriptor.BuildParentPredicate<TEntity>(parent);
-            container.ApplyModification(predicate);
-        }
+        ResourceIdentifiers.ApplyParent(container, request.Parent);
 
         var token = await PageToken.FromStringAsync(request.PageToken, Protector)
                  ?? new PageToken {

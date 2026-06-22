@@ -123,7 +123,7 @@ public sealed class PlanExecutor
                                                ct)
                                           .ConfigureAwait(false);
 
-        return new QueryInsightResponse {
+        return new() {
             Rows          = page,
             Schema        = [..result.Schema],
             NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
@@ -153,7 +153,7 @@ public sealed class PlanExecutor
                                                ct)
                                           .ConfigureAwait(false);
 
-        return new QueryInsightResponse {
+        return new() {
             Rows          = page,
             Schema        = JoinSchema(root),
             NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
@@ -227,7 +227,7 @@ public sealed class PlanExecutor
 
         var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
         foreach (var item in selection.Items) {
-            fields.Add(new FieldDescriptor(item.Alias, FieldType.Object, null, item.Kind is SelectionKind.Nested, []));
+            fields.Add(new(item.Alias, FieldType.Object, null, item.Kind is SelectionKind.Nested, []));
         }
 
         return fields.ToImmutable();

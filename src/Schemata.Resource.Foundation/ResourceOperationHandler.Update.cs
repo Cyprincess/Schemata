@@ -82,7 +82,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         request.CanonicalName = name;
 
         var container = new ResourceRequestContainer<TEntity>();
-        ApplyIdentifierPredicates(container, name);
+        ResourceIdentifiers.Apply(container, name);
 
         var requestResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
             ctx,
@@ -136,7 +136,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
     private static List<string> ResolveMaskFields(string mask) {
         try {
-            return MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireMask.Convert).LeafPaths().ToList();
+            return MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireNameRules.ResolveClrName).LeafPaths().ToList();
         } catch (ArgumentException ex) {
             throw InvalidUpdateMaskPath(mask, ex.Message);
         }

@@ -3,8 +3,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
+using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Http.Controllers;
 
@@ -12,16 +12,16 @@ namespace Schemata.Flow.Http.Controllers;
 [ApiController]
 [Route("~/v1/processes:definitions")]
 public sealed class ProcessDefinitionsController(
-    IProcessRegistry                registry,
+    ProcessDefinitionQueryService   query,
     IOptions<JsonSerializerOptions> json
 ) : ControllerBase
 {
     /// <summary>Lists registered Flow process definitions.</summary>
     [HttpGet]
     public IActionResult ListProcessDefinitions() {
-        var entities = registry.GetRegisteredProcesses()
-                               .Select(n => new ProcessDefinitionInfo { CanonicalName = $"definitions/{n}" })
-                               .ToList();
+        var entities = query.ListProcessDefinitions()
+                            .Select(n => new ProcessDefinitionInfo { CanonicalName = n.CanonicalName })
+                            .ToList();
         return new JsonResult(new ListResultBase<ProcessDefinitionInfo> { Entities = entities }, json.Value);
     }
 }

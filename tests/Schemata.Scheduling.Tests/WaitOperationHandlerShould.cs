@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Entity.Repository;
-using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 

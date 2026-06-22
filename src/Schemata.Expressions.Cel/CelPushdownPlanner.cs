@@ -41,14 +41,14 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
         }
 
         if (residual.Count == 0) {
-            return new ExpressionPushdownPlan(node, null);
+            return new(node, null);
         }
 
         if (pushed.Count == 0) {
-            return new ExpressionPushdownPlan(null, node);
+            return new(null, node);
         }
 
-        return new ExpressionPushdownPlan(Rebuild(node, pushed, "\u0001P"), Rebuild(node, residual, "\u0001R"));
+        return new(Rebuild(node, pushed, "\u0001P"), Rebuild(node, residual, "\u0001R"));
     }
 
     #endregion

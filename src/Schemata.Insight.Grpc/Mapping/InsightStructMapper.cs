@@ -21,11 +21,11 @@ public static class InsightStructMapper
         };
 
         foreach (var source in message.Sources) {
-            request.Sources.Add(new SourceBinding(source.Alias, source.Name));
+            request.Sources.Add(new(source.Alias, source.Name));
         }
 
         foreach (var join in message.Joins) {
-            request.Joins.Add(new JoinSpec(join.Left, join.Right, join.Kind, ToExpression(join.On)));
+            request.Joins.Add(new(join.Left, join.Right, join.Kind, ToExpression(join.On)));
         }
 
         foreach (var transformation in message.Transformations) {
@@ -73,54 +73,54 @@ public static class InsightStructMapper
 
     private static InsightValue ToValue(object? value) {
         return value switch {
-            null                                                  => new InsightValue { NullValue = true },
-            string text                                           => new InsightValue { StringValue = text },
-            bool flag                                             => new InsightValue { BoolValue = flag },
+            null        => new() { NullValue   = true },
+            string text => new() { StringValue = text },
+            bool flag   => new() { BoolValue   = flag },
             byte or sbyte or short or ushort or int or uint or long
-                                                                  => new InsightValue { IntValue = Convert.ToInt64(value) },
-            ulong unsigned                                        => new InsightValue { IntValue = unchecked((long)unsigned) },
-            float or double or decimal                            => new InsightValue { NumberValue = Convert.ToDouble(value) },
-            IReadOnlyDictionary<string, object?> nested           => new InsightValue { StructValue = ToStruct(nested) },
-            IEnumerable<IReadOnlyDictionary<string, object?>> list => new InsightValue {
+                                                                  => new() { IntValue = Convert.ToInt64(value) },
+            ulong unsigned                              => new() { IntValue    = unchecked((long)unsigned) },
+            float or double or decimal                  => new() { NumberValue = Convert.ToDouble(value) },
+            IReadOnlyDictionary<string, object?> nested => new() { StructValue = ToStruct(nested) },
+            IEnumerable<IReadOnlyDictionary<string, object?>> list => new() {
                 ListValue = list.Select(item => new InsightValue { StructValue = ToStruct(item) }).ToList(),
             },
-            IEnumerable<object?> items                            => new InsightValue { ListValue = items.Select(ToValue).ToList() },
-            var other                                            => new InsightValue { StringValue = other.ToString() },
+            IEnumerable<object?> items => new() { ListValue   = items.Select(ToValue).ToList() },
+            var other                  => new() { StringValue = other.ToString() },
         };
     }
 
     private static InsightExpression ToExpression(InsightExpressionMessage message) {
-        return new InsightExpression(message.Source, message.Language);
+        return new(message.Source, message.Language);
     }
 
     private static TransformationSpec ToTransformation(TransformationMessage message) {
         var spec = new TransformationSpec();
 
         if (message.Filter is { } filter) {
-            spec.Filter = new FilterTransform(ToExpression(filter));
+            spec.Filter = new(ToExpression(filter));
         }
 
         if (message.Compute is { Count: > 0 } compute) {
-            spec.Compute = new ComputeTransform(
+            spec.Compute = new(
                 [..compute.Select(field => new ComputedFieldSpec(ToExpression(field.Expression), field.Alias))]);
         }
 
         if (message.IsGroupBy) {
-            spec.GroupBy = new GroupByTransform(
+            spec.GroupBy = new(
                 [..message.GroupByKeys ?? []],
                 [..(message.GroupByAggregations ?? []).Select(a => new AggregationSpec(a.Field, a.Function, a.Alias))]);
         }
 
         if (message.OrderBy is { } orderBy) {
-            spec.OrderBy = new OrderByTransform(orderBy);
+            spec.OrderBy = new(orderBy);
         }
 
         if (message.Top is { } top) {
-            spec.Top = new TopTransform(top);
+            spec.Top = new(top);
         }
 
         if (message.Skip is { } skip) {
-            spec.Skip = new SkipTransform(skip);
+            spec.Skip = new(skip);
         }
 
         return spec;

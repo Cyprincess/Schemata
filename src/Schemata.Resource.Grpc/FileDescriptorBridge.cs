@@ -81,7 +81,7 @@ internal static class FileDescriptorBridge
         messages[listResultType] = $"List{descriptor.Plural}Response";
 
         foreach (var method in methods) {
-            var iface = FindHandlerInterface(method.Handler);
+            var iface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
             if (iface is null) {
                 continue;
             }
@@ -148,7 +148,7 @@ internal static class FileDescriptorBridge
         }
 
         foreach (var method in methods) {
-            var iface = FindHandlerInterface(method.Handler);
+            var iface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
             if (iface is null) {
                 continue;
             }
@@ -170,15 +170,6 @@ internal static class FileDescriptorBridge
 
         return FileDescriptor.BuildFromByteStrings(deps.Select(d => d.SerializedData).Append(proto.ToByteString()))
                              .Last();
-    }
-
-    private static Type? FindHandlerInterface(Type handler) {
-        foreach (var iface in handler.GetInterfaces()) {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
-                return iface;
-            }
-        }
-        return null;
     }
 
     private static DescriptorProto BuildMessage(

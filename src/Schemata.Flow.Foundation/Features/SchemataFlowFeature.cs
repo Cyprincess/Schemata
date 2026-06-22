@@ -8,17 +8,20 @@ using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Skeleton;
-using Schemata.Flow.Skeleton.Events;
 using Schemata.Flow.Skeleton.Runtime;
-using Schemata.Flow.StateMachine;
 
 namespace Schemata.Flow.Foundation.Features;
 
 /// <summary>Registers the BPMN process engine, registry, runtime, and lifecycle observers.</summary>
 public sealed class SchemataFlowFeature : FeatureBase
 {
-    /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow feature.</summary>
+    /// <summary>Default <see cref="FeatureBase.Order" /> for the Flow feature.</summary>
+    public const int DefaultOrder = DefaultPriority;
+
+    /// <summary>Default <see cref="FeatureBase.Priority" /> for the Flow feature.</summary>
     public const int DefaultPriority = SchemataConstants.Orders.Extension + 80_000_000;
+
+    public override int Order => DefaultOrder;
 
     public override int Priority => DefaultPriority;
 
@@ -39,10 +42,6 @@ public sealed class SchemataFlowFeature : FeatureBase
             return registry;
         });
         services.TryAddSingleton<IProcessRuntime, ProcessRuntime>();
-
-        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
-
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
 
         services.AddHostedService<ProcessInitializer>();
     }

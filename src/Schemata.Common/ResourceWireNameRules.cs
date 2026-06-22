@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
+using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using static Schemata.Abstractions.SchemataConstants;
@@ -7,22 +9,25 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Common;
 
 /// <summary>
-///     Maps resource-specific CLR property names to their public wire names and back.
+///     Maps resource-specific CLR property names to their public wire names and back. Owns the
+///     AIP-122 (<c>name</c>), AIP-154 (<c>etag</c>), and AIP-132/231-235 (collection plural)
+///     aliases plus the wire-segment-to-CLR-property fallback used by AIP-157 / AIP-161 mask
+///     parsing.
 /// </summary>
 public static class ResourceWireNameRules
 {
     /// <summary>
-    ///     Resolves the wire field name for a resource property.
+    ///     Resolves the public wire field name for a CLR property declared (or inherited) on
+    ///     <paramref name="owner" />.
     /// </summary>
     /// <param name="owner">The type that declares the property.</param>
     /// <param name="propertyName">The CLR property name.</param>
-    /// <param name="pluralName">Resolves the plural collection name for a list element type.</param>
     /// <returns>The wire field name, or <see langword="null" /> when the property is suppressed.</returns>
-    public static string? Resolve(Type owner, string propertyName, Func<Type, string> pluralName) {
+    public static string? ResolveWireName(Type owner, string propertyName) {
         if (propertyName == nameof(IEntitiesResult<>.Entities)) {
             var carrier = owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
             if (carrier is not null) {
-                return pluralName(carrier.GetGenericArguments()[0]);
+                return ResourceNameDescriptor.ForType(carrier.GetGenericArguments()[0]).Plural;
             }
         }
 
@@ -45,29 +50,29 @@ public static class ResourceWireNameRules
     }
 
     /// <summary>
-    ///     Resolves a wire field name back to the CLR property it serializes from, inverting
-    ///     <see cref="Resolve" /> for the AIP-122 <c>name</c> and AIP-154 <c>etag</c> aliases and the
-    ///     plural collection field. Returns <see langword="null" /> when no resource-specific alias
-    ///     applies so the caller can fall back to its default name conversion.
+    ///     Resolves a wire-format mask segment to the CLR property it serializes from. Applies the
+    ///     resource-name aliases first (<c>name</c>, <c>etag</c>, collection plural) and otherwise
+    ///     falls back to a Pascal-cased member lookup so a mask such as <c>name,etag,first_name</c>
+    ///     targets <c>CanonicalName</c>, <c>EntityTag</c>, and <c>FirstName</c>.
     /// </summary>
     /// <param name="owner">The type that declares the wire field.</param>
-    /// <param name="wireName">The wire field name to resolve.</param>
-    /// <param name="pluralName">Resolves the plural collection name for a list element type.</param>
-    /// <returns>The CLR property name, or <see langword="null" /> when no alias applies.</returns>
-    public static string? ResolveClr(Type owner, string wireName, Func<Type, string> pluralName) {
-        if (typeof(ICanonicalName).IsAssignableFrom(owner) && wireName == Parameters.Name) {
+    /// <param name="wireSegment">The wire-format mask segment.</param>
+    /// <returns>The CLR property name; never <see langword="null" />.</returns>
+    public static string ResolveClrName(Type owner, string wireSegment) {
+        if (typeof(ICanonicalName).IsAssignableFrom(owner) && wireSegment == Parameters.Name) {
             return nameof(ICanonicalName.CanonicalName);
         }
 
-        if (typeof(IFreshness).IsAssignableFrom(owner) && wireName == Parameters.EntityTag) {
+        if (typeof(IFreshness).IsAssignableFrom(owner) && wireSegment == Parameters.EntityTag) {
             return nameof(IFreshness.EntityTag);
         }
 
         var carrier = owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
-        if (carrier is not null && wireName == pluralName(carrier.GetGenericArguments()[0])) {
+        if (carrier is not null && wireSegment == ResourceNameDescriptor.ForType(carrier.GetGenericArguments()[0]).Plural) {
             return nameof(IEntitiesResult<>.Entities);
         }
 
-        return null;
+        var member = MemberAccess.Resolve(Expression.Parameter(owner), wireSegment) as MemberExpression;
+        return member?.Member.Name ?? wireSegment.Pascalize();
     }
 }

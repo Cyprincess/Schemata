@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
@@ -48,8 +47,7 @@ internal static class ResourceCustomMethod
         }
 
         if (options.Resources.TryGetValue(entity.TypeHandle, out var resourceAttr)
-         && resourceAttr.Endpoints is { Count: > 0 } endpoints
-         && endpoints.All(e => e != GrpcResourceAttribute.Name)) {
+         && !GrpcResourceHelper.IsGrpcEnabled(resourceAttr)) {
             return;
         }
 
@@ -57,7 +55,7 @@ internal static class ResourceCustomMethod
         var service    = GrpcResourceNaming.ServiceFullName(entity, descriptor);
 
         foreach (var method in methods) {
-            var handlerInterface = FindHandlerInterface(method.Handler);
+            var handlerInterface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
             if (handlerInterface is null) {
                 continue;
             }
@@ -112,14 +110,5 @@ internal static class ResourceCustomMethod
         var name = request.CanonicalName;
 
         return await operation.InvokeAsync(handler, verb, name, request, http.User, ctx.CancellationToken);
-    }
-
-    private static Type? FindHandlerInterface(Type handler) {
-        foreach (var iface in handler.GetInterfaces()) {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
-                return iface;
-            }
-        }
-        return null;
     }
 }

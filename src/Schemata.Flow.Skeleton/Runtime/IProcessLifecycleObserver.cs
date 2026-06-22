@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
@@ -19,4 +20,7 @@ public interface IProcessLifecycleObserver
 
     /// <summary>Fires after the runtime evicts a terminal instance from its cache.</summary>
     Task OnTerminatedAsync(SchemataProcess process, CancellationToken ct = default);
+
+    /// <summary>Fires after process runtime execution fails.</summary>
+    Task OnFailedAsync(SchemataProcess process, Exception exception, CancellationToken ct = default);
 }
