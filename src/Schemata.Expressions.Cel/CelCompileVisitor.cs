@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Collections;
 using Humanizer;
 using Parlot;
 using Schemata.Expressions.Cel.Expressions;
@@ -32,15 +33,17 @@ internal sealed class CelCompileVisitor
     private static readonly MethodInfo ModuloMethod         = Method(nameof(DynamicValues.Modulo));
 
     private readonly Stack<Dictionary<string, ParameterExpression>> _scopes = new();
-    private readonly bool                                           _dynamic;
+    private readonly CompileMode                                    _mode;
 
     /// <summary>
     ///     Creates a visitor for expressions evaluated against the supplied context type.
     /// </summary>
     public CelCompileVisitor(Type contextType, ExpressionCompileOptions? options) {
-        _dynamic  = typeof(IReadOnlyDictionary<string, object?>).IsAssignableFrom(contextType);
+        _mode     = UsesValueSemantics(contextType) ? CompileMode.Value : CompileMode.Typed;
         Parameter = Expression.Parameter(contextType, LowerFirst(contextType.Name));
     }
+
+    public bool ValueMode => _mode == CompileMode.Value;
 
     /// <summary>
     ///     Gets the root parameter used by generated expressions.
@@ -52,23 +55,34 @@ internal sealed class CelCompileVisitor
     /// </summary>
     public Expression Visit(CelNode node) {
         return node switch {
-            CelConstant constant       => _dynamic ? DynamicConstant(constant) : Expression.Constant(constant.Value),
+            CelConstant constant       => ValueMode ? ValueConstant(constant) : Expression.Constant(constant.Value),
             CelIdentifier identifier   => Visit(identifier),
-            CelMember member           => _dynamic ? MemberAccess(Visit(member.Target), member.Member) : Access(Visit(member.Target), member.Member),
+            CelMember member           => ValueMode ? BuildValueMember(member) : Access(Visit(member.Target), member.Member),
+            CelIndex index             => ValueMode ? ValueBinary(nameof(CelValues.Index), Visit(index.Target), Visit(index.Index)) : UnsupportedValueOnly("CEL indexing"),
             CelUnary unary             => BuildUnary(unary),
             CelBinary binary           => BuildBinary(binary),
             CelCall call               => BuildCall(call),
-            CelMemberCall call         => _dynamic ? UnsupportedDynamic("CEL member calls") : BuildMemberCall(call),
-            CelConditional conditional => _dynamic ? UnsupportedDynamic("CEL conditional expressions") : BuildConditional(conditional),
-            CelList list               => _dynamic ? UnsupportedDynamic("CEL list literals") : BuildList(list),
-            CelMap map                 => _dynamic ? UnsupportedDynamic("CEL map literals") : BuildMap(map),
+            CelMemberCall call         => ValueMode ? BuildValueMemberCall(call) : BuildMemberCall(call),
+            CelConditional conditional => ValueMode ? BuildValueConditional(conditional) : BuildConditional(conditional),
+            CelList list               => ValueMode ? BuildValueList(list) : BuildList(list),
+            CelMap map                 => ValueMode ? BuildValueMap(map) : BuildMap(map),
             var _                      => throw new ParseException("Unsupported CEL node.", default),
         };
     }
 
     private Expression Visit(CelIdentifier node) {
-        if (_dynamic) {
-            return MemberAccess(Parameter, node.Name);
+        if (ValueMode) {
+            foreach (var scope in _scopes) {
+                if (scope.TryGetValue(node.Name, out var local)) {
+                    return local;
+                }
+            }
+
+            if (TryKnownType(node.Name, out var type)) {
+                return Expression.Constant(type, typeof(object));
+            }
+
+            return Expression.Call(ValueMethod(nameof(CelValues.Identifier), 2), ToObject(Parameter), Expression.Constant(node.Name));
         }
 
         foreach (var scope in _scopes) {
@@ -89,8 +103,13 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildUnary(CelUnary node) {
-        if (_dynamic) {
-            return BuildDynamicUnary(node);
+        if (ValueMode) {
+            var valueOperand = Visit(node.Operand);
+            return node.Operator switch {
+                "!"   => ValueUnary(nameof(CelValues.Not), valueOperand),
+                "-"   => ValueUnary(nameof(CelValues.Negate), valueOperand),
+                var _ => throw new ParseException($"Unsupported CEL unary operator '{node.Operator}'.", default),
+            };
         }
 
         var operand = Visit(node.Operand);
@@ -102,8 +121,26 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildBinary(CelBinary node) {
-        if (_dynamic) {
-            return BuildDynamicBinary(node);
+        if (ValueMode) {
+            var valueLeft  = Visit(node.Left);
+            var valueRight = Visit(node.Right);
+            return node.Operator switch {
+                "&&" => ValueBinary(nameof(CelValues.And), valueLeft, valueRight),
+                "||" => ValueBinary(nameof(CelValues.Or), valueLeft, valueRight),
+                "+"  => ValueBinary(nameof(CelValues.Add), valueLeft, valueRight),
+                "-"  => ValueBinary(nameof(CelValues.Subtract), valueLeft, valueRight),
+                "*"  => ValueBinary(nameof(CelValues.Multiply), valueLeft, valueRight),
+                "/"  => ValueBinary(nameof(CelValues.Divide), valueLeft, valueRight),
+                "%"  => ValueBinary(nameof(CelValues.Modulo), valueLeft, valueRight),
+                "==" => ValueBinary(nameof(CelValues.Equal), valueLeft, valueRight),
+                "!=" => ValueBinary(nameof(CelValues.NotEqual), valueLeft, valueRight),
+                "<"  => ValueBinary(nameof(CelValues.Less), valueLeft, valueRight),
+                "<=" => ValueBinary(nameof(CelValues.LessOrEqual), valueLeft, valueRight),
+                ">"  => ValueBinary(nameof(CelValues.Greater), valueLeft, valueRight),
+                ">=" => ValueBinary(nameof(CelValues.GreaterOrEqual), valueLeft, valueRight),
+                "in" => ValueBinary(nameof(CelValues.Contains), valueRight, valueLeft),
+                var _ => throw new ParseException($"Unsupported CEL binary operator '{node.Operator}'.", default),
+            };
         }
 
         var left  = Visit(node.Left);
@@ -129,8 +166,21 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildCall(CelCall node) {
-        if (_dynamic) {
-            return BuildDynamicCall(node);
+        if (ValueMode) {
+            if (node.Name == "has" && node.Args.Count == 1) {
+                return Expression.Call(ValueMethod(nameof(CelValues.Has), 1), ToObject(Visit(node.Args[0])));
+            }
+
+            if (node.Name == "size" && node.Args.Count == 1) {
+                return ValueUnary(nameof(CelValues.Size), Visit(node.Args[0]));
+            }
+
+            if (node.Args.Count == 1 && IsConversion(node.Name)) {
+                return Expression.Call(ValueMethod(nameof(CelValues.Convert), 2), Expression.Constant(node.Name),
+                                       ToObject(Visit(node.Args[0])));
+            }
+
+            return Expression.Call(ValueMethod(nameof(CelValues.UnknownFunction), 1), Expression.Constant(node.Name));
         }
 
         if (node.Name == "has" && node.Args.Count == 1) {
@@ -449,12 +499,206 @@ internal sealed class CelCompileVisitor
         throw new ParseException($"Expression of type '{expression.Type}' cannot be used as a boolean.", default);
     }
 
+    private static bool UsesValueSemantics(Type contextType) {
+        return contextType == typeof(object)
+            || typeof(IReadOnlyDictionary<string, object?>).IsAssignableFrom(contextType)
+            || typeof(IDictionary<string, object?>).IsAssignableFrom(contextType)
+            || typeof(IDictionary).IsAssignableFrom(contextType);
+    }
+
+    private static bool IsConversion(string name) {
+        return name is "int" or "uint" or "double" or "string" or "bytes" or "bool" or "timestamp" or "duration" or "dyn" or "type";
+    }
+
+    private static Expression ValueConstant(CelConstant value) {
+        var constant = value.Value switch {
+            int i => (object)(long)i,
+            byte[] bytes => bytes,
+            var other => other,
+        };
+
+        return Expression.Constant(constant, typeof(object));
+    }
+
+    private static Expression ValueMember(Expression container, string name) {
+        return Expression.Call(ValueMethod(nameof(CelValues.Member), 2), ToObject(container), Expression.Constant(name));
+    }
+
+    private Expression BuildValueMember(CelMember member) {
+        if (TryQualifiedType(member, out var type)) {
+            return Expression.Constant(type, typeof(object));
+        }
+
+        return ValueMember(Visit(member.Target), member.Member);
+    }
+
+    private static bool TryKnownType(string name, out CelType type) {
+        type = name switch {
+            "bool" => new CelType("bool"),
+            "int" => new CelType("int"),
+            "uint" => new CelType("uint"),
+            "double" => new CelType("double"),
+            "string" => new CelType("string"),
+            "bytes" => new CelType("bytes"),
+            "list" => new CelType("list"),
+            "map" => new CelType("map"),
+            "type" => new CelType("type"),
+            "null_type" => new CelType("null_type"),
+            var _ => default,
+        };
+        return !string.IsNullOrEmpty(type.Name);
+    }
+
+    private static bool TryQualifiedType(CelNode node, out CelType type) {
+        var parts = new Stack<string>();
+        var current = node;
+        while (current is CelMember member) {
+            parts.Push(member.Member);
+            current = member.Target;
+        }
+
+        if (current is CelIdentifier identifier) {
+            parts.Push(identifier.Name);
+        }
+
+        var name = string.Join('.', parts);
+        type = name switch {
+            "google.protobuf.Timestamp" => new CelType("google.protobuf.Timestamp"),
+            "google.protobuf.Duration" => new CelType("google.protobuf.Duration"),
+            var _ => default,
+        };
+        return !string.IsNullOrEmpty(type.Name);
+    }
+
+    private static Expression ValueUnary(string method, Expression operand) {
+        return Expression.Call(ValueMethod(method, 1), ToObject(operand));
+    }
+
+    private static Expression ValueBinary(string method, Expression left, Expression right) {
+        return Expression.Call(ValueMethod(method, 2), ToObject(left), ToObject(right));
+    }
+
+    private Expression BuildValueConditional(CelConditional node) {
+        var condition = Expression.Variable(typeof(object), "condition");
+        var assign    = Expression.Assign(condition, ToObject(Visit(node.Condition)));
+        var whenTrue  = ToObject(Visit(node.WhenTrue));
+        var whenFalse = ToObject(Visit(node.WhenFalse));
+        return Expression.Block(
+            [condition],
+            assign,
+            Expression.Condition(
+                Expression.Call(ValueMethod(nameof(CelValues.IsTrue), 1), condition),
+                whenTrue,
+                Expression.Condition(
+                    Expression.Call(ValueMethod(nameof(CelValues.IsFalse), 1), condition),
+                    whenFalse,
+                    Expression.Call(ValueMethod(nameof(CelValues.ConditionalError), 1), condition))));
+    }
+
+    private Expression BuildValueList(CelList node) {
+        return Expression.Call(ValueMethod(nameof(CelValues.List), 1),
+                               Expression.NewArrayInit(typeof(object), node.Items.Select(item => ToObject(Visit(item)))));
+    }
+
+    private Expression BuildValueMap(CelMap node) {
+        return Expression.Call(ValueMethod(nameof(CelValues.Map), 1),
+                               Expression.NewArrayInit(typeof(object), node.Entries.SelectMany(entry => new[] {
+                                   ToObject(Visit(entry.Key)), ToObject(Visit(entry.Value)),
+                               })));
+    }
+
+    private Expression BuildValueMemberCall(CelMemberCall node) {
+        var target = Visit(node.Target);
+        if (node.Name is "exists" or "all" or "exists_one" or "existsOne" or "filter" or "map" or "transformList" or "transformMap") {
+            return BuildValueMacro(node.Name, target, node.Args);
+        }
+
+        var args = node.Args.Select(arg => ToObject(Visit(arg))).ToArray();
+        return Expression.Call(ValueMethod(nameof(CelValues.Call), 3),
+                               Expression.Constant(node.Name),
+                               ToObject(target),
+                               Expression.NewArrayInit(typeof(object), args));
+    }
+
+    private Expression BuildValueMacro(string name, Expression source, IReadOnlyList<CelNode> args) {
+        if (args.Count < 2 || args[0] is not CelIdentifier first) {
+            throw new ParseException($"CEL macro '{name}' requires iteration variables and expression.", default);
+        }
+
+        if (args.Count >= 3 && args[1] is CelIdentifier second) {
+            return BuildValueMacro2(name, source, first.Name, second.Name, args.Skip(2).ToArray());
+        }
+
+        var parameter = Expression.Parameter(typeof(object), first.Name);
+        _scopes.Push(new() { [first.Name] = parameter });
+        try {
+            if (name == "map" && args.Count == 3) {
+                var predicate = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[1])), parameter);
+                var transform = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[2])), parameter);
+                return Expression.Call(ValueMethod(nameof(CelValues.MapMacro), 3), ToObject(source), predicate, transform);
+            }
+
+            if (args.Count != 2) {
+                throw new ParseException($"CEL macro '{name}' has an unsupported argument shape.", default);
+            }
+
+            var body = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[1])), parameter);
+            var method = name switch {
+                "exists" => nameof(CelValues.Exists),
+                "all" => nameof(CelValues.All),
+                "exists_one" or "existsOne" => nameof(CelValues.ExistsOne),
+                "filter" => nameof(CelValues.Filter),
+                "map" => nameof(CelValues.MapMacro),
+                var _ => throw new ParseException($"Unsupported CEL macro '{name}'.", default),
+            };
+            return Expression.Call(ValueMethod(method, 2), ToObject(source), body);
+        } finally {
+            _scopes.Pop();
+        }
+    }
+
+    private Expression BuildValueMacro2(string name, Expression source, string first, string second, IReadOnlyList<CelNode> rest) {
+        var index = Expression.Parameter(typeof(object), first);
+        var value = Expression.Parameter(typeof(object), second);
+        _scopes.Push(new() { [first] = index, [second] = value });
+        try {
+            if (name is "transformList" or "transformMap" && rest.Count == 2) {
+                var predicate = Expression.Lambda<Func<object?, object?, object?>>(ToObject(Visit(rest[0])), index, value);
+                var transform = Expression.Lambda<Func<object?, object?, object?>>(ToObject(Visit(rest[1])), index, value);
+                var filterMethod = name == "transformMap" ? nameof(CelValues.TransformMap2) : nameof(CelValues.TransformList2);
+                return Expression.Call(ValueMethod(filterMethod, 3), ToObject(source), predicate, transform);
+            }
+
+            if (rest.Count != 1) {
+                throw new ParseException($"CEL macro '{name}' has an unsupported argument shape.", default);
+            }
+
+            var body = Expression.Lambda<Func<object?, object?, object?>>(ToObject(Visit(rest[0])), index, value);
+            var method = name switch {
+                "exists" => nameof(CelValues.Exists2),
+                "all" => nameof(CelValues.All2),
+                "exists_one" or "existsOne" => nameof(CelValues.ExistsOne2),
+                "transformList" => nameof(CelValues.TransformList2),
+                "transformMap" => nameof(CelValues.TransformMap2),
+                var _ => throw new ParseException($"Unsupported CEL macro '{name}'.", default),
+            };
+            return Expression.Call(ValueMethod(method, 2), ToObject(source), body);
+        } finally {
+            _scopes.Pop();
+        }
+    }
+
     private static bool IsRegexMatch(string input, string pattern) {
         return Regex.IsMatch(input, pattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
 
     private static MethodInfo Method(string name) {
         return typeof(DynamicValues).GetMethod(name)!;
+    }
+
+    private static MethodInfo ValueMethod(string name, int parameterCount) {
+        return typeof(CelValues).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                                .Single(method => method.Name == name && method.GetParameters().Length == parameterCount);
     }
 
     private static Expression DynamicConstant(CelConstant value) {
@@ -527,7 +771,17 @@ internal sealed class CelCompileVisitor
         throw new ParseException($"{construct} are not supported in dynamic evaluation.", default);
     }
 
+    private static Expression UnsupportedValueOnly(string construct) {
+        throw new ParseException($"{construct} are not supported in typed evaluation.", default);
+    }
+
     private static string LowerFirst(string name) {
         return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
+    }
+
+    private enum CompileMode
+    {
+        Typed,
+        Value,
     }
 }

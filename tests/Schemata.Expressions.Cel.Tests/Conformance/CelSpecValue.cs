@@ -16,5 +16,7 @@ public sealed record CelSpecValue(object? Value)
 
     public static CelSpecValue Error(string message) { return new(new CelSpecError(message)); }
 
+    public static CelSpecValue Type(string name) { return new(new CelType(name)); }
+
     public static CelSpecValue Null() { return new((object?)null); }
 }

@@ -43,6 +43,18 @@ public class CelParserShould
         Assert.True(expected.SequenceEqual(bytes));
     }
 
+    [Theory]
+    [InlineData("' '", " ")]
+    [InlineData("'  '", "  ")]
+    [InlineData("' hi '", " hi ")]
+    [InlineData("'a b c'", "a b c")]
+    [InlineData("\" leading\"", " leading")]
+    public void Parse_StringLiteralWithWhitespace_PreservesContent(string source, string expected) {
+        var node = Assert.IsType<CelConstant>(CelParser.Expression.Parse(source));
+
+        Assert.Equal(expected, node.Value);
+    }
+
     [Fact]
     public void Parse_TernaryOperator_ReturnsConditionalNode() {
         var node = Assert.IsType<CelConditional>(CelParser.Expression.Parse("ready ? 'go' : 'stop'"));

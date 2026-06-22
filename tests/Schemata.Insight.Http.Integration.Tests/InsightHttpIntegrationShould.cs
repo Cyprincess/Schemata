@@ -99,7 +99,7 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
                     ],
                     "selections": [
                         { "field": "o.number", "alias": "number" },
-                        { "expression": { "source": "o.amount * 1.1", "language": "cel" }, "alias": "total" }
+                        { "expression": { "source": "double(o.amount) * 1.1", "language": "cel" }, "alias": "total" }
                     ]
                 }
             ]

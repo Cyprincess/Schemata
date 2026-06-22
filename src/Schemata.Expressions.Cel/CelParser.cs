@@ -63,10 +63,12 @@ public static class CelParser
         var decimalWithDot
             = Parsers.Capture(
                 sign.And(digits).And(Parsers.Terms.Char('.')).And(digits).And(Parsers.ZeroOrOne(exponent)));
+        var decimalLeadingDot
+            = Parsers.Capture(sign.And(Parsers.Terms.Char('.')).And(digits).And(Parsers.ZeroOrOne(exponent)));
         var decimalWithExponent = Parsers.Capture(sign.And(digits).And(exponent));
-        var @double = decimalWithDot.Or(decimalWithExponent)
-                                    .Then<CelNode>((_, s) => new CelConstant(
-                                                       double.Parse(s.Span.ToString(), CultureInfo.InvariantCulture)));
+        var @double = decimalWithDot.Or(decimalLeadingDot).Or(decimalWithExponent)
+                                     .Then<CelNode>((_, s) => new CelConstant(
+                                                        double.Parse(s.Span.ToString(), CultureInfo.InvariantCulture)));
         var integer = Parsers.Terms.Integer().Then<CelNode>((_, n) => new CelConstant(n));
         var number  = hexUint.Or(decimalUint).Or(negativeHexInt).Or(hexInt).Or(@double).Or(integer);
 
@@ -123,8 +125,12 @@ public static class CelParser
                       .Or(map)
                       .Or(identifierNode)
                       .Or(composite);
-        var memberSuffix = dot.SkipAnd(identifier.And(Parsers.ZeroOrOne(arguments)));
-        var primary = atom.And(Parsers.ZeroOrMany(memberSuffix)).Then<CelNode>(p => BuildPostfix(p.Item1, p.Item2));
+        var memberSuffix = dot.SkipAnd(identifier.And(Parsers.ZeroOrOne(arguments)))
+                              .Then<object>(s => s);
+        var indexSuffix = Parsers.Between(lbracket, expression, rbracket)
+                                 .Then<object>(i => i);
+        var primary = atom.And(Parsers.ZeroOrMany(memberSuffix.Or(indexSuffix)))
+                          .Then<CelNode>(p => BuildPostfix(p.Item1, p.Item2));
 
         var unaryMinus = Parsers.Terms.Char('-')
                                 .When((ctx, _) => {
@@ -177,25 +183,32 @@ public static class CelParser
         });
     }
 
-    private static CelNode BuildPostfix(CelNode target, IReadOnlyList<(string, IReadOnlyList<CelNode>)> suffixes) {
+    private static CelNode BuildPostfix(CelNode target, IReadOnlyList<object> suffixes) {
         var node = target;
         for (var i = 0; i < suffixes.Count; i++) {
             var suffix = suffixes[i];
-            node = suffix.Item2 is null
-                ? new CelMember(node, suffix.Item1)
-                : new CelMemberCall(node, suffix.Item1, suffix.Item2);
+            node = suffix switch {
+                CelNode index => new CelIndex(node, index),
+                ValueTuple<string, IReadOnlyList<CelNode>> member => member.Item2 is null
+                    ? new CelMember(node, member.Item1)
+                    : new CelMemberCall(node, member.Item1, member.Item2),
+                var _ => node,
+            };
         }
 
         return node;
     }
 
+    // String literal content must preserve whitespace, so every sub-parser here uses Parsers.Literals
+    // (no leading-whitespace skipping) rather than Parsers.Terms; the opening quote stays a Terms parser
+    // so a string token may still be preceded by whitespace in an expression.
     private static Parser<string> QuotedContent(char quote) {
-        var plain            = Parsers.Terms.Pattern(c => c != quote && c != '\\').Then((_, s) => s.Span.ToString());
-        var escapedQuote     = Parsers.Terms.Text("\\" + quote);
-        var escapedBackslash = Parsers.Terms.Text("\\\\");
+        var plain            = Parsers.Literals.Pattern(c => c != quote && c != '\\').Then((_, s) => s.Span.ToString());
+        var escapedQuote     = Parsers.Literals.Text("\\" + quote);
+        var escapedBackslash = Parsers.Literals.Text("\\\\");
         var escaped = escapedQuote.Or(escapedBackslash)
-                                  .Or(Parsers.Capture(Parsers.Terms.Char('\\')
-                                                             .And(Parsers.Terms.Pattern(c => c != quote && c != '\\')))
+                                  .Or(Parsers.Capture(Parsers.Literals.Char('\\')
+                                                             .And(Parsers.Literals.Pattern(c => c != quote && c != '\\')))
                                              .Then((_, s) => s.Span.ToString()));
 
         return Parsers.ZeroOrMany(escaped.Or(plain)).Then(parts => string.Concat(parts));
@@ -257,11 +270,19 @@ public static class CelParser
                     break;
                 case 'U':
                     builder.Append(char.ConvertFromUtf32(int.Parse(source.Substring(i + 1, 8), NumberStyles.HexNumber,
-                                                                   CultureInfo.InvariantCulture)));
+                                                                    CultureInfo.InvariantCulture)));
                     i += 8;
                     break;
                 default:
-                    throw new ParseException($"Invalid string escape sequence '\\{escaped}'.", default);
+                    if (escaped >= '0' && escaped <= '7') {
+                        var octal = source.Substring(i, Math.Min(3, source.Length - i));
+                        builder.Append((char)Convert.ToByte(octal, 8));
+                        i += octal.Length - 1;
+                    } else {
+                        throw new ParseException($"Invalid string escape sequence '\\{escaped}'.", default);
+                    }
+
+                    break;
             }
         }
 

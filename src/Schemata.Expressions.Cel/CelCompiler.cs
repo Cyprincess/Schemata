@@ -48,7 +48,9 @@ public sealed class CelCompiler : IExpressionCompiler
             return ExpressionCache.GetOrAddExpression(key, () => {
                 var visitor = new CelCompileVisitor(typeof(TContext), options);
                 var body    = visitor.Visit(node);
-                if (body.Type != typeof(TResult)) {
+                if (visitor.ValueMode && typeof(TResult) == typeof(bool)) {
+                    body = Expression.Call(typeof(CelValues).GetMethod(nameof(CelValues.IsTrue))!, body);
+                } else if (body.Type != typeof(TResult)) {
                     body = Expression.Convert(body, typeof(TResult));
                 }
 

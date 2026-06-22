@@ -47,7 +47,7 @@ public class CelDynamicEvaluationShould
         var tree    = _compiler.Parse("c.discount * o.amount");
         var compute = _compiler.Compile<IReadOnlyDictionary<string, object?>, object>(tree).Compile();
 
-        Assert.Equal(20.0, compute(Combined(("c", "discount", 0.2), ("o", "amount", 100))));
+        Assert.Equal(new CelError("no matching overload"), compute(Combined(("c", "discount", 0.2), ("o", "amount", 100))));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class CelDynamicEvaluationShould
         var predicate = Predicate("has(o.email)");
 
         Assert.True(predicate(Row("o", ("email", "a@b.com"))));
-        Assert.False(predicate(Row("o", ("email", null))));
+        Assert.True(predicate(Row("o", ("email", null))));
         Assert.False(predicate(Row("o", ("other", 1))));
     }
 
@@ -68,10 +68,11 @@ public class CelDynamicEvaluationShould
     }
 
     [Fact]
-    public void Reject_Unsupported_Construct_In_Dynamic_Evaluation() {
+    public void Evaluate_Macros_In_Dynamic_Evaluation() {
         var tree = _compiler.Parse("o.tags.exists(x, x == 1)");
+        var func = _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree).Compile();
 
-        Assert.Throws<ExpressionException>(() => _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree));
+        Assert.True(func(Row("o", ("tags", new object?[] { 0, 1, 2 }))));
     }
 
     private Func<IReadOnlyDictionary<string, object?>, bool> Predicate(string source) {

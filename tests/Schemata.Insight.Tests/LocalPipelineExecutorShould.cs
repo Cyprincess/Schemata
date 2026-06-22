@@ -61,9 +61,9 @@ public class LocalPipelineExecutorShould
         var result = await Collect(executor.RunAsync(rows, "s", stages, CancellationToken.None));
 
         Assert.Equal(2, result.Count);
-        Assert.Equal(2d, result[0]["decade"]);
+        Assert.Equal(2L, result[0]["decade"]);
         Assert.Equal(2, result[0]["count"]);
-        Assert.Equal(3d, result[1]["decade"]);
+        Assert.Equal(3L, result[1]["decade"]);
         Assert.Equal(1, result[1]["count"]);
     }
 

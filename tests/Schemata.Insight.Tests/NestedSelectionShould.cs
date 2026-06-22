@@ -51,7 +51,7 @@ public class NestedSelectionShould
                     },
                     Selections = {
                         new() { Field = "o.id", Alias = "id" },
-                        new() { Expression = new InsightExpression("o.amount * 1.1", "cel"), Alias = "total" },
+                        new() { Expression = new InsightExpression("double(o.amount) * 1.1", "cel"), Alias = "total" },
                     },
                 },
             },
