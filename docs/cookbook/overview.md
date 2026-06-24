@@ -38,6 +38,7 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 | [Distributed Cache](distributed-cache.md) | Adding Redis, eviction strategy trade-offs |
 | [Custom Advisor](custom-advisor.md) | Author a per-entity advisor, register via TryAddEnumerable, integration test |
 | [Custom Expression Language](custom-expression-language.md) | Implement IExpressionCompiler, keyed DI registration |
+| [Federated Query](federated-query.md) | Join repository sources, compute aggregates, and drill into nested rows |
 
 ## Mapping
 

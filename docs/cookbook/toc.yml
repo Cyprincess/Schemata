@@ -30,6 +30,8 @@
   href: custom-advisor.md
 - name: Custom Expression Language
   href: custom-expression-language.md
+- name: Federated Query
+  href: federated-query.md
 - name: Multi-Engine Mapping
   href: multi-engine-mapping.md
 - name: Module Packaging

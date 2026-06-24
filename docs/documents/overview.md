@@ -121,6 +121,17 @@ The broadcast notification fan-out layer.
 | [Dispatch](push/dispatch.md) | Fan-out, self-filtering, streaming order, isolation, the advisor |
 | [Subscriptions](push/subscriptions.md) | `SchemataPushSubscription`, the manager, ownership |
 
+## Insight
+
+The federated read-query system.
+
+| Document | Covers |
+| --- | --- |
+| [Overview](insight/overview.md) | Architecture, packages, startup, wire types, catalogs, drivers, security |
+| [Planning](insight/planning.md) | Plan nodes, nested selections, expression slots, validation reasons |
+| [Drivers](insight/drivers.md) | `ISourceDriver`, pushdown, residual stages, repository source behavior |
+| [Transports](insight/transports.md) | HTTP and gRPC query endpoints and error translation |
+
 ## Flow
 
 The BPMN process engine.

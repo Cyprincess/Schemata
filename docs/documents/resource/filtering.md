@@ -1,55 +1,113 @@
 # Filtering
 
-`ResourceOperationHandler.ListAsync` accepts an AIP-160 filter and an AIP-132 order-by, compiles each to a LINQ
-expression at request time, and applies it to the entity query through `ResourceRequestContainer<TEntity>`. The
-filter and order compilers are resolved as keyed DI services under the fixed key `AipLanguage.Name` (`"aip"`).
+`ResourceOperationHandler.ListAsync` accepts a filter, language, order-by, pagination settings, and parent scope. It resolves the filter language from the resource module profile, compiles the filter through the selected expression compiler, and applies ordering through the language-independent order compiler.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs` |
-| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipOrderCompiler.cs`, `AipLanguage.cs` |
-| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs` |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `SchemataResourceOptions.cs`, `SchemataResourceBuilder.cs` |
+| `Schemata.Expressions.Skeleton` | `ExpressionLanguageResolver.cs`, `ResolvedLanguage.cs`, `FilteringMode.cs`, `ResidualPage.cs`, `IExpressionCompiler.cs`, `IExpressionPushdownPlanner.cs`, `IOrderCompiler.cs` |
+| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs` |
+| `Schemata.Expressions.Cel` | `CelCompiler.cs`, `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs` |
+| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
 
-## `filter` parameter
+## Enabling languages
 
-The `filter` query parameter takes an AIP-160 expression compiled to `Expression<Func<TEntity, bool>>` and applied
-as a `Where` clause:
-
-```
-GET /v1/students?filter=age>18 AND full_name:"ali"
-```
-
-## `order_by` parameter
-
-The `order_by` query parameter takes a comma-separated list of fields with optional `ASC` (default) or `DESC`:
-
-```
-GET /v1/students?order_by=age DESC, full_name ASC
-```
-
-## How compilation works
+`SchemataResourceBuilder` implements `IExpressionLanguageBuilder`. Enable filter languages and ordering on that builder:
 
 ```csharp
-// filter
-var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name);
-var tree     = compiler.Parse(request.Filter);
-var filter   = compiler.Compile<TEntity, bool>(tree);
-container.ApplyFiltering(filter);
+builder.UseSchemata(schema => {
+    schema.UseResource()
+          .UseAip(entry => entry.Filtering = FilteringMode.Residual)
+          .UseCel()
+          .UseOrdering();
+});
+```
 
-// order
-var order = _sp.GetRequiredKeyedService<IOrderCompiler>(AipLanguage.Name)
-               .CompileOrder<TEntity>(request.OrderBy);
+The builder stores its `ExpressionLanguageProfile` into `SchemataResourceOptions.Expressions` when at least one language is enabled. The first enabled language is the default for requests that omit `language`; explicit `language` values must name an enabled entry.
+
+## `filter` and `language`
+
+A request can omit `language` or select an enabled language:
+
+```text
+GET /v1/students?filter=age>18 AND full_name:"ali"
+GET /v1/students?language=cel&filter=age > 18 && full_name.contains('ali')
+```
+
+The handler resolves the request like this:
+
+```csharp
+var resolved = ExpressionLanguageResolver.Resolve(
+    profile,
+    request.Language,
+    name => _sp.GetKeyedService<ExpressionLanguageDescriptor>(name));
+
+var compiler = _sp.GetRequiredKeyedService<IExpressionCompiler>(resolved.Language);
+var tree = compiler.Parse(request.Filter);
+```
+
+If the profile is empty or the requested language is not enabled, the handler maps `UnknownExpressionLanguageException` to a validation error on `language`.
+
+## Filtering mode and residual evaluation
+
+The effective `FilteringMode` comes from descriptor, profile, and entry settings. `Strict` at any level wins; `Residual` applies only when no level is strict; an all-default chain becomes `Strict`.
+
+In `Strict`, the handler compiles the full tree and applies it to the repository query:
+
+```csharp
+container.ApplyFiltering(compiler.Compile<TEntity, bool>(tree));
+```
+
+In `Residual`, the handler resolves `IExpressionPushdownPlanner` keyed by the selected language and plans against `ExpressionCapabilities.Relational`:
+
+```csharp
+var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
+var plan = planner.Plan(tree, ExpressionCapabilities.Relational);
+
+if (plan.Pushed is not null) {
+    container.ApplyFiltering(compiler.Compile<TEntity, bool>(plan.Pushed));
+}
+
+if (plan.Residual is not null) {
+    residual = compiler.Compile<TEntity, bool>(plan.Residual).Compile();
+}
+```
+
+The pushed tree narrows the backend query to a superset. `ResidualPage.ScanAsync` then evaluates the residual locally, applies `skip` after residual matches, collects the page, and detects `HasMore`. The default residual scan cap is `10_000` source rows. Override it at descriptor level through `AddAipExpressions` / `AddCelExpressions`, at module profile level, or at language entry level:
+
+```csharp
+schema.UseResource()
+      .UseAip(entry => {
+          entry.Filtering = FilteringMode.Residual;
+          entry.MaxResidualScanRows = 20_000;
+      });
+```
+
+Reaching the cap before the page or exact count is known throws `InvalidOperationException`.
+
+## `order_by`
+
+`order_by` uses the non-keyed `IOrderCompiler` from `Schemata.Expressions.Order`:
+
+```csharp
+var compiler = _sp.GetRequiredService<IOrderCompiler>();
+var order = compiler.CompileOrder<TEntity>(request.OrderBy);
 container.ApplyOrdering(KeyOrdering<TEntity>.Compose(order));
 ```
 
-Both are registered as keyed singletons by `services.AddAipExpressions()`, which `SchemataResourceFeature` calls
-automatically. The key is fixed to `AipLanguage.Name` in the handler; registering an `IExpressionCompiler` under a
-different key (e.g. `"cel"`) does not change List behavior. To filter with another language, call its compiler
-directly from a custom advisor or endpoint — see [Custom Language](../expressions/custom-language.md).
+The syntax is AIP-132: comma-separated fields with optional `asc` or `desc` direction.
+
+```text
+GET /v1/students?order_by=age desc, full_name asc
+```
+
+Enable it with `UseOrdering()` or `services.AddOrderExpressions()`.
 
 ## Supported AIP-160 operators
+
+AIP remains the default language when `UseAip()` is the first enabled entry. Its common operators are:
 
 | Operator | Syntax | Example |
 | --- | --- | --- |
@@ -59,80 +117,66 @@ directly from a custom advisor or endpoint — see [Custom Language](../expressi
 | Less than or equal | `<=` | `age <= 25` |
 | Greater than | `>` | `age > 18` |
 | Greater than or equal | `>=` | `age >= 18` |
-| Has (substring/membership) | `:` | `full_name:"ali"` |
-| Wildcard presence | `*` (with `:`) | `tags:*` |
+| Has | `:` | `full_name:"ali"` |
+| Presence | `:*` | `tags:*` |
 | Logical AND | `AND` | `age > 18 AND full_name:"ali"` |
 | Logical OR | `OR` | `age = 1 OR age = 2` |
 | Logical NOT | `NOT` / `-` | `NOT age = 3`, `-age = 3` |
 | Grouping | `(...)` | `(age > 18 OR full_name:"ali")` |
 
-For the full grammar, value types, and built-in functions (`timestamp`, `duration`), see
-[AIP Expressions](../expressions/aip.md).
+For CEL syntax, see [CEL Expressions](../expressions/cel.md). For the full AIP grammar, see [AIP Expressions](../expressions/aip.md).
 
 ## Pagination
 
-`PageToken` carries `Parent`, `Filter`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON,
-Brotli-compressed, sealed with ASP.NET Core Data Protection (purpose
-`Schemata.Resource.Foundation.PageToken`), and emitted as a URL-safe Base64 string, so a client can neither read
-nor forge it. `PageToken.FromStringAsync` rejects a tampered or malformed token with `ValidationException`
-(`InvalidPageToken`).
+`PageToken` carries `Parent`, `Filter`, `Language`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64. `PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException` (`InvalidPageToken`).
 
 | Parameter | Default | Cap |
 | --- | --- | --- |
 | `page_size` | 25 | 100 |
 | `skip` | 0 | unbounded |
 
-The query fetches one look-ahead row beyond `page_size`; `next_page_token` is emitted only when that extra row
-exists, so an exactly-full last page omits it per AIP-158. A negative `page_size` throws `ValidationException`
-(`InvalidPageSize`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the request
-throws `ValidationException` (`InvalidPageToken`).
+The token must match `Parent`, `Filter`, `Language`, `OrderBy`, and `ShowDeleted` from the current request. A mismatch throws `ValidationException` (`InvalidPageToken`). A negative `page_size` throws `ValidationException` (`InvalidPageSize`).
 
-`total_size` follows `TotalSizeMode`: `Exact` (default) counts with `CountAsync`, `Estimated` uses
-`EstimateCountAsync`, `None` omits the field and skips counting. Set it globally on
-`SchemataResourceOptions.TotalSize` or per resource on `ResourceAttribute.TotalSize`.
+Without a residual predicate, paging applies in the backend query with one look-ahead row. With a residual predicate, backend paging is delayed until `ResidualPage` has applied local filtering.
+
+`total_size` follows `TotalSizeMode`: `Exact` (default) counts exactly, `Estimated` calls `EstimateCountAsync`, and `None` omits the field. During residual evaluation, exact mode uses `ResidualPage`'s exact total; estimated mode estimates the pushed superset.
 
 ## `ResourceRequestContainer`
 
-`ResourceRequestContainer<T>` accumulates query modifications into a composable
-`Func<IQueryable<T>, IQueryable<T>>`:
+`ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>`:
 
 | Method | Effect |
 | --- | --- |
-| `ApplyFiltering(predicate)` | Appends a `Where(predicate)` |
-| `ApplyOrdering(order)` | Applies the order function |
-| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` (with the look-ahead row) |
-| `ApplyModification(predicate)` | Appends an arbitrary `Where` (parent scoping, entitlement filtering) |
+| `ApplyFiltering(predicate)` | Appends `Where(predicate)`. |
+| `ApplyOrdering(order)` | Applies the order function. |
+| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row. |
+| `ApplyModification(predicate)` | Appends an arbitrary `Where` for advisors. |
 
-The composed `Query` function is passed to `CountAsync` and `ListAsync`.
+The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, and `ListAsync`.
 
 ## Error mapping
 
-A filter or order that fails to parse raises `ParseException` or `ArgumentException`, which `ListAsync` converts to
-`ValidationException` with `Field` `filter` or `order_by` and reason `FieldReasons.InvalidFilter` or
-`FieldReasons.InvalidOrderBy`. The HTTP transport surfaces this as `422`; gRPC surfaces it as
-`InvalidArgument`.
+A malformed filter, unknown field, or failed compilation maps to `ValidationException` with field `filter` and reason `FieldReasons.InvalidFilter`. An unknown language maps to field `language` and reason `FieldReasons.InvalidFilter`. An invalid order-by maps to field `order_by` and reason `FieldReasons.InvalidOrderBy`.
+
+HTTP surfaces these as `422`; gRPC surfaces them as `InvalidArgument`.
 
 ## Extension points
 
-- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyModification`
-  (entitlement, tenant scoping). The container is passed to every list request advisor.
-
-## Design rationale
-
-Compiling filters to LINQ (rather than evaluating in memory) lets the database apply them. The shared
-`ExpressionCache` keys compiled expressions by a SHA-256 hash so a repeated identical filter does not recompile —
-see [Expressions Overview](../expressions/overview.md).
+- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates through `container.ApplyModification` before the handler compiles the request filter.
+- Implement a custom `IExpressionCompiler` plus `Use*` builder seam to add a filter language.
+- Implement `IExpressionPushdownPlanner` for residual mode when the language can push a backend-safe subset.
 
 ## Caveats
 
-- The filter and order compilers are fixed to `AipLanguage.Name`.
-- The `has` operator (`:`) compiles to a `Contains` call on strings and a membership check on collections;
-  `field:*` is a presence check, not a glob pattern.
-- `CountAsync` runs before paging; on large tables use `TotalSizeMode.Estimated` or `None`.
+- `field:*` is a presence check, not a glob pattern.
+- Residual mode can scan up to `MaxResidualScanRows` source rows per request before failing.
+- `CountAsync` runs before paging in strict mode; use `TotalSizeMode.Estimated` or `None` on large collections when exact totals are not needed.
 
 ## See also
 
 - [Read Pipeline](read-pipeline.md)
-- [AIP Expressions](../expressions/aip.md)
 - [Expressions Overview](../expressions/overview.md)
+- [Pushdown and Residual Evaluation](../expressions/pushdown.md)
+- [AIP Expressions](../expressions/aip.md)
+- [CEL Expressions](../expressions/cel.md)
 - [Filtering and Pagination](../../guides/filtering-and-pagination.md)

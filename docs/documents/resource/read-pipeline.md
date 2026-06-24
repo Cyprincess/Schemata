@@ -115,8 +115,8 @@ on `total_size`, which is optional under `TotalSizeMode.None`.
 
 ## Caveats
 
-- The filter and order compilers are resolved by the fixed key `AipLanguage.Name`. Registering a compiler under
-  a different key does not change List behavior.
+- List resolves the filter language from the resource expression profile; enable languages on
+  `SchemataResourceBuilder` before exposing filterable endpoints.
 - `CountAsync` runs a separate query before paging. On large tables, use `TotalSizeMode.Estimated` or `None`.
 
 ## See also

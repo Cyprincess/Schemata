@@ -1,6 +1,16 @@
 # Packages
 
-Schemata ships three families of meta-package targets — Application, Business, and Module — each with three variants (base, Persisting, Complex). Each `.csproj` sets MSBuild property flags; a shared `Directory.Build.props` in each family's folder translates those flags into concrete `ProjectReference` entries. All targets produce `net8.0;net10.0` binaries and bundle `Schemata.Advice.Generator` as an analyzer.
+Schemata ships three families of meta-package targets: Application, Business, and Module. Each family has base, Persisting, and Complex variants; Application also has a Modular variant. Each target `.csproj` sets MSBuild property flags, and the family `Directory.Build.props` translates those flags into `ProjectReference` entries. Target packages multi-target `net8.0;net10.0`, ship build assets, and pack `Schemata.Advice.Generator` as an analyzer.
+
+## Package layers
+
+Runtime packages follow the Skeleton / Foundation / Provider convention:
+
+- `*.Skeleton` packages contain contracts, base types, attributes, options, and persisted entities that other layers can reference without pulling in runtime registration.
+- `*.Foundation` packages contain concrete logic, default services, builders, feature registration, and owned cross-package wiring.
+- Named provider and bridge packages (`*.Redis`, `*.RabbitMq`, `*.Http`, `*.Grpc`, `*.Scheduling`, `*.Event`) contain adapters that connect a foundation to a specific transport, broker, storage backend, or neighboring runtime.
+
+This split keeps optional runtimes direct-referenceable. A provider depends on the skeleton contract it adapts; a foundation depends on its own skeleton and owns the default feature. Bridge packages join two foundations through a sub-builder, as `Schemata.Push.Scheduling` does for scheduled sends and `Schemata.Flow.Scheduling` does for timer catches.
 
 ## Where the code lives
 
@@ -12,32 +22,33 @@ Schemata ships three families of meta-package targets — Application, Business,
 
 ## MSBuild flag reference
 
-Each `.csproj` sets one or more of these flags. The `Directory.Build.props` in the same folder translates each flag into a `ProjectReference`:
+Each `.csproj` sets one or more of these flags. The `Directory.Build.props` in the same folder translates each flag into a project reference or packed analyzer:
 
-| Flag | Package added |
+| Flag | Package or asset added |
 | --- | --- |
-| `UseRepository=true` | `Schemata.Entity.Repository` |
-| `UseModularTargets=true` | `Schemata.Modular` (Application only) |
-| `UseTenancy=true` | `Schemata.Tenancy.Foundation` |
+| `UseDSLTargets=true` | Packs `Schemata.Modeling.Generator.dll` and `Parlot.dll` as analyzers |
+| `UseModularTargets=true` | `Schemata.Modular` and `Schemata.Application.Modular.Targets.targets` under `build/` (Application only) |
+| `UseTenancy=true` | `Schemata.Tenancy.Foundation` (Application only) |
 | `UseAuthorization=true` | `Schemata.Authorization.Foundation` (Application) or `Schemata.Authorization.Skeleton` (Business/Module) |
 | `UseIdentity=true` | `Schemata.Identity.Foundation` (Application) or `Schemata.Identity.Skeleton` (Business/Module) |
-| `UseMapster=true` | `Schemata.Mapping.Mapster` |
-| `UseMapping=true` | `Schemata.Mapping.Skeleton` |
-| `UseResourceGrpc=true` | `Schemata.Resource.Foundation` + `Schemata.Resource.Grpc` |
-| `UseResourceHttp=true` | `Schemata.Resource.Foundation` + `Schemata.Resource.Http` |
+| `UseMapster=true` | `Schemata.Mapping.Mapster` (Application only) |
+| `UseMapping=true` | `Schemata.Mapping.Skeleton` (Business/Module) |
+| `UseRepository=true` | `Schemata.Entity.Repository` |
+| `UseResourceGrpc=true` | `Schemata.Resource.Foundation` and `Schemata.Resource.Grpc` (Application only) |
+| `UseResourceHttp=true` | `Schemata.Resource.Foundation` and `Schemata.Resource.Http` (Application only) |
 | `UseSecurity=true` | `Schemata.Security.Foundation` (Application) or `Schemata.Security.Skeleton` (Business/Module) |
-| `UseValidation=true` | `Schemata.Validation.FluentValidation` |
-| `UseDSLTargets=true` | `Schemata.Modeling.Generator` (packed as analyzer) |
+| `UseValidation=true` | `Schemata.Validation.FluentValidation` (Application/Module) |
 
 ## Application targets
 
-Application targets reference `Schemata.Core` and include `Microsoft.AspNetCore.App`. Use them for host application projects (the entry point that calls `WebApplication.CreateBuilder`).
+Application targets reference `Schemata.Core` and include `Microsoft.AspNetCore.App`. Use them for host projects that create the ASP.NET Core application.
 
 ### Schemata.Application.Targets
 
 Base application target. MSBuild flags: none beyond defaults.
 
 Effective references:
+
 - `Schemata.Core`
 - `Schemata.Advice.Generator` (analyzer)
 
@@ -46,22 +57,25 @@ Effective references:
 Adds the repository pattern. MSBuild flags: `UseRepository=true`.
 
 Adds over base:
+
 - `Schemata.Entity.Repository`
 
 ### Schemata.Application.Modular.Targets
 
-Adds modular architecture. MSBuild flags: `UseModularTargets=true`.
+Adds host-side module stamping. MSBuild flags: `UseModularTargets=true`.
 
 Adds over base:
+
 - `Schemata.Modular`
 
-Also packs `Schemata.Application.Modular.Targets.targets` into the NuGet `build/` folder so the consuming project gets the modular MSBuild targets automatically.
+Also packs `Schemata.Application.Modular.Targets.targets` into the package `build/` folder so the consuming host emits module attributes during build.
 
 ### Schemata.Application.Complex.Targets
 
-All-in-one application target. MSBuild flags: `UseDSLTargets=true`, `UseModularTargets=true`, `UseTenancy=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapster=true`, `UseRepository=true`, `UseResourceGrpc=true`, `UseResourceHttp=true`, `UseSecurity=true`, `UseValidation=true`.
+Application Complex target. MSBuild flags: `UseDSLTargets=true`, `UseModularTargets=true`, `UseTenancy=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapster=true`, `UseRepository=true`, `UseResourceGrpc=true`, `UseResourceHttp=true`, `UseSecurity=true`, `UseValidation=true`.
 
-Effective references (all of base plus):
+Effective references, all of base plus:
+
 - `Schemata.Entity.Repository`
 - `Schemata.Modular`
 - `Schemata.Tenancy.Foundation`
@@ -77,13 +91,14 @@ Effective references (all of base plus):
 
 ## Business targets
 
-Business targets reference `Schemata.Abstractions` only (no `Schemata.Core`, no `Microsoft.AspNetCore.App`). Use them for class library projects that define domain models, repository contracts, and business logic without a dependency on ASP.NET Core.
+Business targets reference `Schemata.Abstractions`. Use them for class libraries that define domain models, contracts, and business logic without ASP.NET Core hosting dependencies.
 
 ### Schemata.Business.Targets
 
 Base business target. MSBuild flags: none beyond defaults.
 
 Effective references:
+
 - `Schemata.Abstractions`
 - `Schemata.Advice.Generator` (analyzer)
 
@@ -92,13 +107,15 @@ Effective references:
 Adds the repository pattern. MSBuild flags: `UseRepository=true`.
 
 Adds over base:
+
 - `Schemata.Entity.Repository`
 
 ### Schemata.Business.Complex.Targets
 
-All-in-one business target. MSBuild flags: `UseDSLTargets=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapping=true`, `UseRepository=true`, `UseSecurity=true`.
+Business Complex target. MSBuild flags: `UseDSLTargets=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapping=true`, `UseRepository=true`, `UseSecurity=true`.
 
-Effective references (all of base plus):
+Effective references, all of base plus:
+
 - `Schemata.Entity.Repository`
 - `Schemata.Authorization.Skeleton`
 - `Schemata.Identity.Skeleton`
@@ -115,23 +132,26 @@ Module targets reference `Schemata.Abstractions` and include `Microsoft.AspNetCo
 Base module target. MSBuild flags: none beyond defaults.
 
 Effective references:
+
 - `Schemata.Abstractions`
 - `Schemata.Advice.Generator` (analyzer)
 
-Also packs `Schemata.Module.Targets.props`, `Schemata.Module.Targets.targets`, and `Package.Build.props` into the NuGet `build/` folder.
+Also packs `Schemata.Module.Targets.props`, `Schemata.Module.Targets.targets`, and `Package.Build.props` into the package `build/` folder.
 
 ### Schemata.Module.Persisting.Targets
 
 Adds the repository pattern. MSBuild flags: `UseRepository=true`.
 
 Adds over base:
+
 - `Schemata.Entity.Repository`
 
 ### Schemata.Module.Complex.Targets
 
-All-in-one module target. MSBuild flags: `UseDSLTargets=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapping=true`, `UseRepository=true`, `UseSecurity=true`, `UseValidation=true`.
+Module Complex target. MSBuild flags: `UseDSLTargets=true`, `UseAuthorization=true`, `UseIdentity=true`, `UseMapping=true`, `UseRepository=true`, `UseSecurity=true`, `UseValidation=true`.
 
-Effective references (all of base plus):
+Effective references, all of base plus:
+
 - `Schemata.Entity.Repository`
 - `Schemata.Authorization.Skeleton`
 - `Schemata.Identity.Skeleton`
@@ -164,20 +184,33 @@ Effective references (all of base plus):
 | Schemata.Validation.FluentValidation | | | | x | | | | | | x |
 | Schemata.Modeling.Generator | | | | x | | | x | | | x |
 
-**Legend:** App = Application, Biz = Business, Mod = Module, P = Persisting, M = Modular, C = Complex
+**Legend:** App = Application, Biz = Business, Mod = Module, P = Persisting, M = Modular, C = Complex.
 
 ## Design motivation
 
-The three-family split (Application / Business / Module) reflects the three project roles in a Schemata solution. Application projects host the ASP.NET Core pipeline and need `Schemata.Core` plus `Microsoft.AspNetCore.App`. Business projects define domain logic and need only `Schemata.Abstractions`. Module projects implement `IModule` and need both `Schemata.Abstractions` and `Microsoft.AspNetCore.App` (for middleware and endpoint registration).
+The three-family split reflects the three project roles in a Schemata solution. Application projects host the ASP.NET Core pipeline and need `Schemata.Core` plus `Microsoft.AspNetCore.App`. Business projects define domain logic and need only `Schemata.Abstractions`. Module projects implement `IModule` and need both `Schemata.Abstractions` and `Microsoft.AspNetCore.App` for middleware and endpoint registration.
 
-Within each family, the Persisting variant adds `Schemata.Entity.Repository` for data access. The Complex variant adds the full suite of runtime packages. Business and Module Complex variants reference `*.Skeleton` packages (contracts only) so the projects stay free of the ASP.NET Core hosting infrastructure that `*.Foundation` packages pull in.
+Within each family, the Persisting variant adds `Schemata.Entity.Repository` for data access. The Complex variant adds the family-specific default set. Business and Module Complex variants reference `*.Skeleton` packages so those projects depend on contracts instead of runtime feature registration.
 
 ## Caveats
 
-- `Schemata.Application.Complex.Targets` does not include `Schemata.Flow.Foundation` or `Schemata.Scheduling.Foundation`. Add those packages directly if you need them.
-- `Schemata.Business.Complex.Targets` uses `UseMapping=true` (adds `Schemata.Mapping.Skeleton`), not `UseMapster=true`. Mapster is an application-layer concern.
-- The `UseDSLTargets=true` flag packs `Schemata.Modeling.Generator` and its `Parlot.dll` dependency as analyzers. Both DLLs must exist in `artifacts/bin/Schemata.Modeling.Generator/$(Configuration)/netstandard2.0/` before the Targets pack runs. Build the generators first.
+- `Schemata.Application.Complex.Targets` includes Resource HTTP/gRPC, but it does not include Flow, Scheduling, Push, or Insight foundations. Reference those packages directly in the consuming host when those runtimes are active.
+- `Schemata.Business.Complex.Targets` uses `UseMapping=true` and adds `Schemata.Mapping.Skeleton`; it does not add `Schemata.Mapping.Mapster`.
+- `UseDSLTargets=true` packs `Schemata.Modeling.Generator` and `Parlot.dll` as analyzers. Build the generators before packing targets so both files exist under `artifacts/bin/Schemata.Modeling.Generator/$(Configuration)/netstandard2.0/`.
 - Central package management (`ManagePackageVersionsCentrally=true`) is active. Do not add `Version=` attributes to `PackageReference` elements in consuming projects.
+
+## Optional runtimes not in any meta-target
+
+Reference these packages directly from the host when their runtime is needed:
+
+- `Schemata.Flow.Foundation` — combine with `Schemata.Flow.Http`, `Schemata.Flow.Grpc`, `Schemata.Flow.Event`, or `Schemata.Flow.Scheduling` when the host exposes or bridges process runtime behavior.
+- `Schemata.Scheduling.Foundation` — combine with `Schemata.Scheduling.Http`, `Schemata.Scheduling.Grpc`, or `Schemata.Scheduling.Event` when jobs need transport or event surfaces.
+- `Schemata.Push.Foundation` — combine with transport implementations and the Resource runtime for subscription storage; see the [Push overview](push/overview.md).
+- `Schemata.Push.Scheduling` — combine with `Schemata.Push.Foundation` and `Schemata.Scheduling.Foundation` when deferred sends must return long-running operations; see the [Push overview](push/overview.md).
+- `Schemata.Insight.Foundation` — combine with Resource HTTP/gRPC and a repository provider when the host records insight data; see the [Insight overview](insight/overview.md).
+- `Schemata.Insight.Http` — combine with `Schemata.Insight.Foundation` and Resource HTTP to expose insight endpoints; see the [Insight overview](insight/overview.md).
+- `Schemata.Insight.Grpc` — combine with `Schemata.Insight.Foundation` and Resource gRPC to expose insight endpoints; see the [Insight overview](insight/overview.md).
+- `Schemata.Expressions.Order` — combine with Resource or repository code that accepts AIP order-by expressions.
 
 ## See also
 

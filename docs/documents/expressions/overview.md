@@ -1,20 +1,27 @@
 # Expressions Overview
 
-The expression stack compiles filter strings (AIP-160, CEL) into LINQ `Expression<Func<TContext, TResult>>` trees
-that apply directly to `IQueryable<T>` queries, and order-by strings (AIP-132) into ordering functions. Three
-packages form the stack: `Schemata.Expressions.Skeleton` holds the contracts and shared cache,
-`Schemata.Expressions.Aip` implements the AIP language, and `Schemata.Expressions.Cel` implements CEL. Each
-language registers as a keyed DI service.
+The expression stack turns user filter text into LINQ expression trees, keeps language choice per module, and can split a filter between backend pushdown and local residual evaluation. Ordering is a separate AIP-132 compiler, so filter languages and order-by share contracts but register independently.
+
+## Package split
+
+| Package | Role |
+| --- | --- |
+| `Schemata.Expressions.Skeleton` | Contracts, cache, language profile/resolver, pushdown contracts, residual paging, and alias-keyed dynamic values. |
+| `Schemata.Expressions.Aip` | AIP-160 filter parser/compiler plus AIP pushdown planner. |
+| `Schemata.Expressions.Cel` | CEL parser/compiler plus pushdown planner and CEL value semantics. |
+| `Schemata.Expressions.Order` | AIP-132 order-by compiler, independent of the filter language. |
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
 | `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs`, `IExpressionTree.cs` |
-| `Schemata.Expressions.Skeleton` | `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `LruCache.cs` |
-| `Schemata.Expressions.Skeleton` | `ExpressionRuntime.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs` |
-| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipOrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
-| `Schemata.Expressions.Cel` | `CelCompiler.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageResolver.cs`, `ExpressionLanguageDescriptor.cs`, `ExpressionLanguageOptions.cs`, `ResolvedLanguage.cs` |
+| `Schemata.Expressions.Skeleton` | `FilteringMode.cs`, `ExpressionCapabilities.cs`, `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ResidualPage.cs` |
+| `Schemata.Expressions.Skeleton` | `DynamicValues.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`, `ExpressionRuntime.cs` |
+| `Schemata.Expressions.Aip` | `AipLanguage.cs`, `AipParser.cs`, `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Cel` | `CelLanguage.cs`, `CelParser.cs`, `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs`, `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs`, `CelPushdownPlanner.cs`, `Expressions/*.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
 
 ## Contracts
 
@@ -26,120 +33,162 @@ public interface IExpressionCompiler
     string Language { get; }
     IExpressionTree Parse(string source);
     Expression<Func<TContext, TResult>> Compile<TContext, TResult>(
-        IExpressionTree tree, ExpressionCompileOptions? options = null);
+        IExpressionTree tree,
+        ExpressionCompileOptions? options = null);
 }
 ```
 
-`Parse` produces an `IExpressionTree` (the AST); `Compile` turns it into a typed lambda. The two steps are cached
-independently, so a tree parsed once can be compiled for several context types without re-parsing. `Language` is
-the DI registration key.
+`Parse` returns a language AST. `Compile` turns that AST into a typed `Expression<Func<TContext, TResult>>`. `Language` is the keyed DI name used by `GetRequiredKeyedService<IExpressionCompiler>(name)`.
 
 ### `IOrderCompiler`
 
 ```csharp
 public interface IOrderCompiler
 {
-    string Language { get; }
     Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(
-        string source, ExpressionCompileOptions? options = null);
+        string source,
+        ExpressionCompileOptions? options = null);
+
+    IReadOnlyList<OrderKey> Parse(string source);
 }
 ```
 
-`CompileOrder` parses and compiles an order-by string into a function that applies an `OrderBy`/`ThenBy` chain.
+`IOrderCompiler` is non-keyed. `Schemata.Expressions.Order.OrderCompiler` parses AIP-132 order-by text into `OrderKey` values and compiles them into an `OrderBy`/`ThenBy` chain.
 
-### `IExpressionTree`
+### `IExpressionPushdownPlanner`
 
 ```csharp
-public interface IExpressionTree
+public interface IExpressionPushdownPlanner
 {
     string Language { get; }
+    ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities);
 }
 ```
 
-The AST root type implements it. `AipParser`'s `Filter` and `CelNode` both carry a `Source` string used as the
-cache key on `Compile`.
+A planner receives a parsed tree and backend capabilities, then returns `ExpressionPushdownPlan(Pushed, Residual)`. The pushed part is a weakening of the original filter; `Pushed && Residual` is equivalent to the original. See [Pushdown and Residual Evaluation](pushdown.md).
 
-### `ExpressionCompileOptions`
+## Language profiles
+
+A module that accepts expressions owns an `ExpressionLanguageProfile`. The profile has an ordered `Languages` list, a module-level `Filtering` override, and a module-level `MaxResidualScanRows` override. Each `ExpressionLanguageEntry` names one language and can override `Filtering` and `MaxResidualScanRows` for that language in the module.
+
+`IExpressionLanguageBuilder` is the shared builder seam:
 
 ```csharp
-public sealed class ExpressionCompileOptions
+public interface IExpressionLanguageBuilder
 {
-    public IDictionary<string, ExpressionFunction> Functions { get; }
+    IServiceCollection Services { get; }
+    ExpressionLanguageProfile Languages { get; }
 }
 ```
 
-`Functions` injects named `ExpressionFunction` factories into a compiler. Both the AIP and CEL compilers consult
-`options.Functions` and fold the function set into the cache key, so two option sets binding the same name to
-different delegates do not share a compiled result.
-
-## `ExpressionCache`
-
-`ExpressionCache` is a process-wide static with three LRU caches:
-
-| Cache | Capacity | Key | Value |
-| --- | --- | --- | --- |
-| `Trees` | 500 | `ExpressionCacheKey` | `IExpressionTree` |
-| `Expressions` | 500 | `ExpressionCacheKey` | `LambdaExpression` |
-| `Delegates` | 200 | `LambdaExpression` (reference identity) | `Delegate` |
-
-### Cache key
-
-`ExpressionCacheKey.Create` joins five inputs with the unit separator (``) and returns their SHA-256 hash:
-
-```
-language + source + contextType.AssemblyQualifiedName + resultType.AssemblyQualifiedName + options
-```
-
-The `options` component is a fingerprint of the custom functions. `Parse` keys with null context/result/options;
-`Compile` keys with the full tuple.
-
-### `LruCache<TKey, TValue>`
-
-`LruCache` is a thread-safe doubly-linked-list plus dictionary with LRU eviction. `GetOrAdd` locks to check for a
-hit, runs the factory outside the lock on a miss, then re-checks under lock before inserting, so concurrent
-compilations of the same key produce one stored value.
-
-### `ExpressionRuntime`
+Language packages expose `Use*` extensions over this seam. A resource module can enable AIP filtering, CEL filtering, and AIP-132 ordering without reaching for raw service registration:
 
 ```csharp
-public static TResult Evaluate<TContext, TResult>(
-    Expression<Func<TContext, TResult>> expression, TContext context);
+schema.UseResource()
+      .UseAip(entry => entry.Filtering = FilteringMode.Residual)
+      .UseCel(entry => entry.MaxResidualScanRows = 25_000)
+      .UseOrdering();
 ```
 
-`Evaluate` resolves a compiled delegate from `ExpressionCache.GetOrAddDelegate` (keyed by lambda reference) and
-invokes it against one object.
+`UseAip<T>` calls `AddAipExpressions()`, then enables `ExpressionLanguages.Aip` in the module profile. `UseCel<T>` does the same for `ExpressionLanguages.Cel`. `UseOrdering<T>` registers the non-keyed order compiler and does not add a filter language.
 
-## Registration
+## Language resolver
+
+`ExpressionLanguageResolver.Resolve(profile, requested, descriptors)` selects the language for a request:
+
+1. An empty `requested` value picks the first enabled `ExpressionLanguageEntry`.
+2. A non-empty request must match an enabled entry by ordinal string comparison.
+3. A missing language or an empty profile throws `UnknownExpressionLanguageException`.
+4. The returned `ResolvedLanguage` carries `Language`, effective `Filtering`, and effective `MaxResidualScanRows`.
+
+`FilteringMode` has three values:
+
+| Mode | Meaning |
+| --- | --- |
+| `Default` | Inherit from the other levels. If every level is `Default`, `OrStrict()` resolves to `Strict`. |
+| `Strict` | Compile the whole filter for the backend path; untranslatable filters fail instead of running locally. |
+| `Residual` | Push the translatable part and evaluate the rest locally under a scan cap. |
+
+`Narrow` intersects modes. `Strict` at any level wins; `Residual` wins only when neither side is `Strict`; `Default` yields to the other side. The resolver applies descriptor defaults, then profile overrides, then entry overrides, and finally calls `OrStrict()`.
+
+The residual scan cap has the same three levels. `ExpressionLanguageEntry.MaxResidualScanRows` wins when positive, then `ExpressionLanguageProfile.MaxResidualScanRows`, then `ExpressionLanguageDescriptor.MaxResidualScanRows`, then the built-in default of `10_000` rows.
+
+## Language descriptors
+
+`ExpressionLanguageDescriptor` records global defaults registered under the language name:
 
 ```csharp
-services.AddAipExpressions();  // IExpressionCompiler + IOrderCompiler keyed "aip"
-services.AddCelExpressions();  // IExpressionCompiler keyed "cel"
+public sealed record ExpressionLanguageDescriptor(
+    string Language,
+    FilteringMode Filtering,
+    int MaxResidualScanRows,
+    bool SupportsValues = false);
 ```
 
-`SchemataResourceFeature` calls `AddAipExpressions()` automatically. CEL is opt-in. Resolve a compiler by key:
+AIP registers `SupportsValues: false` because it is predicate-only. CEL registers `SupportsValues: true`, so modules that need scalar evaluation can select CEL for Insight planning and Flow conditions.
+
+## Capabilities
+
+`ExpressionCapabilities` tells a pushdown planner what a backend can translate:
+
+| Flag | Meaning |
+| --- | --- |
+| `Comparison` | Equality and ordering comparisons. |
+| `Logical` | Boolean composition: and, or, and not. |
+| `Presence` | Field presence checks. |
+| `Wildcard` | Wildcard text matching. |
+| `Arithmetic` | Numeric arithmetic. |
+| `Membership` | Collection membership checks. |
+| `StringMatch` | String helper functions. |
+| `Functions` | Extra named functions the backend can translate. |
+
+`ExpressionCapabilities.Relational` is the default preset. Its flags are all true and `Functions` is empty, covering constructs relational repositories normally translate while leaving language-specific functions in the residual.
+
+## Cache and compile options
+
+`ExpressionCache` stores parsed trees, compiled lambda expressions, and compiled delegates. Tree and expression caches use `ExpressionCacheKey`; delegate caching uses lambda reference identity so the same cached lambda compiles once.
+
+`ExpressionCacheKey.Create(language, source, contextType, resultType, options)` joins those five fields with the unit separator and hashes the material with SHA-256. `Parse` uses null context/result/options. `Compile` passes the target context type, result type, and an options fingerprint.
+
+`ExpressionCompileOptions.Fingerprint(options, builtinsVersion)` returns a stable fragment for cache keys:
+
+```text
+builtins:v1;functions:none
+builtins:v1;functions:name:runtimeHash,...
+```
+
+Compilers should pass a fingerprint whenever custom `ExpressionFunction` bindings affect output. AIP delegates this to `AipBuiltInFunctions.Fingerprint(options)`; CEL calls `ExpressionCompileOptions.Fingerprint(options)` directly.
+
+## Dynamic values
+
+`DynamicValues` centralizes alias-keyed row evaluation for dictionary contexts. Insight joins and Flow conditions can pass rows shaped like this:
 
 ```csharp
-var aip = sp.GetRequiredKeyedService<IExpressionCompiler>(AipLanguage.Name); // "aip"
-var cel = sp.GetRequiredKeyedService<IExpressionCompiler>(CelLanguage.Name); // "cel"
+new Dictionary<string, object?> {
+    ["o"] = new Dictionary<string, object?> {
+        ["status"] = "paid",
+        ["amount"] = 10L,
+    },
+};
 ```
 
-## Design rationale
+The compilers emit calls to `DynamicValues.Member`, `Truthy`, `Equal`, comparison helpers, and arithmetic helpers when compiling against `IReadOnlyDictionary<string, object?>` or related map types.
 
-Splitting `Parse` from `Compile` lets the tree cache serve many context types from one parse. The delegate
-cache is keyed by lambda reference identity: the expression cache returns the same `LambdaExpression`
-instance for identical inputs, so the delegate cache hit rate stays high.
+Important semantics:
 
-## Caveats
+| Helper | Behavior |
+| --- | --- |
+| `Missing` | Sentinel distinct from a present null. Missing fields do not match equality or ordering. |
+| `Truthy` | Booleans keep their value; present non-null values are true; missing and null are false. |
+| `Equal` / `NotEqual` | Missing operands are false; two nulls are equal; numeric types compare by numeric value. |
+| Numeric coercion | Integer, unsigned, floating, and decimal CLR numbers coerce through `double` for dynamic comparisons and arithmetic. |
 
-- The three caches are process-wide statics with LRU eviction; they are never explicitly cleared.
-- CEL implements `IExpressionCompiler` only, not `IOrderCompiler`. Resolving `IOrderCompiler` keyed by
-  `CelLanguage.Name` throws.
-- `ResourceOperationHandler.ListAsync` resolves both compilers by the fixed key `AipLanguage.Name`; a compiler
-  registered under another key does not affect the resource system.
+CEL value mode builds on `DynamicValues` but routes full CEL scalar behavior through `CelValues`. See [CEL Expressions](cel.md).
 
 ## See also
 
+- [Pushdown and Residual Evaluation](pushdown.md)
 - [AIP Expressions](aip.md)
 - [CEL Expressions](cel.md)
 - [Custom Language](custom-language.md)
-- [Filtering](../resource/filtering.md)
+- [Resource Filtering](../resource/filtering.md)

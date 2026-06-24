@@ -30,7 +30,8 @@ Start with [Getting Started](getting-started.md) and work through the guides in 
 | 14 | [Event Bus](event-bus.md) | In-process event publishing and handling |
 | 15 | [Scheduling](scheduling.md) | Cron and periodic background jobs |
 | 16 | [Push](push.md) | Broadcast notification fan-out across transports |
-| 17 | [Modular](modular.md) | Module discovery and assembly loading |
+| 17 | [Insight](insight.md) | Federated read query across registered sources |
+| 18 | [Modular](modular.md) | Module discovery and assembly loading |
 
 ## What the guides don't cover
 

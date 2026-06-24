@@ -3,15 +3,15 @@
 `ProcessRegistry` and `ProcessRuntime` bridge the BPMN engine to the rest of the framework.
 `ProcessRegistry` holds the compiled definitions and resolves the engine for each. `ProcessRuntime`
 is the public entry point: it loads instances, drives the engine, runs the pre-commit advisor
-pipeline, persists the result, and notifies observers. Both are singletons registered by
-`SchemataFlowFeature`.
+pipeline, writes the source entity when configured, persists the result, and notifies observers. Both
+are singletons registered by `SchemataFlowFeature`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Foundation` | `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessRuntime.Events.cs`, `ProcessRuntime.Cache.cs`, `ProcessRuntime.Lifecycle.cs`, `ProcessPersistence.cs`, `ProcessInitializer.cs` |
-| `Schemata.Flow.Skeleton` | `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Runtime/IProcessLifecycleObserver.cs` |
+| `Schemata.Flow.Foundation` | `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessRuntime.Events.cs`, `ProcessRuntime.Lifecycle.cs`, `ProcessPersistence.cs`, `ProcessWriteback.cs`, `ProcessInitializer.cs`, `Runtime/ExpressionConditionExpression.cs` |
+| `Schemata.Flow.Skeleton` | `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IFlowWritebackProjector.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Runtime/IProcessLifecycleObserver.cs`, `SchemataFlowOptions.cs` |
 
 ## ProcessRegistry
 
@@ -91,11 +91,13 @@ Every state-changing method routes through a shared `ApplyAsync` step:
 4. Build a `FlowTransitionContext` and run the **`IFlowTransitionAdvisor` pipeline** against it.
    This runs in the pre-commit window: an advisor that throws aborts the transition before anything
    is persisted.
-5. Persist the instance row and the transition row in one unit of work (`ProcessPersistence`).
-6. Sync the persisted fields back onto the caller's process and hand back the instance and transition.
+5. Build the optional source writeback callback for the registered engine.
+6. Persist the instance row, transition row, and source writeback in one unit of work
+   (`ProcessPersistence`).
+7. Sync the persisted fields back onto the caller's process and hand back the instance and transition.
 
 After `ApplyAsync` returns, the calling method publishes the relevant lifecycle notification (see
-below). A failing engine call publishes a `ProcessFailedEvent` and rethrows.
+below). A failing engine call publishes failure notifications and rethrows.
 
 `UpdatedBy` is resolved from the `ClaimsPrincipal`: the subject claim becomes `users/{sub}`, falling
 back to `Identity.Name`.
@@ -121,7 +123,9 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
 
 It implements `ISoftDelete`, so the default query filter hides tombstoned instances; read them
 inside a `using (repository.SuppressQuerySoftDelete())` scope. `IConcurrency` carries the optimistic
-`Timestamp`.
+`Timestamp`. `SourceTimestamp` records the source entity timestamp captured at start time and after
+writeback; later transitions compare it with the current source row when the source implements
+`IConcurrency`.
 
 ## SchemataProcessTransition entity
 
@@ -144,13 +148,68 @@ One transition row is written per state change, in the same unit of work as the 
 ## Persistence
 
 `ProcessPersistence` owns the database. `PersistTransitionAsync` opens a unit of work over
-`IRepository<SchemataProcess>`, joins `IRepository<SchemataProcessTransition>`, upserts the instance
-row, adds the transition row, and commits; a failure rolls back. There is no persistence observer —
-durability is built into the runtime's commit path, and `IProcessLifecycleObserver` is purely a
-post-commit notification surface.
+`IRepository<SchemataProcess>`, joins `IRepository<SchemataProcessTransition>`, runs the optional
+writeback callback, upserts the instance row, adds the transition row, and commits; a failure rolls
+back. There is no persistence observer — durability is built into the runtime's commit path, and
+`IProcessLifecycleObserver` is purely a post-commit notification surface.
 
 `ProcessInitializer` (a hosted service) hydrates every persisted instance with `WaitingAtId != null`
 into the runtime cache at startup, so waiting instances are addressable after a restart.
+
+## Source writeback
+
+`SchemataFlowOptions.SourceWriteback` controls whether transitions project runtime state back to the
+source business entity. The default is `true`; set it to `false` to persist only
+`SchemataProcess` and `SchemataProcessTransition` rows.
+
+`ProcessWriteback.Build` returns a unit-of-work callback when the process has both `Source` and
+`SourceType`, writeback is enabled, and the resolved source type implements `ICanonicalName`. The
+callback resolves `IRepository<TSource>`, joins the transition unit of work, and loads the source row
+by `CanonicalName == process.Source`.
+
+The default projection is the state-machine projection: when the source entity implements
+`IStateful`, it receives `ProcessInstance.State`. That writes the current BPMN display state onto the
+business row. Engines with a different runtime position model can register a keyed
+`IFlowWritebackProjector` under their `EngineName`; `ProcessWriteback` uses that projector instead of
+the default `IStateful` assignment.
+
+Optimistic concurrency uses the source timestamp captured on the process row. When
+`process.SourceTimestamp` has a value and the loaded source entity implements `IConcurrency`,
+`ProcessWriteback` compares it with `entity.Timestamp`. A mismatch throws
+`FailedPreconditionException` and aborts the transition before the process row or transition row
+commit. After a successful source update, the refreshed source `Timestamp` is copied back to
+`SchemataProcess.SourceTimestamp`, so the next transition checks against the new version.
+
+The writeback runs inside the same unit of work as the instance and transition rows. A writeback
+failure rolls back the whole transition; a successful transition keeps the business row, process row,
+and transition history together.
+
+## Expression languages
+
+Flow condition expressions route through the shared [Expressions](../expressions/overview.md)
+language profile. `SchemataFlowOptions.Expressions` is an `ExpressionLanguageProfile`: enabled
+languages are stored in priority order, and the first enabled language is the module default.
+
+`ExpressionConditionExpression` resolves the language on each evaluation call. It reads the active
+`SchemataFlowOptions`, lets a process configuration language override select a default, then calls
+`ExpressionLanguageResolver.Resolve` against the module profile. The resolved language name selects
+the keyed `IExpressionCompiler`; the compiler parses the condition source and compiles it as a
+`Func<IReadOnlyDictionary<string, object?>, bool>`.
+
+`SchemataFlowBuilder` implements `IExpressionLanguageBuilder`, so language packages can configure the
+Flow profile through the same seam used by other modules:
+
+```csharp
+schema.UseFlow()
+      .UseAip()
+      .UseCel()
+      .Use<OrderProcess>();
+```
+
+Flow variables round-trip through JSON and can arrive at evaluation as `JsonElement`. Before calling
+the compiled predicate, `ExpressionConditionExpression` unwraps JSON objects into string-keyed maps,
+arrays into lists, strings into `string`, numbers into `long` or `double`, booleans into `bool`, and
+JSON null/unsupported kinds into `null`.
 
 ## IFlowTransitionAdvisor
 
@@ -191,19 +250,22 @@ public interface IProcessLifecycleObserver
     Task OnTransitionedAsync(SchemataProcess process, SchemataProcessTransition transition,
         CancellationToken ct = default);
     Task OnTerminatedAsync(SchemataProcess process, CancellationToken ct = default);
+    Task OnFailedAsync(SchemataProcess process, Exception exception, CancellationToken ct = default);
 }
 ```
 
 Lifecycle observers run after the commit. Each is invoked in its own try/catch — a thrown observer
-is logged at warning and does not affect the committed transition. The runtime also publishes flow
-lifecycle events on `IEventBus` alongside the observer calls: `ProcessStartedEvent`,
-`TransitionMadeEvent`, `ProcessCompletedEvent`, and `ProcessFailedEvent`.
+is logged at warning and does not affect the committed transition. `Schemata.Flow.Event` registers
+`ProcessEventLifecycleObserver` to publish `ProcessStartedEvent`, `TransitionMadeEvent`,
+`ProcessCompletedEvent`, and `ProcessFailedEvent` on `IEventBus` when the event bridge is active.
 
 ## Extension points
 
 - Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to provision infrastructure
   or veto a transition before it commits.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to react after the commit.
+- Implement `IFlowWritebackProjector` and register it as a keyed service under an engine name to
+  project runtime state onto source entities differently from the default `IStateful` projection.
 - Call `IProcessRegistry.RegisterAsync` to add a definition after startup.
 
 ## Design rationale
@@ -218,6 +280,8 @@ principal before calling in.
   `ProcessDefinition` constructor. Keep those constructors cheap.
 - `ThrowSignalAsync` enumerates cached instances and persisted instances with `WaitingAtId != null`
   to find signal matches. For large deployments, index `WaitingAtId`.
+- Source writeback only starts when the source type is resolvable in `AppDomainTypeCache`, implements
+  `ICanonicalName`, and has an `IRepository<TSource>` registration.
 
 ## See also
 
@@ -225,3 +289,4 @@ principal before calling in.
 - [HTTP Transport](http.md)
 - [Event Integration](event.md)
 - [Scheduling Integration](scheduling.md)
+- [Expressions](../expressions/overview.md)

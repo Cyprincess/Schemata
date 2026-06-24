@@ -1,17 +1,14 @@
 # Scheduling Jobs
 
-A fire runs through two stages: the `IJobExecutionAdvisor` intercept lane, then the
-`IJobLifecycleObserver` gate. The advisor pipeline runs first and can short-circuit the fire
-entirely. The observer pipeline runs next; the scheduler collects every observer's
-`OnTriggeredAsync` outcome and applies the most-restrictive result before calling
-`IScheduledJob.ExecuteAsync`.
+Every scheduled unit is an `IScheduledJob`. The scheduler persists a `SchemataJobExecution` row before a fire runs, then `JobExecutionDispatcher` claims due rows and executes the body through the advisor and observer pipeline. Cron, periodic, one-time, `:run`, Resource purge, and scheduled push sends all use that same execution row model.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduledJob.cs`, `IJobLifecycleObserver.cs`, `JobContext.cs`, `JobTriggerOutcome.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.Execute.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Observers/SchemataJobAuditObserver.cs`, `JobExecutionDispatcher.cs` |
+| `Schemata.Scheduling.Skeleton` | `IScheduledJob.cs`, `JobContext.cs`, `JobRegistration.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `Attributes/ScheduledJobAttribute.cs`, `IJobLifecycleObserver.cs`, `JobTriggerOutcome.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ExecutionState.cs` |
+| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Observers/SchemataJobAuditObserver.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs` |
+| `Schemata.Resource.Foundation` | `PurgeJob.cs`, `PurgeJobKeyResolver.cs`, `PurgeHandler.cs`, `PurgeOperationArgs.cs` |
 
 ## IScheduledJob
 
@@ -22,9 +19,7 @@ public interface IScheduledJob
 }
 ```
 
-`JobContext.Job` is the job's canonical name; `JobContext.Variables` is the variable dictionary
-deserialized from `SchemataJob.Variables`. A job assigns `JobContext.Execution.Output` to surface a
-result document on the execution row.
+The dispatcher resolves the job type from `SchemataJobExecution.JobKey`, creates a DI scope, builds a `JobContext`, and calls `ExecuteAsync`. A job can set `context.Execution.Output` to publish the AIP-151 `response` payload on the operation row.
 
 ```csharp
 public sealed class ReportJob : IScheduledJob
@@ -34,31 +29,76 @@ public sealed class ReportJob : IScheduledJob
     public ReportJob(IReportService reports) { _reports = reports; }
 
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
-        await _reports.GenerateDailyReportAsync(ct);
+        var result = await _reports.GenerateDailyReportAsync(ct);
+        if (context.Execution is not null) {
+            context.Execution.Output = JsonSerializer.Serialize(result);
+        }
     }
 }
 ```
 
-Register via `SchedulingBuilder.WithJob<T>`:
+Register a scheduled job through `SchedulingBuilder.WithJob<T>`:
 
 ```csharp
 schema.UseScheduling()
       .WithJob<ReportJob>("0 8 * * *");  // daily at 08:00 UTC
 ```
 
-## IJobExecutionAdvisor (intercept lane)
+Register an on-demand job without a schedule through `WithJob<T>()` or `AddScheduledJob<T>()`. That records the type in `SchemataSchedulingOptions.Jobs` so the registry can resolve executions after a restart without arming a timer at startup.
+
+## JobContext
+
+`JobContext` is the per-fire payload passed to `IScheduledJob.ExecuteAsync`:
+
+| Property | Source and purpose |
+| --- | --- |
+| `Job` | Canonical name of the job or one-shot operation being fired. |
+| `Variables` | Free-form caller variables serialized through `SchemataJob.Variables`. |
+| `ExecutionUid` | UID reserved for the execution row; `TriggerAsync` accepts a caller-provided value so the caller can return the operation name immediately. |
+| `StartTime` | Scheduler-managed due time. Future values create future-dated `Pending` rows. |
+| `Method` | Custom method verb that produced the long-running operation, for example `purge`; ordinary scheduled fires leave it `null`. |
+| `JobKey` | Stable key used by `IScheduledJobRegistry` to resolve the job type. |
+| `ArgsJson` | Serialized typed arguments replayed by the job body. `PurgeJob<TEntity>` deserializes this into `PurgeOperationArgs`. |
+| `Execution` | The `SchemataJobExecution` row currently being run. Jobs set `Execution.Output` before returning to persist an operation response. |
+| `TriggerOutcome` | Most-restrictive observer result captured for the current fire. |
+
+`ArgsJson` is for typed, restart-durable work. Resource purge stores the request filter, language, and force flag there, then `PurgeJob<TEntity>` deserializes the payload when the dispatcher runs the job. `Variables` remains the dictionary channel for caller-supplied values on ordinary job runs.
+
+## Stable job keys
+
+A persisted execution stores `JobKey`, not an in-process delegate. The registry resolves that key to the concrete job type when `JobExecutionDispatcher` drains the row.
+
+Key resolution order:
+
+1. `[ScheduledJob("stable-key")]` on the job type.
+2. Explicit registrations already known to `IScheduledJobRegistry`.
+3. `Type.FullName` when no attribute supplies a key.
+4. `IScheduledJobKeyResolver` implementations on registry misses.
+
+Use `[ScheduledJob]` for ordinary jobs whose key must survive a type rename:
+
+```csharp
+[ScheduledJob("reports.daily")]
+public sealed class ReportJob : IScheduledJob
+{
+    public Task ExecuteAsync(JobContext context, CancellationToken ct) => Task.CompletedTask;
+}
+```
+
+Closed-generic jobs need `IScheduledJobKeyResolver` because their key usually contains a runtime value. Resource purge uses `PurgeJobKeyResolver`: `PurgeJob<TEntity>` resolves to `purge:{collection}`, and a persisted key resolves back to the closed-generic `PurgeJob<TEntity>` by asking `IResourceTypeResolver` for the entity registered to that collection.
+
+## IJobExecutionAdvisor
 
 ```csharp
 public interface IJobExecutionAdvisor : IAdvisor<JobContext>;
 ```
 
-The advisor pipeline runs before the observer gate and follows the `IAdvisor` contract:
+The advisor pipeline runs before lifecycle observers and follows the `IAdvisor` contract:
 
-- `Continue` — proceed to the observer pipeline.
-- `Handle` — return without firing the job or notifying observers.
-- `Block` — return without firing the job or notifying observers.
+- `Continue` proceeds to observer gating and then the job body.
+- `Handle` or `Block` stops the body and finalizes the execution as `Blocked`.
 
-Register via `TryAddEnumerable`:
+Register advisors via `TryAddEnumerable`:
 
 ```csharp
 services.TryAddEnumerable(
@@ -67,8 +107,7 @@ services.TryAddEnumerable(
 
 ## IJobLifecycleObserver
 
-`IJobLifecycleObserver` is the audit, gating, and bridge extension point. It spans the schedule and
-fire lifecycle:
+`IJobLifecycleObserver` is the audit, gating, and bridge extension point:
 
 ```csharp
 public interface IJobLifecycleObserver
@@ -85,90 +124,69 @@ public interface IJobLifecycleObserver
 }
 ```
 
-`OnScheduledAsync` / `OnUnscheduledAsync` fire when an entry is recorded, advanced, or removed.
-`OnTriggeredAsync` returns a `JobTriggerOutcome` that gates the fire. `OnSucceededAsync` and
-`OnFailedAsync` fire after the body settles. Observer exceptions are logged at `Warning` and
-swallowed, so one failing observer does not stop the others.
+`OnScheduledAsync` and `OnUnscheduledAsync` run when a schedule is recorded, advanced, paused, or removed. `OnTriggeredAsync` returns a `JobTriggerOutcome` that gates the fire. `OnSucceededAsync` and `OnFailedAsync` run after the body settles. Observer exceptions are logged at `Warning` and swallowed, so one failing observer does not stop the others.
 
 ### JobTriggerOutcome
 
 ```csharp
 public enum JobTriggerOutcome
 {
-    Proceed = 0,  // run the job
-    Skip    = 1,  // skip this fire and advance the schedule
-    Block   = 2,  // skip this fire and freeze the schedule
+    Proceed = 0,
+    Skip    = 1,
+    Block   = 2,
 }
 ```
 
-When multiple observers run, the scheduler keeps the most-restrictive outcome: `Block > Skip >
-Proceed`.
-
-### Outcome semantics
+When multiple observers run, the dispatcher keeps the most-restrictive outcome: `Block > Skip > Proceed`.
 
 | Outcome | Execution row state | Schedule |
 | --- | --- | --- |
-| `Proceed` | `Succeeded` after `ExecuteAsync` returns (`Failed` if it throws) | Advances |
+| `Proceed` | `Succeeded` after `ExecuteAsync` returns, or `Failed` if it throws | Advances |
 | `Skip` | `Skipped` | Advances to the next occurrence |
 | `Block` | `Blocked` | Frozen at the current `NextRunTime` |
 
-`Skip` fits an external system that already handled the fire. `Block` fits a prerequisite that is not
-met and a job that must retry at the same time.
-
-## Where OnTriggeredAsync runs
-
-For cron and periodic fires, `DefaultScheduler` collects `OnTriggeredAsync` outcomes inside the fire
-path. For `TriggerAsync` fires, the scheduler invokes `OnTriggeredAsync` once when the operation is
-triggered, captures the result on `JobContext.TriggerOutcome`, and the execution path honors that
-captured value — one observer call and one audit row per trigger.
+`Skip` fits work that an external system already handled. `Block` fits a prerequisite that is not met and a job that must retry at the same time.
 
 ## Execution flow
 
-```
-fire
+```text
+SchemataJobExecution row is Pending and due
+  |
+  v
+JobExecutionDispatcher claims Pending -> Running
   |
   v
 IJobExecutionAdvisor pipeline
   |-- Continue: proceed
-  |-- Handle / Block: return (no observers, body not run)
+  |-- Handle / Block: finalize Blocked
   |
   v
-resolve OnTriggeredAsync outcome (most-restrictive merge)
-  |-- Block: mark execution Blocked, leave NextRunTime, notify OnBlockedAsync, return
-  |-- Skip:  mark execution Skipped, advance NextRunTime, notify OnSkippedAsync, reschedule, return
+IJobLifecycleObserver.OnTriggeredAsync merge
+  |-- Block: mark execution Blocked, keep NextRunTime
+  |-- Skip:  mark execution Skipped, advance recurring schedule
   |-- Proceed:
-  |       IScheduledJob.ExecuteAsync(context, ct)
-  |         |-- returns: OnSucceededAsync on all observers, advance schedule, reschedule
-  |         |-- throws:  job marked Failed, OnFailedAsync on all observers
+  |       resolve IScheduledJob from JobKey
+  |       call ExecuteAsync(context, ct)
+  |         |-- returns: mark Succeeded, persist Output, advance recurring schedule
+  |         |-- throws:  mark Failed, record RecentError
 ```
 
-`OnBlockedAsync` and `OnSkippedAsync` are extra hooks on the built-in `SchemataJobAuditObserver`; the
-scheduler invokes them only on registered `SchemataJobAuditObserver` instances to persist the
-`Blocked` / `Skipped` execution state.
-
-## SchemataJobAuditObserver
-
-The built-in observer commits the `SchemataJob` row and its `SchemataJobExecution` row in a single
-unit of work, so a failed write never leaves the two audit rows out of step. `OnScheduledAsync`
-upserts the job row; `OnSucceededAsync` / `OnFailedAsync` write the terminal execution state, end
-time, error, and output.
+`SchemataJobAuditObserver` persists the `SchemataJob` row. `JobExecutionDispatcher` owns the execution row from claim through terminal state, then asks observers to record the matching job-row transition. For recurring jobs, the dispatcher computes the next fire and calls the scheduler so the next `Pending` row is materialized.
 
 ## Extension points
 
-- Implement `IJobLifecycleObserver` (`TryAddEnumerable`) to observe transitions, gate fires, or
-  bridge to other systems.
-- Implement `IJobExecutionAdvisor` (`TryAddEnumerable`) to intercept a fire before the observer
-  pipeline.
+- Implement `IScheduledJob` to define work.
+- Apply `[ScheduledJob]` to pin a stable key.
+- Implement `IScheduledJobKeyResolver` for closed-generic or runtime-keyed jobs.
+- Implement `IJobLifecycleObserver` (`TryAddEnumerable`) to observe transitions, gate fires, or bridge to other systems.
+- Implement `IJobExecutionAdvisor` (`TryAddEnumerable`) to intercept a fire before observer gating.
 
 ## Caveats
 
-- `IJobExecutionAdvisor` returning `Handle` or `Block` bypasses the observer pipeline entirely: no
-  observer runs and the execution row is left untouched.
-- Observer exceptions are logged at `Warning` and swallowed. A throwing observer does not stop other
-  observers or fail the job.
-- A job body throwing is the only path that marks the `SchemataJob` row `Failed`; an advisor,
-  observer, or resolution failure is a system error that leaves the job's state for the next
-  occurrence.
+- Advisor `Handle` and `Block` outcomes prevent the job body from running and finalize the execution as `Blocked`.
+- Observer exceptions are logged at `Warning` and swallowed. A throwing observer does not stop other observers or fail the job.
+- A job body throwing marks the execution `Failed`. The job row remains `Active` for recurring jobs and becomes `Failed` for one-time jobs.
+- `JobExecutionDispatcher` resolves the job type from `JobKey`; a missing registration fails the execution row instead of loading a CLR type from persisted data.
 
 ## See also
 

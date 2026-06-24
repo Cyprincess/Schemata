@@ -91,6 +91,8 @@
       href: expressions/aip.md
     - name: CEL
       href: expressions/cel.md
+    - name: Pushdown
+      href: expressions/pushdown.md
     - name: Custom Language
       href: expressions/custom-language.md
 - name: Event
@@ -153,6 +155,17 @@
       href: push/dispatch.md
     - name: Subscriptions
       href: push/subscriptions.md
+- name: Insight
+  href: insight/overview.md
+  items:
+    - name: Overview
+      href: insight/overview.md
+    - name: Planning
+      href: insight/planning.md
+    - name: Drivers
+      href: insight/drivers.md
+    - name: Transports
+      href: insight/transports.md
 - name: Mapping
   href: mapping/overview.md
   items:
