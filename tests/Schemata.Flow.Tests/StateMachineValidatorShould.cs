@@ -105,16 +105,6 @@ public class StateMachineValidatorShould
     }
 
     [Fact]
-    public void Validate_DuplicateElementNames_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Same", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "Same", Position = EventPosition.End };
-
-        var definition = new ProcessDefinition { Name = "test", Elements = { startEvent, endEvent } };
-
-        Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
-    }
-
-    [Fact]
     public void Validate_FlowUnknownSource_Throws() {
         var startEvent  = new FlowEvent { Id = "start", Name   = "Start", Position = EventPosition.Start };
         var endEvent    = new FlowEvent { Id = "end", Name     = "End", Position   = EventPosition.End };

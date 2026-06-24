@@ -6,6 +6,6 @@ public abstract class FlowElement
     /// <summary>Stable engine identifier referenced by sequence flows and the runtime.</summary>
     public string Id { get; set; } = null!;
 
-    /// <summary>Human-readable label.</summary>
+    /// <summary>Human-readable display label.</summary>
     public string Name { get; set; } = null!;
 }

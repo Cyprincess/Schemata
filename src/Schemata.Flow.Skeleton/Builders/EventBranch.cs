@@ -60,7 +60,8 @@ public sealed class EventBranch
 
         if (_decisionBranches is not null) {
             var exclusiveGw = new ExclusiveGateway {
-                Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{_eventDefinition.Name}",
+                Id   = $"gateway_{Identifiers.NewUid():n}",
+                Name = $"Decision_{_eventDefinition.Name}",
             };
             definition.Elements.Add(exclusiveGw);
 

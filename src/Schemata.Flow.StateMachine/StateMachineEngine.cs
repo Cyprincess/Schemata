@@ -74,7 +74,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         };
 
         if (!string.IsNullOrEmpty(process.WaitingAtId)) {
-            var waiting = FindElementById(definition, process.WaitingAtId, process.WaitingAt);
+            var waiting = FindElementById(definition, process.WaitingAtId);
 
             switch (waiting) {
                 case EventBasedGateway @event:
@@ -106,7 +106,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             }
         }
 
-        var current = FindElementById(definition, process.StateId, process.State);
+        var current = FindElementById(definition, process.StateId);
         if (current is not Activity root) {
             throw new InvalidArgumentException(message: $"Trigger '{
                 trigger.Name
@@ -149,20 +149,22 @@ public sealed class StateMachineEngine : IFlowRuntime
         var variables = DeserializeVariables(process);
 
         if (!string.IsNullOrEmpty(process.WaitingAtId)) {
+            var stateElement   = FindElementById(definition, process.StateId);
+            var waitingElement = FindElementById(definition, process.WaitingAtId);
             return new() {
                 StateId     = process.StateId!,
-                State       = process.State,
+                State       = DisplayNameOf(stateElement),
                 WaitingAtId = process.WaitingAtId,
-                WaitingAt   = process.WaitingAt,
+                WaitingAt   = DisplayNameOf(waitingElement),
                 Variables   = variables,
                 IsComplete  = false,
             };
         }
 
-        var current = FindElementById(definition, process.StateId, process.State);
+        var current = FindElementById(definition, process.StateId);
         if (current is null) {
             throw new NotFoundException(message: $"Current state '{
-                process.StateId ?? process.State
+                process.StateId
             }' not found in process definition.");
         }
 
@@ -171,7 +173,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         if (matched is null) {
             return new() {
                 StateId    = process.StateId!,
-                State      = process.State,
+                State      = DisplayNameOf(current),
                 Variables  = variables,
                 IsComplete = false,
             };
@@ -179,6 +181,10 @@ public sealed class StateMachineEngine : IFlowRuntime
 
         var instance = new ProcessInstance { Variables = variables };
         return await ApplyTargetStateAsync(instance, definition, matched.Target);
+    }
+
+    private static string? DisplayNameOf(FlowElement? element) {
+        return element?.Name;
     }
 
     #endregion
@@ -421,16 +427,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         return instance;
     }
 
-    private static FlowElement? FindElementById(ProcessDefinition definition, string? id, string? name = null) {
-        if (!string.IsNullOrEmpty(id)) {
-            var found = definition.Elements.FirstOrDefault(e => e.Id == id);
-            if (found is not null) return found;
-        }
-
-        if (!string.IsNullOrEmpty(name)) {
-            return definition.Elements.FirstOrDefault(e => e.Name == name);
-        }
-
-        return null;
+    private static FlowElement? FindElementById(ProcessDefinition definition, string? id) {
+        return string.IsNullOrEmpty(id) ? null : definition.Elements.FirstOrDefault(e => e.Id == id);
     }
 }

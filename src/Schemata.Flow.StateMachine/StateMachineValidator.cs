@@ -27,7 +27,6 @@ public static class StateMachineValidator
             throw new FailedPreconditionException(message: "State machine requires at least one end event.");
         }
 
-        ValidateElementNames(definition);
         ValidateFlows(definition);
 
         foreach (var gateway in definition.Elements.OfType<Gateway>()) {
@@ -97,17 +96,6 @@ public static class StateMachineValidator
                 throw new FailedPreconditionException(message: $"Element '{
                     element.Name
                 }' is not reachable from the start event.");
-            }
-        }
-    }
-
-    private static void ValidateElementNames(ProcessDefinition definition) {
-        var names = new HashSet<string>();
-        foreach (var element in definition.Elements) {
-            if (string.IsNullOrEmpty(element.Name)) continue;
-            if (!names.Add(element.Name)) {
-                throw new FailedPreconditionException(
-                    message: $"Duplicate element name '{element.Name}'. All elements must have unique names.");
             }
         }
     }
