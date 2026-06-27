@@ -3,10 +3,11 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -43,7 +44,10 @@ public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<T
         ArgumentNullException.ThrowIfNull(entity);
 
         if (entity.DeleteTime is null) {
-            throw new AlreadyExistsException(message: $"Resource '{name ?? entity.CanonicalName}' is not deleted.");
+            throw SchemataResourceErrors.PreconditionFailed<TEntity>(
+                name: name ?? entity.CanonicalName,
+                subject: PreconditionSubjects.NotSoftDeleted,
+                description: "Resource is not deleted.");
         }
 
         entity.DeleteTime = null;

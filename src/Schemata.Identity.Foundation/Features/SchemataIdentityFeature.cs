@@ -101,7 +101,8 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
 
         var builder = services.AddIdentityApiEndpoints<TUser>(configure)
                               .AddRoles<TRole>()
-                              .AddUserManager<SchemataUserManager<TUser>>();
+                              .AddUserManager<SchemataUserManager<TUser>>()
+                              .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>();
 
         build(builder);
     }

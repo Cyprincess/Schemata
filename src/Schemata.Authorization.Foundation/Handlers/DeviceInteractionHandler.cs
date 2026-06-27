@@ -66,7 +66,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -74,7 +74,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -85,7 +85,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || string.IsNullOrWhiteSpace(device.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -93,7 +93,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -101,7 +101,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -147,7 +147,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(subject)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4017)
+                SchemataResources.GetResourceString(SchemataResources.USER_IDENTITY_REQUIRED)
             );
         }
 
@@ -158,7 +158,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -166,7 +166,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -177,7 +177,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || string.IsNullOrWhiteSpace(device.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -185,7 +185,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -193,25 +193,25 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
         var authorization = new TAuth {
-            Application     = application.Name,
-            Subject         = subject,
-            Type            = AuthorizationTypes.Device,
-            Status          = TokenStatuses.Valid,
-            Scopes          = payload.Scope,
+            Application = application.CanonicalName,
+            Subject     = subject,
+            Type        = AuthorizationTypes.Device,
+            Status      = TokenStatuses.Valid,
+            Scopes      = payload.Scope,
         };
         await auths.CreateAsync(authorization, ct);
 
         var sid = principal.FindFirstValue(options.Value.SessionIdClaimType);
 
-        device.Subject           = subject;
-        device.Status            = TokenStatuses.Authorized;
-        device.Authorization = authorization.Name;
-        device.SessionId         = sid;
+        device.Subject       = subject;
+        device.Status        = TokenStatuses.Authorized;
+        device.Authorization = authorization.CanonicalName;
+        device.SessionId     = sid;
 
         await tokens.UpdateAsync(device, ct);
         await tokens.RevokeAsync(token, ct);
@@ -230,7 +230,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (token?.Type != TokenTypes.UserCode || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -238,7 +238,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -246,7 +246,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         if (device?.Type != TokenTypes.DeviceCode) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 

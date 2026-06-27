@@ -1,5 +1,6 @@
 using System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
@@ -28,9 +29,12 @@ public static class SchemataRepositoryBuilderExtensions
         Action<IServiceProvider, DbContextOptionsBuilder>? configure
     )
         where TContext : DbContext {
-        configure ??= (_, _) => { };
+        var user = configure ?? ((_, _) => { });
 
-        builder.Services.AddDbContextFactory<TContext>(configure);
+        builder.Services.AddDbContextFactory<TContext>((sp, options) => {
+            options.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
+            user(sp, options);
+        });
 
         return builder;
     }
@@ -51,9 +55,12 @@ public static class SchemataRepositoryBuilderExtensions
         Action<IServiceProvider, DbContextOptionsBuilder>? configure
     )
         where TContextImplementation : DbContext, TContextService {
-        configure ??= (_, _) => { };
+        var user = configure ?? ((_, _) => { });
 
-        builder.Services.AddDbContextFactory<TContextImplementation>(configure);
+        builder.Services.AddDbContextFactory<TContextImplementation>((sp, options) => {
+            options.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
+            user(sp, options);
+        });
 
         return builder;
     }

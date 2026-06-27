@@ -30,6 +30,18 @@ Schemata.Authorization.Foundation/
 - [Schemata.Authorization.Skeleton](../Schemata.Authorization.Skeleton/) — the contracts (`IApplication`, `IScope`, `IToken`, `IAuthorization`, grant + response type enums, attribute markers). Pick implementations there before customising this package.
 - [Schemata.Authorization.Identity](../Schemata.Authorization.Identity/) — ties this package to `Schemata.Identity.Foundation` for user resolution against ASP.NET Core Identity.
 
+## Canonical Names + Pairwise Subjects
+
+Every cross-resource reference is stored as a full AIP-122 canonical name (`applications/{client}`, `authorizations/{id}`, `users/{uid}`, `jobs/{leaf}`). Every advisor and handler writes `application.CanonicalName` / `authorization.CanonicalName` end-to-end; consent + revocation + admin lookup paths read by canonical name too. Identity hands the framework a canonical `Claims.Subject` from the first sign-in step via [SchemataUserClaimsPrincipalFactory](../Schemata.Identity.Foundation/SchemataUserClaimsPrincipalFactory.cs); `IdentitySubjectProvider` accepts canonical or bare uid and always emits canonical.
+
+Pairwise subject identifiers are persisted bidirectionally:
+
+- [Services/PairwiseSubjectTranslator.cs](Services/PairwiseSubjectTranslator.cs) — owns `EnsureMappingAsync` (forward upsert) and the public `ToPairwiseAsync` / `ToCanonicalAsync` API; resolves through `IPairwiseSubjectTranslator`.
+- [Services/SubjectIdentifierService.cs](Services/SubjectIdentifierService.cs) — single place that decides between public + pairwise.
+- [Advisors/AdvicePairwiseProjection.cs](Advisors/AdvicePairwiseProjection.cs) runs at `Orders.Max` so every OIDC wire surface (id_token, access JWT, userinfo, introspection, back-channel logout) picks up the projected `sub` automatically.
+- [Advisors/AdviceSubjectClaimDestination.cs](Advisors/AdviceSubjectClaimDestination.cs) routes the subject claim to the correct destination set.
+- The `(Application, CanonicalSubject)` / `(Application, PairwiseSubject)` indexes live on the `SchemataSubjectMapping` entity declared in `Schemata.Authorization.Skeleton`.
+
 ## Conventions
 
 - **Persistence comes through `Schemata.Entity.Repository`** — every store / manager goes through `IRepository<TEntity>` and the advisor pipeline. No raw `DbContext` use.

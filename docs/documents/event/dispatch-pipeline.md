@@ -34,7 +34,7 @@ the response.
 Each pass claims rows in state `Pending`, plus any `Publishing` row a crashed dispatcher left stale
 past a five-minute claim timeout (batch size 100). For each row:
 
-1. Transitions the row to `Publishing` under its concurrency token; a `ConcurrencyException` means a
+1. Transitions the row to `Publishing` under its concurrency token; a `AbortedException` means a
    competing dispatcher won the claim, so the row is skipped.
 2. Calls `IEventOutboxPublisher.PublishAsync(EventOutboxMessage)`, passing the persisted payload,
    correlation id, and source snapshot.

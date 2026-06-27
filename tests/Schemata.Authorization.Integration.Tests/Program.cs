@@ -7,6 +7,7 @@ using Moq;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 
 var options = new WebApplicationOptions { Args = args };
 
@@ -43,10 +44,19 @@ var tokenMock = new Mock<ITokenManager<SchemataToken>>();
 tokenMock.Setup(m => m.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
          .Returns((SchemataToken? t, CancellationToken _) => Task.FromResult(t));
 
+// SchemataSubjectMapping repository is only exercised when an application uses
+// SubjectTypes.Pairwise; the test client is confidential / public-sub so a no-op
+// mock satisfies PairwiseSubjectTranslator's constructor without persisting.
+var mappingMock = new Mock<IRepository<SchemataSubjectMapping>>();
+mappingMock.Setup(m => m.AddAsync(It.IsAny<SchemataSubjectMapping>(), It.IsAny<CancellationToken>()))
+           .Returns((SchemataSubjectMapping? m, CancellationToken _) => Task.FromResult(m));
+mappingMock.Setup(m => m.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.FromResult(0));
+
 builder.Services.AddSingleton(appMock.Object);
 builder.Services.AddSingleton(scopeMock.Object);
 builder.Services.AddSingleton(authzMock.Object);
 builder.Services.AddSingleton(tokenMock.Object);
+builder.Services.AddSingleton(mappingMock.Object);
 
 builder.UseSchemata(schema => {
     schema.UseWellKnown();

@@ -76,7 +76,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(request.RefreshToken)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.RefreshToken)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.RefreshToken)
             );
         }
 
@@ -87,7 +87,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -103,7 +103,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
         }
 
@@ -111,7 +111,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(token?.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -119,7 +119,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         if (principal is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -140,7 +140,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 );
         }
 
@@ -150,7 +150,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             if (!ScopeParser.IsSubset(request.Scope, scope)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
                 );
             }
         }
@@ -160,7 +160,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidGrant,
-                    SchemataResources.GetResourceString(SchemataResources.ST4004)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
                 );
             }
         }

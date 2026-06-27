@@ -41,14 +41,14 @@ public sealed class ClientAuthenticationService<TApp>(IEnumerable<IClientAuthent
             1 => results.FirstOrDefault(),
             > 1 => throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                SchemataResources.GetResourceString(SchemataResources.ST4003)
+                SchemataResources.GetResourceString(SchemataResources.MULTIPLE_CLIENT_AUTH_METHODS)
             ),
             // RFC 6749 §5.2: a failed client authentication is invalid_client and, because credentials
             // may have been presented via the Authorization header, carries HTTP 401 so the exception
             // filter can attach a WWW-Authenticate challenge.
             var _ => throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId),
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId),
                 (int)HttpStatusCode.Unauthorized
             ),
         };

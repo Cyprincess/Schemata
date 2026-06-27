@@ -41,11 +41,11 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (string.IsNullOrWhiteSpace(o.DeviceVerificationUri)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST4018), "Device flow", nameof(o.DeviceVerificationUri)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.REQUIRED_SETTING_MISSING), "Device flow", nameof(o.DeviceVerificationUri)));
             }
 
             if (!Uri.TryCreate(o.DeviceVerificationUri, UriKind.Absolute, out var _)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST4019), nameof(o.DeviceVerificationUri)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ABSOLUTE_URI_REQUIRED), nameof(o.DeviceVerificationUri)));
             }
         });
 

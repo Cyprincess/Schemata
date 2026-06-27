@@ -59,19 +59,19 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (o.SigningKey is null) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningKey)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningKey)));
             }
 
             if (string.IsNullOrWhiteSpace(o.SigningAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningAlgorithm)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningAlgorithm)));
             }
 
             if (o.EncryptionKey is not null && string.IsNullOrWhiteSpace(o.EncryptionAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST4020), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.MISSING_DEPENDENT_SETTING), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
             }
 
             if (string.IsNullOrWhiteSpace(o.Issuer)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.Issuer)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.Issuer)));
             }
         });
 
@@ -112,6 +112,14 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         services.TryAddScoped<TokenService>();
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
+
+        // Pairwise (application × canonical-subject) → pairwise-hash mapping lives in
+        // SchemataSubjectMapping. The hosting startup must register a repository for that
+        // entity against its DbContext so AdvicePairwiseProjection (writer) and
+        // IPairwiseSubjectTranslator (reader / reverse-lookup) share the same durable table.
+        services.TryAddScoped<PairwiseSubjectTranslator<TApp>>();
+        services.TryAddScoped<IPairwiseSubjectTranslator>(
+            sp => sp.GetRequiredService<PairwiseSubjectTranslator<TApp>>());
 
         services.TryAddScoped<IPasswordHasher<TApp>, PasswordHasher<TApp>>();
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();

@@ -48,7 +48,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         if (string.IsNullOrWhiteSpace(request.SubjectToken)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.SubjectToken)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.SubjectToken)
             );
         }
 
@@ -56,7 +56,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.ST1013),
+                    SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY),
                     Parameters.SubjectTokenType
                 )
             );
@@ -67,14 +67,14 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         if (!string.IsNullOrWhiteSpace(request.ActorToken) && string.IsNullOrWhiteSpace(request.ActorTokenType)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ActorTokenType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ActorTokenType)
             );
         }
 
         if (!string.IsNullOrWhiteSpace(request.ActorTokenType) && string.IsNullOrWhiteSpace(request.ActorToken)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ActorToken)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ActorToken)
             );
         }
 
@@ -83,7 +83,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         if (!string.IsNullOrWhiteSpace(request.RequestedTokenType) && !TokenTypeUris.IsStandard(request.RequestedTokenType)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.RequestedTokenType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.RequestedTokenType)
             );
         }
 
@@ -94,7 +94,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -110,7 +110,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
         }
 
@@ -119,7 +119,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.ST1015),
+                    SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED),
                     Parameters.SubjectTokenType
                 )
             );

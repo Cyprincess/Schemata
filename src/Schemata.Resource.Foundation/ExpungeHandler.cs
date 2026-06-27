@@ -3,9 +3,10 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -35,7 +36,10 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
         ArgumentNullException.ThrowIfNull(entity);
 
         if (entity.DeleteTime is null) {
-            throw new FailedPreconditionException(message: $"Resource '{name ?? entity.CanonicalName}' is not deleted.");
+            throw SchemataResourceErrors.PreconditionFailed<TEntity>(
+                name: name ?? entity.CanonicalName,
+                subject: PreconditionSubjects.StateNotDeleted,
+                description: "Resource is not deleted.");
         }
 
         using (_repository.SuppressSoftDelete()) {

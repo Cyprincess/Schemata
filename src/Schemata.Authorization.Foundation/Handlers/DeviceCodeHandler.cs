@@ -69,7 +69,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.DeviceCode)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.DeviceCode)
             );
         }
 
@@ -80,7 +80,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -96,7 +96,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
         }
 
@@ -104,7 +104,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         if (token is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -124,14 +124,14 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 );
         }
 
         if (string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -139,7 +139,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         if (payload is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -148,7 +148,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
                 );
             }
 

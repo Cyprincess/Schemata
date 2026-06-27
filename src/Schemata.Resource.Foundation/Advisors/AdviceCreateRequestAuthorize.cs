@@ -25,7 +25,7 @@ public static class AdviceCreateRequestAuthorize
 ///     <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso> via
 ///     <see cref="IAccessProvider{TEntity,TRequest}" />.
 ///     Skips when <see cref="AnonymousGranted" /> is present.
-///     Throws <see cref="AuthorizationException" /> on denial.
+///     Throws <see cref="PermissionDeniedException" /> on denial.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>

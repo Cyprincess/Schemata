@@ -96,10 +96,10 @@ public Guid Timestamp { get; set; }
 - **EF Core** reads `[ConcurrencyCheck]` natively. `UpdateAsync` detaches the entity, re-attaches it as
   modified, and bumps `Timestamp` to a fresh GUID as the current value while the incoming token stays
   the original. `SaveChangesAsync` then issues `UPDATE ... WHERE <key> AND Timestamp = @original`; a
-  zero-row result raises `DbUpdateConcurrencyException`, normalized to `ConcurrencyException`.
+  zero-row result raises `DbUpdateConcurrencyException`, normalized to `AbortedException`.
 - **LinqToDB** maps `[ConcurrencyCheck]` to an optimistic-lock column through the metadata reader
   registered by `UseLinqToDb`, and `UpdateAsync` calls `UpdateOptimisticAsync`. A zero-row result
-  raises `ConcurrencyException`.
+  raises `AbortedException`.
 
 Without `[ConcurrencyCheck]`, the update writes unconditionally; concurrent writers can lose updates.
 The add stamp alone does not guard the update path.
@@ -171,7 +171,7 @@ Records the canonical name of the principal that owns the entity (e.g., `users/c
 | `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query. |
 
 Both consult `SchemataOwnerOptions.OnNullOwner` when the resolver returns `null`: `Reject` (default)
-throws `AuthorizationException`, `EmptyResult` blocks, `AllowAll` continues. See
+throws `PermissionDeniedException`, `EmptyResult` blocks, `AllowAll` continues. See
 [ownership.md](../repository/ownership.md).
 
 ## IExpiration

@@ -1,7 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -55,7 +57,8 @@ public sealed class AdviceAddUniqueness<TEntity> : IRepositoryAddAdvisor<TEntity
         }
 
         if (existing is not null) {
-            throw new AlreadyExistsException();
+            var name = (entity as ICanonicalName)?.CanonicalName;
+            throw SchemataResourceErrors.AlreadyExists<TEntity>(name);
         }
 
         return AdviseResult.Continue;

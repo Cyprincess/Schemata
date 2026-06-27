@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Authorization.Skeleton.Entities;
 
@@ -17,12 +18,15 @@ namespace Schemata.Authorization.Skeleton.Entities;
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
     /// <summary>Canonical name of the application that receives this token.</summary>
+    [ResourceReference(typeof(SchemataApplication))]
     public virtual string? Application { get; set; }
 
     /// <summary>Canonical name of the authorization record that grants this token.</summary>
+    [ResourceReference(typeof(SchemataAuthorization))]
     public virtual string? Authorization { get; set; }
 
-    /// <summary>Identifier of the resource owner this token represents.</summary>
+    /// <summary>Canonical name of the resource owner this token represents.</summary>
+    [ResourceReference]
     public virtual string? Subject { get; set; }
 
     /// <summary>

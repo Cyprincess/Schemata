@@ -55,7 +55,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -71,7 +71,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
         }
 

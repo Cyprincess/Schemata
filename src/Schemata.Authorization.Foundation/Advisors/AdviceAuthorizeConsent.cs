@@ -61,8 +61,8 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
         var scopes = ScopeParser.Parse(authz.Request?.Scope);
 
         var authorized = false;
-        if (!string.IsNullOrWhiteSpace(subject) && !string.IsNullOrWhiteSpace(authz.Application?.Name)) {
-            await foreach (var a in authorizations.ListAsync(subject, authz.Application.Name, ct)) {
+        if (!string.IsNullOrWhiteSpace(subject) && !string.IsNullOrWhiteSpace(authz.Application?.CanonicalName)) {
+            await foreach (var a in authorizations.ListAsync(subject, authz.Application.CanonicalName, ct)) {
                 if (a.Status != TokenStatuses.Valid) {
                     continue;
                 }
@@ -104,7 +104,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                     throw new OAuthException(
                         OAuthErrors.InvalidRequest,
                         string.Format(
-                            SchemataResources.GetResourceString(SchemataResources.ST4016),
+                            SchemataResources.GetResourceString(SchemataResources.UNSUPPORTED_PROMPT),
                             PromptValues.Consent
                         )
                     );
@@ -113,7 +113,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                 if (!authorized) {
                     throw new OAuthException(
                         OAuthErrors.ConsentRequired,
-                        SchemataResources.GetResourceString(SchemataResources.ST4010)
+                        SchemataResources.GetResourceString(SchemataResources.USER_CONSENT_REQUIRED)
                     );
                 }
 
@@ -144,7 +144,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                 if (none) {
                     throw new OAuthException(
                         OAuthErrors.ConsentRequired,
-                        SchemataResources.GetResourceString(SchemataResources.ST4010)
+                        SchemataResources.GetResourceString(SchemataResources.USER_CONSENT_REQUIRED)
                     );
                 }
 

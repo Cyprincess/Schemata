@@ -69,7 +69,7 @@ key value is already being tracked."
 
 A standalone `CommitAsync` flushes the implicit unit of work, which calls `SaveChangesAsync` and then
 dispatches `IRepositoryCommittedAdvisor<TEntity>`. A `DbUpdateConcurrencyException` from the guarded
-update is normalized to `ConcurrencyException`. When enlisted, the repository commits through the unit
+update is normalized to `AbortedException`. When enlisted, the repository commits through the unit
 of work, which buffers every enlisted repository's changes and persists them with one
 `SaveChangesAsync`.
 
@@ -92,7 +92,7 @@ pluralized through Humanizer.
 LinqToDB executes mutations immediately inside the open transaction. `AddAsync` runs the add advisors,
 calls `EnsureWriteUnitOfWork`, then `InsertAsync`. `AddRangeAsync` runs the add advisors per entity and
 persists the survivors with one bulk-copy round trip. `UpdateAsync` runs the update advisors, then calls
-`UpdateOptimisticAsync` for concurrency-controlled entities (raising `ConcurrencyException` on a
+`UpdateOptimisticAsync` for concurrency-controlled entities (raising `AbortedException` on a
 zero-row result) or `UpdateAsync` otherwise. `RemoveAsync` runs the remove advisors, then `DeleteAsync`.
 
 Because writes execute immediately, a query later in the same transaction observes the repository's own
@@ -115,7 +115,7 @@ is logged at warning level.
 | Write execution | Buffered in the tracker, flushed at commit | Immediate, inside the open transaction |
 | Read-your-own-writes before commit | No | Yes |
 | `UpdateAsync` | Detach, `Context.Update`, bump token | `UpdateOptimisticAsync` or `UpdateAsync` |
-| Concurrency on update | `DbUpdateConcurrencyException` → `ConcurrencyException` | zero-row `UpdateOptimisticAsync` → `ConcurrencyException` |
+| Concurrency on update | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
 
 ## Extension points
 

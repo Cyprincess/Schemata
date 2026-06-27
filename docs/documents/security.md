@@ -140,7 +140,7 @@ Each authorize advisor builds an `AccessContext<TRequest>` with the operation na
    Get, Update, and Delete regardless of the anonymous marker; Create has no entitlement step.
 2. Skips the access check when `AdviceContext.Has<AnonymousGranted>()`; otherwise calls
    `AuthorizeHelper.EnsureAsync(access, context, parent, principal, ct)`, which throws
-   `AuthorizationException` (HTTP 403) when access is denied.
+   `PermissionDeniedException` (HTTP 403) when access is denied.
 
 `AnonymousGranted` is set by the anonymous advisors, which consult `AnonymousAccess.IsAnonymous`.
 That helper reads the `[Anonymous]` attribute on the entity: no operation list grants all

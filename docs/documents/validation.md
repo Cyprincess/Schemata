@@ -67,9 +67,11 @@ same type is ignored.
 Each FluentValidation failure becomes an `ErrorFieldViolation`:
 
 - `Field` — `PropertyName` in `snake_case`.
-- `Reason` — the error code with the `Validator` suffix stripped and `snake_case`-d, plus any
-  comparison operands (e.g. `inclusive_between,1,150`, `maximum_length,200`).
-- `Description` — the formatted message.
+- `Reason` — the error code with the `Validator` suffix stripped and converted to AIP-193
+  UPPER_SNAKE_CASE (e.g. `INCLUSIVE_BETWEEN`, `MAXIMUM_LENGTH`, `NOT_EMPTY`). Reasons stay literal
+  keys; comparison operands stay in `Description`.
+- `Description` — the formatted FluentValidation message, including any operand values that the
+  template renders (e.g. `"Age must be between 1 and 150."`).
 
 It returns `AdviseResult.Continue` whether or not it found errors; collection, not short-circuit, is
 its job.

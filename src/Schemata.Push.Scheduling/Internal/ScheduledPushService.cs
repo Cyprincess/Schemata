@@ -33,12 +33,12 @@ public sealed class ScheduledPushService : IScheduledPushService
         DateTimeOffset?   at = null,
         CancellationToken ct = default
     ) {
-        var argsJson   = JsonSerializer.Serialize(context, SchemataJson.Default);
-        var uid        = Identifiers.NewUid();
-        var collection = ResourceNameDescriptor.ForType<SchemataJobExecution>().Collection;
+        var argsJson = JsonSerializer.Serialize(context, SchemataJson.Default);
+        var uid      = Identifiers.NewUid();
 
+        // One-shot push dispatch has no persistent SchemataJob; the resulting
+        // SchemataJobExecution is addressable as operations/{uid} on its own.
         var jobContext = new JobContext {
-            Job          = $"{collection}/{uid:n}:{SendMethod}",
             ExecutionUid = uid,
             Method       = SendMethod,
             ArgsJson     = argsJson,

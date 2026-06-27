@@ -27,7 +27,7 @@ public static class AdviceGetRequestAuthorize
 ///     <see cref="IAccessProvider{TEntity,GetRequest}" /> and applies row-level
 ///     entitlement filtering. Entitlement filtering is always applied; access
 ///     check is skipped when <see cref="AnonymousGranted" /> is present.
-///     Throws <see cref="AuthorizationException" /> on denial.
+///     Throws <see cref="PermissionDeniedException" /> on denial.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 public sealed class AdviceGetRequestAuthorize<TEntity> : IResourceGetRequestAdvisor<TEntity>

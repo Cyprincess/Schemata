@@ -5,6 +5,7 @@ using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
+using Schemata.Common.Errors;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -28,7 +29,7 @@ internal static class AuthorizeHelper
     ///     parent-read probe by re-asking the same access provider with <see cref="Operations.Get" /> —
     ///     this lets implementations distinguish "can see existence" from "cannot see existence" while
     ///     the advisor stays independent of the parent's entity type. Parent pass throws
-    ///     <see cref="AuthorizationException" /> (visible existence → disclose the missing permission);
+    ///     <see cref="PermissionDeniedException" /> (visible existence → disclose the missing permission);
     ///     parent fail throws <see cref="NotFoundException" /> (hide existence entirely).
     /// </summary>
     public static async Task EnsureAsync<TEntity, TRequest>(
@@ -43,7 +44,7 @@ internal static class AuthorizeHelper
         }
 
         if (context.Operation == nameof(Operations.Get)) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TEntity>(resource);
         }
 
         var parent = new AccessContext<TRequest> {
@@ -52,9 +53,12 @@ internal static class AuthorizeHelper
         };
 
         if (await access.HasAccessAsync(default, parent, principal, ct)) {
-            throw new AuthorizationException(message: string.Format(PermissionDeniedTemplate, $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}", resource));
+            var permission = $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}";
+            throw SchemataResourceErrors.PermissionDenied<TEntity>(
+                name: resource,
+                description: string.Format(PermissionDeniedTemplate, permission, resource));
         }
 
-        throw new NotFoundException();
+        throw SchemataResourceErrors.NotFound<TEntity>(resource);
     }
 }

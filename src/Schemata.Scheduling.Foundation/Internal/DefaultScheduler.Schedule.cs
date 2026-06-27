@@ -27,12 +27,19 @@ public sealed partial class DefaultScheduler
         return ScheduleCoreAsync(job, ct);
     }
 
-    public async Task UnscheduleAsync(string job, CancellationToken ct) {
+    /// <summary>
+    ///     Removes the in-memory registry entry for the SchemataJob whose canonical name is
+    ///     <paramref name="jobCanonical" /> and cancels any strictly-future Pending
+    ///     execution rows that point at it.
+    /// </summary>
+    /// <param name="jobCanonical">AIP-122 canonical name of the SchemataJob (e.g. <c>"jobs/my-schedule"</c>).</param>
+    /// <param name="ct">A cancellation token.</param>
+    public async Task UnscheduleAsync(string jobCanonical, CancellationToken ct) {
         ScheduledEntry? entry;
 
         await _lock.WaitAsync(ct);
         try {
-            if (_entries.TryRemove(job, out entry)) {
+            if (_entries.TryRemove(jobCanonical, out entry)) {
                 await entry.Cts.CancelAsync();
                 entry.Cts.Dispose();
             }
@@ -42,7 +49,7 @@ public sealed partial class DefaultScheduler
 
         // A paused/unscheduled job must not leave a future occurrence armed. Strictly-future rows
         // only; a due-now operation row (StartTime <= now) is owned by its :cancel handler.
-        await CancelFuturePendingAsync(job, ct);
+        await CancelFuturePendingAsync(jobCanonical, ct);
 
         if (entry is null) {
             return;
@@ -53,7 +60,8 @@ public sealed partial class DefaultScheduler
     }
 
     private async Task ScheduleCoreAsync(SchemataJob job, CancellationToken ct) {
-        if (string.IsNullOrWhiteSpace(job.Name)) {
+        var key = job.CanonicalName ?? job.Name;
+        if (string.IsNullOrWhiteSpace(key)) {
             return;
         }
 
@@ -65,7 +73,7 @@ public sealed partial class DefaultScheduler
                 return;
             }
 
-            if (_entries.TryRemove(job.Name, out var existing)) {
+            if (_entries.TryRemove(key, out var existing)) {
                 await existing.Cts.CancelAsync();
                 existing.Cts.Dispose();
             }
@@ -77,8 +85,8 @@ public sealed partial class DefaultScheduler
             // Collapse or skip a missed window per policy before the row is materialized.
             job.NextRunTime = AdjustForMissedWindow(job, _time.GetUtcNow().UtcDateTime);
 
-            entry              = new(job, new());
-            _entries[job.Name] = entry;
+            entry         = new(job, new());
+            _entries[key] = entry;
         } finally {
             _lock.Release();
         }
@@ -100,10 +108,18 @@ public sealed partial class DefaultScheduler
             return;
         }
 
+        // SchemataJobExecution.Job stores the SchemataJob canonical name; scheduled jobs always
+        // carry CanonicalName by the time they reach this advisor (the canonical-name advisor
+        // populates it before AddAsync commits).
+        var canonical = job.CanonicalName;
+        if (string.IsNullOrWhiteSpace(canonical)) {
+            return;
+        }
+
         // One unfired occurrence per job: if a Pending row already exists (e.g. the initializer armed
         // the same job twice), adopt it instead of duplicating the operation.
         var existing = await executions.FirstOrDefaultAsync(
-            q => q.Where(e => e.Job == job.Name && e.State == ExecutionState.Pending), ct);
+            q => q.Where(e => e.Job == canonical && e.State == ExecutionState.Pending), ct);
         if (existing is not null) {
             return;
         }
@@ -116,7 +132,7 @@ public sealed partial class DefaultScheduler
             Uid           = uid,
             Name          = name,
             CanonicalName = $"{descriptor.Collection}/{name}",
-            Job           = job.Name,
+            Job           = canonical,
             JobKey        = job.JobKey,
             ArgsJson      = job.ArgsJson,
             State         = ExecutionState.Pending,
@@ -128,7 +144,7 @@ public sealed partial class DefaultScheduler
         await uow.CommitAsync(ct);
     }
 
-    private async Task CancelFuturePendingAsync(string jobName, CancellationToken ct) {
+    private async Task CancelFuturePendingAsync(string jobCanonical, CancellationToken ct) {
         using var scope      = _services.CreateScope();
         var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
         if (executions is null) {
@@ -138,7 +154,7 @@ public sealed partial class DefaultScheduler
         var now    = _time.GetUtcNow().UtcDateTime;
         var future = new List<SchemataJobExecution>();
         await foreach (var row in executions.ListAsync(
-                           q => q.Where(e => e.Job == jobName
+                           q => q.Where(e => e.Job == jobCanonical
                                           && e.State == ExecutionState.Pending
                                           && e.StartTime > now), ct)) {
             future.Add(row);
@@ -149,7 +165,7 @@ public sealed partial class DefaultScheduler
             row.EndTime = now;
             try {
                 await executions.UpdateAsync(row, ct);
-            } catch (ConcurrencyException) {
+            } catch (AbortedException) {
                 // A competing handler already moved the row; nothing to do.
             }
         }

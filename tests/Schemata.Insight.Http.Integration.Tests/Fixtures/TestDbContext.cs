@@ -18,9 +18,9 @@ public class TestDbContext : DbContext
     public DbSet<SchemataInsightSource> InsightSources { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) {
-        var source = modelBuilder.Entity<SchemataInsightSource>();
-        source.HasKey(s => s.Uid);
-        source.Ignore(s => s.DisplayNames);
-        source.Ignore(s => s.Descriptions);
+        // SchemataModelCustomizer wires JSON converters for DisplayNames / Descriptions
+        // when registered via ReplaceService<IModelCustomizer>; this DbContext only needs
+        // to declare keys explicitly.
+        modelBuilder.Entity<SchemataInsightSource>().HasKey(s => s.Uid);
     }
 }

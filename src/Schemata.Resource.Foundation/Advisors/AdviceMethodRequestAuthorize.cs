@@ -28,7 +28,7 @@ public static class AdviceMethodRequestAuthorize
 ///     <see cref="AccessContext{TRequest}.Operation" /> -- enabling fine-grained
 ///     per-verb permission policies.
 ///     Skips when <see cref="AnonymousGranted" /> is present.
-///     Throws <see cref="AuthorizationException" /> on denial.
+///     Throws <see cref="PermissionDeniedException" /> on denial.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>

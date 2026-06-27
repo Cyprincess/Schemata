@@ -44,16 +44,16 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
             throw new InvalidOperationException("Purge requires a scheduler.");
         }
 
-        var uid        = Identifiers.NewUid();
-        var collection = ResourceNameDescriptor.ForType<SchemataJobExecution>().Collection;
-        var args   = JsonSerializer.Serialize(new PurgeOperationArgs {
+        var uid = Identifiers.NewUid();
+        var args = JsonSerializer.Serialize(new PurgeOperationArgs {
             Filter   = request.Filter,
             Language = request.Language,
             Force    = request.Force,
         }, SchemataJson.Default);
 
+        // One-shot purge has no persistent SchemataJob; the resulting SchemataJobExecution
+        // is addressable as operations/{uid} on its own, so JobContext.Job stays null.
         var context = new JobContext {
-            Job          = $"{collection}/{uid:n}:{Verbs.Purge}",
             ExecutionUid = uid,
             Method       = Verbs.Purge,
             ArgsJson     = args,

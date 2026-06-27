@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Scheduling.Skeleton.Entities;
 
@@ -20,7 +21,13 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, ITimestamp
 {
-    /// <summary>Canonical name of the originating <see cref="SchemataJob" />.</summary>
+    /// <summary>
+    ///     AIP-122 canonical name of the originating <see cref="SchemataJob" />, or
+    ///     <see langword="null" /> when this execution does not correspond to a persistent
+    ///     scheduler entry (e.g. one-shot triggers raised by <see cref="IScheduler.TriggerAsync{TJob}" />
+    ///     for back-channel logout, push dispatch, or resource purge).
+    /// </summary>
+    [ResourceReference(typeof(SchemataJob))]
     public virtual string? Job { get; set; }
 
     /// <summary>

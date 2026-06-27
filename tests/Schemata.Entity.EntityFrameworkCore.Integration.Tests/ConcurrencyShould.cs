@@ -70,7 +70,7 @@ public class ConcurrencyShould : IAsyncLifetime
 
             await repoA.CommitAsync();
 
-            await Assert.ThrowsAsync<ConcurrencyException>(() => repoB.CommitAsync());
+            await Assert.ThrowsAsync<AbortedException>(() => repoB.CommitAsync());
         }
 
         {
@@ -112,7 +112,7 @@ public class ConcurrencyShould : IAsyncLifetime
                 entity!.Timestamp = stale;
                 entity.FullName   = "rejected";
                 await repository.UpdateAsync(entity);
-                await Assert.ThrowsAsync<ConcurrencyException>(() => repository.CommitAsync());
+                await Assert.ThrowsAsync<AbortedException>(() => repository.CommitAsync());
             }
         }
     }

@@ -23,7 +23,12 @@ public class DeviceInteractionHandlerShould
         var jsonOpts = Options.Create(new JsonSerializerOptions());
         var authOpts = Options.Create(new SchemataAuthorizationOptions { SessionIdClaimType = "sid" });
 
-        var app  = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "device-client" };
+        var app = new SchemataApplication {
+            Uid           = Identifiers.NewUid(),
+            ClientId      = "device-client",
+            Name          = "device-client",
+            CanonicalName = "applications/device-client",
+        };
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByClientIdAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
 
@@ -63,7 +68,8 @@ public class DeviceInteractionHandlerShould
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
-                     a.Name = "auth-generated";
+                     a.Name          = "auth-generated";
+                     a.CanonicalName = "authorizations/auth-generated";
                      return a;
                  });
 
@@ -74,7 +80,7 @@ public class DeviceInteractionHandlerShould
         return new(handler, tokens, authzMgr, device, userCode);
     }
 
-    private static ClaimsPrincipal CreatePrincipal(string subject = "user-42", string sid = "sess-99") {
+    private static ClaimsPrincipal CreatePrincipal(string subject = "users/u-42", string sid = "sess-99") {
         return new(new ClaimsIdentity([new(Claims.Subject, subject), new("sid", sid)], "test"));
     }
 
@@ -90,14 +96,14 @@ public class DeviceInteractionHandlerShould
         var createInvocation = Assert.Single(f.AuthzMgr.Invocations,
                                              i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync));
         var created = Assert.IsType<SchemataAuthorization>(createInvocation.Arguments[0]);
-        Assert.Equal("device-client", created.Application);
-        Assert.Equal("user-42", created.Subject);
+        Assert.Equal("applications/device-client", created.Application);
+        Assert.Equal("users/u-42", created.Subject);
         Assert.Equal("openid profile", created.Scopes);
         Assert.Equal(TokenStatuses.Valid, created.Status);
 
-        Assert.Equal("auth-generated", f.Device.Authorization);
+        Assert.Equal("authorizations/auth-generated", f.Device.Authorization);
         Assert.Equal("sess-xyz", f.Device.SessionId);
-        Assert.Equal("user-42", f.Device.Subject);
+        Assert.Equal("users/u-42", f.Device.Subject);
         Assert.Equal(TokenStatuses.Authorized, f.Device.Status);
     }
 

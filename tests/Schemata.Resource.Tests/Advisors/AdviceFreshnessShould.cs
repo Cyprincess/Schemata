@@ -1,7 +1,10 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
@@ -25,13 +28,15 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task UpdateFreshness_MismatchedETag_ThrowsConcurrencyException() {
+    public async Task UpdateFreshness_MismatchedETag_ThrowsFailedPrecondition() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
         var request = new Student { EntityTag = "W/\"intentionally-wrong\"" };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, entity, null));
+        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+            () => advisor.AdviseAsync(ctx, request, entity, null));
+        AssertEtagMismatch(ex);
     }
 
     [Fact]
@@ -64,13 +69,15 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task UpdateFreshness_StrongFormatETag_ThrowsConcurrencyException() {
+    public async Task UpdateFreshness_StrongFormatETag_ThrowsFailedPrecondition() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
         var request = new Student { EntityTag = "\"strong-tag\"" };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, entity, null));
+        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+            () => advisor.AdviseAsync(ctx, request, entity, null));
+        AssertEtagMismatch(ex);
     }
 
     [Fact]
@@ -86,13 +93,21 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task DeleteFreshness_StrongFormatETag_ThrowsConcurrencyException() {
+    public async Task DeleteFreshness_StrongFormatETag_ThrowsFailedPrecondition() {
         var advisor = new AdviceDeleteFreshness<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(
-                                                           ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
+        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+            () => advisor.AdviseAsync(ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
+        AssertEtagMismatch(ex);
+    }
+
+    private static void AssertEtagMismatch(FailedPreconditionException exception) {
+        Assert.NotNull(exception.Details);
+        var precondition = Assert.Single(exception.Details!.OfType<PreconditionFailureDetail>());
+        var violation    = Assert.Single(precondition.Violations!);
+        Assert.Equal(SchemataConstants.PreconditionSubjects.EtagMismatch, violation.Subject);
     }
 
     [Fact]
@@ -113,7 +128,7 @@ public class AdviceFreshnessShould
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
         var request = new Student { EntityTag = "\"strong-tag\"" };
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, entity, null));
+        await Assert.ThrowsAsync<AbortedException>(() => advisor.AdviseAsync(ctx, request, entity, null));
     }
 
     [Fact]

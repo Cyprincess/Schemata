@@ -90,7 +90,7 @@ are skipped. `AdviceAddOwner` runs after `AdviceAddCanonicalName` (its
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
 
 **Verify:** Start the app. A `POST /students` request without authentication
-throws `AuthorizationException` (the default `OnNullOwner` policy is
+throws `PermissionDeniedException` (the default `OnNullOwner` policy is
 `Reject`). This confirms the advisor is active.
 
 ## Step 3 — Implement `IOwnerResolver<Student>`
@@ -143,8 +143,8 @@ Bob's rows appear.
 When `ResolveAsync` returns null (unauthenticated request), the default policy
 is `OnNullOwnerPolicy.Reject`:
 
-- `AdviceAddOwner` throws `AuthorizationException`.
-- `AdviceBuildQueryOwner` throws `AuthorizationException`.
+- `AdviceAddOwner` throws `PermissionDeniedException`.
+- `AdviceBuildQueryOwner` throws `PermissionDeniedException`.
 
 To return an empty result instead of an error for unauthenticated queries,
 change the policy:
@@ -161,7 +161,7 @@ The three policies are:
 
 | Policy | Add behavior | Query behavior |
 | --- | --- | --- |
-| `Reject` (default) | Throws `AuthorizationException` | Throws `AuthorizationException` |
+| `Reject` (default) | Throws `PermissionDeniedException` | Throws `PermissionDeniedException` |
 | `EmptyResult` | Returns `AdviseResult.Block` | Applies `WHERE 1=0` |
 | `AllowAll` | Leaves `Owner` unset | No filter applied |
 

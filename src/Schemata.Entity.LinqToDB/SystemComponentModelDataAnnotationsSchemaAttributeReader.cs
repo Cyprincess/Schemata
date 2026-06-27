@@ -64,7 +64,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
                         attr.Schema = names[1];
                         break;
                     default:
-                        throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1019), name, type.FullName));
+                        throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_TABLE_NAME), name, type.FullName));
                 }
 
                 attributes.Add(attr);
@@ -116,7 +116,54 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             attributes.Add(new OptimisticLockPropertyAttribute(VersionBehavior.Guid));
         }
 
+        // [ResourceReference] is intentionally not projected to a LinqToDB AssociationAttribute:
+        // AssociationAttribute targets navigation properties (declared type == the related entity),
+        // not the canonical-name scalar foreign key. Referential integrity is enforced at write time
+        // by AdviceValidateResourceReferences in the repository pipeline.
+
+        if (TryGetMemberType(member) is { } memberType
+         && TryGetJsonConverterType(memberType) is { } converterType) {
+            attributes.Add(new ValueConverterAttribute {
+                ConverterType = converterType,
+            });
+
+            // Force LinqToDB to materialize the property as a TEXT column even though its CLR type
+            // is not a primitive; without the explicit column attribute, CreateTable<T> silently
+            // skips collection / dictionary properties because they have no built-in SQL mapping.
+            if (!attributes.Exists(a => a is global::LinqToDB.Mapping.ColumnAttribute)) {
+                attributes.Add(new global::LinqToDB.Mapping.ColumnAttribute {
+                    Name     = member.Name,
+                    DataType = global::LinqToDB.DataType.Text,
+                    DbType   = "TEXT",
+                });
+            }
+        }
+
         return attributes.ToArray();
+    }
+
+    private static Type? TryGetMemberType(MemberInfo member) {
+        return member switch {
+            PropertyInfo property => property.PropertyType,
+            FieldInfo field       => field.FieldType,
+            _                     => null,
+        };
+    }
+
+    private static Type? TryGetJsonConverterType(Type memberType) {
+        if (memberType == typeof(Dictionary<string, string>)) {
+            return typeof(LinqToDbJsonConverter<Dictionary<string, string>>);
+        }
+
+        if (memberType == typeof(string)) {
+            return null;
+        }
+
+        if (typeof(ICollection<string>).IsAssignableFrom(memberType)) {
+            return typeof(LinqToDbJsonConverter<>).MakeGenericType(memberType);
+        }
+
+        return null;
     }
 
     public MemberInfo[] GetDynamicColumns(Type type) { return []; }

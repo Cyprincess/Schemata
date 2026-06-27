@@ -76,7 +76,7 @@ public sealed class AdviceAddOwner<TEntity> : IRepositoryAddAdvisor<TEntity>
         }
 
         return _options.Value.OnNullOwner switch {
-            OnNullOwnerPolicy.Reject      => throw new AuthorizationException(),
+            OnNullOwnerPolicy.Reject      => throw new PermissionDeniedException(),
             OnNullOwnerPolicy.EmptyResult => AdviseResult.Block,
             OnNullOwnerPolicy.AllowAll    => AdviseResult.Continue,
             var _                         => AdviseResult.Continue,

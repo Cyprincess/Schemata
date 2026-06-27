@@ -7,7 +7,7 @@ public enum OnNullOwnerPolicy
 {
     /// <summary>
     ///     Reject the operation. <see cref="Advisors.AdviceAddOwner{TEntity}" /> throws an
-    ///     <see cref="Schemata.Abstractions.Exceptions.AuthorizationException" /> before persisting
+    ///     <see cref="Schemata.Abstractions.Exceptions.PermissionDeniedException" /> before persisting
     ///     an unowned entity; <see cref="Advisors.AdviceBuildQueryOwner{TEntity}" /> forces the query
     ///     to an empty result. This is the safe default.
     /// </summary>

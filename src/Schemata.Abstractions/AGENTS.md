@@ -42,7 +42,8 @@ Two enums power query semantics: [Operations.cs](Entities/Operations.cs) (`Creat
 
 All in [Resource/](Resource/). Attributes are how a controller / handler is wired to a resource type.
 
-- Attributes: `[Resource]`, `[Resource<TEntity>]`, `[Resource<TEntity,TKey>]`, `[Resource<TEntity,TKey,TParent>]`, `[Resource<TEntity,TKey,TParent,TGrandparent>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourcePackage]`, `[ResourceMethod]`, `[Anonymous]`, `[ReadAcross]`, `[RateLimitPolicy]`.
+- Attributes: `[Resource]`, `[Resource<TEntity>]`, `[Resource<TEntity,TKey>]`, `[Resource<TEntity,TKey,TParent>]`, `[Resource<TEntity,TKey,TParent,TGrandparent>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourcePackage]`, `[ResourceMethod]`, `[ResourceReference]` / `[ResourceReference(typeof(T))]`, `[Anonymous]`, `[ReadAcross]`, `[RateLimitPolicy]`.
+- `[ResourceReference]` marks cross-resource fields ([Resource/ResourceReferenceAttribute.cs](Resource/ResourceReferenceAttribute.cs)). Typed form (`[ResourceReference(typeof(TTarget))]`) drives ORM-level foreign keys via [AdviceValidateResourceReferences](../Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferences.cs) + [SchemataModelCustomizer](../Schemata.Entity.EntityFrameworkCore/SchemataModelCustomizer.cs); the untyped polymorphic form drives runtime validation only. Storage always uses full AIP-122 canonical names (e.g. `applications/{client}`, `users/{uid}`).
 - Method scopes: [ResourceMethodScope.cs](Resource/ResourceMethodScope.cs) + [ResourceHttpMethod.cs](Resource/ResourceHttpMethod.cs).
 - Request bases: `GetRequest`, `ListRequest`, `DeleteRequest`, `PurgeRequest`, `EmptyResourceRequest`.
 - Result bases: `CreateResultBase`, `GetResultBase`, `ListResultBase`, `UpdateResultBase`, `DeleteResultBase`, `EmptyResourceResponse`, `ExpungeResponse`, `PurgeResponse`.
@@ -57,6 +58,8 @@ Mirror of [google.rpc.Status](https://cloud.google.com/apis/design/errors). All 
 - `ErrorResponse` wraps an `ErrorBody` plus `IErrorDetail[]`. AIP-flavoured `OAuthErrorResponse` for OAuth 2.0 flows.
 - `IErrorDetail` implementations: `BadRequestDetail`, `DebugInfoDetail`, `ErrorInfoDetail`, `HelpDetail`, `LocalizedMessageDetail`, `PreconditionFailureDetail`, `QuotaFailureDetail`, `RequestInfoDetail`, `ResourceInfoDetail`, `RetryInfoDetail`, plus the violation records (`ErrorFieldViolation`, `PreconditionViolation`, `QuotaViolation`, `ErrorHelpLink`).
 - Exception hierarchy: `SchemataException` ← `InvalidArgumentException`, `AlreadyExistsException`, `NotFoundException`, `FailedPreconditionException`, `AbortedException`, `QuotaExceededException`, `UnauthenticatedException`, `PermissionDeniedException`, `NoContentException`, `OAuthException`, `TenantResolveException`, `ValidationException`. Each maps to a specific HTTP/gRPC status.
+- AIP-193 alignment: `google.rpc.Code` (Status) is separate from `ErrorInfo.reason` (UPPER_SNAKE_CASE domain identifier). The reason table is `SchemataConstants.ErrorReasons` ([SchemataConstants.cs:556](SchemataConstants.cs)). Every named exception attaches a default reason; the localized message helper falls back Reason resx → Status resx.
+- Fluent error-detail helpers live in `Schemata.Common`: [SchemataResourceErrors](../Schemata.Common/Errors/SchemataResourceErrors.cs) (`NotFound<T>(...)`, `AlreadyExists<T>(...)` etc., accepts `reason:` override) and [SchemataErrorDetailExtensions](../Schemata.Common/Errors/SchemataErrorDetailExtensions.cs) (`.WithRetryAfter(TimeSpan)`, `.WithHelp(description, url)` for `RetryInfo` / `Help` decoration). `ErrorFieldViolation` carries the canonical `localized_message`; `QuotaViolation` carries the six `QuotaFailure.Violation` fields.
 
 ## Modular
 

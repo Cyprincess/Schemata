@@ -30,7 +30,7 @@ public static class AdviceMethodFreshness
 ///     <para>
 ///         The check fires whenever the request implements <see cref="IFreshness" /> and supplies a
 ///         non-empty ETag: any value that differs from the entity's current weak tag — including
-///         strong-format or malformed tags — raises <see cref="ConcurrencyException" /> (AIP-154:
+///         strong-format or malformed tags — raises <see cref="AbortedException" /> (AIP-154:
 ///         a provided mismatching etag MUST abort). Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
@@ -67,7 +67,7 @@ public sealed class AdviceMethodFreshness<TEntity, TRequest, TResponse> : IResou
         }
 
         if (tag != expected) {
-            throw new ConcurrencyException();
+            throw new AbortedException();
         }
 
         return Task.FromResult(AdviseResult.Continue);

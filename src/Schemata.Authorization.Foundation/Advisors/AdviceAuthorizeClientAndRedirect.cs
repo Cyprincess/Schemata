@@ -66,7 +66,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         if (string.IsNullOrWhiteSpace(authz.Request?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
             );
         }
 
@@ -74,7 +74,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         if (application is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -83,7 +83,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         if (!await apps.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRedirectUri,
-                SchemataResources.GetResourceString(SchemataResources.ST4009)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_REDIRECT_URI)
             );
         }
 
@@ -93,7 +93,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         if (!options.Value.AllowedResponseTypes.Contains(authz.Request.ResponseType)) {
             throw new OAuthException(
                 OAuthErrors.UnsupportedResponseType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.ResponseType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseType)
             ) {
                 RedirectUri  = authz.Request.RedirectUri,
                 State        = authz.Request.State,
@@ -105,7 +105,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
          && !options.Value.AllowedResponseModes.Contains(authz.Request.ResponseMode)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.ResponseMode)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
             ) {
                 RedirectUri  = authz.Request.RedirectUri,
                 State        = authz.Request.State,

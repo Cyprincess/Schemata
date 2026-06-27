@@ -93,7 +93,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
         await RolesRepository.UpdateAsync(role, ct);
         try {
             await RolesRepository.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
 
@@ -127,7 +127,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
 
         try {
             await uow.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
 

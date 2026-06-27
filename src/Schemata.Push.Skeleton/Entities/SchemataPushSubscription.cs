@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Push.Skeleton.Entities;
 
@@ -67,6 +68,7 @@ public class SchemataPushSubscription : IIdentifier, ICanonicalName, IOwnable, I
 
     #region IOwnable Members
 
+    [ResourceReference]
     public virtual string? Owner { get; set; }
 
     #endregion

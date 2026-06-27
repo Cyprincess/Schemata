@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
@@ -35,12 +36,20 @@ public static class AdvicePairwiseProjection
 ///     the sectored identifier or subject type requires it.
 /// </remarks>
 /// <seealso cref="AdviceAudienceClaims" />
-public sealed class AdvicePairwiseProjection<TApp>(
-    IApplicationManager<TApp> apps,
-    ISubjectIdentifierService subjectService
-) : IClaimsAdvisor
+public sealed class AdvicePairwiseProjection<TApp> : IClaimsAdvisor
     where TApp : SchemataApplication
 {
+    private readonly IApplicationManager<TApp>       _apps;
+    private readonly PairwiseSubjectTranslator<TApp> _translator;
+
+    public AdvicePairwiseProjection(
+        IApplicationManager<TApp>       apps,
+        PairwiseSubjectTranslator<TApp> translator
+    ) {
+        _apps       = apps;
+        _translator = translator;
+    }
+
     #region IClaimsAdvisor Members
 
     public int Order => AdvicePairwiseProjection.DefaultOrder;
@@ -53,12 +62,14 @@ public sealed class AdvicePairwiseProjection<TApp>(
             return AdviseResult.Continue;
         }
 
-        var app = await apps.FindByClientIdAsync(client, ct);
+        var app = await _apps.FindByClientIdAsync(client, ct);
         if (app is null) {
             return AdviseResult.Continue;
         }
 
-        var projected = subjectService.Resolve(sub, app);
+        // Persist + return the per-app per-subject pairwise hash; non-pairwise applications
+        // pass canonical through unchanged.
+        var projected = await _translator.EnsureMappingAsync(app, sub, ct);
         if (projected == sub) {
             return AdviseResult.Continue;
         }

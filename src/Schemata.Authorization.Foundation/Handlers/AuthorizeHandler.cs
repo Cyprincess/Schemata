@@ -70,7 +70,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 ) {
                     RedirectUri  = authz.Request.RedirectUri,
                     State        = authz.Request.State,
@@ -81,7 +81,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         if (authz.Application is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             ) {
                 RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
             };
@@ -94,7 +94,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(options.Value.InteractionUri)) {
             throw new OAuthException(
                 OAuthErrors.ServerError,
-                SchemataResources.GetResourceString(SchemataResources.ST4008)
+                SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
             ) {
                 RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
             };
@@ -104,12 +104,12 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
-            Application     = authz.Application.Name,
-            Type            = TokenTypes.Interaction,
-            Status          = TokenStatuses.Valid,
-            ReferenceId     = reference,
-            Payload         = payload,
-            ExpireTime      = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
+            Application = authz.Application.CanonicalName,
+            Type        = TokenTypes.Interaction,
+            Status      = TokenStatuses.Valid,
+            ReferenceId = reference,
+            Payload     = payload,
+            ExpireTime  = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
         };
 
         await tokens.CreateAsync(interaction, ct);

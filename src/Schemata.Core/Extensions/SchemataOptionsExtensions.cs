@@ -97,7 +97,7 @@ public static class SchemataOptionsExtensions
 
                 schemata.Logger.Log(
                     LogLevel.Debug,
-                    SchemataResources.GetResourceString(SchemataResources.ST0001),
+                    SchemataResources.GetResourceString(SchemataResources.DEPENDENCY_AUTO_REGISTERED),
                     type.Name,
                     dependency.Name
                 );
@@ -112,7 +112,7 @@ public static class SchemataOptionsExtensions
                 }
 
                 var level    = depends.Optional ? LogLevel.Information : LogLevel.Error;
-                var resource = depends.Optional ? SchemataResources.ST0003 : SchemataResources.ST0002;
+                var resource = depends.Optional ? SchemataResources.DEPENDENCY_SUGGESTED : SchemataResources.DEPENDENCY_REQUIRED;
 
                 schemata.Logger.Log(level, SchemataResources.GetResourceString(resource), type.Name, depends.Name);
 

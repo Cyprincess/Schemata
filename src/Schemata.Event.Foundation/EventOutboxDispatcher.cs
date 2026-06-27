@@ -91,7 +91,7 @@ public sealed class EventOutboxDispatcher(
         try {
             await records.UpdateAsync(record, ct);
             await records.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return;
         }
 
@@ -106,13 +106,13 @@ public sealed class EventOutboxDispatcher(
 
             if (delivery == EventOutboxDelivery.Delivered) {
                 // The broker accepted the message; a downstream consumer sets the terminal state
-                // later. Mark the row delivered as a fallback; a ConcurrencyException means the
+                // later. Mark the row delivered as a fallback; a AbortedException means the
                 // audit observer's OnDeliveredAsync committed the transition first.
                 record.State = EventState.Recorded;
                 try {
                     await records.UpdateAsync(record, ct);
                     await records.CommitAsync(ct);
-                } catch (ConcurrencyException) {
+                } catch (AbortedException) {
                     // The audit observer committed the Recorded transition first.
                 }
             }
@@ -129,7 +129,7 @@ public sealed class EventOutboxDispatcher(
             try {
                 await records.UpdateAsync(record, ct);
                 await records.CommitAsync(ct);
-            } catch (ConcurrencyException) {
+            } catch (AbortedException) {
                 // Another dispatcher committed the row first.
             }
         }

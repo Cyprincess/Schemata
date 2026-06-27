@@ -80,7 +80,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
 
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
-            ? (await apps.FindByClientIdAsync(client, ct))?.Name
+            ? (await apps.FindByClientIdAsync(client, ct))?.CanonicalName
             : null;
         var subject = principal.FindFirstValue(Claims.Subject);
 
@@ -94,7 +94,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 );
         }
 
