@@ -82,16 +82,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
          || token.ShowDeleted != request.ShowDeleted) {
             throw new ValidationException([new() {
                 Field       = nameof(request.PageToken).Underscore(),
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2003),
-                Reason      = FieldReasons.InvalidPageToken,
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                Reason      = SchemataResources.INVALID_PAGE_TOKEN,
             }]);
         }
 
         if (request.PageSize is < 0) {
             throw new ValidationException([new() {
                 Field       = nameof(request.PageSize).Underscore(),
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2008),
-                Reason      = FieldReasons.InvalidPageSize,
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_SIZE),
+                Reason      = SchemataResources.INVALID_PAGE_SIZE,
             }]);
         }
 
@@ -136,8 +136,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             } catch (Exception ex) when (ex is ExpressionException or ArgumentException) {
                 throw new ValidationException([new() {
                     Field = nameof(request.Filter).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "filter"),
-                    Reason = FieldReasons.InvalidFilter,
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "filter"),
+                    Reason = SchemataResources.INVALID_FILTER,
                 }]);
             }
         }
@@ -150,8 +150,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             } catch (ArgumentException) {
                 throw new ValidationException([new() {
                     Field = nameof(request.OrderBy).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "order_by"),
-                    Reason = FieldReasons.InvalidOrderBy,
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "order_by"),
+                    Reason = SchemataResources.INVALID_ORDER_BY,
                 }]);
             }
         }
@@ -240,8 +240,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         } catch (UnknownExpressionLanguageException) {
             throw new ValidationException([new() {
                 Field       = nameof(ListRequest.Language).Underscore(),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "language"),
-                Reason      = FieldReasons.InvalidFilter,
+                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "language"),
+                Reason      = SchemataResources.INVALID_FILTER,
             }]);
         }
     }

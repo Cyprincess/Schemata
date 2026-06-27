@@ -116,7 +116,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         if (IsConcurrencyControlled) {
             var rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticAsync(entity, ct);
             if (rows == 0) {
-                throw new ConcurrencyException();
+                throw new AbortedException();
             }
         } else {
             await Context.UpdateAsync(entity, TableName, token: ct);

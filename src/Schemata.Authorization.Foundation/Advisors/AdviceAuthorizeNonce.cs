@@ -52,7 +52,7 @@ public sealed class AdviceAuthorizeNonce<TApp>(IOptions<CodeFlowOptions> options
          && string.IsNullOrWhiteSpace(authz.Request.Nonce)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Nonce)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Nonce)
             );
         }
 

@@ -59,19 +59,19 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (o.SigningKey is null) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningKey)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningKey)));
             }
 
             if (string.IsNullOrWhiteSpace(o.SigningAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.SigningAlgorithm)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningAlgorithm)));
             }
 
             if (o.EncryptionKey is not null && string.IsNullOrWhiteSpace(o.EncryptionAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST4020), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.MISSING_DEPENDENT_SETTING), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
             }
 
             if (string.IsNullOrWhiteSpace(o.Issuer)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), nameof(o.Issuer)));
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.Issuer)));
             }
         });
 

@@ -46,7 +46,7 @@ After adding this, delete `app.db` and let EF Core recreate the schema with the 
 The plumbing is split between the repository pipeline and the database:
 
 1. `AdviceAddConcurrency` (add pipeline) mints `Timestamp` on create.
-2. On update, EF Core reads `[ConcurrencyCheck]` and issues `UPDATE ... WHERE Timestamp = @original` while bumping `Timestamp` to a fresh GUID. A stale token matches zero rows, which surfaces as `ConcurrencyException` (mapped to HTTP 409). There is no update-side concurrency advisor.
+2. On update, EF Core reads `[ConcurrencyCheck]` and issues `UPDATE ... WHERE Timestamp = @original` while bumping `Timestamp` to a fresh GUID. A stale token matches zero rows, which surfaces as `AbortedException` (mapped to HTTP 409). There is no update-side concurrency advisor.
 3. The resource freshness advisors bridge `Timestamp` to the HTTP ETag: the response advisor encodes `Timestamp` as a weak ETag (`W/"<base64url>"`) on the detail DTO, and the update advisor reads the request's ETag and compares it to the stored `Timestamp` before the write.
 
 Without `[ConcurrencyCheck]`, the add stamp still mints a token but the update writes unconditionally, so concurrent writers can lose updates.

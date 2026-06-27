@@ -59,13 +59,13 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
         if (requested.Contains(Scopes.OpenId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.ST4006)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
             );
         }
 
         foreach (var s in requested) {
             await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
-                error: OAuthErrors.InvalidScope, resource: SchemataResources.ST4006);
+                error: OAuthErrors.InvalidScope, resource: SchemataResources.INVALID_SCOPE);
         }
 
         return AdviseResult.Continue;

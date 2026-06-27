@@ -51,7 +51,8 @@ hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRe
 | `AdviceDeleteFreshness` | Validates `DeleteRequest.Etag` against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
 `AdviceDeleteFreshness` fires when `Etag` is non-empty: any value differing from the entity's current weak tag
-throws `ConcurrencyException`. Only an absent or whitespace tag opts out.
+throws `FailedPreconditionException` with an `ETAG_MISMATCH` precondition violation. Only an absent or
+whitespace tag opts out.
 
 ### 6. Persistence and soft-delete branching
 

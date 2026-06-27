@@ -45,7 +45,7 @@ public static class PermissionAdvice
 
         var exception = new OAuthException(
             error ?? OAuthErrors.UnauthorizedClient,
-            SchemataResources.GetResourceString(resource ?? SchemataResources.ST4007),
+            SchemataResources.GetResourceString(resource ?? SchemataResources.UNAUTHORIZED_GRANT_TYPE),
             code);
         configure?.Invoke(exception);
         throw exception;

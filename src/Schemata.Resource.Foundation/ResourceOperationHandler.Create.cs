@@ -75,8 +75,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (entity is null) {
             throw new ValidationException([new() {
                 Field       = nameof(request),
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2001),
-                Reason      = FieldReasons.InvalidPayload,
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAYLOAD),
+                Reason      = SchemataResources.INVALID_PAYLOAD,
             }]);
         }
 

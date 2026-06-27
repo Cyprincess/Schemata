@@ -64,7 +64,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
                         attr.Schema = names[1];
                         break;
                     default:
-                        throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.ST1019), name, type.FullName));
+                        throw new MetadataException(string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_TABLE_NAME), name, type.FullName));
                 }
 
                 attributes.Add(attr);

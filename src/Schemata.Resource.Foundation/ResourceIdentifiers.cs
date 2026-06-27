@@ -28,8 +28,8 @@ internal static class ResourceIdentifiers
         if (string.IsNullOrWhiteSpace(name)) {
             throw new ValidationException([new() {
                 Field       = nameof(name),
-                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), nameof(name).Humanize(LetterCasing.Title)),
-                Reason      = FieldReasons.NotEmpty,
+                Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), nameof(name).Humanize(LetterCasing.Title)),
+                Reason      = SchemataResources.NOT_EMPTY,
             }]);
         }
 
@@ -40,7 +40,7 @@ internal static class ResourceIdentifiers
             throw new ValidationException([new() {
                 Field       = nameof(name),
                 Description = $"The requested resource name `{name}` is invalid.",
-                Reason      = FieldReasons.InvalidName,
+                Reason      = SchemataResources.INVALID_NAME,
             }]);
         }
 
@@ -76,8 +76,8 @@ internal static class ResourceIdentifiers
         if (parsed is null) {
             throw new ValidationException([new() {
                 Field       = nameof(ListRequest.Parent).Underscore(),
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2009),
-                Reason      = FieldReasons.InvalidParent,
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PARENT),
+                Reason      = SchemataResources.INVALID_PARENT,
             }]);
         }
 
@@ -89,8 +89,8 @@ internal static class ResourceIdentifiers
 
                 throw new ValidationException([new() {
                     Field       = nameof(ListRequest.Parent).Underscore(),
-                    Description = SchemataResources.GetResourceString(SchemataResources.ST2002),
-                    Reason      = FieldReasons.CrossParentUnsupported,
+                    Description = SchemataResources.GetResourceString(SchemataResources.CROSS_PARENT_UNSUPPORTED),
+                    Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                 }]);
             }
         }

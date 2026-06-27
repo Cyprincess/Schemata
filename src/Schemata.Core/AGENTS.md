@@ -1,60 +1,72 @@
-# Schemata.Core
+# Schemata.Core — Composition Root
 
-Hub of the framework: `SchemataBuilder`, the feature lifecycle, and all built-in middleware features (slots 100M-240M).
+`SchemataBuilder` + the 16 built-in ASP.NET features that wire the framework into a host. Every Schemata application transitively pulls this package.
 
 ## Layout
 
 ```
-Features/                15 built-in features + ISimpleFeature/FeatureBase/DependsOn
-Extensions/              SchemataBuilder, options, app, endpoint, web-host wiring
-Json/                    JsonStringNumberConverter + PolymorphicTypeResolver
-SchemataBuilder.cs       Fluent builder; AddFeature<T>(), Invoke(), HasFeature<T>()
-SchemataStartup.cs       IStartupFilter that runs app/endpoint phases by Priority
-SchemataOptions.cs       Keyed bag shared across features
-Configurators.cs         Deferred service-collection actions
-Services.cs              Internal staging IServiceCollection
+Schemata.Core/
+├── SchemataBuilder.cs         # fluent builder; stages services, configurators, options
+├── SchemataOptions.cs         # cross-feature key-value bag + feature registry
+├── SchemataStartup.cs         # ASP.NET startup filter that runs the pipeline
+├── SchemataExtensionPart.cs   # MVC application part hook for extension assemblies
+├── Configurators.cs           # deferred Action<TOptions> / Action<T1,T2> registry
+├── Services.cs                # internal IServiceCollection impl used for staging
+├── Utilities.cs               # internal reflection helpers
+├── WellKnownOptions.cs        # /.well-known/* route table
+├── Extensions/                # public API (UseSchemata / Configure / Add / Map)
+├── Features/                  # 16 ISimpleFeature implementations + FeatureBase
+└── Json/                      # snake_case + 53-bit-safe number converters
 ```
 
-## Built-in Slots (`Priority == Order`)
+## Public API Entry Points
 
-| Slot | Feature |
+- [Extensions/WebApplicationBuilderExtensions.cs](Extensions/WebApplicationBuilderExtensions.cs) — `UseSchemata(this WebApplicationBuilder, Action<SchemataBuilder>)`.
+- [Extensions/ServiceCollectionExtensions.cs](Extensions/ServiceCollectionExtensions.cs) — `AddSchemata(...)` — registers the startup filter + flushes staged services.
+- [Extensions/ApplicationBuilderExtensions.cs](Extensions/ApplicationBuilderExtensions.cs) — runs feature `ConfigureApplication` in `Priority` order.
+- [Extensions/EndpointBuilderExtensions.cs](Extensions/EndpointBuilderExtensions.cs) — runs feature `ConfigureEndpoints` in `Priority` order; only invoked when an `EndpointDataSource` is registered.
+- [SchemataBuilder.cs](SchemataBuilder.cs) — fluent surface: `AddFeature<T>`, `HasFeature<T>`, `Configure<TOptions>`, `Configure<T1,T2>`, `ConfigureServices(Action<IServiceCollection>)`, `Invoke(IServiceCollection)`, `CreateLogger<T>()`, `ReplaceLoggerFactory`.
+
+## Built-in Features
+
+All in [Features/](Features/), each a `FeatureBase` subclass. See [../../README.md](../../README.md) for the full priority table; this is the implementation map.
+
+| File | Priority |
 |---|---|
-| 100M | ForwardedHeaders |
-| 110M | DeveloperExceptionPage |
-| 120M | Logging |
-| 130M | HttpLogging |
-| 140M | W3CLogging |
-| 150M | Https |
-| 170M | CookiePolicy |
-| 180M | Routing |
-| 185M | WellKnown (`+5M` sub-slot of Routing) |
-| 190M | Quota |
-| 200M | Cors |
-| 210M | Authentication |
-| 220M | Session (`SchemataSessionFeature<T>`) |
-| 230M | Controllers |
-| 240M | JsonSerializer |
+| `SchemataForwardedHeadersFeature.cs` | 100_000_000 |
+| `SchemataDeveloperExceptionPageFeature.cs` | 110_000_000 |
+| `SchemataLoggingFeature.cs` | 120_000_000 |
+| `SchemataHttpLoggingFeature.cs` | 130_000_000 |
+| `SchemataW3CLoggingFeature.cs` | 140_000_000 |
+| `SchemataHttpsFeature.cs` | 150_000_000 |
+| `SchemataCookiePolicyFeature.cs` | 170_000_000 |
+| `SchemataRoutingFeature.cs` | 180_000_000 |
+| `SchemataWellKnownFeature.cs` | 185_000_000 (sub-feature of Routing, +5M) |
+| `SchemataQuotaFeature.cs` | 190_000_000 |
+| `SchemataCorsFeature.cs` | 200_000_000 |
+| `SchemataAuthenticationFeature.cs` | 210_000_000 |
+| `SchemataSessionFeature.cs` | 220_000_000 |
+| `SchemataControllersFeature.cs` | 230_000_000 |
+| `SchemataJsonSerializerFeature.cs` | 240_000_000 |
 
-Slot 160M is reserved for `Schemata.Tenancy.Foundation.SchemataTenancyFeature<TM,TT>` (declared outside Core; `Order` overridden to 900M).
+Tenancy lives at `160_000_000` but the feature class is in `Schemata.Tenancy.Foundation`, not here.
 
-## Lifecycle Internals
+## Conventions
 
-- `SchemataBuilder.Invoke(IServiceCollection)` sorts features by `Order`, runs `ConfigureServices`, then flushes `Configurators` against the host's services.
-- `SchemataStartup` runs `app.UseSchemata(...)` (app phase), then `app.UseEndpoints(...)` containing endpoint phase, then `app.CleanSchemata()`.
-- `SchemataOptionsExtensions.AddFeature(...)` instantiates with an `ILogger`, stores by `RuntimeTypeHandle`, walks `[DependsOn<T>]` recursively. String-form `[DependsOn("Type, Asm")]` is logged only - it does not auto-register.
+- **Add a built-in feature** = new `Features/Schemata{X}Feature.cs` extending `FeatureBase` + matching `Use{X}(this SchemataBuilder)` in `Extensions/SchemataBuilderExtensions.cs`.
+- **Pick an unused priority** in the table above. Stay outside `[100_000_000, 900_000_000]` if you are adding a non-built-in feature in your own app.
+- **`Order` defaults to `Priority`** in `FeatureBase`. Override only when DI-registration order must differ from middleware order.
+- **`SchemataStartup` is the only `IStartupFilter`** that should touch the Schemata pipeline. Do not register competing startup filters that re-run feature hooks.
 
-## Where To Look
+## Anti-Patterns
 
-| Task | File |
-|---|---|
-| Add a `Use*()` activator on `SchemataBuilder` | [Extensions/SchemataBuilderExtensions.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/Extensions/SchemataBuilderExtensions.cs) |
-| Change service flush order | [SchemataBuilder.cs#Invoke](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/SchemataBuilder.cs) |
-| Change app/endpoint phase wiring | [SchemataStartup.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/SchemataStartup.cs) + [Extensions/ApplicationBuilderExtensions.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/Extensions/ApplicationBuilderExtensions.cs) + [Extensions/EndpointBuilderExtensions.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/Extensions/EndpointBuilderExtensions.cs) |
-| Add a built-in middleware feature | [Features/](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Core/Features/) - copy a sibling, pick an unused 10M-wide slot |
+- **Do NOT** mutate `SchemataBuilder.Services` from inside a feature's `ConfigureServices` — receive the host `IServiceCollection` parameter instead. The staging collection is for the builder phase only and gets cleared by `Invoke`.
+- **Do NOT** rely on the order of `SchemataBuilder.AddFeature` calls; sequencing is by `Order`/`Priority`, not insertion.
+- **Do NOT** read `IConfiguration` to decide whether to register services in `ConfigureApplication` — by then DI is already built. Decide in `ConfigureServices`.
+- **Do NOT** swap `SchemataOptions.Logging` after features have begun configuring — call `ReplaceLoggerFactory` once, up front.
 
-## Rules
+## Notes
 
-- JSON serializer feature tweaks `JsonSerializerOptions` unconditionally; MVC `JsonOptions` are wired only when `SchemataControllersFeature` is registered.
-- On `NET10_0_OR_GREATER` the forwarded-header default clears `KnownIPNetworks`; older TFMs clear `KnownNetworks` - keep both branches.
-- `[Information]` log lines emit only when `SchemataLoggingFeature` is present; ordering matters for visibility during startup.
-- `WellKnown` lives at `Routing+5M` deliberately so `/.well-known/*` registers before user-defined endpoints. Do not shift it.
+- `SchemataJsonSerializerFeature` sets JSON to snake_case and adds `JsonStringNumberConverter` for safe 53-bit JS integer round-trip ([Json/JsonStringNumberConverter.cs](Json/JsonStringNumberConverter.cs)). Polymorphic resolution is handled by [Json/PolymorphicTypeResolver.cs](Json/PolymorphicTypeResolver.cs) driven by `[Polymorphic]` attributes from `Schemata.Abstractions`.
+- `SchemataWellKnownFeature` reads [WellKnownOptions.cs](WellKnownOptions.cs); extensions (e.g. Authorization OIDC discovery) push entries into this table during `ConfigureServices`.
+- `SchemataExtensionPart` is the hook by which extension packages register MVC application parts so their controllers are discovered.

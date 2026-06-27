@@ -48,7 +48,7 @@ public sealed class IntrospectionHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(request.Token)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Token)
             );
         }
 
@@ -59,7 +59,7 @@ public sealed class IntrospectionHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 

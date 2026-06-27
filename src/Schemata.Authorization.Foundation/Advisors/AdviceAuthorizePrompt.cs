@@ -67,7 +67,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
                 if (!AdviceAuthorizePrompt.KnownValues.Contains(v, StringComparer.Ordinal)) {
                     throw new OAuthException(
                         OAuthErrors.InvalidRequest,
-                        string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), v)
+                        string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), v)
                     );
                 }
             }
@@ -79,12 +79,12 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
                 case true when values.Length > 1:
                     throw new OAuthException(
                         OAuthErrors.InvalidRequest,
-                        string.Format(SchemataResources.GetResourceString(SchemataResources.ST4015), PromptValues.None)
+                        string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_PROMPT_COMBINATION), PromptValues.None)
                     );
                 case true when (authz.Principal?.Identity?.IsAuthenticated != true):
                     throw new OAuthException(
                         OAuthErrors.LoginRequired,
-                        SchemataResources.GetResourceString(SchemataResources.ST4011)
+                        SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED)
                     );
             }
 
@@ -100,7 +100,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
         if (!int.TryParse(authz.Request.MaxAge, out var age) || age < 0) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.MaxAge)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.MaxAge)
             );
         }
 
@@ -115,7 +115,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
         if (none) {
             throw new OAuthException(
                 OAuthErrors.LoginRequired,
-                SchemataResources.GetResourceString(SchemataResources.ST4011)
+                SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED)
             );
         }
 

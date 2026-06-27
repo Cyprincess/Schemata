@@ -72,7 +72,7 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfW
             _rollback.Clear();
 
             if (ex is DbUpdateConcurrencyException) {
-                throw new ConcurrencyException();
+                throw new AbortedException();
             }
 
             throw;

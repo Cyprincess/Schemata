@@ -28,7 +28,7 @@ public static class InsightSecurityGate
     /// <param name="services">The provider resolving the closed Security providers.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>An <c>Expression&lt;Func&lt;rowType, bool&gt;&gt;</c> entitlement, or null.</returns>
-    /// <exception cref="AuthorizationException">Source-level access is denied.</exception>
+    /// <exception cref="PermissionDeniedException">Source-level access is denied.</exception>
     public static async Task<Expression?> AuthorizeAsync(
         Type                rowType,
         QueryInsightRequest request,
@@ -44,7 +44,7 @@ public static class InsightSecurityGate
             var allowed = (bool)(await InvokeAsync(accessType, accessProvider, "HasAccessAsync",
                                                    [null, context, principal, ct]))!;
             if (!allowed) {
-                throw new AuthorizationException(message: $"Access to source '{rowType.Name}' is denied.");
+                throw new PermissionDeniedException(message: $"Access to source '{rowType.Name}' is denied.");
             }
         }
 

@@ -49,7 +49,7 @@ public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicat
         if (introspection.Application?.ClientType == ClientTypes.Public) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4002),
+                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED),
                 401
             );
         }
@@ -57,7 +57,7 @@ public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicat
         if (!await manager.HasPermissionAsync(introspection.Application, PermissionPrefixes.Endpoint + Endpoints.Introspect, ct)) {
             throw new OAuthException(
                 OAuthErrors.UnauthorizedClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4007),
+                SchemataResources.GetResourceString(SchemataResources.UNAUTHORIZED_GRANT_TYPE),
                 403
             );
         }

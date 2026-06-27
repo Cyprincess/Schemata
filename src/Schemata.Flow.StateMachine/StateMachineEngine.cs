@@ -163,9 +163,9 @@ public sealed class StateMachineEngine : IFlowRuntime
 
         var current = FindElementById(definition, process.StateId);
         if (current is null) {
-            throw new NotFoundException(message: $"Current state '{
-                process.StateId
-            }' not found in process definition.");
+            throw new FailedPreconditionException(
+                reason: "FLOW_STATE_NOT_DEFINED",
+                message: $"Current state '{process.StateId}' is not defined on the process.");
         }
 
         var matched = await ResolveAutoFlowAsync(definition, current, variables);

@@ -78,7 +78,7 @@ public class ConcurrencyShould : IAsyncLifetime
                 var entity = await LoadAsync(repository, id);
                 entity!.Timestamp = stale;
                 entity.FullName   = "rejected";
-                await Assert.ThrowsAsync<ConcurrencyException>(() => repository.UpdateAsync(entity));
+                await Assert.ThrowsAsync<AbortedException>(() => repository.UpdateAsync(entity));
             }
         }
 

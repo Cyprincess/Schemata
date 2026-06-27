@@ -64,7 +64,7 @@ public class SubjectIdentifierService(IOptions<SchemataAuthorizationOptions> opt
 
         var redirect = application.RedirectUris?.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(redirect)) {
-            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1017));
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.SECTOR_IDENTIFIER_URI_REQUIRED));
         }
 
         return new Uri(redirect).Host;

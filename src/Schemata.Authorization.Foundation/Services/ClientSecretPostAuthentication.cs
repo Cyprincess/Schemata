@@ -50,7 +50,7 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         if (ids.Count != 1) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
             );
         }
 
@@ -58,7 +58,7 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         if (string.IsNullOrWhiteSpace(id)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.ClientId)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
             );
         }
 
@@ -69,7 +69,7 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         if (app == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -77,13 +77,13 @@ public sealed class ClientSecretPostAuthentication<TApp>(
             if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
             }
         } else if (app.ClientType == ClientTypes.Confidential) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4002)
+                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED)
             );
         }
 

@@ -44,7 +44,7 @@ public sealed class RevocationHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(request.Token)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Token)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Token)
             );
         }
 
@@ -55,7 +55,7 @@ public sealed class RevocationHandler<TApp, TToken>(
          && request.TokenTypeHint != TokenTypes.RefreshToken) {
             throw new OAuthException(
                 OAuthErrors.UnsupportedTokenType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.TokenTypeHint)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.TokenTypeHint)
             );
         }
 

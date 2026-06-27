@@ -22,7 +22,7 @@ public sealed class DefaultModulesProvider : IModulesProvider
     public DefaultModulesProvider() {
         var entry = Assembly.GetEntryAssembly();
         if (entry is null) {
-            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1028));
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ENTRY_ASSEMBLY_REQUIRED));
         }
 
         var modules = entry.GetCustomAttributes<ModuleAttribute>();

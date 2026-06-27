@@ -541,11 +541,48 @@ public static class SchemataConstants
     #region Nested type: ErrorReasons
 
     /// <summary>
-    ///     Machine-readable reason codes for structured error details.
+    ///     Domain-specific <see cref="Errors.ErrorInfoDetail.Reason" /> identifiers attached
+    ///     by the framework's named exceptions. These are intentionally more specific than
+    ///     <see cref="ErrorCodes" />, which carry the top-level <c>google.rpc.Code</c> name.
     /// </summary>
+    /// <remarks>
+    ///     Per <seealso href="https://google.aip.dev/193">AIP-193</seealso> and
+    ///     <see href="https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto">
+    ///     google/rpc/error_details.proto</see>, <c>ErrorInfo.reason</c> exists to disambiguate
+    ///     beyond the ~20 top-level Codes, so a NOT_FOUND status pairs with a more specific
+    ///     reason such as <c>RESOURCE_NOT_FOUND</c>. Throw sites with finer context should
+    ///     supply a still more specific reason via <c>Details = [new ErrorInfoDetail { Reason = "..." }]</c>.
+    /// </remarks>
     public static class ErrorReasons
     {
-        /// <summary>The concurrency token mismatches the stored value.</summary>
+        /// <summary>Default reason for a missing resource (Status NOT_FOUND).</summary>
+        public const string ResourceNotFound = "RESOURCE_NOT_FOUND";
+
+        /// <summary>Default reason for a conflicting create (Status ALREADY_EXISTS).</summary>
+        public const string ResourceAlreadyExists = "RESOURCE_ALREADY_EXISTS";
+
+        /// <summary>Default reason when system state blocks the operation (Status FAILED_PRECONDITION).</summary>
+        public const string PreconditionNotSatisfied = "PRECONDITION_NOT_SATISFIED";
+
+        /// <summary>Default reason for malformed request arguments (Status INVALID_ARGUMENT).</summary>
+        public const string InvalidArgumentValue = "INVALID_ARGUMENT_VALUE";
+
+        /// <summary>Default reason for field-level validation failures (Status INVALID_ARGUMENT).</summary>
+        public const string ValidationFailed = "VALIDATION_FAILED";
+
+        /// <summary>Default reason when tenant resolution fails (Status FAILED_PRECONDITION).</summary>
+        public const string TenantResolutionFailed = "TENANT_RESOLUTION_FAILED";
+
+        /// <summary>Default reason for missing or invalid credentials (Status UNAUTHENTICATED).</summary>
+        public const string CredentialsMissingOrInvalid = "CREDENTIALS_MISSING_OR_INVALID";
+
+        /// <summary>Default reason for permission rejection (Status PERMISSION_DENIED).</summary>
+        public const string InsufficientPermission = "INSUFFICIENT_PERMISSION";
+
+        /// <summary>Default reason when quota or rate limit is exceeded (Status RESOURCE_EXHAUSTED).</summary>
+        public const string QuotaExceeded = "QUOTA_EXCEEDED";
+
+        /// <summary>Optimistic-concurrency conflict (Status ABORTED).</summary>
         public const string ConcurrencyMismatch = "CONCURRENCY_MISMATCH";
     }
 
@@ -567,49 +604,6 @@ public static class SchemataConstants
         ///     .
         /// </summary>
         public const string LogoutEvent = "http://schemas.openid.net/event/backchannel-logout";
-    }
-
-    #endregion
-
-    #region Nested type: FieldReasons
-
-    /// <summary>
-    ///     Machine-readable reason codes for field-level validation violations.
-    /// </summary>
-    public static class FieldReasons
-    {
-        /// <summary>The field requires a value.</summary>
-        public const string NotEmpty = "not_empty";
-
-        /// <summary>The request payload is invalid.</summary>
-        public const string InvalidPayload = "invalid_payload";
-
-        /// <summary>The filter expression is invalid.</summary>
-        public const string InvalidFilter = "invalid_filter";
-
-        /// <summary>The update_mask expression is invalid.</summary>
-        public const string InvalidUpdateMask = "invalid_update_mask";
-
-        /// <summary>The read_mask expression is invalid.</summary>
-        public const string InvalidReadMask = "invalid_read_mask";
-
-        /// <summary>The resource name is invalid.</summary>
-        public const string InvalidName = "invalid_name";
-
-        /// <summary>The order_by expression is invalid.</summary>
-        public const string InvalidOrderBy = "invalid_order_by";
-
-        /// <summary>The page token is invalid or expired.</summary>
-        public const string InvalidPageToken = "invalid_page_token";
-
-        /// <summary>The page_size is negative.</summary>
-        public const string InvalidPageSize = "invalid_page_size";
-
-        /// <summary>Cross-parent operation rejection reason.</summary>
-        public const string CrossParentUnsupported = "cross_parent_unsupported";
-
-        /// <summary>The parent is malformed or unsupported.</summary>
-        public const string InvalidParent = "invalid_parent";
     }
 
     #endregion
@@ -1306,6 +1300,18 @@ public static class SchemataConstants
     {
         /// <summary>The request itself is the subject.</summary>
         public const string Request = "request";
+
+        /// <summary>The resource is soft-deleted and blocks the update path.</summary>
+        public const string SoftDeleted = "SOFT_DELETED";
+
+        /// <summary>The resource is not soft-deleted and blocks the expunge path (AIP-164).</summary>
+        public const string StateNotDeleted = "STATE_NOT_DELETED";
+
+        /// <summary>The resource is not soft-deleted and blocks the undelete path (AIP-164).</summary>
+        public const string NotSoftDeleted = "NOT_SOFT_DELETED";
+
+        /// <summary>The supplied entity tag does not match the stored value (AIP-154).</summary>
+        public const string EtagMismatch = "ETAG_MISMATCH";
     }
 
     #endregion

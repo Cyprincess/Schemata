@@ -69,7 +69,7 @@ public sealed class AdviceBuildQueryOwner<TEntity> : IRepositoryBuildQueryAdviso
 
         switch (_options.Value.OnNullOwner) {
             case OnNullOwnerPolicy.Reject:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
             case OnNullOwnerPolicy.EmptyResult:
                 return AdviseResult.Block;
             case OnNullOwnerPolicy.AllowAll:

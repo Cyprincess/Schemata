@@ -8,11 +8,13 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Common.Errors;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
@@ -34,11 +36,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         var claims = new ClaimsStore();
@@ -55,7 +57,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<ClaimsStore>.Success(claims);
@@ -77,11 +79,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         await SendConfirmationCodeAsync(found, request.EmailAddress, null);
@@ -94,7 +96,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -116,11 +118,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         await SendConfirmationCodeAsync(found, null, request.PhoneNumber);
@@ -133,7 +135,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -155,16 +157,19 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         var result = await _users.ChangePasswordAsync(found, request.OldPassword!, request.NewPassword!);
         if (!result.Succeeded) {
-            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation { Reason = e.Code, Description = e.Description }));
+            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation {
+                Reason      = NormalizeIdentityCode(e.Code),
+                Description = e.Description,
+            }));
         }
 
         switch (await Advisor.For<IIdentityProfileChangeAdvisor>()
@@ -175,7 +180,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -196,11 +201,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         var result = new AuthenticatorResponse { IsTwoFactorEnabled = await _users.GetTwoFactorEnabledAsync(found) };
@@ -209,7 +214,7 @@ public sealed partial class IdentityHandler<TUser>
             await _users.ResetAuthenticatorKeyAsync(found);
             var key = await _users.GetAuthenticatorKeyAsync(found);
             if (string.IsNullOrWhiteSpace(key)) {
-                throw new NotSupportedException(SchemataResources.GetResourceString(SchemataResources.ST3001));
+                throw new NotSupportedException(SchemataResources.GetResourceString(SchemataResources.AUTHENTICATOR_KEY_REQUIRED));
             }
 
             var codes = await _users.GenerateNewTwoFactorRecoveryCodesAsync(found, 10);
@@ -240,11 +245,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         await _users.SetTwoFactorEnabledAsync(found, true);
@@ -257,7 +262,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -279,11 +284,11 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw new NotFoundException();
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
         }
 
         var passed = request switch {
@@ -307,7 +312,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);

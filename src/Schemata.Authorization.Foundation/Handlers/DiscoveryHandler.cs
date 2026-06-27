@@ -80,7 +80,7 @@ public sealed class DiscoveryHandler<TScope>(
             default:
                 throw new OAuthException(
                     OAuthErrors.ServerError,
-                    SchemataResources.GetResourceString(SchemataResources.ST4014)
+                    SchemataResources.GetResourceString(SchemataResources.INTERNAL)
                 );
         }
 
@@ -106,7 +106,7 @@ public sealed class DiscoveryHandler<TScope>(
     public AuthorizationResult GetJwks() {
         if (options.Value.SigningKey == null) {
             throw new InvalidOperationException(
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1016), "Signing key")
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing key")
             );
         }
 

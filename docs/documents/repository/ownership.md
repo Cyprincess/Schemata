@@ -40,7 +40,7 @@ public interface IOwnerResolver<TEntity>
 3. If `IOwnable.Owner` is already non-null/non-empty, skips — callers can override the default by pre-setting the owner.
 4. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If the result is non-empty, assigns it to `IOwnable.Owner` and returns `Continue`.
 5. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`:
-   - `Reject` (default) — throws `AuthorizationException`.
+   - `Reject` (default) — throws `PermissionDeniedException`.
    - `EmptyResult` — returns `Block`.
    - `AllowAll` — returns `Continue`.
 

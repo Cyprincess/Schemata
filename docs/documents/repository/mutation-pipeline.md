@@ -77,7 +77,7 @@ There is no update-side concurrency advisor. Optimistic concurrency on update is
 database when the concrete entity annotates `IConcurrency.Timestamp` with `[ConcurrencyCheck]`. EF Core
 detaches the entity, re-attaches it as modified, and bumps the current `Timestamp` so `SaveChangesAsync`
 issues a guarded `UPDATE ... WHERE Timestamp = @original`; a zero-row result becomes
-`ConcurrencyException`. LinqToDB calls `UpdateOptimisticAsync` for the same effect. See
+`AbortedException`. LinqToDB calls `UpdateOptimisticAsync` for the same effect. See
 [providers.md](providers.md) and [entity/traits.md](../entity/traits.md#iconcurrency).
 
 ## Remove pipeline

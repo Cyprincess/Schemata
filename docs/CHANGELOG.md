@@ -54,7 +54,7 @@ All notable changes to this project will be documented in this file. See [conven
 - **(Entity)** validate repository add & update - (f6059ed) - Chino Chang
 - **(Entity)** use OfType<T>() - (1101f84) - Chino Chang
 - **(Entity)** attributes supports - (8d9cf80) - Chino Chang
-- **(Entity)** add ConcurrencyException - (ee9aec1) - Chino Chang
+- **(Entity)** add AbortedException - (ee9aec1) - Chino Chang
 - **(Entity)** add canonical name - (a038ec3) - Chino Chang
 - **(Entity)** add Schemata.Entity.Repository - (b24e7fe) - Chino Chang
 - **(Identity)** add user & account - (590a302) - Chino Chang

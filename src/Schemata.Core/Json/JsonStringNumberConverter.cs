@@ -40,7 +40,7 @@ public class JsonStringNumberConverter : JsonConverter<long>
 
         throw new JsonException(
             string.Format(
-                SchemataResources.GetResourceString(SchemataResources.ST1025),
+                SchemataResources.GetResourceString(SchemataResources.CONVERSION_FAILED),
                 reader.GetString(),
                 typeToConvert
             )

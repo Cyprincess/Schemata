@@ -114,7 +114,7 @@ public abstract class AdviceRequestIdempotencyBase<TEntity, TRequest, TPayload>
                 return AdviseResult.Handle;
             }
 
-            throw new ConcurrencyException();
+            throw new AbortedException();
         }
 
         ctx.Set(new IdempotencyReservation(key, payloadHash, recordBytes));

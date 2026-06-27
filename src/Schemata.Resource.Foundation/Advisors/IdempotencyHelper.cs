@@ -25,7 +25,7 @@ internal static class IdempotencyHelper
     /// <summary>
     ///     Reads the cache entry under <paramref name="key" /> and, when it is a finalized
     ///     (DONE) envelope, returns its payload. A payload-hash mismatch raises
-    ///     <see cref="ConcurrencyException" /> (same request id, different payload). A missing
+    ///     <see cref="AbortedException" /> (same request id, different payload). A missing
     ///     entry or a still-pending reservation yields <c>(false, null)</c>.
     /// </summary>
     public static async Task<(bool Found, TPayload? Payload)> ReadDoneAsync<TPayload>(
@@ -50,7 +50,7 @@ internal static class IdempotencyHelper
         }
 
         if (cached.Hash != payloadHash) {
-            throw new ConcurrencyException();
+            throw new AbortedException();
         }
 
         return (true, cached.Payload);

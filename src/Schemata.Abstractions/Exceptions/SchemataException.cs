@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
@@ -63,7 +64,13 @@ public class SchemataException : Exception
     /// </remarks>
     /// <param name="requestId">Optional request identifier included in <see cref="RequestInfoDetail" />.</param>
     /// <param name="domain">Optional ErrorInfo domain.</param>
-    public virtual object? CreateErrorResponse(string? requestId = null, string? domain = null) {
+    /// <param name="locale">
+    ///     Optional <seealso href="https://www.rfc-editor.org/rfc/bcp/bcp47.html">BCP-47</seealso>
+    ///     language tag parsed from the transport's <c>Accept-Language</c> header. When
+    ///     supplied and resolvable, a <see cref="LocalizedMessageDetail" /> is appended via
+    ///     <see cref="EnsureLocalizedMessage" />.
+    /// </param>
+    public virtual object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
         var status  = Status ?? ErrorCodes.Internal;
         var details = new List<IErrorDetail>();
 
@@ -73,6 +80,7 @@ public class SchemataException : Exception
 
         EnsureErrorInfo(details, status, domain);
         EnsureRequestInfo(details, requestId);
+        EnsureLocalizedMessage(details, locale, status);
 
         return new ErrorResponse {
             Error = new() {
@@ -113,5 +121,92 @@ public class SchemataException : Exception
         }
 
         details.Add(new RequestInfoDetail { RequestId = requestId });
+    }
+
+    /// <summary>
+    ///     Appends a <see cref="LocalizedMessageDetail" /> when a locale resolves a resx
+    ///     template; otherwise the detail list is left untouched.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         AIP-193 splits the response shape into three independent identifiers:
+    ///         <see cref="Status" /> (a <c>google.rpc.Code</c> name such as
+    ///         <c>NOT_FOUND</c>) for top-level classification,
+    ///         <see cref="ErrorInfoDetail.Reason" /> for a domain-specific further
+    ///         identifier (e.g. <c>RESOURCE_NOT_FOUND</c>) on which clients branch, and
+    ///         <see cref="LocalizedMessageDetail" /> for the user-facing text.
+    ///     </para>
+    ///     <para>
+    ///         The lookup tries the <see cref="ErrorInfoDetail.Reason" /> resx key first,
+    ///         then falls back to the <c>Status</c> resx key. This keeps a localized
+    ///         template available even when a specific Reason has no dedicated resx
+    ///         entry. When the template contains positional placeholders, the values of
+    ///         <see cref="ErrorInfoDetail.Metadata" /> supply substitution arguments in
+    ///         insertion order. The helper silently skips on any failure - unresolvable
+    ///         locale, missing resx keys, or template format error - so localization
+    ///         never interferes with the developer-facing
+    ///         <see cref="Exception.Message" />.
+    ///     </para>
+    /// </remarks>
+    /// <param name="details">Mutable detail list for the response.</param>
+    /// <param name="locale">BCP-47 language tag parsed from <c>Accept-Language</c>.</param>
+    /// <param name="status">Top-level <c>google.rpc.Code</c> name used as the resx fallback key when Reason has no dedicated entry.</param>
+    protected static void EnsureLocalizedMessage(List<IErrorDetail> details, string? locale, string? status) {
+        if (string.IsNullOrWhiteSpace(locale)) {
+            return;
+        }
+
+        if (details.Any(d => d is LocalizedMessageDetail)) {
+            return;
+        }
+
+        var errorInfo = details.OfType<ErrorInfoDetail>().FirstOrDefault();
+        var reason    = errorInfo?.Reason;
+
+        CultureInfo culture;
+        try {
+            culture = CultureInfo.GetCultureInfo(locale);
+        } catch (CultureNotFoundException) {
+            return;
+        }
+
+        var template = TryGetResource(reason, culture) ?? TryGetResource(status, culture);
+        if (string.IsNullOrEmpty(template)) {
+            return;
+        }
+
+        string message;
+        try {
+            if (errorInfo?.Metadata is { Count: > 0 } metadata) {
+                var args = new object?[metadata.Count];
+                var i    = 0;
+                foreach (var value in metadata.Values) {
+                    args[i++] = value;
+                }
+
+                message = string.Format(culture, template, args);
+            } else {
+                message = template;
+            }
+        } catch (FormatException) {
+            return;
+        }
+
+        details.Add(new LocalizedMessageDetail {
+            Locale  = locale,
+            Message = message,
+        });
+    }
+
+    private static string? TryGetResource(string? key, CultureInfo culture) {
+        if (key is not { Length: > 0 }) {
+            return null;
+        }
+
+        try {
+            return SchemataResources.ResourceManager.GetString(key, culture);
+        } catch (Exception) {
+            return null;
+        }
     }
 }

@@ -63,7 +63,7 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
         if (required && string.IsNullOrWhiteSpace(authz.Request?.CodeChallenge)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.CodeChallenge)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.CodeChallenge)
             );
         }
 
@@ -74,7 +74,7 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
         if (!IsValidCodeChallenge(authz.Request.CodeChallenge)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.CodeChallenge)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.CodeChallenge)
             );
         }
 
@@ -95,13 +95,13 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             case PkceMethods.Plain:
                 throw new OAuthException(
                     OAuthErrors.InvalidRequest,
-                    string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), PkceMethods.Plain)
+                    string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), PkceMethods.Plain)
                 );
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidRequest,
                     string.Format(
-                        SchemataResources.GetResourceString(SchemataResources.ST1015),
+                        SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED),
                         Parameters.CodeChallengeMethod
                     )
                 );

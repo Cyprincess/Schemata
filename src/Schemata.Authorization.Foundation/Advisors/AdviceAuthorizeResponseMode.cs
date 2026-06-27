@@ -59,7 +59,7 @@ public sealed class AdviceAuthorizeResponseMode<TApp>(IOptions<CodeFlowOptions> 
          && authz.ResponseMode == ResponseModes.Query) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.ResponseMode)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
             ) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,

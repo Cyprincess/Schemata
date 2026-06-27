@@ -28,7 +28,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
         if (handler == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
             );
         }
 
@@ -45,7 +45,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
         if (handler == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
             );
         }
 
@@ -57,7 +57,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
         if (handler == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), request.CodeType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
             );
         }
 

@@ -29,7 +29,7 @@ public class ResourceGrpcErrorIntegrationShould
     }
 
     [Fact]
-    public async Task Update_WrongETag_ThrowsAborted() {
+    public async Task Update_WrongETag_ThrowsFailedPrecondition() {
         var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
         var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
 
@@ -37,13 +37,14 @@ public class ResourceGrpcErrorIntegrationShould
         Assert.NotNull(created);
         Assert.False(string.IsNullOrWhiteSpace(created.CanonicalName), "CanonicalName should be auto-set");
 
-        // Send wrong ETag — AdviceUpdateFreshness will throw ConcurrencyException → Aborted
+        // Send wrong ETag — AdviceUpdateFreshness throws FailedPreconditionException with the
+        // ETAG_MISMATCH precondition subject, mapping to StatusCode.FailedPrecondition.
         var update = new Student {
             FullName = "Updated", EntityTag = "W/\"wrong-etag-value\"", CanonicalName = created.CanonicalName,
         };
 
         var rpc = await Assert.ThrowsAsync<RpcException>(() => client.UpdateAsync(update).AsTask());
 
-        Assert.Equal(StatusCode.Aborted, rpc.StatusCode);
+        Assert.Equal(StatusCode.FailedPrecondition, rpc.StatusCode);
     }
 }

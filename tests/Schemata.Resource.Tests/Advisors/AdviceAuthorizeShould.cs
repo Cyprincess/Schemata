@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
@@ -94,10 +95,12 @@ public class AdviceAuthorizeShould
         var request   = new Student { FullName = "Visible", Name = "students/42" };
         var container = new ResourceRequestContainer<Student>();
 
-        var ex = await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
+        var ex = await Assert.ThrowsAsync<PermissionDeniedException>(() => advisor.AdviseAsync(
                                                                       ctx, request, container, null));
+        var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
+        Assert.Equal("students/42", resource.ResourceName);
         Assert.Equal("Permission 'student.Create' denied on resource 'students/42' (or it might not exist).",
-                     ex.Message);
+                     resource.Description);
     }
 
     [Fact]
@@ -258,9 +261,12 @@ public class AdviceAuthorizeShould
         var container = new ResourceRequestContainer<Student>();
         var request   = new ListRequest { Parent = "schools/9" };
 
-        var ex = await Assert.ThrowsAsync<AuthorizationException>(() => advisor.AdviseAsync(
+        var ex = await Assert.ThrowsAsync<PermissionDeniedException>(() => advisor.AdviseAsync(
                                                                       ctx, request, container, null));
-        Assert.Equal("Permission 'student.List' denied on resource 'schools/9' (or it might not exist).", ex.Message);
+        var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
+        Assert.Equal("schools/9", resource.ResourceName);
+        Assert.Equal("Permission 'student.List' denied on resource 'schools/9' (or it might not exist).",
+                     resource.Description);
     }
 
     [Fact]

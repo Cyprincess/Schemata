@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
         if (implementation?.GetGenericTypeDefinition() != service) {
             throw new ArgumentException(
                 string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.ST1029),
+                    SchemataResources.GetResourceString(SchemataResources.IMPLEMENTATION_REQUIRED),
                     type,
                     service
                 )

@@ -28,7 +28,7 @@ public static class AdviceUpdateRequestAuthorize
 ///     <see cref="IEntitlementProvider{TEntity,TRequest}" />.
 ///     Skips access check when <see cref="AnonymousGranted" /> is present.
 ///     Entitlement filtering is always applied regardless of anonymous access.
-///     Throws <see cref="AuthorizationException" /> on denial.
+///     Throws <see cref="PermissionDeniedException" /> on denial.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>

@@ -5,312 +5,342 @@
   <file datatype="xml" source-language="en" target-language="cs"
     original="../SchemataResources.resx">
     <body>
-      <trans-unit id="ST0001">
+      <trans-unit id="DEPENDENCY_AUTO_REGISTERED">
         <source>{0} depends on {1}, it will be added automatically.</source>
         <target state="translated">{0} závisí na {1}, bude přidáno automaticky.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST0002">
+      <trans-unit id="DEPENDENCY_REQUIRED">
         <source>{0} requires {1}, you should add it manually.</source>
         <target state="translated">{0} vyžaduje {1}, měli byste jej přidat ručně.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST0003">
+      <trans-unit id="DEPENDENCY_SUGGESTED">
         <source>{0} suggests adding {1}.</source>
         <target state="translated">{0} doporučuje přidat {1}.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1001">
+      <trans-unit id="INVALID_ARGUMENT">
         <source>The request contains an invalid argument.</source>
         <target state="translated">Požadavek obsahuje neplatný argument.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1002">
+      <trans-unit id="TENANT_RESOLUTION_FAILED">
         <source>Unable to resolve tenant for the current request.</source>
         <target state="translated">Nelze vyřešit tenanta pro aktuální požadavek.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1003">
+      <trans-unit id="FAILED_PRECONDITION">
         <source>The request cannot be executed in the current system state.</source>
         <target state="translated">Požadavek nelze provést v aktuálním stavu systému.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1004">
+      <trans-unit id="UNAUTHENTICATED">
         <source>The request does not have valid authentication credentials.</source>
         <target state="translated">Požadavek nemá platné ověřovací údaje.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1005">
+      <trans-unit id="PERMISSION_DENIED">
         <source>You do not have permission to perform this action.</source>
         <target state="translated">Nemáte oprávnění k provedení této akce.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1006">
+      <trans-unit id="NOT_FOUND">
         <source>The requested resource was not found.</source>
         <target state="translated">Požadovaný prostředek nebyl nalezen.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1007">
+      <trans-unit id="ALREADY_EXISTS">
         <source>The resource already exists.</source>
         <target state="translated">Prostředek již existuje.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1008">
+      <trans-unit id="CONCURRENCY_MISMATCH">
         <source>A concurrency conflict occurred while saving to the database.</source>
         <target state="translated">Při ukládání do databáze došlo ke konfliktu souběžnosti.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1009">
+      <trans-unit id="VALIDATION_ERROR">
         <source>One or more validation errors occurred.</source>
         <target state="translated">Došlo k jedné nebo více chybám ověření.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1010">
+      <trans-unit id="RESOURCE_EXHAUSTED">
         <source>Rate limit exceeded.</source>
         <target state="translated">Překročen limit rychlosti.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1011">
+      <trans-unit id="NAMED_NOT_FOUND">
         <source>{0} '{1}' not found.</source>
         <target state="translated">{0} „{1}" nebylo nalezeno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1012">
+      <trans-unit id="GENERIC_ERROR">
         <source>An error occurred.</source>
         <target state="translated">Došlo k chybě.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1013">
+      <trans-unit id="NOT_EMPTY">
         <source>'{0}' must not be empty.</source>
         <target state="translated">'{0}' nesmí být prázdné.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1014">
+      <trans-unit id="UNSUPPORTED_ALGORITHM">
         <source>Unsupported algorithm: {0}.</source>
         <target state="translated">Nepodporovaný algoritmus: {0}.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1015">
+      <trans-unit id="NOT_SUPPORTED">
         <source>'{0}' is not supported.</source>
         <target state="translated">„{0}" není podporováno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1016">
+      <trans-unit id="NOT_CONFIGURED">
         <source>'{0}' is not configured.</source>
         <target state="translated">„{0}" není nakonfigurováno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1017">
+      <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
         <target state="translated">Aplikace nemá URI identifikátoru sektoru ani přesměrovací
                     URI.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1018">
+      <trans-unit id="PATTERN_REQUIRED">
         <source>Cannot resolve a resource name without a pattern.</source>
         <target state="translated">Nelze vyřešit název prostředku bez vzoru.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1019">
+      <trans-unit id="INVALID_TABLE_NAME">
         <source>Invalid table name '{0}' of type '{1}'.</source>
         <target state="translated">Neplatný název tabulky '{0}' typu '{1}'.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1020">
+      <trans-unit id="TABLE_KEY_REQUIRED">
         <source>Entity must have at least one [TableKey].</source>
         <target state="translated">Entita musí mít alespoň jeden [TableKey].</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1022">
+      <trans-unit id="ENTITY_KEY_COUNT_MISMATCH">
         <source>Entity key count mismatch.</source>
         <target state="translated">Neshoda počtu klíčů entity.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1023">
+      <trans-unit id="PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
         <target state="translated">Nelze vyřešit parametr '{0}' typu '{1}'.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1024">
+      <trans-unit id="METHOD_PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
         <target state="translated">Nelze vyřešit parametr '{0}' metody '{1}' na typu '{2}'.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1025">
+      <trans-unit id="CONVERSION_FAILED">
         <source>Unable to convert '{0}' to {1}.</source>
         <target state="translated">Nelze převést '{0}' na {1}.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1026">
+      <trans-unit id="SOURCE_FIELD_REQUIRED">
         <source>Mapping for field {0} is missing a source field.</source>
         <target state="translated">Mapování pro pole {0} postrádá zdrojové pole.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1027">
+      <trans-unit id="TENANT_NOT_INITIALIZED">
         <source>Tenant is not initialized successfully.</source>
         <target state="translated">Tenant nebyl úspěšně inicializován.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1028">
+      <trans-unit id="ENTRY_ASSEMBLY_REQUIRED">
         <source>Entry assembly is null.</source>
         <target state="translated">Vstupní assembly je null.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST1029">
+      <trans-unit id="IMPLEMENTATION_REQUIRED">
         <source>The type {0} does not implement {1}.</source>
         <target state="translated">Typ {0} neimplementuje {1}.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2001">
+      <trans-unit id="INVALID_PAYLOAD">
         <source>Invalid request payload.</source>
         <target state="translated">Neplatné tělo požadavku.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2002">
+      <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">Čtení napříč nadřazenými prvky není pro tento prostředek
                     podporováno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2003">
+      <trans-unit id="INVALID_PAGE_TOKEN">
         <source>The page token is invalid or has expired.</source>
         <target state="translated">Token stránky je neplatný nebo vypršel.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2004">
+      <trans-unit id="INVALID_EXPRESSION">
         <source>The {0} expression is malformed.</source>
         <target state="translated">Výraz {0} je chybně formátován.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2005">
+      <trans-unit id="INVALID_FIELD">
         <source>Invalid field.</source>
         <target state="translated">Neplatné pole.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2006">
+      <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
         <target state="translated">Neplatný název pole '{0}'.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2007">
+      <trans-unit id="FUNCTION_NOT_REGISTERED">
         <source>Function '{0}' not registered.</source>
         <target state="translated">Funkce '{0}' není registrována.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST2008">
+      <trans-unit id="INVALID_PAGE_SIZE">
         <source>The page_size must not be negative.</source>
         <target state="new">The page_size must not be negative.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST3001">
+      <trans-unit id="AUTHENTICATOR_KEY_REQUIRED">
         <source>The user manager must produce an authenticator key after reset.</source>
         <target state="translated">Správce uživatelů musí po resetu vytvořit klíč
                     autentikátoru.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4001">
+      <trans-unit id="INVALID_CLIENT_CREDENTIALS">
         <source>The client credentials are missing or invalid.</source>
         <target state="translated">Přihlašovací údaje klienta chybí nebo jsou neplatné.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4002">
+      <trans-unit id="CLIENT_SECRET_REQUIRED">
         <source>Client secret is required for confidential clients.</source>
         <target state="translated">Pro důvěrné klienty je vyžadován klientský tajný klíč.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4003">
+      <trans-unit id="MULTIPLE_CLIENT_AUTH_METHODS">
         <source>The request uses more than one client authentication method.</source>
         <target state="translated">Požadavek používá více než jednu metodu ověření klienta.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4004">
+      <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
         <target state="translated">Poskytnutý grant je neplatný, vypršel nebo byl zrušen.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4005">
+      <trans-unit id="PKCE_VERIFIER_MISMATCH">
         <source>The code_verifier does not match the code_challenge.</source>
         <target state="translated">code_verifier neodpovídá code_challenge.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4006">
+      <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
         <target state="translated">Požadovaný rozsah není pro tohoto klienta povolen.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4007">
+      <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
         <target state="translated">Klient není oprávněn používat tento typ grantu.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4008">
+      <trans-unit id="ACCESS_DENIED">
         <source>The resource owner or authorization server denied the request.</source>
         <target state="translated">Vlastník zdroje nebo autorizační server žádost zamítl.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4009">
+      <trans-unit id="INVALID_REDIRECT_URI">
         <source>The redirect_uri does not match any registered URI.</source>
         <target state="translated">redirect_uri neodpovídá žádnému registrovanému URI.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4010">
+      <trans-unit id="USER_CONSENT_REQUIRED">
         <source>User consent is required.</source>
         <target state="translated">Je vyžadován souhlas uživatele.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4011">
+      <trans-unit id="USER_AUTHENTICATION_REQUIRED">
         <source>User authentication is required.</source>
         <target state="translated">Je vyžadováno ověření uživatele.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4012">
+      <trans-unit id="AUTHORIZATION_PENDING">
         <source>The authorization request is still pending.</source>
         <target state="translated">Žádost o autorizaci stále čeká na vyřízení.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4013">
+      <trans-unit id="SLOW_DOWN">
         <source>The polling interval is too short. Increase the interval and retry.</source>
         <target state="translated">Interval dotazování je příliš krátký. Prodlužte interval a zkuste to znovu.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4014">
+      <trans-unit id="INTERNAL">
         <source>An internal server error occurred.</source>
         <target state="translated">Došlo k interní chybě serveru.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4015">
+      <trans-unit id="INVALID_PROMPT_COMBINATION">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
         <target state="translated">Hodnotu promptu '{0}' nelze kombinovat s jinými hodnotami.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4016">
+      <trans-unit id="UNSUPPORTED_PROMPT">
         <source>The '{0}' prompt value is not supported for this client.</source>
         <target state="translated">Hodnota promptu '{0}' není pro tohoto klienta podporována.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4017">
+      <trans-unit id="USER_IDENTITY_REQUIRED">
         <source>A valid user identity is required for this request.</source>
         <target state="translated">Pro tento požadavek je vyžadována platná identita uživatele.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4018">
+      <trans-unit id="REQUIRED_SETTING_MISSING">
         <source>{0} is enabled but {1} is not set.</source>
         <target state="translated">{0} je povoleno, ale {1} není nastaveno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4019">
+      <trans-unit id="ABSOLUTE_URI_REQUIRED">
         <source>{0} must be an absolute URI.</source>
         <target state="translated">{0} musí být absolutní URI.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST4020">
+      <trans-unit id="MISSING_DEPENDENT_SETTING">
         <source>{0} is set but {1} is not set.</source>
         <target state="translated">{0} je nastaveno, ale {1} není nastaveno.</target>
         <note />
       </trans-unit>
-      <trans-unit id="ST5001">
+      <trans-unit id="UNABLE_TO_RESOLVE">
         <source>Unable to resolve {0}.</source>
         <target state="translated">Nelze vyřešit {0}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_FILTER">
+        <source>The filter expression is invalid.</source>
+        <target state="new">The filter expression is invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_UPDATE_MASK">
+        <source>The update_mask expression is invalid.</source>
+        <target state="new">The update_mask expression is invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_READ_MASK">
+        <source>The read_mask expression is invalid.</source>
+        <target state="new">The read_mask expression is invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_NAME">
+        <source>The resource name is invalid.</source>
+        <target state="new">The resource name is invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_ORDER_BY">
+        <source>The order_by expression is invalid.</source>
+        <target state="new">The order_by expression is invalid.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REFERENCE">
+        <source>The supplied reference does not resolve to any registered resource type.</source>
+        <target state="new">The supplied reference does not resolve to any registered resource type.</target>
         <note />
       </trans-unit>
     </body>

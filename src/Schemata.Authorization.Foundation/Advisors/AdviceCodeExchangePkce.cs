@@ -60,7 +60,7 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
              && options.Value.RequirePkceDowngradeProtection) {
                 throw new OAuthException(
                     OAuthErrors.InvalidGrant,
-                    SchemataResources.GetResourceString(SchemataResources.ST4005)
+                    SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
                 );
             }
 
@@ -70,14 +70,14 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         if (string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4005)
+                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
             );
         }
 
         if (exchange.Request.CodeVerifier.Length is < 43 or > 128 || !exchange.Request.CodeVerifier.All(IsUnreserved)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4005)
+                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
             );
         }
 
@@ -100,7 +100,7 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         if (!valid) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4005)
+                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
             );
         }
 

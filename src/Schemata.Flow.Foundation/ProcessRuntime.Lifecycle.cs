@@ -32,7 +32,9 @@ public sealed partial class ProcessRuntime
         }
 
         var reg = _registry.GetRegistration(processName)
-               ?? throw new NotFoundException(message: $"Process definition '{processName}' not found.");
+               ?? throw new NotFoundException(
+                   reason: "PROCESS_DEFINITION_NOT_REGISTERED",
+                   message: $"Process definition '{processName}' not registered.");
 
         // One scope spans the whole operation so persistence, provisioning, and lifecycle
         // notifications resolve their scoped services (repositories, advisors) from a single scope.
@@ -40,7 +42,9 @@ public sealed partial class ProcessRuntime
         var       sp    = scope.ServiceProvider;
 
         var runtime = sp.GetKeyedService<IFlowRuntime>(reg.Engine)
-                   ?? throw new NotFoundException(message: $"Runtime '{reg.Engine}' not found.");
+                   ?? throw new FailedPreconditionException(
+                       reason: "FLOW_RUNTIME_NOT_REGISTERED",
+                       message: $"Flow runtime '{reg.Engine}' is not registered with the host.");
 
         var process = new SchemataProcess {
             Name           = Identifiers.NewUid().ToString("n"),
@@ -131,7 +135,9 @@ public sealed partial class ProcessRuntime
         var (process, definition, runtime) = await LoadAsync(sp, instanceName, ct);
 
         var msg = definition.Messages.FirstOrDefault(m => m.Name == messageName)
-               ?? throw new NotFoundException(message: $"Message '{messageName}' not found in process definition.");
+               ?? throw new InvalidArgumentException(
+                   reason: "MESSAGE_NOT_DEFINED",
+                   message: $"Message '{messageName}' is not defined on the process.");
 
         ProcessInstance instance;
         SchemataProcessTransition transition;

@@ -519,7 +519,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         await UsersRepository.UpdateAsync(user, ct);
         try {
             await UsersRepository.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
 
@@ -561,7 +561,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         try {
             await uow.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
 
@@ -821,7 +821,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
         if (roleEntity is null) {
             throw new InvalidOperationException(
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Role",
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NAMED_NOT_FOUND), "Role",
                               normalizedRoleName));
         }
 

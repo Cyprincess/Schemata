@@ -71,7 +71,7 @@ public class AdviceIdempotencyShould
         var request   = new StudentRequest { RequestId = "req-concurrent" };
         var container = new ResourceRequestContainer<Student>();
 
-        await Assert.ThrowsAsync<ConcurrencyException>(() => advisor.AdviseAsync(ctx, request, container, null));
+        await Assert.ThrowsAsync<AbortedException>(() => advisor.AdviseAsync(ctx, request, container, null));
     }
 
     [Fact]

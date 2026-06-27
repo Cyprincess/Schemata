@@ -29,7 +29,7 @@ public static class AdviceCreateRequestIdempotency
 ///     <see cref="ICacheProvider" /> for a cached result keyed by
 ///     <see cref="PendingIdempotencyKey" />.
 ///     If found with a matching payload hash, returns <see cref="AdviseResult.Handle" /> with the
-///     cached result; a hash mismatch raises <see cref="ConcurrencyException" />.
+///     cached result; a hash mismatch raises <see cref="AbortedException" />.
 ///     Otherwise, stores a <see cref="PendingIdempotencyKey" /> in the context for
 ///     <see cref="AdviceResponseIdempotency{TEntity,TDetail}" /> to persist the result
 ///     after a successful create.

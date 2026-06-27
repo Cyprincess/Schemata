@@ -81,7 +81,9 @@ public sealed class ProcessRegistry : IProcessRegistry
         };
 
         if (!_registrations.TryAdd(configuration.Name, registration)) {
-            throw new AlreadyExistsException(message: $"Process '{configuration.Name}' is already registered.");
+            throw new AlreadyExistsException(
+                reason: "PROCESS_DEFINITION_ALREADY_REGISTERED",
+                message: $"Process definition '{configuration.Name}' is already registered.");
         }
 
         return default;

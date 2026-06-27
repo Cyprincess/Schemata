@@ -10,6 +10,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
+using Schemata.Common.Errors;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -46,16 +47,20 @@ public sealed partial class ProcessRuntime : IProcessRuntime
     ) {
         if (!_instances.TryGetValue(instanceName, out var process)) {
             process = await _persistence.FindAsync(services, instanceName, ct)
-                   ?? throw new NotFoundException(message: $"Process instance '{instanceName}' not found.");
+                   ?? throw SchemataResourceErrors.NotFound<SchemataProcess>($"processes/{instanceName}");
 
             Hydrate(process);
         }
 
         var reg = _registry.GetRegistration(process.DefinitionName)
-               ?? throw new NotFoundException(message: $"Process definition '{process.DefinitionName}' not found.");
+               ?? throw new NotFoundException(
+                   reason: "PROCESS_DEFINITION_NOT_REGISTERED",
+                   message: $"Process definition '{process.DefinitionName}' not registered.");
 
         var runtime = services.GetKeyedService<IFlowRuntime>(reg.Engine)
-                   ?? throw new NotFoundException(message: $"Runtime '{reg.Engine}' not found.");
+                   ?? throw new FailedPreconditionException(
+                       reason: "FLOW_RUNTIME_NOT_REGISTERED",
+                       message: $"Flow runtime '{reg.Engine}' is not registered with the host.");
 
         return (process, reg.Definition, runtime);
     }

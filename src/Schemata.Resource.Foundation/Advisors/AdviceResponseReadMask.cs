@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -56,7 +57,7 @@ public static class AdviceResponseReadMask
         return new([new() {
             Field       = nameof(GetRequest.ReadMask).Underscore(),
             Description = $"The read_mask path `{path}` is invalid: {reason}.",
-            Reason      = FieldReasons.InvalidReadMask,
+            Reason      = SchemataResources.INVALID_READ_MASK,
         }]);
     }
 }

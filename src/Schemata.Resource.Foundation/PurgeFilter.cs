@@ -65,16 +65,16 @@ internal static class PurgeFilter
     private static ValidationException InvalidFilter() {
         return new([new() {
             Field       = nameof(PurgeRequest.Filter).Underscore(),
-            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "filter"),
-            Reason      = FieldReasons.InvalidFilter,
+            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "filter"),
+            Reason      = SchemataResources.INVALID_FILTER,
         }]);
     }
 
     private static ValidationException InvalidLanguage() {
         return new([new() {
             Field       = nameof(PurgeRequest.Language).Underscore(),
-            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST2004), "language"),
-            Reason      = FieldReasons.InvalidFilter,
+            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "language"),
+            Reason      = SchemataResources.INVALID_FILTER,
         }]);
     }
 }

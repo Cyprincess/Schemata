@@ -149,7 +149,7 @@ public sealed partial class DefaultScheduler
             row.EndTime = now;
             try {
                 await executions.UpdateAsync(row, ct);
-            } catch (ConcurrencyException) {
+            } catch (AbortedException) {
                 // A competing handler already moved the row; nothing to do.
             }
         }

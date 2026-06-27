@@ -289,7 +289,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 );
         }
 

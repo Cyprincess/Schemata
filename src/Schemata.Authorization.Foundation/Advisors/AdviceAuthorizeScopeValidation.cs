@@ -52,7 +52,7 @@ public sealed class AdviceAuthorizeScopeValidation<TApp>(
          && !requested.Contains(Scopes.OpenId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.ST4006)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
             ) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
@@ -66,7 +66,7 @@ public sealed class AdviceAuthorizeScopeValidation<TApp>(
 
         foreach (var s in requested) {
             await PermissionAdvice.RequireAsync(apps, authz.Application, PermissionPrefixes.Scope + s, ct,
-                error: OAuthErrors.InvalidScope, resource: SchemataResources.ST4006,
+                error: OAuthErrors.InvalidScope, resource: SchemataResources.INVALID_SCOPE,
                 configure: exception => {
                     exception.RedirectUri  = authz.Request?.RedirectUri;
                     exception.State        = authz.Request?.State;

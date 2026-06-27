@@ -72,7 +72,7 @@ public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions
 
             throw new OAuthException(
                 OAuthErrors.SlowDown,
-                SchemataResources.GetResourceString(SchemataResources.ST4013)
+                SchemataResources.GetResourceString(SchemataResources.SLOW_DOWN)
             );
         }
 

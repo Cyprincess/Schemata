@@ -93,7 +93,7 @@ public sealed class JobExecutionDispatcher(
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             return;
         }
 
@@ -194,7 +194,7 @@ public sealed class JobExecutionDispatcher(
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             // Row moved on under another worker (e.g. :cancel) after we claimed it; honour that.
             return;
         }
@@ -317,7 +317,7 @@ public sealed class JobExecutionDispatcher(
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);
-        } catch (ConcurrencyException) {
+        } catch (AbortedException) {
             // Another dispatcher already transitioned the row; nothing to do.
         }
     }

@@ -180,7 +180,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         var properties = KeyPropertiesCache(type);
         if (properties.Count == 0) {
-            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1020));
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.TABLE_KEY_REQUIRED));
         }
 
         var keys = new List<object>();
@@ -207,11 +207,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         var properties = KeyPropertiesCache(type);
         if (properties.Count == 0) {
-            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1020));
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.TABLE_KEY_REQUIRED));
         }
 
         if (properties.Count != keys.Length) {
-            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ST1022));
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.ENTITY_KEY_COUNT_MISMATCH));
         }
 
         var predicate = Predicate.True<TEntity>();

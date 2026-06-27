@@ -32,7 +32,7 @@ public sealed class AdviceUserInfoOpenIdRequirement : IUserInfoAdvisor
         if (!info.GrantedScopes.Contains(Scopes.OpenId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.ST4006),
+                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE),
                 403
             );
         }
@@ -40,7 +40,7 @@ public sealed class AdviceUserInfoOpenIdRequirement : IUserInfoAdvisor
         if (string.IsNullOrWhiteSpace(info.InternalSubject)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
-                SchemataResources.GetResourceString(SchemataResources.ST4017)
+                SchemataResources.GetResourceString(SchemataResources.USER_IDENTITY_REQUIRED)
             );
         }
 

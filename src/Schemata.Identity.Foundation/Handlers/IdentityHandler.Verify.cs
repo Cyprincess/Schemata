@@ -31,7 +31,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         // Missing accounts and invalid confirmation codes share one response shape for
@@ -59,7 +59,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -81,7 +81,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);

@@ -13,7 +13,7 @@ detail entries on the exception itself. The HTTP exception-handler middleware tu
 | `Schemata.Abstractions` | `Exceptions/SchemataException.cs` and one file per subclass |
 | `Schemata.Abstractions` | `Errors/ErrorResponse.cs`, `Errors/ErrorBody.cs`, `Errors/IErrorDetail.cs` |
 | `Schemata.Abstractions` | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs`, `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
-| `Schemata.Abstractions` | `SchemataConstants.cs` (`ErrorCodes`, `ErrorReasons`, `FieldReasons`) |
+| `Schemata.Abstractions` | `SchemataConstants.cs` (`ErrorCodes` for `google.rpc.Code` names; `ErrorReasons` for framework-default `ErrorInfo.reason` identifiers) |
 | `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs` |
 
 ## Envelope
@@ -29,7 +29,7 @@ Errors serialize inside an `ErrorResponse` wrapper:
     "details": [
       {
         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
-        "reason": "NOT_FOUND"
+        "reason": "RESOURCE_NOT_FOUND"
       },
       {
         "@type": "type.googleapis.com/google.rpc.RequestInfo",
@@ -39,6 +39,11 @@ Errors serialize inside an `ErrorResponse` wrapper:
   }
 }
 ```
+
+The `status` field carries the broad `google.rpc.Code` name; `reason` carries the
+framework-default domain identifier from `SchemataConstants.ErrorReasons`
+(`RESOURCE_NOT_FOUND` here). Throw sites with finer context override the default to a more
+specific value such as `USER_NOT_FOUND`.
 
 ### ErrorResponse and ErrorBody
 
@@ -66,8 +71,8 @@ Every domain exception derives from `SchemataException`:
 Exception
   SchemataException
     AlreadyExistsException        InvalidArgumentException     QuotaExceededException
-    AuthorizationException        NoContentException           TenantResolveException
-    ConcurrencyException          NotFoundException            UnauthenticatedException
+    PermissionDeniedException        NoContentException           TenantResolveException
+    AbortedException          NotFoundException            UnauthenticatedException
     FailedPreconditionException   OAuthException               ValidationException
 ```
 
@@ -81,12 +86,74 @@ The constructor is `SchemataException(int code, string? status = null, string? m
 | `Status` | `string?` | The canonical `google.rpc.Code` string |
 | `Details` | `List<IErrorDetail>?` | Typed detail entries |
 
-`CreateErrorResponse(requestId, domain)` builds the envelope: it inserts an `ErrorInfoDetail`
-(with `reason` set to `Status`, falling back to `INTERNAL`) at the front of the detail list when
-none is present, appends a `RequestInfoDetail` when a request id is supplied, and returns an
-`ErrorResponse`. Subclasses override it to produce protocol-specific envelopes — `OAuthException`
-returns an `OAuthErrorResponse` per RFC 6749, and `NoContentException` returns `null` so no body is
-written.
+### Status vs Reason
+
+[AIP-193](https://google.aip.dev/193) and
+[`google/rpc/error_details.proto`](https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto)
+distinguish two independent identifiers, and the framework keeps them strictly separate:
+
+- `Status` is the top-level `google.rpc.Code` name (`NOT_FOUND`, `ABORTED`, ...). It travels at
+  the envelope root and provides broad classification.
+- `ErrorInfoDetail.Reason` is a **domain-specific** UPPER_SNAKE_CASE identifier that
+  **further-identifies** the error. Per the AIP, its existence is justified precisely because
+  the ~20 top-level Codes cannot disambiguate errors across a real service surface.
+
+Reusing the Status name as Reason (`Status=NOT_FOUND` paired with `Reason="NOT_FOUND"`)
+contributes zero disambiguation and is forbidden. Named framework exceptions attach a
+domain-specific default from `SchemataConstants.ErrorReasons` (for example `RESOURCE_NOT_FOUND`
+for `NotFoundException`, `CONCURRENCY_MISMATCH` for `AbortedException`); throw sites with
+finer context override via the constructor's `reason:` argument or by appending an explicit
+`ErrorInfoDetail` to `Details`.
+
+`CreateErrorResponse(requestId, domain, locale)` builds the envelope:
+
+1. `EnsureErrorInfo` inserts a fallback `ErrorInfoDetail` whose `Reason` mirrors the Status
+   only when the throw site supplied no `ErrorInfoDetail`. This is a safety net for raw
+   `SchemataException` throws, not a recommended shape — every named exception attaches its
+   own domain-specific reason and bypasses the fallback.
+2. `EnsureRequestInfo` appends a `RequestInfoDetail` when a request id is supplied.
+3. `EnsureLocalizedMessage` appends a `LocalizedMessageDetail` when a BCP-47 `locale` resolves
+   an entry in `SchemataResources`. The helper tries `ErrorInfoDetail.Reason` first; if that
+   key is absent from the resx, it falls back to the `Status` name. The template is formatted
+   against the values of `ErrorInfoDetail.Metadata` in insertion order, so a specific reason
+   (`RESOURCE_NOT_FOUND`) and the generic Status (`NOT_FOUND`) can share the same translated
+   text without duplicate resx entries. The helper silently skips on null locale, unresolvable
+   culture, both keys missing, format error, or when a `LocalizedMessageDetail` is already
+   attached.
+
+Subclasses override `CreateErrorResponse` to produce protocol-specific envelopes — `OAuthException`
+returns an `OAuthErrorResponse` per RFC 6749 and propagates the uppercased OAuth `error` value
+into `ErrorInfoDetail.Reason` (e.g. `invalid_grant` → `INVALID_GRANT`), and `NoContentException`
+returns `null` so no body is written.
+
+### SchemataResourceErrors factory
+
+Resource-themed exceptions (`NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`,
+`PERMISSION_DENIED`, `ABORTED`) flow through
+[`SchemataResourceErrors`](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Common/Errors/SchemataResourceErrors.cs)
+in `Schemata.Common.Errors`. Each factory method pre-attaches:
+
+- `ErrorInfoDetail` with the matching AIP-193 `Reason`,
+- `ResourceInfoDetail` with `ResourceType` (derived from `ResourceNameDescriptor.ForType<T>().Singular`)
+  and `ResourceName` (the supplied canonical name),
+- For `PreconditionFailed<T>`, an additional `PreconditionFailureDetail` carrying a single
+  `PreconditionViolation` whose `Subject` is the precondition identifier (e.g.
+  `SchemataConstants.PreconditionSubjects.EtagMismatch`).
+
+`Owner` is only populated on `PermissionDenied<T>`; `NotFound<T>` omits it per AIP-211 to avoid
+leaking existence.
+
+```csharp
+using Schemata.Common.Errors;
+
+public sealed class Book { /* AIP-122 resource entity */ }
+
+throw SchemataResourceErrors.PermissionDenied<Book>(
+    name: "books/x",
+    owner: "users/alice",
+    description: "Permission 'book.Update' denied on resource 'books/x'.",
+    reason: "BOOK_UPDATE_DENIED");
+```
 
 ### Exception types
 
@@ -96,9 +163,9 @@ written.
 | `ValidationException` | 422 | `INVALID_ARGUMENT` | One or more validation errors occurred. |
 | `NotFoundException` | 404 | `NOT_FOUND` | The requested resource was not found. |
 | `AlreadyExistsException` | 409 | `ALREADY_EXISTS` | The resource already exists. |
-| `AuthorizationException` | 403 | `PERMISSION_DENIED` | You do not have permission to perform this action. |
+| `PermissionDeniedException` | 403 | `PERMISSION_DENIED` | You do not have permission to perform this action. |
 | `UnauthenticatedException` | 401 | `UNAUTHENTICATED` | The request does not have valid authentication credentials. |
-| `ConcurrencyException` | 409 | `ABORTED` | A concurrency conflict occurred while saving to the database. |
+| `AbortedException` | 409 | `ABORTED` | A concurrency conflict occurred while saving to the database. |
 | `FailedPreconditionException` | 412 | `FAILED_PRECONDITION` | The request cannot be executed in the current system state. |
 | `TenantResolveException` | 400 | `FAILED_PRECONDITION` | Unable to resolve tenant for the current request. |
 | `QuotaExceededException` | 429 | `RESOURCE_EXHAUSTED` | Rate limit exceeded. |
@@ -114,6 +181,7 @@ validate-only requests.
 | --- | --- | --- |
 | `BadRequestDetail` | `.../google.rpc.BadRequest` | `field_violations`: `List<ErrorFieldViolation>` |
 | `ErrorInfoDetail` | `.../google.rpc.ErrorInfo` | `reason`, `domain`, `metadata` |
+| `LocalizedMessageDetail` | `.../google.rpc.LocalizedMessage` | `locale`, `message` |
 | `PreconditionFailureDetail` | `.../google.rpc.PreconditionFailure` | `violations`: `List<PreconditionViolation>` (`type`, `subject`, `description`) |
 | `QuotaFailureDetail` | `.../google.rpc.QuotaFailure` | `violations`: `List<QuotaViolation>` (`subject`, `description`) |
 | `RequestInfoDetail` | `.../google.rpc.RequestInfo` | `request_id`, `serving_data` |
@@ -121,9 +189,11 @@ validate-only requests.
 
 Each `ErrorFieldViolation` carries `field` (snake_case path), `description`, and `reason`. With
 FluentValidation, the reason is derived from the validator's error code by stripping the
-`Validator` suffix and converting to `snake_case`; comparison values append as comma-separated
-parameters (`maximum_length,100`). `ErrorInfoDetail.Reason` uses values such as
-`SchemataConstants.ErrorReasons.ConcurrencyMismatch` (`"CONCURRENCY_MISMATCH"`).
+`Validator` suffix and converting to AIP-193 UPPER_SNAKE_CASE (e.g. `NOT_EMPTY`, `INCLUSIVE_BETWEEN`).
+Comparison operands ride inside `description` via the FluentValidation message template; `reason`
+carries only the validator code. `ErrorInfoDetail.Reason` uses values such as
+`SchemataConstants.ErrorReasons.ConcurrencyMismatch` (`"CONCURRENCY_MISMATCH"`) or any AIP-193 key
+matching an entry in `SchemataResources.resx`.
 
 ## HTTP transport
 
@@ -153,7 +223,7 @@ exceptions emit their own envelope.
 
 - `ValidationException` uses HTTP 422, not 400, to separate validation failures from malformed
   requests.
-- `ConcurrencyException` uses HTTP 409 with status `ABORTED`, matching the `google.rpc.Code` table.
+- `AbortedException` uses HTTP 409 with status `ABORTED`, matching the `google.rpc.Code` table.
 - `NoContentException` is a control-flow signal for validate-only requests; its
   `CreateErrorResponse` returns `null` and the response is HTTP 204 with no body.
 

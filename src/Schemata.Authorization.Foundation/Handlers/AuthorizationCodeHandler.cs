@@ -66,7 +66,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(request.Code)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), Parameters.Code)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Code)
             );
         }
 
@@ -77,7 +77,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ST4001)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
             );
         }
 
@@ -93,7 +93,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.ST4001)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
                 );
         }
 
@@ -101,7 +101,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         if (string.IsNullOrWhiteSpace(token?.Payload) || string.IsNullOrWhiteSpace(token.Subject)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -109,7 +109,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         if (payload == null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.ST4004)
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
@@ -131,7 +131,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             default:
                 throw new OAuthException(
                     OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ST4008)
+                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
                 );
         }
 
@@ -140,7 +140,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.ST4006)
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
                 );
             }
 

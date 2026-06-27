@@ -36,7 +36,7 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
         if (handler is null) {
             throw new OAuthException(
                 OAuthErrors.UnsupportedGrantType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.ST1015), Parameters.GrantType)
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.GrantType)
             );
         }
 

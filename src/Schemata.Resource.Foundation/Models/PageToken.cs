@@ -109,8 +109,8 @@ public class PageToken
                                         or InvalidDataException) {
             throw new ValidationException([new() {
                 Field       = nameof(ListRequest.PageToken).Underscore(),
-                Description = SchemataResources.GetResourceString(SchemataResources.ST2003),
-                Reason      = FieldReasons.InvalidPageToken,
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                Reason      = SchemataResources.INVALID_PAGE_TOKEN,
             }]);
         }
     }

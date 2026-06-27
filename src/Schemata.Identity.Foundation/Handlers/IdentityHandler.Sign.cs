@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -18,6 +19,29 @@ namespace Schemata.Identity.Foundation.Handlers;
 public sealed partial class IdentityHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    /// <summary>
+    ///     Normalizes an ASP.NET Identity error code (PascalCase, e.g.
+    ///     <c>"PasswordTooShort"</c>) into the AIP-193 UPPER_SNAKE_CASE form
+    ///     (<c>"PASSWORD_TOO_SHORT"</c>) required by <see cref="ErrorFieldViolation.Reason" />.
+    /// </summary>
+    private static string NormalizeIdentityCode(string? code) {
+        if (string.IsNullOrEmpty(code)) {
+            return "IDENTITY_VALIDATION_FAILED";
+        }
+
+        var builder = new StringBuilder(code.Length + 8);
+        for (var i = 0; i < code.Length; i++) {
+            var c = code[i];
+            if (i > 0 && char.IsUpper(c) && (char.IsLower(code[i - 1]) || char.IsDigit(code[i - 1]))) {
+                builder.Append('_');
+            }
+
+            builder.Append(char.ToUpperInvariant(c));
+        }
+
+        return builder.ToString();
+    }
+
     /// <summary>Registers a user and builds the sign-in principal.</summary>
     public async Task<IdentityResult<ClaimsPrincipal>> RegisterAsync(
         RegisterRequest   request,
@@ -34,7 +58,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var user = new TUser {
@@ -51,12 +75,15 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var result = await _users.CreateAsync(user, request.Password);
         if (!result.Succeeded) {
-            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation { Reason = e.Code, Description = e.Description }));
+            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation {
+                Reason      = NormalizeIdentityCode(e.Code),
+                Description = e.Description,
+            }));
         }
 
         switch (await Advisor.For<IIdentityRegisterAdvisor<TUser>>()
@@ -67,7 +94,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (_users.Options.SignIn.RequireConfirmedAccount) {
@@ -95,7 +122,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var found = await _users.FindByNameAsync(request.Username);
@@ -134,7 +161,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(found);
@@ -158,7 +185,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         if (ticket?.Principal is null || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
@@ -173,7 +200,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(found);
@@ -186,7 +213,7 @@ public sealed partial class IdentityHandler<TUser>
                 return response!;
             case AdviseResult.Block:
             default:
-                throw new AuthorizationException();
+                throw new PermissionDeniedException();
         }
 
         return IdentityResult<ClaimsPrincipal>.Success(claims);

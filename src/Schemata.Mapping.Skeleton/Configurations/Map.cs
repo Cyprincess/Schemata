@@ -55,7 +55,7 @@ public sealed class Map<TSource, TDestination>
             if (!mapping.HasSourceField) {
                 throw new InvalidOperationException(
                     string.Format(
-                        SchemataResources.GetResourceString(SchemataResources.ST1026),
+                        SchemataResources.GetResourceString(SchemataResources.SOURCE_FIELD_REQUIRED),
                         mapping.DestinationType
                     )
                 );

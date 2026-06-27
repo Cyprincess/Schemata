@@ -1,37 +1,85 @@
-# Schemata.Abstractions
+# Schemata.Abstractions — Root Contracts
 
-Shared cross-package contracts. **No runtime logic.** Pure types, interfaces, constants, attributes, and base records consumed by every other `src/` project.
+97 source files. The bottom of the dependency graph: no package outside `Microsoft.Extensions.*` is referenced. Every other Schemata package depends on this one.
 
 ## Layout
 
 ```
-Advisors/        Advisor-pipeline contracts shared across subsystems
-Entities/        Marker interfaces (ISoftDelete, IConcurrent, ITimestamped, IOwned, ...)
-Errors/          Google-API-style error model types
-Exceptions/      Framework exception hierarchy
-Json/            Shared converters/resolvers used by Foundation packages
-Modular/         Module discovery contracts (IModule, [Module])
-Resource/        Resource-layer contracts surfaced through Foundation/Http/Grpc
-xlf/             Localized resource fallbacks
+Schemata.Abstractions/
+├── IFeature.cs            # Order/Priority contract; shared by features + modules
+├── SchemataConstants.cs   # well-known string constants (DI keys, header names, …)
+├── Unit.cs                # void-equivalent value type for generic pipelines
+├── Advisors/              # IAdvisor + AdviceContext + AdviseResult
+├── Entities/              # trait marker interfaces + Operations / Ordering enums
+├── Errors/                # Google AIP error model (ErrorBody, *Detail records)
+├── Exceptions/            # SchemataException + per-status subclasses
+├── Json/                  # PolymorphicAttribute (consumed by Schemata.Core)
+├── Modular/               # IModule, ModuleBase, ModuleAttribute
+└── Resource/              # AIP resource attributes, request/result base records
 ```
 
-Top-level: [IFeature.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Abstractions/IFeature.cs) (the `Order`/`Priority` contract) and [SchemataConstants.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Abstractions/SchemataConstants.cs) (the canonical constants table).
+## Entity Traits
 
-## `SchemataConstants` Anchors
+All in [Entities/](Entities/). A trait is a marker interface; advisors react to it with `entity is ITrait` checks.
 
-`SchemataConstants` is the central registry. Add new spec-defined strings here, not in foundations. Nested classes match a single spec/concept each:
+| Trait | Adds |
+|---|---|
+| `IIdentifier` | primary key |
+| `ITimestamp` | `CreateTime` / `UpdateTime` (advisor-stamped) |
+| `ISoftDelete` | `DeleteTime` / `PurgeTime` (advisor-stamped, filtered from queries) |
+| `IConcurrency` | optimistic concurrency token |
+| `IOwnable` | per-row owner (paired with `Schemata.Entity.Owner`) |
+| `IExpiration` | `ExpireTime` filtering |
+| `IStateful` | `State` enum + transition support |
+| `ITransition` | history of state transitions |
+| `IDescriptive` | `Title` / `Description` text |
+| `ISourceReference` | external system back-link |
+| `ICanonicalName` | AIP resource name parsing (paired with `[CanonicalName]`) |
 
-- `Orders` - `Base=100M`, `Extension=400M`, `Max=900M`
-- OAuth/OIDC: `GrantTypes`, `Claims`, `ClaimDestinations`, `OAuthErrors`, `PkceMethods`, `PromptValues`, `ClientAuthMethods`, `ClientTypes`, `ConsentTypes`, `ApplicationTypes`, `AuthorizationTypes`, `Endpoints`, `Parameters`, `EventTypes`
-- JOSE: `EncryptionAlgorithms`, `ContentEncryptionAlgorithms`
-- Google AIP: `ErrorCodes`, `ErrorReasons`, `FieldReasons`
-- Other: `FlowEngines`, `InteractionTypes`, `Keys`, `PermissionPrefixes`, `PreconditionSubjects`, `Principals`
+Two enums power query semantics: [Operations.cs](Entities/Operations.cs) (`Create`/`Get`/`List`/`Update`/`Delete`/...), [Ordering.cs](Entities/Ordering.cs) (`Ascending`/`Descending`).
 
-Each constant docs the originating RFC / spec with `<seealso>`.
+## Resource Contracts (Google AIP)
 
-## Rules
+All in [Resource/](Resource/). Attributes are how a controller / handler is wired to a resource type.
 
-- Do not introduce concrete runtime logic here. If you need DI registration, put it in a Foundation package and depend on this one.
-- Constants are wire values; never localize, never trim, never reformat.
-- Marker interfaces in `Entities/` are read by repository advisors (see [src/Schemata.Entity.Repository/AGENTS.md](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Entity.Repository/AGENTS.md)); changing their members ripples across every entity project.
-- `IFeature` is the lowest-common contract; do not add lifecycle hooks here - those belong on `ISimpleFeature` in `Schemata.Core`.
+- Attributes: `[Resource]`, `[Resource<TEntity>]`, `[Resource<TEntity,TKey>]`, `[Resource<TEntity,TKey,TParent>]`, `[Resource<TEntity,TKey,TParent,TGrandparent>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourcePackage]`, `[ResourceMethod]`, `[Anonymous]`, `[ReadAcross]`, `[RateLimitPolicy]`.
+- Method scopes: [ResourceMethodScope.cs](Resource/ResourceMethodScope.cs) + [ResourceHttpMethod.cs](Resource/ResourceHttpMethod.cs).
+- Request bases: `GetRequest`, `ListRequest`, `DeleteRequest`, `PurgeRequest`, `EmptyResourceRequest`.
+- Result bases: `CreateResultBase`, `GetResultBase`, `ListResultBase`, `UpdateResultBase`, `DeleteResultBase`, `EmptyResourceResponse`, `ExpungeResponse`, `PurgeResponse`.
+- Long-running operations: `Operation`, `OperationMetadata`, `OperationResponse`, `OperationStatus`.
+- Pluggable behaviour interfaces: `IRequestIdentification`, `IUpdateMask`, `IFreshness`, `IValidation`, `IAllowMissing`, `IEntitiesResult`, `IResourceMethodHandler`, `IResourceTypeResolver`.
+- `TotalSizeMode` controls AIP list pagination total semantics.
+
+## Error / Exception Model
+
+Mirror of [google.rpc.Status](https://cloud.google.com/apis/design/errors). All in [Errors/](Errors/) + [Exceptions/](Exceptions/).
+
+- `ErrorResponse` wraps an `ErrorBody` plus `IErrorDetail[]`. AIP-flavoured `OAuthErrorResponse` for OAuth 2.0 flows.
+- `IErrorDetail` implementations: `BadRequestDetail`, `DebugInfoDetail`, `ErrorInfoDetail`, `HelpDetail`, `LocalizedMessageDetail`, `PreconditionFailureDetail`, `QuotaFailureDetail`, `RequestInfoDetail`, `ResourceInfoDetail`, `RetryInfoDetail`, plus the violation records (`ErrorFieldViolation`, `PreconditionViolation`, `QuotaViolation`, `ErrorHelpLink`).
+- Exception hierarchy: `SchemataException` ← `InvalidArgumentException`, `AlreadyExistsException`, `NotFoundException`, `FailedPreconditionException`, `AbortedException`, `QuotaExceededException`, `UnauthenticatedException`, `PermissionDeniedException`, `NoContentException`, `OAuthException`, `TenantResolveException`, `ValidationException`. Each maps to a specific HTTP/gRPC status.
+- AIP-193 alignment: `google.rpc.Code` (Status) is separate from `ErrorInfo.reason` (UPPER_SNAKE_CASE domain identifier). The reason table is `SchemataConstants.ErrorReasons` ([SchemataConstants.cs:556](SchemataConstants.cs)). Every named exception attaches a default reason; the localized message helper falls back Reason resx → Status resx.
+- Fluent error-detail helpers live in `Schemata.Common`: [SchemataResourceErrors](../Schemata.Common/Errors/SchemataResourceErrors.cs) (`NotFound<T>(...)`, `AlreadyExists<T>(...)` etc., accepts `reason:` override) and [SchemataErrorDetailExtensions](../Schemata.Common/Errors/SchemataErrorDetailExtensions.cs) (`.WithRetryAfter(TimeSpan)`, `.WithHelp(description, url)` for `RetryInfo` / `Help` decoration). `ErrorFieldViolation` carries the canonical `localized_message`; `QuotaViolation` carries the six `QuotaFailure.Violation` fields.
+
+## Modular
+
+[Modular/IModule.cs](Modular/IModule.cs) — empty marker that extends `IFeature` so modules participate in ordering. [Modular/ModuleBase.cs](Modular/ModuleBase.cs) — `Order=0, Priority=Order` default. [Modular/ModuleAttribute.cs](Modular/ModuleAttribute.cs) — discovery hint emitted by `Schemata.Application.Modular.Targets`.
+
+## Conventions
+
+- **One concept per file.** No multi-interface files (look at the existing tree).
+- **No async or DI here** — `Schemata.Abstractions` must remain framework-agnostic enough to be referenced from `netstandard2.0` consumers if needed.
+- **All XML doc comments are required** on public types — `GenerateDocumentationFile=true` is on for `src/*`.
+- **A new trait is just a marker interface** in `Entities/` plus a paired advisor in `Schemata.Entity.Repository` (or wherever the behaviour lives).
+
+## Anti-Patterns
+
+- **Do NOT** add methods to a trait interface — they are marker-only. Behaviour belongs in advisors.
+- **Do NOT** add references to ASP.NET Core, EF Core, LinqToDB, or any vendor package from this project; it would push the dependency down to every consumer.
+- **Do NOT** introduce a new exception type without picking a deterministic HTTP/gRPC status mapping. Update `Schemata.Transport.Http`'s exception handler at the same time.
+- **Do NOT** rename a trait — generated code in `Schemata.Modeling.Generator` references trait names from `.skm` files.
+
+## Notes
+
+- `Unit.cs` exists so generic pipelines can be expressed without `void` special-casing.
+- `SchemataConstants.cs` is the single source of truth for HTTP header names (`X-Request-Id`, `Authorization`, …) and DI keys; do not duplicate the strings inline.
+- `ResourceAttribute` has five arity-suffixed files (\`1, \`2, \`3, \`4) to support nested parent/grandparent typing — keep them in sync.

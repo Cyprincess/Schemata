@@ -8,9 +8,10 @@ namespace Schemata.Abstractions.Exceptions;
 /// </summary>
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.FAILED_PRECONDITION</c> (HTTP 400), per
-///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>,
-///     and attaches a <see cref="PreconditionFailureDetail" /> with a <c>"TENANT"</c>
-///     violation entry.
+///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
+///     Attaches <see cref="ErrorReasons.TenantResolutionFailed" /> on
+///     <see cref="ErrorInfoDetail" /> plus a <see cref="PreconditionFailureDetail" /> with
+///     a <c>"TENANT"</c> violation entry.
 /// </remarks>
 public class TenantResolveException : SchemataException
 {
@@ -24,13 +25,16 @@ public class TenantResolveException : SchemataException
         int     code    = 400,
         string? status  = ErrorCodes.FailedPrecondition,
         string? message = null
-    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ST1002)) {
-        Details = [new PreconditionFailureDetail {
-            Violations = [new() {
-                Type        = Keys.Tenancy,
-                Subject     = PreconditionSubjects.Request,
-                Description = SchemataResources.GetResourceString(SchemataResources.ST1002),
-            }],
-        }];
+    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.TENANT_RESOLUTION_FAILED)) {
+        Details = [
+            new ErrorInfoDetail { Reason = ErrorReasons.TenantResolutionFailed },
+            new PreconditionFailureDetail {
+                Violations = [new() {
+                    Type        = Keys.Tenancy,
+                    Subject     = PreconditionSubjects.Request,
+                    Description = SchemataResources.GetResourceString(SchemataResources.TENANT_RESOLUTION_FAILED),
+                }],
+            },
+        ];
     }
 }

@@ -30,7 +30,7 @@ public static class AdviceMethodRequestIdempotency
 ///     <see cref="ResourceMethodVerb" /> as the operation token.
 ///     If found with a matching payload hash, returns <see cref="AdviseResult.Handle" /> with the
 ///     cached <typeparamref name="TResponse" /> placed in the context; a hash mismatch raises
-///     <see cref="ConcurrencyException" />.
+///     <see cref="AbortedException" />.
 ///     Otherwise, stores a <see cref="PendingIdempotencyKey" /> in the context for
 ///     <see cref="AdviceResponseIdempotency{TEntity, TDetail}" /> to persist the result
 ///     after a successful method invocation.

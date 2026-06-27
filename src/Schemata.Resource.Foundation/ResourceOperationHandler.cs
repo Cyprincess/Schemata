@@ -10,6 +10,7 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
@@ -68,10 +69,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="name">The requested resource name.</param>
     /// <returns>An exception carrying missing-resource error details.</returns>
     internal static NotFoundException ResourceNotFound(string? name) {
-        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        return new(message: string.Format(SchemataResources.GetResourceString(SchemataResources.ST1011), "Resource", name)) {
-            Details = [new ResourceInfoDetail { ResourceType = descriptor.Singular, ResourceName = name }],
-        };
+        return SchemataResourceErrors.NotFound<TEntity>(name);
     }
 
     private static NotFoundException CollectionNotFound() {

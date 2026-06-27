@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -147,7 +148,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             new() {
                 Field       = nameof(IUpdateMask.UpdateMask).Underscore(),
                 Description = $"The update_mask path `{path}` is invalid: {reason}.",
-                Reason      = FieldReasons.InvalidUpdateMask,
+                Reason      = SchemataResources.INVALID_UPDATE_MASK,
             },
         ]);
     }

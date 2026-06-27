@@ -25,5 +25,7 @@ public class NoContentException : SchemataException
         string? message = null
     ) : base(code, status, message) { }
 
-    public override object? CreateErrorResponse(string? requestId = null, string? domain = null) { return null; }
+    public override object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
+        return null;
+    }
 }

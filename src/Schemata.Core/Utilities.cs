@@ -72,7 +72,7 @@ public static class Utilities
             if (sp is null) {
                 throw new InvalidOperationException(
                     string.Format(
-                        SchemataResources.GetResourceString(SchemataResources.ST1023),
+                        SchemataResources.GetResourceString(SchemataResources.PARAMETER_NOT_RESOLVED),
                         parameter.Name,
                         type.FullName
                     )
@@ -149,7 +149,7 @@ public static class Utilities
             if (sp is null) {
                 throw new InvalidOperationException(
                     string.Format(
-                        SchemataResources.GetResourceString(SchemataResources.ST1024),
+                        SchemataResources.GetResourceString(SchemataResources.METHOD_PARAMETER_NOT_RESOLVED),
                         parameter.Name,
                         method,
                         instance.GetType().FullName
