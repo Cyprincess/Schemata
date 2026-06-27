@@ -73,29 +73,18 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
         foreach (var error in results.Errors) {
             var field = error.PropertyName.Underscore();
 
-            var code = error.ErrorCode.EndsWith("Validator")
-                ? error.ErrorCode[..^9].Underscore()
-                : error.ErrorCode.Underscore();
-            var values = error.FormattedMessagePlaceholderValues;
-            if (values.TryGetValue("ComparisonValue", out var c)) {
-                code += $",{c}";
-            } else if (values.TryGetValue("From", out var from)) {
-                code += $",{from},{values["To"]}";
-            } else if (values.TryGetValue("ExpectedPrecision", out var expected)) {
-                code += $",{expected},{values["ExpectedScale"]}";
-            } else {
-                if (values.TryGetValue("MinLength", out var l)) {
-                    code += $",{l}";
-                }
+            var raw = error.ErrorCode.EndsWith("Validator")
+                ? error.ErrorCode[..^9]
+                : error.ErrorCode;
 
-                if (values.TryGetValue("MaxLength", out var u) && !u.Equals(l)) {
-                    code += $",{u}";
-                }
-            }
+            // AIP-193 requires machine-readable reason codes in UPPER_SNAKE_CASE; operand
+            // values that the previous implementation appended to the reason now live in
+            // ErrorFieldViolation.Description via the FluentValidation message template.
+            var reason = raw.Underscore().ToUpperInvariant();
 
             errors.Add(new() {
                 Field       = field,
-                Reason      = code,
+                Reason      = reason,
                 Description = error.ErrorMessage,
             });
         }

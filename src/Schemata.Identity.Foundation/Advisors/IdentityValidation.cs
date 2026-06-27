@@ -5,6 +5,7 @@ using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
@@ -16,14 +17,14 @@ namespace Schemata.Identity.Foundation.Advisors;
 /// </summary>
 internal static class IdentityValidation
 {
-    /// <summary>Builds a <see cref="FieldReasons.NotEmpty" /> violation for the CLR property <paramref name="field" />.</summary>
+    /// <summary>Builds a <see cref="SchemataResources.NOT_EMPTY" /> violation for the CLR property <paramref name="field" />.</summary>
     /// <param name="field">The CLR property name (rendered as snake_case field and a Title-cased label).</param>
     /// <returns>The field violation.</returns>
     public static ErrorFieldViolation NotEmptyError(string field) {
         return new() {
             Field       = field.Underscore(),
-            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), field.Humanize(LetterCasing.Title)),
-            Reason      = FieldReasons.NotEmpty,
+            Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), field.Humanize(LetterCasing.Title)),
+            Reason      = SchemataResources.NOT_EMPTY,
         };
     }
 
@@ -36,7 +37,7 @@ internal static class IdentityValidation
         }
     }
 
-    /// <summary>Resolves the authenticated user or throws <see cref="NotFoundException" />.</summary>
+    /// <summary>Resolves the authenticated user or throws a resource-themed <see cref="NotFoundException" />.</summary>
     /// <typeparam name="TUser">The user entity type.</typeparam>
     /// <param name="users">The user manager.</param>
     /// <param name="principal">The current principal.</param>
@@ -45,6 +46,6 @@ internal static class IdentityValidation
         where TUser : SchemataUser, new() {
         return await users.GetUserAsync(principal) is { } user
             ? user
-            : throw new NotFoundException();
+            : throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
     }
 }

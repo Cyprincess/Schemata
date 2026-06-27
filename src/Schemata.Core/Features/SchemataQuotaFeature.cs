@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Features;
 
@@ -45,17 +44,11 @@ public sealed class SchemataQuotaFeature : FeatureBase
                     }
                 }
 
-                throw new QuotaExceededException(429, ErrorCodes.ResourceExhausted, SchemataResources.GetResourceString(SchemataResources.ST1010)) {
-                    Details = [
-                        new QuotaFailureDetail {
-                            Violations = [new() {
-                                Subject     = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
-                                Description = SchemataResources.GetResourceString(SchemataResources.ST1010),
-                            }],
-                        },
-                        new RequestInfoDetail { RequestId = ctx.HttpContext.TraceIdentifier },
-                    ],
-                };
+                throw new QuotaExceededException(violations: [
+                    new QuotaViolation {
+                        Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
+                    },
+                ]);
             };
         });
     }

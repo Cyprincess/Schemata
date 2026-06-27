@@ -44,10 +44,42 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
                 context.HttpContext.Response.Headers.WWWAuthenticate = Schemes.Basic;
             }
 
-            context.Result = new JsonResult(oauth.CreateErrorResponse(context.HttpContext.TraceIdentifier)) { StatusCode = oauth.Code };
+            var locale = ParseAcceptLanguage(context.HttpContext.Request.Headers.AcceptLanguage);
+            context.Result = new JsonResult(oauth.CreateErrorResponse(context.HttpContext.TraceIdentifier, locale: locale)) { StatusCode = oauth.Code };
         }
 
         context.ExceptionHandled = true;
+    }
+
+    /// <summary>
+    ///     Extracts the highest-quality language tag from an <c>Accept-Language</c> header
+    ///     (e.g. <c>"zh-CN,en-US;q=0.9"</c> -> <c>"zh-CN"</c>). Returns <see langword="null" />
+    ///     when the header is empty so the central <c>EnsureLocalizedMessage</c> helper skips
+    ///     localization.
+    /// </summary>
+    private static string? ParseAcceptLanguage(Microsoft.Extensions.Primitives.StringValues header) {
+        foreach (var value in header) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                continue;
+            }
+
+            foreach (var segment in value.Split(',')) {
+                var trimmed = segment.Trim();
+                if (trimmed.Length == 0) {
+                    continue;
+                }
+
+                var semicolon = trimmed.IndexOf(';');
+                var tag       = semicolon < 0 ? trimmed : trimmed[..semicolon].Trim();
+                if (tag.Length == 0 || tag == "*") {
+                    continue;
+                }
+
+                return tag;
+            }
+        }
+
+        return null;
     }
 
     #endregion

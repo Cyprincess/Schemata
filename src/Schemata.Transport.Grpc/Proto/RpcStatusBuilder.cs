@@ -12,13 +12,20 @@ namespace Schemata.Transport.Grpc.Proto;
 internal static class RpcStatusBuilder
 {
     /// <summary>
-    ///     Builds a gRPC status message from a Schemata exception and request identifier.
+    ///     Builds a gRPC status message from a Schemata exception, request identifier, and
+    ///     optional locale.
     /// </summary>
     /// <param name="ex">The Schemata exception.</param>
     /// <param name="requestId">The request identifier to include in error details.</param>
+    /// <param name="locale">
+    ///     Optional <seealso href="https://www.rfc-editor.org/rfc/bcp/bcp47.html">BCP-47</seealso>
+    ///     language tag parsed from the gRPC <c>accept-language</c> metadata; flows through
+    ///     <see cref="SchemataException.CreateErrorResponse" /> to attach a
+    ///     <see cref="LocalizedMessageDetail" /> when resolvable.
+    /// </param>
     /// <returns>The gRPC status message.</returns>
-    public static Google.Rpc.Status Build(SchemataException ex, string? requestId) {
-        var response = ex.CreateErrorResponse(requestId);
+    public static Google.Rpc.Status Build(SchemataException ex, string? requestId, string? locale = null) {
+        var response = ex.CreateErrorResponse(requestId, locale: locale);
         if (response is not ErrorResponse error) {
             return new() {
                 Code = MapFromCanonical(ex.Status),

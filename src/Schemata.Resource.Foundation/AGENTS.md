@@ -1,35 +1,74 @@
-# Schemata.Resource.Foundation
+# Schemata.Resource.Foundation — Google AIP CRUD Core
 
-Google AIP-compliant resource service. CRUD + List/Search over typed handlers, surfaced through HTTP (`Schemata.Resource.Http`, `MapHttp`) and gRPC (`Schemata.Resource.Grpc`, `MapGrpc`). Reference: [google.aip.dev/general](https://google.aip.dev/general).
+Implementation of the resource-oriented CRUD service defined by [Google AIP General](https://google.aip.dev/general). Handles `Get`, `List`, `Create`, `Update`, `Delete`, `Undelete`, `Purge`, `Expunge`, plus long-running operations. 86 source files. No `Skeleton` package — this is the hub.
 
-## Activation
+## Layout
 
-```csharp
-schema.UseResource()
-      .MapHttp(...)    // adds SchemataHttpResourceFeature  (490_100_000)
-      .MapGrpc(...);   // adds SchemataGrpcResourceFeature  (490_200_000)
+```
+Schemata.Resource.Foundation/
+├── SchemataResourceBuilder.cs       # fluent surface; Use<TEntity>(...) per resource
+├── SchemataResourceOptions.cs       # per-resource options (auth, validation, freshness, ...)
+├── ResourceOperationHandler.cs      # base + dispatcher
+├── ResourceOperationHandler.{Create,Get,List,Update,Delete}.cs   # one partial per AIP method
+├── ResourceMethodOperationHandler.cs # custom-method dispatcher
+├── ResourceAdviceContext.cs         # AdviceContext specialization for resource pipeline
+├── ResourceEndpointSelector.cs      # selects HTTP/gRPC handler per resource attribute
+├── ResourceRequestContainer.cs      # request/response envelope shared across transports
+├── ResourceIdentifiers.cs           # AIP resource-name parsing helpers
+├── DefaultResourceTypeResolver.cs   # resolves TEntity from the request URL/path
+├── KeyOrdering.cs                   # AIP sort-spec parser
+├── PurgeFilter.cs / PurgeHandler.cs / PurgeJob.cs / PurgeJobKeyResolver.cs / PurgeOperationArgs.cs
+│                                    # Purge LRO machinery
+├── ExpungeHandler.cs                # hard-delete on top of Purge
+├── UndeleteHandler.cs               # ISoftDelete reversal
+├── Advisors/    # IResourceAdvisor implementations (auth, validation, freshness, mask, ...)
+├── Extensions/  # UseResource + SchemataBuilder/IServiceCollection extension methods
+├── Features/    # SchemataResourceFeature (priority 490_000_000)
+├── Internal/    # private helpers; not part of the public API
+└── Models/      # internal request/response DTOs
 ```
 
-`SchemataResourceFeature` sits at `Priority 490_000_000`.
+## Public Entry Points
 
-## Handler Contract
+- [Extensions/SchemataBuilderExtensions.cs](Extensions/SchemataBuilderExtensions.cs) — `UseResource(this SchemataBuilder, Action<SchemataResourceBuilder>)`.
+- [SchemataResourceBuilder.cs](SchemataResourceBuilder.cs) — fluent: `Use<TEntity>()`, `MapHttp()` / `MapGrpc()` (provided by the `.Http` / `.Grpc` companion packages), auth/validation/freshness toggles.
 
-Every resource method registers a class implementing
-`IResourceMethodHandler<TEntity, TRequest, TResponse>`. Registration fails when the type does not implement this interface - see [Features/SchemataResourceFeature.cs](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Resource.Foundation/Features/SchemataResourceFeature.cs).
+## Transport Companions
 
-Built-in soft-delete methods (`Undelete`, the soft-aware `Delete`) are added only when the entity implements `Schemata.Abstractions.Entities.ISoftDelete`. Do not register them for non-soft-delete entities.
+- [Schemata.Resource.Http](../Schemata.Resource.Http/) — REST endpoint mapping (`MapHttp()`); pulls `Schemata.Transport.Http`.
+- [Schemata.Resource.Grpc](../Schemata.Resource.Grpc/) — gRPC endpoint mapping (`MapGrpc()`); pulls `Schemata.Transport.Grpc` (code-first protobuf-net).
 
-## Standard Surface
+Resource attributes from [Schemata.Abstractions/Resource/](../Schemata.Abstractions/Resource/) (`[Resource<TEntity>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourceMethod]`, …) drive endpoint discovery. The resolver in [ResourceEndpointSelector.cs](ResourceEndpointSelector.cs) maps attribute-decorated types to handler instances.
 
-Per AIP: `Create`, `Get`, `List`, `Search`, `Update`, `Delete`, `Undelete`, `BatchGet`, `BatchUpdate`, `BatchDelete`. Resource names use the AIP path scheme; bindings are produced by the resource builder, not hand-routed.
+## Pipeline Shape
 
-## Errors & Field Reasons
+For each method (`Create` / `Get` / `List` / `Update` / `Delete` / custom):
 
-Use `SchemataConstants.ErrorCodes` (`NOT_FOUND`, `INVALID_ARGUMENT`, `FAILED_PRECONDITION`, ...) and `FieldReasons` (`invalid_filter`, `invalid_update_mask`, `invalid_read_mask`, `invalid_order_by`, `invalid_page_token`, `invalid_page_size`, `cross_parent_unsupported`, `invalid_parent`, ...) for AIP-style structured errors. Never invent new strings here.
+1. Transport handler builds a `ResourceRequestContainer` and a `ResourceAdviceContext`.
+2. `ResourceOperationHandler.<Method>` runs the advisor chain via `AdvicePipelineExtensions.RunAsync` (generated by [Schemata.Advice.Generator](../../generators/Schemata.Advice.Generator/)).
+3. Built-in advisors (`Advisors/`) cover sanitization, validation, authorization, freshness checks, update-mask application, soft-delete handling.
+4. The terminal advisor calls `IRepository<TEntity>` through the repository pipeline (which itself runs its own advisor chain).
 
-## Rules
+`Purge` and `Expunge` are LROs: they enqueue a `PurgeJob` via the Scheduling subsystem. `Undelete` requires the entity to implement [ISoftDelete](../Schemata.Abstractions/Entities/ISoftDelete.cs).
 
-- Filters, order-by, read masks, and update masks are CEL/AIP expressions and route through `Schemata.Expressions.*`. Do not parse them manually.
-- Page sizes must be non-negative; the foundation rejects with `INVALID_ARGUMENT` + `invalid_page_size`. Do not relax this.
-- `MapHttp` and `MapGrpc` are mutually compatible; a resource may expose both. The Foundation feature is auto-pulled by both bridges via `[DependsOn]`.
-- Resource handlers are scoped per-request; do not store mutable state on handler instances.
+## Conventions
+
+- **Sanitization runs before validation** ([docs/documents/resource/create-pipeline.md:81-83](../../docs/documents/resource/create-pipeline.md)). Validators never see server-managed fields.
+- **`ResourceOperationHandler` is split into one partial file per method** to keep each method readable. Mirror that pattern when adding a new method type — do not pile new code into `ResourceOperationHandler.cs`.
+- **Custom methods** go through [ResourceMethodOperationHandler.cs](ResourceMethodOperationHandler.cs) + `[ResourceMethod]` on the entity attribute class.
+- **Long-running operations** return [Operation](../Schemata.Abstractions/Resource/Operation.cs); resolve completion via [OperationResponse](../Schemata.Abstractions/Resource/OperationResponse.cs).
+
+## Anti-Patterns
+
+- **Do NOT** add HTTP-specific logic to this package — it must stay transport-agnostic. Put HTTP plumbing in `Schemata.Resource.Http`.
+- **Do NOT** bypass the advisor chain by calling `IRepository<TEntity>` directly from a transport handler — authorization and validation live in advisors.
+- **Do NOT** mutate the inbound request DTO after validation — the validator may have rejected fields you assume are clean.
+- **Do NOT** add a new built-in advisor without inserting it at a deterministic position in the chain; the chain order is part of the public contract.
+- **Do NOT** invent a non-AIP method on a resource. If a custom verb is required, use `[ResourceMethod]` so the AIP method-naming convention is preserved.
+
+## Notes
+
+- `WithAuthorization(scheme)` installs an always-pass MVC filter and lets the real decision happen in the advisor pipeline ([docs/documents/resource/http-transport.md:127-129](../../docs/documents/resource/http-transport.md)) — required so async authorization can short-circuit through `AdviseResult.Break`.
+- HTTP transport is **unary only**; streaming verbs are gRPC-only.
+- AIP resource names parse through [ResourceIdentifiers.cs](ResourceIdentifiers.cs) + [ResourceNameDescriptor](../Schemata.Common/ResourceNameDescriptor.cs); use them rather than splitting `/` manually.
+- Integration tests: [../../tests/Schemata.Resource.Http.Integration.Tests/](../../tests/Schemata.Resource.Http.Integration.Tests/) and [../../tests/Schemata.Resource.Grpc.Integration.Tests/](../../tests/Schemata.Resource.Grpc.Integration.Tests/). Unit tests: [../../tests/Schemata.Resource.Tests/](../../tests/Schemata.Resource.Tests/).

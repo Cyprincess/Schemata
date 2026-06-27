@@ -166,7 +166,7 @@ public sealed class ResourceNameDescriptor
     /// <exception cref="ValidationException">Thrown when a required placeholder value is missing or empty.</exception>
     public string Resolve(object entity) {
         if (_segments.Length == 0) {
-            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ST1018));
+            throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.PATTERN_REQUIRED));
         }
 
         var type       = entity.GetType();
@@ -187,8 +187,8 @@ public sealed class ResourceNameDescriptor
             if (string.IsNullOrWhiteSpace(value)) {
                 throw new ValidationException([new() {
                     Field       = seg.Property!.Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.ST1013), seg.Property!.Humanize(LetterCasing.Title)),
-                    Reason      = FieldReasons.NotEmpty,
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), seg.Property!.Humanize(LetterCasing.Title)),
+                    Reason      = SchemataResources.NOT_EMPTY,
                 }]);
             }
 

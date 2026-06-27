@@ -43,7 +43,7 @@ public sealed class AdviceEnrollValidation<TUser>(SchemataUserManager<TUser> use
         IdentityValidation.RequireNotEmpty(request.TwoFactorCode, nameof(request.TwoFactorCode));
 
         if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode)) {
-            throw new AuthorizationException();
+            throw new PermissionDeniedException();
         }
 
         return AdviseResult.Continue;

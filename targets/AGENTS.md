@@ -1,35 +1,68 @@
-# targets/
+# targets — MSBuild Meta-Packages
 
-Meta-packages assembled from `src/` projects via opt-in MSBuild toggles. Each family ships three SKUs: base, `Persisting` (adds repository), and `Complex` (adds everything wired in by the family). `Modular` is an extra SKU for the Application family.
+10 NuGet packages whose only job is to inject curated sets of references, analyzers, and MSBuild assets into a consumer's csproj. They are how end-users adopt Schemata without naming every individual package.
+
+## Three Families × Three Tiers
 
 ```
-Schemata.Application.Targets/   ASP.NET web application bootstrap
-Schemata.Business.Targets/      Business-layer composition (no host)
-Schemata.Module.Targets/        Module project conventions (consumed via UseModularTargets)
+Application.Targets         Business.Targets         Module.Targets
+Application.Persisting.Targets    Business.Persisting.Targets    Module.Persisting.Targets
+Application.Modular.Targets       Business.Complex.Targets       Module.Complex.Targets
+Application.Complex.Targets
 ```
 
-Each family has its own `Directory.Build.props` that imports the root, multi-targets `net8.0;net10.0`, and conditionally `ProjectReference`s `src/Schemata.*` packages based on `Use*` toggles defined per `*.csproj`.
+| Family | Audience | What "Base" contains |
+|---|---|---|
+| **Application** | ASP.NET host app | `Schemata.Core` + ASP.NET Core framework reference |
+| **Business** | shared domain library (no ASP.NET) | `Schemata.Abstractions` |
+| **Module** | plug-in module library loaded by `Schemata.Modular` | `Schemata.Abstractions` |
 
-## Common Toggles
+Each family stacks:
 
-| Toggle | Effect |
-|---|---|
-| `UseDSLTargets=true` | Packs `Schemata.Modeling.Generator.dll` + `Parlot.dll` as analyzers |
-| `UseModularTargets=true` | Adds `Schemata.Modular` ref + includes `*.Modular.Targets.targets` in the package `build/` folder (host module stamping) |
-| `UseTenancy=true` | Adds `Schemata.Tenancy.Foundation` |
-| `UseAuthorization=true` | Adds `Schemata.Authorization.Foundation` |
-| `UseIdentity=true` | Adds `Schemata.Identity.Foundation` |
-| `UseMapster=true` | Adds `Schemata.Mapping.Mapster` (not AutoMapper - that's a separate switch) |
-| `UseRepository=true` | Adds `Schemata.Entity.Repository` |
-| `UseResourceGrpc=true` | Adds `Schemata.Resource.Foundation` + `Schemata.Resource.Grpc` |
+- `Base` — abstractions only.
+- `Persisting` — adds `Schemata.Entity.Repository` (`UseRepository=true`).
+- `Modular` (Application only) — adds `Schemata.Modular` + auto-emits `[assembly: ModuleAttribute("...")]` from module project/package names.
+- `Complex` — Persisting plus DSL + Mapping + Authorization + Identity + Security (+ Validation for Module; + Modular + Tenancy + Resource HTTP/gRPC for Application).
 
-The `*.Complex.Targets.csproj` files set most of these; `*.Persisting.Targets.csproj` only sets `UseRepository=true`; base SKUs set none.
+## How Targets Are Wired
 
-## Rules
+Each family lives in `targets/Schemata.{Family}.Targets/`. Inside that directory:
 
-- `Schemata.Application.Complex.Targets` **does not include** `Schemata.Flow.Foundation` or `Schemata.Scheduling.Foundation`. Reference them explicitly in the consuming project when you need them.
-- `Schemata.Application.Modular.Targets.targets` is packed under `build/$(AssemblyName).targets` only when `UseModularTargets=true`; without it, host module stamping does not run and `[Module]` attributes will not be generated.
-- Each module assembly must declare exactly one `IModule` and remain loadable via `Assembly.Load`. Do not hand-author the host's `[Module]` attributes - they are generated.
-- `EnforceExtendedAnalyzerRules=true` applies here, same as for generators.
-- `IncludeBuildOutput=false` for all target projects - they only ship build assets, not assemblies.
-- When adding a new toggle, also add it to every SKU csproj where it must be off-by-default; do not assume MSBuild default emptiness.
+- `Directory.Build.props` — shared MSBuild logic for every variant in the family. Reads `Use{Capability}=true` flags and conditionally adds `<PackageReference>` + analyzer references.
+- One `.csproj` per tier — typically a single line of `<PropertyGroup>` setting the relevant `Use*` flags (`UseRepository`, `UseDsl`, `UseAuthorization`, `UseIdentity`, `UseMapping`, `UseSecurity`, `UseValidation`, `UseModular`, `UseTenancy`, `UseResource*`, …).
+- `Schemata.{Family}.Targets.props` / `.targets` — packed into the NuGet under `build/` so the consumer's MSBuild auto-imports them.
+
+The `Schemata.Application.Modular.Targets.targets` file is the one piece of real MSBuild logic ([Schemata.Application.Targets/Schemata.Application.Modular.Targets.targets](Schemata.Application.Targets/Schemata.Application.Modular.Targets.targets)): it walks `ModulePackageNames` + module project references and emits `[assembly: ModuleAttribute("…")]` for each.
+
+## Consumer Use
+
+Plain `<PackageReference>` is enough — NuGet pulls the `build/` assets automatically. No `IncludeAssets=build` necessary.
+
+```xml
+<!-- App project -->
+<PackageReference Include="Schemata.Application.Complex.Targets" />
+
+<!-- Domain library -->
+<PackageReference Include="Schemata.Business.Complex.Targets" />
+
+<!-- Module library -->
+<PackageReference Include="Schemata.Module.Complex.Targets" />
+```
+
+## Conventions
+
+- **One file added to a tier package = touches every consumer**. Treat changes here as breaking.
+- **`EnforceExtendedAnalyzerRules=true`** ([../Directory.Build.props](../Directory.Build.props#L67-L69)) — RS-rule violations fail the build.
+- **`IncludeBuildOutput=false`** for these projects ([../Directory.Build.props](../Directory.Build.props#L71-L76)) — there is no compiled DLL, only MSBuild assets.
+- **Always document the new flag in [Schemata.{Family}.Targets/README.md](Schemata.Business.Targets/README.md)** when you add a `Use*` switch.
+
+## Anti-Patterns
+
+- **Do NOT** add direct `<PackageReference>` to runtime packages from the target csproj. Wire via the family's `Directory.Build.props` conditional on a `Use*` flag.
+- **Do NOT** ship a target package that adds a hard dependency on ASP.NET Core from `Business.Targets` — that family is explicitly framework-agnostic.
+- **Do NOT** introduce a tier-specific MSBuild item that bypasses the family `Directory.Build.props` — every consumer of every tier must see the same wiring rules.
+
+## Notes
+
+- Per-family README is what nuget.org renders: [Schemata.Application.Targets/](Schemata.Application.Targets/), [Schemata.Business.Targets/README.md](Schemata.Business.Targets/README.md), [Schemata.Module.Targets/README.md](Schemata.Module.Targets/README.md).
+- The modeling generator (`.skm` → C#) is packaged into the `Complex` tiers — picking `Complex` is how a consumer "opts in" to SKM.

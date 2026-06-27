@@ -23,190 +23,208 @@
       PublicKeyToken=b77a5c561934e089
     </value>
   </resheader>
-  <data name="ST0001" xml:space="preserve">
+  <data name="DEPENDENCY_AUTO_REGISTERED" xml:space="preserve">
         <value>{0} depends on {1}, it will be added automatically.</value>
     </data>
-  <data name="ST0002" xml:space="preserve">
+  <data name="DEPENDENCY_REQUIRED" xml:space="preserve">
         <value>{0} requires {1}, you should add it manually.</value>
     </data>
-  <data name="ST0003" xml:space="preserve">
+  <data name="DEPENDENCY_SUGGESTED" xml:space="preserve">
         <value>{0} suggests adding {1}.</value>
     </data>
-  <data name="ST1001" xml:space="preserve">
+  <data name="INVALID_ARGUMENT" xml:space="preserve">
         <value>The request contains an invalid argument.</value>
     </data>
-  <data name="ST1002" xml:space="preserve">
+  <data name="TENANT_RESOLUTION_FAILED" xml:space="preserve">
         <value>Unable to resolve tenant for the current request.</value>
     </data>
-  <data name="ST1003" xml:space="preserve">
+  <data name="FAILED_PRECONDITION" xml:space="preserve">
         <value>The request cannot be executed in the current system state.</value>
     </data>
-  <data name="ST1004" xml:space="preserve">
+  <data name="UNAUTHENTICATED" xml:space="preserve">
         <value>The request does not have valid authentication credentials.</value>
     </data>
-  <data name="ST1005" xml:space="preserve">
+  <data name="PERMISSION_DENIED" xml:space="preserve">
         <value>You do not have permission to perform this action.</value>
     </data>
-  <data name="ST1006" xml:space="preserve">
+  <data name="NOT_FOUND" xml:space="preserve">
         <value>The requested resource was not found.</value>
     </data>
-  <data name="ST1007" xml:space="preserve">
+  <data name="ALREADY_EXISTS" xml:space="preserve">
         <value>The resource already exists.</value>
     </data>
-  <data name="ST1008" xml:space="preserve">
+  <data name="CONCURRENCY_MISMATCH" xml:space="preserve">
         <value>A concurrency conflict occurred while saving to the database.</value>
     </data>
-  <data name="ST1009" xml:space="preserve">
+  <data name="VALIDATION_ERROR" xml:space="preserve">
         <value>One or more validation errors occurred.</value>
     </data>
-  <data name="ST1010" xml:space="preserve">
+  <data name="RESOURCE_EXHAUSTED" xml:space="preserve">
         <value>Rate limit exceeded.</value>
     </data>
-  <data name="ST1011" xml:space="preserve">
+  <data name="NAMED_NOT_FOUND" xml:space="preserve">
         <value>{0} '{1}' not found.</value>
     </data>
-  <data name="ST1012" xml:space="preserve">
+  <data name="GENERIC_ERROR" xml:space="preserve">
         <value>An error occurred.</value>
     </data>
-  <data name="ST1013" xml:space="preserve">
+  <data name="NOT_EMPTY" xml:space="preserve">
         <value>'{0}' must not be empty.</value>
     </data>
-  <data name="ST1014" xml:space="preserve">
+  <data name="UNSUPPORTED_ALGORITHM" xml:space="preserve">
         <value>Unsupported algorithm: {0}.</value>
     </data>
-  <data name="ST1015" xml:space="preserve">
+  <data name="NOT_SUPPORTED" xml:space="preserve">
         <value>'{0}' is not supported.</value>
     </data>
-  <data name="ST1016" xml:space="preserve">
+  <data name="NOT_CONFIGURED" xml:space="preserve">
         <value>'{0}' is not configured.</value>
     </data>
-  <data name="ST1017" xml:space="preserve">
+  <data name="SECTOR_IDENTIFIER_URI_REQUIRED" xml:space="preserve">
         <value>Application has no sector identifier URI and no redirect URIs.</value>
     </data>
-  <data name="ST1018" xml:space="preserve">
+  <data name="PATTERN_REQUIRED" xml:space="preserve">
         <value>Cannot resolve a resource name without a pattern.</value>
     </data>
-  <data name="ST1019" xml:space="preserve">
+  <data name="INVALID_TABLE_NAME" xml:space="preserve">
         <value>Invalid table name '{0}' of type '{1}'.</value>
     </data>
-  <data name="ST1020" xml:space="preserve">
+  <data name="TABLE_KEY_REQUIRED" xml:space="preserve">
         <value>Entity must have at least one [TableKey].</value>
     </data>
-  <data name="ST1022" xml:space="preserve">
+  <data name="ENTITY_KEY_COUNT_MISMATCH" xml:space="preserve">
         <value>Entity key count mismatch.</value>
     </data>
-  <data name="ST1023" xml:space="preserve">
+  <data name="PARAMETER_NOT_RESOLVED" xml:space="preserve">
         <value>Cannot resolve parameter '{0}' of type '{1}'.</value>
     </data>
-  <data name="ST1024" xml:space="preserve">
+  <data name="METHOD_PARAMETER_NOT_RESOLVED" xml:space="preserve">
         <value>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</value>
     </data>
-  <data name="ST1025" xml:space="preserve">
+  <data name="CONVERSION_FAILED" xml:space="preserve">
         <value>Unable to convert '{0}' to {1}.</value>
     </data>
-  <data name="ST1026" xml:space="preserve">
+  <data name="SOURCE_FIELD_REQUIRED" xml:space="preserve">
         <value>Mapping for field {0} is missing a source field.</value>
     </data>
-  <data name="ST1027" xml:space="preserve">
+  <data name="TENANT_NOT_INITIALIZED" xml:space="preserve">
         <value>Tenant is not initialized successfully.</value>
     </data>
-  <data name="ST1028" xml:space="preserve">
+  <data name="ENTRY_ASSEMBLY_REQUIRED" xml:space="preserve">
         <value>Entry assembly is null.</value>
     </data>
-  <data name="ST1029" xml:space="preserve">
+  <data name="IMPLEMENTATION_REQUIRED" xml:space="preserve">
         <value>The type {0} does not implement {1}.</value>
     </data>
-  <data name="ST2001" xml:space="preserve">
+  <data name="INVALID_PAYLOAD" xml:space="preserve">
         <value>Invalid request payload.</value>
     </data>
-  <data name="ST2002" xml:space="preserve">
+  <data name="CROSS_PARENT_UNSUPPORTED" xml:space="preserve">
         <value>Cross-parent reading is not supported for this resource.</value>
     </data>
-  <data name="ST2003" xml:space="preserve">
+  <data name="INVALID_PAGE_TOKEN" xml:space="preserve">
         <value>The page token is invalid or has expired.</value>
     </data>
-  <data name="ST2004" xml:space="preserve">
+  <data name="INVALID_EXPRESSION" xml:space="preserve">
         <value>The {0} expression is malformed.</value>
     </data>
-  <data name="ST2005" xml:space="preserve">
+  <data name="INVALID_FIELD" xml:space="preserve">
         <value>Invalid field.</value>
     </data>
-  <data name="ST2006" xml:space="preserve">
+  <data name="INVALID_FIELD_NAME" xml:space="preserve">
         <value>Invalid field name '{0}'.</value>
     </data>
-  <data name="ST2007" xml:space="preserve">
+  <data name="FUNCTION_NOT_REGISTERED" xml:space="preserve">
         <value>Function '{0}' not registered.</value>
     </data>
-  <data name="ST2008" xml:space="preserve">
+  <data name="INVALID_PAGE_SIZE" xml:space="preserve">
         <value>The page_size must not be negative.</value>
     </data>
-  <data name="ST2009" xml:space="preserve">
+  <data name="INVALID_PARENT" xml:space="preserve">
         <value>The parent is invalid.</value>
     </data>
-  <data name="ST3001" xml:space="preserve">
+  <data name="AUTHENTICATOR_KEY_REQUIRED" xml:space="preserve">
         <value>The user manager must produce an authenticator key after reset.</value>
     </data>
-  <data name="ST4001" xml:space="preserve">
+  <data name="INVALID_CLIENT_CREDENTIALS" xml:space="preserve">
         <value>The client credentials are missing or invalid.</value>
     </data>
-  <data name="ST4002" xml:space="preserve">
+  <data name="CLIENT_SECRET_REQUIRED" xml:space="preserve">
         <value>Client secret is required for confidential clients.</value>
     </data>
-  <data name="ST4003" xml:space="preserve">
+  <data name="MULTIPLE_CLIENT_AUTH_METHODS" xml:space="preserve">
         <value>The request uses more than one client authentication method.</value>
     </data>
-  <data name="ST4004" xml:space="preserve">
+  <data name="INVALID_GRANT" xml:space="preserve">
         <value>The provided grant is invalid, expired, or revoked.</value>
     </data>
-  <data name="ST4005" xml:space="preserve">
+  <data name="PKCE_VERIFIER_MISMATCH" xml:space="preserve">
         <value>The code_verifier does not match the code_challenge.</value>
     </data>
-  <data name="ST4006" xml:space="preserve">
+  <data name="INVALID_SCOPE" xml:space="preserve">
         <value>The requested scope is not allowed for this client.</value>
     </data>
-  <data name="ST4007" xml:space="preserve">
+  <data name="UNAUTHORIZED_GRANT_TYPE" xml:space="preserve">
         <value>The client is not authorized to use this grant type.</value>
     </data>
-  <data name="ST4008" xml:space="preserve">
+  <data name="ACCESS_DENIED" xml:space="preserve">
         <value>The resource owner or authorization server denied the request.</value>
     </data>
-  <data name="ST4009" xml:space="preserve">
+  <data name="INVALID_REDIRECT_URI" xml:space="preserve">
         <value>The redirect_uri does not match any registered URI.</value>
     </data>
-  <data name="ST4010" xml:space="preserve">
+  <data name="USER_CONSENT_REQUIRED" xml:space="preserve">
         <value>User consent is required.</value>
     </data>
-  <data name="ST4011" xml:space="preserve">
+  <data name="USER_AUTHENTICATION_REQUIRED" xml:space="preserve">
         <value>User authentication is required.</value>
     </data>
-  <data name="ST4012" xml:space="preserve">
+  <data name="AUTHORIZATION_PENDING" xml:space="preserve">
         <value>The authorization request is still pending.</value>
     </data>
-  <data name="ST4013" xml:space="preserve">
+  <data name="SLOW_DOWN" xml:space="preserve">
         <value>The polling interval is too short. Increase the interval and retry.</value>
     </data>
-  <data name="ST4014" xml:space="preserve">
+  <data name="INTERNAL" xml:space="preserve">
         <value>An internal server error occurred.</value>
     </data>
-  <data name="ST4015" xml:space="preserve">
+  <data name="INVALID_PROMPT_COMBINATION" xml:space="preserve">
         <value>The '{0}' prompt value cannot be combined with other values.</value>
     </data>
-  <data name="ST4016" xml:space="preserve">
+  <data name="UNSUPPORTED_PROMPT" xml:space="preserve">
         <value>The '{0}' prompt value is not supported for this client.</value>
     </data>
-  <data name="ST4017" xml:space="preserve">
+  <data name="USER_IDENTITY_REQUIRED" xml:space="preserve">
         <value>A valid user identity is required for this request.</value>
     </data>
-  <data name="ST4018" xml:space="preserve">
+  <data name="REQUIRED_SETTING_MISSING" xml:space="preserve">
         <value>{0} is enabled but {1} is not set.</value>
     </data>
-  <data name="ST4019" xml:space="preserve">
+  <data name="ABSOLUTE_URI_REQUIRED" xml:space="preserve">
         <value>{0} must be an absolute URI.</value>
     </data>
-  <data name="ST4020" xml:space="preserve">
+  <data name="MISSING_DEPENDENT_SETTING" xml:space="preserve">
         <value>{0} is set but {1} is not set.</value>
     </data>
-  <data name="ST5001" xml:space="preserve">
+  <data name="UNABLE_TO_RESOLVE" xml:space="preserve">
         <value>Unable to resolve {0}.</value>
+    </data>
+  <data name="INVALID_FILTER" xml:space="preserve">
+        <value>The filter expression is invalid.</value>
+    </data>
+  <data name="INVALID_UPDATE_MASK" xml:space="preserve">
+        <value>The update_mask expression is invalid.</value>
+    </data>
+  <data name="INVALID_READ_MASK" xml:space="preserve">
+        <value>The read_mask expression is invalid.</value>
+    </data>
+  <data name="INVALID_NAME" xml:space="preserve">
+        <value>The resource name is invalid.</value>
+    </data>
+  <data name="INVALID_ORDER_BY" xml:space="preserve">
+        <value>The order_by expression is invalid.</value>
+    </data>
+  <data name="INVALID_REFERENCE" xml:space="preserve">
+        <value>The supplied reference does not resolve to any registered resource type.</value>
     </data>
 </root>

@@ -69,7 +69,7 @@ public class OAuthException : SchemataException
     /// </summary>
     public string? ErrorUri { get; set; }
 
-    public override object? CreateErrorResponse(string? requestId = null, string? domain = null) {
+    public override object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
         var status  = Status ?? ErrorCodes.Internal;
         var details = new List<IErrorDetail>();
 
@@ -77,8 +77,14 @@ public class OAuthException : SchemataException
             details.AddRange(Details);
         }
 
-        EnsureErrorInfo(details, status, domain);
+        // The OAuth `error` wire value is RFC 6749 lowercase (e.g. "invalid_grant"); the AIP-193
+        // structured Reason / resx data name uses UPPER_SNAKE_CASE. Normalize for ErrorInfoDetail
+        // and EnsureLocalizedMessage so OAuth errors localize through the same resx pipeline as
+        // every other SchemataException.
+        var reason = status.ToUpperInvariant();
+        EnsureErrorInfo(details, reason, domain);
         EnsureRequestInfo(details, requestId);
+        EnsureLocalizedMessage(details, locale, reason);
 
         return new OAuthErrorResponse {
             Error            = status,
