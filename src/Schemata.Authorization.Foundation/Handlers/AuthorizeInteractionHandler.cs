@@ -219,8 +219,11 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         await _tokens.RevokeAsync(interaction, ct);
 
         // Record consent so future requests for the same client/scope can skip interaction.
+        // Application / AuthorizationName carry full AIP-122 canonical names per the
+        // [ResourceReference] contracts on SchemataAuthorization / SchemataToken; the OAuth
+        // wire `client_id` keeps mapping to SchemataApplication.Name via FindByClientIdAsync.
         var authorization = new TAuth {
-            Application         = application.Name,
+            Application         = application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,
             Status              = TokenStatuses.Valid,
@@ -233,7 +236,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
 
         await _auths.CreateAsync(authorization, ct);
 
-        properties[Properties.AuthorizationName] = authorization.Name;
+        properties[Properties.AuthorizationName] = authorization.CanonicalName;
 
         return AuthorizationResult.SignIn(response, properties);
     }

@@ -20,15 +20,20 @@ public sealed partial class DefaultScheduler
         var registry = _services.GetRequiredService<IScheduledJobRegistry>();
         var jobKey   = registry.ResolveKey(typeof(TJob)) ?? typeof(TJob).FullName!;
 
+        // The transient SchemataJob materialises the fire context; it is never persisted via
+        // IRepository<SchemataJob>, so CanonicalName carries whatever the caller supplied
+        // (a real `jobs/{leaf}` for RunJobHandler triggers, null for one-shot ops with no
+        // persistent scheduler entry such as back-channel logout / push / purge).
         var job = new SchemataJob {
-            Name         = context.Job,
-            JobKey       = jobKey,
-            ArgsJson     = context.ArgsJson,
-            ScheduleType = ScheduleType.OneTime,
-            NextRunTime  = _time.GetUtcNow().UtcDateTime,
-            Replay       = false,
-            State        = JobState.Active,
-            Variables    = JobVariableSerializer.Serialize(context.Variables),
+            Name          = context.Job,
+            CanonicalName = context.Job,
+            JobKey        = jobKey,
+            ArgsJson      = context.ArgsJson,
+            ScheduleType  = ScheduleType.OneTime,
+            NextRunTime   = _time.GetUtcNow().UtcDateTime,
+            Replay        = false,
+            State         = JobState.Active,
+            Variables     = JobVariableSerializer.Serialize(context.Variables),
         };
 
         // A trigger is a one-shot occurrence: persist its Pending row synchronously so the returned
@@ -55,8 +60,12 @@ public sealed partial class DefaultScheduler
     }
 
     private async Task ArmOneShotTimerAsync(SchemataJob job) {
-        if (string.IsNullOrWhiteSpace(job.Name)) {
-            // Untracked one-shot: rely on the dispatcher poll to drain it when it comes due.
+        // The in-memory registry keys entries by canonical name when one exists, falling back
+        // to the bare leaf for jobs that have not yet been routed through the canonical-name
+        // advisor. Unnamed one-shot triggers (BCL / push / purge) skip
+        // the registry entirely and rely on the dispatcher poll to drain the Pending row.
+        var key = job.CanonicalName ?? job.Name;
+        if (string.IsNullOrWhiteSpace(key)) {
             return;
         }
 
@@ -67,13 +76,13 @@ public sealed partial class DefaultScheduler
                 return;
             }
 
-            if (_entries.TryRemove(job.Name, out var existing)) {
+            if (_entries.TryRemove(key, out var existing)) {
                 await existing.Cts.CancelAsync();
                 existing.Cts.Dispose();
             }
 
-            entry              = new(job, new());
-            _entries[job.Name] = entry;
+            entry         = new(job, new());
+            _entries[key] = entry;
         } finally {
             _lock.Release();
         }
@@ -96,7 +105,7 @@ public sealed partial class DefaultScheduler
             Uid           = uid,
             Name          = name,
             CanonicalName = $"{descriptor.Collection}/{name}",
-            Job           = job.Name,
+            Job           = job.CanonicalName,
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,
             ArgsJson      = context.ArgsJson ?? job.ArgsJson,

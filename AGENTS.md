@@ -1,6 +1,6 @@
 # Schemata Knowledge Base
 
-**Commit:** `ea5306fd` on `master`
+**Commit:** `486efd2f` on `master`
 
 ## Overview
 

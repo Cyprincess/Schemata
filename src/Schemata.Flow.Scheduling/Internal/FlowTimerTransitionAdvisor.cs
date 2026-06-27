@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -87,7 +88,11 @@ public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
         }
 
         if (previousTimerJob is not null) {
-            await scheduler.UnscheduleAsync(previousTimerJob, ct);
+            // IScheduler.UnscheduleAsync expects the SchemataJob canonical name; compose it
+            // from the bare timer-job leaf so the lookup matches the in-memory entries
+            // dictionary key (canonical name).
+            var collection = ResourceNameDescriptor.ForType<SchemataJob>().Collection;
+            await scheduler.UnscheduleAsync($"{collection}/{previousTimerJob}", ct);
         }
 
         if (timerJob is not null) {

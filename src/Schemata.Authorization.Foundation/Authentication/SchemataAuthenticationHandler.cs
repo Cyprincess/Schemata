@@ -271,8 +271,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         claims.AddRange(identity.Claims);
 
         var client = principal.FindFirstValue(Claims.ClientId);
+        // SchemataToken.Application carries the AIP-122 canonical name; the OAuth wire client_id
+        // is still resolved against SchemataApplication.Name via FindByClientIdAsync.
         var app = !string.IsNullOrWhiteSpace(client)
-            ? (await apps.FindByClientIdAsync(client, ct))?.Name
+            ? (await apps.FindByClientIdAsync(client, ct))?.CanonicalName
             : null;
         var @internal = principal.FindFirstValue(Claims.Subject);
 

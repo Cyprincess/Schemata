@@ -36,15 +36,22 @@ public class AdviceAuthorizeAutoApproveSignInShould
     }
 
     private static AuthorizeContext<SchemataApplication> CreateGrantedContext(
-        string subject  = "user-1",
+        string subject  = "users/u-1",
         string scope    = "openid profile",
         string sid      = "sess-1",
         string clientId = "app-1"
     ) {
         var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
-        // ClientId and Name are aliased on SchemataApplication; setting ClientId last.
+        // ClientId, Name, and CanonicalName populate the AIP-122 trio: ClientId is the OAuth
+        // wire id, Name mirrors it as the SchemataApplication leaf, and CanonicalName is the
+        // full `applications/{client}` form that downstream stores SchemataAuthorization.Application.
         return new() {
-            Application     = new() { Uid   = Identifiers.NewUid(), ClientId = clientId },
+            Application     = new() {
+                Uid           = Identifiers.NewUid(),
+                ClientId      = clientId,
+                Name          = clientId,
+                CanonicalName = $"applications/{clientId}",
+            },
             Request         = new() { Scope = scope },
             Principal       = new(new ClaimsIdentity(claims, "test")),
             ConsentDecision = ConsentDecision.Granted,
@@ -66,8 +73,8 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var invocation = Assert.Single(authzMgr.Invocations,
                                        i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync));
         var captured = Assert.IsType<SchemataAuthorization>(invocation.Arguments[0]);
-        Assert.Equal("app-1", captured.Application);
-        Assert.Equal("user-1", captured.Subject);
+        Assert.Equal("applications/app-1", captured.Application);
+        Assert.Equal("users/u-1", captured.Subject);
         Assert.Equal("openid profile", captured.Scopes);
         Assert.Equal(TokenStatuses.Valid, captured.Status);
     }

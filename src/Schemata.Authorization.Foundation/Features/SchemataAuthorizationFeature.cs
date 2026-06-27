@@ -113,6 +113,14 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         services.TryAddScoped<TokenService>();
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
 
+        // Pairwise (application × canonical-subject) → pairwise-hash mapping lives in
+        // SchemataSubjectMapping. The hosting startup must register a repository for that
+        // entity against its DbContext so AdvicePairwiseProjection (writer) and
+        // IPairwiseSubjectTranslator (reader / reverse-lookup) share the same durable table.
+        services.TryAddScoped<PairwiseSubjectTranslator<TApp>>();
+        services.TryAddScoped<IPairwiseSubjectTranslator>(
+            sp => sp.GetRequiredService<PairwiseSubjectTranslator<TApp>>());
+
         services.TryAddScoped<IPasswordHasher<TApp>, PasswordHasher<TApp>>();
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();

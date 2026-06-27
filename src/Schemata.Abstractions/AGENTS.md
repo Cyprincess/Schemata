@@ -42,7 +42,8 @@ Two enums power query semantics: [Operations.cs](Entities/Operations.cs) (`Creat
 
 All in [Resource/](Resource/). Attributes are how a controller / handler is wired to a resource type.
 
-- Attributes: `[Resource]`, `[Resource<TEntity>]`, `[Resource<TEntity,TKey>]`, `[Resource<TEntity,TKey,TParent>]`, `[Resource<TEntity,TKey,TParent,TGrandparent>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourcePackage]`, `[ResourceMethod]`, `[Anonymous]`, `[ReadAcross]`, `[RateLimitPolicy]`.
+- Attributes: `[Resource]`, `[Resource<TEntity>]`, `[Resource<TEntity,TKey>]`, `[Resource<TEntity,TKey,TParent>]`, `[Resource<TEntity,TKey,TParent,TGrandparent>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourcePackage]`, `[ResourceMethod]`, `[ResourceReference]` / `[ResourceReference(typeof(T))]`, `[Anonymous]`, `[ReadAcross]`, `[RateLimitPolicy]`.
+- `[ResourceReference]` marks cross-resource fields ([Resource/ResourceReferenceAttribute.cs](Resource/ResourceReferenceAttribute.cs)). Typed form (`[ResourceReference(typeof(TTarget))]`) drives ORM-level foreign keys via [AdviceValidateResourceReferences](../Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferences.cs) + [SchemataModelCustomizer](../Schemata.Entity.EntityFrameworkCore/SchemataModelCustomizer.cs); the untyped polymorphic form drives runtime validation only. Storage always uses full AIP-122 canonical names (e.g. `applications/{client}`, `users/{uid}`).
 - Method scopes: [ResourceMethodScope.cs](Resource/ResourceMethodScope.cs) + [ResourceHttpMethod.cs](Resource/ResourceHttpMethod.cs).
 - Request bases: `GetRequest`, `ListRequest`, `DeleteRequest`, `PurgeRequest`, `EmptyResourceRequest`.
 - Result bases: `CreateResultBase`, `GetResultBase`, `ListResultBase`, `UpdateResultBase`, `DeleteResultBase`, `EmptyResourceResponse`, `ExpungeResponse`, `PurgeResponse`.

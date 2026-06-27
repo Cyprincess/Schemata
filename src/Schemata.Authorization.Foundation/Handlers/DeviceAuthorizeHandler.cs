@@ -85,7 +85,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new TToken {
-            Application = application.Name,
+            Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
             ReferenceId     = GenerateDeviceCode(),
@@ -99,7 +99,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         await tokens.CreateAsync(dc, ct);
 
         var uc = new TToken {
-            Application = application.Name,
+            Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,
             ReferenceId     = GenerateUserCode(),

@@ -48,7 +48,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         }
 
         await _eventBus.PublishAsync(new JobScheduled {
-            Job         = job.Name!,
+            Job         = job.CanonicalName,
             Variables   = JobVariableSerializer.Deserialize(job.Variables),
             ScheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
@@ -61,7 +61,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         }
 
         await _eventBus.PublishAsync(new JobUnscheduled {
-            Job       = job.Name!,
+            Job           = job.CanonicalName,
             UnscheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }

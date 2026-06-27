@@ -39,7 +39,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
     IApplicationManager<TApp>              apps,
     ITokenManager<TToken>                  tokens,
     TokenService                           issuer,
-    ISubjectIdentifierService              identifier,
+    PairwiseSubjectTranslator<TApp>        translator,
     IOptions<SchemataAuthorizationOptions> options,
     IServiceProvider                       services
 ) : ILogoutNotifier
@@ -74,7 +74,9 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
                 continue;
             }
 
-            var sub = !string.IsNullOrWhiteSpace(subject) ? identifier.Resolve(subject, app) : null;
+            var sub = !string.IsNullOrWhiteSpace(subject)
+                ? await translator.EnsureMappingAsync(app, subject!, ct)
+                : null;
 
             var claims = new List<Claim> {
                 new(Claims.JwtId, Identifiers.NewUid().ToString("n")),
@@ -100,8 +102,10 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             var uri = app.BackChannelLogoutUri;
             var jwt = issuer.CreateToken(claims, TimeSpan.FromMinutes(2));
 
+            // One-shot trigger with no persistent SchemataJob entry — the execution row is
+            // self-identifying via operations/{uid}, so JobContext.Job stays null and the
+            // SchemataJobExecution.Job foreign reference is empty.
             await scheduler.TriggerAsync<BackChannelLogoutJob>(new() {
-                Job = $"authorization/back-channel-logout/{Identifiers.NewUid():n}",
                 Variables = new Dictionary<string, object?> {
                     [BackChannelLogoutJob.VariableKeys.Uri]         = uri,
                     [BackChannelLogoutJob.VariableKeys.LogoutToken] = jwt,

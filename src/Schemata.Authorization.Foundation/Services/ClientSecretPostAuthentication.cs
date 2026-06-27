@@ -41,8 +41,8 @@ public sealed class ClientSecretPostAuthentication<TApp>(
             return null;
         }
 
-        // client_secret_post is only attempted when the form carries a client_id; without one,
-        // defer to the next authenticator (e.g. HTTP Basic) rather than rejecting the request.
+        // client_secret_post requires a form-encoded client_id; a missing client_id leaves the
+        // request available for the next authenticator (e.g. HTTP Basic) to claim.
         if (form is null || !form.TryGetValue(Parameters.ClientId, out var ids) || ids.Count == 0) {
             return null;
         }

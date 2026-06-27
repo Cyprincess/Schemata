@@ -27,9 +27,9 @@ public class AdviceAuthorizeConsentShould
         var advisor = new AdviceAuthorizeConsent<SchemataApplication, SchemataAuthorization>(authzMgr.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { ClientId = "test-app", ConsentType = ConsentTypes.Explicit },
-            Request     = new() { Scope    = "openid profile" },
-            Principal   = CreatePrincipal("user-1"),
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid profile" },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);
@@ -45,14 +45,23 @@ public class AdviceAuthorizeConsentShould
         var advisor = new AdviceAuthorizeConsent<SchemataApplication, SchemataAuthorization>(authzMgr.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { ClientId = "test-app", ConsentType = ConsentTypes.Explicit },
-            Request     = new() { Scope    = "openid profile email" },
-            Principal   = CreatePrincipal("user-1"),
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid profile email" },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);
 
         Assert.NotEqual(ConsentDecision.Granted, authz.ConsentDecision);
+    }
+
+    private static SchemataApplication CreateApplication(string clientId = "test-app") {
+        return new() {
+            ClientId      = clientId,
+            Name          = clientId,
+            CanonicalName = $"applications/{clientId}",
+            ConsentType   = ConsentTypes.Explicit,
+        };
     }
 
     private static ClaimsPrincipal CreatePrincipal(string subject) {

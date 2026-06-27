@@ -62,8 +62,8 @@ public sealed class AdviceDeviceCodePolling<TApp>(ICacheProvider cache, IOptions
         var existing = await cache.GetAsync(key, ct);
         if (existing is not null) {
             // RFC 8628 §3.5: the client MUST raise its polling interval by 5 seconds on every
-            // slow_down. Persist the grown interval so repeated too-fast polls widen the enforced
-            // window instead of being rejected against a fixed one.
+            // slow_down. The grown interval is persisted so repeated too-fast polls widen the
+            // enforced window for this device code.
             var current = existing.Length >= sizeof(int) ? BitConverter.ToInt32(existing, 0) : options.Value.DeviceCodeInterval;
             var next    = current + 5;
             await cache.SetAsync(key, BitConverter.GetBytes(next), new() {

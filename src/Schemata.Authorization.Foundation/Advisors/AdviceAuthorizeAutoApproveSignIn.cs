@@ -84,7 +84,7 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
 
         var authorization = new TAuth {
-            Application         = authz.Application.Name,
+            Application         = authz.Application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,
             Status              = TokenStatuses.Valid,

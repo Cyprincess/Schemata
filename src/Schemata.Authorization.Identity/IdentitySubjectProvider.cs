@@ -10,22 +10,39 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Authorization.Identity;
 
 /// <summary>
-///     Resolves an OAuth/OIDC subject identifier (`sub`)
-///     back to the owning <typeparamref name="TUser" /> and produces the user's claims.
+///     Resolves an OAuth/OIDC subject identifier (`sub`) back to the owning
+///     <typeparamref name="TUser" /> and produces the user's claims.
 /// </summary>
+/// <remarks>
+///     <para>
+///         Accepts <c>subject</c> in either AIP-122 canonical form (<c>"users/{uid}"</c>)
+///         emitted by <c>SchemataUserClaimsPrincipalFactory</c>, or as the bare uid
+///         string. The leaf segment after the last <c>'/'</c> is used as the lookup key
+///         against <c>SchemataUserManager.FindByIdAsync</c>.
+///     </para>
+///     <para>
+///         Emits <c>sub</c> as the resolved user's <c>CanonicalName</c> so downstream
+///         claim assembly and pairwise projection see canonical form; pairwise hashing
+///         happens later in the OIDC wire pipeline.
+///     </para>
+/// </remarks>
 internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> manager) : ISubjectProvider
     where TUser : SchemataUser
 {
     #region ISubjectProvider Members
 
     public async Task<IEnumerable<Claim>> GetClaimsAsync(string subject, CancellationToken ct = default) {
-        var user = await manager.FindByIdAsync(subject);
+        var user = await ResolveAsync(subject);
         if (user is null) {
             return [];
         }
 
-        var claims  = new List<Claim> {
-            new(Claims.Subject, user.Uid.ToString()),
+        var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
+            ? user.CanonicalName!
+            : $"users/{user.Uid}";
+
+        var claims = new List<Claim> {
+            new(Claims.Subject, canonical),
         };
 
         var username = await manager.GetUserPrincipalNameAsync(user);
@@ -58,9 +75,23 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
     }
 
     public async Task<bool> ValidateAsync(string subject, CancellationToken ct = default) {
-        var user = await manager.FindByIdAsync(subject);
-        return user is not null;
+        return await ResolveAsync(subject) is not null;
     }
 
     #endregion
+
+    /// <summary>
+    ///     Resolves a subject string to the owning user. Accepts canonical form
+    ///     (<c>"users/{uid}"</c>) or the bare uid; the leaf segment is fed into
+    ///     <c>SchemataUserManager.FindByIdAsync</c>.
+    /// </summary>
+    private Task<TUser?> ResolveAsync(string subject) {
+        if (string.IsNullOrWhiteSpace(subject)) {
+            return Task.FromResult<TUser?>(null);
+        }
+
+        var slash = subject.LastIndexOf('/');
+        var leaf  = slash < 0 ? subject : subject[(slash + 1)..];
+        return manager.FindByIdAsync(leaf);
+    }
 }

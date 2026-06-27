@@ -61,8 +61,8 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
         var scopes = ScopeParser.Parse(authz.Request?.Scope);
 
         var authorized = false;
-        if (!string.IsNullOrWhiteSpace(subject) && !string.IsNullOrWhiteSpace(authz.Application?.Name)) {
-            await foreach (var a in authorizations.ListAsync(subject, authz.Application.Name, ct)) {
+        if (!string.IsNullOrWhiteSpace(subject) && !string.IsNullOrWhiteSpace(authz.Application?.CanonicalName)) {
+            await foreach (var a in authorizations.ListAsync(subject, authz.Application.CanonicalName, ct)) {
                 if (a.Status != TokenStatuses.Valid) {
                     continue;
                 }

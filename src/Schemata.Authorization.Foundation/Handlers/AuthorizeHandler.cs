@@ -104,12 +104,12 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
-            Application     = authz.Application.Name,
-            Type            = TokenTypes.Interaction,
-            Status          = TokenStatuses.Valid,
-            ReferenceId     = reference,
-            Payload         = payload,
-            ExpireTime      = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
+            Application = authz.Application.CanonicalName,
+            Type        = TokenTypes.Interaction,
+            Status      = TokenStatuses.Valid,
+            ReferenceId = reference,
+            Payload     = payload,
+            ExpireTime  = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
         };
 
         await tokens.CreateAsync(interaction, ct);

@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -31,7 +32,10 @@ builder.UseSchemata(schema => {
     insight.UseDatabaseCatalog();
     insight.MapHttp();
 
-    schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
+    schema.Services.AddDbContextFactory<TestDbContext>(opts => {
+        opts.UseInMemoryDatabase(dbName);
+        opts.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
+    });
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
     schema.Services.AddRepository<Customer, EfCoreRepository<TestDbContext, Customer>>();
     schema.Services.AddRepository<Buyer, EfCoreRepository<TestDbContext, Buyer>>();

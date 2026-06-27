@@ -117,7 +117,7 @@ public class IntrospectionHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "user-42"),
+            new(Claims.Subject, "users/u-42"),
             new(Claims.ClientId, "test-client"),
             new(Claims.Scope, "openid profile"),
             new(Claims.Audience, "api"),
@@ -133,7 +133,7 @@ public class IntrospectionHandlerShould
         var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
         Assert.True(response.Active);
-        Assert.Equal("user-42", response.Sub);
+        Assert.Equal("users/u-42", response.Sub);
         Assert.Equal("test-client", response.ClientId);
         Assert.Equal("openid profile", response.Scope);
         Assert.Equal(Schemes.Bearer, response.TokenType);

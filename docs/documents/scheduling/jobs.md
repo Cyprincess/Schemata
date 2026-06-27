@@ -52,7 +52,7 @@ Register an on-demand job without a schedule through `WithJob<T>()` or `AddSched
 
 | Property | Source and purpose |
 | --- | --- |
-| `Job` | Canonical name of the job or one-shot operation being fired. |
+| `Job` | Canonical name of the job or one-shot operation being fired; `null` when the fire has no persistent scheduler entry. |
 | `Variables` | Free-form caller variables serialized through `SchemataJob.Variables`. |
 | `ExecutionUid` | UID reserved for the execution row; `TriggerAsync` accepts a caller-provided value so the caller can return the operation name immediately. |
 | `StartTime` | Scheduler-managed due time. Future values create future-dated `Pending` rows. |

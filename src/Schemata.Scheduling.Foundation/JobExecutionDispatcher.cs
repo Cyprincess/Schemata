@@ -243,10 +243,12 @@ public sealed class JobExecutionDispatcher(
         SchemataJobExecution execution,
         CancellationToken    ct
     ) {
-        if (!string.IsNullOrWhiteSpace(execution.Job)) {
+        var canonical = execution.Job;
+        if (!string.IsNullOrWhiteSpace(canonical)) {
             var jobs = serviceProvider.GetService<IRepository<SchemataJob>>();
             if (jobs is not null) {
-                var existing = await jobs.FirstOrDefaultAsync(q => q.Where(j => j.Name == execution.Job), ct);
+                var existing = await jobs.FirstOrDefaultAsync(
+                    q => q.Where(j => j.CanonicalName == canonical), ct);
                 if (existing is not null) {
                     return existing;
                 }
@@ -254,20 +256,21 @@ public sealed class JobExecutionDispatcher(
         }
 
         // One-shot triggers and durable operations carry no persisted SchemataJob row; synthesize a
-        // transient shell so the advisor / observer pipeline has a job to reason about.
+        // transient shell so the advisor / observer pipeline has a job to reason about. CanonicalName
+        // mirrors execution.Job so downstream lookups stay consistent.
         return new() {
-            Name         = execution.Job,
-            JobKey       = execution.JobKey,
-            ArgsJson     = execution.ArgsJson,
-            ScheduleType = ScheduleType.OneTime,
-            Replay       = false,
-            State        = JobState.Active,
+            CanonicalName = canonical,
+            JobKey        = execution.JobKey,
+            ArgsJson      = execution.ArgsJson,
+            ScheduleType  = ScheduleType.OneTime,
+            Replay        = false,
+            State         = JobState.Active,
         };
     }
 
     private static JobContext BuildContext(SchemataJobExecution execution) {
         return new() {
-            Job          = execution.Job!,
+            Job          = execution.Job,
             ExecutionUid = execution.Uid,
             StartTime    = execution.StartTime,
             Method       = execution.Method,

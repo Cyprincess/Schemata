@@ -47,7 +47,7 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
         TToken            token,
         CancellationToken ct = default
     ) {
-        if (string.IsNullOrWhiteSpace(token.Application) || token.Application != application.Name) {
+        if (string.IsNullOrWhiteSpace(token.Application) || token.Application != application.CanonicalName) {
             return Task.FromResult(AdviseResult.Block);
         }
 

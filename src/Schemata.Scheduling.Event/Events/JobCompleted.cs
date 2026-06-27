@@ -11,8 +11,11 @@ namespace Schemata.Scheduling.Event.Events;
 /// </summary>
 public sealed class JobCompleted : IEvent
 {
-    /// <summary>Job name as registered with the scheduler.</summary>
-    public string Job { get; init; } = null!;
+    /// <summary>
+    ///     Canonical name of the originating <see cref="Schemata.Scheduling.Skeleton.Entities.SchemataJob" />,
+    ///     or <see langword="null" /> for one-shot triggers with no persistent scheduler entry.
+    /// </summary>
+    public string? Job { get; init; }
 
     /// <summary>Variables carried by the job at completion time.</summary>
     public IReadOnlyDictionary<string, object?>? Variables { get; init; }

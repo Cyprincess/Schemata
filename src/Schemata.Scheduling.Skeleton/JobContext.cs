@@ -7,8 +7,12 @@ namespace Schemata.Scheduling.Skeleton;
 /// <summary>Per-fire context handed to <see cref="IScheduledJob.ExecuteAsync" />.</summary>
 public class JobContext
 {
-    /// <summary>Canonical name of the job entry being fired.</summary>
-    public string Job { get; set; } = null!;
+    /// <summary>
+    ///     AIP-122 canonical name of the originating <see cref="Entities.SchemataJob" /> for
+    ///     this fire, or <see langword="null" /> when the fire was raised through
+    ///     <see cref="IScheduler.TriggerAsync{TJob}" /> with no persistent scheduler entry.
+    /// </summary>
+    public string? Job { get; set; }
 
     /// <summary>Caller-supplied variables, serialized to/from <see cref="Entities.SchemataJob.Variables" />.</summary>
     public IReadOnlyDictionary<string, object?> Variables { get; set; } = new Dictionary<string, object?>();

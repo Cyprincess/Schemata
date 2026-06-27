@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -49,8 +51,10 @@ public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest> : IResourceUpdate
         }
 
         if (entity is ISoftDelete { DeleteTime: not null }) {
-            throw new FailedPreconditionException(
-                message: $"Resource '{entity.CanonicalName}' is deleted and must be undeleted before it can be updated.");
+            throw SchemataResourceErrors.PreconditionFailed<TEntity>(
+                name: entity.CanonicalName,
+                subject: PreconditionSubjects.SoftDeleted,
+                description: "Resource is deleted and must be undeleted before it can be updated.");
         }
 
         return Task.FromResult(AdviseResult.Continue);

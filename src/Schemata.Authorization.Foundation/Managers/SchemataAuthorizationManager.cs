@@ -17,8 +17,8 @@ namespace Schemata.Authorization.Foundation.Managers;
 /// <typeparam name="TAuthorization">The authorization entity type, must derive from <see cref="SchemataAuthorization" />.</typeparam>
 /// <remarks>
 ///     Authorizations represent a user's consent to a specific application for a set of scopes. They are
-///     keyed by subject + application name. Revocation sets the status to <see cref="TokenStatuses.Revoked" />
-///     without physically deleting the record.
+///     keyed by canonical subject + canonical application name. Revocation sets the status to
+///     <see cref="TokenStatuses.Revoked" /> without physically deleting the record.
 /// </remarks>
 /// <seealso cref="SchemataTokenManager{TToken}" />
 public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManager<TAuthorization>
@@ -32,9 +32,16 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
 
     #region IAuthorizationManager<TAuthorization> Members
 
+    /// <summary>
+    ///     Streams authorizations matching <paramref name="subject" /> and
+    ///     <paramref name="application" />. Both arguments are AIP-122 canonical names
+    ///     (<c>users/{uid}</c> and <c>applications/{client}</c>) since
+    ///     <see cref="SchemataAuthorization.Subject" /> and
+    ///     <see cref="SchemataAuthorization.Application" /> are persisted in canonical form.
+    /// </summary>
     public async IAsyncEnumerable<TAuthorization> ListAsync(
         string?                                    subject,
-        string?                                    client,
+        string?                                    application,
         [EnumeratorCancellation] CancellationToken ct = default
     ) {
         ct.ThrowIfCancellationRequested();
@@ -43,12 +50,12 @@ public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManage
             yield break;
         }
 
-        if (string.IsNullOrWhiteSpace(client)) {
+        if (string.IsNullOrWhiteSpace(application)) {
             yield break;
         }
 
         await foreach (var authorization in _authorizations.ListAsync(
-                           q => q.Where(a => a.Subject == subject && a.Application == client), ct)) {
+                           q => q.Where(a => a.Subject == subject && a.Application == application), ct)) {
             yield return authorization;
         }
     }

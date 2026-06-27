@@ -71,7 +71,10 @@ stores are `SchemataUserStore<TUser>` and `SchemataRoleStore<TRole>`.
   "sub"`, `UserNameClaimType = "preferred_username"`, `EmailClaimType = "email"`, `RoleClaimType =
   "role"`, `SecurityStampClaimType = "security_stamp"`.
 - Builds the Identity stack: `AddIdentityApiEndpoints<TUser>(configure).AddRoles<TRole>()
-  .AddUserManager<SchemataUserManager<TUser>>()`, then applies the `build` delegate to the result.
+  .AddUserManager<SchemataUserManager<TUser>>()
+  .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>()`, then applies the
+  `build` delegate to the result. The factory issues `Claims.Subject` as the user's canonical name
+  (`users/{uid}`).
 
 ## AuthenticateController
 
