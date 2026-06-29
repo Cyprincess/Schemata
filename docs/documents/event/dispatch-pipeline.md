@@ -56,8 +56,9 @@ The in-process publisher (`InProcessEventOutboxPublisher.PublishAsync`) and the 
 
 1. Resolve the wire name back to a CLR type via `IEventTypeRegistry.Resolve`. An unknown name is a
    poison message (dropped in-process, dead-lettered on RabbitMQ).
-2. Deserialize the payload and load matching subscriptions through `IEventSubscriptionStore.FindAsync`,
-   exposing them on `IEventDispatchContext`.
+2. Deserialize the payload and load matching subscriptions through
+   `IRepository<SchemataEventSubscription>.ListMatchingAsync`, exposing them on
+   `IEventDispatchContext`.
 3. Invoke handlers through `HandlerResolver.InvokeEventHandlersAsync` under the type's
    `EventRouting`.
 4. In a `finally` block, run the `IEventConsumeAdvisor` pipeline, then notify every
@@ -127,30 +128,32 @@ instances; with neither, it throws `InvalidOperationException`. For `SendAsync`,
 ```csharp
 public interface IEventDispatchContext
 {
-    IReadOnlyList<IEventSubscription>? MatchedSubscriptions { get; }
-    void SetSubscriptions(IReadOnlyList<IEventSubscription>? subscriptions);
+    IReadOnlyList<SchemataEventSubscription>? MatchedSubscriptions { get; }
+    void SetSubscriptions(IReadOnlyList<SchemataEventSubscription>? subscriptions);
 }
 ```
 
 `EventDispatchContext` is registered as scoped by `UseConsumer(c => c.UseInProcess())`. The bus sets
 the matched subscriptions before handler invocation; handlers and advisors read them.
 
-## EventSubscription
+## SchemataEventSubscription
+
+Subscriptions are persisted entities in `Schemata.Event.Skeleton.Entities`:
 
 ```csharp
-public sealed class EventSubscription : IEventSubscription
+public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    public EventSubscription(string id, string eventType, string? correlationKey = null, string? target = null);
-    public string  Id             { get; }
-    public string  EventType      { get; }
-    public string? CorrelationKey { get; }
-    public string? Target         { get; }
+    public string  EventType      { get; set; }
+    public string? CorrelationKey { get; set; }
+    public string  Target         { get; set; }
+    public string  SubscriptionId { get; set; }
+    // plus framework traits (Uid, Name, CanonicalName, Timestamp, CreateTime, UpdateTime)
 }
 ```
 
-`IEventSubscriptionStore.FindAsync(eventType, correlationKey)` returns subscriptions matching the
-wire name and the optional correlation key. The default `RepositoryEventSubscriptionStore` persists
-them as `SchemataEventSubscription` rows.
+`IRepository<SchemataEventSubscription>.ListMatchingAsync(eventType, correlationKey)` returns
+subscriptions matching the wire name and the optional correlation key. The extension lives in
+`Schemata.Event.Foundation.SchemataEventSubscriptionExtensions`.
 
 ## Routing
 

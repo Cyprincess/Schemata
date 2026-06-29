@@ -15,10 +15,12 @@ using RabbitMQ.Client.Events;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Event.Foundation;
 using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
+using Schemata.Event.Skeleton.Entities;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
@@ -120,11 +122,11 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var replyTo       = ea.BasicProperties.ReplyTo;
         var body          = Encoding.UTF8.GetString(ea.Body.Span);
 
-        using var scope    = _services.CreateScope();
-        var       store    = scope.ServiceProvider.GetRequiredService<IEventSubscriptionStore>();
-        var       resolver = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
-        var       registry = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
-        var       tracker  = scope.ServiceProvider.GetService<CorrelationTracker>();
+        using var scope         = _services.CreateScope();
+        var       subscriptions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var       resolver      = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
+        var       registry      = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
+        var       tracker       = scope.ServiceProvider.GetService<CorrelationTracker>();
 
         // Reply correlation comes first because reply payloads bypass subscription matching.
         if (!string.IsNullOrEmpty(correlationId) && tracker != null) {
@@ -150,15 +152,19 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return await HandleRequestAsync(channel, resolver, registry, eventType, body, correlationId, ct);
         }
 
-        var subscriptions = await store.FindAsync(eventTypeName, ct: ct);
-        if (subscriptions.Count == 0) {
+        var matched = new List<SchemataEventSubscription>();
+        await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, ct: ct)) {
+            matched.Add(sub);
+        }
+
+        if (matched.Count == 0) {
             // ACK and drop orphan events. The queue is shared with other consumers and orphan
             // events are expected during rolling deploys.
             return true;
         }
 
         var context = scope.ServiceProvider.GetRequiredService<IEventDispatchContext>();
-        context.SetSubscriptions(subscriptions);
+        context.SetSubscriptions(matched);
 
         var eventInstance = JsonSerializer.Deserialize(body, eventType, _json);
         if (eventInstance == null) {

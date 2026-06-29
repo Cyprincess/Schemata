@@ -1,18 +1,19 @@
 # Flow Event Integration
 
 `Schemata.Flow.Event` bridges BPMN message and signal catches to the event bus. As a process
-transitions, `FlowEventTransitionAdvisor` keeps `IEventSubscriptionStore` in sync with the catches
-the instance is waiting on. When a matching event is dispatched, `FlowEventHandler` correlates it
-back to the waiting instance through `IProcessRuntime`. The same package also publishes process
-lifecycle notifications through `ProcessEventLifecycleObserver`.
+transitions, `FlowEventTransitionAdvisor` keeps `IRepository<SchemataEventSubscription>` in sync
+with the catches the instance is waiting on. When a matching event is dispatched, `FlowEventHandler`
+correlates it back to the waiting instance through `IProcessRuntime`. The same package also
+publishes process lifecycle notifications through `ProcessEventLifecycleObserver`.
 
 ## Where the code lives
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionAdvisor.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Models/FlowEventSubscription.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
+| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionAdvisor.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
 | `Schemata.Flow.Skeleton` | `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Runtime/IProcessLifecycleObserver.cs` |
-| `Schemata.Event.Skeleton` | `EventSubscription.cs`, `IEventSubscriptionStore.cs`, `IEventHandler.cs`, `IEventDispatchContext.cs` |
+| `Schemata.Event.Skeleton` | `Entities/SchemataEventSubscription.cs`, `IEventHandler.cs`, `IEventDispatchContext.cs` |
+| `Schemata.Event.Foundation` | `SchemataEventSubscriptionExtensions.cs` |
 
 ## Activation
 
@@ -60,17 +61,21 @@ subscriptions and wakes the waiting process instances.
 ## FlowEventTransitionAdvisor
 
 `FlowEventTransitionAdvisor` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
-`AdviseAsync` runs in the transition's pre-commit window and reconciles `IEventSubscriptionStore`
-against the new waiting state, returning `AdviseResult.Continue`.
+`AdviseAsync` runs in the transition's pre-commit window and reconciles
+`IRepository<SchemataEventSubscription>` against the new waiting state, returning
+`AdviseResult.Continue`.
 
 ### Subscription lifecycle
 
 1. **Remove old subscriptions** when `PreviousWaitingAtId` is set and differs from the new
-   `WaitingAtId`. The advisor resolves the previous element and calls `store.RemoveAsync`. An
-   event-based gateway removes the subscription for every outgoing intermediate catch.
+   `WaitingAtId`. The advisor resolves the previous element, looks up each subscription by
+   `SubscriptionId`, and removes the matching row through `IRepository.RemoveAsync`. An event-based
+   gateway removes the subscription for every outgoing intermediate catch.
 2. **Skip the add** when the instance is complete or the new `WaitingAtId` is empty.
 3. **Add new subscriptions** when the new waiting element is an intermediate catch with a definition,
-   or an event-based gateway. A gateway adds one subscription per outgoing intermediate catch.
+   or an event-based gateway. The advisor upserts each subscription by `SubscriptionId`
+   (`IRepository.FirstOrDefaultAsync` then `AddAsync` or `UpdateAsync`). A gateway adds one
+   subscription per outgoing intermediate catch.
 
 The default state-machine engine waits at the host activity for boundary message and signal events,
 so this advisor registers intermediate catches and event-based gateway branches. A custom keyed
@@ -79,24 +84,30 @@ those catches.
 
 ### Subscription format
 
-`FlowEventTransitionAdvisor` writes immutable `EventSubscription` values to the configured
-`IEventSubscriptionStore`. `FlowEventSubscription` is the mutable model with the same four fields:
-`Id`, `EventType`, `CorrelationKey`, and `Target`.
+`FlowEventTransitionAdvisor` writes `SchemataEventSubscription` rows through
+`IRepository<SchemataEventSubscription>`. Each row carries `SubscriptionId`, `EventType`,
+`CorrelationKey`, and `Target`.
 
 ```csharp
 // Message catch (point-to-point):
-new EventSubscription(
-    id:             $"flow:{process.CanonicalName}:{elementId}",
-    eventType:      definition.Name,
-    correlationKey: process.CanonicalName,
-    target:         process.CanonicalName);
+new SchemataEventSubscription {
+    SubscriptionId = $"flow:{process.CanonicalName}:{elementId}",
+    EventType      = definition.Name,
+    CorrelationKey = process.CanonicalName,
+    Target         = process.CanonicalName,
+    Name           = $"flow:{process.CanonicalName}:{elementId}",
+    CanonicalName  = $"event-subscriptions/flow:{process.CanonicalName}:{elementId}",
+};
 
 // Signal catch (broadcast):
-new EventSubscription(
-    id:             $"flow:{process.CanonicalName}:{elementId}",
-    eventType:      definition.Name,
-    correlationKey: null,
-    target:         process.CanonicalName);
+new SchemataEventSubscription {
+    SubscriptionId = $"flow:{process.CanonicalName}:{elementId}",
+    EventType      = definition.Name,
+    CorrelationKey = null,
+    Target         = process.CanonicalName,
+    Name           = $"flow:{process.CanonicalName}:{elementId}",
+    CanonicalName  = $"event-subscriptions/flow:{process.CanonicalName}:{elementId}",
+};
 ```
 
 The subscription id includes the waiting element id, so two catches in one process can wait for the
@@ -156,7 +167,6 @@ observer does not roll back a transition that already committed.
 ## Extension points
 
 - Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to add subscription logic.
-- Implement `IEventSubscriptionStore` to back subscriptions with a durable store.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to publish additional
   lifecycle notifications after Flow commits.
 

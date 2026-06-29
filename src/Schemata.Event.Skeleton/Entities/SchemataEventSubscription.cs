@@ -22,7 +22,7 @@ public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurren
     /// <summary>Subscription target identifier consumed by the delivering handler.</summary>
     public virtual string Target { get; set; } = null!;
 
-    /// <summary>Stable subscription identifier from <see cref="IEventSubscription.Id" />.</summary>
+    /// <summary>Stable subscription identifier; the unique lookup key used by the dispatcher.</summary>
     public virtual string SubscriptionId { get; set; } = null!;
 
     #region ICanonicalName Members

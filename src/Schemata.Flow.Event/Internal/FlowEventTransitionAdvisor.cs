@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
-using Schemata.Event.Skeleton;
-using Schemata.Flow.Skeleton.Entities;
+using Schemata.Entity.Repository;
+using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
 
@@ -18,53 +19,50 @@ namespace Schemata.Flow.Event.Internal;
 /// </summary>
 public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
 {
-    private readonly IEventSubscriptionStore _store;
+    private readonly IRepository<SchemataEventSubscription> _subscriptions;
 
-    /// <summary>Creates an advisor that stores Flow event subscriptions.</summary>
-    public FlowEventTransitionAdvisor(IEventSubscriptionStore store) {
-        _store = store;
+    /// <summary>Creates an advisor that persists Flow event subscriptions through the supplied repository.</summary>
+    public FlowEventTransitionAdvisor(IRepository<SchemataEventSubscription> subscriptions) {
+        _subscriptions = subscriptions;
     }
 
     #region IFlowTransitionAdvisor Members
 
     public int Order => 0;
 
-    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, FlowTransitionContext context, CancellationToken ct = default) {
-        var process    = context.Process;
-        var instance   = context.Instance;
-        var definition = context.Definition;
+    public async Task<AdviseResult> AdviseAsync(
+        AdviceContext         ctx,
+        FlowTransitionContext context,
+        CancellationToken     ct = default
+    ) {
+        var process     = context.Process;
+        var instance    = context.Instance;
+        var definition  = context.Definition;
+        var processName = process.CanonicalName!;
 
         // The instance carries the new waiting element; PreviousWaitingAtId is the only source for
         // the element being left, so its subscription can be removed.
         if (!string.IsNullOrEmpty(context.PreviousWaitingAtId)
          && context.PreviousWaitingAtId != instance.WaitingAtId
          && definition is not null) {
-            var processName = process.CanonicalName!;
-            var oldElement  = definition.Elements.FirstOrDefault(e => e.Id == context.PreviousWaitingAtId);
-            await RemoveSubscriptionsAsync(oldElement, definition, processName, ct);
-        }
-
-        if (instance.IsComplete) {
-            return AdviseResult.Continue;
-        }
-
-        if (string.IsNullOrEmpty(instance.WaitingAtId) || definition is null) {
-            return AdviseResult.Continue;
-        }
-
-        var element = definition.Elements.FirstOrDefault(e => e.Id == instance.WaitingAtId);
-
-        if (element is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: not null } evt) {
-            await AddSubscriptionAsync(process, evt.Id, evt.Definition, ct);
-        } else if (element is EventBasedGateway gateway) {
-            var outgoing = definition.Flows.Where(f => f.Source == gateway);
-            foreach (var flow in outgoing) {
-                if (flow.Target is FlowEvent {
-                    Position: EventPosition.IntermediateCatch, Definition: not null,
-                } catchEvt) {
-                    await AddSubscriptionAsync(process, catchEvt.Id, catchEvt.Definition, ct);
-                }
+            var oldElement = definition.Elements.FirstOrDefault(e => e.Id == context.PreviousWaitingAtId);
+            foreach (var elementId in ResolveCatchElementIds(oldElement, definition)) {
+                await RemoveSubscriptionAsync(SubscriptionId(processName, elementId), ct);
             }
+        }
+
+        if (instance.IsComplete || string.IsNullOrEmpty(instance.WaitingAtId) || definition is null) {
+            return AdviseResult.Continue;
+        }
+
+        var newElement = definition.Elements.FirstOrDefault(e => e.Id == instance.WaitingAtId);
+        foreach (var (elementId, eventDef) in ResolveCatchEventDefinitions(newElement, definition)) {
+            await UpsertSubscriptionAsync(
+                SubscriptionId(processName, elementId),
+                eventDef.Name,
+                eventDef is Message ? processName : null,
+                processName,
+                ct);
         }
 
         return AdviseResult.Continue;
@@ -72,42 +70,68 @@ public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
 
     #endregion
 
-    private async Task RemoveSubscriptionsAsync(
-        FlowElement?      element,
-        ProcessDefinition definition,
-        string            processName,
+    private async Task RemoveSubscriptionAsync(string subscriptionId, CancellationToken ct) {
+        var existing = await _subscriptions.FirstOrDefaultAsync(
+            q => q.Where(s => s.SubscriptionId == subscriptionId), ct);
+        if (existing is null) {
+            return;
+        }
+
+        await _subscriptions.RemoveAsync(existing, ct);
+        await _subscriptions.CommitAsync(ct);
+    }
+
+    private async Task UpsertSubscriptionAsync(
+        string            subscriptionId,
+        string            eventType,
+        string?           correlationKey,
+        string            target,
         CancellationToken ct
     ) {
-        if (element is FlowEvent { Definition: not null } evt) {
-            var id = $"flow:{processName}:{evt.Id}";
-            await _store.RemoveAsync(id, ct);
+        var existing = await _subscriptions.FirstOrDefaultAsync(
+            q => q.Where(s => s.SubscriptionId == subscriptionId), ct);
+
+        if (existing is null) {
+            await _subscriptions.AddAsync(new() {
+                Name           = subscriptionId,
+                CanonicalName  = $"event-subscriptions/{subscriptionId}",
+                SubscriptionId = subscriptionId,
+                EventType      = eventType,
+                CorrelationKey = correlationKey,
+                Target         = target,
+            }, ct);
+        } else {
+            existing.EventType      = eventType;
+            existing.CorrelationKey = correlationKey;
+            existing.Target         = target;
+            await _subscriptions.UpdateAsync(existing, ct);
+        }
+
+        await _subscriptions.CommitAsync(ct);
+    }
+
+    private static string SubscriptionId(string processName, string elementId) {
+        return $"flow:{processName}:{elementId}";
+    }
+
+    private static IEnumerable<string> ResolveCatchElementIds(FlowElement? element, ProcessDefinition definition) {
+        return ResolveCatchEventDefinitions(element, definition).Select(t => t.ElementId);
+    }
+
+    private static IEnumerable<(string ElementId, IEventDefinition Definition)> ResolveCatchEventDefinitions(
+        FlowElement?      element,
+        ProcessDefinition definition
+    ) {
+        if (element is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: not null } evt) {
+            yield return (evt.Id, evt.Definition);
         } else if (element is EventBasedGateway gateway) {
-            var outgoing = definition.Flows.Where(f => f.Source == gateway);
-            foreach (var flow in outgoing) {
+            foreach (var flow in definition.Flows.Where(f => f.Source == gateway)) {
                 if (flow.Target is FlowEvent {
                     Position: EventPosition.IntermediateCatch, Definition: not null,
                 } catchEvt) {
-                    var id = $"flow:{processName}:{catchEvt.Id}";
-                    await _store.RemoveAsync(id, ct);
+                    yield return (catchEvt.Id, catchEvt.Definition);
                 }
             }
         }
-    }
-
-    private async Task AddSubscriptionAsync(
-        SchemataProcess   process,
-        string            elementId,
-        IEventDefinition  definition,
-        CancellationToken ct
-    ) {
-        var correlationKey = definition is Message ? process.CanonicalName : null;
-        // Key the subscription by the waiting element id so two catches sharing an event
-        // name in one process keep distinct subscriptions.
-        var id             = $"flow:{process.CanonicalName}:{elementId}";
-        var target         = process.CanonicalName!;
-        var eventType      = definition.Name;
-
-        var subscription = new EventSubscription(id, eventType, correlationKey, target);
-        await _store.AddAsync(subscription, ct);
     }
 }

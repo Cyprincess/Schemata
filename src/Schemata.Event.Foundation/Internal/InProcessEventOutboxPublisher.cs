@@ -13,8 +13,10 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
+using Schemata.Event.Skeleton.Entities;
 
 namespace Schemata.Event.Foundation.Internal;
 
@@ -46,11 +48,14 @@ public sealed class InProcessEventOutboxPublisher(
             throw new InvalidOperationException($"Event payload for '{message.EventType}' could not be deserialized.");
         }
 
-        var store         = scope.ServiceProvider.GetRequiredService<IEventSubscriptionStore>();
-        var subscriptions = await store.FindAsync(message.EventType, ct: ct);
+        var subscriptions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var matched       = new List<SchemataEventSubscription>();
+        await foreach (var sub in subscriptions.ListMatchingAsync(message.EventType, ct: ct)) {
+            matched.Add(sub);
+        }
 
         var context = scope.ServiceProvider.GetRequiredService<IEventDispatchContext>();
-        context.SetSubscriptions(subscriptions);
+        context.SetSubscriptions(matched);
 
         var eventCtx = new EventContext(@event, message.EventType) {
             Payload       = message.Payload,
