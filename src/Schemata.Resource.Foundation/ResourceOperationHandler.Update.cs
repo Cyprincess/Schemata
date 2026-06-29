@@ -8,6 +8,7 @@ using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
@@ -147,7 +148,9 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return new([
             new() {
                 Field       = nameof(IUpdateMask.UpdateMask).Underscore(),
-                Description = $"The update_mask path `{path}` is invalid: {reason}.",
+                Description = LocalizedMessageFormatter.FormatInvariant(
+                    SchemataResources.INVALID_UPDATE_MASK,
+                    new Dictionary<string, string> { ["path"] = path, ["reason"] = reason }),
                 Reason      = SchemataResources.INVALID_UPDATE_MASK,
             },
         ]);

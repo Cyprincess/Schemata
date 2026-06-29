@@ -7,12 +7,12 @@
     <body>
       <trans-unit id="DEPENDENCY_AUTO_REGISTERED">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="translated">{0} 依赖 {1}，将会自动添加。</target>
+        <target state="translated">{0} 依赖 {1},将自动添加。</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_REQUIRED">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="translated">{0} 需要 {1}，请手动添加。</target>
+        <target state="translated">{0} 需要 {1},请手动添加。</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_SUGGESTED">
@@ -32,17 +32,17 @@
       </trans-unit>
       <trans-unit id="FAILED_PRECONDITION">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="translated">请求无法在当前系统状态下执行。</target>
+        <target state="translated">在当前系统状态下无法执行该请求。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHENTICATED">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="translated">请求没有有效的身份验证凭据。</target>
+        <target state="translated">请求未提供有效的身份验证凭据。</target>
         <note />
       </trans-unit>
       <trans-unit id="PERMISSION_DENIED">
         <source>You do not have permission to perform this action.</source>
-        <target state="translated">您没有权限执行此操作。</target>
+        <target state="translated">您没有执行此操作的权限。</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_FOUND">
@@ -52,7 +52,7 @@
       </trans-unit>
       <trans-unit id="ALREADY_EXISTS">
         <source>The resource already exists.</source>
-        <target state="translated">该资源已存在。</target>
+        <target state="translated">资源已存在。</target>
         <note />
       </trans-unit>
       <trans-unit id="CONCURRENCY_MISMATCH">
@@ -62,7 +62,7 @@
       </trans-unit>
       <trans-unit id="VALIDATION_ERROR">
         <source>One or more validation errors occurred.</source>
-        <target state="translated">发生了一个或多个验证错误。</target>
+        <target state="translated">发生一项或多项验证错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="RESOURCE_EXHAUSTED">
@@ -72,12 +72,12 @@
       </trans-unit>
       <trans-unit id="NAMED_NOT_FOUND">
         <source>{0} '{1}' not found.</source>
-        <target state="translated">{0}「{1}」未找到。</target>
+        <target state="translated">未找到 {0} '{1}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="GENERIC_ERROR">
         <source>An error occurred.</source>
-        <target state="translated">发生了一个错误。</target>
+        <target state="translated">发生错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_EMPTY">
@@ -87,12 +87,12 @@
       </trans-unit>
       <trans-unit id="UNSUPPORTED_ALGORITHM">
         <source>Unsupported algorithm: {0}.</source>
-        <target state="translated">不支持的算法：{0}。</target>
+        <target state="translated">不支持的算法:{0}。</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_SUPPORTED">
         <source>'{0}' is not supported.</source>
-        <target state="translated">'{0}' 不受支持。</target>
+        <target state="translated">不支持 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_CONFIGURED">
@@ -102,17 +102,17 @@
       </trans-unit>
       <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
-        <target state="translated">应用程序没有扇区标识符 URI 和重定向 URI。</target>
+        <target state="translated">应用程序未提供 sector identifier URI,也没有重定向 URI。</target>
         <note />
       </trans-unit>
       <trans-unit id="PATTERN_REQUIRED">
         <source>Cannot resolve a resource name without a pattern.</source>
-        <target state="translated">没有模式无法解析资源名称。</target>
+        <target state="translated">没有模式则无法解析资源名称。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_TABLE_NAME">
         <source>Invalid table name '{0}' of type '{1}'.</source>
-        <target state="translated">类型「{1}」的表名「{0}」无效。</target>
+        <target state="translated">类型 '{1}' 的表名 '{0}' 无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="TABLE_KEY_REQUIRED">
@@ -127,17 +127,17 @@
       </trans-unit>
       <trans-unit id="PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
-        <target state="translated">无法解析类型「{1}」的参数「{0}」。</target>
+        <target state="translated">无法解析类型 '{1}' 的参数 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="METHOD_PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
-        <target state="translated">无法解析类型「{2}」上方法「{1}」的参数「{0}」。</target>
+        <target state="translated">无法解析类型 '{2}' 上方法 '{1}' 的参数 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="CONVERSION_FAILED">
         <source>Unable to convert '{0}' to {1}.</source>
-        <target state="translated">无法将「{0}」转换为 {1}。</target>
+        <target state="translated">无法将 '{0}' 转换为 {1}。</target>
         <note />
       </trans-unit>
       <trans-unit id="SOURCE_FIELD_REQUIRED">
@@ -165,14 +165,9 @@
         <target state="translated">无效的请求载荷。</target>
         <note />
       </trans-unit>
-      <trans-unit id="INVALID_PARENT">
-        <source>The parent is invalid.</source>
-        <target state="translated">父资源无效。</target>
-        <note />
-      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
-        <source>Cross-parent reading is not supported for this resource.</source>
-        <target state="translated">此资源不支持跨父级读取。</target>
+        <source>Cross-parent operation is not supported for '{parent}'.</source>
+        <target state="translated">不支持针对 '{parent}' 的跨父资源操作。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_TOKEN">
@@ -192,22 +187,27 @@
       </trans-unit>
       <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
-        <target state="translated">无效的字段名称「{0}」。</target>
+        <target state="translated">无效的字段名称 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="FUNCTION_NOT_REGISTERED">
         <source>Function '{0}' not registered.</source>
-        <target state="translated">函数「{0}」未注册。</target>
+        <target state="translated">函数 '{0}' 未注册。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_SIZE">
         <source>The page_size must not be negative.</source>
-        <target state="new">The page_size must not be negative.</target>
+        <target state="translated">page_size 不能为负数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent '{parent}' is invalid.</source>
+        <target state="translated">父资源 '{parent}' 无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHENTICATOR_KEY_REQUIRED">
         <source>The user manager must produce an authenticator key after reset.</source>
-        <target state="translated">用户管理器必须在重置后生成验证器密钥。</target>
+        <target state="translated">重置后用户管理器必须生成验证器密钥。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_CLIENT_CREDENTIALS">
@@ -222,12 +222,12 @@
       </trans-unit>
       <trans-unit id="MULTIPLE_CLIENT_AUTH_METHODS">
         <source>The request uses more than one client authentication method.</source>
-        <target state="translated">请求使用了多种客户端认证方法。</target>
+        <target state="translated">请求使用了多种客户端身份验证方式。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="translated">提供的授权无效、已过期或已被撤销。</target>
+        <target state="translated">提供的授权无效、已过期或已撤销。</target>
         <note />
       </trans-unit>
       <trans-unit id="PKCE_VERIFIER_MISMATCH">
@@ -237,12 +237,12 @@
       </trans-unit>
       <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="translated">请求的作用域不允许此客户端使用。</target>
+        <target state="translated">此客户端不允许使用所请求的范围。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="translated">客户端未被授权使用此授权类型。</target>
+        <target state="translated">此客户端未被授权使用该授权类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="ACCESS_DENIED">
@@ -252,7 +252,7 @@
       </trans-unit>
       <trans-unit id="INVALID_REDIRECT_URI">
         <source>The redirect_uri does not match any registered URI.</source>
-        <target state="translated">redirect_uri 与任何已注册的 URI 不匹配。</target>
+        <target state="translated">redirect_uri 与任何已注册的 URI 都不匹配。</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_CONSENT_REQUIRED">
@@ -262,32 +262,32 @@
       </trans-unit>
       <trans-unit id="USER_AUTHENTICATION_REQUIRED">
         <source>User authentication is required.</source>
-        <target state="translated">需要用户认证。</target>
+        <target state="translated">需要用户身份验证。</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHORIZATION_PENDING">
         <source>The authorization request is still pending.</source>
-        <target state="translated">授权请求仍在处理中。</target>
+        <target state="translated">授权请求仍在等待中。</target>
         <note />
       </trans-unit>
       <trans-unit id="SLOW_DOWN">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="translated">轮询间隔太短。请增加间隔并重试。</target>
+        <target state="translated">轮询间隔过短,请增大间隔后重试。</target>
         <note />
       </trans-unit>
       <trans-unit id="INTERNAL">
         <source>An internal server error occurred.</source>
-        <target state="translated">发生了内部服务器错误。</target>
+        <target state="translated">发生内部服务器错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PROMPT_COMBINATION">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
-        <target state="translated">'{0}' 提示值不能与其他值组合使用。</target>
+        <target state="translated">'{0}' prompt 值不能与其他值组合使用。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNSUPPORTED_PROMPT">
         <source>The '{0}' prompt value is not supported for this client.</source>
-        <target state="translated">'{0}' 提示值不受此客户端支持。</target>
+        <target state="translated">'{0}' prompt 值不被此客户端支持。</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_IDENTITY_REQUIRED">
@@ -297,7 +297,7 @@
       </trans-unit>
       <trans-unit id="REQUIRED_SETTING_MISSING">
         <source>{0} is enabled but {1} is not set.</source>
-        <target state="translated">{0} 已启用但 {1} 未设置。</target>
+        <target state="translated">{0} 已启用,但 {1} 未设置。</target>
         <note />
       </trans-unit>
       <trans-unit id="ABSOLUTE_URI_REQUIRED">
@@ -307,7 +307,7 @@
       </trans-unit>
       <trans-unit id="MISSING_DEPENDENT_SETTING">
         <source>{0} is set but {1} is not set.</source>
-        <target state="translated">{0} 已设置但 {1} 未设置。</target>
+        <target state="translated">{0} 已设置,但 {1} 未设置。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNABLE_TO_RESOLVE">
@@ -317,32 +317,247 @@
       </trans-unit>
       <trans-unit id="INVALID_FILTER">
         <source>The filter expression is invalid.</source>
-        <target state="new">The filter expression is invalid.</target>
+        <target state="translated">filter 表达式无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_UPDATE_MASK">
-        <source>The update_mask expression is invalid.</source>
-        <target state="new">The update_mask expression is invalid.</target>
+        <source>The update_mask path '{path}' is invalid: {reason}.</source>
+        <target state="translated">update_mask 路径 '{path}' 无效:{reason}。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_READ_MASK">
-        <source>The read_mask expression is invalid.</source>
-        <target state="new">The read_mask expression is invalid.</target>
+        <source>The read_mask path '{path}' is invalid: {reason}.</source>
+        <target state="translated">read_mask 路径 '{path}' 无效:{reason}。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_NAME">
-        <source>The resource name is invalid.</source>
-        <target state="new">The resource name is invalid.</target>
+        <source>The requested resource name '{name}' is invalid.</source>
+        <target state="translated">请求的资源名称 '{name}' 无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_ORDER_BY">
         <source>The order_by expression is invalid.</source>
-        <target state="new">The order_by expression is invalid.</target>
+        <target state="translated">order_by 表达式无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_REFERENCE">
-        <source>The supplied reference does not resolve to any registered resource type.</source>
-        <target state="new">The supplied reference does not resolve to any registered resource type.</target>
+        <source>'{value}' does not resolve to any registered resource type.</source>
+        <target state="translated">'{value}' 无法解析为任何已注册的资源类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING">
+        <source>Back-channel logout requires Scheduling.</source>
+        <target state="translated">反向通道注销需要 Scheduling 模块。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_NAME_REQUIRED">
+        <source>Process name is required.</source>
+        <target state="translated">流程名称是必填项。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_ALREADY_REGISTERED">
+        <source>Process definition '{name}' is already registered.</source>
+        <target state="translated">流程定义 '{name}' 已经注册。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_NOT_REGISTERED">
+        <source>Process definition '{name}' is not registered.</source>
+        <target state="translated">流程定义 '{name}' 未注册。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_RUNTIME_NOT_REGISTERED">
+        <source>Flow runtime '{engine}' is not registered with the host.</source>
+        <target state="translated">Flow 运行时 '{engine}' 未在主机上注册。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_MESSAGE_NOT_DEFINED">
+        <source>Message '{name}' is not defined on the process.</source>
+        <target state="translated">流程未定义消息 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_SOURCE_MODIFIED_CONCURRENTLY">
+        <source>Source '{name}' was modified concurrently; the flow transition was aborted.</source>
+        <target state="translated">源 '{name}' 被并发修改;流程转换已中止。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_TIMER_MISSING_VARIABLE">
+        <source>Flow timer job is missing the '{variable}' variable.</source>
+        <target state="translated">流程定时器作业缺少 '{variable}' 变量。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_TIMER_REQUIRES_SCHEDULING">
+        <source>Process '{name}' reached a timer catch, which requires Scheduling.</source>
+        <target state="translated">流程 '{name}' 抵达计时器捕获,需要 Scheduling 模块。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_ACCESS_DENIED">
+        <source>Access to source '{name}' is denied.</source>
+        <target state="translated">拒绝访问源 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="OPERATION_ALREADY_FINISHED">
+        <source>Operation '{name}' has already finished.</source>
+        <target state="translated">操作 '{name}' 已经完成。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_NO_START_EVENT">
+        <source>Process definition has no start event.</source>
+        <target state="translated">流程定义没有起始事件。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_START_EVENT_OUTGOING">
+        <source>Start event must have exactly one outgoing sequence flow.</source>
+        <target state="translated">起始事件必须有且仅有一个出向序列流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_ONE_START_EVENT">
+        <source>State machine requires exactly one start event.</source>
+        <target state="translated">状态机需要有且仅有一个起始事件。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_END_EVENT">
+        <source>State machine requires at least one end event.</source>
+        <target state="translated">状态机至少需要一个结束事件。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_INVALID_TRIGGER">
+        <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
+        <target state="translated">触发器 '{trigger}' 在状态 '{state}' 下无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_UNKNOWN_CURRENT_STATE">
+        <source>Current state '{state}' is not defined on the process.</source>
+        <target state="translated">流程中未定义当前状态 '{state}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_GATEWAY_UNSUPPORTED">
+        <source>Gateway '{name}' is not supported by the state machine engine.</source>
+        <target state="translated">状态机引擎不支持网关 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED">
+        <source>Gateway '{name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.</source>
+        <target state="translated">状态机引擎不支持网关 '{name}'。仅支持排他与基于事件的网关。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_CYCLIC_AUTO_FLOW">
+        <source>Cyclic auto-flow detected at element '{name}'; the process cannot reach a stable state.</source>
+        <target state="translated">在元素 '{name}' 处检测到循环自动流;流程无法达到稳定状态。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_UNKNOWN_TARGET">
+        <source>Unknown target element '{name}'.</source>
+        <target state="translated">未知的目标元素 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_UNSUPPORTED">
+        <source>Activity '{name}' is not supported by the state machine engine.</source>
+        <target state="translated">状态机引擎不支持活动 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED">
+        <source>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</source>
+        <target state="translated">活动 '{name}' 带有循环特征,状态机引擎不支持。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ELEMENT_UNREACHABLE">
+        <source>Element '{name}' is not reachable from the start event.</source>
+        <target state="translated">元素 '{name}' 从起始事件不可达。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_FLOW_NO_SOURCE">
+        <source>Sequence flow '{id}' has no source element.</source>
+        <target state="translated">序列流 '{id}' 没有源元素。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_FLOW_NO_TARGET">
+        <source>Sequence flow '{id}' has no target element.</source>
+        <target state="translated">序列流 '{id}' 没有目标元素。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_SOURCE">
+        <source>Sequence flow '{id}' references unknown source element '{source}'.</source>
+        <target state="translated">序列流 '{id}' 引用了未知的源元素 '{source}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_TARGET">
+        <source>Sequence flow '{id}' references unknown target element '{target}'.</source>
+        <target state="translated">序列流 '{id}' 引用了未知的目标元素 '{target}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_END_EVENT_OUTGOING">
+        <source>End event '{name}' must not have outgoing flows.</source>
+        <target state="translated">结束事件 '{name}' 不得有出向流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED">
+        <source>Event-based gateway '{name}' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.</source>
+        <target state="translated">基于事件的网关 '{name}' 设置了 Parallel=true,状态机引擎不支持。仅支持排他模式(Parallel=false)。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING">
+        <source>Event-based gateway '{name}' must have at least one outgoing flow.</source>
+        <target state="translated">基于事件的网关 '{name}' 必须至少有一个出向流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_TARGET">
+        <source>Event-based gateway '{name}' outgoing flow must target an IntermediateCatchEvent.</source>
+        <target state="translated">基于事件的网关 '{name}' 的出向流必须指向 IntermediateCatchEvent。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING">
+        <source>Exclusive gateway '{name}' must have at least one outgoing flow.</source>
+        <target state="translated">排他网关 '{name}' 必须至少有一个出向流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_BOUNDARY_UNATTACHED">
+        <source>Boundary event '{name}' is not attached to any activity.</source>
+        <target state="translated">边界事件 '{name}' 未附加到任何活动。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY">
+        <source>Boundary event '{name}' is attached to unknown activity.</source>
+        <target state="translated">边界事件 '{name}' 附加到未知的活动。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING">
+        <source>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</source>
+        <target state="translated">边界事件 '{name}' 是非中断的,状态机引擎不支持。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED">
+        <source>Boundary event '{name}' must have exactly one outgoing flow.</source>
+        <target state="translated">边界事件 '{name}' 必须有且仅有一个出向流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
+        <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
+        <target state="translated">中间捕获事件 '{name}' 必须至少有一个出向流。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED">
+        <source>Intermediate catch event '{name}' can only be reached from an EventBasedGateway.</source>
+        <target state="translated">中间捕获事件 '{name}' 只能从 EventBasedGateway 到达。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_NO_OUTGOING">
+        <source>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</source>
+        <target state="translated">活动 '{name}' 没有出向流,无法继续。请将其连接到结束事件或其他元素。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY">
+        <source>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</source>
+        <target state="translated">活动 '{name}' 有混合的出向路径(直接与网关)。每个活动最多只能有一种出向路径类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_END">
+        <source>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</source>
+        <target state="translated">活动 '{name}' 有混合的出向路径(结束事件与其他)。每个活动最多只能有一种出向路径类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
+        <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
+        <target state="translated">活动 '{name}' 有多个直接通向其他活动的出向流。一个活动最多只能有一条直接出向流。</target>
         <note />
       </trans-unit>
     </body>

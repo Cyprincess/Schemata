@@ -25,10 +25,10 @@ namespace Schemata.Entity.EntityFrameworkCore;
 ///         </item>
 ///         <item>
 ///             For every property whose declared type is
-///             <see cref="Dictionary{TKey, TValue}" /> with string keys and string values,
-///             or <see cref="ICollection{T}" /> of strings, registers a JSON
-///             <see cref="EfCoreJsonValueConverter{T}" /> so EF Core stores the value as a
-///             single text column.
+///             <see cref="Dictionary{TKey, TValue}" /> with string keys and either
+///             non-nullable or nullable string values, or <see cref="ICollection{T}" /> of
+///             strings, registers a JSON <see cref="EfCoreJsonValueConverter{T}" /> so EF
+///             Core stores the value as a single text column.
 ///         </item>
 ///     </list>
 ///     Polymorphic <see cref="ResourceReferenceAttribute" /> properties
@@ -125,6 +125,10 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
         }
 
         if (type == typeof(Dictionary<string, string>)) {
+            return true;
+        }
+
+        if (type == typeof(Dictionary<string, string?>)) {
             return true;
         }
 

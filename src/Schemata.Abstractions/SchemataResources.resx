@@ -120,7 +120,7 @@
         <value>Invalid request payload.</value>
     </data>
   <data name="CROSS_PARENT_UNSUPPORTED" xml:space="preserve">
-        <value>Cross-parent reading is not supported for this resource.</value>
+        <value>Cross-parent operation is not supported for '{parent}'.</value>
     </data>
   <data name="INVALID_PAGE_TOKEN" xml:space="preserve">
         <value>The page token is invalid or has expired.</value>
@@ -141,7 +141,7 @@
         <value>The page_size must not be negative.</value>
     </data>
   <data name="INVALID_PARENT" xml:space="preserve">
-        <value>The parent is invalid.</value>
+        <value>The parent '{parent}' is invalid.</value>
     </data>
   <data name="AUTHENTICATOR_KEY_REQUIRED" xml:space="preserve">
         <value>The user manager must produce an authenticator key after reset.</value>
@@ -213,18 +213,147 @@
         <value>The filter expression is invalid.</value>
     </data>
   <data name="INVALID_UPDATE_MASK" xml:space="preserve">
-        <value>The update_mask expression is invalid.</value>
+        <value>The update_mask path '{path}' is invalid: {reason}.</value>
     </data>
   <data name="INVALID_READ_MASK" xml:space="preserve">
-        <value>The read_mask expression is invalid.</value>
+        <value>The read_mask path '{path}' is invalid: {reason}.</value>
     </data>
   <data name="INVALID_NAME" xml:space="preserve">
-        <value>The resource name is invalid.</value>
+        <value>The requested resource name '{name}' is invalid.</value>
     </data>
   <data name="INVALID_ORDER_BY" xml:space="preserve">
         <value>The order_by expression is invalid.</value>
     </data>
   <data name="INVALID_REFERENCE" xml:space="preserve">
-        <value>The supplied reference does not resolve to any registered resource type.</value>
+        <value>'{value}' does not resolve to any registered resource type.</value>
+    </data>
+  <data name="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING" xml:space="preserve">
+        <value>Back-channel logout requires Scheduling.</value>
+    </data>
+  <data name="PROCESS_NAME_REQUIRED" xml:space="preserve">
+        <value>Process name is required.</value>
+    </data>
+  <data name="PROCESS_ALREADY_REGISTERED" xml:space="preserve">
+        <value>Process definition '{name}' is already registered.</value>
+    </data>
+  <data name="PROCESS_NOT_REGISTERED" xml:space="preserve">
+        <value>Process definition '{name}' is not registered.</value>
+    </data>
+  <data name="FLOW_RUNTIME_NOT_REGISTERED" xml:space="preserve">
+        <value>Flow runtime '{engine}' is not registered with the host.</value>
+    </data>
+  <data name="PROCESS_MESSAGE_NOT_DEFINED" xml:space="preserve">
+        <value>Message '{name}' is not defined on the process.</value>
+    </data>
+  <data name="FLOW_SOURCE_MODIFIED_CONCURRENTLY" xml:space="preserve">
+        <value>Source '{name}' was modified concurrently; the flow transition was aborted.</value>
+    </data>
+  <data name="FLOW_TIMER_MISSING_VARIABLE" xml:space="preserve">
+        <value>Flow timer job is missing the '{variable}' variable.</value>
+    </data>
+  <data name="FLOW_TIMER_REQUIRES_SCHEDULING" xml:space="preserve">
+        <value>Process '{name}' reached a timer catch, which requires Scheduling.</value>
+    </data>
+  <data name="INSIGHT_ACCESS_DENIED" xml:space="preserve">
+        <value>Access to source '{name}' is denied.</value>
+    </data>
+  <data name="OPERATION_ALREADY_FINISHED" xml:space="preserve">
+        <value>Operation '{name}' has already finished.</value>
+    </data>
+  <data name="STATE_MACHINE_NO_START_EVENT" xml:space="preserve">
+        <value>Process definition has no start event.</value>
+    </data>
+  <data name="STATE_MACHINE_START_EVENT_OUTGOING" xml:space="preserve">
+        <value>Start event must have exactly one outgoing sequence flow.</value>
+    </data>
+  <data name="STATE_MACHINE_REQUIRES_ONE_START_EVENT" xml:space="preserve">
+        <value>State machine requires exactly one start event.</value>
+    </data>
+  <data name="STATE_MACHINE_REQUIRES_END_EVENT" xml:space="preserve">
+        <value>State machine requires at least one end event.</value>
+    </data>
+  <data name="STATE_MACHINE_INVALID_TRIGGER" xml:space="preserve">
+        <value>Trigger '{trigger}' is not valid from state '{state}'.</value>
+    </data>
+  <data name="STATE_MACHINE_UNKNOWN_CURRENT_STATE" xml:space="preserve">
+        <value>Current state '{state}' is not defined on the process.</value>
+    </data>
+  <data name="STATE_MACHINE_GATEWAY_UNSUPPORTED" xml:space="preserve">
+        <value>Gateway '{name}' is not supported by the state machine engine.</value>
+    </data>
+  <data name="STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED" xml:space="preserve">
+        <value>Gateway '{name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.</value>
+    </data>
+  <data name="STATE_MACHINE_CYCLIC_AUTO_FLOW" xml:space="preserve">
+        <value>Cyclic auto-flow detected at element '{name}'; the process cannot reach a stable state.</value>
+    </data>
+  <data name="STATE_MACHINE_UNKNOWN_TARGET" xml:space="preserve">
+        <value>Unknown target element '{name}'.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_UNSUPPORTED" xml:space="preserve">
+        <value>Activity '{name}' is not supported by the state machine engine.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED" xml:space="preserve">
+        <value>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</value>
+    </data>
+  <data name="STATE_MACHINE_ELEMENT_UNREACHABLE" xml:space="preserve">
+        <value>Element '{name}' is not reachable from the start event.</value>
+    </data>
+  <data name="STATE_MACHINE_FLOW_NO_SOURCE" xml:space="preserve">
+        <value>Sequence flow '{id}' has no source element.</value>
+    </data>
+  <data name="STATE_MACHINE_FLOW_NO_TARGET" xml:space="preserve">
+        <value>Sequence flow '{id}' has no target element.</value>
+    </data>
+  <data name="STATE_MACHINE_FLOW_UNKNOWN_SOURCE" xml:space="preserve">
+        <value>Sequence flow '{id}' references unknown source element '{source}'.</value>
+    </data>
+  <data name="STATE_MACHINE_FLOW_UNKNOWN_TARGET" xml:space="preserve">
+        <value>Sequence flow '{id}' references unknown target element '{target}'.</value>
+    </data>
+  <data name="STATE_MACHINE_END_EVENT_OUTGOING" xml:space="preserve">
+        <value>End event '{name}' must not have outgoing flows.</value>
+    </data>
+  <data name="STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED" xml:space="preserve">
+        <value>Event-based gateway '{name}' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.</value>
+    </data>
+  <data name="STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING" xml:space="preserve">
+        <value>Event-based gateway '{name}' must have at least one outgoing flow.</value>
+    </data>
+  <data name="STATE_MACHINE_EVENT_GATEWAY_TARGET" xml:space="preserve">
+        <value>Event-based gateway '{name}' outgoing flow must target an IntermediateCatchEvent.</value>
+    </data>
+  <data name="STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING" xml:space="preserve">
+        <value>Exclusive gateway '{name}' must have at least one outgoing flow.</value>
+    </data>
+  <data name="STATE_MACHINE_BOUNDARY_UNATTACHED" xml:space="preserve">
+        <value>Boundary event '{name}' is not attached to any activity.</value>
+    </data>
+  <data name="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY" xml:space="preserve">
+        <value>Boundary event '{name}' is attached to unknown activity.</value>
+    </data>
+  <data name="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING" xml:space="preserve">
+        <value>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</value>
+    </data>
+  <data name="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED" xml:space="preserve">
+        <value>Boundary event '{name}' must have exactly one outgoing flow.</value>
+    </data>
+  <data name="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING" xml:space="preserve">
+        <value>Intermediate catch event '{name}' must have at least one outgoing flow.</value>
+    </data>
+  <data name="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED" xml:space="preserve">
+        <value>Intermediate catch event '{name}' can only be reached from an EventBasedGateway.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_NO_OUTGOING" xml:space="preserve">
+        <value>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY" xml:space="preserve">
+        <value>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_MIXED_END" xml:space="preserve">
+        <value>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</value>
+    </data>
+  <data name="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT" xml:space="preserve">
+        <value>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</value>
     </data>
 </root>

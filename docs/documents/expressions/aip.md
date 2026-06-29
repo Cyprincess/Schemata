@@ -134,7 +134,7 @@ When compiling against `IReadOnlyDictionary<string, object?>`, AIP uses `Dynamic
 
 ## Error handling
 
-`Parse` and `Compile` wrap Parlot parse failures in `ExpressionException`; invalid tree types and member paths raise `ArgumentException` or `ParseException`. `ResourceOperationHandler.ListAsync` maps expression failures to `ValidationException` with `FieldReasons.InvalidFilter`. Order-by failures from `OrderCompiler` map to `FieldReasons.InvalidOrderBy`.
+`Parse` and `Compile` wrap Parlot parse failures in `ExpressionException`; invalid tree types and member paths raise `ArgumentException` or `ParseException`. `ResourceOperationHandler.ListAsync` maps expression failures to `ValidationException` with `Reason = INVALID_FILTER`. Order-by failures from `OrderCompiler` map to `Reason = INVALID_ORDER_BY`.
 
 ## Caveats
 

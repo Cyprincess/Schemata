@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Insight.Skeleton;
 using Schemata.Security.Skeleton;
@@ -44,7 +46,9 @@ public static class InsightSecurityGate
             var allowed = (bool)(await InvokeAsync(accessType, accessProvider, "HasAccessAsync",
                                                    [null, context, principal, ct]))!;
             if (!allowed) {
-                throw new PermissionDeniedException(message: $"Access to source '{rowType.Name}' is denied.");
+                throw new PermissionDeniedException(
+                    SchemataResources.INSIGHT_ACCESS_DENIED,
+                    new Dictionary<string, string> { ["name"] = rowType.Name });
             }
         }
 

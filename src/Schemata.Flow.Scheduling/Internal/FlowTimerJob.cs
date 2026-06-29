@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -22,10 +24,14 @@ public sealed class FlowTimerJob : IScheduledJob
 
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
         var processName = ExtractProcessName(context)
-                       ?? throw new FailedPreconditionException(message: "Flow timer job is missing the 'processName' variable.");
+                       ?? throw new FailedPreconditionException(
+                              SchemataResources.FLOW_TIMER_MISSING_VARIABLE,
+                              new Dictionary<string, string> { ["variable"] = "processName" });
 
         var timerDef = ExtractTimerDefinition(context)
-                    ?? throw new FailedPreconditionException(message: "Flow timer job is missing the 'timerDef' variable.");
+                    ?? throw new FailedPreconditionException(
+                           SchemataResources.FLOW_TIMER_MISSING_VARIABLE,
+                           new Dictionary<string, string> { ["variable"] = "timerDef" });
 
         await _runtime.TriggerEventAsync(processName, timerDef, ct: ct);
     }

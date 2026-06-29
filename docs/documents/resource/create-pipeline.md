@@ -43,7 +43,7 @@ Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principa
 ### 3. Mapping
 
 `_mapper.Map<TRequest, TEntity>(request)` converts the sanitized request to an entity. A `null` result throws
-`ValidationException` with reason `FieldReasons.InvalidPayload`.
+`ValidationException` with `Reason = INVALID_PAYLOAD`.
 
 ### 4. Create entity — `IResourceCreateAdvisor<TEntity, TRequest>`
 

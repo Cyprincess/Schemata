@@ -34,6 +34,10 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
 ///     concurrency token drives LINQ to DB's optimistic-update predicate.
 ///     Key discovery uses class-level <c>[PrimaryKey]</c> declarations on the entity.
+///     Properties of type <see cref="System.Collections.Generic.Dictionary{TKey, TValue}" />
+///     with string keys (non-nullable or nullable string values) or
+///     <see cref="System.Collections.Generic.ICollection{T}" /> of strings receive a JSON
+///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
 /// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
@@ -153,6 +157,10 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     private static Type? TryGetJsonConverterType(Type memberType) {
         if (memberType == typeof(Dictionary<string, string>)) {
             return typeof(LinqToDbJsonConverter<Dictionary<string, string>>);
+        }
+
+        if (memberType == typeof(Dictionary<string, string?>)) {
+            return typeof(LinqToDbJsonConverter<Dictionary<string, string?>>);
         }
 
         if (memberType == typeof(string)) {

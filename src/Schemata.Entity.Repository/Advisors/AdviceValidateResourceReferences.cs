@@ -10,6 +10,7 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common.Errors;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -105,7 +106,9 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
             violations.Add(new ErrorFieldViolation {
                 Field       = reference.Property.Name,
                 Reason      = SchemataResources.INVALID_REFERENCE,
-                Description = $"'{value}' does not resolve to any registered resource type.",
+                Description = LocalizedMessageFormatter.FormatInvariant(
+                    SchemataResources.INVALID_REFERENCE,
+                    new Dictionary<string, string> { ["value"] = value }),
             });
         }
 

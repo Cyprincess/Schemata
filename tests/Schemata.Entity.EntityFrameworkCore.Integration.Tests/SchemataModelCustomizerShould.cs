@@ -140,6 +140,38 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
     }
 
     [Fact]
+    public async Task JsonConverter_OnNullableValueDictionary_Roundtrips() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "nullable-dict-test",
+                CanonicalName = "books/nullable-dict-test",
+                Annotations = new() {
+                    ["language"] = "fr",
+                    ["origin"]   = null,
+                },
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.NotNull(found!.Annotations);
+            Assert.Equal("fr", found.Annotations!["language"]);
+            Assert.Null(found.Annotations["origin"]);
+        }
+    }
+
+    [Fact]
     public async Task JsonConverter_OnCollectionString_Roundtrips() {
         Guid bookUid;
         {
@@ -172,8 +204,9 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
     public sealed class Book : IIdentifier, ICanonicalName
     {
-        public Dictionary<string, string>? Metadata { get; set; }
-        public List<string>?               Tags     { get; set; }
+        public Dictionary<string, string>?  Metadata    { get; set; }
+        public Dictionary<string, string?>? Annotations { get; set; }
+        public List<string>?                Tags        { get; set; }
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }

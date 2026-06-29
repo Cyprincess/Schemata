@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -34,5 +35,19 @@ public class AlreadyExistsException : SchemataException
         if (reason is { Length: > 0 }) {
             Details = [new ErrorInfoDetail { Reason = reason }];
         }
+    }
+
+    /// <summary>
+    ///     Initializes a new <see cref="AlreadyExistsException" /> from a resx key. The
+    ///     en-US-invariant message is rendered from <see cref="SchemataResources" /> with
+    ///     the named arguments in <paramref name="args" />; <paramref name="resourceKey" />
+    ///     also becomes the <see cref="ErrorInfoDetail.Reason" /> so the locale-aware
+    ///     response path can rehydrate the localized message from the same template.
+    /// </summary>
+    /// <param name="resourceKey">The <see cref="SchemataResources" /> data name.</param>
+    /// <param name="args">Optional named arguments substituted into the template.</param>
+    public AlreadyExistsException(string resourceKey, IReadOnlyDictionary<string, string>? args = null)
+        : this(message: LocalizedMessageFormatter.FormatInvariant(resourceKey, args), reason: resourceKey) {
+        AttachMetadata(args);
     }
 }

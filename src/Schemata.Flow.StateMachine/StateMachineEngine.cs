@@ -33,12 +33,12 @@ public sealed class StateMachineEngine : IFlowRuntime
         var start = definition.Elements.OfType<FlowEvent>().FirstOrDefault(e => e.Position == EventPosition.Start);
 
         if (start is null) {
-            throw new FailedPreconditionException(message: "Process definition has no start event.");
+            throw new FailedPreconditionException(SchemataResources.STATE_MACHINE_NO_START_EVENT);
         }
 
         var outgoing = definition.Flows.Where(sf => sf.Source == start).ToList();
         if (outgoing.Count != 1) {
-            throw new FailedPreconditionException(message: "Start event must have exactly one outgoing sequence flow.");
+            throw new FailedPreconditionException(SchemataResources.STATE_MACHINE_START_EVENT_OUTGOING);
         }
 
         var variables = DeserializeVariables(process);
@@ -108,11 +108,9 @@ public sealed class StateMachineEngine : IFlowRuntime
 
         var current = FindElementById(definition, process.StateId);
         if (current is not Activity root) {
-            throw new InvalidArgumentException(message: $"Trigger '{
-                trigger.Name
-            }' is not valid from state '{
-                process.State
-            }'.");
+            throw new InvalidArgumentException(
+                SchemataResources.STATE_MACHINE_INVALID_TRIGGER,
+                new Dictionary<string, string> { ["trigger"] = trigger.Name, ["state"] = process.State ?? string.Empty });
         }
 
         var boundary = ResolveBoundaryEventFlow(definition, root, trigger);
@@ -122,11 +120,9 @@ public sealed class StateMachineEngine : IFlowRuntime
 
         var outgoing = definition.Flows.FirstOrDefault(sf => sf.Source == root);
         if (outgoing is not { Target: EventBasedGateway gateway }) {
-            throw new InvalidArgumentException(message: $"Trigger '{
-                trigger.Name
-            }' is not valid from state '{
-                process.State
-            }'.");
+            throw new InvalidArgumentException(
+                SchemataResources.STATE_MACHINE_INVALID_TRIGGER,
+                new Dictionary<string, string> { ["trigger"] = trigger.Name, ["state"] = process.State ?? string.Empty });
         }
 
         var matched = await ResolveEventBasedGatewayFlowAsync(definition, gateway, trigger, variables);
@@ -134,11 +130,9 @@ public sealed class StateMachineEngine : IFlowRuntime
             return await ApplyTargetStateAsync(instance, definition, matched.Target);
         }
 
-        throw new InvalidArgumentException(message: $"Trigger '{
-            trigger.Name
-        }' is not valid from state '{
-            process.State
-        }'.");
+        throw new InvalidArgumentException(
+            SchemataResources.STATE_MACHINE_INVALID_TRIGGER,
+            new Dictionary<string, string> { ["trigger"] = trigger.Name, ["state"] = process.State ?? string.Empty });
     }
 
     public async ValueTask<ProcessInstance> AdvanceAsync(
@@ -164,8 +158,8 @@ public sealed class StateMachineEngine : IFlowRuntime
         var current = FindElementById(definition, process.StateId);
         if (current is null) {
             throw new FailedPreconditionException(
-                reason: "FLOW_STATE_NOT_DEFINED",
-                message: $"Current state '{process.StateId}' is not defined on the process.");
+                SchemataResources.STATE_MACHINE_UNKNOWN_CURRENT_STATE,
+                new Dictionary<string, string> { ["state"] = process.StateId ?? string.Empty });
         }
 
         var matched = await ResolveAutoFlowAsync(definition, current, variables);
@@ -337,7 +331,9 @@ public sealed class StateMachineEngine : IFlowRuntime
             case EventBasedGateway:
                 return null;
             case ParallelGateway or InclusiveGateway:
-                throw new FailedPreconditionException(message: $"Gateway '{gateway.Name}' is not supported by the state machine engine.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_GATEWAY_UNSUPPORTED,
+                    new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
         }
 
         var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
@@ -372,7 +368,8 @@ public sealed class StateMachineEngine : IFlowRuntime
         visited ??= [];
         if (!visited.Add(target)) {
             throw new FailedPreconditionException(
-                message: $"Cyclic auto-flow detected at element '{target.Name}'; the process cannot reach a stable state.");
+                SchemataResources.STATE_MACHINE_CYCLIC_AUTO_FLOW,
+                new Dictionary<string, string> { ["name"] = target.Name ?? string.Empty });
         }
 
         switch (target) {
@@ -404,7 +401,8 @@ public sealed class StateMachineEngine : IFlowRuntime
             }
             default:
                 throw new FailedPreconditionException(
-                    message: $"Unknown target element '{target.Name}'.");
+                    SchemataResources.STATE_MACHINE_UNKNOWN_TARGET,
+                    new Dictionary<string, string> { ["name"] = target.Name ?? string.Empty });
         }
     }
 
