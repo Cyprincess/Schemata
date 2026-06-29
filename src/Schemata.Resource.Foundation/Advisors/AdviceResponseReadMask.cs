@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
@@ -7,6 +8,7 @@ using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -56,7 +58,9 @@ public static class AdviceResponseReadMask
     private static ValidationException InvalidReadMaskPath(string path, string reason) {
         return new([new() {
             Field       = nameof(GetRequest.ReadMask).Underscore(),
-            Description = $"The read_mask path `{path}` is invalid: {reason}.",
+            Description = LocalizedMessageFormatter.FormatInvariant(
+                SchemataResources.INVALID_READ_MASK,
+                new Dictionary<string, string> { ["path"] = path, ["reason"] = reason }),
             Reason      = SchemataResources.INVALID_READ_MASK,
         }]);
     }

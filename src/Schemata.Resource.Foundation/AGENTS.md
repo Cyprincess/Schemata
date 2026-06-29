@@ -66,11 +66,35 @@ For each method (`Create` / `Get` / `List` / `Update` / `Delete` / custom):
 - **Do NOT** add a new built-in advisor without inserting it at a deterministic position in the chain; the chain order is part of the public contract.
 - **Do NOT** invent a non-AIP method on a resource. If a custom verb is required, use `[ResourceMethod]` so the AIP method-naming convention is preserved.
 
+## Resource Field Semantics
+
+The framework recognises four field shapes for resource relationships. Pick the one that matches the storage and validation behaviour you actually need; new shapes need a plan, not an ad-hoc string field.
+
+| Mode | Role | Storage | Marker | Example |
+|---|---|---|---|---|
+| **A** — identity-composing parent | Parent segment of the resource's own canonical name | Bare leaf id (`"acme"`, no `/`) on a dedicated property (e.g. `Tenant`) | Structural — derived from the `[CanonicalName]` template | [`SchemataTenantHost.Tenant`](../Schemata.Tenancy.Skeleton/Entities/SchemataTenantHost.cs#L22) |
+| **B** — cross-resource reference | Outgoing FK to an independent resource | Full AIP-122 canonical (`"applications/x"`) | `[ResourceReference(typeof(T))]` (typed) or `[ResourceReference]` (polymorphic) | [`SchemataAuthorization.Application`](../Schemata.Authorization.Skeleton/Entities/SchemataAuthorization.cs) |
+| **C** — provenance back-link | Audit pointer from a derived row to its source | Full canonical + source type + timestamp | [`ISourceReference`](../Schemata.Abstractions/Entities/ISourceReference.cs) | [`SchemataEvent`](../Schemata.Event.Skeleton/Entities/SchemataEvent.cs) |
+| **D** — scope collection | One-to-many list of resource canonicals; no FK | `ICollection<string>?` JSON column | None (intentional) | [`SchemataScope.Resources`](../Schemata.Authorization.Skeleton/Entities/SchemataScope.cs) |
+
+`IChild` is **not** a fifth mode — it is the DTO-side wire projection of mode A, exposing the parent canonical (`"tenants/t1"`) without touching the entity's leaf-id storage.
+
+### `[ResourceReference]` typed vs polymorphic
+
+| | `[ResourceReference(typeof(T))]` | `[ResourceReference]` (no parameter) |
+|---|---|---|
+| Database FK | Yes — EF Core wires `HasForeignKey` against `T.CanonicalName` alternate key | No — relies on advisor validation only |
+| Write-time validation | `IResourceTypeResolver.Resolve(value) == typeof(T)` | `IResourceTypeResolver.Resolve(value) != null` |
+| Mismatch raises | `NotFoundException` of `T` (mode B target) | `ValidationException` with `Reason = SchemataResources.INVALID_REFERENCE` |
+| Use when | Field always points at a single concrete entity type | Field is polymorphic / owner-style (e.g. `IOwnable.Owner`) |
+
+Storage shape is identical for both: the full AIP-122 canonical name.
+
 ## Notes
 
 - `WithAuthorization(scheme)` installs an always-pass MVC filter and lets the real decision happen in the advisor pipeline ([docs/documents/resource/http-transport.md:127-129](../../docs/documents/resource/http-transport.md)) — required so async authorization can short-circuit through `AdviseResult.Break`.
 - HTTP transport is **unary only**; streaming verbs are gRPC-only.
 - AIP resource names parse through [ResourceIdentifiers.cs](ResourceIdentifiers.cs) + [ResourceNameDescriptor](../Schemata.Common/ResourceNameDescriptor.cs); use them rather than splitting `/` manually.
 - Cross-resource fields use the `[ResourceReference]` / `[ResourceReference(typeof(T))]` attribute from [Schemata.Abstractions](../Schemata.Abstractions/Resource/ResourceReferenceAttribute.cs). Validation runs via [AdviceValidateResourceReferences](../Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferences.cs) in the repository pipeline; canonical-name materialization runs via [AdviceAddCanonicalName](../Schemata.Entity.Repository/Advisors/AdviceAddCanonicalName.cs); the EF Core provider wires ORM-level FKs through [SchemataModelCustomizer](../Schemata.Entity.EntityFrameworkCore/SchemataModelCustomizer.cs).
-- Child-resource DTOs implement [IChild](../Schemata.Abstractions/Entities/IChild.cs) to opt into automatic parent canonical materialization. The trait is DTO-only — never put it on an entity, since the entity already stores its mode-A parent segment as a bare leaf id (e.g. `Tenant = "t1"`) and a second `Parent` property would collide with mapper-driven entity→DTO copy. Three advisors carry the work: [AdviceApplyChildParent](Advisors/AdviceApplyChildParent.cs) reverse-parses `request.Parent` into the entity's mode-A field on Create / Update; [AdviceFillChildParentResponse](Advisors/AdviceFillChildParentResponse.cs) derives `Parent` from the entity's canonical for Get / Create / Update responses; [AdviceFillChildParentListResponse](Advisors/AdviceFillChildParentListResponse.cs) does the same for each List summary. Wildcard parents (`tenants/-`) raise `FieldReasons.CrossParentUnsupported`; malformed parents raise `FieldReasons.InvalidParent`.
+- Child-resource DTOs implement [IChild](../Schemata.Abstractions/Entities/IChild.cs) to opt into automatic parent canonical materialization. The trait is DTO-only — never put it on an entity, since the entity already stores its mode-A parent segment as a bare leaf id (e.g. `Tenant = "t1"`) and a second `Parent` property would collide with mapper-driven entity→DTO copy. Three advisors carry the work: [AdviceApplyChildParent](Advisors/AdviceApplyChildParent.cs) reverse-parses `request.Parent` into the entity's mode-A field on Create / Update; [AdviceFillChildParentResponse](Advisors/AdviceFillChildParentResponse.cs) derives `Parent` from the entity's canonical for Get / Create / Update responses; [AdviceFillChildParentListResponse](Advisors/AdviceFillChildParentListResponse.cs) does the same for each List summary. Wildcard parents (`tenants/-`) raise `SchemataResources.CROSS_PARENT_UNSUPPORTED`; malformed parents raise `SchemataResources.INVALID_PARENT`.
 - Integration tests: [../../tests/Schemata.Resource.Http.Integration.Tests/](../../tests/Schemata.Resource.Http.Integration.Tests/) and [../../tests/Schemata.Resource.Grpc.Integration.Tests/](../../tests/Schemata.Resource.Grpc.Integration.Tests/). Unit tests: [../../tests/Schemata.Resource.Tests/](../../tests/Schemata.Resource.Tests/).

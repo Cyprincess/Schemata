@@ -76,6 +76,37 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     }
 
     [Fact]
+    public void JsonConverter_OnNullableValueDictionary_Roundtrips() {
+        using var diagnostic = new DataConnection(_options);
+        var columns = diagnostic.Query<string>(
+                                     "SELECT name FROM pragma_table_info('rr_books')")
+                                .ToList();
+        Assert.Contains("Annotations", columns);
+
+        var uid = Identifiers.NewUid();
+        {
+            using var connection = new DataConnection(_options);
+            connection.Insert(new Book {
+                Uid           = uid,
+                Name          = "nullable-dict-test",
+                CanonicalName = "books/nullable-dict-test",
+                Annotations = new() {
+                    ["language"] = "fr",
+                    ["origin"]   = null,
+                },
+            });
+        }
+
+        {
+            using var connection = new DataConnection(_options);
+            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
+            Assert.NotNull(found.Annotations);
+            Assert.Equal("fr", found.Annotations!["language"]);
+            Assert.Null(found.Annotations["origin"]);
+        }
+    }
+
+    [Fact]
     public void JsonConverter_OnDictionaryStringString_Roundtrips() {
         using var diagnostic = new DataConnection(_options);
         var columns = diagnostic.Query<string>(
@@ -112,7 +143,8 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     [PrimaryKey(nameof(Uid))]
     public sealed class Book : IIdentifier, ICanonicalName
     {
-        public Dictionary<string, string>? Metadata { get; set; }
+        public Dictionary<string, string>?  Metadata    { get; set; }
+        public Dictionary<string, string?>? Annotations { get; set; }
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }

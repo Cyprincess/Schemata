@@ -61,4 +61,19 @@ public class FailedPreconditionException : SchemataException
         Details ??= [];
         Details.Add(new PreconditionFailureDetail { Violations = violations.ToList() });
     }
+
+    /// <summary>
+    ///     Initializes a new <see cref="FailedPreconditionException" /> from a resx key. The
+    ///     en-US-invariant message is rendered from
+    ///     <see cref="SchemataResources" /> with the named arguments in
+    ///     <paramref name="args" />; <paramref name="resourceKey" /> also becomes the
+    ///     <see cref="ErrorInfoDetail.Reason" /> so the locale-aware response path can
+    ///     rehydrate the localized message from the same template.
+    /// </summary>
+    /// <param name="resourceKey">The <see cref="SchemataResources" /> data name.</param>
+    /// <param name="args">Optional named arguments substituted into the template.</param>
+    public FailedPreconditionException(string resourceKey, IReadOnlyDictionary<string, string>? args = null)
+        : this(message: LocalizedMessageFormatter.FormatInvariant(resourceKey, args), reason: resourceKey) {
+        AttachMetadata(args);
+    }
 }

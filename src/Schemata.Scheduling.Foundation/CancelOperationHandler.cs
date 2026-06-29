@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
@@ -39,7 +41,8 @@ public sealed class CancelOperationHandler(
                          or ExecutionState.Failed
                          or ExecutionState.Cancelled) {
             throw new FailedPreconditionException(
-                message: $"Operation '{entity.CanonicalName}' has already finished.");
+                SchemataResources.OPERATION_ALREADY_FINISHED,
+                new Dictionary<string, string> { ["name"] = entity.CanonicalName ?? string.Empty });
         }
 
         if (!string.IsNullOrEmpty(entity.Job)) {

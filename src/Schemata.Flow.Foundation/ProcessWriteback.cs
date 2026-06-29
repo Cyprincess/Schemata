@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
@@ -109,7 +111,8 @@ internal static class ProcessWriteback
             if (process.SourceTimestamp is { } expected && entity is IConcurrency concurrency
              && concurrency.Timestamp != expected) {
                 throw new FailedPreconditionException(
-                    message: $"Source '{name}' was modified concurrently; the flow transition was aborted.");
+                    SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
+                    new Dictionary<string, string> { ["name"] = name ?? string.Empty });
             }
 
             var projector = engine is null

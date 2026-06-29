@@ -156,7 +156,7 @@ The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, a
 
 ## Error mapping
 
-A malformed filter, unknown field, or failed compilation maps to `ValidationException` with field `filter` and reason `FieldReasons.InvalidFilter`. An unknown language maps to field `language` and reason `FieldReasons.InvalidFilter`. An invalid order-by maps to field `order_by` and reason `FieldReasons.InvalidOrderBy`.
+A malformed filter, unknown field, or failed compilation maps to `ValidationException` with field `filter` and `Reason = INVALID_FILTER`. An unknown language maps to field `language` and `Reason = INVALID_FILTER`. An invalid order-by maps to field `order_by` and `Reason = INVALID_ORDER_BY`.
 
 HTTP surfaces these as `422`; gRPC surfaces them as `InvalidArgument`.
 

@@ -54,6 +54,27 @@ public class SchemataException : Exception
     public List<IErrorDetail>? Details { get; set; }
 
     /// <summary>
+    ///     Copies <paramref name="args" /> onto the first <see cref="ErrorInfoDetail" /> in
+    ///     <see cref="Details" /> so the resx template can rehydrate its named placeholders
+    ///     during locale resolution. Convenience constructors on subclasses call this after
+    ///     chaining to the base ctor that creates the <see cref="ErrorInfoDetail" />.
+    /// </summary>
+    /// <param name="args">Named arguments for the resx template; <see langword="null" /> or
+    ///     empty leaves the existing detail untouched.</param>
+    protected void AttachMetadata(IReadOnlyDictionary<string, string>? args) {
+        if (args is not { Count: > 0 }) {
+            return;
+        }
+
+        var info = Details?.OfType<ErrorInfoDetail>().FirstOrDefault();
+        if (info is null) {
+            return;
+        }
+
+        info.Metadata = args.ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    /// <summary>
     ///     Builds the error response envelope returned by the API.
     /// </summary>
     /// <remarks>
@@ -140,12 +161,16 @@ public class SchemataException : Exception
     ///         The lookup tries the <see cref="ErrorInfoDetail.Reason" /> resx key first,
     ///         then falls back to the <c>Status</c> resx key. This keeps a localized
     ///         template available even when a specific Reason has no dedicated resx
-    ///         entry. When the template contains positional placeholders, the values of
-    ///         <see cref="ErrorInfoDetail.Metadata" /> supply substitution arguments in
-    ///         insertion order. The helper silently skips on any failure - unresolvable
-    ///         locale, missing resx keys, or template format error - so localization
-    ///         never interferes with the developer-facing
-    ///         <see cref="Exception.Message" />.
+    ///         entry. When the template carries named placeholders (e.g.
+    ///         <c>{resource}</c>) the helper substitutes them from
+    ///         <see cref="ErrorInfoDetail.Metadata" /> by key, which makes the wire
+    ///         contract independent of dictionary enumeration order. Templates that
+    ///         still use positional placeholders (e.g. <c>{0}</c>) fall through to
+    ///         <see cref="string.Format(IFormatProvider, string, object?[])" /> with
+    ///         <see cref="Dictionary{TKey, TValue}.Values" /> in insertion order. The
+    ///         helper silently skips on any failure — unresolvable locale, missing
+    ///         resx keys, or template format error — so localization never interferes
+    ///         with the developer-facing <see cref="Exception.Message" />.
     ///     </para>
     /// </remarks>
     /// <param name="details">Mutable detail list for the response.</param>
@@ -171,24 +196,8 @@ public class SchemataException : Exception
         }
 
         var template = TryGetResource(reason, culture) ?? TryGetResource(status, culture);
-        if (string.IsNullOrEmpty(template)) {
-            return;
-        }
-
-        string message;
-        try {
-            if (errorInfo?.Metadata is { Count: > 0 } metadata) {
-                var args = new object?[metadata.Count];
-                var i    = 0;
-                foreach (var value in metadata.Values) {
-                    args[i++] = value;
-                }
-
-                message = string.Format(culture, template, args);
-            } else {
-                message = template;
-            }
-        } catch (FormatException) {
+        var message  = LocalizedMessageFormatter.Format(template, errorInfo?.Metadata, culture);
+        if (string.IsNullOrEmpty(message)) {
             return;
         }
 

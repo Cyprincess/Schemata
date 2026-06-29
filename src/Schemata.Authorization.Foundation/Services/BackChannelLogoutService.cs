@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
@@ -62,8 +63,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
 
          var scheduler = services.GetService<IScheduler>();
          if (scheduler == null) {
-             throw new FailedPreconditionException(message: "Back-channel logout requires Scheduling."
-             );
+             throw new FailedPreconditionException(SchemataResources.BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING);
          }
 
          await foreach (var app in apps.ListAsync(

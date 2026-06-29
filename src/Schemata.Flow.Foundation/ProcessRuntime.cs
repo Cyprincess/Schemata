@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -54,13 +55,13 @@ public sealed partial class ProcessRuntime : IProcessRuntime
 
         var reg = _registry.GetRegistration(process.DefinitionName)
                ?? throw new NotFoundException(
-                   reason: "PROCESS_DEFINITION_NOT_REGISTERED",
-                   message: $"Process definition '{process.DefinitionName}' not registered.");
+                   SchemataResources.PROCESS_NOT_REGISTERED,
+                   new Dictionary<string, string> { ["name"] = process.DefinitionName });
 
         var runtime = services.GetKeyedService<IFlowRuntime>(reg.Engine)
                    ?? throw new FailedPreconditionException(
-                       reason: "FLOW_RUNTIME_NOT_REGISTERED",
-                       message: $"Flow runtime '{reg.Engine}' is not registered with the host.");
+                       SchemataResources.FLOW_RUNTIME_NOT_REGISTERED,
+                       new Dictionary<string, string> { ["engine"] = reg.Engine });
 
         return (process, reg.Definition, runtime);
     }

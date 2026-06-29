@@ -62,7 +62,7 @@ public sealed class ProcessRegistry : IProcessRegistry
         ArgumentNullException.ThrowIfNull(configuration);
 
         if (string.IsNullOrWhiteSpace(configuration.Name)) {
-            throw new InvalidArgumentException(message: "Process name is required.");
+            throw new InvalidArgumentException(SchemataResources.PROCESS_NAME_REQUIRED);
         }
 
         var definition = LoadDefinition(configuration);
@@ -82,8 +82,8 @@ public sealed class ProcessRegistry : IProcessRegistry
 
         if (!_registrations.TryAdd(configuration.Name, registration)) {
             throw new AlreadyExistsException(
-                reason: "PROCESS_DEFINITION_ALREADY_REGISTERED",
-                message: $"Process definition '{configuration.Name}' is already registered.");
+                SchemataResources.PROCESS_ALREADY_REGISTERED,
+                new Dictionary<string, string> { ["name"] = configuration.Name });
         }
 
         return default;

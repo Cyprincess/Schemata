@@ -1,12 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Resource.Foundation.Advisors;
 using Xunit;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Tests.Advisors;
 
@@ -50,7 +50,7 @@ public class AdviceApplyChildParentShould
                                       d => d is Schemata.Abstractions.Errors.BadRequestDetail) as Schemata.Abstractions.Errors.BadRequestDetail;
         Assert.NotNull(violation!.FieldViolations);
         var field = Assert.Single(violation.FieldViolations!);
-        Assert.Equal(FieldReasons.CrossParentUnsupported, field.Reason);
+        Assert.Equal(SchemataResources.CROSS_PARENT_UNSUPPORTED, field.Reason);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class AdviceApplyChildParentShould
                                       d => d is Schemata.Abstractions.Errors.BadRequestDetail) as Schemata.Abstractions.Errors.BadRequestDetail;
         Assert.NotNull(violation!.FieldViolations);
         var field = Assert.Single(violation.FieldViolations!);
-        Assert.Equal(FieldReasons.InvalidParent, field.Reason);
+        Assert.Equal(SchemataResources.INVALID_PARENT, field.Reason);
     }
 
     [Fact]

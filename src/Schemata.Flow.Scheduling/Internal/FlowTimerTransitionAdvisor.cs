@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
@@ -84,7 +85,9 @@ public sealed class FlowTimerTransitionAdvisor : IFlowTransitionAdvisor
 
         var scheduler = _services.GetService<IScheduler>();
         if (scheduler == null) {
-            throw new FailedPreconditionException(message: $"Process '{process.CanonicalName}' reached a timer catch, which requires Scheduling.");
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_TIMER_REQUIRES_SCHEDULING,
+                new Dictionary<string, string> { ["name"] = process.CanonicalName ?? string.Empty });
         }
 
         if (previousTimerJob is not null) {

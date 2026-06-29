@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -39,7 +41,9 @@ internal static class ResourceIdentifiers
         if (parsed is null) {
             throw new ValidationException([new() {
                 Field       = nameof(name),
-                Description = $"The requested resource name `{name}` is invalid.",
+                Description = LocalizedMessageFormatter.FormatInvariant(
+                    SchemataResources.INVALID_NAME,
+                    new Dictionary<string, string> { ["name"] = name! }),
                 Reason      = SchemataResources.INVALID_NAME,
             }]);
         }
@@ -76,7 +80,9 @@ internal static class ResourceIdentifiers
         if (parsed is null) {
             throw new ValidationException([new() {
                 Field       = nameof(ListRequest.Parent).Underscore(),
-                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PARENT),
+                Description = LocalizedMessageFormatter.FormatInvariant(
+                    SchemataResources.INVALID_PARENT,
+                    new Dictionary<string, string> { ["parent"] = parent! }),
                 Reason      = SchemataResources.INVALID_PARENT,
             }]);
         }
@@ -89,7 +95,9 @@ internal static class ResourceIdentifiers
 
                 throw new ValidationException([new() {
                     Field       = nameof(ListRequest.Parent).Underscore(),
-                    Description = SchemataResources.GetResourceString(SchemataResources.CROSS_PARENT_UNSUPPORTED),
+                    Description = LocalizedMessageFormatter.FormatInvariant(
+                        SchemataResources.CROSS_PARENT_UNSUPPORTED,
+                        new Dictionary<string, string> { ["parent"] = parent! }),
                     Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                 }]);
             }

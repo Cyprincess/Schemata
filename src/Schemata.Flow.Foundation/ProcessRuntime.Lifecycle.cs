@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Event.Skeleton;
@@ -33,8 +34,8 @@ public sealed partial class ProcessRuntime
 
         var reg = _registry.GetRegistration(processName)
                ?? throw new NotFoundException(
-                   reason: "PROCESS_DEFINITION_NOT_REGISTERED",
-                   message: $"Process definition '{processName}' not registered.");
+                   SchemataResources.PROCESS_NOT_REGISTERED,
+                   new Dictionary<string, string> { ["name"] = processName });
 
         // One scope spans the whole operation so persistence, provisioning, and lifecycle
         // notifications resolve their scoped services (repositories, advisors) from a single scope.
@@ -43,8 +44,8 @@ public sealed partial class ProcessRuntime
 
         var runtime = sp.GetKeyedService<IFlowRuntime>(reg.Engine)
                    ?? throw new FailedPreconditionException(
-                       reason: "FLOW_RUNTIME_NOT_REGISTERED",
-                       message: $"Flow runtime '{reg.Engine}' is not registered with the host.");
+                       SchemataResources.FLOW_RUNTIME_NOT_REGISTERED,
+                       new Dictionary<string, string> { ["engine"] = reg.Engine });
 
         var process = new SchemataProcess {
             Name           = Identifiers.NewUid().ToString("n"),
@@ -136,8 +137,8 @@ public sealed partial class ProcessRuntime
 
         var msg = definition.Messages.FirstOrDefault(m => m.Name == messageName)
                ?? throw new InvalidArgumentException(
-                   reason: "MESSAGE_NOT_DEFINED",
-                   message: $"Message '{messageName}' is not defined on the process.");
+                   SchemataResources.PROCESS_MESSAGE_NOT_DEFINED,
+                   new Dictionary<string, string> { ["name"] = messageName });
 
         ProcessInstance instance;
         SchemataProcessTransition transition;

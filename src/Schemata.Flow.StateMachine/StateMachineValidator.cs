@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Models;
 
@@ -14,24 +15,26 @@ public static class StateMachineValidator
                                     .Where(e => e.Position == EventPosition.Start)
                                     .ToList();
         if (startEvents.Count != 1) {
-            throw new FailedPreconditionException(message: "State machine requires exactly one start event.");
+            throw new FailedPreconditionException(SchemataResources.STATE_MACHINE_REQUIRES_ONE_START_EVENT);
         }
 
         var startOutgoing = definition.Flows.Where(sf => sf.Source == startEvents[0]).ToList();
         if (startOutgoing.Count != 1) {
-            throw new FailedPreconditionException(message: "Start event must have exactly one outgoing flow.");
+            throw new FailedPreconditionException(SchemataResources.STATE_MACHINE_START_EVENT_OUTGOING);
         }
 
         var endEvents = definition.Elements.OfType<FlowEvent>().Where(e => e.Position == EventPosition.End).ToList();
         if (endEvents.Count == 0) {
-            throw new FailedPreconditionException(message: "State machine requires at least one end event.");
+            throw new FailedPreconditionException(SchemataResources.STATE_MACHINE_REQUIRES_END_EVENT);
         }
 
         ValidateFlows(definition);
 
         foreach (var gateway in definition.Elements.OfType<Gateway>()) {
             if (gateway is not (ExclusiveGateway or EventBasedGateway)) {
-                throw new FailedPreconditionException(message: $"Gateway '{gateway.Name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED,
+                    new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
             }
 
             if (gateway is EventBasedGateway eventBasedGateway) {
@@ -55,13 +58,15 @@ public static class StateMachineValidator
             ValidateActivity(definition, activity);
 
             if (activity is SubProcess or CallActivity) {
-                throw new FailedPreconditionException(message: $"Activity '{activity.Name}' is not supported by the state machine engine.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_ACTIVITY_UNSUPPORTED,
+                    new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
             }
 
             if (activity.LoopCharacteristics is not null) {
-                throw new FailedPreconditionException(message: $"Activity '{
-                    activity.Name
-                }' has loop characteristics which are not supported by the state machine engine.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED,
+                    new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
             }
         }
 
@@ -93,9 +98,9 @@ public static class StateMachineValidator
 
         foreach (var element in definition.Elements) {
             if (!reachable.Contains(element)) {
-                throw new FailedPreconditionException(message: $"Element '{
-                    element.Name
-                }' is not reachable from the start event.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_ELEMENT_UNREACHABLE,
+                    new Dictionary<string, string> { ["name"] = element.Name ?? string.Empty });
             }
         }
     }
@@ -105,27 +110,33 @@ public static class StateMachineValidator
 
         foreach (var flow in definition.Flows) {
             if (flow.Source is null) {
-                throw new FailedPreconditionException(message: $"Sequence flow '{flow.Id}' has no source element.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_FLOW_NO_SOURCE,
+                    new Dictionary<string, string> { ["id"] = flow.Id ?? string.Empty });
             }
 
             if (flow.Target is null) {
-                throw new FailedPreconditionException(message: $"Sequence flow '{flow.Id}' has no target element.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_FLOW_NO_TARGET,
+                    new Dictionary<string, string> { ["id"] = flow.Id ?? string.Empty });
             }
 
             if (!elementSet.Contains(flow.Source)) {
-                throw new FailedPreconditionException(message: $"Sequence flow '{
-                    flow.Id
-                }' references unknown source element '{
-                    flow.Source.Name
-                }'.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_FLOW_UNKNOWN_SOURCE,
+                    new Dictionary<string, string> {
+                        ["id"]     = flow.Id ?? string.Empty,
+                        ["source"] = flow.Source.Name ?? string.Empty,
+                    });
             }
 
             if (!elementSet.Contains(flow.Target)) {
-                throw new FailedPreconditionException(message: $"Sequence flow '{
-                    flow.Id
-                }' references unknown target element '{
-                    flow.Target.Name
-                }'.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_FLOW_UNKNOWN_TARGET,
+                    new Dictionary<string, string> {
+                        ["id"]     = flow.Id ?? string.Empty,
+                        ["target"] = flow.Target.Name ?? string.Empty,
+                    });
             }
         }
 
@@ -133,31 +144,32 @@ public static class StateMachineValidator
             var outgoing = definition.Flows.Where(sf => sf.Source == endEvent).ToList();
             if (outgoing.Count > 0) {
                 throw new FailedPreconditionException(
-                    message: $"End event '{endEvent.Name}' must not have outgoing flows.");
+                    SchemataResources.STATE_MACHINE_END_EVENT_OUTGOING,
+                    new Dictionary<string, string> { ["name"] = endEvent.Name ?? string.Empty });
             }
         }
     }
 
     private static void ValidateEventBasedGateway(ProcessDefinition definition, EventBasedGateway gateway) {
         if (gateway.Parallel) {
-            throw new FailedPreconditionException(message: $"Event-based gateway '{
-                gateway.Name
-            }' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED,
+                new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
         }
 
         var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
 
         if (outgoing.Count == 0) {
-            throw new FailedPreconditionException(message: $"Event-based gateway '{
-                gateway.Name
-            }' must have at least one outgoing flow.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING,
+                new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
         }
 
         foreach (var flow in outgoing) {
             if (flow.Target is not FlowEvent { Position: EventPosition.IntermediateCatch }) {
-                throw new FailedPreconditionException(message: $"Event-based gateway '{
-                    gateway.Name
-                }' outgoing flow must target an IntermediateCatchEvent.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_EVENT_GATEWAY_TARGET,
+                    new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
             }
         }
     }
@@ -165,37 +177,37 @@ public static class StateMachineValidator
     private static void ValidateExclusiveGateway(ProcessDefinition definition, ExclusiveGateway gateway) {
         var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
         if (outgoing.Count == 0) {
-            throw new FailedPreconditionException(message: $"Exclusive gateway '{
-                gateway.Name
-            }' must have at least one outgoing flow.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING,
+                new Dictionary<string, string> { ["name"] = gateway.Name ?? string.Empty });
         }
     }
 
     private static void ValidateBoundaryEvent(ProcessDefinition definition, FlowEvent boundary) {
         if (boundary.AttachedTo is null) {
-            throw new FailedPreconditionException(message: $"Boundary event '{
-                boundary.Name
-            }' is not attached to any activity.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_BOUNDARY_UNATTACHED,
+                new Dictionary<string, string> { ["name"] = boundary.Name ?? string.Empty });
         }
 
         var attachedActivity = definition.Elements.OfType<Activity>().FirstOrDefault(a => a == boundary.AttachedTo);
         if (attachedActivity is null) {
-            throw new FailedPreconditionException(message: $"Boundary event '{
-                boundary.Name
-            }' is attached to unknown activity.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY,
+                new Dictionary<string, string> { ["name"] = boundary.Name ?? string.Empty });
         }
 
         if (!boundary.Interrupting) {
-            throw new FailedPreconditionException(message: $"Boundary event '{
-                boundary.Name
-            }' is non-interrupting, which is not supported by the state machine engine.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_BOUNDARY_NON_INTERRUPTING,
+                new Dictionary<string, string> { ["name"] = boundary.Name ?? string.Empty });
         }
 
         var outgoing = definition.Flows.Where(sf => sf.Source == boundary).ToList();
         if (outgoing.Count != 1) {
-            throw new FailedPreconditionException(message: $"Boundary event '{
-                boundary.Name
-            }' must have exactly one outgoing flow.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED,
+                new Dictionary<string, string> { ["name"] = boundary.Name ?? string.Empty });
         }
     }
 
@@ -204,16 +216,16 @@ public static class StateMachineValidator
         var outgoing = definition.Flows.Where(sf => sf.Source == catchEvent).ToList();
 
         if (outgoing.Count == 0) {
-            throw new FailedPreconditionException(message: $"Intermediate catch event '{
-                catchEvent.Name
-            }' must have at least one outgoing flow.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_CATCH_EVENT_NO_OUTGOING,
+                new Dictionary<string, string> { ["name"] = catchEvent.Name ?? string.Empty });
         }
 
         foreach (var flow in incoming) {
             if (flow.Source is not EventBasedGateway) {
-                throw new FailedPreconditionException(message: $"Intermediate catch event '{
-                    catchEvent.Name
-                }' can only be reached from an EventBasedGateway.");
+                throw new FailedPreconditionException(
+                    SchemataResources.STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED,
+                    new Dictionary<string, string> { ["name"] = catchEvent.Name ?? string.Empty });
             }
         }
     }
@@ -222,9 +234,9 @@ public static class StateMachineValidator
         var outgoing = definition.Flows.Where(sf => sf.Source == activity).ToList();
 
         if (outgoing.Count == 0) {
-            throw new FailedPreconditionException(message: $"Activity '{
-                activity.Name
-            }' has no outgoing flow and cannot proceed. Route it to an end event or another element.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_ACTIVITY_NO_OUTGOING,
+                new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
         }
 
         var targets           = outgoing.Select(sf => sf.Target).ToList();
@@ -234,21 +246,21 @@ public static class StateMachineValidator
         var hasEndEvent       = targets.OfType<FlowEvent>().Any(e => e.Position == EventPosition.End);
 
         if (hasDirectActivity && hasGateway) {
-            throw new FailedPreconditionException(message: $"Activity '{
-                activity.Name
-            }' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_ACTIVITY_MIXED_GATEWAY,
+                new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
         }
 
         if (hasEndEvent && (hasGateway || hasDirectActivity)) {
-            throw new FailedPreconditionException(message: $"Activity '{
-                activity.Name
-            }' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_ACTIVITY_MIXED_END,
+                new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
         }
 
         if (directActivities.Count > 1) {
-            throw new FailedPreconditionException(message: $"Activity '{
-                activity.Name
-            }' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.");
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT,
+                new Dictionary<string, string> { ["name"] = activity.Name ?? string.Empty });
         }
     }
 }

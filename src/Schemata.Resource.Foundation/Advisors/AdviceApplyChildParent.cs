@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -38,10 +38,10 @@ public static class AdviceApplyChildParent
 ///     <para>
 ///         Wildcard parents (<c>tenants/-</c> per AIP-159) are rejected with a
 ///         <see cref="ValidationException" /> carrying
-///         <see cref="FieldReasons.CrossParentUnsupported" />. A parent path that
-///         does not match the resource's
+///         <see cref="SchemataResources.CROSS_PARENT_UNSUPPORTED" />. A parent path
+///         that does not match the resource's
 ///         <see cref="ResourceNameDescriptor.Pattern" /> is rejected with
-///         <see cref="FieldReasons.InvalidParent" />.
+///         <see cref="SchemataResources.INVALID_PARENT" />.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
@@ -89,8 +89,10 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
                 throw new ValidationException([
                     new ErrorFieldViolation {
                         Field       = nameof(IChild.Parent).ToLowerInvariant(),
-                        Description = $"The parent `{child.Parent}` uses AIP-159 wildcard which is not supported here.",
-                        Reason      = FieldReasons.CrossParentUnsupported,
+                        Description = LocalizedMessageFormatter.FormatInvariant(
+                            SchemataResources.CROSS_PARENT_UNSUPPORTED,
+                            new Dictionary<string, string> { ["parent"] = child.Parent! }),
+                        Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                     },
                 ]);
             }
@@ -104,8 +106,10 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
             throw new ValidationException([
                 new ErrorFieldViolation {
                     Field       = nameof(IChild.Parent).ToLowerInvariant(),
-                    Description = $"The parent `{child.Parent}` does not match the resource's pattern.",
-                    Reason      = FieldReasons.InvalidParent,
+                    Description = LocalizedMessageFormatter.FormatInvariant(
+                        SchemataResources.INVALID_PARENT,
+                        new Dictionary<string, string> { ["parent"] = child.Parent! }),
+                    Reason      = SchemataResources.INVALID_PARENT,
                 },
             ]);
         }
