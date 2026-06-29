@@ -29,6 +29,7 @@ public class FlowEventTransitionAdvisorShould
                 Process    = process,
                 Definition = definition,
                 Instance   = new() { WaitingAtId = "catch-msg" },
+                UnitOfWork = Mock.Of<IUnitOfWork>(),
             });
 
         var row = Assert.Single(rows);
@@ -56,6 +57,7 @@ public class FlowEventTransitionAdvisorShould
                 Process    = process,
                 Definition = definition,
                 Instance   = new() { WaitingAtId = "catch-sig" },
+                UnitOfWork = Mock.Of<IUnitOfWork>(),
             });
 
         var row = Assert.Single(rows);
@@ -83,6 +85,7 @@ public class FlowEventTransitionAdvisorShould
                 Definition          = definition,
                 Instance            = new() { IsComplete = true },
                 PreviousWaitingAtId = "catch-msg",
+                UnitOfWork          = Mock.Of<IUnitOfWork>(),
             });
 
         Assert.Empty(rows);
@@ -107,6 +110,7 @@ public class FlowEventTransitionAdvisorShould
                 Process    = process,
                 Definition = definition,
                 Instance   = new() { WaitingAtId = "catch-msg" },
+                UnitOfWork = Mock.Of<IUnitOfWork>(),
             });
 
         var row = Assert.Single(rows);
@@ -146,11 +150,33 @@ public class FlowEventTransitionAdvisorShould
                 Process    = process,
                 Definition = definition,
                 Instance   = new() { WaitingAtId = "gw" },
+                UnitOfWork = Mock.Of<IUnitOfWork>(),
             });
 
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, r => r.SubscriptionId == "flow:processes/p1:catch-pay" && r.CorrelationKey == "processes/p1");
         Assert.Contains(rows, r => r.SubscriptionId == "flow:processes/p1:catch-sig" && r.CorrelationKey == null);
+    }
+
+    [Fact]
+    public async SystemTask JoinsUnitOfWork_AndDoesNotCommit() {
+        var rows       = new List<SchemataEventSubscription>();
+        var repository = Repository(rows);
+        var uow        = Mock.Of<IUnitOfWork>();
+        var advisor    = new FlowEventTransitionAdvisor(repository.Object);
+
+        var (definition, process) = MessageCatchSetup();
+
+        await advisor.AdviseAsync(
+            Advice(), new() {
+                Process    = process,
+                Definition = definition,
+                Instance   = new() { WaitingAtId = "catch-msg" },
+                UnitOfWork = uow,
+            });
+
+        repository.Verify(r => r.Join(uow), Times.Once);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static AdviceContext Advice() {
@@ -185,7 +211,6 @@ public class FlowEventTransitionAdvisorShould
                                 predicate,
                             CancellationToken _
                         ) => new(predicate(rows.AsQueryable()).FirstOrDefault()));
-        records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(SystemTask.CompletedTask);
         return records;
     }
 }

@@ -42,17 +42,26 @@ internal sealed class ProcessPersistence
     /// <param name="services">The service collection.</param>
     /// <param name="process">Current process row.</param>
     /// <param name="transition">Current transition.</param>
+    /// <param name="advisor">
+    ///     An optional callback invoked inside the transition's unit of work, before the writeback
+    ///     and the process row are persisted. The runtime uses it to run
+    ///     <see cref="Schemata.Flow.Skeleton.Observers.IFlowTransitionAdvisor" /> with the live unit
+    ///     of work, so advisor writes commit atomically with the process row; a throw aborts the
+    ///     whole transition.
+    /// </param>
     /// <param name="writeback">
     ///     An optional callback enlisted in the transition's unit of work before the process row is
-    ///     persisted, projecting the transition onto its source business entity. Running it first lets
-    ///     the refreshed <see cref="ISourceReference.SourceTimestamp" /> land in the same write; a
-    ///     throw aborts the whole transition.
+    ///     persisted, projecting the transition onto its source business entity. Running it before
+    ///     the process row lets the refreshed
+    ///     <see cref="Abstractions.Entities.ISourceReference.SourceTimestamp" /> land in the same
+    ///     write; a throw aborts the whole transition.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
     public async Task PersistTransitionAsync(
         IServiceProvider                            services,
         SchemataProcess                             process,
         SchemataProcessTransition                   transition,
+        Func<IUnitOfWork, CancellationToken, Task>? advisor,
         Func<IUnitOfWork, CancellationToken, Task>? writeback,
         CancellationToken                           ct
     ) {
@@ -67,6 +76,10 @@ internal sealed class ProcessPersistence
         transitions.Join(uow);
 
         try {
+            if (advisor is not null) {
+                await advisor(uow, ct);
+            }
+
             if (writeback is not null) {
                 await writeback(uow, ct);
             }

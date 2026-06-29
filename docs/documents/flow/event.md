@@ -61,8 +61,10 @@ subscriptions and wakes the waiting process instances.
 ## FlowEventTransitionAdvisor
 
 `FlowEventTransitionAdvisor` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
-`AdviseAsync` runs in the transition's pre-commit window and reconciles
-`IRepository<SchemataEventSubscription>` against the new waiting state, returning
+`AdviseAsync` runs inside the transition's unit of work, before the process row is persisted, and
+reconciles `IRepository<SchemataEventSubscription>` against the new waiting state. It enlists the
+subscription repository in `context.UnitOfWork` via `IRepository.Join`, so subscription writes
+commit atomically with the process row and roll back together on any failure. Returns
 `AdviseResult.Continue`.
 
 ### Subscription lifecycle
@@ -172,9 +174,9 @@ observer does not roll back a transition that already committed.
 
 ## Caveats
 
-- Subscription reconciliation runs inside the pre-commit advisor pipeline. A subscription is created
-  before the transition commits; if a later commit failure leaves a subscription behind, remove
-  subscriptions whose `Target` no longer resolves to a waiting process.
+- Subscription reconciliation joins the transition's unit of work. Subscription writes commit
+  atomically with the process row; a transition rollback rolls subscription writes back together,
+  so no orphan rows are left behind.
 - `IEventHandler<IEvent>` is the generic handler. A more specific `IEventHandler<TEvent>` path may
   receive the same CLR event type before or instead of the generic handler, depending on the event
   bus implementation and registration order.

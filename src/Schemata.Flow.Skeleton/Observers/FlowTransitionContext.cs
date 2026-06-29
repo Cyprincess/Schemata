@@ -1,3 +1,4 @@
+using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
@@ -33,4 +34,12 @@ public class FlowTransitionContext
 
     /// <summary>Event that triggered the transition, if any.</summary>
     public IEventDefinition? Trigger { get; set; }
+
+    /// <summary>
+    ///     Unit of work the transition is committing through. Advisors that need their writes to
+    ///     commit atomically with the process row enlist their repositories with
+    ///     <see cref="IRepository.Join" />; advisors that only touch external systems may ignore it.
+    ///     Set by the runtime just before the advisor pipeline runs.
+    /// </summary>
+    public IUnitOfWork? UnitOfWork { get; set; }
 }

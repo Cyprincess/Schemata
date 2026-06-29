@@ -35,6 +35,8 @@ public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
         FlowTransitionContext context,
         CancellationToken     ct = default
     ) {
+        _subscriptions.Join(context.UnitOfWork!);
+
         var process     = context.Process;
         var instance    = context.Instance;
         var definition  = context.Definition;
@@ -78,7 +80,6 @@ public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
         }
 
         await _subscriptions.RemoveAsync(existing, ct);
-        await _subscriptions.CommitAsync(ct);
     }
 
     private async Task UpsertSubscriptionAsync(
@@ -106,8 +107,6 @@ public sealed class FlowEventTransitionAdvisor : IFlowTransitionAdvisor
             existing.Target         = target;
             await _subscriptions.UpdateAsync(existing, ct);
         }
-
-        await _subscriptions.CommitAsync(ct);
     }
 
     private static string SubscriptionId(string processName, string elementId) {

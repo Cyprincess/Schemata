@@ -98,7 +98,7 @@ IProcessRuntime (ProcessRuntime, singleton)
     v
 IFlowRuntime (StateMachineEngine, keyed singleton) -- computes the next ProcessInstance
     |
-    | pre-commit: IFlowTransitionAdvisor pipeline (provisions timers / subscriptions)
+    | in unit of work: IFlowTransitionAdvisor pipeline (provisions timers / subscriptions)
     | commit:     IRepository<SchemataProcess> + IRepository<SchemataProcessTransition>
     | post-commit: IProcessLifecycleObserver + flow lifecycle events on IEventBus
     v
@@ -121,8 +121,9 @@ persisted instance + transition row
 - **Custom engine** — implement `IFlowRuntime`, register it as a keyed singleton under your engine
   name, and pass that name to `flow.Use<TProcess>(engine: "...")`.
 - **Transition advisors** — implement `IFlowTransitionAdvisor` (an `IAdvisor<FlowTransitionContext>`)
-  and register via `TryAddEnumerable`. They run in the pre-commit window and provision the
-  infrastructure a new waiting state depends on; a thrown advisor aborts the transition.
+  and register via `TryAddEnumerable`. They run inside the transition's unit of work and provision
+  the infrastructure a new waiting state depends on; a thrown advisor aborts the transition, rolling
+  back any repository writes joined to the unit of work.
 - **Lifecycle observers** — implement `IProcessLifecycleObserver` and register via `TryAddEnumerable`
   to react to `OnStartedAsync`, `OnTransitionedAsync`, and `OnTerminatedAsync` after the commit.
 - **Transport** — add `MapHttp()` or `MapGrpc()`.

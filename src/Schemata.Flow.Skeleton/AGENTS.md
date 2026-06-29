@@ -52,6 +52,7 @@ Bridges to other subsystems live in companion packages:
 - **AST nodes are immutable records**. Build them through the DSL — never `new` an AST node directly outside `Builders/`.
 - **IDs**: builder assigns deterministic node IDs via [Utilities/](Utilities/). Do not hand-write IDs; bridging to `Event`/`Scheduling` depends on the assigned shape.
 - **Observers**: register `IFlowObserver` implementations through DI. Observer exceptions are logged at `Warning` and swallowed — they cannot fail a transition ([docs/documents/scheduling/jobs.md:186-189](../../docs/documents/scheduling/jobs.md)).
+- **Transition advisors**: `IFlowTransitionAdvisor` implementations run inside the transition's unit of work. Advisors that write business entities enlist their repositories with `context.UnitOfWork.Join(...)` so writes commit atomically with the process row; advisors that only provision external infrastructure (timer jobs, broker subscriptions) ignore the unit of work. A throw rolls back the whole transition along with any joined writes.
 - **Engine subset**: when authoring a process for the default `StateMachine` engine, stay within: one start event, ≥1 end event, plain activities (no `SubProcess` / `CallActivity` / loop characteristics), `ExclusiveGateway`, `EventBasedGateway` (exclusive mode), interrupting boundary events, intermediate catches reachable from an `EventBasedGateway`. Wider AST features require a custom `IFlowRuntime`.
 
 ## Anti-Patterns

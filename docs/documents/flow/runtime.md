@@ -2,8 +2,9 @@
 
 `ProcessRegistry` and `ProcessRuntime` bridge the BPMN engine to the rest of the framework.
 `ProcessRegistry` holds the compiled definitions and resolves the engine for each. `ProcessRuntime`
-is the public entry point: it loads instances, drives the engine, runs the pre-commit advisor
-pipeline, writes the source entity when configured, persists the result, and notifies observers. Both
+is the public entry point: it loads instances, drives the engine, runs the transition advisor
+pipeline inside the persistence unit of work, writes the source entity when configured, persists the
+result, and notifies observers. Both
 are singletons registered by `SchemataFlowFeature`.
 
 ## Where the code lives
@@ -89,8 +90,9 @@ Every state-changing method routes through a shared `ApplyAsync` step:
 3. Copy the engine result onto a clone of the process and build a `SchemataProcessTransition`
    (`Previous`, `Posterior`, `Event`, `UpdatedBy`).
 4. Build a `FlowTransitionContext` and run the **`IFlowTransitionAdvisor` pipeline** against it.
-   This runs in the pre-commit window: an advisor that throws aborts the transition before anything
-   is persisted.
+   The pipeline runs inside the transition's unit of work: an advisor that throws aborts the
+   transition before anything is persisted, and repository writes the advisor joined via
+   `context.UnitOfWork` roll back with it.
 5. Build the optional source writeback callback for the registered engine.
 6. Persist the instance row, transition row, and source writeback in one unit of work
    (`ProcessPersistence`).
@@ -227,11 +229,15 @@ public class FlowTransitionContext
     public string?            PreviousWaitingAtId { get; set; }
     public string?            PreviousWaitingAt   { get; set; }
     public IEventDefinition?  Trigger             { get; set; }
+    public IUnitOfWork?       UnitOfWork          { get; set; }
 }
 ```
 
 A transition advisor is an `IAdvisor<FlowTransitionContext>`: its `AdviseAsync` returns an
-`AdviseResult`, and it runs in the pre-commit window. The built-in advisors provision wake-up
+`AdviseResult`, and it runs inside the transition's unit of work, before the process row is
+persisted. Advisors that write business entities enlist their repositories with
+`context.UnitOfWork.Join(...)` so those writes commit atomically with the process row; advisors
+that only provision external infrastructure may ignore it. The built-in advisors provision wake-up
 infrastructure for the new waiting state and return `AdviseResult.Continue`; a throwing advisor
 aborts the transition so an instance never persists into a state whose timer job or event
 subscription was never created. The `Previous*` fields are the only source of the pre-transition

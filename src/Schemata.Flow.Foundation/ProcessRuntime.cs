@@ -99,15 +99,19 @@ public sealed partial class ProcessRuntime : IProcessRuntime
             Trigger             = trigger,
         };
 
-        // Provision the wake-up infrastructure (timer jobs, event subscriptions) the new waiting state
-        // depends on before committing the transition. A provisioning failure aborts the transition
-        // before persistence can strand the instance.
-        await ProvisionFlowTransitionAsync(services, context, ct);
-
         var engine    = _registry.GetRegistration(persisted.DefinitionName)?.Engine;
         var writeback = ProcessWriteback.Build(services, persisted, instance, engine);
 
-        await _persistence.PersistTransitionAsync(services, persisted, transition, writeback, ct);
+        // The advisor pipeline runs inside the transition's unit of work; advisor writes that join
+        // the unit of work commit atomically with the process row, or roll back together on failure.
+        await _persistence.PersistTransitionAsync(
+            services, persisted, transition,
+            advisor: (uow, ctc) => {
+                context.UnitOfWork = uow;
+                return ProvisionFlowTransitionAsync(services, context, ctc);
+            },
+            writeback: writeback,
+            ct: ct);
 
         ProcessPersistence.SyncProcessFields(process, persisted);
 

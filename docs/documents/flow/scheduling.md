@@ -45,7 +45,7 @@ services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowT
 ## FlowTimerTransitionAdvisor
 
 `FlowTimerTransitionAdvisor` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
-`AdviseAsync` runs in the transition's pre-commit window and reconciles the scheduler against the new
+`AdviseAsync` runs inside the transition's unit of work, before the process row is persisted, and reconciles the scheduler against the new
 waiting state, returning `AdviseResult.Continue`. Only timer-catch transitions touch the scheduler;
 other transitions pass through untouched.
 
@@ -98,8 +98,8 @@ fires again on its next occurrence.
 
 - `FlowTimerJob` is activated from the DI scope by its key, not pre-registered. A container that
   refuses to construct unregistered types needs `services.AddScoped<FlowTimerJob>()`.
-- The job is built inside the pre-commit advisor pipeline, so it is scheduled before the transition
-  commits. A failed commit rolls back the instance row while the scheduled job remains; reconcile by
+- The job is scheduled from the advisor pipeline inside the transition's unit of work, before the
+  transition commits — an external side effect the unit of work cannot roll back. A failed commit rolls back the instance row while the scheduled job remains; reconcile by
   dropping jobs without a matching waiting instance.
 - The job name `flow-{process.CanonicalName}-{elementId}` is deterministic per waiting element, so a
   transition out of a timer catch cancels exactly the job it scheduled.
