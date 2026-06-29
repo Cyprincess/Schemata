@@ -74,8 +74,9 @@ public class ProcessRuntimeShould
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Runtime.StartProcessInstanceAsync("approval")
                                                                          .AsTask());
 
-        // Provisioning runs before transition persistence, so a failure leaves the unit of work untouched.
-        Assert.Empty(fixture.UnitOfWorks);
+        // Provisioning runs inside the transition's unit of work, so a failure rolls it back.
+        var uow = Assert.Single(fixture.UnitOfWorks);
+        uow.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
