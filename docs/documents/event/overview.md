@@ -11,8 +11,8 @@ string end to end. Publishing a type with no registration throws at the publish 
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Event.Skeleton` | `IEventBus.cs`, `IEvent.cs`, `IRequest.cs`, `IEventHandler.cs`, `IRequestHandler.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `IEventSubscriptionStore.cs`, `IEventSubscription.cs`, `EventSubscription.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
-| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `Internal/RepositoryEventSubscriptionStore.cs`, `Internal/HandlerResolver.cs` |
+| `Schemata.Event.Skeleton` | `IEventBus.cs`, `IEvent.cs`, `IRequest.cs`, `IEventHandler.cs`, `IRequestHandler.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
+| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Internal/HandlerResolver.cs` |
 | `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
 
 ## Wire names
@@ -173,7 +173,8 @@ stored in `SchemataEventOptions.RoutingTable`.
   transitions alongside the built-in audit observer.
 - Implement `IEventBus` (scoped) to replace the transport.
 - Implement `IEventOutboxPublisher` (singleton) to replay outbox rows over a custom broker.
-- Implement `IEventSubscriptionStore` to back durable subscriptions with a different store.
+- Durable subscriptions persist through `IRepository<SchemataEventSubscription>`; swap the repository
+  provider to change the backing store.
 
 ## Caveats
 

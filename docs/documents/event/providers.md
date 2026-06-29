@@ -9,7 +9,7 @@ reaches handlers.
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/RepositoryEventSubscriptionStore.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs` |
+| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `SchemataEventSubscriptionExtensions.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs` |
 | `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
 
 ## In-process provider
@@ -32,9 +32,11 @@ schema.UseEvent()
 
 `UseConsumer(c => c.UseInProcess())` registers, all scoped (`TryAdd`):
 
-- `RepositoryEventSubscriptionStore` as `IEventSubscriptionStore`
 - `HandlerResolver`
 - `EventDispatchContext` as `IEventDispatchContext`
+
+Subscriptions are persisted through `IRepository<SchemataEventSubscription>`, which a persistence
+provider (EF Core or LinqToDB) must register for the in-process consumer to resolve.
 
 ### Behavior
 
@@ -47,11 +49,12 @@ because the consume path already owns the terminal `Succeeded`/`Failed` state.
 `InProcessEventBus.SendAsync` runs the single `IRequestHandler<TRequest, TResponse>` inline and
 returns its response.
 
-### RepositoryEventSubscriptionStore
+### Subscription persistence
 
-`RepositoryEventSubscriptionStore` persists subscriptions as `SchemataEventSubscription` rows through
-`IRepository<SchemataEventSubscription>`, so subscriptions survive restarts. A persistence provider
-(EF Core or LinqToDB) must be configured for the in-process consumer to resolve the repository.
+`SchemataEventSubscription` rows persist through `IRepository<SchemataEventSubscription>`, so
+subscriptions survive restarts. `SchemataEventSubscriptionExtensions.ListMatchingAsync(eventType,
+correlationKey)` is the read-side helper the in-process publisher and the RabbitMQ consumer use to
+resolve matching subscriptions during dispatch.
 
 ## RabbitMQ provider
 
@@ -149,7 +152,6 @@ tracker matches by correlation id; on `RequestTimeoutMs` (default 30,000 ms) it 
 
 - Implement `IEventBus` (scoped) to replace the transport.
 - Implement `IEventOutboxPublisher` (singleton) to replay outbox rows over a custom broker.
-- Implement `IEventSubscriptionStore` to back subscriptions with a different store.
 - Implement `IEventPublishAdvisor` or `IEventConsumeAdvisor` to add cross-cutting behavior without
   touching the transport.
 

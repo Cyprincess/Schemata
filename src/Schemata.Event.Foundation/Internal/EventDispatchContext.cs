@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Schemata.Event.Skeleton;
+using Schemata.Event.Skeleton.Entities;
 
 namespace Schemata.Event.Foundation.Internal;
 
@@ -8,9 +9,9 @@ public sealed class EventDispatchContext : IEventDispatchContext
 {
     #region IEventDispatchContext Members
 
-    public IReadOnlyList<IEventSubscription>? MatchedSubscriptions { get; private set; }
+    public IReadOnlyList<SchemataEventSubscription>? MatchedSubscriptions { get; private set; }
 
-    public void SetSubscriptions(IReadOnlyList<IEventSubscription>? subscriptions) {
+    public void SetSubscriptions(IReadOnlyList<SchemataEventSubscription>? subscriptions) {
         MatchedSubscriptions = subscriptions;
     }
 

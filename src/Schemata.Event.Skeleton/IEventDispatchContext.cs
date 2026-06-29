@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Schemata.Event.Skeleton.Entities;
 
 namespace Schemata.Event.Skeleton;
 
@@ -9,8 +10,8 @@ namespace Schemata.Event.Skeleton;
 public interface IEventDispatchContext
 {
     /// <summary>Subscriptions matched by the bus before handler invocation.</summary>
-    IReadOnlyList<IEventSubscription>? MatchedSubscriptions { get; }
+    IReadOnlyList<SchemataEventSubscription>? MatchedSubscriptions { get; }
 
     /// <summary>Assigns the matched subscriptions; called by the bus, not by handlers.</summary>
-    void SetSubscriptions(IReadOnlyList<IEventSubscription>? subscriptions);
+    void SetSubscriptions(IReadOnlyList<SchemataEventSubscription>? subscriptions);
 }

@@ -4,8 +4,8 @@
 
 A BPMN process that parks at an event-based gateway and resumes when either a message or a signal
 arrives on the event bus. `UseEvent()` on the flow builder wires `FlowEventTransitionAdvisor`, which
-keeps `IEventSubscriptionStore` in sync as the instance waits and advances. Publishing through
-`IEventBus` then lets `FlowEventHandler` correlate the event back to the waiting instance.
+keeps `IRepository<SchemataEventSubscription>` in sync as the instance waits and advances. Publishing
+through `IEventBus` then lets `FlowEventHandler` correlate the event back to the waiting instance.
 
 ## Prerequisites
 
@@ -94,7 +94,7 @@ the event bus still needs a producer and consumer for events to flow.
 `IFlowTransitionAdvisor`) and `FlowEventHandler` (a scoped `IEventHandler<IEvent>`, the fallback
 handler).
 
-**Check:** the app starts and `IEventSubscriptionStore` resolves from DI.
+**Check:** the app starts and `IRepository<SchemataEventSubscription>` resolves from DI.
 
 ## Step 4: Start an instance
 
@@ -120,7 +120,7 @@ subscriptions:
 
 The registered process name is the type name, `OrderProcess`.
 
-**Check:** `POST /orders` returns `202`; two rows appear in `IEventSubscriptionStore`.
+**Check:** `POST /orders` returns `202`; two `SchemataEventSubscription` rows appear in the repository.
 
 ## Step 5: Correlate a message to advance one instance
 
