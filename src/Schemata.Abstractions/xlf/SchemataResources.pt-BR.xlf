@@ -167,6 +167,11 @@
         <target state="translated">Carga da solicitação inválida.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">O recurso pai é inválido.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">A leitura entre pais não é compatível com este recurso.</target>

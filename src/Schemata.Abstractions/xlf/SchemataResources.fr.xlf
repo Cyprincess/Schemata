@@ -170,6 +170,11 @@
         <target state="translated">Contenu de requête invalide.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">Le parent n'est pas valide.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">La lecture inter-parent n'est pas prise en charge pour cette

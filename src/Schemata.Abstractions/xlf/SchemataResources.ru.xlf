@@ -166,6 +166,11 @@
         <target state="translated">Недопустимое тело запроса.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">Родительский ресурс недействителен.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">Кросс-родительское чтение не поддерживается для этого ресурса.</target>

@@ -166,6 +166,11 @@
         <target state="translated">Neplatné tělo požadavku.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">Nadřazený prostředek je neplatný.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">Čtení napříč nadřazenými prvky není pro tento prostředek

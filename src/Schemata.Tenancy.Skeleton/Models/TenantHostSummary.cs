@@ -4,10 +4,17 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Tenancy.Skeleton.Models;
 
 /// <summary>List item for <see cref="Entities.SchemataTenantHost" />.</summary>
-public class TenantHostSummary : IIdentifier, ICanonicalName, ITimestamp
+public class TenantHostSummary : IIdentifier, ICanonicalName, ITimestamp, IChild
 {
     /// <summary>HTTP Host header value that routes requests to the parent tenant.</summary>
     public string? Host { get; set; }
+
+    #region IChild Members
+
+    /// <inheritdoc />
+    public string? Parent { get; set; }
+
+    #endregion
 
     #region ICanonicalName Members
 
