@@ -170,6 +170,11 @@
         <target state="translated">Ungültige Anfragenutzlast.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">Die übergeordnete Ressource ist ungültig.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">Das übergreifende Lesen wird für diese Ressource nicht

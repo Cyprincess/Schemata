@@ -88,8 +88,8 @@ public sealed class ResourceNameDescriptor
 
         string ResolvePropertyName(string placeholder) {
             return placeholder switch {
-                "Parent"                                        => "Parent",
-                var _ when string.Equals(Singular, placeholder) => "Name",
+                nameof(IChild.Parent)                           => nameof(IChild.Parent),
+                var _ when string.Equals(Singular, placeholder) => nameof(ICanonicalName.Name),
                 var _                                           => placeholder,
             };
         }

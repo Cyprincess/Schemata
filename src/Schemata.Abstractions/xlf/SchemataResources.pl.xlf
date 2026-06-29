@@ -167,6 +167,11 @@
         <target state="translated">Nieprawidłowe dane żądania.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">Element nadrzędny jest nieprawidłowy.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">Odczyt międzynadrzędny nie jest obsługiwany dla tego zasobu.</target>

@@ -11,7 +11,7 @@ sequences advisors within a stage.
 | --- | --- |
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`, `ResourceWireMask.cs` |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs`, `Advisors/AdviceUpdateRequestValidation.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs`, `Advisors/AdviceUpdateSoftDeleted.cs`, `Advisors/AdviceUpdateFreshness.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`, `Advisors/AdviceUpdateSoftDeleted.cs`, `Advisors/AdviceUpdateFreshness.cs` |
 | `Schemata.Abstractions` | `Resource/UpdateResultBase.cs`, `Resource/IUpdateMask.cs` |
 
 ## Stages
@@ -46,6 +46,7 @@ null result throws `ResourceNotFound(name)`.
 
 | Advisor | What it does |
 | --- | --- |
+| `AdviceApplyChildParent` | Reverse-parses `request.Parent` into the entity's mode-A parent field for `IChild` DTOs; runs first |
 | `AdviceUpdateSoftDeleted` | Rejects updates to a soft-deleted entity with `FailedPreconditionException`; runs before freshness |
 | `AdviceUpdateFreshness` | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
@@ -73,8 +74,8 @@ and copies only those fields. An unknown segment throws `ValidationException` (`
 
 ### 8. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
-The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseFreshness` writes the new
-ETag; `AdviceResponseReadMask` trims to `read_mask`).
+The updated entity is mapped to `TDetail` and the response chain runs (`AdviceFillChildParentResponse` derives
+`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag; `AdviceResponseReadMask` trims to `read_mask`).
 
 ## Field masks (AIP-161)
 

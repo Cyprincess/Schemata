@@ -157,11 +157,14 @@ Each operation returns a thin result base carrying the response DTO:
 | `AdviceCreateRequestValidation<TEntity, TRequest>` | Create request |
 | `AdviceUpdateRequestSanitize<TEntity, TRequest>` | Update request |
 | `AdviceUpdateRequestValidation<TEntity, TRequest>` | Update request |
+| `AdviceApplyChildParent<TEntity, TRequest>` | Create / Update entity |
 | `AdviceUpdateSoftDeleted<TEntity, TRequest>` | Update entity |
 | `AdviceUpdateFreshness<TEntity, TRequest>` | Update entity |
 | `AdviceDeleteFreshness<TEntity>` | Delete entity |
+| `AdviceFillChildParentResponse<TEntity, TDetail>` | Response |
 | `AdviceResponseFreshness<TEntity, TDetail>` | Response |
 | `AdviceResponseReadMask<TEntity, TDetail>` | Response |
+| `AdviceFillChildParentListResponse<TSummary>` | List response |
 | `AdviceListResponseReadMask<TSummary>` | List response |
 | `AdviceResponseIdempotency<TEntity, TDetail>` | Response |
 

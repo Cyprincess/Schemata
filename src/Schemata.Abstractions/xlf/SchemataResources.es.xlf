@@ -168,6 +168,11 @@
         <target state="translated">Carga de solicitud no válida.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_PARENT">
+        <source>The parent is invalid.</source>
+        <target state="translated">El elemento principal no es válido.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent reading is not supported for this resource.</source>
         <target state="translated">La lectura entre padres no es compatible con este recurso.</target>

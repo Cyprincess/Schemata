@@ -35,6 +35,7 @@ All in [Entities/](Entities/). A trait is a marker interface; advisors react to 
 | `IDescriptive` | `Title` / `Description` text |
 | `ISourceReference` | external system back-link |
 | `ICanonicalName` | AIP resource name parsing (paired with `[CanonicalName]`) |
+| `IChild` | DTO-only marker exposing a derived `Parent` canonical (AIP-132 / 133); never implement on persisted entities |
 
 Two enums power query semantics: [Operations.cs](Entities/Operations.cs) (`Create`/`Get`/`List`/`Update`/`Delete`/...), [Ordering.cs](Entities/Ordering.cs) (`Ascending`/`Descending`).
 

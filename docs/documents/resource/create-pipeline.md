@@ -10,8 +10,8 @@ only sequences advisors within a stage.
 | --- | --- |
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.Create.cs` |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs`, `Advisors/AdviceCreateRequestValidation.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs`, `Advisors/AdviceFillChildParentResponse.cs` |
 | `Schemata.Abstractions` | `Resource/CreateResultBase.cs` |
 
 ## Stages
@@ -48,8 +48,9 @@ Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principa
 ### 4. Create entity — `IResourceCreateAdvisor<TEntity, TRequest>`
 
 Receives the original request and the freshly mapped entity. This is the socket for entity-level logic that must
-run before persistence. No built-in resource advisor occupies it; trait behavior such as timestamp, canonical
-name, and uniqueness is applied by repository add advisors during `AddAsync`.
+run before persistence. `AdviceApplyChildParent` reverse-parses `request.Parent` into the entity's mode-A parent
+field for `IChild` DTOs; other trait behavior such as timestamp, canonical name, and uniqueness is applied by
+repository add advisors during `AddAsync`.
 
 ### 5. Persistence
 
@@ -64,6 +65,7 @@ response advisors.
 
 | Advisor | What it does |
 | --- | --- |
+| `AdviceFillChildParentResponse` | Derives `IChild.Parent` from the entity's canonical name; runs before freshness |
 | `AdviceResponseFreshness` | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
 | `AdviceResponseReadMask` | Trims the detail to the requested AIP-157 `read_mask` fields |
 | `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key |
