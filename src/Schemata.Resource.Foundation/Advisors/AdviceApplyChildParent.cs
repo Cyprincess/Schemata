@@ -92,7 +92,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
                         Field       = nameof(IChild.Parent).ToLowerInvariant(),
                         Description = LocalizedMessageFormatter.FormatInvariant(
                             SchemataResources.CROSS_PARENT_UNSUPPORTED,
-                            new Dictionary<string, string> { ["parent"] = child.Parent! }),
+                            new Dictionary<string, string?> { ["parent"] = child.Parent }),
                         Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                     },
                 ]);
@@ -109,7 +109,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
                     Field       = nameof(IChild.Parent).ToLowerInvariant(),
                     Description = LocalizedMessageFormatter.FormatInvariant(
                         SchemataResources.INVALID_PARENT,
-                        new Dictionary<string, string> { ["parent"] = child.Parent! }),
+                        new Dictionary<string, string?> { ["parent"] = child.Parent }),
                     Reason      = SchemataResources.INVALID_PARENT,
                 },
             ]);

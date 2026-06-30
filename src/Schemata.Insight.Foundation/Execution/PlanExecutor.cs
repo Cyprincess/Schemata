@@ -78,12 +78,18 @@ public sealed class PlanExecutor
         TotalSizeMode       mode,
         CancellationToken   ct
     ) {
-        var source = FindSource(root)
-                  ?? throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+        var source = FindSource(root);
+        if (source is null) {
+            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+        }
 
-        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName)
-                  ?? throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"No driver '{source.Config.DriverName}' is registered.");
+        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
+        if (driver is null) {
+            throw new InsightValidationException(
+                InsightReasons.Unimplemented,
+                $"No driver '{source.Config.DriverName}' is registered."
+            );
+        }
 
         var (pushable, localStages) = Split(root);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config);
@@ -202,12 +208,18 @@ public sealed class PlanExecutor
         ClaimsPrincipal?                          principal,
         [EnumeratorCancellation] CancellationToken ct
     ) {
-        var source = FindSource(node)
-                  ?? throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
+        var source = FindSource(node);
+        if (source is null) {
+            throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
+        }
 
-        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName)
-                  ?? throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"No driver '{source.Config.DriverName}' is registered.");
+        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
+        if (driver is null) {
+            throw new InsightValidationException(
+                InsightReasons.Unimplemented,
+                $"No driver '{source.Config.DriverName}' is registered."
+            );
+        }
 
         var (pushable, localStages) = Split(node);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config);

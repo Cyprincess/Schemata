@@ -1,5 +1,4 @@
 using Grpc.AspNetCore.Server.Model;
-using ProtoBuf.Grpc;
 
 namespace Schemata.Insight.Grpc;
 

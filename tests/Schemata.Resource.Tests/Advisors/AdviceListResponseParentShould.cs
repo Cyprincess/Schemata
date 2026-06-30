@@ -18,7 +18,7 @@ public class AdviceListResponseParentShould
         ];
         var advisor = new AdviceListResponseParent<PlainSummary>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), array, principal: null);
+        var result = await advisor.AdviseAsync(EmptyContext(), array, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -27,7 +27,7 @@ public class AdviceListResponseParentShould
     public async Task NullArray_IsNoOp() {
         var advisor = new AdviceListResponseParent<ChildSummary>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), summaries: null, principal: null);
+        var result = await advisor.AdviseAsync(EmptyContext(), null, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -42,7 +42,7 @@ public class AdviceListResponseParentShould
         ];
         var advisor = new AdviceListResponseParent<ChildSummary>();
 
-        await advisor.AdviseAsync(EmptyContext(), array, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), array, null);
 
         Assert.Equal("tenants/t1", array.Value[0].Parent);
         Assert.Equal("tenants/t2", array.Value[1].Parent);
@@ -56,7 +56,7 @@ public class AdviceListResponseParentShould
         ImmutableArray<ChildSummary>? input = original;
         var advisor = new AdviceListResponseParent<ChildSummary>();
 
-        await advisor.AdviseAsync(EmptyContext(), input, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), input, null);
 
         Assert.Same(original[0], input.Value[0]);
         Assert.Equal("tenants/t1", original[0].Parent);

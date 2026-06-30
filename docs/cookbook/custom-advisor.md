@@ -144,10 +144,10 @@ Core repository for `Student`; `EfCoreRepository<TContext, TEntity>` resolves it
 
 The built-in update advisors and their `Order` values:
 
-| Advisor | Order |
-| --- | --- |
-| `AdviceUpdateTimestamp` | 100,000,000 (`Orders.Base`) |
-| `AdviceUpdateValidation` | 110,000,000 |
+| Advisor                  | Order                       |
+| ------------------------ | --------------------------- |
+| `AdviceUpdateTimestamp`  | 100,000,000 (`Orders.Base`) |
+| `AdviceUpdateValidation` | 110,000,000                 |
 
 `SlugNormalizeAdvisor` at `Order = 50_000_000` runs before both. To run after validation, pick an
 `Order` above 110,000,000; user advisors stay outside the reserved range

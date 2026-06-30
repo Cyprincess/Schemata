@@ -18,11 +18,11 @@ The pushed tree is a weakening of the original expression. Every row accepted by
 
 Three shapes are possible:
 
-| Shape | Meaning |
-| --- | --- |
-| `Pushed != null`, `Residual == null` | The backend can translate the whole expression. |
+| Shape                                | Meaning                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `Pushed != null`, `Residual == null` | The backend can translate the whole expression.                           |
 | `Pushed == null`, `Residual != null` | Nothing can safely push; local residual sees the backend query unchanged. |
-| `Pushed != null`, `Residual != null` | The backend narrows to a superset; local residual finishes the filter. |
+| `Pushed != null`, `Residual != null` | The backend narrows to a superset; local residual finishes the filter.    |
 
 Resource list handling uses this shape only when the resolved `FilteringMode` is `Residual`. `Strict` mode compiles the whole parsed tree directly.
 
@@ -49,19 +49,19 @@ When the planner rebuilds partial filters, it appends `\u0001P` to the pushed so
 
 The CEL planner is conservative by node kind:
 
-| Node kind | Pushability |
-| --- | --- |
-| `CelConstant`, `CelIdentifier` | Pushable. |
-| `CelMember` | Residual; member/null behavior can differ from backend SQL logic. |
-| Comparison `CelBinary` | Pushes when `Comparison` is enabled, both sides are pushable, and a flat field participates. |
-| Logical `CelBinary` | Pushes when `Logical` is enabled and both sides are pushable. |
-| Arithmetic `CelBinary` | Pushes when `Arithmetic` is enabled, both sides are pushable, and a flat field participates. |
-| `in` | Pushes when `Membership` is enabled and both sides are pushable. |
-| `CelUnary` `!` | Pushes when `Logical` is enabled and the operand is pushable. |
-| `CelUnary` `-` | Pushes when `Arithmetic` is enabled and the operand is pushable. |
-| `CelCall` `has(x)` | Pushes when `Presence` is enabled and `x` is a `CelIdentifier`. |
-| `CelMemberCall` `contains`, `startsWith`, `endsWith` | Pushes when `StringMatch` is enabled, target is a flat identifier, and arguments are constants or identifiers. |
-| `matches`, macros, conditionals, list literals, map literals, indexes | Residual. |
+| Node kind                                                             | Pushability                                                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `CelConstant`, `CelIdentifier`                                        | Pushable.                                                                                                      |
+| `CelMember`                                                           | Residual; member/null behavior can differ from backend SQL logic.                                              |
+| Comparison `CelBinary`                                                | Pushes when `Comparison` is enabled, both sides are pushable, and a flat field participates.                   |
+| Logical `CelBinary`                                                   | Pushes when `Logical` is enabled and both sides are pushable.                                                  |
+| Arithmetic `CelBinary`                                                | Pushes when `Arithmetic` is enabled, both sides are pushable, and a flat field participates.                   |
+| `in`                                                                  | Pushes when `Membership` is enabled and both sides are pushable.                                               |
+| `CelUnary` `!`                                                        | Pushes when `Logical` is enabled and the operand is pushable.                                                  |
+| `CelUnary` `-`                                                        | Pushes when `Arithmetic` is enabled and the operand is pushable.                                               |
+| `CelCall` `has(x)`                                                    | Pushes when `Presence` is enabled and `x` is a `CelIdentifier`.                                                |
+| `CelMemberCall` `contains`, `startsWith`, `endsWith`                  | Pushes when `StringMatch` is enabled, target is a flat identifier, and arguments are constants or identifiers. |
+| `matches`, macros, conditionals, list literals, map literals, indexes | Residual.                                                                                                      |
 
 Partial CEL plans also append `\u0001P` and `\u0001R` to `CelNode.Source` so pushed and residual compilations do not share one cache key.
 

@@ -6,7 +6,6 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -43,7 +42,7 @@ internal static class ResourceIdentifiers
                 Field       = nameof(name),
                 Description = LocalizedMessageFormatter.FormatInvariant(
                     SchemataResources.INVALID_NAME,
-                    new Dictionary<string, string> { ["name"] = name! }),
+                    new Dictionary<string, string?> { ["name"] = name }),
                 Reason      = SchemataResources.INVALID_NAME,
             }]);
         }
@@ -82,7 +81,7 @@ internal static class ResourceIdentifiers
                 Field       = nameof(ListRequest.Parent).Underscore(),
                 Description = LocalizedMessageFormatter.FormatInvariant(
                     SchemataResources.INVALID_PARENT,
-                    new Dictionary<string, string> { ["parent"] = parent! }),
+                    new Dictionary<string, string?> { ["parent"] = parent }),
                 Reason      = SchemataResources.INVALID_PARENT,
             }]);
         }
@@ -97,7 +96,7 @@ internal static class ResourceIdentifiers
                     Field       = nameof(ListRequest.Parent).Underscore(),
                     Description = LocalizedMessageFormatter.FormatInvariant(
                         SchemataResources.CROSS_PARENT_UNSUPPORTED,
-                        new Dictionary<string, string> { ["parent"] = parent! }),
+                        new Dictionary<string, string?> { ["parent"] = parent }),
                     Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                 }]);
             }

@@ -1,41 +1,50 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
 
 /// <summary>
-///     The context passed to an <see cref="IConditionExpression.Evaluate" />
-///     invocation during flow traversal. Provides access to the process definition,
-///     the running instance, variables, and the current state.
+///     The context passed to an <see cref="IConditionExpression.Evaluate" /> invocation during flow
+///     traversal. Provides access to the process definition, the addressed token, the event payload,
+///     the bookkeeping counters, and the current element name.
 /// </summary>
 public sealed class FlowConditionContext
 {
-    /// <summary>
-    ///     The process definition that contains the flow being traversed.
-    /// </summary>
+    /// <summary>The process definition that contains the flow being traversed.</summary>
     public ProcessDefinition Definition { get; set; } = null!;
 
     /// <summary>
-    ///     The process instance being evaluated.
+    ///     The token being evaluated. The state-machine engine sets this to the unique token; the
+    ///     BPMN engine sets it to the specific token whose outgoing flow is under evaluation.
     /// </summary>
-    public ProcessInstance Instance { get; set; } = null!;
+    public TokenSnapshot Token { get; set; } = null!;
 
-    /// <summary>
-    ///     A snapshot of the process variables at the time of evaluation.
-    ///     Keys are <c>snake_case</c> names derived from CLR type names by convention.
-    /// </summary>
-    public Dictionary<string, object?> Variables { get; set; } = [];
+    /// <summary>The persisted process instance being evaluated.</summary>
+    public SchemataProcess? Process { get; set; }
 
-    /// <summary>
-    ///     The <see cref="FlowElement.Name" /> of the element currently being
-    ///     evaluated for outgoing transitions.
-    /// </summary>
+    /// <summary>The persisted token entity being evaluated.</summary>
+    public SchemataProcessToken? TokenEntity { get; set; }
+
+    /// <summary>The execution context shared by condition evaluation and engine persistence.</summary>
+    public required FlowExecutionContext Execution { get; set; }
+
+    /// <summary>The event payload visible to typed payload conditions.</summary>
+    public object? Payload { get; set; }
+
+    /// <summary>Engine-private counters visible to condition expressions.</summary>
+    public Dictionary<string, int> Bookkeeping { get; set; } = [];
+
+    /// <summary>The element name currently being evaluated for outgoing transitions.</summary>
     public string CurrentState { get; set; } = null!;
 
-    /// <summary>
-    ///     The service provider the engine supplies so a condition can resolve the expression
-    ///     language services it needs; <see langword="null" /> when the engine evaluates without DI.
-    /// </summary>
-    public IServiceProvider? Services { get; set; }
+    /// <summary>Builds a task context for source-aware condition expressions.</summary>
+    public FlowTaskContext CreateTaskContext() {
+        if (Process is null || TokenEntity is null) {
+            throw new InvalidOperationException("Source-aware flow conditions require process and token context.");
+        }
+
+        return new(Definition, Process, TokenEntity, Execution, Payload) { TrackSources = false };
+    }
 }

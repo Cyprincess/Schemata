@@ -244,4 +244,3 @@ summaries.
 - [Insight Planning](../documents/insight/planning.md) — plan nodes and validation rules
 - [Insight Drivers](../documents/insight/drivers.md) — repository pushdown and residual execution
 - [Insight Transports](../documents/insight/transports.md) — HTTP and gRPC query surfaces
-

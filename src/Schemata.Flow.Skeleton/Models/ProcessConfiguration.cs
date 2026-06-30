@@ -21,7 +21,7 @@ public sealed class ProcessConfiguration
     /// <summary>When <c>true</c>, process operations enforce authorization.</summary>
     public bool RequiresAuthorization { get; set; }
 
-    /// <summary>Enables authorization checks on process operations.</summary>
+    /// <summary>Requires an authenticated principal for operations on this definition's processes; anonymous callers receive a not-found response.</summary>
     public ProcessConfiguration WithAuthorization() {
         RequiresAuthorization = true;
         return this;

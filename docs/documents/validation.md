@@ -8,9 +8,9 @@ runs them against any request whose type has a registered validator.
 
 ## Packages
 
-| Package | Key types |
-| --- | --- |
-| `Schemata.Validation.Skeleton` | `Advisors.IValidationAdvisor<T>` |
+| Package                                | Key types                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Schemata.Validation.Skeleton`         | `Advisors.IValidationAdvisor<T>`                                                                 |
 | `Schemata.Validation.FluentValidation` | `AddValidator<TValidator>`, `Advisors.AdviceValidation<T>`, `Advisors.AdviceValidationErrors<T>` |
 
 ## IValidationAdvisor
@@ -97,7 +97,7 @@ the chain produces no violations and the operation proceeds.
 
 ## Validator implementation
 
-Validators are standard FluentValidation classes; no Schemata base type is required.
+Validators are plain FluentValidation `AbstractValidator<T>` subclasses.
 
 ```csharp
 public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
@@ -111,10 +111,10 @@ public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
 
 ## Extension points
 
-| Interface | Purpose |
-| --- | --- |
+| Interface               | Purpose                                                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `IValidationAdvisor<T>` | Add validation logic outside FluentValidation. Register via `TryAddEnumerable` and choose an `Order` between the collector (100,000,000) and the terminal (110,000,000) to contribute violations, or after the terminal to react to the outcome. |
-| `IValidator<T>` | The FluentValidation entry point. Compose multiple rule sets for one type with `Include(new OtherValidator())` inside a single `AbstractValidator<T>`. |
+| `IValidator<T>`         | The FluentValidation entry point. Compose multiple rule sets for one type with `Include(new OtherValidator())` inside a single `AbstractValidator<T>`.                                                                                           |
 
 ## Caveats
 

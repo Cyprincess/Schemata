@@ -9,13 +9,8 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class SequenceFlow
 {
-    /// <summary>Unique identifier for this sequence flow within the process definition.</summary>
-    public string Id { get; set; } = null!;
-
-    /// <summary>The element this flow originates from.</summary>
     public FlowElement Source { get; set; } = null!;
 
-    /// <summary>The element this flow leads to.</summary>
     public FlowElement Target { get; set; } = null!;
 
     /// <summary>Optional guard expression; when present, the flow is only taken if the condition evaluates to true.</summary>

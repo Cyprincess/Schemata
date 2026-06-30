@@ -79,7 +79,7 @@ dotnet run
 Trigger validation errors:
 
 ```shell
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"","age":200}'
 ```
@@ -94,22 +94,39 @@ Response (HTTP 422):
     "message": "One or more validation errors occurred.",
     "details": [
       {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "VALIDATION_FAILED"
+      },
+      {
         "@type": "type.googleapis.com/google.rpc.BadRequest",
         "field_violations": [
-          { "field": "full_name", "reason": "not_empty",              "description": "'Full Name' must not be empty." },
-          { "field": "age",       "reason": "inclusive_between,1,150", "description": "'Age' must be between 1 and 150." }
+          {
+            "field": "full_name",
+            "reason": "NOT_EMPTY",
+            "description": "'Full Name' must not be empty."
+          },
+          {
+            "field": "age",
+            "reason": "INCLUSIVE_BETWEEN",
+            "description": "'Age' must be between 1 and 150."
+          }
         ]
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.RequestInfo",
+        "request_id": "0HN7..."
       }
     ]
   }
 }
 ```
 
-The `reason` code is the FluentValidation error code in `snake_case`, with comparison operands
-appended. Dry-run validation validates without persisting:
+The `reason` code is the FluentValidation error code in `UPPER_SNAKE_CASE`, per AIP-193;
+comparison operands (the `1, 150` bounds) appear in the `description` through the message
+template. Dry-run validation validates without persisting:
 
 ```shell
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20,"validate_only":true}'
 ```

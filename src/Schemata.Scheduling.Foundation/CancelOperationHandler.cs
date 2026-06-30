@@ -42,7 +42,7 @@ public sealed class CancelOperationHandler(
                          or ExecutionState.Cancelled) {
             throw new FailedPreconditionException(
                 SchemataResources.OPERATION_ALREADY_FINISHED,
-                new Dictionary<string, string> { ["name"] = entity.CanonicalName ?? string.Empty });
+                new Dictionary<string, string?> { ["name"] = entity.CanonicalName });
         }
 
         if (!string.IsNullOrEmpty(entity.Job)) {

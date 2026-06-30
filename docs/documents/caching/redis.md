@@ -4,8 +4,8 @@
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
+| Item                 | Path                                               |
+| -------------------- | -------------------------------------------------- |
 | `RedisCacheProvider` | `src/Schemata.Caching.Redis/RedisCacheProvider.cs` |
 
 ## Mechanism
@@ -31,14 +31,14 @@ compare and the write in one script makes each operation atomic across processes
 
 Collection operations use native Redis Set commands:
 
-| Operation | Redis command |
-|---|---|
-| `CollectionAddAsync` | `SADD` |
-| `CollectionMembersAsync` | `SMEMBERS` |
-| `CollectionRemoveAsync` | `SREM` |
-| `CollectionClearAsync` | `DEL` |
+| Operation                | Redis command |
+| ------------------------ | ------------- |
+| `CollectionAddAsync`     | `SADD`        |
+| `CollectionMembersAsync` | `SMEMBERS`    |
+| `CollectionRemoveAsync`  | `SREM`        |
+| `CollectionClearAsync`   | `DEL`         |
 
-These commands are atomic at the Redis server level, making collection operations safe across multiple processes and cluster nodes. No in-process locking is needed.
+These commands are atomic at the Redis server level, so collection operations stay safe across multiple processes and cluster nodes without in-process locking.
 
 ### Sliding expiration via metadata key
 

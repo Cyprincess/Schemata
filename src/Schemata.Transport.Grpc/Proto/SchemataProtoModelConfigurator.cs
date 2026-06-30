@@ -20,6 +20,12 @@ public static class SchemataProtoModelConfigurator
     ///     field names. Idempotent across already-configured types and fields. Returns
     ///     <see langword="false" /> when the type cannot be added (e.g. open generic).
     /// </summary>
+    /// <remarks>
+    ///     Dictionary properties with a scalar key are registered as proto3 maps
+    ///     (<see cref="ValueMember.IsMap" />), so duplicate keys resolve last-wins. A
+    ///     <see langword="null" /> map value is written as a key-only entry on the wire;
+    ///     proto3 readers materialize it as an empty string.
+    /// </remarks>
     public static bool ConfigureType(RuntimeTypeModel model, Type? type) {
         if (type is null) {
             return false;
@@ -51,6 +57,11 @@ public static class SchemataProtoModelConfigurator
             var field = meta.AddField(number++, property.Name);
             field.Name = resolved.Underscore();
 
+            var key = GetDictionaryKeyType(property.PropertyType);
+            if (key is not null && IsScalarMapKey(key)) {
+                field.IsMap = true;
+            }
+
             var underlying = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
 
             if (underlying.IsClass && underlying != typeof(string) && !underlying.IsArray) {
@@ -69,6 +80,28 @@ public static class SchemataProtoModelConfigurator
         }
 
         return true;
+    }
+
+    private static Type? GetDictionaryKeyType(Type type) {
+        var dictionary = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+            ? type
+            : type.GetInterfaces()
+                  .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+        return dictionary?.GetGenericArguments()[0];
+    }
+
+    private static bool IsScalarMapKey(Type type) {
+        return type == typeof(string)
+            || type == typeof(bool)
+            || type == typeof(sbyte)
+            || type == typeof(byte)
+            || type == typeof(short)
+            || type == typeof(ushort)
+            || type == typeof(int)
+            || type == typeof(uint)
+            || type == typeof(long)
+            || type == typeof(ulong)
+            || type == typeof(char);
     }
 
     /// <summary>

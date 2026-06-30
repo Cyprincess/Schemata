@@ -51,13 +51,13 @@ features have had a chance to register their services.
 
 The five available resolvers and their lookup sources are:
 
-| Method | Resolver | Source |
-| --- | --- | --- |
-| `UseHeaderResolver()` | `RequestHeaderResolver` | `x-tenant-id` request header |
-| `UseHostResolver()` | `RequestHostResolver<TTenant>` | `Host` header matched against tenant host names |
-| `UsePathResolver()` | `RequestPathResolver` | `{Tenant}` route parameter |
-| `UsePrincipalResolver()` | `RequestPrincipalResolver` | `Tenant` claim on the authenticated principal |
-| `UseQueryResolver()` | `RequestQueryResolver` | `Tenant` query string parameter |
+| Method                   | Resolver                       | Source                                          |
+| ------------------------ | ------------------------------ | ----------------------------------------------- |
+| `UseHeaderResolver()`    | `RequestHeaderResolver`        | `x-tenant-id` request header                    |
+| `UseHostResolver()`      | `RequestHostResolver<TTenant>` | `Host` header matched against tenant host names |
+| `UsePathResolver()`      | `RequestPathResolver`          | `{Tenant}` route parameter                      |
+| `UsePrincipalResolver()` | `RequestPrincipalResolver`     | `Tenant` claim on the authenticated principal   |
+| `UseQueryResolver()`     | `RequestQueryResolver`         | `Tenant` query string parameter                 |
 
 Each `UseXxxResolver()` extension calls `services.TryAddScoped<ITenantResolver, X>()`. Only the **first** registration sticks; subsequent calls return without modifying DI. `SchemataTenantContextAccessor<TTenant>` takes a single `ITenantResolver` from DI and asks it once per request. To combine several signals (for example, "header overrides path"), implement a composite `ITenantResolver` and register it before any `UseXxxResolver()` extension:
 

@@ -584,6 +584,18 @@ public static class SchemataConstants
 
         /// <summary>Optimistic-concurrency conflict (Status ABORTED).</summary>
         public const string ConcurrencyMismatch = "CONCURRENCY_MISMATCH";
+
+        /// <summary>The named token does not exist on the addressed process (Status NOT_FOUND).</summary>
+        public const string ProcessTokenNotFound = "PROCESS_TOKEN_NOT_FOUND";
+
+        /// <summary>The addressed token is suspended, terminal, or otherwise not ready to receive the operation (Status FAILED_PRECONDITION).</summary>
+        public const string ProcessTokenNotReady = "PROCESS_TOKEN_NOT_READY";
+
+        /// <summary>The process has more than one ready token and the caller did not disambiguate (Status FAILED_PRECONDITION).</summary>
+        public const string ProcessTokenAmbiguous = "PROCESS_TOKEN_AMBIGUOUS";
+
+        /// <summary>A registered process references a BPMN-only AST node that the state-machine engine cannot run (Status FAILED_PRECONDITION).</summary>
+        public const string StateMachineRequiresBpmnEngine = "STATE_MACHINE_REQUIRES_BPMN_ENGINE";
     }
 
     #endregion

@@ -7,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
-using Schemata.Tenancy.Foundation.Services;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;

@@ -7,10 +7,10 @@ reaches handlers.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `SchemataEventSubscriptionExtensions.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs` |
-| `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| Package                     | Key files                                                                                                                                                                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `SchemataEventSubscriptionExtensions.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`                                                                  |
+| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
 
 ## In-process provider
 

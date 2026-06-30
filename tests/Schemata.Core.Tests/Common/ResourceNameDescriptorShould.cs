@@ -103,4 +103,36 @@ public class ResourceNameDescriptorShould
 
         Assert.Equal("publishers/{publisher}/books/{book}", descriptor.Pattern);
     }
+
+    [Fact]
+    public void Singular_PreserveDisplayNameThatSingularizesToDifferentValue() {
+        var descriptor = ResourceNameDescriptor.ForType<Process>();
+
+        Assert.Equal("Process", descriptor.Singular);
+    }
+
+    [Fact]
+    public void Plural_PluralizePreservedSingular() {
+        var descriptor = ResourceNameDescriptor.ForType<Process>();
+
+        Assert.Equal("Processes", descriptor.Plural);
+    }
+
+    [Fact]
+    public void Resolve_MapLeafToName_ForDisplayNameThatOverSingularizes() {
+        var descriptor = ResourceNameDescriptor.ForType<Process>();
+
+        var resolved = descriptor.Resolve(new Process { Name = "p1" });
+
+        Assert.Equal("processes/p1", resolved);
+    }
+
+    [Fact]
+    public void Resolve_MapParentToBareProperty_AndLeafToName_ForNestedResource() {
+        var descriptor = ResourceNameDescriptor.ForType<ProcessStep>();
+
+        var resolved = descriptor.Resolve(new ProcessStep { Process = "p1", Name = "s1" });
+
+        Assert.Equal("processes/p1/steps/s1", resolved);
+    }
 }

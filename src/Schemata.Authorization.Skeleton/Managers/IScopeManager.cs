@@ -30,13 +30,13 @@ public interface IScopeManager<TScope>
     Task SetDisplayNameAsync(TScope? scope, string? name, CancellationToken ct = default);
 
     /// <summary>Sets localized display names for the scope.</summary>
-    Task SetDisplayNamesAsync(TScope? scope, Dictionary<string, string>? names, CancellationToken ct = default);
+    Task SetDisplayNamesAsync(TScope? scope, Dictionary<string, string?>? names, CancellationToken ct = default);
 
     /// <summary>Sets the description for the scope.</summary>
     Task SetDescriptionAsync(TScope? scope, string? description, CancellationToken ct = default);
 
     /// <summary>Sets localized descriptions for the scope.</summary>
-    Task SetDescriptionsAsync(TScope? scope, Dictionary<string, string>? descriptions, CancellationToken ct = default);
+    Task SetDescriptionsAsync(TScope? scope, Dictionary<string, string?>? descriptions, CancellationToken ct = default);
 
     /// <summary>Sets the API resources this scope grants access to.</summary>
     Task SetResourcesAsync(TScope? scope, ICollection<string>? resources, CancellationToken ct = default);

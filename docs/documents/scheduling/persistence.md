@@ -4,34 +4,34 @@ The scheduler persists job definitions and execution history in two tables: `Sch
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Skeleton` | `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs` |
+| Package                          | Key files                                                                                                                                                                                                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Skeleton`   | `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`                                                                                                    |
 | `Schemata.Scheduling.Foundation` | `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `Observers/SchemataJobAuditObserver.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs` |
 
 ## SchemataJob
 
 `[Table("SchemataJobs")]`, `[CanonicalName("jobs/{job}")]`, `[PrimaryKey(nameof(Uid))]`, `[Index(nameof(Name), IsUnique = true)]`. Implements `IIdentifier`, `ICanonicalName`, `IConcurrency`, and `ITimestamp`.
 
-| Column | Description |
-| --- | --- |
-| `Uid` | Stable entity identifier. |
-| `Name` | Resource-name segment used by `CanonicalName`. |
-| `CanonicalName` | Public job name in the `jobs/{job}` collection. |
-| `Timestamp` | Concurrency token. |
-| `CreateTime` / `UpdateTime` | Audit timestamps. |
-| `JobKey` | Stable job key resolved through `IScheduledJobRegistry`. |
-| `ScheduleType` | Discriminator for `OneTime`, `Periodic`, or `Cron`. |
-| `NextRunTime` | Next computed fire time; `null` for terminal one-time schedules. |
-| `IntervalTicks` | Interval ticks for periodic entries. |
-| `AnchorTime` | Periodic schedule anchor. |
-| `CronExpression` | Cron expression for cron entries. |
-| `ArgsJson` | Serialized typed arguments consumed through `JobContext.ArgsJson`. |
-| `Variables` | Serialized free-form `JobContext.Variables`. |
-| `Replay` | Whether missed-fire policy may re-fire after a missed window or restart. |
-| `State` | `JobState` lifecycle value. |
-| `RecentRunTime` | Wall-clock time of the most recent fire. |
-| `RecentError` | Diagnostic message from the most recent failed fire. |
+| Column                      | Description                                                              |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `Uid`                       | Stable entity identifier.                                                |
+| `Name`                      | Resource-name segment used by `CanonicalName`.                           |
+| `CanonicalName`             | Public job name in the `jobs/{job}` collection.                          |
+| `Timestamp`                 | Concurrency token.                                                       |
+| `CreateTime` / `UpdateTime` | Audit timestamps.                                                        |
+| `JobKey`                    | Stable job key resolved through `IScheduledJobRegistry`.                 |
+| `ScheduleType`              | Discriminator for `OneTime`, `Periodic`, or `Cron`.                      |
+| `NextRunTime`               | Next computed fire time; `null` for terminal one-time schedules.         |
+| `IntervalTicks`             | Interval ticks for periodic entries.                                     |
+| `AnchorTime`                | Periodic schedule anchor.                                                |
+| `CronExpression`            | Cron expression for cron entries.                                        |
+| `ArgsJson`                  | Serialized typed arguments consumed through `JobContext.ArgsJson`.       |
+| `Variables`                 | Serialized free-form `JobContext.Variables`.                             |
+| `Replay`                    | Whether missed-fire policy may re-fire after a missed window or restart. |
+| `State`                     | `JobState` lifecycle value.                                              |
+| `RecentRunTime`             | Wall-clock time of the most recent fire.                                 |
+| `RecentError`               | Diagnostic message from the most recent failed fire.                     |
 
 ### ScheduleType
 
@@ -51,23 +51,23 @@ public enum JobState { Active, Paused, Completed, Failed, Cancelled }
 
 `[Table("SchemataJobExecutions")]`, `[CanonicalName("operations/{operation}")]`, `[PrimaryKey(nameof(Uid))]`. Implements `IIdentifier`, `ICanonicalName`, `IConcurrency`, `ISoftDelete`, and `ITimestamp`. The public wire form is `Operation`; external callers can read, list, delete, `:cancel`, and `:wait` rows through the scheduling resource bridge.
 
-| Column | Description |
-| --- | --- |
-| `Uid` | Stable execution identifier. |
-| `Name` | Resource-name segment used by `CanonicalName`. |
-| `CanonicalName` | Public operation name in the `operations/{operation}` collection. |
-| `Timestamp` | Concurrency token used for dispatcher row claims. |
-| `CreateTime` / `UpdateTime` | Audit timestamps. |
-| `DeleteTime` / `PurgeTime` | Soft-delete timestamps for operation retention. |
-| `Job` | Canonical name of the originating `SchemataJob`, or a synthetic one-shot name. |
-| `Method` | Custom method verb that dispatched the operation; `null` for ordinary scheduled fires. |
-| `JobKey` | Stable key that resolves the job type after restart. |
-| `ArgsJson` | Serialized typed arguments replayed by the job body. |
-| `State` | `ExecutionState` lifecycle value. |
-| `StartTime` | Due time recorded by the scheduler before the body runs. Future values keep the row `Pending` until due. |
-| `EndTime` | Wall-clock end time, set when the execution finishes. |
-| `RecentError` | Diagnostic message captured on failure. |
-| `Output` | Serialized result document, exposed as the AIP-151 response payload. |
+| Column                      | Description                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `Uid`                       | Stable execution identifier.                                                                             |
+| `Name`                      | Resource-name segment used by `CanonicalName`.                                                           |
+| `CanonicalName`             | Public operation name in the `operations/{operation}` collection.                                        |
+| `Timestamp`                 | Concurrency token used for dispatcher row claims.                                                        |
+| `CreateTime` / `UpdateTime` | Audit timestamps.                                                                                        |
+| `DeleteTime` / `PurgeTime`  | Soft-delete timestamps for operation retention.                                                          |
+| `Job`                       | Canonical name of the originating `SchemataJob`, or a synthetic one-shot name.                           |
+| `Method`                    | Custom method verb that dispatched the operation; `null` for ordinary scheduled fires.                   |
+| `JobKey`                    | Stable key that resolves the job type after restart.                                                     |
+| `ArgsJson`                  | Serialized typed arguments replayed by the job body.                                                     |
+| `State`                     | `ExecutionState` lifecycle value.                                                                        |
+| `StartTime`                 | Due time recorded by the scheduler before the body runs. Future values keep the row `Pending` until due. |
+| `EndTime`                   | Wall-clock end time, set when the execution finishes.                                                    |
+| `RecentError`               | Diagnostic message captured on failure.                                                                  |
+| `Output`                    | Serialized result document, exposed as the AIP-151 response payload.                                     |
 
 ### ExecutionState
 
@@ -86,16 +86,16 @@ public enum ExecutionState
 
 State transitions are:
 
-| From | To | Writer |
-| --- | --- | --- |
-| none | `Pending` | `DefaultScheduler.ScheduleAsync` or `DefaultScheduler.TriggerAsync` materializes the occurrence. |
-| `Pending` | `Running` | `JobExecutionDispatcher` claims the row using the concurrency token. |
-| `Running` | `Succeeded` | Dispatcher after `IScheduledJob.ExecuteAsync` returns. |
-| `Running` | `Failed` | Dispatcher when the job body throws or the job key cannot resolve. |
-| `Running` | `Blocked` | Dispatcher when an advisor or observer blocks the fire. |
-| `Running` | `Skipped` | Dispatcher when an observer skips the fire. |
-| `Pending` / `Running` | `Cancelled` | `CancelOperationHandler` for non-terminal operations. |
-| `Running` | `Failed` | `SchedulingInitializer` on startup for rows orphaned by a host restart. |
+| From                  | To          | Writer                                                                                           |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| none                  | `Pending`   | `DefaultScheduler.ScheduleAsync` or `DefaultScheduler.TriggerAsync` materializes the occurrence. |
+| `Pending`             | `Running`   | `JobExecutionDispatcher` claims the row using the concurrency token.                             |
+| `Running`             | `Succeeded` | Dispatcher after `IScheduledJob.ExecuteAsync` returns.                                           |
+| `Running`             | `Failed`    | Dispatcher when the job body throws or the job key cannot resolve.                               |
+| `Running`             | `Blocked`   | Dispatcher when an advisor or observer blocks the fire.                                          |
+| `Running`             | `Skipped`   | Dispatcher when an observer skips the fire.                                                      |
+| `Pending` / `Running` | `Cancelled` | `CancelOperationHandler` for non-terminal operations.                                            |
+| `Running`             | `Failed`    | `SchedulingInitializer` on startup for rows orphaned by a host restart.                          |
 
 Terminal states are `Succeeded`, `Failed`, `Cancelled`, `Blocked`, and `Skipped`. `WaitOperationHandler` polls until it sees one of the terminal operation states it recognizes (`Succeeded`, `Failed`, or `Cancelled`) or its timeout elapses.
 

@@ -15,7 +15,7 @@ public class AdviceResponseParentShould
         var detail  = new PlainDetail { CanonicalName = "tenants/t1/hosts/h1" };
         var advisor = new AdviceResponseParent<Entity, PlainDetail>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), entity, detail, principal: null);
+        var result = await advisor.AdviseAsync(EmptyContext(), entity, detail, null);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -28,7 +28,7 @@ public class AdviceResponseParentShould
         };
         var advisor = new AdviceResponseParent<Entity, ChildDetail>();
 
-        await advisor.AdviseAsync(EmptyContext(), entity, detail, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), entity, detail, null);
 
         Assert.Equal("tenants/t1", detail.Parent);
     }
@@ -38,7 +38,7 @@ public class AdviceResponseParentShould
         var detail = new ChildDetail { CanonicalName = "tenants/t1/hosts/h1" };
         var advisor = new AdviceResponseParent<Entity, ChildDetail>();
 
-        await advisor.AdviseAsync(EmptyContext(), entity: null, detail, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), null, detail, null);
 
         Assert.Equal("tenants/t1", detail.Parent);
     }
@@ -54,7 +54,7 @@ public class AdviceResponseParentShould
         var detail  = new ChildDetail { CanonicalName = canonical };
         var advisor = new AdviceResponseParent<Entity, ChildDetail>();
 
-        await advisor.AdviseAsync(EmptyContext(), entity: null, detail, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), null, detail, null);
 
         Assert.Equal(expected, detail.Parent);
     }
@@ -68,7 +68,7 @@ public class AdviceResponseParentShould
         };
         var advisor = new AdviceResponseParent<Entity, ChildDetail>();
 
-        await advisor.AdviseAsync(EmptyContext(), entity, detail, principal: null);
+        await advisor.AdviseAsync(EmptyContext(), entity, detail, null);
 
         Assert.Equal("tenants/t1", detail.Parent);
     }

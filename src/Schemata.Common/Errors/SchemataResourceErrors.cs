@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using static Schemata.Abstractions.SchemataConstants;
@@ -65,7 +65,7 @@ public static class SchemataResourceErrors
     /// <param name="description">Optional human-readable context.</param>
     /// <param name="reason">Domain-specific reason; defaults to <see cref="ErrorReasons.ResourceNotFound" />.</param>
     public static NotFoundException NotFound(
-        System.Type type,
+        Type type,
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceNotFound) {

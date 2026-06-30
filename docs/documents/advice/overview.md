@@ -8,12 +8,12 @@ correct runner at compile time.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs` |
-| `Schemata.Advice` | the `AdviceRunner` family (arities 1..16) |
-| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs` |
-| `Schemata.Abstractions` | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
+| Package                     | Key files                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `Schemata.Advice`           | `AdvicePipeline.cs`, `Advisor.cs`                                               |
+| `Schemata.Advice`           | the `AdviceRunner` family (arities 1..16)                                       |
+| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs`                         |
+| `Schemata.Abstractions`     | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
 
 ## AdvicePipeline and Advisor
 
@@ -41,11 +41,11 @@ public static class Advisor
 The runner resolves all DI-registered `TAdvisor` implementations, sorts by `Order` ascending, and
 invokes each in turn. The chain stops on the first non-`Continue` result:
 
-| Result | Meaning |
-| --- | --- |
-| `Continue` | Proceed to the next advisor; after the last, the operation runs normally. |
-| `Block` | Abort the operation; no further advisors run. |
-| `Handle` | The advisor handled the operation; no further advisors run, and the caller uses the state it placed in `AdviceContext`. |
+| Result     | Meaning                                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `Continue` | Proceed to the next advisor; after the last, the operation runs normally.                                               |
+| `Block`    | Abort the operation; no further advisors run.                                                                           |
+| `Handle`   | The advisor handled the operation; no further advisors run, and the caller uses the state it placed in `AdviceContext`. |
 
 `AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>` is the canonical `Handle` case: on a
 cache hit with a matching payload hash it returns `Handle` after storing a `CreateResultBase<TDetail>`
@@ -80,11 +80,11 @@ services.TryAddEnumerable(
 
 `SchemataConstants.Orders` anchors advisor ordering:
 
-| Constant | Value | Usage |
-| --- | --- | --- |
-| `Base` | 100,000,000 | Starting point for most built-in advisors |
-| `Extension` | 400,000,000 | Starting point for extension advisors |
-| `Max` | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
+| Constant    | Value       | Usage                                                 |
+| ----------- | ----------- | ----------------------------------------------------- |
+| `Base`      | 100,000,000 | Starting point for most built-in advisors             |
+| `Extension` | 400,000,000 | Starting point for extension advisors                 |
+| `Max`       | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
 
 Built-in advisors chain by 10M increments from an anchor. Custom advisors take a value between the
 built-in steps or outside the reserved range.

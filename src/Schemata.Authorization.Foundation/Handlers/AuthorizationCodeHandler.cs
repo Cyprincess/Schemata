@@ -106,7 +106,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         }
 
         var payload = JsonSerializer.Deserialize<AuthorizeRequest>(token.Payload, json.Value);
-        if (payload == null) {
+        if (payload is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)

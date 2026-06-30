@@ -1,100 +1,42 @@
-# Schemata.Resource.Foundation — Google AIP CRUD Core
+# Schemata.Resource.Foundation
 
-Implementation of the resource-oriented CRUD service defined by [Google AIP General](https://google.aip.dev/general). Handles `Get`, `List`, `Create`, `Update`, `Delete`, `Undelete`, `Purge`, `Expunge`, plus long-running operations. 86 source files. No `Skeleton` package — this is the hub.
+## OVERVIEW
 
-## Layout
+AIP-compliant resource service. CRUD + custom methods (AIP-136). 90 C# files, ~61 in `Advisors/`. Family: Foundation + Resource.Http + Resource.Grpc as siblings, never cross-referencing. No Skeleton package; entities are user-defined.
 
-```
-Schemata.Resource.Foundation/
-├── SchemataResourceBuilder.cs       # fluent surface; Use<TEntity>(...) per resource
-├── SchemataResourceOptions.cs       # per-resource options (auth, validation, freshness, ...)
-├── ResourceOperationHandler.cs      # base + dispatcher
-├── ResourceOperationHandler.{Create,Get,List,Update,Delete}.cs   # one partial per AIP method
-├── ResourceMethodOperationHandler.cs # custom-method dispatcher
-├── ResourceAdviceContext.cs         # AdviceContext specialization for resource pipeline
-├── ResourceEndpointSelector.cs      # selects HTTP/gRPC handler per resource attribute
-├── ResourceRequestContainer.cs      # request/response envelope shared across transports
-├── ResourceIdentifiers.cs           # AIP resource-name parsing helpers
-├── DefaultResourceTypeResolver.cs   # resolves TEntity from the request URL/path
-├── KeyOrdering.cs                   # AIP sort-spec parser
-├── PurgeFilter.cs / PurgeHandler.cs / PurgeJob.cs / PurgeJobKeyResolver.cs / PurgeOperationArgs.cs
-│                                    # Purge LRO machinery
-├── ExpungeHandler.cs                # hard-delete on top of Purge
-├── UndeleteHandler.cs               # ISoftDelete reversal
-├── Advisors/    # IResourceAdvisor implementations (auth, validation, freshness, mask, ...)
-├── Extensions/  # UseResource + SchemataBuilder/IServiceCollection extension methods
-├── Features/    # SchemataResourceFeature (priority 490_000_000)
-├── Internal/    # private helpers; not part of the public API
-└── Models/      # internal request/response DTOs
-```
+## STRUCTURE
 
-## Public Entry Points
+- `Features/SchemataResourceFeature.cs`: attribute discovery via `[Resource]` (`ResourceAttribute` in `Schemata.Abstractions/Resource/`); depends on `SchemataRoutingFeature`, `SchemataMappingFeature`, `SchemataSecurityFeature`.
+- `Handlers/`: `ResourceOperationHandler<,,,>` split by verb partials (`.Create`/`.Update`/`.Get`/`.List`/`.Delete.cs`); `ResourceMethodOperationHandler<,,>` for AIP-136 custom methods. Runner: `Internal/ResourcePipelineRunner.cs`.
+- Soft-delete lifecycle: `UndeleteHandler`, `ExpungeHandler`, `PurgeHandler`/`PurgeFilter`/`PurgeJob` (scheduled via Scheduling), `PurgeJobKeyResolver`.
+- `Advisors/`: ~30 built-in `Advice*.cs` plus per-verb interfaces (`IResourceCreateAdvisor<TEntity,TRequest>`, `IResourceListResponseAdvisor<TSummary>`, etc.). Naming `Advice<Verb><Aspect>`; ordering anchors via `DefaultOrder = AdviceCreateRequestAnonymous.DefaultOrder + 10_000_000`. Topics: sanitize, validation, idempotency, freshness, parent/child, read-mask, anonymous-vs-authorize variants per verb.
+- `ResourceAdviceContext`: suppression flags from `SchemataResourceOptions` (`CreateRequestValidationSuppressed`, `FreshnessSuppressed`, etc.) injected before the pipeline runs; advisors consult flags and skip.
+- `Models/`: `PageToken.cs` (pagination), `KeyOrdering.cs`, `ResourceEndpointSelector`, `DefaultResourceTypeResolver`.
 
-- [Extensions/SchemataBuilderExtensions.cs](Extensions/SchemataBuilderExtensions.cs) — `UseResource(this SchemataBuilder, Action<SchemataResourceBuilder>)`.
-- [SchemataResourceBuilder.cs](SchemataResourceBuilder.cs) — fluent: `Use<TEntity>()`, `MapHttp()` / `MapGrpc()` (provided by the `.Http` / `.Grpc` companion packages), auth/validation/freshness toggles.
+## ENTRY POINTS
 
-## Transport Companions
+- `Extensions/SchemataBuilderExtensions.cs`: `UseResource(...)` returns `SchemataResourceBuilder`.
+- Per-resource: `builder.Use<TEntity,TRequest,TDetail,TSummary>(endpoints?, configure?)`.
+- Toggles: `WithAuthorization`, `WithoutCreateValidation`, `WithoutUpdateValidation`, `WithoutFreshness`.
+- `.MapHttp()` (`Resource.Http`): `ResourceController`, `ResourceMethodController` (AIP-136), conventions, feature providers. Restrict per-resource: `Use<...>(r => r.MapHttp())`.
+- `.MapGrpc()` (`Resource.Grpc`): code-first `ResourceService`, binder, protobuf-net `RuntimeTypeModelConfigurator`, `FileDescriptorBridge`.
 
-- [Schemata.Resource.Http](../Schemata.Resource.Http/) — REST endpoint mapping (`MapHttp()`); pulls `Schemata.Transport.Http`.
-- [Schemata.Resource.Grpc](../Schemata.Resource.Grpc/) — gRPC endpoint mapping (`MapGrpc()`); pulls `Schemata.Transport.Grpc` (code-first protobuf-net).
+## PIPELINE ORDER
 
-Resource attributes from [Schemata.Abstractions/Resource/](../Schemata.Abstractions/Resource/) (`[Resource<TEntity>]`, `[HttpResource]`, `[GrpcResource]`, `[ResourceMethod]`, …) drive endpoint discovery. The resolver in [ResourceEndpointSelector.cs](ResourceEndpointSelector.cs) maps attribute-decorated types to handler instances.
+Verified ordering facts (full sequence: `docs/documents/resource/create-pipeline.md`):
 
-## Pipeline Shape
+- Sanitization runs BEFORE validation — validators never see server-managed fields stripped from client input.
+- Anonymous/authorize advisor pairs anchor ordering: `AdviceCreateRequestAuthorize.DefaultOrder = AdviceCreateRequestAnonymous.DefaultOrder + 10_000_000`.
+- `Internal/ResourcePipelineRunner.cs` drives the chain per verb.
 
-For each method (`Create` / `Get` / `List` / `Update` / `Delete` / custom):
+## GOTCHAS
 
-1. Transport handler builds a `ResourceRequestContainer` and a `ResourceAdviceContext`.
-2. `ResourceOperationHandler.<Method>` runs the advisor chain via `AdvicePipelineExtensions.RunAsync` (generated by [Schemata.Advice.Generator](../../generators/Schemata.Advice.Generator/)).
-3. Built-in advisors (`Advisors/`) cover sanitization, validation, authorization, freshness checks, update-mask application, soft-delete handling.
-4. The terminal advisor calls `IRepository<TEntity>` through the repository pipeline (which itself runs its own advisor chain).
+- Sanitization runs BEFORE validation. Validators never see server-managed fields clients shouldn't supply (`docs/documents/resource/create-pipeline.md`).
+- Dry-run after validation passes raises `NoContentException` without persisting.
+- Expressions package gotcha, surfaced through this package's filtering: AIP-160 (`aip`) and CEL (`cel`) compilers, pushdown planning + residual scan. AIP-160 inner wildcards (`A*B`) are rejected.
+- Error model deliberately more specific than `google.rpc.Code`. `ALREADY_EXISTS` omitted per AIP-211 (`SchemataResourceErrors` lives in Schemata.Common).
+- Canonical docs: `docs/documents/resource/**`.
 
-`Purge` and `Expunge` are LROs: they enqueue a `PurgeJob` via the Scheduling subsystem. `Undelete` requires the entity to implement [ISoftDelete](../Schemata.Abstractions/Entities/ISoftDelete.cs).
+## DEPS
 
-## Conventions
-
-- **Sanitization runs before validation** ([docs/documents/resource/create-pipeline.md:81-83](../../docs/documents/resource/create-pipeline.md)). Validators never see server-managed fields.
-- **`ResourceOperationHandler` is split into one partial file per method** to keep each method readable. Mirror that pattern when adding a new method type — do not pile new code into `ResourceOperationHandler.cs`.
-- **Custom methods** go through [ResourceMethodOperationHandler.cs](ResourceMethodOperationHandler.cs) + `[ResourceMethod]` on the entity attribute class.
-- **Long-running operations** return [Operation](../Schemata.Abstractions/Resource/Operation.cs); resolve completion via [OperationResponse](../Schemata.Abstractions/Resource/OperationResponse.cs).
-
-## Anti-Patterns
-
-- **Do NOT** add HTTP-specific logic to this package — it must stay transport-agnostic. Put HTTP plumbing in `Schemata.Resource.Http`.
-- **Do NOT** bypass the advisor chain by calling `IRepository<TEntity>` directly from a transport handler — authorization and validation live in advisors.
-- **Do NOT** mutate the inbound request DTO after validation — the validator may have rejected fields you assume are clean.
-- **Do NOT** add a new built-in advisor without inserting it at a deterministic position in the chain; the chain order is part of the public contract.
-- **Do NOT** invent a non-AIP method on a resource. If a custom verb is required, use `[ResourceMethod]` so the AIP method-naming convention is preserved.
-
-## Resource Field Semantics
-
-The framework recognises four field shapes for resource relationships. Pick the one that matches the storage and validation behaviour you actually need; new shapes need a plan, not an ad-hoc string field.
-
-| Mode | Role | Storage | Marker | Example |
-|---|---|---|---|---|
-| **A** — identity-composing parent | Parent segment of the resource's own canonical name | Bare leaf id (`"acme"`, no `/`) on a dedicated property (e.g. `Tenant`) | Structural — derived from the `[CanonicalName]` template | [`SchemataTenantHost.Tenant`](../Schemata.Tenancy.Skeleton/Entities/SchemataTenantHost.cs#L22) |
-| **B** — cross-resource reference | Outgoing FK to an independent resource | Full AIP-122 canonical (`"applications/x"`) | `[ResourceReference(typeof(T))]` (typed) or `[ResourceReference]` (polymorphic) | [`SchemataAuthorization.Application`](../Schemata.Authorization.Skeleton/Entities/SchemataAuthorization.cs) |
-| **C** — provenance back-link | Audit pointer from a derived row to its source | Full canonical + source type + timestamp | [`ISourceReference`](../Schemata.Abstractions/Entities/ISourceReference.cs) | [`SchemataEvent`](../Schemata.Event.Skeleton/Entities/SchemataEvent.cs) |
-| **D** — scope collection | One-to-many list of resource canonicals; no FK | `ICollection<string>?` JSON column | None (intentional) | [`SchemataScope.Resources`](../Schemata.Authorization.Skeleton/Entities/SchemataScope.cs) |
-
-`IChild` is **not** a fifth mode — it is the DTO-side wire projection of mode A, exposing the parent canonical (`"tenants/t1"`) without touching the entity's leaf-id storage.
-
-### `[ResourceReference]` typed vs polymorphic
-
-| | `[ResourceReference(typeof(T))]` | `[ResourceReference]` (no parameter) |
-|---|---|---|
-| Database FK | Yes — EF Core wires `HasForeignKey` against `T.CanonicalName` alternate key | No — relies on advisor validation only |
-| Write-time validation | `IResourceTypeResolver.Resolve(value) == typeof(T)` | `IResourceTypeResolver.Resolve(value) != null` |
-| Mismatch raises | `NotFoundException` of `T` (mode B target) | `ValidationException` with `Reason = SchemataResources.INVALID_REFERENCE` |
-| Use when | Field always points at a single concrete entity type | Field is polymorphic / owner-style (e.g. `IOwnable.Owner`) |
-
-Storage shape is identical for both: the full AIP-122 canonical name.
-
-## Notes
-
-- `WithAuthorization(scheme)` installs an always-pass MVC filter and lets the real decision happen in the advisor pipeline ([docs/documents/resource/http-transport.md:127-129](../../docs/documents/resource/http-transport.md)) — required so async authorization can short-circuit through `AdviseResult.Break`.
-- HTTP transport is **unary only**; streaming verbs are gRPC-only.
-- AIP resource names parse through [ResourceIdentifiers.cs](ResourceIdentifiers.cs) + [ResourceNameDescriptor](../Schemata.Common/ResourceNameDescriptor.cs); use them rather than splitting `/` manually.
-- Cross-resource fields use the `[ResourceReference]` / `[ResourceReference(typeof(T))]` attribute from [Schemata.Abstractions](../Schemata.Abstractions/Resource/ResourceReferenceAttribute.cs). Validation runs via [AdviceValidateResourceReferences](../Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferences.cs) in the repository pipeline; canonical-name materialization runs via [AdviceAddCanonicalName](../Schemata.Entity.Repository/Advisors/AdviceAddCanonicalName.cs); the EF Core provider wires ORM-level FKs through [SchemataModelCustomizer](../Schemata.Entity.EntityFrameworkCore/SchemataModelCustomizer.cs).
-- Child-resource DTOs implement [IChild](../Schemata.Abstractions/Entities/IChild.cs) to opt into automatic parent canonical materialization. The trait is DTO-only — never put it on an entity, since the entity already stores its mode-A parent segment as a bare leaf id (e.g. `Tenant = "t1"`) and a second `Parent` property would collide with mapper-driven entity→DTO copy. Three advisors carry the work: [AdviceApplyChildParent](Advisors/AdviceApplyChildParent.cs) reverse-parses `request.Parent` into the entity's mode-A field on Create / Update; [AdviceResponseParent](Advisors/AdviceResponseParent.cs) derives `Parent` from the entity's canonical for Get / Create / Update responses; [AdviceListResponseParent](Advisors/AdviceListResponseParent.cs) does the same for each List summary. Wildcard parents (`tenants/-`) raise `SchemataResources.CROSS_PARENT_UNSUPPORTED`; malformed parents raise `SchemataResources.INVALID_PARENT`.
-- Integration tests: [../../tests/Schemata.Resource.Http.Integration.Tests/](../../tests/Schemata.Resource.Http.Integration.Tests/) and [../../tests/Schemata.Resource.Grpc.Integration.Tests/](../../tests/Schemata.Resource.Grpc.Integration.Tests/). Unit tests: [../../tests/Schemata.Resource.Tests/](../../tests/Schemata.Resource.Tests/).
+Heaviest cross-consumer in the repo: Caching.Skeleton, Core, Entity.Repository, Expressions.Skeleton (AIP-160/CEL), Mapping.Skeleton, Scheduling.Skeleton, Security.Skeleton, Security.Foundation.

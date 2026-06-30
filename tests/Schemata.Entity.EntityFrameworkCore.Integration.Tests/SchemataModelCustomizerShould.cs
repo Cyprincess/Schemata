@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -200,6 +199,173 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task JsonConverter_OnInterfaceCollectionString_Roundtrips() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "interface-list-test",
+                CanonicalName = "books/interface-list-test",
+                Aliases       = ["les-mis", "the-miserables"],
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.NotNull(found!.Aliases);
+            Assert.Equal(["les-mis", "the-miserables"], found.Aliases!);
+        }
+    }
+
+    [Fact]
+    public async Task JsonConverter_OnDictionaryStringInt_Roundtrips() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "int-dict-test",
+                CanonicalName = "books/int-dict-test",
+                Counters = new() {
+                    ["views"] = 3,
+                    ["likes"] = 5,
+                },
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.NotNull(found!.Counters);
+            Assert.Equal(3, found.Counters!["views"]);
+            Assert.Equal(5, found.Counters["likes"]);
+        }
+    }
+
+    [Fact]
+    public async Task JsonConverter_OnCollectionInt_Roundtrips() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "int-list-test",
+                CanonicalName = "books/int-list-test",
+                Ratings       = [1, 2, 3],
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.NotNull(found!.Ratings);
+            Assert.Equal([1, 2, 3], found.Ratings!);
+        }
+    }
+
+    [Fact]
+    public async Task JsonConverter_OnDictionaryStringInt_InPlaceMutationPersists() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "int-dict-mutation-test",
+                CanonicalName = "books/int-dict-mutation-test",
+                Counters = new() {
+                    ["views"] = 1,
+                },
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.NotNull(found!.Counters);
+
+            found.Counters!["views"] = 2;
+            await db.SaveChangesAsync();
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.Equal(2, found!.Counters!["views"]);
+        }
+    }
+
+    [Fact]
+    public async Task JsonConverter_OnEnumCollectionAndDictionary_Roundtrips() {
+        Guid bookUid;
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+            var book = new Book {
+                Uid           = Identifiers.NewUid(),
+                Name          = "enum-test",
+                CanonicalName = "books/enum-test",
+                Genres        = [Book.Shelf.Fiction, Book.Shelf.Science],
+                ShelfByName   = new() { ["primary"] = Book.Shelf.History },
+            };
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+            bookUid = book.Uid;
+        }
+
+        {
+            using var scope = _root!.CreateScope();
+            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+            var       found = await db.Books.FindAsync(bookUid);
+            Assert.NotNull(found);
+            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found!.Genres!);
+            Assert.Equal(Book.Shelf.History, found.ShelfByName!["primary"]);
+        }
+    }
+
+    [Fact]
+    public void JsonConverter_OnByteArray_UsesNativeBinaryMapping() {
+        using var scope = _root!.CreateScope();
+        var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+        var property = db.Model.FindEntityType(typeof(Book))!.FindProperty(nameof(Book.Payload));
+        Assert.NotNull(property);
+        Assert.Null(property!.GetValueConverter());
+    }
+
     #region Nested type: Book
 
     public sealed class Book : IIdentifier, ICanonicalName
@@ -207,11 +373,24 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
         public Dictionary<string, string>?  Metadata    { get; set; }
         public Dictionary<string, string?>? Annotations { get; set; }
         public List<string>?                Tags        { get; set; }
+        public ICollection<string>?         Aliases     { get; set; }
+        public Dictionary<string, int>?     Counters    { get; set; }
+        public List<int>?                   Ratings     { get; set; }
+        public List<Shelf>?                 Genres      { get; set; }
+        public Dictionary<string, Shelf>?   ShelfByName { get; set; }
+        public byte[]?                      Payload     { get; set; }
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
 
         public Guid Uid { get; set; }
+
+        public enum Shelf
+        {
+            Fiction,
+            History,
+            Science,
+        }
     }
 
     #endregion

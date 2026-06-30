@@ -25,9 +25,9 @@ public interface IScheduler
     Task ScheduleAsync(SchemataJob job, CancellationToken ct);
 
     /// <summary>
-    ///     Registers <paramref name="job" /> with typed variables owned by the Scheduling serializer.
+    ///     Registers <paramref name="job" /> with string variables mirrored to <see cref="SchemataJob.Variables" />.
     /// </summary>
-    Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct);
+    Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, string?>? variables, CancellationToken ct);
 
     /// <summary>Removes the registry entry for <paramref name="job" />, if present.</summary>
     Task UnscheduleAsync(string job, CancellationToken ct);

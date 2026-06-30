@@ -48,7 +48,7 @@ public static class InsightSecurityGate
             if (!allowed) {
                 throw new PermissionDeniedException(
                     SchemataResources.INSIGHT_ACCESS_DENIED,
-                    new Dictionary<string, string> { ["name"] = rowType.Name });
+                    new Dictionary<string, string?> { ["name"] = rowType.Name });
             }
         }
 

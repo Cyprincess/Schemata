@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Grpc.Internal;
 using Schemata.Transport.Grpc;

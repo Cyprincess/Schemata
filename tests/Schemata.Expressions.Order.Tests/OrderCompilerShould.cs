@@ -76,7 +76,7 @@ public class OrderCompilerShould
         var keys = new OrderCompiler().Parse("foo.bar desc");
 
         var key = Assert.Single(keys);
-        Assert.Equal(new[] { "foo", "bar" }, key.Path);
+        Assert.Equal(["foo", "bar"], key.Path);
         Assert.True(key.Descending);
     }
 

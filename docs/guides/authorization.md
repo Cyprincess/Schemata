@@ -5,12 +5,15 @@ token through the client-credentials flow. This guide builds on [Identity](ident
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Authorization.Foundation`. To
-compose manually:
+`Schemata.Application.Complex.Targets` already includes `Schemata.Authorization.Foundation`. The
+Identity bridge — the `.UseIdentity()` call on the authorization builder below — lives in a
+separate package:
 
 ```shell
-dotnet add package --prerelease Schemata.Authorization.Foundation
+dotnet add package --prerelease Schemata.Authorization.Identity
 ```
+
+When composing manually, also add `Schemata.Authorization.Foundation` itself.
 
 ## Enable the server
 
@@ -32,16 +35,16 @@ schema.UseAuthorization(o => {
 
 `UseAuthorization()` returns a `SchemataAuthorizationBuilder`. Each method below adds one flow:
 
-| Method | Grant / endpoint |
-| --- | --- |
-| `UseCodeFlow()` | `authorization_code` with PKCE — `/Connect/Authorize` + `/Connect/Token` |
-| `UseClientCredentialsFlow()` | `client_credentials` — `/Connect/Token` |
-| `UseRefreshTokenFlow()` | `refresh_token` — `/Connect/Token` |
-| `UseDeviceFlow()` | device code — `/Connect/Device` |
-| `UseIntrospection()` | `/Connect/Introspect` |
-| `UseRevocation()` | `/Connect/Revoke` |
-| `UseUserInfo()` | `/Connect/Profile` |
-| `UseEndSession()` | `/Connect/EndSession` |
+| Method                       | Grant / endpoint                                                         |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `UseCodeFlow()`              | `authorization_code` with PKCE — `/Connect/Authorize` + `/Connect/Token` |
+| `UseClientCredentialsFlow()` | `client_credentials` — `/Connect/Token`                                  |
+| `UseRefreshTokenFlow()`      | `refresh_token` — `/Connect/Token`                                       |
+| `UseDeviceFlow()`            | device code — `/Connect/Device`                                          |
+| `UseIntrospection()`         | `/Connect/Introspect`                                                    |
+| `UseRevocation()`            | `/Connect/Revoke`                                                        |
+| `UseUserInfo()`              | `/Connect/Profile`                                                       |
+| `UseEndSession()`            | `/Connect/EndSession`                                                    |
 
 `Issuer`, a signing key, and a signing algorithm are required; the host throws
 `InvalidOperationException` if any is missing. The `.UseIdentity()` call on the authorization builder
@@ -125,7 +128,7 @@ curl -X POST http://localhost:5000/Connect/Token \
 Call a protected endpoint with the token:
 
 ```shell
-curl http://localhost:5000/students \
+curl http://localhost:5000/v1/students \
      -H "Authorization: Bearer <access_token>"
 ```
 

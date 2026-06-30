@@ -46,7 +46,7 @@ public class AlreadyExistsException : SchemataException
     /// </summary>
     /// <param name="resourceKey">The <see cref="SchemataResources" /> data name.</param>
     /// <param name="args">Optional named arguments substituted into the template.</param>
-    public AlreadyExistsException(string resourceKey, IReadOnlyDictionary<string, string>? args = null)
+    public AlreadyExistsException(string resourceKey, IReadOnlyDictionary<string, string?>? args = null)
         : this(message: LocalizedMessageFormatter.FormatInvariant(resourceKey, args), reason: resourceKey) {
         AttachMetadata(args);
     }

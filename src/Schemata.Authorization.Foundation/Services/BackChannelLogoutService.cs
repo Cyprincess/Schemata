@@ -62,7 +62,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
         var clients = await LogoutSessionHelper.GetSessionClientsAsync(tokens, subject, session, ct);
 
          var scheduler = services.GetService<IScheduler>();
-         if (scheduler == null) {
+         if (scheduler is null) {
              throw new FailedPreconditionException(SchemataResources.BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING);
          }
 
@@ -106,7 +106,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             // self-identifying via operations/{uid}, so JobContext.Job stays null and the
             // SchemataJobExecution.Job foreign reference is empty.
             await scheduler.TriggerAsync<BackChannelLogoutJob>(new() {
-                Variables = new Dictionary<string, object?> {
+                Variables = new Dictionary<string, string?> {
                     [BackChannelLogoutJob.VariableKeys.Uri]         = uri,
                     [BackChannelLogoutJob.VariableKeys.LogoutToken] = jwt,
                 },

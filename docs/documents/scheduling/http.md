@@ -10,9 +10,9 @@ handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFe
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Http` | `Features/SchemataSchedulingHttpFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
+| Package                        | Key files                                                                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Http`     | `Features/SchemataSchedulingHttpFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                         |
 | `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
 
 ## Activation
@@ -52,19 +52,19 @@ HTTP transport mounts it at `/v1/jobs`. `SchemataJobExecution` is projected thro
 which carries `[DisplayName("Operation")]` and `[CanonicalName("operations/{operation}")]`, mounting
 at `/v1/operations`.
 
-| Method | Route | Action | AIP |
-| --- | --- | --- | --- |
-| `GET` | `/v1/jobs` | List jobs | AIP-132 |
-| `POST` | `/v1/jobs` | Create job | AIP-133 |
-| `GET` | `/v1/jobs/{name}` | Get job | AIP-131 |
-| `PATCH` | `/v1/jobs/{name}` | Update job | AIP-134 |
-| `DELETE` | `/v1/jobs/{name}` | Delete job | AIP-135 |
-| `POST` | `/v1/jobs/{name}:run` | Trigger one fire → returns `Operation` | AIP-136 |
-| `GET` | `/v1/operations` | List executions | AIP-132 |
-| `GET` | `/v1/operations/{name}` | Get execution | AIP-131 |
-| `DELETE` | `/v1/operations/{name}` | Cancel + remove | AIP-135 |
-| `POST` | `/v1/operations/{name}:cancel` | Cancel a running execution | AIP-136 |
-| `POST` | `/v1/operations/{name}:wait` | Long-poll for terminal state | AIP-136 |
+| Method   | Route                          | Action                                 | AIP     |
+| -------- | ------------------------------ | -------------------------------------- | ------- |
+| `GET`    | `/v1/jobs`                     | List jobs                              | AIP-132 |
+| `POST`   | `/v1/jobs`                     | Create job                             | AIP-133 |
+| `GET`    | `/v1/jobs/{name}`              | Get job                                | AIP-131 |
+| `PATCH`  | `/v1/jobs/{name}`              | Update job                             | AIP-134 |
+| `DELETE` | `/v1/jobs/{name}`              | Delete job                             | AIP-135 |
+| `POST`   | `/v1/jobs/{name}:run`          | Trigger one fire → returns `Operation` | AIP-136 |
+| `GET`    | `/v1/operations`               | List executions                        | AIP-132 |
+| `GET`    | `/v1/operations/{name}`        | Get execution                          | AIP-131 |
+| `DELETE` | `/v1/operations/{name}`        | Cancel + remove                        | AIP-135 |
+| `POST`   | `/v1/operations/{name}:cancel` | Cancel a running execution             | AIP-136 |
+| `POST`   | `/v1/operations/{name}:wait`   | Long-poll for terminal state           | AIP-136 |
 
 `Operations` on `SchemataJobExecution` is set to `[Get, List, Delete]`; `Create` and `Update` are
 not synthesized. The `:run` handler returns an `Operation` representing the queued execution; the
@@ -96,9 +96,10 @@ public sealed class WaitOperationRequest // POST /v1/operations/{name}:wait
 The Resource HTTP transport's `UseExceptionHandler` covers every scheduling endpoint. A
 `SchemataException` writes `Response.StatusCode = ex.Code` with body
 `ex.CreateErrorResponse(context.TraceIdentifier)`; any other exception wraps as a 500
-`SchemataException(ErrorCodes.Internal)`. `WaitOperationHandler` surfaces an in-progress execution
-as a 200 with the current `Operation`; a cancelled execution and a missing execution surface as 404
-`NotFoundException` per AIP-211.
+`SchemataException(ErrorCodes.Internal)`. `WaitOperationHandler` responds 200 with the current
+`Operation` — immediately when the execution is already terminal (succeeded, failed, or cancelled),
+otherwise after polling up to its 30-second cap. A missing execution surfaces as 404
+`NotFoundException` from the method pipeline's entity load.
 
 ## Reflection and metadata
 

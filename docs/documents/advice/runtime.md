@@ -7,10 +7,10 @@ beyond `AdviceContext` and `CancellationToken`.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Advice` | the `AdviceRunner` family (arities 1..16) |
-| `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs` |
+| Package                 | Key files                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `Schemata.Advice`       | the `AdviceRunner` family (arities 1..16)                                       |
+| `Schemata.Advice`       | `AdvicePipeline.cs`, `Advisor.cs`                                               |
 | `Schemata.Abstractions` | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
 
 ## AdviceRunner family
@@ -51,13 +51,13 @@ Higher arities follow the same shape, adding `T2 a2`, `T3 a3`, up to `T16 a16`.
 The file names track the CLR generic arity (`TAdvisor` plus the argument type parameters). The
 nine-argument runner lives in the unsuffixed `AdviceRunner.cs`, so there is no `AdviceRunner\`10.cs`.
 
-| File | Type parameters | Advisor interface | Argument arity |
-| --- | --- | --- | --- |
-| `AdviceRunner\`2.cs` | `TAdvisor, T1` | `IAdvisor<T1>` | 1 |
-| `AdviceRunner\`3.cs` | `TAdvisor, T1, T2` | `IAdvisor<T1, T2>` | 2 |
-| `AdviceRunner\`4.cs` .. `AdviceRunner\`9.cs` | `TAdvisor, T1..T3` .. `TAdvisor, T1..T8` | `IAdvisor<T1..T3>` .. `IAdvisor<T1..T8>` | 3..8 |
-| `AdviceRunner.cs` | `TAdvisor, T1..T9` | `IAdvisor<T1..T9>` | 9 |
-| `AdviceRunner\`11.cs` .. `AdviceRunner\`17.cs` | `TAdvisor, T1..T10` .. `TAdvisor, T1..T16` | `IAdvisor<T1..T10>` .. `IAdvisor<T1..T16>` | 10..16 |
+| File                                         | Type parameters                            | Advisor interface                          | Argument arity |
+| -------------------------------------------- | ------------------------------------------ | ------------------------------------------ | -------------- |
+| `AdviceRunner\`2.cs`                         | `TAdvisor, T1`                             | `IAdvisor<T1>`                             | 1              |
+| `AdviceRunner\`3.cs`                         | `TAdvisor, T1, T2`                         | `IAdvisor<T1, T2>`                         | 2              |
+| `AdviceRunner\`4.cs`..`AdviceRunner\`9.cs`   | `TAdvisor, T1..T3` .. `TAdvisor, T1..T8`   | `IAdvisor<T1..T3>` .. `IAdvisor<T1..T8>`   | 3..8           |
+| `AdviceRunner.cs`                            | `TAdvisor, T1..T9`                         | `IAdvisor<T1..T9>`                         | 9              |
+| `AdviceRunner\`11.cs`..`AdviceRunner\`17.cs` | `TAdvisor, T1..T10` .. `TAdvisor, T1..T16` | `IAdvisor<T1..T10>` .. `IAdvisor<T1..T16>` | 10..16         |
 
 The minimum arity is 1; there is no zero-argument runner or `IAdvisor` zero-argument variant.
 

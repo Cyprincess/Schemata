@@ -1,23 +1,22 @@
 # State Machine Engine
 
-`Schemata.Flow.StateMachine` is the default execution engine for Flow. `SchemataFlowFeature` wires
-it during `ConfigureServices`, so `UseFlow()` alone makes the state machine the `IFlowRuntime` for
-every process registered without an explicit engine name.
+`Schemata.Flow.StateMachine` is the default execution engine for Flow. `UseStateMachine()` on the
+flow builder activates `SchemataFlowStateMachineFeature`, which registers the engine and its
+validator under the `"statemachine"` key. Every process registered through
+`SchemataFlowBuilder.Use<TProcess>()` with no explicit engine runs on this key.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs` |
-| `Schemata.Flow.Foundation` | `Features/SchemataFlowFeature.cs` (registration site) |
+| Package                      | Key files                                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs`, `Features/SchemataFlowStateMachineFeature.cs`, `Extensions/FlowStateMachineBuilderExtensions.cs` |
 
 ## How it gets registered
 
-`SchemataFlowFeature.ConfigureServices` registers the engine and its validator:
+`SchemataFlowStateMachineFeature` carries `[DependsOn<SchemataFlowFeature>]` and runs:
 
 ```csharp
-services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(
-    SchemataConstants.FlowEngines.StateMachine);
+services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
 
 services.TryAddEnumerable(
     ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
@@ -26,29 +25,46 @@ services.TryAddEnumerable(
 The engine key is `SchemataConstants.FlowEngines.StateMachine`, the string `"statemachine"`.
 `SchemataFlowBuilder.Use<TProcess>()` defaults to this key when none is given.
 
+`SchemataFlowStateMachineFeature` exposes the engine and validator through
+`FlowStateMachineBuilderExtensions.UseStateMachine()` on `SchemataFlowBuilder`.
+
 ## Engine key
 
 ```csharp
 flow.Use<OrderProcess>();                          // "statemachine"
-flow.Use<OrderProcess>(engine: "statemachine");    // explicit, same result
+flow.Use<ComplexProcess>(engine: "statemachine");  // explicit, same result
 flow.Use<ComplexProcess>(engine: "my-engine");     // custom keyed engine
 ```
 
-`SchemataConstants.FlowEngines` also defines `Bpmn` (`"bpmn"`) as a reserved key for a full BPMN
-engine; no implementation registers under it.
+`SchemataConstants.FlowEngines` also defines `Bpmn` (`"bpmn"`), the key under which
+`Schemata.Flow.Bpmn.BpmnEngine` registers itself when `UseBpmn()` is on.
 
 ## What the engine does
 
-`StateMachineEngine` implements the three `IFlowRuntime` methods over a stateless traversal:
+`StateMachineEngine` implements the four `IFlowRuntime` methods over a stateless traversal:
 
-| Method | Behavior |
-| --- | --- |
-| `StartAsync` | Finds the start event, follows its outgoing flow, resolves the initial state. |
-| `TriggerAsync` | Matches the trigger against the waiting element (by reference, then name and type) and advances to the matched target. |
-| `AdvanceAsync` | Auto-traverses unconditional flows and exclusive gateways; stops at an event-based gateway or an intermediate catch event. |
+| Method                    | Behavior                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `StartAsync`              | Finds the start event, follows its outgoing flow, and writes the first transition row. A none task that awaits a gateway parks at the gateway during this walk.                                                   |
+| `TriggerAsync`            | Matches the trigger against the waiting element (event-based gateway, intermediate catch, or boundary) and advances to the matched target. Throws `STATE_MACHINE_INVALID_TRIGGER` when no outgoing flow matches.  |
+| `AdvanceAsync`            | Auto-traverses unconditional flows and exclusive gateways; stops at an event-based gateway (keeping the completed activity as `StateName`), an intermediate catch event, or a procedure task body. Returns the input snapshot unchanged when the token is parked. |
+| `FindTriggerTargetsAsync` | Returns the single token canonical name when one trigger can consume the supplied event; returns an empty list otherwise. Used by `FlowRunner.ResolveTargetAsync` to look up the token to address.                |
 
-All state arrives on the `SchemataProcess` argument and leaves on the returned `ProcessInstance`, so
-the engine is a safe singleton. See [Engine](engine.md) for the full traversal and matching rules.
+The engine also runs `ProcedureTaskBase.InvokeAsync(FlowTaskContext)` while resolving the next
+hop, threading `FlowTaskContext` through every procedure task body so source bindings and
+repositories stay in scope.
+
+All state arrives on the `SchemataProcess`, the `SchemataProcessToken` rows, and the
+`SchemataProcessSource` rows, and leaves on the returned `ProcessSnapshot`. The snapshot's
+`Process` is mutated in place; tokens carry the next `StateName` / `WaitingAtName`; transitions
+hold one `SchemataProcessTransition` row (`TransitionKind.Move` for normal advances, `Cancel` for
+explicit cancels, `Fail` for advisor failures). The handler persists the snapshot under its unit
+of work.
+
+`ResolveSingleToken` enforces the single-token contract at runtime: zero tokens raise
+`PROCESS_TOKEN_NOT_FOUND`, more than one raises `PROCESS_TOKEN_AMBIGUOUS`, a mismatched explicit
+`tokenName` raises `PROCESS_TOKEN_NOT_FOUND`. These rejections live in the engine, not the
+validator; a definition that resolves to multiple tokens fails on the first trigger.
 
 ## Validator
 
@@ -58,13 +74,17 @@ registration for every process on this engine. See [Validator](validator.md) for
 
 ## Limitations
 
-The engine carries a single token. The validator rejects, and the engine would otherwise throw
-`FailedPreconditionException` on:
+The engine keeps exactly one live token. The validator rejects (and the engine raises
+`STATE_MACHINE_REQUIRES_BPMN_ENGINE` against) the AST shapes a single-token walk cannot execute:
 
 - `ParallelGateway`, `InclusiveGateway`, `ComplexGateway`
-- Non-interrupting boundary events
-- Sub-processes and call activities
-- Loop characteristics (single and multi-instance)
+- Non-interrupting boundary events (`FlowEvent[Boundary,non-interrupting]`)
+- `SubProcess` (any kind) and `CallActivity`
+- Any `LoopCharacteristics` (standard or multi-instance)
+- `EventBasedGateway` with `Parallel == true`
+
+The engine also refuses to start when the static validator has not been bypassed, so a definition
+that uses these shapes fails fast at startup rather than at runtime on a specific path.
 
 ## Plugging in a custom engine
 
@@ -76,24 +96,23 @@ services.TryAddKeyedSingleton<IFlowRuntime, MyParallelEngine>("parallel");
 builder.UseFlow().Use<ComplexProcess>(engine: "parallel");
 ```
 
-The state machine remains registered and keeps serving processes on the default key.
+The state machine remains registered and keeps serving processes on the default key, because
+`TryAddKeyedSingleton` and `TryAddEnumerable` are non-replacing.
 
 ## Extension points
 
 - Implement `IFlowRuntime` and register it under a new key to add an engine.
 - Implement `IFlowEngineValidator` and register via `TryAddEnumerable` to validate a custom engine.
 
-## Design rationale
-
-Bundling the default engine inside `SchemataFlowFeature` keeps the common case — a single-token
-state machine — to one `UseFlow()` call. Alternate engines coexist under different keys.
-
 ## Caveats
 
 - `TryAddKeyedSingleton` means a registration of `IFlowRuntime` under `"statemachine"` made before
-  `SchemataFlowFeature` runs wins, which is how you replace the default engine without removing the
-  feature.
-- The engine has no dedicated `Use*` method; `UseFlow()` wires it.
+  `SchemataFlowStateMachineFeature` runs wins, which is how you replace the default engine
+  without removing the feature.
+- `SchemataFlowStateMachineFeature` is gated on `SchemataFlowFeature`; chain `.UseFlow()` before
+  `.UseStateMachine()` so the foundation services exist.
+- `ResolveSingleToken` throws before the engine inspects state; a persisted process whose token
+  count is wrong must be repaired out of band.
 
 ## See also
 
@@ -101,3 +120,4 @@ state machine — to one `UseFlow()` call. Alternate engines coexist under diffe
 - [Validator](validator.md)
 - [Overview](overview.md)
 - [Runtime Services](runtime.md)
+- [BPMN Engine](bpmn-engine.md)

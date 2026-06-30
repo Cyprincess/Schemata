@@ -36,12 +36,12 @@ Enum Color { Red Green Blue }
 
 `EnumGenerator` renders each value by assignment kind:
 
-| Assignment      | SKM                 | Emitted C#           |
-| --------------- | ------------------- | -------------------- |
-| number literal  | `Draft = 0`         | `Draft = 0,`         |
-| string literal  | `Json = 'json'`     | `Json = "json",`     |
-| reference       | `Alias = Other.Val` | `Alias = Other.Val,` |
-| none            | `Red`               | `Red,`               |
+| Assignment     | SKM                 | Emitted C#           |
+| -------------- | ------------------- | -------------------- |
+| number literal | `Draft = 0`         | `Draft = 0,`         |
+| string literal | `Json = 'json'`     | `Json = "json",`     |
+| reference      | `Alias = Other.Val` | `Alias = Other.Val,` |
+| none           | `Red`               | `Red,`               |
 
 A value with no assignment takes the next sequential integer from the C# compiler. Any other
 literal kind falls back to its raw string form.

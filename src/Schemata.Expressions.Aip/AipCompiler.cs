@@ -23,7 +23,11 @@ public sealed class AipCompiler : IExpressionCompiler
         var key = ExpressionCacheKey.Create(Language, source, null, null, null);
         return ExpressionCache.GetOrAddTree(key, () => {
             try {
-                var filter = AipParser.Filter.Parse(source) ?? throw new ExpressionException("Invalid AIP filter.");
+                var filter = AipParser.Filter.Parse(source);
+                if (filter is null) {
+                    throw new ExpressionException("Invalid AIP filter.");
+                }
+
                 filter.Source = source;
                 return filter;
             } catch (ParseException ex) {

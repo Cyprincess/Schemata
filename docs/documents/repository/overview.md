@@ -10,14 +10,14 @@ extends it with typed CRUD members.
 
 ## Where the code lives
 
-| Item | Path |
-| --- | --- |
-| `IRepository`, `IRepository<TEntity>` | `src/Schemata.Entity.Repository/IRepository.cs` |
-| `RepositoryBase<TEntity>` | `src/Schemata.Entity.Repository/RepositoryBase.cs` |
-| `IUnitOfWork`, `IUnitOfWork<TContext>` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
-| `QueryContainer<TEntity>`, `QueryContext<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/` |
-| Built-in advisors | `src/Schemata.Entity.Repository/Advisors/` |
-| DI registration | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
+| Item                                                         | Path                                                                       |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `IRepository`, `IRepository<TEntity>`                        | `src/Schemata.Entity.Repository/IRepository.cs`                            |
+| `RepositoryBase<TEntity>`                                    | `src/Schemata.Entity.Repository/RepositoryBase.cs`                         |
+| `IUnitOfWork`, `IUnitOfWork<TContext>`                       | `src/Schemata.Entity.Repository/IUnitOfWork.cs`                            |
+| `QueryContainer<TEntity>`, `QueryContext<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/`                                          |
+| Built-in advisors                                            | `src/Schemata.Entity.Repository/Advisors/`                                 |
+| DI registration                                              | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
 
 ## Query API
 
@@ -94,13 +94,13 @@ restores the prior state on dispose. The convention is a verb method (`SuppressS
 state-noun marker (`SoftDeleteSuppressed`). The advisor checks `ctx.Has<SoftDeleteSuppressed>()` at the
 top of `AdviseAsync`.
 
-| Method | Marker class | Advisors bypassed |
-| --- | --- | --- |
-| `SuppressAddValidation()` | `AddValidationSuppressed` | `AdviceAddValidation` |
-| `SuppressUpdateValidation()` | `UpdateValidationSuppressed` | `AdviceUpdateValidation` |
-| `SuppressQuerySoftDelete()` | `QuerySoftDeleteSuppressed` | `AdviceBuildQuerySoftDelete` |
-| `SuppressSoftDelete()` | `SoftDeleteSuppressed` | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete` |
-| `SuppressTimestamp()` | `TimestampSuppressed` | `AdviceAddTimestamp`, `AdviceUpdateTimestamp` |
+| Method                       | Marker class                 | Advisors bypassed                               |
+| ---------------------------- | ---------------------------- | ----------------------------------------------- |
+| `SuppressAddValidation()`    | `AddValidationSuppressed`    | `AdviceAddValidation`                           |
+| `SuppressUpdateValidation()` | `UpdateValidationSuppressed` | `AdviceUpdateValidation`                        |
+| `SuppressQuerySoftDelete()`  | `QuerySoftDeleteSuppressed`  | `AdviceBuildQuerySoftDelete`                    |
+| `SuppressSoftDelete()`       | `SoftDeleteSuppressed`       | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete` |
+| `SuppressTimestamp()`        | `TimestampSuppressed`        | `AdviceAddTimestamp`, `AdviceUpdateTimestamp`   |
 
 Scope a suppression with `using`:
 

@@ -126,7 +126,7 @@ A `PATCH` request maps through `ISimpleMapper`. The update handler reads `IUpdat
   everything else keeps its current value.
 
 ```shell
-curl -X PATCH http://localhost:5000/students/<name> \
+curl -X PATCH http://localhost:5000/v1/students/<name> \
      -H "Content-Type: application/json" \
      -d '{"age":21,"update_mask":"age"}'
 ```
@@ -142,7 +142,7 @@ dotnet run
 ```
 
 ```shell
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20}'
 ```
@@ -156,7 +156,7 @@ The response is a `StudentDetail`:
   "name": "students/a1b2c3d4e5f6a7b8",
   "entity_tag": null,
   "create_time": "2026-06-04T12:00:00Z",
-  "update_time": null
+  "update_time": "2026-06-04T12:00:00Z"
 }
 ```
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.Repository;
@@ -20,7 +21,8 @@ public class EventOutboxShould
                .Returns(Task.CompletedTask);
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var observer = new SchemataEventAuditObserver(records.Object, Options.Create(new JsonSerializerOptions()));
+        var services = new ServiceCollection().AddSingleton(records.Object).BuildServiceProvider();
+        var observer = new SchemataEventAuditObserver(services, Options.Create(new JsonSerializerOptions()));
         var context = new EventContext(Mock.Of<IEvent>(), "sample") {
             Payload = "{}", CorrelationId = "c1", RequiresOutboxDelivery = true,
         };

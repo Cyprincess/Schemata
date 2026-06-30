@@ -9,11 +9,11 @@ addressing table maps an owner to a transport endpoint.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Push.Skeleton` | `IPushService.cs`, `IPushTransport.cs`, `PushContext.cs`, `PushTarget.cs`, `PushOptions.cs`, `PushPriority.cs`, `TransportResult.cs`, `TransportStatus.cs`, `Advisors/IPushSendAdvisor.cs`, `IPushSubscriptionManager.cs`, `Entities/SchemataPushSubscription.cs` |
-| `Schemata.Push.Foundation` | `DefaultPushService.cs`, `DefaultPushSubscriptionManager.cs`, `Features/SchemataPushFeature.cs`, `Builders/SchemataPushBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs` |
-| `Schemata.Push.Scheduling` | `Features/SchemataPushSchedulingFeature.cs`, `Internal/PushDispatchJob.cs`, `Internal/SchedulingPushService.cs`, `Extensions/PushSchedulingBuilderExtensions.cs` |
+| Package                    | Key files                                                                                                                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Push.Skeleton`   | `IPushService.cs`, `IPushTransport.cs`, `PushContext.cs`, `PushTarget.cs`, `PushOptions.cs`, `PushPriority.cs`, `TransportResult.cs`, `TransportStatus.cs`, `Advisors/IPushSendAdvisor.cs`, `IPushSubscriptionManager.cs`, `Entities/SchemataPushSubscription.cs` |
+| `Schemata.Push.Foundation` | `DefaultPushService.cs`, `DefaultPushSubscriptionManager.cs`, `Features/SchemataPushFeature.cs`, `Builders/SchemataPushBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                     |
+| `Schemata.Push.Scheduling` | `Features/SchemataPushSchedulingFeature.cs`, `Internal/PushDispatchJob.cs`, `Internal/SchedulingPushService.cs`, `Extensions/PushSchedulingBuilderExtensions.cs`                                                                                                  |
 
 ## Startup
 
@@ -42,10 +42,10 @@ The push service is scoped so per-request DI (including tenant-bound services) f
 
 `Schemata.Push.Foundation.Builders.SchemataPushBuilder` contributes transports:
 
-| Member | Effect |
-| --- | --- |
+| Member                       | Effect                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
 | `AddTransport<TTransport>()` | Appends `TTransport` to the `IPushTransport` collection (scoped, `TryAddEnumerable`). |
-| `AddFeature<T>()` | Adds a feature to the Schemata configuration. |
+| `AddFeature<T>()`            | Adds a feature to the Schemata configuration.                                         |
 
 Transports are registered as an enumerable collection so `DefaultPushService` can resolve and fan
 out to all of them. Each transport identifies itself through `IPushTransport.Name`, which doubles as
@@ -68,16 +68,17 @@ public interface IPushService
 `SendAsync` runs the `IPushSendAdvisor` pipeline, then fans out to every transport and yields each
 `TransportResult` as its transport completes.
 
-`ScheduleSendAsync` defers delivery to a durable long-running operation. The base implementation
-throws `NotSupportedException`; activate it with the Push Scheduling bridge:
+`IScheduledPushService.ScheduleSendAsync` defers delivery to a durable long-running operation. The
+contract ships in the Push Scheduling bridge package:
 
 ```csharp
 schema.UsePush(p => p.AddTransport<SignalRPushTransport>()
                      .UseScheduling());
 ```
 
-`UseScheduling()` on `SchemataPushBuilder` adds `SchemataPushSchedulingFeature` (which auto-activates
-the Scheduling feature) and replaces `IPushService` with `SchedulingPushService`. A scheduled send
+`UseScheduling()` on `SchemataPushBuilder` adds `SchemataPushSchedulingFeature` (which depends on
+the Push and Scheduling features) and registers `ScheduledPushService` as `IScheduledPushService`
+alongside the broadcast `IPushService`. A scheduled send
 serializes the `PushContext`, triggers a `PushDispatchJob` through `IScheduler`, and returns the
 pending `operations/{operation}` envelope — so the deferred dispatch is managed and observed through
 the standard LRO surface (`get` / `list` / `:cancel` / `:wait`) exposed by `Schemata.Scheduling.Http`
@@ -105,13 +106,13 @@ ships no transport implementations; provide one by implementing this contract.
 (`[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]`) lets a target round-trip through JSON
 for the durable scheduled path and any wire exposure.
 
-| Target | Carries | Typical responder |
-| --- | --- | --- |
-| `ChannelTarget(string Channel)` | a channel id | channel-aware transports (group/room) |
-| `RecipientTarget(string Subject)` | a recipient canonical name | transports that resolve a subscription |
-| `TopicTarget(string Topic)` | a topic id | publish/subscribe transports |
-| `BroadcastTarget()` | nothing | connection transports delivering to all |
-| `CustomTarget(string Kind, …)` | a kind + parameters | transports matching `Kind` |
+| Target                            | Carries                    | Typical responder                       |
+| --------------------------------- | -------------------------- | --------------------------------------- |
+| `ChannelTarget(string Channel)`   | a channel id               | channel-aware transports (group/room)   |
+| `RecipientTarget(string Subject)` | a recipient canonical name | transports that resolve a subscription  |
+| `TopicTarget(string Topic)`       | a topic id                 | publish/subscribe transports            |
+| `BroadcastTarget()`               | nothing                    | connection transports delivering to all |
+| `CustomTarget(string Kind, …)`    | a kind + parameters        | transports matching `Kind`              |
 
 ## Subscriptions
 
@@ -123,9 +124,9 @@ and `DefaultPushSubscriptionManager` manage the rows. See [Subscriptions](subscr
 
 ## Feature priority table
 
-| Feature | Priority |
-| --- | --- |
-| `SchemataPushFeature` | 500,000,000 |
+| Feature                         | Priority    |
+| ------------------------------- | ----------- |
+| `SchemataPushFeature`           | 500,000,000 |
 | `SchemataPushSchedulingFeature` | 500,400,000 |
 
 ## Extension points

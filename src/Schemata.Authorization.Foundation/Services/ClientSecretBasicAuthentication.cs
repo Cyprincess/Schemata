@@ -83,7 +83,7 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
         }
 
         var app = await apps.FindByClientIdAsync(id, ct);
-        if (app == null) {
+        if (app is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidClient,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)

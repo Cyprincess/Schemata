@@ -6,13 +6,13 @@ startup. `MapHttp()` on `SchemataResourceBuilder` adds `SchemataHttpResourceFeat
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Http` | `Features/SchemataHttpResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs` |
-| `Schemata.Resource.Http` | `ResourceController.cs`, `ResourceControllerConvention.cs`, `ResourceControllerFeatureProvider.cs` |
-| `Schemata.Resource.Http` | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs` |
-| `Schemata.Resource.Http` | `Internal/ResourceHttpConventionHelper.cs` |
-| `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`, `SchemataJsonTraits.cs` |
+| Package                   | Key files                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Http`  | `Features/SchemataHttpResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs`                         |
+| `Schemata.Resource.Http`  | `ResourceController.cs`, `ResourceControllerConvention.cs`, `ResourceControllerFeatureProvider.cs`                   |
+| `Schemata.Resource.Http`  | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs` |
+| `Schemata.Resource.Http`  | `Internal/ResourceHttpConventionHelper.cs`                                                                           |
+| `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`, `SchemataJsonTraits.cs`                                                  |
 
 ## Activation
 
@@ -57,12 +57,12 @@ the `Schemata.*` application-part stripping done by `SchemataControllersFeature`
 — `~/v1/{package}/{collectionPath}` when a package is set, otherwise `~/v1/{collectionPath}` — and drops actions
 for verbs excluded by `ResourceAttribute.Operations`.
 
-| Method | Route | Action | AIP |
-| --- | --- | --- | --- |
-| `GET` | `/v1/{collectionPath}` | `ListAsync([FromQuery] ListRequest)` | AIP-132 |
-| `POST` | `/v1/{collectionPath}` | `CreateAsync([FromBody] TRequest)` → `201 Created` | AIP-133 |
-| `GET` | `/v1/{collectionPath}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)` | AIP-131 |
-| `PATCH` | `/v1/{collectionPath}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)` | AIP-134 |
+| Method   | Route                         | Action                                                                                                      | AIP     |
+| -------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- | ------- |
+| `GET`    | `/v1/{collectionPath}`        | `ListAsync([FromQuery] ListRequest)`                                                                        | AIP-132 |
+| `POST`   | `/v1/{collectionPath}`        | `CreateAsync([FromBody] TRequest)` → `201 Created`                                                          | AIP-133 |
+| `GET`    | `/v1/{collectionPath}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)`                                                       | AIP-131 |
+| `PATCH`  | `/v1/{collectionPath}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)`                                                             | AIP-134 |
 | `DELETE` | `/v1/{collectionPath}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery(Name = "allow_missing")] bool allowMissing)` | AIP-135 |
 
 For a flat resource `CollectionPath` is the plural (`students`), so the routes are `/v1/students` and
@@ -81,10 +81,10 @@ returns `204`.
 `ResourceMethodController<TEntity, TRequest, TResponse, THandler>` per declared method.
 `ResourceMethodControllerConvention` sets each action's absolute route template:
 
-| Scope | Route |
-| --- | --- |
-| `Instance` | `~/v1/{package}/{collectionPath}/{name}:{verb}` |
-| `Collection` | `~/v1/{package}/{collectionPath}:{verb}` |
+| Scope        | Route                                           |
+| ------------ | ----------------------------------------------- |
+| `Instance`   | `~/v1/{package}/{collectionPath}/{name}:{verb}` |
+| `Collection` | `~/v1/{package}/{collectionPath}:{verb}`        |
 
 Methods are `POST` by default; a `ResourceMethodAttribute.Method` of `ResourceHttpMethod.Get` rebinds the request
 from the body to the query string and constrains the verb to `GET`. The verb is carried to runtime as

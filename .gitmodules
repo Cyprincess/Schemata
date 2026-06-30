@@ -1,3 +1,6 @@
 [submodule "specs/cel"]
 	path = specs/cel
 	url = https://github.com/google/cel-spec
+[submodule "specs/bpmn"]
+	path = specs/bpmn
+	url = https://github.com/bpmn-miwg/bpmn-miwg-test-suite

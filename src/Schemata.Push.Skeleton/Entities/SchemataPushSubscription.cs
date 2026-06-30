@@ -52,11 +52,11 @@ public class SchemataPushSubscription : IIdentifier, ICanonicalName, IOwnable, I
 
     public virtual string? DisplayName { get; set; }
 
-    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+    public virtual Dictionary<string, string?>? DisplayNames { get; set; }
 
     public virtual string? Description { get; set; }
 
-    public virtual Dictionary<string, string>? Descriptions { get; set; }
+    public virtual Dictionary<string, string?>? Descriptions { get; set; }
 
     #endregion
 

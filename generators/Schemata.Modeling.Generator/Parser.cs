@@ -74,7 +74,7 @@ public static partial class Parser
 
         QualifiedName = Identifier.And(ZeroOrMany(dot.SkipAnd(Identifier)))
                                   .Then(pair => {
-                                       if (pair.Item2 == null || pair.Item2.Count == 0) {
+                                       if (pair.Item2 is null || pair.Item2.Count == 0) {
                                            return pair.Item1.ToString();
                                        }
 
@@ -141,12 +141,12 @@ public static partial class Parser
                                      var                         name = pair.Item1;
                                      var                         args = pair.Item2;
                                      ImmutableArray<IExpression> array;
-                                     if (args == null || args.Count == 0) {
+                                     if (args is null || args.Count == 0) {
                                          array = ImmutableArray<IExpression>.Empty;
                                      } else {
                                          var builder = ImmutableArray.CreateBuilder<IExpression>(args.Count);
-                                         for (var i = 0; i < args.Count; i++) {
-                                             builder.Add(args[i]);
+                                         foreach (var t in args) {
+                                             builder.Add(t);
                                          }
 
                                          array = builder.MoveToImmutable();
@@ -210,8 +210,8 @@ public static partial class Parser
         FieldOptions = Between(lbracket, options, rbracket)
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<FieldOption>(list.Count);
-                for (var i = 0; i < list.Count; i++) {
-                    builder.Add(ParseFieldOption(list[i]));
+                foreach (var t in list) {
+                    builder.Add(ParseFieldOption(t));
                 }
 
                 return (EquatableArray<FieldOption>)builder.MoveToImmutable();
@@ -220,8 +220,8 @@ public static partial class Parser
         ViewOptions = Between(lbracket, options, rbracket)
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<ViewOption>(list.Count);
-                for (var i = 0; i < list.Count; i++) {
-                    builder.Add(ParseViewOption(list[i]));
+                foreach (var t in list) {
+                    builder.Add(ParseViewOption(t));
                 }
 
                 return (EquatableArray<ViewOption>)builder.MoveToImmutable();
@@ -230,8 +230,8 @@ public static partial class Parser
         PointerOptions = Between(lbracket, options, rbracket)
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<PointerOption>(list.Count);
-                for (var i = 0; i < list.Count; i++) {
-                    builder.Add(ParsePointerOption(list[i]));
+                foreach (var t in list) {
+                    builder.Add(ParsePointerOption(t));
                 }
 
                 return (EquatableArray<PointerOption>)builder.MoveToImmutable();
@@ -282,21 +282,30 @@ public static partial class Parser
                                   var notes      = ImmutableArray.CreateBuilder<Note>();
                                   var properties = ImmutableArray.CreateBuilder<Property>();
 
-                                  if (body != null) {
-                                      for (var i = 0; i < body.Count; i++) {
-                                          switch (body[i]) {
-                                              case Note n:
-                                                  notes.Add(n);
-                                                  break;
-                                              case Property p:
-                                                  properties.Add(p);
-                                                  break;
-                                          }
+                                  if (body is null) {
+                                      return new(
+                                          type,
+                                          nullable,
+                                          name,
+                                          options,
+                                          notes.ToImmutable(),
+                                          properties.ToImmutable()
+                                      );
+                                  }
+
+                                  for (var i = 0; i < body.Count; i++) {
+                                      switch (body[i]) {
+                                          case Note n:
+                                              notes.Add(n);
+                                              break;
+                                          case Property p:
+                                              properties.Add(p);
+                                              break;
                                       }
                                   }
 
                                   return new Field(type, nullable, name, options, notes.ToImmutable(),
-                                                   (EquatableArray<Property>)properties.ToImmutable());
+                                                   properties.ToImmutable());
                               });
 
         // ── Pointer ─────────────────────────────────────────────────────
@@ -320,14 +329,14 @@ public static partial class Parser
                             }
 
                             var notes = ImmutableArray.CreateBuilder<Note>();
-                            if (body != null) {
-                                for (var i = 0; i < body.Count; i++) {
-                                    notes.Add(body[i]);
+                            if (body is not null) {
+                                foreach (var t in body) {
+                                    notes.Add(t);
                                 }
                             }
 
                             return new Pointer(columns.ToImmutable(), options,
-                                               (EquatableArray<Note>)notes.ToImmutable());
+                                               notes.ToImmutable());
                         });
 
         // ── ViewField (recursive) ───────────────────────────────────────
@@ -462,20 +471,26 @@ public static partial class Parser
                          var notes  = ImmutableArray.CreateBuilder<Note>();
                          var fields = ImmutableArray.CreateBuilder<ViewField>();
 
-                         if (body != null) {
-                             for (var i = 0; i < body.Count; i++) {
-                                 switch (body[i]) {
-                                     case Note n:
-                                         notes.Add(n);
-                                         break;
-                                     case ViewField vf:
-                                         fields.Add(vf);
-                                         break;
-                                 }
+                         if (body is null) {
+                             return new(
+                                 name,
+                                 notes.ToImmutable(),
+                                 fields.ToImmutable()
+                             );
+                         }
+
+                         for (var i = 0; i < body.Count; i++) {
+                             switch (body[i]) {
+                                 case Note n:
+                                     notes.Add(n);
+                                     break;
+                                 case ViewField vf:
+                                     fields.Add(vf);
+                                     break;
                              }
                          }
 
-                         return new View(name, notes.ToImmutable(), (EquatableArray<ViewField>)fields.ToImmutable());
+                         return new View(name, notes.ToImmutable(), fields.ToImmutable());
                      });
 
         // ── EnumValue ────────────────────────────────────────────────────
@@ -492,10 +507,11 @@ public static partial class Parser
                                    var body       = parts.Item3;
 
                                    var notes = ImmutableArray.CreateBuilder<Note>();
-                                   if (body != null) {
-                                       for (var i = 0; i < body.Count; i++) {
-                                           notes.Add(body[i]);
-                                       }
+                                   if (body is null) {
+                                       return new(name, assignment, notes.ToImmutable());
+                                   }
+                                   foreach (var t in body) {
+                                       notes.Add(t);
                                    }
 
                                    return new EnumValue(name, assignment, notes.ToImmutable());
@@ -519,21 +535,27 @@ public static partial class Parser
                                 var notes  = ImmutableArray.CreateBuilder<Note>();
                                 var values = ImmutableArray.CreateBuilder<EnumValue>();
 
-                                if (body != null) {
-                                    for (var i = 0; i < body.Count; i++) {
-                                        switch (body[i]) {
-                                            case Note n:
-                                                notes.Add(n);
-                                                break;
-                                            case EnumValue v:
-                                                values.Add(v);
-                                                break;
-                                        }
+                                if (body is null) {
+                                    return new(
+                                        name,
+                                        notes.ToImmutable(),
+                                        values.ToImmutable()
+                                    );
+                                }
+
+                                for (var i = 0; i < body.Count; i++) {
+                                    switch (body[i]) {
+                                        case Note n:
+                                            notes.Add(n);
+                                            break;
+                                        case EnumValue v:
+                                            values.Add(v);
+                                            break;
                                     }
                                 }
 
                                 return new Enumeration(name, notes.ToImmutable(),
-                                                       (EquatableArray<EnumValue>)values.ToImmutable());
+                                                       values.ToImmutable());
                             });
 
         // ── Namespace ────────────────────────────────────────────────────
@@ -564,9 +586,9 @@ public static partial class Parser
                           var body  = parts.Item3;
 
                           var basesBuilder = ImmutableArray.CreateBuilder<string>();
-                          if (bases != null) {
-                              for (var i = 0; i < bases.Count; i++) {
-                                  basesBuilder.Add(bases[i]);
+                          if (bases is not null) {
+                              foreach (var t in bases) {
+                                  basesBuilder.Add(t);
                               }
                           }
 
@@ -574,25 +596,33 @@ public static partial class Parser
                           var uses   = ImmutableArray.CreateBuilder<Use>();
                           var fields = ImmutableArray.CreateBuilder<Field>();
 
-                          if (body != null) {
-                              for (var i = 0; i < body.Count; i++) {
-                                  switch (body[i]) {
-                                      case Note n:
-                                          notes.Add(n);
-                                          break;
-                                      case Use u:
-                                          uses.Add(u);
-                                          break;
-                                      case Field f:
-                                          fields.Add(f);
-                                          break;
-                                  }
+                          if (body is null) {
+                              return new(
+                                  name,
+                                  basesBuilder.ToImmutable(),
+                                  notes.ToImmutable(),
+                                  uses.ToImmutable(),
+                                  fields.ToImmutable()
+                              );
+                          }
+
+                          for (var i = 0; i < body.Count; i++) {
+                              switch (body[i]) {
+                                  case Note n:
+                                      notes.Add(n);
+                                      break;
+                                  case Use u:
+                                      uses.Add(u);
+                                      break;
+                                  case Field f:
+                                      fields.Add(f);
+                                      break;
                               }
                           }
 
-                          return new Trait(name, basesBuilder.ToImmutable(), (EquatableArray<Note>)notes.ToImmutable(),
-                                           (EquatableArray<Use>)uses.ToImmutable(),
-                                           (EquatableArray<Field>)fields.ToImmutable());
+                          return new Trait(name, basesBuilder.ToImmutable(), notes.ToImmutable(),
+                                           uses.ToImmutable(),
+                                           fields.ToImmutable());
                       });
 
         // ── Entity ───────────────────────────────────────────────────────
@@ -620,9 +650,9 @@ public static partial class Parser
                            var body  = parts.Item3;
 
                            var basesBuilder = ImmutableArray.CreateBuilder<string>();
-                           if (bases != null) {
-                               for (var i = 0; i < bases.Count; i++) {
-                                   basesBuilder.Add(bases[i]);
+                           if (bases is not null) {
+                               foreach (var t in bases) {
+                                   basesBuilder.Add(t);
                                }
                            }
 
@@ -634,7 +664,21 @@ public static partial class Parser
                            var pointers = ImmutableArray.CreateBuilder<Pointer>();
                            var fields   = ImmutableArray.CreateBuilder<Field>();
 
-                           if (body != null) {
+                           if (body is null) {
+                               return new(
+                                   name,
+                                   basesBuilder.ToImmutable(),
+                                   notes.ToImmutable(),
+                                   uses.ToImmutable(),
+                                   enums.ToImmutable(),
+                                   traits.ToImmutable(),
+                                   views.ToImmutable(),
+                                   pointers.ToImmutable(),
+                                   fields.ToImmutable()
+                               );
+                           }
+
+                           {
                                for (var i = 0; i < body.Count; i++) {
                                    switch (body[i]) {
                                        case Note n:
@@ -663,13 +707,13 @@ public static partial class Parser
                            }
 
                            return new Entity(name, basesBuilder.ToImmutable(),
-                                             (EquatableArray<Note>)notes.ToImmutable(),
-                                             (EquatableArray<Use>)uses.ToImmutable(),
-                                             (EquatableArray<Enumeration>)enums.ToImmutable(),
-                                             (EquatableArray<Trait>)traits.ToImmutable(),
-                                             (EquatableArray<View>)views.ToImmutable(),
-                                             (EquatableArray<Pointer>)pointers.ToImmutable(),
-                                             (EquatableArray<Field>)fields.ToImmutable());
+                                             notes.ToImmutable(),
+                                             uses.ToImmutable(),
+                                             enums.ToImmutable(),
+                                             traits.ToImmutable(),
+                                             views.ToImmutable(),
+                                             pointers.ToImmutable(),
+                                             fields.ToImmutable());
                        })
                       .WithComments(comments => {
                            comments.WithWhiteSpaceOrNewLine();
@@ -695,7 +739,7 @@ public static partial class Parser
                        var traits   = ImmutableArray.CreateBuilder<Trait>();
                        var enums    = ImmutableArray.CreateBuilder<Enumeration>();
 
-                       if (declarations != null) {
+                       if (declarations is not null) {
                            for (var i = 0; i < declarations.Count; i++) {
                                switch (declarations[i]) {
                                    case Entity e:
@@ -711,8 +755,8 @@ public static partial class Parser
                            }
                        }
 
-                       return new Document(ns, entities.ToImmutable(), (EquatableArray<Trait>)traits.ToImmutable(),
-                                           (EquatableArray<Enumeration>)enums.ToImmutable());
+                       return new Document(ns, entities.ToImmutable(), traits.ToImmutable(),
+                                           enums.ToImmutable());
                    })
                   .WithComments(comments => {
                        comments.WithWhiteSpaceOrNewLine();

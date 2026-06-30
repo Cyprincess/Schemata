@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
+using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Entities;
 
@@ -17,10 +19,27 @@ public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurren
     /// <summary>The parent process's <see cref="ICanonicalName.Name" />.</summary>
     public virtual string? Process { get; set; }
 
-    /// <summary>The previous state before the transition.</summary>
+    /// <summary>
+    ///     Full canonical name of the <see cref="SchemataProcessToken" /> this transition belongs to.
+    ///     Equals the single token canonical under the state-machine engine; identifies the specific
+    ///     token under the BPMN engine when multiple tokens are live.
+    /// </summary>
+    [ResourceReference(typeof(SchemataProcessToken))]
+    public virtual string? Token { get; set; }
+
+    /// <summary>
+    ///     Classification of this transition. The state-machine engine writes only
+    ///     <see cref="TransitionKind.Move" /> / <see cref="TransitionKind.Cancel" /> /
+    ///     <see cref="TransitionKind.Fail" />; the BPMN engine additionally writes
+    ///     <see cref="TransitionKind.Fork" /> / <see cref="TransitionKind.Join" /> /
+    ///     <see cref="TransitionKind.Spawn" /> / <see cref="TransitionKind.Compensate" />.
+    /// </summary>
+    public virtual TransitionKind Kind { get; set; }
+
+    /// <summary>The previous element <see cref="FlowElement.Name" /> before the transition.</summary>
     public virtual string? Previous { get; set; }
 
-    /// <summary>The posterior state after the transition.</summary>
+    /// <summary>The posterior element <see cref="FlowElement.Name" /> after the transition.</summary>
     public virtual string? Posterior { get; set; }
 
     #region ICanonicalName Members

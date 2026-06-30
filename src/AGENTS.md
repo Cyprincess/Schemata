@@ -1,6 +1,6 @@
 # src — Runtime Packages
 
-58 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
+60 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
 
 ## Suffix Vocabulary
 
@@ -36,6 +36,7 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 
 - `Skeleton` ← `Foundation`
 - `Foundation` ← `Identity` (ties the OAuth server to ASP.NET Core Identity)
+- `Skeleton` surface: entities `SchemataApplication` / `SchemataAuthorization` / `SchemataScope` / `SchemataToken` / `SchemataSubjectMapping`; managers `IApplicationManager` / `IAuthorizationManager` / `IScopeManager` / `ITokenManager`; contracts `IClientAuthentication`, `ISubjectProvider`, `ISubjectIdentifierService`, `IPairwiseSubjectTranslator`, `ILogoutNotifier`; value types `ScopeParser`, `AuthorizationResult`/`Status`, `ConsentDecision`. Depends only on `Entity.Repository`.
 
 ### Caching (cache abstraction + adapters)
 
@@ -126,6 +127,6 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 
 ## Notes
 
-- File counts: hot spots are `Schemata.Authorization.Foundation` (119), `Schemata.Abstractions` (97), `Schemata.Resource.Foundation` (86), `Schemata.Flow.Skeleton` (81), `Schemata.Authorization.Skeleton` (70). Each has its own `AGENTS.md` where present.
+- File counts: hot spots are `Schemata.Authorization.Foundation` (120), `Schemata.Flow.Skeleton` (102), `Schemata.Abstractions` (101), `Schemata.Resource.Foundation` (90), `Schemata.Authorization.Skeleton` (72). Each has its own `AGENTS.md` where present.
 - The advice generator is auto-attached as an analyzer to every `src/*` project via [../Directory.Build.props](../Directory.Build.props#L90-L94). Skip with `-p:SchemataSkipGenerators=true`.
 - All packages share `Schemata.png` / `LICENSE` / root `README.md` for the NuGet display via `PackageIconFullPath` + `PackageReadmeFile` resolved in [../Directory.Build.props](../Directory.Build.props#L120-L130).

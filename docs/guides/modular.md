@@ -36,8 +36,8 @@ var app = builder.Build();
 app.Run();
 ```
 
-`UseModular()` adds `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at
-`Priority = 520_000_000`.
+`UseModular()` activates module discovery with the default provider and runner; the feature
+internals are in [Modules](../documents/modules.md).
 
 ## Create the module project
 
@@ -50,7 +50,8 @@ dotnet add StudentModule package --prerelease Schemata.Module.Complex.Targets
 ```
 
 The Complex variant pulls in `Schemata.Abstractions`, the repository pattern, the modeling DSL, the
-Authorization/Identity/Security/Validation/Mapping skeletons, and the advice generator. Use
+Authorization/Identity/Security/Mapping skeletons, `Schemata.Validation.FluentValidation`, and the
+advice generator. Use
 `Schemata.Module.Targets` or `Schemata.Module.Persisting.Targets` for a smaller dependency set.
 
 ## Move the entity and its advisor into the module
@@ -104,12 +105,10 @@ In the host `.csproj`, add a project reference (or a `PackageReference` if you p
 </ItemGroup>
 ```
 
-That single line is the whole registration step. When the host builds,
-`Schemata.Application.Modular.Targets.targets` calls `GetModuleProjectName` on
-`StudentModule.csproj`, gets back `StudentModule` (its `$(AssemblyName)`), and stamps
-`[assembly: Schemata.Abstractions.Modular.ModuleAttribute("StudentModule")]` into the host
-assembly. A NuGet-published module stamps the same attribute via the `Package.Build.props` it packs
-into the consuming app.
+That single line is the whole registration step. When the host builds, the packed MSBuild targets
+stamp `[assembly: ModuleAttribute("StudentModule")]` into the host assembly; a NuGet-published
+module stamps the same attribute through the props file it packs into the consuming app. The
+target-by-target build wiring is in [Modules](../documents/modules.md).
 
 ## Trim the host startup
 
@@ -141,8 +140,7 @@ dotnet run
 ```
 
 The application starts, `StudentModule.ConfigureServices` registers the EF Core repository and the
-name advisor, and every Getting Started endpoint keeps working. To see the stamped attribute, search
-the build log for `ModuleAttribute` under the `ResolveModuleProjectReferences` target output, or
+name advisor, and every Getting Started endpoint keeps working. To see the stamped attribute,
 inspect the generated assembly-info source under `obj/`.
 
 ## Custom discovery

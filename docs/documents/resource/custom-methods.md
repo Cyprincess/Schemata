@@ -6,13 +6,13 @@ lowerCamelCase string.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Abstractions` | `Resource/ResourceMethodAttribute.cs`, `Resource/ResourceMethodScope.cs`, `Resource/ResourceHttpMethod.cs`, `Resource/IResourceMethodHandler.cs` |
-| `Schemata.Resource.Foundation` | `ResourceMethodOperationHandler.cs`, `Advisors/IResourceMethodRequestAdvisor.cs`, `Advisors/IResourceMethodAdvisor.cs`, `Advisors/ResourceMethodVerb.cs` |
+| Package                        | Key files                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Abstractions`        | `Resource/ResourceMethodAttribute.cs`, `Resource/ResourceMethodScope.cs`, `Resource/ResourceHttpMethod.cs`, `Resource/IResourceMethodHandler.cs`                          |
+| `Schemata.Resource.Foundation` | `ResourceMethodOperationHandler.cs`, `Advisors/IResourceMethodRequestAdvisor.cs`, `Advisors/IResourceMethodAdvisor.cs`, `Advisors/ResourceMethodVerb.cs`                  |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceMethodRequestAnonymous.cs`, `Advisors/AdviceMethodRequestAuthorize.cs`, `Advisors/AdviceMethodRequestIdempotency.cs`, `Advisors/AdviceMethodFreshness.cs` |
-| `Schemata.Resource.Http` | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs` |
-| `Schemata.Resource.Grpc` | `ResourceCustomMethod.cs`, `ResourceMethodNaming.cs` |
+| `Schemata.Resource.Http`       | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs`                                                      |
+| `Schemata.Resource.Grpc`       | `ResourceCustomMethod.cs`, `ResourceMethodNaming.cs`                                                                                                                      |
 
 ## Declaring a custom method
 
@@ -49,10 +49,10 @@ registers the handler in DI, and reads the `TRequest`/`TResponse` types from the
 
 ### Scope
 
-| Scope | HTTP route | gRPC RPC | Entity passed to handler |
-| --- | --- | --- | --- |
-| `Instance` | `POST /v1/{collection}/{name}:{verb}` | `{Verb}{Singular}` | The loaded resource |
-| `Collection` | `POST /v1/{collection}:{verb}` | `{Verb}{Singular}` | `null` |
+| Scope        | HTTP route                            | gRPC RPC           | Entity passed to handler |
+| ------------ | ------------------------------------- | ------------------ | ------------------------ |
+| `Instance`   | `POST /v1/{collection}/{name}:{verb}` | `{Verb}{Singular}` | The loaded resource      |
+| `Collection` | `POST /v1/{collection}:{verb}`        | `{Verb}{Singular}` | `null`                   |
 
 The verb follows the colon in the HTTP path; the gRPC RPC is PascalCased and lives on the resource's existing
 service (e.g. `JobService.RunJob`, not a separate service). A `ResourceMethodAttribute.Method` of
@@ -81,12 +81,12 @@ idempotency key distinguishes the same verb against different resources, then lo
 
 ### Built-in method advisors
 
-| Advisor | Stage | What it does |
-| --- | --- | --- |
-| `AdviceMethodRequestAnonymous` | request | Grants anonymous access when the verb is configured for it |
-| `AdviceMethodRequestAuthorize` | request | Authorizes with the verb as the permission token |
+| Advisor                          | Stage   | What it does                                                |
+| -------------------------------- | ------- | ----------------------------------------------------------- |
+| `AdviceMethodRequestAnonymous`   | request | Grants anonymous access when the verb is configured for it  |
+| `AdviceMethodRequestAuthorize`   | request | Authorizes with the verb as the permission token            |
 | `AdviceMethodRequestIdempotency` | request | Replays a cached response keyed by the verb and `RequestId` |
-| `AdviceMethodFreshness` | method | Validates the ETag against the target instance per AIP-154 |
+| `AdviceMethodFreshness`          | method  | Validates the ETag against the target instance per AIP-154  |
 
 `AdviceMethodRequestIdempotency` and `AdviceMethodFreshness` are registered per verb by `RegisterResource`; the
 anonymous and authorize advisors are added by `WithAuthorization()`.

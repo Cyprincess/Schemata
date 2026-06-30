@@ -61,7 +61,7 @@ public class SchemataException : Exception
     /// </summary>
     /// <param name="args">Named arguments for the resx template; <see langword="null" /> or
     ///     empty leaves the existing detail untouched.</param>
-    protected void AttachMetadata(IReadOnlyDictionary<string, string>? args) {
+    protected void AttachMetadata(IReadOnlyDictionary<string, string?>? args) {
         if (args is not { Count: > 0 }) {
             return;
         }
@@ -71,7 +71,7 @@ public class SchemataException : Exception
             return;
         }
 
-        info.Metadata = args.ToDictionary(kv => kv.Key, kv => kv.Value);
+        info.Metadata = args.ToDictionary(kv => kv.Key, kv => kv.Value ?? string.Empty);
     }
 
     /// <summary>

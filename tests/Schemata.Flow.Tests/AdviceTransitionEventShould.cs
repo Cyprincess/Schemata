@@ -10,6 +10,7 @@ using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Observers;
 using Xunit;
 using SystemTask = System.Threading.Tasks.Task;
 
@@ -24,13 +25,7 @@ public class AdviceTransitionEventShould
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.AdviseAsync(
-            Advice(), new() {
-                Process    = process,
-                Definition = definition,
-                Instance   = new() { WaitingAtId = "catch-msg" },
-                UnitOfWork = Mock.Of<IUnitOfWork>(),
-            });
+        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("flow:processes/p1:catch-msg", row.SubscriptionId);
@@ -46,19 +41,13 @@ public class AdviceTransitionEventShould
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
-            Id         = "catch-sig",
+            Name       = "catch-sig",
             Position   = EventPosition.IntermediateCatch,
             Definition = new Signal { Name = "shutdown" },
         });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(
-            Advice(), new() {
-                Process    = process,
-                Definition = definition,
-                Instance   = new() { WaitingAtId = "catch-sig" },
-                UnitOfWork = Mock.Of<IUnitOfWork>(),
-            });
+        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-sig"));
 
         var row = Assert.Single(rows);
         Assert.Null(row.CorrelationKey);
@@ -66,7 +55,7 @@ public class AdviceTransitionEventShould
     }
 
     [Fact]
-    public async SystemTask RemovesOldSubscription_WhenLeavingWaitingState() {
+    public async SystemTask RemovesOldSubscription_WhenProcessReachesTerminalState() {
         var rows = new List<SchemataEventSubscription> {
             new() {
                 SubscriptionId = "flow:processes/p1:catch-msg",
@@ -78,15 +67,11 @@ public class AdviceTransitionEventShould
         var advisor = new AdviceTransitionEvent(Repository(rows).Object);
 
         var (definition, process) = MessageCatchSetup();
+        process.State             = "Completed";
 
         await advisor.AdviseAsync(
-            Advice(), new() {
-                Process             = process,
-                Definition          = definition,
-                Instance            = new() { IsComplete = true },
-                PreviousWaitingAtId = "catch-msg",
-                UnitOfWork          = Mock.Of<IUnitOfWork>(),
-            });
+            Advice(),
+            Context(process, definition, null, "catch-msg"));
 
         Assert.Empty(rows);
     }
@@ -105,13 +90,7 @@ public class AdviceTransitionEventShould
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.AdviseAsync(
-            Advice(), new() {
-                Process    = process,
-                Definition = definition,
-                Instance   = new() { WaitingAtId = "catch-msg" },
-                UnitOfWork = Mock.Of<IUnitOfWork>(),
-            });
+        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("payment", row.EventType);
@@ -125,37 +104,31 @@ public class AdviceTransitionEventShould
         var advisor = new AdviceTransitionEvent(Repository(rows).Object);
 
         var pay = new FlowEvent {
-            Id         = "catch-pay",
+            Name       = "catch-pay",
             Position   = EventPosition.IntermediateCatch,
             Definition = new Message { Name = "payment" },
         };
         var shutdown = new FlowEvent {
-            Id         = "catch-sig",
+            Name       = "catch-sig",
             Position   = EventPosition.IntermediateCatch,
             Definition = new Signal { Name = "shutdown" },
         };
-        var gateway = new EventBasedGateway { Id = "gw" };
+        var gateway = new EventBasedGateway { Name = "gw" };
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(gateway);
         definition.Elements.Add(pay);
         definition.Elements.Add(shutdown);
-        definition.Flows.Add(new() { Id = "f1", Source = gateway, Target = pay });
-        definition.Flows.Add(new() { Id = "f2", Source = gateway, Target = shutdown });
+        definition.Flows.Add(new() { Source = gateway, Target = pay });
+        definition.Flows.Add(new() { Source = gateway, Target = shutdown });
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(
-            Advice(), new() {
-                Process    = process,
-                Definition = definition,
-                Instance   = new() { WaitingAtId = "gw" },
-                UnitOfWork = Mock.Of<IUnitOfWork>(),
-            });
+        await advisor.AdviseAsync(Advice(), Context(process, definition, "gw"));
 
         Assert.Equal(2, rows.Count);
-        Assert.Contains(rows, r => r.SubscriptionId == "flow:processes/p1:catch-pay" && r.CorrelationKey == "processes/p1");
-        Assert.Contains(rows, r => r.SubscriptionId == "flow:processes/p1:catch-sig" && r.CorrelationKey == null);
+        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-pay", CorrelationKey: "processes/p1" });
+        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-sig", CorrelationKey: null });
     }
 
     [Fact]
@@ -166,14 +139,10 @@ public class AdviceTransitionEventShould
         var advisor    = new AdviceTransitionEvent(repository.Object);
 
         var (definition, process) = MessageCatchSetup();
+        var context               = Context(process, definition, "catch-msg");
+        context.UnitOfWork        = uow;
 
-        await advisor.AdviseAsync(
-            Advice(), new() {
-                Process    = process,
-                Definition = definition,
-                Instance   = new() { WaitingAtId = "catch-msg" },
-                UnitOfWork = uow,
-            });
+        await advisor.AdviseAsync(Advice(), context);
 
         repository.Verify(r => r.Join(uow), Times.Once);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -183,10 +152,33 @@ public class AdviceTransitionEventShould
         return new(new ServiceCollection().BuildServiceProvider());
     }
 
+    private static FlowTransitionContext Context(
+        SchemataProcess   process,
+        ProcessDefinition definition,
+        string?           waitingAtName,
+        string?           previousWaitingAtName = null
+    ) {
+        var token = new TokenSnapshot {
+            CanonicalName = "processes/p1/tokens/t1",
+            ScopeName     = "p1",
+            StateName     = waitingAtName ?? "post-wait",
+            WaitingAtName = waitingAtName,
+            Status        = waitingAtName is null ? "Active" : "Waiting",
+        };
+
+        return new() {
+            Definition            = definition,
+            Snapshot              = new() { Process = process, Tokens = [], Transitions = [] },
+            Token                 = token,
+            PreviousWaitingAtName = previousWaitingAtName,
+            UnitOfWork            = Mock.Of<IUnitOfWork>(),
+        };
+    }
+
     private static (ProcessDefinition Definition, SchemataProcess Process) MessageCatchSetup() {
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
-            Id         = "catch-msg",
+            Name       = "catch-msg",
             Position   = EventPosition.IntermediateCatch,
             Definition = new Message { Name = "payment" },
         });

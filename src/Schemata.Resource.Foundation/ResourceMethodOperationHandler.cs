@@ -133,7 +133,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
                 entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
             }
 
-            if (entity == null) {
+            if (entity is null) {
                 throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
             }
 

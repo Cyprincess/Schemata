@@ -91,8 +91,20 @@ The response contains rows, schema, and paging metadata:
     { "full_name": "Cleo", "age": 24 }
   ],
   "schema": [
-    { "name": "full_name", "type": "string", "source_alias": "s", "is_list": false, "children": [] },
-    { "name": "age", "type": "int64", "source_alias": "s", "is_list": false, "children": [] }
+    {
+      "name": "full_name",
+      "type": "string",
+      "source_alias": "s",
+      "is_list": false,
+      "children": []
+    },
+    {
+      "name": "age",
+      "type": "int64",
+      "source_alias": "s",
+      "is_list": false,
+      "children": []
+    }
   ],
   "next_page_token": null,
   "total_size": 2,
@@ -112,7 +124,10 @@ language on the slot:
     {
       "compute": {
         "fields": [
-          { "alias": "age_next_year", "expression": { "source": "double(s.age) + 1", "language": "cel" } }
+          {
+            "alias": "age_next_year",
+            "expression": { "source": "double(s.age) + 1", "language": "cel" }
+          }
         ]
       }
     }
@@ -215,4 +230,3 @@ A successful nested response has each parent row with a list under `passing_cour
 - [Insight Overview](../documents/insight/overview.md) — packages, startup, and the service model
 - [Insight Planning](../documents/insight/planning.md) — transformations, selections, and validation
 - [Insight Drivers](../documents/insight/drivers.md) — repository driver and custom drivers
-

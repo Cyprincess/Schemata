@@ -81,16 +81,15 @@ public sealed class EventOutboxDispatcher(
         }
 
         foreach (var record in pending) {
-            await DeliverAsync(records, record, ct);
+            await DeliverAsync(scope.ServiceProvider, record, ct);
         }
     }
 
-    private async Task DeliverAsync(IRepository<SchemataEvent> records, SchemataEvent record, CancellationToken ct) {
+    private async Task DeliverAsync(IServiceProvider scoped, SchemataEvent record, CancellationToken ct) {
         // Claim the row before broker publish so competing dispatchers skip it.
         record.State = EventState.Publishing;
         try {
-            await records.UpdateAsync(record, ct);
-            await records.CommitAsync(ct);
+            await SaveAsync(scoped, record, ct);
         } catch (AbortedException) {
             return;
         }
@@ -110,8 +109,7 @@ public sealed class EventOutboxDispatcher(
                 // audit observer's OnDeliveredAsync committed the transition first.
                 record.State = EventState.Recorded;
                 try {
-                    await records.UpdateAsync(record, ct);
-                    await records.CommitAsync(ct);
+                    await SaveAsync(scoped, record, ct);
                 } catch (AbortedException) {
                     // The audit observer committed the Recorded transition first.
                 }
@@ -127,11 +125,16 @@ public sealed class EventOutboxDispatcher(
             record.RetryCount  += 1;
             record.RecentError =  ex.Message;
             try {
-                await records.UpdateAsync(record, ct);
-                await records.CommitAsync(ct);
+                await SaveAsync(scoped, record, ct);
             } catch (AbortedException) {
                 // Another dispatcher committed the row first.
             }
         }
+    }
+
+    private static async Task SaveAsync(IServiceProvider scoped, SchemataEvent record, CancellationToken ct) {
+        var records = scoped.GetRequiredService<IRepository<SchemataEvent>>();
+        await records.UpdateAsync(record, ct);
+        await records.CommitAsync(ct);
     }
 }

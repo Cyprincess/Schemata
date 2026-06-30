@@ -22,9 +22,9 @@ public sealed class InsightValidationException : Exception
     /// <param name="message">The human-readable description.</param>
     /// <param name="metadata">Optional structured metadata (e.g. the offending name or language).</param>
     public InsightValidationException(
-        string                               reason,
-        string                               message,
-        IReadOnlyDictionary<string, string>? metadata = null
+        string                                reason,
+        string                                message,
+        IReadOnlyDictionary<string, string?>? metadata = null
     ) : base(message) {
         Reason   = reason;
         Metadata = metadata;
@@ -34,5 +34,5 @@ public sealed class InsightValidationException : Exception
     public string Reason { get; }
 
     /// <summary>Optional structured metadata.</summary>
-    public IReadOnlyDictionary<string, string>? Metadata { get; }
+    public IReadOnlyDictionary<string, string?>? Metadata { get; }
 }

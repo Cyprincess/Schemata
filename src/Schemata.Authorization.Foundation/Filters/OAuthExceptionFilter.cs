@@ -4,6 +4,7 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
@@ -40,7 +41,7 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
             // RFC 6749 §5.2: an invalid_client error answered with HTTP 401 MUST carry a WWW-Authenticate
             // challenge naming the scheme the client used; Basic is the scheme this server accepts on the
             // Authorization header.
-            if (oauth.Code == (int)HttpStatusCode.Unauthorized && oauth.Status == OAuthErrors.InvalidClient) {
+            if (oauth is { Code: (int)HttpStatusCode.Unauthorized, Status: OAuthErrors.InvalidClient }) {
                 context.HttpContext.Response.Headers.WWWAuthenticate = Schemes.Basic;
             }
 
@@ -57,7 +58,7 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
     ///     when the header is empty so the central <c>EnsureLocalizedMessage</c> helper skips
     ///     localization.
     /// </summary>
-    private static string? ParseAcceptLanguage(Microsoft.Extensions.Primitives.StringValues header) {
+    private static string? ParseAcceptLanguage(StringValues header) {
         foreach (var value in header) {
             if (string.IsNullOrWhiteSpace(value)) {
                 continue;

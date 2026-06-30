@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;

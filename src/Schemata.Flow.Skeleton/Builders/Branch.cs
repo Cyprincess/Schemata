@@ -6,7 +6,6 @@ namespace Schemata.Flow.Skeleton.Builders;
 /// <summary>One arm of <see cref="ActivityBehavior.Decide" /> guarded by an optional condition.</summary>
 public sealed class Branch
 {
-    /// <summary>Creates a branch entering at <paramref name="entry" /> with an optional <paramref name="condition" />.</summary>
     public Branch(Activity entry, IConditionExpression? condition = null, bool isDefault = false) {
         Entry     = entry;
         Exit      = entry;
@@ -30,5 +29,19 @@ public sealed class Branch
     public Branch Go(Activity target) {
         Exit = target;
         return this;
+    }
+
+    /// <summary>
+    ///     Names and registers the anonymous <see cref="NoneTask" /> exit created by
+    ///     <c>ProcessBuilder.When</c> / <c>Otherwise</c>. Runs when a gateway wires the branch:
+    ///     the gateway name plus the branch position make the name deterministic across rebuilds.
+    /// </summary>
+    internal void EnsureExitRegistered(ProcessDefinition definition, FlowElement gateway, int index) {
+        if (Exit is not NoneTask task || !string.IsNullOrEmpty(task.Name)) {
+            return;
+        }
+
+        task.Name = IsDefault ? $"Branch_{gateway.Name}_Default" : $"Branch_{gateway.Name}_{index}";
+        definition.Elements.Add(task);
     }
 }

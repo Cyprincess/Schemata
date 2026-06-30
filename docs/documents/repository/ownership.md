@@ -6,13 +6,13 @@ Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the a
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
-| `IOwnerResolver<TEntity>` | `src/Schemata.Entity.Owner/IOwnerResolver.cs` |
-| `SchemataOwnerOptions` | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs` |
-| `AdviceAddOwner<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs` |
-| `AdviceBuildQueryOwner<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs` |
-| `UseOwner` extension | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs` |
+| Item                             | Path                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `IOwnerResolver<TEntity>`        | `src/Schemata.Entity.Owner/IOwnerResolver.cs`                                 |
+| `SchemataOwnerOptions`           | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs`                           |
+| `AdviceAddOwner<TEntity>`        | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs`                        |
+| `AdviceBuildQueryOwner<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                 |
+| `UseOwner` extension             | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs` |
 
 ## IOwnerResolver
 
@@ -31,7 +31,7 @@ public interface IOwnerResolver<TEntity>
 
 `AdviceAddOwner<TEntity>` implements `IRepositoryAddAdvisor<TEntity>`. It runs during the add mutation pipeline and populates `IOwnable.Owner`.
 
-**Order:** `AdviceAddCanonicalName.DefaultOrder + 10_000_000` = 230,000,000. Runs after `AdviceAddCanonicalName` so the entity's own canonical name is settled before the owner is assigned.
+**Order:** `AdviceAddCanonicalName.DefaultOrder + 10_000_000` = 130,000,000. Runs after `AdviceAddCanonicalName` so the entity's own canonical name is settled before the owner is assigned.
 
 **Behavior:**
 
@@ -89,9 +89,9 @@ public sealed class PrincipalOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 
 ## Suppression
 
-| Method | Marker | Effect |
-|---|---|---|
-| `repository.SuppressOwner()` | `OwnerSuppressed` | Skips `AdviceAddOwner` for this instance. |
+| Method                            | Marker                 | Effect                                           |
+| --------------------------------- | ---------------------- | ------------------------------------------------ |
+| `repository.SuppressOwner()`      | `OwnerSuppressed`      | Skips `AdviceAddOwner` for this instance.        |
 | `repository.SuppressQueryOwner()` | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for this instance. |
 
 ```csharp

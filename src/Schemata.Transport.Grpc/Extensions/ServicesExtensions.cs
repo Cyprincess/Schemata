@@ -22,7 +22,7 @@ public static class ServicesExtensions
         this IServiceCollection     services,
         Action<GrpcServiceOptions>? configureOptions
     ) {
-        var builder = configureOptions == null ? services.AddGrpc() : services.AddGrpc(configureOptions);
+        var builder = configureOptions is null ? services.AddGrpc() : services.AddGrpc(configureOptions);
         services.TryAddSingleton(SimpleRpcExceptionsInterceptor.Instance);
         return builder;
     }

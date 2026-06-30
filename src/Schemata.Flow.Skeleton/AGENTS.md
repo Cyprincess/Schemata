@@ -1,71 +1,51 @@
-# Schemata.Flow.Skeleton — BPMN AST + Builder DSL
+# Schemata.Flow.Skeleton
 
-The Schemata BPMN model. Defines the AST that every flow engine consumes, the strongly-typed C# DSL that produces it, and the contracts (`IFlowRuntime`, observers, events) for plugging in an engine. 81 source files.
+## OVERVIEW
 
-The reference engine `Schemata.Flow.StateMachine` runs a subset of [BPMN 2.0.2](https://www.omg.org/spec/BPMN/2.0.2/); this package's AST covers more (parallel / inclusive / complex gateways, subprocesses, multi-instance loops) and is intended for alternate engines plugged in via a keyed `IFlowRuntime`.
+Engine-neutral foundation of the Flow domain: process AST, runtime contracts, persisted entities, shared token helpers, and the process-builder DSL. Consumed by both engines (default `Schemata.Flow.StateMachine`, full BPMN via `Schemata.Flow.Bpmn`) and by `Schemata.Flow.Foundation`.
 
-## Layout
+## STRUCTURE
 
 ```
-Schemata.Flow.Skeleton/
-├── SchemataFlowOptions.cs       # framework-wide flow options
-├── FlowProcessAuthorization.cs  # per-process authorization contract
-├── Builders/                    # strongly-typed C# DSL → AST
-├── Entities/                    # process / instance / token persistence models
-├── Events/                      # flow lifecycle event payloads (start, complete, error, ...)
-├── Models/                      # AST nodes (Activity, Gateway, Event, BoundaryEvent, ...)
-├── Observers/                   # IFlowObserver contracts
-├── Runtime/                     # IFlowRuntime + engine resolution
-└── Utilities/                   # AST traversal + ID assignment helpers
+src/Schemata.Flow.Skeleton/
+  Models/         process AST: ProcessDefinition, ProcessSnapshot, ProcessConfiguration, TargetState, TransitionKind, TokenSnapshot
+                  gateways: Exclusive / Parallel / Inclusive / Complex / EventBased
+                  events: StartEvent, EndEvent, FlowEvent, EventPosition
+                  event definitions: IEventDefinition (Message, Signal, Error, Escalation, Timer, Conditional, Cancel, Compensation, Parallel, Link, Multiple, None; MIEventBehavior)
+                  tasks: None, Service, User, Manual, BusinessRule, Script, Send, Receive
+                  sub-processes: SubProcess (abstract), Embedded, Event, Transaction, CallActivity, AdHoc
+                  loops: StandardLoopCharacteristics, MultiInstanceLoopCharacteristics
+  Runtime/        contracts + shared helpers
+                  IFlowRuntime, IFlowEngineValidator, IProcessRegistry, IProcessLifecycleObserver, ITokenLifecycleObserver, IFlowTransitionAdvisor, FlowTransitionContext
+                  TokenFactory, TokenAggregator, TokenSnapshotFactory, FlowResolver (state-machine engine only)
+                  FlowSourceDescriptor, ProcessStates, ISourceCondition, SourceStringConditionExpression, FlowExecutionContext (TouchedSources)
+  Entities/       SchemataProcess, SchemataProcessToken, SchemataProcessTransition, SchemataProcessSource
+                  token states: Active / Waiting / Completed / Failed / Cancelled / Compensating / Compensated
+  Builders/       engine-neutral fluent DSL: ProcessBuilder, ActivityBehavior, BoundaryCatch, Branch, EventBranch, FlowBranch, InclusiveBranch, InclusiveMerge, ParallelFork, ParallelJoin, StartFlow, FlowSourceBindingBuilder
+  Utilities/      ProcessDefinitionExtensions, ProcessScopeMap, ProcessStructureValidator
 ```
 
-## Builder DSL
+## WHERE TO LOOK
 
-All in [Builders/](Builders/). The DSL produces the AST in [Models/](Models/):
-
-| File | Role |
+| Task | Location |
 |---|---|
-| [Builders/ProcessBuilder.cs](Builders/ProcessBuilder.cs) | top-level entry; defines one process |
-| [Builders/StartFlow.cs](Builders/StartFlow.cs) | start event + initial sequence flow |
-| [Builders/ActivityBehavior.cs](Builders/ActivityBehavior.cs) | activity attachment + execution behaviour binding |
-| [Builders/BoundaryCatch.cs](Builders/BoundaryCatch.cs) | interrupting/non-interrupting boundary events |
-| [Builders/EventBranch.cs](Builders/EventBranch.cs) | event-based gateway branches |
-| [Builders/FlowBranch.cs](Builders/FlowBranch.cs) | exclusive-gateway branches |
-| [Builders/InclusiveBranch.cs](Builders/InclusiveBranch.cs) | inclusive-gateway branches |
-| [Builders/InclusiveMerge.cs](Builders/InclusiveMerge.cs) | inclusive-gateway merge node |
-| [Builders/ParallelFork.cs](Builders/ParallelFork.cs) | parallel-gateway split |
-| [Builders/ParallelJoin.cs](Builders/ParallelJoin.cs) | parallel-gateway join |
-| [Builders/Branch.cs](Builders/Branch.cs) | shared branch base class |
+| Add a new AST node consumable by both engines | `Models/` |
+| Add a runtime contract implemented by engines | `Runtime/IFlowRuntime.cs` and adjacent interfaces |
+| Persist a new process row | `Entities/` plus `Schemata.Entity.Repository` wiring |
+| Change aggregate token-state semantics | `Runtime/TokenAggregator.cs` (aggregate lives on `SchemataProcess.State`) |
+| Add fluent DSL for application code | `Builders/` |
+| Detect "needs full BPMN engine" at startup | `FlowDiagnostics.RequiresBpmnEngine` |
+| Share engine-neutral scope and graph validation helpers | `Utilities/ProcessScopeMap.cs`, `Utilities/ProcessStructureValidator.cs` |
+| Wire a CallActivity target | `Runtime/IProcessRegistry.cs`, `ProcessRegistration` |
+| Declare source bindings and projection | `Models/ProcessDefinition.cs` (`BindSource`), `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Runtime/FlowSourceDescriptor.cs` |
 
-## Runtime Hook
+## CONVENTIONS / GOTCHAS
 
-`IFlowRuntime` (in [Runtime/](Runtime/)) is registered **keyed by engine name** in DI. The default key resolves to `Schemata.Flow.StateMachine`. To plug in an alternate engine, register an `IFlowRuntime` under a different key and reference that key from `SchemataFlowBuilder` in `Schemata.Flow.Foundation`.
-
-Bridges to other subsystems live in companion packages:
-
-- [Schemata.Flow.Event](../Schemata.Flow.Event/) — wires BPMN `Message` and `Signal` intermediate catches to [Schemata.Event.Foundation](../Schemata.Event.Foundation/).
-- [Schemata.Flow.Scheduling](../Schemata.Flow.Scheduling/) — wires BPMN `Timer` catches to [Schemata.Scheduling.Foundation](../Schemata.Scheduling.Foundation/).
-- [Schemata.Flow.Http](../Schemata.Flow.Http/) / [Schemata.Flow.Grpc](../Schemata.Flow.Grpc/) — resource bridges for process instances and transitions.
-
-## Conventions
-
-- **AST nodes are immutable records**. Build them through the DSL — never `new` an AST node directly outside `Builders/`.
-- **IDs**: builder assigns deterministic node IDs via [Utilities/](Utilities/). Do not hand-write IDs; bridging to `Event`/`Scheduling` depends on the assigned shape.
-- **Observers**: register `IFlowObserver` implementations through DI. Observer exceptions are logged at `Warning` and swallowed — they cannot fail a transition ([docs/documents/scheduling/jobs.md:186-189](../../docs/documents/scheduling/jobs.md)).
-- **Transition advisors**: `IFlowTransitionAdvisor` implementations run inside the transition's unit of work. Advisors that write business entities enlist their repositories with `context.UnitOfWork.Join(...)` so writes commit atomically with the process row; advisors that only provision external infrastructure (timer jobs, broker subscriptions) ignore the unit of work. A throw rolls back the whole transition along with any joined writes.
-- **Engine subset**: when authoring a process for the default `StateMachine` engine, stay within: one start event, ≥1 end event, plain activities (no `SubProcess` / `CallActivity` / loop characteristics), `ExclusiveGateway`, `EventBasedGateway` (exclusive mode), interrupting boundary events, intermediate catches reachable from an `EventBasedGateway`. Wider AST features require a custom `IFlowRuntime`.
-
-## Anti-Patterns
-
-- **Do NOT** add ASP.NET / HTTP dependencies to this package — Skeleton stays transport-agnostic. Transport adapters live in `Flow.Http` and `Flow.Grpc`.
-- **Do NOT** mutate an AST after `ProcessBuilder.Build()` — observers, persistence, and runtime cache it.
-- **Do NOT** assume `Timer` / `Message` / `Signal` catches will fire without their bridge package. They are inert until `Flow.Scheduling` / `Flow.Event` is added.
-- **Do NOT** plug an engine in directly with `services.AddSingleton<IFlowRuntime>` — use keyed registration so multiple engines can coexist.
-- **Do NOT** call `BoundaryCatch` / `EventBranch` / `BoundaryCatch` from outside their parent builder. The DSL relies on parent-child threading to produce correct AST IDs.
-
-## Notes
-
-- The C# DSL is intentionally verbose where BPMN is ambiguous (e.g. `ParallelFork` + `ParallelJoin` rather than letting a gateway play both roles). That is by design.
-- `FlowProcessAuthorization` is the per-process authorization plug-in; pair with `Schemata.Security.Foundation` for policy evaluation.
-- Tests: [../../tests/Schemata.Flow.Tests/](../../tests/Schemata.Flow.Tests/).
-- For the alternate-engine plug-in pattern, see `Schemata.Flow.StateMachine` which is the in-tree reference implementation against this Skeleton.
+- **Engine-neutrality is the contract.** BPMN-only runtime concepts, such as compensation stacks, belong in `Schemata.Flow.Bpmn`, never in `Models/` or `Runtime/`. New types added here must be representable by the default state-machine engine OR gated behind `FlowDiagnostics.RequiresBpmnEngine`.
+- **IFlowRuntime purity.** Engines never load or persist state (root AGENTS.md); XML remarks on `IFlowRuntime.cs` carry the detail.
+- **Multi-token AST is not multi-token runtime.** Parallel / inclusive / complex gateways, sub-processes, and MI loops are AST-representable here; the default state-machine engine is a strict subset. Execute them via `Schemata.Flow.Bpmn`.
+- **State-machine resolver lives here.** `FlowResolver` is consumed by the state-machine engine only. BPMN has its own `ResolveTargetAsync`. Every resolve/condition entry point requires the execution scope's `IServiceProvider`; `FlowConditionContext.Execution` is `required`, so condition and task contexts always observe the same provider as advisors.
+- **Token states are closed.** Adding a new `SchemataProcessTokenState` requires updating `TokenAggregator.ApplyResolvedToToken` and the persistence path in lockstep.
+- **String conditions compile at registration.** `SourceStringConditionExpression` carries raw expression text; `ProcessRegistry` (Foundation) binds the predicate via the keyed `IExpressionCompiler` selected by `ProcessConfiguration.Language`. Running an unregistered definition leaves them uncompiled and `Evaluate` throws.
+- **CallActivity wiring.** Engines resolve the target at runtime via `IProcessRegistry` / `ProcessRegistration`.
+- **Dependency.** `Schemata.Entity.Repository` (entities only). No engine package references.

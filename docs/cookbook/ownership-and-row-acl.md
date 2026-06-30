@@ -78,10 +78,10 @@ schema.ConfigureServices(services => {
 
 `UseOwner()` registers two open-generic advisors as `Scoped`:
 
-| Advisor | Pipeline | What it does |
-| --- | --- | --- |
-| `AdviceAddOwner<TEntity>` | Add | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner` |
-| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | Appends `WHERE Owner = <resolved>` to every query |
+| Advisor                          | Pipeline   | What it does                                                        |
+| -------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `AdviceAddOwner<TEntity>`        | Add        | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner` |
+| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | Appends `WHERE Owner = <resolved>` to every query                   |
 
 Both advisors check `IOwnable` at runtime — entities that don't implement it
 are skipped. `AdviceAddOwner` runs after `AdviceAddCanonicalName` (its
@@ -89,7 +89,7 @@ are skipped. `AdviceAddOwner` runs after `AdviceAddCanonicalName` (its
 `AdviceBuildQueryOwner` runs after `AdviceBuildQuerySoftDelete` (its `Order`
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
 
-**Verify:** Start the app. A `POST /students` request without authentication
+**Verify:** Start the app. A `POST /v1/students` request without authentication
 throws `PermissionDeniedException` (the default `OnNullOwner` policy is
 `Reject`). This confirms the advisor is active.
 
@@ -134,8 +134,8 @@ schema.ConfigureServices(services => {
 });
 ```
 
-**Verify:** Authenticate as `alice` and `POST /students`. The created row has
-`Owner = "users/alice"`. Authenticate as `bob` and `GET /students` — only
+**Verify:** Authenticate as `alice` and `POST /v1/students`. The created row has
+`Owner = "users/alice"`. Authenticate as `bob` and `GET /v1/students` — only
 Bob's rows appear.
 
 ## Step 4 — Configure the null-owner policy
@@ -159,15 +159,15 @@ schema.ConfigureServices(services => {
 
 The three policies are:
 
-| Policy | Add behavior | Query behavior |
-| --- | --- | --- |
+| Policy             | Add behavior                       | Query behavior                     |
+| ------------------ | ---------------------------------- | ---------------------------------- |
 | `Reject` (default) | Throws `PermissionDeniedException` | Throws `PermissionDeniedException` |
-| `EmptyResult` | Returns `AdviseResult.Block` | Applies `WHERE 1=0` |
-| `AllowAll` | Leaves `Owner` unset | No filter applied |
+| `EmptyResult`      | Returns `AdviseResult.Block`       | Applies `WHERE 1=0`                |
+| `AllowAll`         | Leaves `Owner` unset               | No filter applied                  |
 
 `AllowAll` is only safe when authorization is enforced upstream by other means.
 
-**Verify:** With `EmptyResult`, an unauthenticated `GET /students` returns an
+**Verify:** With `EmptyResult`, an unauthenticated `GET /v1/students` returns an
 empty list with HTTP 200 instead of 401.
 
 ## Step 5 — Suppress ownership for admin queries

@@ -7,8 +7,8 @@ A new advisor interface needs only its declaration.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
+| Package                     | Key files                                               |
+| --------------------------- | ------------------------------------------------------- |
 | `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs` |
 
 The generator targets `netstandard2.0`, references `Microsoft.CodeAnalysis.CSharp`, and is

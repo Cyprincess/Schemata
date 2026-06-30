@@ -9,10 +9,10 @@ the response.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Event.Skeleton` | `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventContext.cs`, `IEventDispatchContext.cs`, `EventRouting.cs` |
-| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `EventOutboxDispatcher.cs`, `Internal/HandlerResolver.cs`, `Observers/SchemataEventAuditObserver.cs` |
+| Package                     | Key files                                                                                                                                                                                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Event.Skeleton`   | `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventContext.cs`, `IEventDispatchContext.cs`, `EventRouting.cs` |
+| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `EventOutboxDispatcher.cs`, `Internal/HandlerResolver.cs`, `Observers/SchemataEventAuditObserver.cs`                                                                    |
 
 ## Publish path
 

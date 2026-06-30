@@ -20,10 +20,10 @@ public class ScopeDetail : IIdentifier, ICanonicalName, IDescriptive, ITimestamp
 
     #region IDescriptive Members
 
-    public string?                     DisplayName  { get; set; }
-    public Dictionary<string, string>? DisplayNames { get; set; }
-    public string?                     Description  { get; set; }
-    public Dictionary<string, string>? Descriptions { get; set; }
+    public string?                      DisplayName  { get; set; }
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+    public string?                      Description  { get; set; }
+    public Dictionary<string, string?>? Descriptions { get; set; }
 
     #endregion
 

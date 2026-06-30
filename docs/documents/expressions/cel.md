@@ -4,13 +4,13 @@
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Expressions.Cel` | `CelLanguage.cs`, `CelParser.cs` |
-| `Schemata.Expressions.Cel` | `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs` |
-| `Schemata.Expressions.Cel` | `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs` |
+| Package                    | Key files                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Schemata.Expressions.Cel` | `CelLanguage.cs`, `CelParser.cs`                                                                    |
+| `Schemata.Expressions.Cel` | `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs`                                            |
+| `Schemata.Expressions.Cel` | `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs`                                    |
 | `Schemata.Expressions.Cel` | `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
-| `Schemata.Expressions.Cel` | `Expressions/CelNode.cs` and sibling AST nodes |
+| `Schemata.Expressions.Cel` | `Expressions/CelNode.cs` and sibling AST nodes                                                      |
 
 ## Registration
 
@@ -25,10 +25,10 @@ services.AddCelExpressions(options => {
 
 `AddCelExpressions` registers three keyed services under `CelLanguage.Name`:
 
-| Service | Implementation / value |
-| --- | --- |
-| `IExpressionCompiler` | `CelCompiler` |
-| `IExpressionPushdownPlanner` | `CelPushdownPlanner` |
+| Service                        | Implementation / value                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `IExpressionCompiler`          | `CelCompiler`                                                                                         |
+| `IExpressionPushdownPlanner`   | `CelPushdownPlanner`                                                                                  |
 | `ExpressionLanguageDescriptor` | `Language = "cel"`, configured `Filtering`, configured `MaxResidualScanRows`, `SupportsValues = true` |
 
 Modules should enable CEL through the builder seam:
@@ -49,38 +49,38 @@ schema.UseResource()
 
 ### Literals
 
-| Type | Examples |
-| --- | --- |
-| Integer / unsigned | `42`, `-7`, `0x1F`, `42u` |
-| Double | `3.14`, `-0.5`, `1e10` |
-| Boolean / null | `true`, `false`, `null` |
-| String | `"hello"`, `'world'`, `"""triple"""`, `r"raw"` |
-| Bytes | `b"bytes"` |
-| List / map | `[1, 2]`, `{"name": "Alice"}` |
+| Type               | Examples                                       |
+| ------------------ | ---------------------------------------------- |
+| Integer / unsigned | `42`, `-7`, `0x1F`, `42u`                      |
+| Double             | `3.14`, `-0.5`, `1e10`                         |
+| Boolean / null     | `true`, `false`, `null`                        |
+| String             | `"hello"`, `'world'`, `"""triple"""`, `r"raw"` |
+| Bytes              | `b"bytes"`                                     |
+| List / map         | `[1, 2]`, `{"name": "Alice"}`                  |
 
 ### Operators
 
-| Category | Symbols |
-| --- | --- |
-| Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` |
-| Membership | `in` |
-| Logical | `&&`, `\|\|`, `!` |
-| Arithmetic | `+`, `-`, `*`, `/`, `%` |
-| Conditional | `? :` |
+| Category    | Symbols                          |
+| ----------- | -------------------------------- |
+| Comparison  | `==`, `!=`, `<`, `<=`, `>`, `>=` |
+| Membership  | `in`                             |
+| Logical     | `&&`, `\|\|`, `!`                |
+| Arithmetic  | `+`, `-`, `*`, `/`, `%`          |
+| Conditional | `? :`                            |
 
 ### Functions, member calls, and macros
 
-| Syntax | Behavior |
-| --- | --- |
-| `has(expr)` | Presence check. |
-| `size(expr)` | Size of string, list, map, array, or countable collection. |
-| `s.contains(x)` | String/list/map membership. |
-| `s.startsWith(x)`, `s.endsWith(x)` | Ordinal string prefix/suffix checks. |
-| `s.matches(pattern)` | Regex match with a 100 ms timeout. |
-| `list.exists(x, pred)` | Existential macro. |
-| `list.all(x, pred)` | Universal macro. |
-| `list.filter(x, pred)` | Filtering macro. |
-| `list.map(x, expr)` | Mapping macro. |
+| Syntax                             | Behavior                                                   |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `has(expr)`                        | Presence check.                                            |
+| `size(expr)`                       | Size of string, list, map, array, or countable collection. |
+| `s.contains(x)`                    | String/list/map membership.                                |
+| `s.startsWith(x)`, `s.endsWith(x)` | Ordinal string prefix/suffix checks.                       |
+| `s.matches(pattern)`               | Regex match with a 100 ms timeout.                         |
+| `list.exists(x, pred)`             | Existential macro.                                         |
+| `list.all(x, pred)`                | Universal macro.                                           |
+| `list.filter(x, pred)`             | Filtering macro.                                           |
+| `list.map(x, expr)`                | Mapping macro.                                             |
 
 Value mode also supports CEL conversion functions: `dyn`, `type`, `int`, `uint`, `double`, `string`, `bytes`, `bool`, `timestamp`, and `duration`.
 

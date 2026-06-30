@@ -239,11 +239,44 @@
   <data name="PROCESS_NOT_REGISTERED" xml:space="preserve">
         <value>Process definition '{name}' is not registered.</value>
     </data>
+  <data name="FLOW_EXPRESSION_INVALID" xml:space="preserve">
+        <value>Condition expression '{expression}' is invalid.</value>
+    </data>
+  <data name="FLOW_EXPRESSION_LANGUAGE_NOT_REGISTERED" xml:space="preserve">
+        <value>Expression language '{language}' has no registered compiler.</value>
+    </data>
+  <data name="FLOW_EXPRESSION_LANGUAGE_REQUIRED" xml:space="preserve">
+        <value>Process '{name}' declares string condition expressions; set Language on its process configuration.</value>
+    </data>
   <data name="FLOW_RUNTIME_NOT_REGISTERED" xml:space="preserve">
         <value>Flow runtime '{engine}' is not registered with the host.</value>
     </data>
   <data name="PROCESS_MESSAGE_NOT_DEFINED" xml:space="preserve">
         <value>Message '{name}' is not defined on the process.</value>
+    </data>
+  <data name="PROCESS_TOKEN_NOT_FOUND" xml:space="preserve">
+        <value>Token '{token}' is not found on process '{process}'.</value>
+    </data>
+  <data name="PROCESS_TOKEN_NOT_READY" xml:space="preserve">
+        <value>Token '{token}' is not in a ready state.</value>
+    </data>
+  <data name="PROCESS_TOKEN_AMBIGUOUS" xml:space="preserve">
+        <value>Multiple ready tokens are available; specify one of: {tokens}.</value>
+    </data>
+  <data name="PROCESS_SOURCE_BINDING_AMBIGUOUS" xml:space="preserve">
+        <value>Multiple source bindings match the supplied source type.</value>
+    </data>
+  <data name="PROCESS_SOURCE_BINDING_DUPLICATE" xml:space="preserve">
+        <value>A process source binding is declared more than once.</value>
+    </data>
+  <data name="PROCESS_SOURCE_MEMBER_CONFLICT" xml:space="preserve">
+        <value>Process source bindings target the same member.</value>
+    </data>
+  <data name="PROCESS_SOURCE_MEMBER_INVALID" xml:space="preserve">
+        <value>A process source binding member must be a writable instance property.</value>
+    </data>
+  <data name="STATE_MACHINE_REQUIRES_BPMN_ENGINE" xml:space="preserve">
+        <value>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</value>
     </data>
   <data name="FLOW_SOURCE_MODIFIED_CONCURRENTLY" xml:space="preserve">
         <value>Source '{name}' was modified concurrently; the flow transition was aborted.</value>
@@ -300,16 +333,22 @@
         <value>Element '{name}' is not reachable from the start event.</value>
     </data>
   <data name="STATE_MACHINE_FLOW_NO_SOURCE" xml:space="preserve">
-        <value>Sequence flow '{id}' has no source element.</value>
+        <value>Sequence flow targeting '{target}' has no source element.</value>
     </data>
   <data name="STATE_MACHINE_FLOW_NO_TARGET" xml:space="preserve">
-        <value>Sequence flow '{id}' has no target element.</value>
+        <value>Sequence flow from '{source}' has no target element.</value>
     </data>
   <data name="STATE_MACHINE_FLOW_UNKNOWN_SOURCE" xml:space="preserve">
-        <value>Sequence flow '{id}' references unknown source element '{source}'.</value>
+        <value>Sequence flow references unknown source element '{source}'.</value>
     </data>
   <data name="STATE_MACHINE_FLOW_UNKNOWN_TARGET" xml:space="preserve">
-        <value>Sequence flow '{id}' references unknown target element '{target}'.</value>
+        <value>Sequence flow references unknown target element '{target}'.</value>
+    </data>
+  <data name="STATE_MACHINE_ELEMENT_NAME_REQUIRED" xml:space="preserve">
+        <value>Element of type '{type}' has no name. Every flow element requires a non-empty name.</value>
+    </data>
+  <data name="STATE_MACHINE_DUPLICATE_ELEMENT_NAME" xml:space="preserve">
+        <value>Element name '{name}' is used by more than one element. Element names must be unique within a process.</value>
     </data>
   <data name="STATE_MACHINE_END_EVENT_OUTGOING" xml:space="preserve">
         <value>End event '{name}' must not have outgoing flows.</value>
@@ -338,6 +377,12 @@
   <data name="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED" xml:space="preserve">
         <value>Boundary event '{name}' must have exactly one outgoing flow.</value>
     </data>
+  <data name="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION" xml:space="preserve">
+        <value>Cancel boundary event '{name}' must be attached to a transaction sub-process.</value>
+    </data>
+  <data name="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT" xml:space="preserve">
+        <value>Transaction sub-process '{name}' must contain at least one end event.</value>
+    </data>
   <data name="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING" xml:space="preserve">
         <value>Intermediate catch event '{name}' must have at least one outgoing flow.</value>
     </data>
@@ -355,5 +400,41 @@
     </data>
   <data name="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT" xml:space="preserve">
         <value>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</value>
+    </data>
+  <data name="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED" xml:space="preserve">
+        <value>Multi-instance activity '{name}' must define loop cardinality.</value>
+    </data>
+  <data name="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED" xml:space="preserve">
+        <value>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</value>
+    </data>
+  <data name="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED" xml:space="preserve">
+        <value>Call activity '{name}' must define calledElement.</value>
+    </data>
+  <data name="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED" xml:space="preserve">
+        <value>Event sub-process start event '{name}' must define a trigger event definition.</value>
+    </data>
+  <data name="STATE_MACHINE_ESCALATION_NAME_REQUIRED" xml:space="preserve">
+        <value>Escalation event '{name}' must define a non-empty escalation name.</value>
+    </data>
+  <data name="STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE" xml:space="preserve">
+        <value>None task '{name}' passes through to its awaited gateway or end event, so boundary events attached to it can never fire. Use a user task, or move the catches into the Await branches.</value>
+    </data>
+  <data name="STATE_MACHINE_ENTER_TASK_BYPASSED" xml:space="preserve">
+        <value>Activity '{name}' runs enter task '{enter}' on entry, but the flow from '{source}' targets the activity directly and bypasses it. Route inbound flows through the enter task.</value>
+    </data>
+  <data name="BPMN_NOT_IMPLEMENTED" xml:space="preserve">
+        <value>BPMN feature '{feature}' is not yet implemented in this engine version.</value>
+    </data>
+  <data name="BPMN_CALL_ACTIVITY_REQUIRES_SERVICES" xml:space="preserve">
+        <value>BPMN call activity '{name}' requires a service provider; register Schemata.Flow.Bpmn with a process registry.</value>
+    </data>
+  <data name="BPMN_LOOP_NOT_IMPLEMENTED" xml:space="preserve">
+        <value>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</value>
+    </data>
+  <data name="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED" xml:space="preserve">
+        <value>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</value>
+    </data>
+  <data name="BPMN_INVALID_TRIGGER" xml:space="preserve">
+        <value>Trigger '{trigger}' is not valid from state '{state}'.</value>
     </data>
 </root>

@@ -530,6 +530,16 @@
         <target state="translated">경계 이벤트 '{name}'에는 발신 흐름이 정확히 하나 있어야 합니다.</target>
         <note />
       </trans-unit>
+      <trans-unit id="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION">
+        <source>Cancel boundary event '{name}' must be attached to a transaction sub-process.</source>
+        <target state="new">Cancel boundary event '{name}' must be attached to a transaction sub-process.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT">
+        <source>Transaction sub-process '{name}' must contain at least one end event.</source>
+        <target state="new">Transaction sub-process '{name}' must contain at least one end event.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
         <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
         <target state="translated">중간 catch 이벤트 '{name}'에는 최소 하나의 발신 흐름이 있어야 합니다.</target>
@@ -558,6 +568,51 @@
       <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
         <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
         <target state="translated">활동 '{name}'에 여러 직접 발신 흐름이 활동을 향해 있습니다. 활동은 최대 하나의 직접 발신 흐름만 가질 수 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED">
+        <source>Multi-instance activity '{name}' must define loop cardinality.</source>
+        <target state="new">Multi-instance activity '{name}' must define loop cardinality.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED">
+        <source>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</source>
+        <target state="new">Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED">
+        <source>Call activity '{name}' must define calledElement.</source>
+        <target state="new">Call activity '{name}' must define calledElement.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED">
+        <source>Event sub-process start event '{name}' must define a trigger event definition.</source>
+        <target state="new">Event sub-process start event '{name}' must define a trigger event definition.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ESCALATION_NAME_REQUIRED">
+        <source>Escalation event '{name}' must define a non-empty escalation name.</source>
+        <target state="new">Escalation event '{name}' must define a non-empty escalation name.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
+        <source>Token '{token}' is not found on process '{process}'.</source>
+        <target state="new">Token '{token}' is not found on process '{process}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_READY">
+        <source>Token '{token}' is not in a ready state.</source>
+        <target state="new">Token '{token}' is not in a ready state.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
+        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
+        <target state="new">Multiple ready tokens are available; specify one of: {tokens}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
+        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
+        <target state="new">Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</target>
         <note />
       </trans-unit>
     </body>

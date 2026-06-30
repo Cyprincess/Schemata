@@ -138,6 +138,10 @@
       href: flow/runtime.md
     - name: State Machine
       href: flow/state-machine.md
+    - name: BPMN Engine
+      href: flow/bpmn-engine.md
+    - name: BPMN Inclusive Merge
+      href: flow/bpmn-inclusive-merge.md
     - name: Event Integration
       href: flow/event.md
     - name: Scheduling Integration

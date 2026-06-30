@@ -6,9 +6,6 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
-/// <summary>
-///     Read-only <c>:preview</c> custom method used to exercise GET routing.
-/// </summary>
 public sealed class PreviewHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
 {
     #region IResourceMethodHandler<Student,EmptyResourceRequest,Student> Members

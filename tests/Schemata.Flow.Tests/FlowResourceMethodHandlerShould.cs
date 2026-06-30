@@ -1,11 +1,10 @@
-using System.Collections.Generic;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -16,136 +15,70 @@ namespace Schemata.Flow.Tests;
 public class FlowResourceMethodHandlerShould
 {
     [Fact]
-    public async Task Start_DelegatesToRuntime() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", false);
-        var process  = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
+    public async Task Start_RejectsAnonymous_WhenDefinitionRequiresAuthorization() {
+        var handler = new StartProcessHandler(Runner(Registry("approval", true).Object));
 
-        runtime.Setup(r => r.StartProcessInstanceAsync("approval", It.IsAny<IReadOnlyDictionary<string, object?>?>(),
-                                                       It.IsAny<ClaimsPrincipal?>(), It.IsAny<string?>(),
-                                                       It.IsAny<string?>(), It.IsAny<object?>(),
-                                                       It.IsAny<CancellationToken>()))
-               .ReturnsAsync(process);
-
-        var handler = new StartProcessHandler(runtime.Object, registry.Object);
-
-        var result = await handler.InvokeAsync(null, new() { DefinitionName = "approval" }, null, null,
-                                               CancellationToken.None);
-
-        Assert.Same(process, result);
-        runtime.Verify(
-            r => r.StartProcessInstanceAsync("approval", null, null, null, null, null, It.IsAny<CancellationToken>()),
-            Times.Once);
+        await Assert.ThrowsAsync<NotFoundException>(async () =>
+            await handler.InvokeAsync(null, new() { DefinitionName = "approval" }, null, null, CancellationToken.None));
     }
 
     [Fact]
-    public async Task Start_PassesDisplayNameAndDescription_Atomically() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", false);
-        var process  = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
+    public async Task Start_FailsPrecondition_WhenEngineNotRegistered() {
+        var handler = new StartProcessHandler(Runner(Registry("approval", false).Object));
 
-        runtime.Setup(r => r.StartProcessInstanceAsync(It.IsAny<string>(),
-                                                       It.IsAny<IReadOnlyDictionary<string, object?>?>(),
-                                                       It.IsAny<ClaimsPrincipal?>(), It.IsAny<string?>(),
-                                                       It.IsAny<string?>(), It.IsAny<object?>(),
-                                                       It.IsAny<CancellationToken>()))
-               .ReturnsAsync(process);
-
-        var handler = new StartProcessHandler(runtime.Object, registry.Object);
-
-        await handler.InvokeAsync(
-            null, new() { DefinitionName = "approval", DisplayName = "Approve PR", Description = "Review and approve" },
-            null, null, CancellationToken.None);
-
-        // The start call receives metadata and keeps the source entity slot empty.
-        runtime.Verify(
-            r => r.StartProcessInstanceAsync("approval", null, null, "Approve PR", "Review and approve", null,
-                                             It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Complete_DelegatesToRuntime() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", false);
-        var process  = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
-        var instance = new ProcessInstance { StateId = "done" };
-
-        runtime.Setup(r => r.CompleteActivityAsync("processes/p1", null, null, It.IsAny<CancellationToken>()))
-               .ReturnsAsync(instance);
-
-        var handler = new CompleteActivityHandler(runtime.Object, registry.Object);
-
-        var result = await handler.InvokeAsync("processes/p1", new(), process, null, CancellationToken.None);
-
-        Assert.Same(instance, result);
-        Assert.Equal("processes/p1", result.CanonicalName);
-    }
-
-    [Fact]
-    public async Task Signal_DelegatesToRuntime() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", false, "approved");
-        runtime.Setup(r => r.ThrowSignalAsync("approved", null, null, It.IsAny<CancellationToken>()))
-               .Returns(ValueTask.CompletedTask);
-
-        var handler = new ThrowSignalHandler(runtime.Object, registry.Object);
-
-        var result = await handler.InvokeAsync(null, new() { SignalName = "approved" }, null, null,
-                                               CancellationToken.None);
-
-        Assert.NotNull(result);
-        runtime.Verify(r => r.ThrowSignalAsync("approved", null, null, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Terminate_DelegatesToRuntime() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", false);
-        var process  = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
-        var instance = new ProcessInstance { StateId = "terminated" };
-
-        runtime.Setup(r => r.TerminateProcessInstanceAsync("processes/p1", null, It.IsAny<CancellationToken>()))
-               .ReturnsAsync(instance);
-
-        var handler = new TerminateProcessHandler(runtime.Object, registry.Object);
-
-        var result = await handler.InvokeAsync("processes/p1", new(), process, null, CancellationToken.None);
-
-        Assert.Same(instance, result);
-        Assert.Equal("processes/p1", result.CanonicalName);
+        // The definition resolves but no IFlowRuntime is registered under the "StateMachine" key.
+        await Assert.ThrowsAsync<FailedPreconditionException>(async () =>
+            await handler.InvokeAsync(null, new() { DefinitionName = "approval" }, null, null, CancellationToken.None));
     }
 
     [Fact]
     public async Task Complete_RejectsAnonymous_WhenProcessRequiresAuthorization() {
-        var runtime  = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", true);
-        var process  = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
-        var handler  = new CompleteActivityHandler(runtime.Object, registry.Object);
+        var handler = new CompleteActivityHandler(Runner(Registry("approval", true).Object));
+        var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
 
-        await Assert.ThrowsAsync<NotFoundException>(async () => await handler.InvokeAsync(
-                                                        "processes/p1", new(), process, new(), CancellationToken.None));
-
-        runtime.Verify(
-            r => r.CompleteActivityAsync(It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, object?>?>(),
-                                         It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
+        await Assert.ThrowsAsync<NotFoundException>(async () =>
+            await handler.InvokeAsync("processes/p1", new(), process, null, CancellationToken.None));
     }
 
     [Fact]
-    public async Task Complete_AllowsAuthenticated_WhenProcessRequiresAuthorization() {
-        var runtime = new Mock<IProcessRuntime>();
-        var registry = Registry("approval", true);
+    public async Task Correlate_RejectsAnonymous_WhenProcessRequiresAuthorization() {
+        var handler = new CorrelateMessageHandler(Runner(Registry("approval", true).Object));
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
-        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
-        runtime.Setup(r => r.CompleteActivityAsync("processes/p1", null, principal, It.IsAny<CancellationToken>()))
-               .ReturnsAsync(new ProcessInstance { StateId = "done" });
+        await Assert.ThrowsAsync<NotFoundException>(async () =>
+            await handler.InvokeAsync("processes/p1", new() { MessageName = "approve" }, process, null, CancellationToken.None));
+    }
 
-        var handler = new CompleteActivityHandler(runtime.Object, registry.Object);
+    [Fact]
+    public async Task Terminate_RejectsAnonymous_WhenProcessRequiresAuthorization() {
+        var handler = new TerminateProcessHandler(Runner(Registry("approval", true).Object));
+        var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "approval" };
 
-        await handler.InvokeAsync("processes/p1", new(), process, principal, CancellationToken.None);
+        await Assert.ThrowsAsync<NotFoundException>(async () =>
+            await handler.InvokeAsync("processes/p1", new(), process, null, CancellationToken.None));
+    }
 
-        runtime.Verify(r => r.CompleteActivityAsync("processes/p1", null, principal, It.IsAny<CancellationToken>()),
-                       Times.Once);
+    [Fact]
+    public async Task Signal_RejectsAnonymous_WhenAnyListeningProcessRequiresAuthorization() {
+        var handler = new ThrowSignalHandler(Runner(Registry("approval", true, "approved").Object));
+
+        await Assert.ThrowsAsync<NotFoundException>(async () =>
+            await handler.InvokeAsync(null, new() { SignalName = "approved" }, null, null, CancellationToken.None));
+    }
+
+    private static ProcessPersistence Persistence() {
+        return new();
+    }
+
+    private static FlowRunner Runner(IProcessRegistry registry) {
+        return new(registry, new(), Persistence(), Notifier(), new ServiceCollection().BuildServiceProvider());
+    }
+
+    private static ProcessLifecycleNotifier Notifier() {
+        return new(
+            [],
+            [],
+            new NullLogger<ProcessLifecycleNotifier>());
     }
 
     private static Mock<IProcessRegistry> Registry(

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -210,7 +211,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         IReadOnlyList<Func<TEntity, bool>> residuals,
         ImmutableArray<SelectionItem>      items,
         string                             alias,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        [EnumeratorCancellation] CancellationToken ct
     ) where TEntity : class {
         await foreach (var entity in entities.WithCancellation(ct).ConfigureAwait(false)) {
             if (residuals.All(residual => residual(entity))) {

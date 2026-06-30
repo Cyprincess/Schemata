@@ -7,12 +7,12 @@ sequences advisors within a stage.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`, `ResourceWireMask.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs`, `Advisors/AdviceUpdateRequestValidation.cs` |
+| Package                        | Key files                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`, `ResourceWireMask.cs`                                                                                                    |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs`, `Advisors/AdviceUpdateRequestValidation.cs`                                                                         |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`, `Advisors/AdviceUpdateSoftDeleted.cs`, `Advisors/AdviceUpdateFreshness.cs` |
-| `Schemata.Abstractions` | `Resource/UpdateResultBase.cs`, `Resource/IUpdateMask.cs` |
+| `Schemata.Abstractions`        | `Resource/UpdateResultBase.cs`, `Resource/IUpdateMask.cs`                                                                                                      |
 
 ## Stages
 
@@ -24,18 +24,18 @@ Receives the principal and the token `nameof(Operations.Update)`. `Block` throws
 
 `ResourceNameDescriptor.ClearParentProperties(request)` nulls the request's parent-segment properties so a client
 cannot re-parent the resource. The handler then sets `request.CanonicalName = name` so the AIP-155 idempotency key
-distinguishes updates to different resources that share a `RequestId`. `ApplyIdentifierPredicates` adds the leaf
+distinguishes updates to different resources that share a `RequestId`. `ResourceIdentifiers.Apply` adds the leaf
 and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 
 ### 3. Update request — `IResourceUpdateRequestAdvisor<TEntity, TRequest>`
 
-| Advisor | What it does |
-| --- | --- |
-| `AdviceUpdateRequestAnonymous` | Grants anonymous access when configured |
-| `AdviceUpdateRequestAuthorize` | Authorizes the request through the access provider |
-| `AdviceUpdateRequestSanitize` | Clears server-managed fields (the same `SystemFields` list as Create) |
-| `AdviceUpdateRequestValidation` | Runs validation; skipped when `UpdateRequestValidationSuppressed` is present |
-| `AdviceUpdateRequestIdempotency` | On a `RequestId` hit returns the cached result; on a miss reserves the key |
+| Advisor                          | What it does                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `AdviceUpdateRequestAnonymous`   | Grants anonymous access when configured                                      |
+| `AdviceUpdateRequestAuthorize`   | Authorizes the request through the access provider                           |
+| `AdviceUpdateRequestSanitize`    | Clears server-managed fields (the same `SystemFields` list as Create)        |
+| `AdviceUpdateRequestValidation`  | Runs validation; skipped when `UpdateRequestValidationSuppressed` is present |
+| `AdviceUpdateRequestIdempotency` | On a `RequestId` hit returns the cached result; on a miss reserves the key   |
 
 ### 4. Entity load
 
@@ -44,11 +44,11 @@ null result throws `ResourceNotFound(name)`.
 
 ### 5. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
 
-| Advisor | What it does |
-| --- | --- |
-| `AdviceApplyChildParent` | Reverse-parses `request.Parent` into the entity's mode-A parent field for `IChild` DTOs; runs first |
-| `AdviceUpdateSoftDeleted` | Rejects updates to a soft-deleted entity with `FailedPreconditionException`; runs before freshness |
-| `AdviceUpdateFreshness` | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
+| Advisor                   | What it does                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `AdviceApplyChildParent`  | Reverse-parses `request.Parent` into the entity's mode-A parent field for `IChild` DTOs; runs first                      |
+| `AdviceUpdateSoftDeleted` | Rejects updates to a soft-deleted entity with `FailedPreconditionException`; runs before freshness                       |
+| `AdviceUpdateFreshness`   | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
 `AdviceUpdateFreshness` fires when the request implements `IFreshness` and supplies a non-empty `EntityTag`: any
 value differing from the entity's current weak tag throws. Only an absent or whitespace tag opts out.

@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Schemata.Abstractions.Resource;
-using Schemata.Resource.Foundation;
 
 namespace Schemata.Resource.Grpc.Internal;
 

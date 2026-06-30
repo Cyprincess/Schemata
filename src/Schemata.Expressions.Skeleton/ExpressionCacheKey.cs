@@ -24,7 +24,7 @@ public readonly struct ExpressionCacheKey : IEquatable<ExpressionCacheKey>
         string? options
     ) {
         var material = string.Join("\u001f", language, source, contextType?.AssemblyQualifiedName,
-                                   resultType?.AssemblyQualifiedName, options ?? string.Empty);
+                                   resultType?.AssemblyQualifiedName, options);
         using var sha     = SHA256.Create();
         var       bytes   = sha.ComputeHash(Encoding.UTF8.GetBytes(material));
         var       builder = new StringBuilder(bytes.Length * 2);

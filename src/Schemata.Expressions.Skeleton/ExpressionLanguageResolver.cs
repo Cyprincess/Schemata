@@ -26,13 +26,15 @@ public static class ExpressionLanguageResolver
             throw new UnknownExpressionLanguageException(requested, []);
         }
 
-        ExpressionLanguageEntry entry;
+        ExpressionLanguageEntry? entry;
         if (string.IsNullOrWhiteSpace(requested)) {
             entry = entries[0];
         } else {
-            entry = entries.FirstOrDefault(e => string.Equals(e.Language, requested, StringComparison.Ordinal))
-                 ?? throw new UnknownExpressionLanguageException(
-                        requested, entries.Select(e => e.Language).ToArray());
+            entry = entries.FirstOrDefault(e => string.Equals(e.Language, requested, StringComparison.Ordinal));
+        }
+
+        if (entry is null) {
+            throw new UnknownExpressionLanguageException(requested, entries.Select(e => e.Language).ToArray());
         }
 
         var descriptor = descriptors(entry.Language);

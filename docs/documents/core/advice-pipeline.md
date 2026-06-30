@@ -7,11 +7,11 @@ operations, validation, and authorization.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Abstractions` | `Advisors/IAdvisor.cs` (arities 1..16), `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
-| `Schemata.Advice` | `AdvicePipeline.cs`, `Advisor.cs`, the `AdviceRunner` family |
-| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits the `RunAsync` extension methods |
+| Package                     | Key files                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| `Schemata.Abstractions`     | `Advisors/IAdvisor.cs` (arities 1..16), `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
+| `Schemata.Advice`           | `AdvicePipeline.cs`, `Advisor.cs`, the `AdviceRunner` family                                    |
+| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits the `RunAsync` extension methods                           |
 
 ## IAdvisor
 
@@ -30,6 +30,7 @@ public interface IAdvisor
 
 `IAdvisor<T1>` through `IAdvisor<T1, ..., T16>` extend `IAdvisor` and declare `AdviseAsync`. The
 arity matches the number of domain arguments passed alongside the `AdviceContext`; the minimum is
+
 1.
 
 ```csharp
@@ -68,13 +69,13 @@ public class AdviceContext
 }
 ```
 
-| Member | Behavior |
-| --- | --- |
-| `Set<T>(value)` | Stores `value` keyed by `typeof(T)`, overwriting any prior value of that type. |
-| `Get<T>()` | Returns the stored value; throws `KeyNotFoundException` when absent. |
-| `TryGet<T>(out value)` | Returns `true` and sets `value` only when a non-null entry exists. |
-| `Has<T>()` | Returns `true` when an entry for `typeof(T)` exists, even if the stored value is `null`. |
-| `Use<T>(value)` | Sets `value` and returns an `IDisposable` that restores the previous entry (or removes the key) on dispose, supporting nested scopes. |
+| Member                 | Behavior                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Set<T>(value)`        | Stores `value` keyed by `typeof(T)`, overwriting any prior value of that type.                                                        |
+| `Get<T>()`             | Returns the stored value; throws `KeyNotFoundException` when absent.                                                                  |
+| `TryGet<T>(out value)` | Returns `true` and sets `value` only when a non-null entry exists.                                                                    |
+| `Has<T>()`             | Returns `true` when an entry for `typeof(T)` exists, even if the stored value is `null`.                                              |
+| `Use<T>(value)`        | Sets `value` and returns an `IDisposable` that restores the previous entry (or removes the key) on dispose, supporting nested scopes. |
 
 `ServiceProvider` lets advisors resolve services at execution time without constructor injection.
 
@@ -91,11 +92,11 @@ public enum AdviseResult
 }
 ```
 
-| Result | Meaning |
-| --- | --- |
-| `Continue` | Proceed to the next advisor. After the last advisor, the operation runs normally. |
-| `Block` | Abort the operation; no further advisors run. The caller treats it as a silent refusal or default value. |
-| `Handle` | The advisor has fully handled the operation (e.g. a cached result, or a delete converted to a soft-delete). No further advisors run; the caller uses what the advisor placed in the context. |
+| Result     | Meaning                                                                                                                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Continue` | Proceed to the next advisor. After the last advisor, the operation runs normally.                                                                                                            |
+| `Block`    | Abort the operation; no further advisors run. The caller treats it as a silent refusal or default value.                                                                                     |
+| `Handle`   | The advisor has fully handled the operation (e.g. a cached result, or a delete converted to a soft-delete). No further advisors run; the caller uses what the advisor placed in the context. |
 
 `Block` and `Handle` both short-circuit; the distinction lets the caller interpret the early exit.
 
@@ -200,11 +201,11 @@ public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity
 
 `SchemataConstants.Orders` anchors advisor ordering:
 
-| Constant | Value | Usage |
-| --- | --- | --- |
-| `Base` | 100,000,000 | Starting point for most built-in advisors |
-| `Extension` | 400,000,000 | Starting point for extension advisors |
-| `Max` | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
+| Constant    | Value       | Usage                                                 |
+| ----------- | ----------- | ----------------------------------------------------- |
+| `Base`      | 100,000,000 | Starting point for most built-in advisors             |
+| `Extension` | 400,000,000 | Starting point for extension advisors                 |
+| `Max`       | 900,000,000 | Terminal advisors (soft-delete, response idempotency) |
 
 Built-in repository advisors chain by 10M increments from `Base`. On the add pipeline:
 `AdviceAddTimestamp` (100M), `AdviceAddConcurrency` (110M), `AdviceAddCanonicalName` (120M),

@@ -7,12 +7,12 @@ endpoint.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Grpc` | `Features/SchemataGrpcResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs` |
-| `Schemata.Resource.Grpc` | `IResourceService.cs`, `ResourceService.cs`, `ResourceServiceBinder.cs`, `ResourceServiceMethodProvider.cs` |
-| `Schemata.Resource.Grpc` | `ResourceCustomMethod.cs`, `Internal/GrpcResourceNaming.cs`, `ResourceMethodNaming.cs`, `FileDescriptorBridge.cs` |
-| `Schemata.Transport.Grpc` | `Features/SchemataTransportGrpcFeature.cs`, `Proto/SchemataProtoTraits.cs`, `Proto/RpcStatusBuilder.cs`, `Interceptors/ExceptionMappingInterceptor.cs` |
+| Package                   | Key files                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Grpc`  | `Features/SchemataGrpcResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs`                                                                   |
+| `Schemata.Resource.Grpc`  | `IResourceService.cs`, `ResourceService.cs`, `ResourceServiceBinder.cs`, `ResourceServiceMethodProvider.cs`                                                    |
+| `Schemata.Resource.Grpc`  | `ResourceCustomMethod.cs`, `Internal/GrpcResourceNaming.cs`, `ResourceMethodNaming.cs`, `FileDescriptorBridge.cs`                                              |
+| `Schemata.Transport.Grpc` | `Proto/SchemataTransportGrpcFeature.cs`, `Proto/SchemataProtoModelConfigurator.cs`, `Proto/RpcStatusBuilder.cs`, `Interceptors/ExceptionMappingInterceptor.cs` |
 
 ## Activation
 
@@ -82,7 +82,7 @@ unary handler resolves the `IResourceMethodHandler<TEntity, TRequest, TResponse>
 
 `SchemataProtoModelConfigurator` adds each request, detail, summary, and `ListResultBase<TSummary>` type to the
 `RuntimeTypeModel`. For each writable property it resolves the wire name through
-`SchemataProtoTraits.ResolveWireName` — the same `ResourceWireNameRules` aliases as HTTP (`Name` dropped,
+`ResourceWireNameRules.ResolveWireName` — the same `ResourceWireNameRules` aliases as HTTP (`Name` dropped,
 `CanonicalName` → `name`, `EntityTag` → `etag`, `Entities` → plural) — then applies snake_case via Humanizer
 `Underscore()`. `GrpcMarshallers.Create<T>` builds marshallers over the model, so payloads serialize with the
 same field names as the HTTP JSON.

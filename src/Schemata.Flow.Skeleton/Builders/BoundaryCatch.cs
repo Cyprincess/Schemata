@@ -1,4 +1,3 @@
-using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -16,7 +15,6 @@ public sealed class BoundaryCatch
     private readonly IEventDefinition  _eventDefinition;
     private          bool              _nonInterrupting;
 
-    /// <summary>Creates a boundary catch builder for <paramref name="eventDefinition" /> on <paramref name="activity" />.</summary>
     internal BoundaryCatch(
         ActivityBehavior  behavior,
         ProcessDefinition definition,
@@ -29,21 +27,22 @@ public sealed class BoundaryCatch
         _eventDefinition = eventDefinition;
     }
 
-    /// <summary>Routes the catch to <paramref name="target" /> and returns control to the host activity builder.</summary>
+    /// <summary>
+    ///     Routes the catch to <paramref name="target" /> and returns control to the host activity builder.
+    ///     The boundary name is scoped by the host activity so two hosts catching the same event
+    ///     definition stay distinct.
+    /// </summary>
     public ActivityBehavior Go(FlowElement target) {
         var boundaryEvent = new FlowEvent {
-            Id           = $"boundary_{Identifiers.NewUid():n}",
-            Name         = $"Catch_{_eventDefinition.Name}",
+            Name         = $"Catch_{_activity.Name}_{_eventDefinition.Name}",
             Position     = EventPosition.Boundary,
             Definition   = _eventDefinition,
-            Interrupting = !_nonInterrupting,
+            Interrupting = _nonInterrupting ? false : _eventDefinition is not EscalationDefinition,
             AttachedTo   = _activity,
         };
 
         _definition.Elements.Add(boundaryEvent);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = boundaryEvent, Target = target,
-        });
+        _definition.Flows.Add(new() { Source = boundaryEvent, Target = _definition.ResolveEntry(target) });
 
         return _behavior;
     }

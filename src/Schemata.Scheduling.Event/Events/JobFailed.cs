@@ -18,7 +18,7 @@ public sealed class JobFailed : IEvent
     public string? Job { get; init; }
 
     /// <summary>Variables carried by the job at failure time.</summary>
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
 
     /// <summary>UTC timestamp when the job failed.</summary>
     public DateTime FailedAt { get; init; }

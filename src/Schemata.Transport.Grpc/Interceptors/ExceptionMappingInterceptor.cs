@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Transport.Grpc.Proto;
@@ -54,7 +55,7 @@ public class ExceptionMappingInterceptor : Interceptor
     ///     when the header is empty so the central <c>EnsureLocalizedMessage</c> helper skips
     ///     localization.
     /// </summary>
-    private static string? ParseAcceptLanguage(Microsoft.Extensions.Primitives.StringValues header) {
+    private static string? ParseAcceptLanguage(StringValues header) {
         foreach (var value in header) {
             if (string.IsNullOrWhiteSpace(value)) {
                 continue;

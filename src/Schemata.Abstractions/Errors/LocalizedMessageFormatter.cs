@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Schemata.Abstractions.Errors;
@@ -45,9 +46,9 @@ public static partial class LocalizedMessageFormatter
     /// <param name="resourceKey">The resx data name.</param>
     /// <param name="args">Optional named substitution arguments.</param>
     /// <returns>The English-invariant rendered message.</returns>
-    public static string? FormatInvariant(string resourceKey, IReadOnlyDictionary<string, string>? args = null) {
+    public static string? FormatInvariant(string resourceKey, IReadOnlyDictionary<string, string?>? args = null) {
         var template = SchemataResources.ResourceManager.GetString(resourceKey, CultureInfo.InvariantCulture);
-        return Format(template, args, CultureInfo.InvariantCulture);
+        return Format(template, args?.ToDictionary(kv => kv.Key, kv => kv.Value ?? string.Empty), CultureInfo.InvariantCulture);
     }
 
     /// <summary>

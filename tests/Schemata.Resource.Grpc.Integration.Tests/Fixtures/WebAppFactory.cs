@@ -20,10 +20,6 @@ public class WebAppFactory : WebApplicationFactory<Program>
         return GrpcChannel.ForAddress(client.BaseAddress!, new() { HttpClient = client });
     }
 
-    /// <summary>
-    ///     Creates a gRPC channel and a <see cref="ClientFactory" /> built from the server-side
-    ///     <see cref="BinderConfiguration" /> used by startup.
-    /// </summary>
     public (GrpcChannel Channel, ClientFactory Client) CreateGrpcChannelWithClient() {
         var channel = CreateGrpcChannel();
         var binder  = Services.GetRequiredService<BinderConfiguration>();

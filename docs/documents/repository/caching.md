@@ -6,12 +6,12 @@ For the full query-cache reference, see [entity/query-cache.md](../entity/query-
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
-| `UseQueryCache` extension | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
-| Cache advisors | `src/Schemata.Entity.Cache/Advisors/` |
-| `SchemataQueryCacheOptions` | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs` |
-| `ICacheProvider` | `src/Schemata.Caching.Skeleton/ICacheProvider.cs` |
+| Item                        | Path                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `UseQueryCache` extension   | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
+| Cache advisors              | `src/Schemata.Entity.Cache/Advisors/`                                         |
+| `SchemataQueryCacheOptions` | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs`                      |
+| `ICacheProvider`            | `src/Schemata.Caching.Skeleton/ICacheProvider.cs`                             |
 
 ## Enabling query caching
 
@@ -22,10 +22,10 @@ services.AddRepository(typeof(EfCoreRepository<,>))
 
 `UseQueryCache` registers three open-generic scoped advisors:
 
-| Advisor | Interface | Order |
-|---|---|---|
-| `AdviceQueryCache<,,>` | `IRepositoryQueryAdvisor<,,>` | 100,000,000 |
-| `AdviceResultCache<,,>` | `IRepositoryResultAdvisor<,,>` | 100,000,000 |
+| Advisor                       | Interface                       | Order       |
+| ----------------------------- | ------------------------------- | ----------- |
+| `AdviceQueryCache<,,>`        | `IRepositoryQueryAdvisor<,,>`   | 100,000,000 |
+| `AdviceResultCache<,,>`       | `IRepositoryResultAdvisor<,,>`  | 100,000,000 |
 | `AdviceCommittedEvictCache<>` | `IRepositoryCommittedAdvisor<>` | 900,000,000 |
 
 A concrete `ICacheProvider` must be registered separately. Use `DistributedCacheProvider` for single-process deployments or `RedisCacheProvider` for multi-process / cluster deployments.
@@ -34,17 +34,17 @@ A concrete `ICacheProvider` must be registered separately. Use `DistributedCache
 
 `SchemataQueryCacheOptions` (configured via `UseQueryCache(o => ...)`):
 
-| Property | Default | Description |
-|---|---|---|
-| `Ttl` | 5 minutes | Sliding expiration for cached results and reverse-index entries. |
-| `EvictionEnabled` | `true` | When `false`, committed eviction is skipped; entries live until TTL expires. |
+| Property          | Default   | Description                                                                  |
+| ----------------- | --------- | ---------------------------------------------------------------------------- |
+| `Ttl`             | 5 minutes | Sliding expiration for cached results and reverse-index entries.             |
+| `EvictionEnabled` | `true`    | When `false`, committed eviction is skipped; entries live until TTL expires. |
 
 ## Suppression
 
-| Method | Marker | Effect |
-|---|---|---|
-| `repository.SuppressQueryCache()` | `QueryCacheSuppressed` | Skips `AdviceQueryCache` and `AdviceResultCache` for this instance. |
-| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache` for this instance. |
+| Method                                    | Marker                         | Effect                                                              |
+| ----------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
+| `repository.SuppressQueryCache()`         | `QueryCacheSuppressed`         | Skips `AdviceQueryCache` and `AdviceResultCache` for this instance. |
+| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache` for this instance.                |
 
 Scope a suppression with `using`:
 

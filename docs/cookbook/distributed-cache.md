@@ -40,7 +40,7 @@ var builder = WebApplication.CreateBuilder(args)
 
 `AddDistributedCache()` registers `DistributedCacheProvider` as the `ICacheProvider` singleton with `TryAddSingleton`, so it does not replace an existing registration. `UseQueryCache` lives on `SchemataRepositoryBuilder` — chain it after `AddRepository`.
 
-**Assertion:** `GET /students` returns `200 OK`. A second identical request within 5 minutes returns the same result without hitting the database (confirm by adding a query log to the EF context).
+**Assertion:** `GET /v1/students` returns `200 OK`. A second identical request within 5 minutes returns the same result without hitting the database (confirm by adding a query log to the EF context).
 
 ## Step 2: Configure TTL and understand the cache key
 
@@ -57,7 +57,7 @@ services.AddRepository(typeof(EfCoreRepository<,>))
 
 ## Step 3: Swap to Redis
 
-Replace `AddDistributedMemoryCache` and `AddDistributedCache` with the Redis equivalents. The `ICacheProvider` contract is identical; no other code changes are needed.
+Replace `AddDistributedMemoryCache` and `AddDistributedCache` with the Redis equivalents. The `ICacheProvider` contract is identical, so the rest of the code carries over unchanged.
 
 ```csharp
 services.AddSingleton<IConnectionMultiplexer>(
@@ -67,17 +67,17 @@ services.AddRedisCache();   // registers RedisCacheProvider as ICacheProvider
 
 `RedisCacheProvider` resolves `IConnectionMultiplexer` and calls `GetDatabase()`. `AddRedisCache()` uses `TryAddSingleton<ICacheProvider, RedisCacheProvider>()`; if `AddDistributedCache()` ran first, `AddRedisCache()` is silently ignored. Register exactly one provider.
 
-**Assertion:** With Redis running, `GET /students` populates a key in Redis (verify with `redis-cli KEYS "*"`). Restart the app and the first request still returns cached data from Redis.
+**Assertion:** With Redis running, `GET /v1/students` populates a key in Redis (verify with `redis-cli KEYS "*"`). Restart the app and the first request still returns cached data from Redis.
 
 ## Step 4: Understand the eviction strategy
 
 `UseQueryCache` registers three advisors:
 
-| Advisor | Interface | What it does |
-| --- | --- | --- |
-| `AdviceQueryCache` | `IRepositoryQueryAdvisor` | Returns cached result on hit; `AdviseResult.Handle` short-circuits DB |
-| `AdviceResultCache` | `IRepositoryResultAdvisor` | Writes query result to cache after DB execution |
-| `AdviceCommittedEvictCache` | `IRepositoryCommittedAdvisor` | Evicts cache entries for updated and removed entities after commit |
+| Advisor                     | Interface                     | What it does                                                          |
+| --------------------------- | ----------------------------- | --------------------------------------------------------------------- |
+| `AdviceQueryCache`          | `IRepositoryQueryAdvisor`     | Returns cached result on hit; `AdviseResult.Handle` short-circuits DB |
+| `AdviceResultCache`         | `IRepositoryResultAdvisor`    | Writes query result to cache after DB execution                       |
+| `AdviceCommittedEvictCache` | `IRepositoryCommittedAdvisor` | Evicts cache entries for updated and removed entities after commit    |
 
 Eviction happens in the committed advisor pipeline. If the transaction rolls back, committed advisors do not run and the cache retains the pre-update value. A rolled-back write should not invalidate a valid cached read.
 

@@ -40,7 +40,7 @@ public sealed class MaskTree
     /// <returns>The parsed mask tree.</returns>
     /// <exception cref="ArgumentException">Thrown when a path cannot be resolved from <paramref name="rootType" />.</exception>
     public static MaskTree FromWire(Type rootType, string mask, bool allowCollectionTraversal) {
-        return Parse(rootType, Split(mask), allowCollectionTraversal, static (_, segment) => InflectorExtensions.Pascalize(segment));
+        return Parse(rootType, Split(mask), allowCollectionTraversal, static (_, segment) => segment.Pascalize());
     }
 
     /// <summary>

@@ -4,24 +4,24 @@ The expression stack turns user filter text into LINQ expression trees, keeps la
 
 ## Package split
 
-| Package | Role |
-| --- | --- |
+| Package                         | Role                                                                                                              |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Expressions.Skeleton` | Contracts, cache, language profile/resolver, pushdown contracts, residual paging, and alias-keyed dynamic values. |
-| `Schemata.Expressions.Aip` | AIP-160 filter parser/compiler plus AIP pushdown planner. |
-| `Schemata.Expressions.Cel` | CEL parser/compiler plus pushdown planner and CEL value semantics. |
-| `Schemata.Expressions.Order` | AIP-132 order-by compiler, independent of the filter language. |
+| `Schemata.Expressions.Aip`      | AIP-160 filter parser/compiler plus AIP pushdown planner.                                                         |
+| `Schemata.Expressions.Cel`      | CEL parser/compiler plus pushdown planner and CEL value semantics.                                                |
+| `Schemata.Expressions.Order`    | AIP-132 order-by compiler, independent of the filter language.                                                    |
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs`, `IExpressionTree.cs` |
-| `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageResolver.cs`, `ExpressionLanguageDescriptor.cs`, `ExpressionLanguageOptions.cs`, `ResolvedLanguage.cs` |
-| `Schemata.Expressions.Skeleton` | `FilteringMode.cs`, `ExpressionCapabilities.cs`, `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ResidualPage.cs` |
-| `Schemata.Expressions.Skeleton` | `DynamicValues.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`, `ExpressionRuntime.cs` |
-| `Schemata.Expressions.Aip` | `AipLanguage.cs`, `AipParser.cs`, `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
-| `Schemata.Expressions.Cel` | `CelLanguage.cs`, `CelParser.cs`, `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs`, `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs`, `CelPushdownPlanner.cs`, `Expressions/*.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
-| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
+| Package                         | Key files                                                                                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs`, `IExpressionTree.cs`                                                                                                                                                                                                                   |
+| `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageResolver.cs`, `ExpressionLanguageDescriptor.cs`, `ExpressionLanguageOptions.cs`, `ResolvedLanguage.cs`                                                                                                                             |
+| `Schemata.Expressions.Skeleton` | `FilteringMode.cs`, `ExpressionCapabilities.cs`, `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ResidualPage.cs`                                                                                                                                                      |
+| `Schemata.Expressions.Skeleton` | `DynamicValues.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`, `ExpressionRuntime.cs`                                                                                                                                     |
+| `Schemata.Expressions.Aip`      | `AipLanguage.cs`, `AipParser.cs`, `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs`                                                                                                       |
+| `Schemata.Expressions.Cel`      | `CelLanguage.cs`, `CelParser.cs`, `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs`, `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs`, `CelPushdownPlanner.cs`, `Expressions/*.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Order`    | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                                                                                                                                                                                                  |
 
 ## Contracts
 
@@ -103,11 +103,11 @@ schema.UseResource()
 
 `FilteringMode` has three values:
 
-| Mode | Meaning |
-| --- | --- |
-| `Default` | Inherit from the other levels. If every level is `Default`, `OrStrict()` resolves to `Strict`. |
-| `Strict` | Compile the whole filter for the backend path; untranslatable filters fail instead of running locally. |
-| `Residual` | Push the translatable part and evaluate the rest locally under a scan cap. |
+| Mode       | Meaning                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `Default`  | Inherit from the other levels. If every level is `Default`, `OrStrict()` resolves to `Strict`.         |
+| `Strict`   | Compile the whole filter for the backend path; untranslatable filters fail instead of running locally. |
+| `Residual` | Push the translatable part and evaluate the rest locally under a scan cap.                             |
 
 `Narrow` intersects modes. `Strict` at any level wins; `Residual` wins only when neither side is `Strict`; `Default` yields to the other side. The resolver applies descriptor defaults, then profile overrides, then entry overrides, and finally calls `OrStrict()`.
 
@@ -131,16 +131,16 @@ AIP registers `SupportsValues: false` because it is predicate-only. CEL register
 
 `ExpressionCapabilities` tells a pushdown planner what a backend can translate:
 
-| Flag | Meaning |
-| --- | --- |
-| `Comparison` | Equality and ordering comparisons. |
-| `Logical` | Boolean composition: and, or, and not. |
-| `Presence` | Field presence checks. |
-| `Wildcard` | Wildcard text matching. |
-| `Arithmetic` | Numeric arithmetic. |
-| `Membership` | Collection membership checks. |
-| `StringMatch` | String helper functions. |
-| `Functions` | Extra named functions the backend can translate. |
+| Flag          | Meaning                                          |
+| ------------- | ------------------------------------------------ |
+| `Comparison`  | Equality and ordering comparisons.               |
+| `Logical`     | Boolean composition: and, or, and not.           |
+| `Presence`    | Field presence checks.                           |
+| `Wildcard`    | Wildcard text matching.                          |
+| `Arithmetic`  | Numeric arithmetic.                              |
+| `Membership`  | Collection membership checks.                    |
+| `StringMatch` | String helper functions.                         |
+| `Functions`   | Extra named functions the backend can translate. |
 
 `ExpressionCapabilities.Relational` is the default preset. Its flags are all true and `Functions` is empty, covering constructs relational repositories normally translate while leaving language-specific functions in the residual.
 
@@ -176,12 +176,12 @@ The compilers emit calls to `DynamicValues.Member`, `Truthy`, `Equal`, compariso
 
 Important semantics:
 
-| Helper | Behavior |
-| --- | --- |
-| `Missing` | Sentinel distinct from a present null. Missing fields do not match equality or ordering. |
-| `Truthy` | Booleans keep their value; present non-null values are true; missing and null are false. |
-| `Equal` / `NotEqual` | Missing operands are false; two nulls are equal; numeric types compare by numeric value. |
-| Numeric coercion | Integer, unsigned, floating, and decimal CLR numbers coerce through `double` for dynamic comparisons and arithmetic. |
+| Helper               | Behavior                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `Missing`            | Sentinel distinct from a present null. Missing fields do not match equality or ordering.                             |
+| `Truthy`             | Booleans keep their value; present non-null values are true; missing and null are false.                             |
+| `Equal` / `NotEqual` | Missing operands are false; two nulls are equal; numeric types compare by numeric value.                             |
+| Numeric coercion     | Integer, unsigned, floating, and decimal CLR numbers coerce through `double` for dynamic comparisons and arithmetic. |
 
 CEL value mode builds on `DynamicValues` but routes full CEL scalar behavior through `CelValues`. See [CEL Expressions](cel.md).
 

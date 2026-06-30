@@ -45,9 +45,9 @@ public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<T
 
         if (entity.DeleteTime is null) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                name: name ?? entity.CanonicalName,
-                subject: PreconditionSubjects.NotSoftDeleted,
-                description: "Resource is not deleted.");
+                name ?? entity.CanonicalName,
+                PreconditionSubjects.NotSoftDeleted,
+                "Resource is not deleted.");
         }
 
         entity.DeleteTime = null;
@@ -56,7 +56,13 @@ public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<T
         await _repository.UpdateAsync(entity, ct);
         await _repository.CommitAsync(ct);
 
-        return _mapper.Map<TEntity, TDetail>(entity)
-            ?? throw new InvalidOperationException($"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'.");
+        var map = _mapper.Map<TEntity, TDetail>(entity);
+        if (map is null) {
+            throw new InvalidOperationException(
+                $"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'."
+            );
+        }
+
+        return map;
     }
 }

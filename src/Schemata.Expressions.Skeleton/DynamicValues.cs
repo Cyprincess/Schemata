@@ -52,7 +52,7 @@ public static class DynamicValues
     ///     Coerces a value to a boolean, treating missing, null, and non-boolean values as false.
     /// </summary>
     public static bool ToBoolean(object? value) {
-        return value is bool flag && flag;
+        return value is bool and true;
     }
 
     /// <summary>

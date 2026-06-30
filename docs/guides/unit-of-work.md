@@ -117,9 +117,7 @@ public sealed class EnrollmentService(
 
 ## Committed advisors
 
-After a successful standalone repository commit or unit-of-work commit, Schemata invokes registered `IRepositoryCommittedAdvisor<TEntity>` implementations. Each advisor receives a `CommitChanges<TEntity>` snapshot containing added, updated, and removed entities.
-
-Query cache eviction uses this committed pipeline. Updated and removed entities evict reverse-indexed cache entries after the database commit succeeds; added entities are ignored.
+After a successful commit — standalone or through a unit of work — Schemata notifies registered committed advisors with a snapshot of the added, updated, and removed entities. Query cache eviction rides on this hook. The advisor contract and snapshot shape are in [Unit of Work](../documents/repository/unit-of-work.md).
 
 ## Next steps
 

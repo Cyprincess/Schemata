@@ -23,11 +23,11 @@ dotnet add MyApp.Catalog package --prerelease Schemata.Module.Complex.Targets
 
 The module-side targets variants:
 
-| Package | Adds |
-| --- | --- |
-| `Schemata.Module.Targets` | `Schemata.Abstractions` + the advice generator |
-| `Schemata.Module.Persisting.Targets` | Base + `Schemata.Entity.Repository` |
-| `Schemata.Module.Complex.Targets` | Persisting + DSL + Authorization/Identity/Mapping/Security/Validation skeletons |
+| Package                              | Adds                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| `Schemata.Module.Targets`            | `Schemata.Abstractions` + the advice generator                                  |
+| `Schemata.Module.Persisting.Targets` | Base + `Schemata.Entity.Repository`                                             |
+| `Schemata.Module.Complex.Targets`    | Persisting + DSL + Authorization/Identity/Mapping/Security/Validation skeletons |
 
 The Targets package packs `build/Package.Build.props` (contributing
 `ModulePackageNames Include="<package-name>"`) and `build/<package>.targets` (exposing

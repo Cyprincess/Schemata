@@ -17,18 +17,17 @@ dotnet add package --prerelease Schemata.Push.Foundation
 
 ## Enable push
 
-`UsePush()` returns a `SchemataPushBuilder`. `SchemataPushFeature` runs at Priority 500,000,000.
-Register transports on the returned builder:
+`UsePush()` returns a `SchemataPushBuilder`. Register transports on it:
 
 ```csharp
 schema.UsePush().AddTransport<ConsolePushTransport>();
 ```
 
-`AddTransport<T>()` appends the transport to the `IPushTransport` collection that the push service
-fans out to. `UsePush` also registers `DefaultPushService` as `IPushService`,
-`DefaultPushSubscriptionManager` as `IPushSubscriptionManager`, and `SchemataPushSubscription` as a
-resource. The subscription table persists through `IRepository<SchemataPushSubscription>`, so the EF
-Core setup from Getting Started must be configured.
+`AddTransport<T>()` appends the transport to the collection that the push service fans out to.
+`UsePush` also registers the push service, the subscription manager, and the
+`SchemataPushSubscription` resource. Subscriptions persist through the repository, so the EF Core
+setup from Getting Started must be configured. The full service registration list is in
+[Push Overview](../documents/push/overview.md).
 
 ## Implement a transport
 
@@ -123,13 +122,13 @@ device and reports `Sent`; a transport with no matching subscription reports `Sk
 
 `PushTarget` has five built-in shapes. Each transport decides which it handles:
 
-| Target | Addresses |
-| --- | --- |
-| `RecipientTarget(subject)` | one recipient by canonical name |
-| `ChannelTarget(channel)` | a named channel or group |
-| `TopicTarget(topic)` | a publish/subscribe topic |
-| `BroadcastTarget()` | every connection a transport holds |
-| `CustomTarget(kind, params)` | transports matching `kind` |
+| Target                       | Addresses                          |
+| ---------------------------- | ---------------------------------- |
+| `RecipientTarget(subject)`   | one recipient by canonical name    |
+| `ChannelTarget(channel)`     | a named channel or group           |
+| `TopicTarget(topic)`         | a publish/subscribe topic          |
+| `BroadcastTarget()`          | every connection a transport holds |
+| `CustomTarget(kind, params)` | transports matching `kind`         |
 
 ## Verify
 

@@ -4,12 +4,12 @@ The scheduling subsystem runs `IScheduledJob` implementations on cron, periodic,
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduler.cs`, `IScheduledJob.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`, `JobRegistration.cs`, `JobTriggerOutcome.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Attributes/ScheduledJobAttribute.cs`, `Extensions/ScheduledJobServiceCollectionExtensions.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation` | `Features/SchemataSchedulingFeature.cs`, `Builders/SchedulingBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `Observers/SchemataJobAuditObserver.cs`, `Internal/DefaultScheduler.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs` |
-| `Schemata.Scheduling.Event` | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `Events/*.cs`, `Attributes/PublishEventAttribute.cs`, `SchemataSchedulingEventOptions.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs` |
-| `Schemata.Scheduling.Http` / `Schemata.Scheduling.Grpc` | `Features/SchemataSchedulingHttpFeature.cs`, `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
+| Package                                                 | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Skeleton`                          | `IScheduler.cs`, `IScheduledJob.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`, `JobRegistration.cs`, `JobTriggerOutcome.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Attributes/ScheduledJobAttribute.cs`, `Extensions/ScheduledJobServiceCollectionExtensions.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs` |
+| `Schemata.Scheduling.Foundation`                        | `Features/SchemataSchedulingFeature.cs`, `Builders/SchedulingBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `Observers/SchemataJobAuditObserver.cs`, `Internal/DefaultScheduler.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`                                                                                                                                                             |
+| `Schemata.Scheduling.Event`                             | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `Events/*.cs`, `Attributes/PublishEventAttribute.cs`, `SchemataSchedulingEventOptions.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                 |
+| `Schemata.Scheduling.Http` / `Schemata.Scheduling.Grpc` | `Features/SchemataSchedulingHttpFeature.cs`, `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## Startup
 
@@ -36,14 +36,14 @@ builder.UseSchemata(schema => {
 
 `Schemata.Scheduling.Foundation.Builders.SchedulingBuilder` registers jobs:
 
-| Member | Effect |
-| --- | --- |
-| `WithJob<T>()` | Registers `T` as a known job key without arming a schedule. Use this for on-demand jobs triggered through `IScheduler.TriggerAsync`. |
-| `WithJob<T>(IScheduleDefinition schedule)` | Registers `T` against an explicit schedule. |
-| `WithJob<T>(string cronExpression)` | Wraps the expression in a `CronSchedule`. |
-| `WithJob<T>(TimeSpan delay)` | One-time fire at `UtcNow + delay` via `OneTimeSchedule`. |
-| `WithJob<T>(DateTime runTime)` | One-time fire at the UTC `runTime`. |
-| `AddFeature<T>()` | Adds a feature to the Schemata configuration. |
+| Member                                     | Effect                                                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `WithJob<T>()`                             | Registers `T` as a known job key without arming a schedule. Use this for on-demand jobs triggered through `IScheduler.TriggerAsync`. |
+| `WithJob<T>(IScheduleDefinition schedule)` | Registers `T` against an explicit schedule.                                                                                          |
+| `WithJob<T>(string cronExpression)`        | Wraps the expression in a `CronSchedule`.                                                                                            |
+| `WithJob<T>(TimeSpan delay)`               | One-time fire at `UtcNow + delay` via `OneTimeSchedule`.                                                                             |
+| `WithJob<T>(DateTime runTime)`             | One-time fire at the UTC `runTime`.                                                                                                  |
+| `AddFeature<T>()`                          | Adds a feature to the Schemata configuration.                                                                                        |
 
 Scheduled overloads register `T` as transient and append a `JobRegistration` with a schedule to `SchemataSchedulingOptions.Jobs`. `WithJob<T>()` and `AddScheduledJob<T>()` append known-only registrations so on-demand executions can resolve their key after a restart.
 
@@ -99,12 +99,12 @@ The Resource `:purge` method dispatches `PurgeJob<TEntity>` through the schedule
 
 ## Feature priority table
 
-| Feature | Activation | Priority |
-| --- | --- | --- |
-| `SchemataSchedulingFeature` | `schema.UseScheduling()` | 470,000,000 |
-| `SchemataSchedulingEventFeature` | `.UseEvent()` | 470,100,000 |
-| `SchemataSchedulingHttpFeature` | `.MapHttp()` | 470,200,000 |
-| `SchemataSchedulingGrpcFeature` | `.MapGrpc()` | 470,300,000 |
+| Feature                          | Activation               | Priority    |
+| -------------------------------- | ------------------------ | ----------- |
+| `SchemataSchedulingFeature`      | `schema.UseScheduling()` | 470,000,000 |
+| `SchemataSchedulingEventFeature` | `.UseEvent()`            | 470,100,000 |
+| `SchemataSchedulingHttpFeature`  | `.MapHttp()`             | 470,200,000 |
+| `SchemataSchedulingGrpcFeature`  | `.MapGrpc()`             | 470,300,000 |
 
 ## Extension points
 

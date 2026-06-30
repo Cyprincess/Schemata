@@ -21,15 +21,15 @@ Members may appear in any order.
 
 ## Members
 
-| Member   | Emitted                          |
-| -------- | -------------------------------- |
-| `Note`   | No                               |
-| `Use`    | Base list only                   |
+| Member   | Emitted                           |
+| -------- | --------------------------------- |
+| `Note`   | No                                |
+| `Use`    | Base list only                    |
 | `Enum`   | Yes (inline, via `EnumGenerator`) |
-| `Trait`  | No                               |
-| `Object` | No (stored as a `View` node)     |
-| `Index`  | No (stored as a `Pointer` node)  |
-| Field    | Yes                              |
+| `Trait`  | No                                |
+| `Object` | No (stored as a `View` node)      |
+| `Index`  | No (stored as a `Pointer` node)   |
+| Field    | Yes                               |
 
 ## Composition
 

@@ -9,11 +9,11 @@ string end to end. Publishing a type with no registration throws at the publish 
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Event.Skeleton` | `IEventBus.cs`, `IEvent.cs`, `IRequest.cs`, `IEventHandler.cs`, `IRequestHandler.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
-| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Internal/HandlerResolver.cs` |
-| `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Event.Skeleton`   | `IEventBus.cs`, `IEvent.cs`, `IRequest.cs`, `IEventHandler.cs`, `IRequestHandler.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventSourceContract.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
+| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Internal/HandlerResolver.cs`                                        |
+| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs`                                                                                                                                                                                                    |
 
 ## Wire names
 
@@ -59,14 +59,14 @@ no built-in advisor ships.
 
 `Schemata.Event.Foundation.Builders.EventBuilder` is the fluent configuration surface:
 
-| Member | Effect |
-| --- | --- |
-| `RegisterEvent<TEvent>(string name)` | Maps the CLR type to a wire name via `IPostConfigureOptions<EventTypeRegistryConfiguration>`. |
-| `UseProducer(Action<EventProducerBuilder>?)` | Configures the producer (the `IEventBus` implementation). |
-| `UseConsumer(Action<EventConsumerBuilder>?)` | Configures the consumer (subscription store, handler resolver, dispatch context). |
-| `UseHandler<TEvent, THandler>()` | Registers a scoped `IEventHandler<TEvent>`. |
-| `UseHandler<TRequest, TResponse, THandler>()` | Registers a scoped `IRequestHandler<TRequest, TResponse>`. |
-| `ConfigureRouting<TEvent>(EventRouting)` | Sets the per-type `EventRouting` mode. |
+| Member                                        | Effect                                                                                        |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `RegisterEvent<TEvent>(string name)`          | Maps the CLR type to a wire name via `IPostConfigureOptions<EventTypeRegistryConfiguration>`. |
+| `UseProducer(Action<EventProducerBuilder>?)`  | Configures the producer (the `IEventBus` implementation).                                     |
+| `UseConsumer(Action<EventConsumerBuilder>?)`  | Configures the consumer (subscription store, handler resolver, dispatch context).             |
+| `UseHandler<TEvent, THandler>()`              | Registers a scoped `IEventHandler<TEvent>`.                                                   |
+| `UseHandler<TRequest, TResponse, THandler>()` | Registers a scoped `IRequestHandler<TRequest, TResponse>`.                                    |
+| `ConfigureRouting<TEvent>(EventRouting)`      | Sets the per-type `EventRouting` mode.                                                        |
 
 ## IEventBus
 
@@ -93,8 +93,8 @@ its response.
 
 The `(@event, sourceEntity, ct)` overload attaches an originating business entity to the publish.
 `sourceEntity` must implement both `Schemata.Abstractions.Entities.ICanonicalName` and
-`IConcurrency`; the default interface method `EnsureSourceEntityContract` throws
-`InvalidOperationException` naming the offending type otherwise. The audit observer captures the
+`IConcurrency`; `EventSourceContract.Ensure` throws `InvalidOperationException` naming the
+offending type otherwise. The audit observer captures the
 source's `CanonicalName` and concurrency `Timestamp` onto the `SchemataEvent` row so consumers can
 compare the publish snapshot against the source's current state.
 
@@ -104,17 +104,17 @@ All three calls require the type registered in `IEventTypeRegistry` first.
 
 `Schemata.Event.Skeleton.EventContext` is the per-dispatch carrier passed to advisors and observers:
 
-| Member | Description |
-| --- | --- |
-| `IEvent Event` | The dispatched event instance. |
-| `string EventType` | Wire-format name; also the routing key and the persisted `SchemataEvent.EventType`. |
-| `string? Payload` | Serialized event body for audit and transport. |
-| `string? CorrelationId` | End-to-end correlation identifier. |
-| `SchemataEvent? Record` | Audit row attached by the audit observer on publish. |
+| Member                        | Description                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `IEvent Event`                | The dispatched event instance.                                                              |
+| `string EventType`            | Wire-format name; also the routing key and the persisted `SchemataEvent.EventType`.         |
+| `string? Payload`             | Serialized event body for audit and transport.                                              |
+| `string? CorrelationId`       | End-to-end correlation identifier.                                                          |
+| `SchemataEvent? Record`       | Audit row attached by the audit observer on publish.                                        |
 | `bool RequiresOutboxDelivery` | Set by the bus when delivery runs through a durable broker; drives the initial audit state. |
-| `object? Source` | Optional originating business entity from the source-entity overload. |
-| `object? Result` | Handler outcome (request response or publish acknowledgement). |
-| `Exception? Exception` | Exception thrown by the handler, if any. |
+| `object? Source`              | Optional originating business entity from the source-entity overload.                       |
+| `object? Result`              | Handler outcome (request response or publish acknowledgement).                              |
+| `Exception? Exception`        | Exception thrown by the handler, if any.                                                    |
 
 ## SchemataEvent audit entity
 
@@ -122,17 +122,17 @@ All three calls require the type registered in `IEventTypeRegistry` first.
 `[CanonicalName("events/{event}")]`) implements `IIdentifier`, `ICanonicalName`, `IConcurrency`,
 `ISourceReference`, and `ITimestamp`:
 
-| Column | Description |
-| --- | --- |
-| `EventType` | Wire-format name. |
-| `Payload` | Serialized event body. |
-| `State` | `EventState` lifecycle value. |
-| `CorrelationId` | Correlation identifier copied from the context. |
-| `ResponsePayload` | Serialized handler response (request/reply). |
-| `RecentError` | Last error from a failed handler dispatch. |
-| `RetryCount` | Number of outbox redelivery attempts. |
-| `SourceType` | CLR full name of the source business entity. |
-| `Source` | Canonical name of the source entity. |
+| Column            | Description                                                 |
+| ----------------- | ----------------------------------------------------------- |
+| `EventType`       | Wire-format name.                                           |
+| `Payload`         | Serialized event body.                                      |
+| `State`           | `EventState` lifecycle value.                               |
+| `CorrelationId`   | Correlation identifier copied from the context.             |
+| `ResponsePayload` | Serialized handler response (request/reply).                |
+| `RecentError`     | Last error from a failed handler dispatch.                  |
+| `RetryCount`      | Number of outbox redelivery attempts.                       |
+| `SourceType`      | CLR full name of the source business entity.                |
+| `Source`          | Canonical name of the source entity.                        |
 | `SourceTimestamp` | Concurrency token captured from the source at publish time. |
 
 ### EventState
@@ -173,8 +173,8 @@ stored in `SchemataEventOptions.RoutingTable`.
   transitions alongside the built-in audit observer.
 - Implement `IEventBus` (scoped) to replace the transport.
 - Implement `IEventOutboxPublisher` (singleton) to replay outbox rows over a custom broker.
-- Durable subscriptions persist through `IRepository<SchemataEventSubscription>`; swap the repository
-  provider to change the backing store.
+- Durable subscriptions persist through `IRepository<SchemataEventSubscription>`; point the
+  repository provider at a different store to relocate them.
 
 ## Caveats
 

@@ -70,9 +70,9 @@ public class SchemataTenantManager<TTenant> : ITenantManager<TTenant>
     }
 
     public virtual ValueTask SetDisplayNamesAsync(
-        TTenant                    tenant,
-        Dictionary<string, string> names,
-        CancellationToken          ct
+        TTenant                     tenant,
+        Dictionary<string, string?> names,
+        CancellationToken           ct
     ) {
         tenant.DisplayNames = names is { Count: > 0 } ? names : null;
 

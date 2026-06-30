@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 
@@ -36,15 +35,19 @@ public sealed class SchemataQuotaFeature : FeatureBase
 
             var rejected = options.OnRejected;
             options.OnRejected = async (ctx, ct) => {
-                if (rejected is not null) {
-                    await rejected(ctx, ct);
-
-                    if (ctx.HttpContext.Response.HasStarted) {
-                        return;
-                    }
+                if (rejected is null) {
+                    throw new QuotaExceededException(
+                        [new() { Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}", },]
+                    );
                 }
 
-                throw new QuotaExceededException(violations: [
+                await rejected(ctx, ct);
+
+                if (ctx.HttpContext.Response.HasStarted) {
+                    return;
+                }
+
+                throw new QuotaExceededException([
                     new() {
                         Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
                     },

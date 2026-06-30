@@ -13,12 +13,10 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
-using Schemata.Common;
 using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Models;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -235,8 +233,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         var profile = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value.Expressions
                    ?? new ExpressionLanguageProfile();
         try {
-            return ExpressionLanguageResolver.Resolve(profile, requested,
-                                                      n => _sp.GetKeyedService<ExpressionLanguageDescriptor>(n));
+            return ExpressionLanguageResolver.Resolve(profile, requested, n => _sp.GetKeyedService<ExpressionLanguageDescriptor>(n));
         } catch (UnknownExpressionLanguageException) {
             throw new ValidationException([new() {
                 Field       = nameof(ListRequest.Language).Underscore(),

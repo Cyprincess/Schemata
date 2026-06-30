@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Flow BPMN engine</Description>
+    <PackageTags>application;business;framework;state;flow;workflow;bpmn</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -42,13 +42,13 @@ caller sees one result per transport and reads the `Status` to learn what each d
 
 Typical responses by target:
 
-| Target | A transport that owns this target | Other transports |
-| --- | --- | --- |
-| `RecipientTarget` | resolves a `SchemataPushSubscription` (or its own hub state) and sends | `Skipped` |
-| `ChannelTarget` | a channel-aware transport sends to the group | `Skipped` |
-| `TopicTarget` | a pub/sub transport sends to the topic | `Skipped` |
-| `BroadcastTarget` | a connection transport sends to all clients | `Skipped` |
-| `CustomTarget` | a transport whose `Kind` matches sends | `Skipped` |
+| Target            | A transport that owns this target                                      | Other transports |
+| ----------------- | ---------------------------------------------------------------------- | ---------------- |
+| `RecipientTarget` | resolves a `SchemataPushSubscription` (or its own hub state) and sends | `Skipped`        |
+| `ChannelTarget`   | a channel-aware transport sends to the group                           | `Skipped`        |
+| `TopicTarget`     | a pub/sub transport sends to the topic                                 | `Skipped`        |
+| `BroadcastTarget` | a connection transport sends to all clients                            | `Skipped`        |
+| `CustomTarget`    | a transport whose `Kind` matches sends                                 | `Skipped`        |
 
 Filtering is transport-defined, so multiple transports can claim the same target (a
 `BroadcastTarget` delivered by both SignalR and a websocket gateway, for example).
@@ -120,13 +120,13 @@ public sealed record TransportResult(
     string?         Error       = null);
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `Transport` | the reporting transport's `Name` |
-| `Status` | `Sent`, `Skipped`, `Failed`, or `Unspecified` |
-| `Address` | the obfuscated delivery address, when the transport reports one |
-| `ProviderRef` | the backend message reference, when the transport reports one |
-| `Error` | the failure reason when `Status` is `Failed` |
+| Field         | Meaning                                                         |
+| ------------- | --------------------------------------------------------------- |
+| `Transport`   | the reporting transport's `Name`                                |
+| `Status`      | `Sent`, `Skipped`, `Failed`, or `Unspecified`                   |
+| `Address`     | the obfuscated delivery address, when the transport reports one |
+| `ProviderRef` | the backend message reference, when the transport reports one   |
+| `Error`       | the failure reason when `Status` is `Failed`                    |
 
 The `Sent`, `Skipped`, and `Failed` factory methods construct the common shapes.
 

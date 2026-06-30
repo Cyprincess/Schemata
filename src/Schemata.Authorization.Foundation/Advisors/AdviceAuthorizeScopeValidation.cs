@@ -66,7 +66,7 @@ public sealed class AdviceAuthorizeScopeValidation<TApp>(
 
         foreach (var s in requested) {
             await PermissionAdvice.RequireAsync(apps, authz.Application, PermissionPrefixes.Scope + s, ct,
-                error: OAuthErrors.InvalidScope, resource: SchemataResources.INVALID_SCOPE,
+                OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE,
                 configure: exception => {
                     exception.RedirectUri  = authz.Request?.RedirectUri;
                     exception.State        = authz.Request?.State;

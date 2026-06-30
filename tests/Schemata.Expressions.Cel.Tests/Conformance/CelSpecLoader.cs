@@ -342,7 +342,7 @@ public static class CelSpecLoader
                     i += 8;
                     break;
                 default:
-                    if (escaped >= '0' && escaped <= '7') {
+                    if (escaped is >= '0' and <= '7') {
                         var octal = source.Substring(i, Math.Min(3, source.Length - i));
                         bytes.Add(Convert.ToByte(octal, 8));
                         i += octal.Length - 1;

@@ -25,7 +25,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
         CancellationToken ct
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
-        if (handler == null) {
+        if (handler is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
@@ -42,7 +42,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
         CancellationToken ct
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
-        if (handler == null) {
+        if (handler is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
@@ -54,7 +54,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
 
     public override async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
-        if (handler == null) {
+        if (handler is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)

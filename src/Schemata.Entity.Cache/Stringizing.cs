@@ -89,7 +89,7 @@ public class Stringizing : ExpressionVisitor
                 _builder.Append(formattable.ToString(null, CultureInfo.InvariantCulture));
                 return node;
             default:
-                _builder.Append(Convert.ToString(node.Value, CultureInfo.InvariantCulture) ?? string.Empty);
+                _builder.Append(Convert.ToString(node.Value, CultureInfo.InvariantCulture));
                 return node;
         }
     }
@@ -146,7 +146,7 @@ public class Stringizing : ExpressionVisitor
             AppendMethodHead(method.Name, arity);
             AppendArguments(node.Arguments, 1);
         } else if (node.Object is null) {
-            _builder.Append(method.DeclaringType?.FullName ?? method.DeclaringType?.Name ?? string.Empty);
+            _builder.Append(method.DeclaringType?.FullName ?? method.DeclaringType?.Name);
             AppendMethodHead(method.Name, arity);
             AppendArguments(node.Arguments, 0);
         } else {

@@ -142,7 +142,7 @@ public sealed class StudentCreatedHandler : IEventHandler<StudentCreated>
 The handler runs when the outbox dispatcher drains the published row, which may be after the HTTP
 response has returned.
 
-**Assertion:** `POST /students` with a valid body logs `"Student 'Alice' created at ..."` shortly
+**Assertion:** `POST /v1/students` with a valid body logs `"Student 'Alice' created at ..."` shortly
 after the repository commit succeeds.
 
 ## Common pitfalls

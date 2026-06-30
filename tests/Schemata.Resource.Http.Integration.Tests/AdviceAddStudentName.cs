@@ -8,9 +8,6 @@ using Schemata.Resource.Http.Integration.Tests.Fixtures;
 
 namespace Schemata.Resource.Http.Integration.Tests;
 
-/// <summary>
-///     Assigns a GUID-based canonical name to every new Student.
-/// </summary>
 internal sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
 {
     #region IRepositoryAddAdvisor<Student> Members

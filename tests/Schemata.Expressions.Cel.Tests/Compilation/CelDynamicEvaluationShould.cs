@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests.Compilation;

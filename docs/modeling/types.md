@@ -8,18 +8,18 @@ generated C# verbatim. Type names are case-insensitive.
 
 The generator emits `clr.FullName`, so the property type is always the fully-qualified CLR name.
 
-| SKM token    | Aliases                     | C# type                      |
-| ------------ | --------------------------- | ---------------------------- |
-| `string`     | `text`                      | `string`                     |
-| `int`        | `integer`, `int32`, `int4`  | `int`                        |
-| `long`       | `int64`, `int8`             | `long`                       |
-| `biginteger` | `bigint`                    | `System.Numerics.BigInteger` |
-| `float`      | `float32`, `float4`         | `float`                      |
-| `double`     | `float64`, `float8`         | `double`                     |
-| `decimal`    | `numeric`, `number`         | `decimal`                    |
-| `boolean`    | `bool`                      | `bool`                       |
-| `datetime`   | `timestamp`                 | `DateTimeOffset`             |
-| `guid`       | `uuid`                      | `Guid`                       |
+| SKM token    | Aliases                    | C# type                      |
+| ------------ | -------------------------- | ---------------------------- |
+| `string`     | `text`                     | `string`                     |
+| `int`        | `integer`, `int32`, `int4` | `int`                        |
+| `long`       | `int64`, `int8`            | `long`                       |
+| `biginteger` | `bigint`                   | `System.Numerics.BigInteger` |
+| `float`      | `float32`, `float4`        | `float`                      |
+| `double`     | `float64`, `float8`        | `double`                     |
+| `decimal`    | `numeric`, `number`        | `decimal`                    |
+| `boolean`    | `bool`                     | `bool`                       |
+| `datetime`   | `timestamp`                | `DateTimeOffset`             |
+| `guid`       | `uuid`                     | `Guid`                       |
 
 The integer and float aliases follow byte-width naming: `int4`/`int8` are 4- and 8-byte
 integers (`int`/`long`), `float4`/`float8` are 4- and 8-byte floats (`float`/`double`).

@@ -64,8 +64,8 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
 
         if (tag != expected) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                name: entity.CanonicalName,
-                subject: PreconditionSubjects.EtagMismatch);
+                entity.CanonicalName,
+                PreconditionSubjects.EtagMismatch);
         }
 
         return Task.FromResult(AdviseResult.Continue);

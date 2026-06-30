@@ -22,8 +22,8 @@ public sealed partial class DefaultScheduler
         return ScheduleCoreAsync(job, ct);
     }
 
-    public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, object?>? variables, CancellationToken ct) {
-        job.Variables = JobVariableSerializer.Serialize(variables);
+    public Task ScheduleAsync(SchemataJob job, IReadOnlyDictionary<string, string?>? variables, CancellationToken ct) {
+        job.Variables = variables is null ? null : new Dictionary<string, string?>(variables);
         return ScheduleCoreAsync(job, ct);
     }
 
@@ -135,6 +135,7 @@ public sealed partial class DefaultScheduler
             Job           = canonical,
             JobKey        = job.JobKey,
             ArgsJson      = job.ArgsJson,
+            Variables     = job.Variables is null ? null : new Dictionary<string, string?>(job.Variables),
             State         = ExecutionState.Pending,
             StartTime     = due,
         };
@@ -240,7 +241,7 @@ public sealed partial class DefaultScheduler
     }
 
     private DateTime ComputeAfter(SchemataJob job, DateTime time) {
-        if (job.ScheduleType == ScheduleType.Periodic && job.IntervalTicks is { } ticks) {
+        if (job is { ScheduleType: ScheduleType.Periodic, IntervalTicks: { } ticks }) {
             return time.AddTicks(ticks);
         }
 

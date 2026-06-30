@@ -99,7 +99,7 @@ internal sealed class AipCompileVisitor
         _guard = null;
 
         Expression result;
-        if (node.Comparator is Has && node.Arg is not null && TryBuildRepeatedHas(node.Comparable, node.Arg, out var has)) {
+        if (node is { Comparator: Has, Arg: not null } && TryBuildRepeatedHas(node.Comparable, node.Arg, out var has)) {
             result = has;
         } else {
             var left = Visit(node.Comparable);

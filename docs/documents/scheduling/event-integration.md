@@ -8,8 +8,8 @@ a global default.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
+| Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Event` | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `SchemataSchedulingEventOptions.cs`, `JobEventConfiguration.cs`, `Attributes/PublishEventAttribute.cs`, `Events/JobScheduled.cs`, `Events/JobUnscheduled.cs`, `Events/JobTriggered.cs`, `Events/JobCompleted.cs`, `Events/JobFailed.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs` |
 
 ## Activation
@@ -35,13 +35,13 @@ per-job overrides.
 1. `EventPublishingJobLifecycleObserver` as a scoped `IJobLifecycleObserver` (`TryAddEnumerable`).
 2. Wire names for the five lifecycle event types in `EventTypeRegistryConfiguration`:
 
-| Event | Wire name |
-| --- | --- |
-| `JobScheduled` | `schemata/scheduling/job-scheduled` |
+| Event            | Wire name                             |
+| ---------------- | ------------------------------------- |
+| `JobScheduled`   | `schemata/scheduling/job-scheduled`   |
 | `JobUnscheduled` | `schemata/scheduling/job-unscheduled` |
-| `JobTriggered` | `schemata/scheduling/job-triggered` |
-| `JobCompleted` | `schemata/scheduling/job-completed` |
-| `JobFailed` | `schemata/scheduling/job-failed` |
+| `JobTriggered`   | `schemata/scheduling/job-triggered`   |
+| `JobCompleted`   | `schemata/scheduling/job-completed`   |
+| `JobFailed`      | `schemata/scheduling/job-failed`      |
 
 ## EventPublishingJobLifecycleObserver
 
@@ -66,11 +66,11 @@ execution row is marked `Skipped`, and the schedule advances to the next occurre
 `NextRunTime`, set the gate to `AdviseResult.Block` (which both suppresses publishing and returns
 `JobTriggerOutcome.Block`) or register a custom `IJobLifecycleObserver` that returns `Block`.
 
-| Gate / flag | OnTriggered outcome | Execution row | Schedule |
-| --- | --- | --- | --- |
-| `Continue`, `InterceptExecution = false` (default) | `Proceed` | `Succeeded` / `Failed` from the body | Advances |
-| `Continue`, `InterceptExecution = true` | `Skip` | `Skipped` | Advances |
-| `Block` | `Block` | `Blocked` | Frozen at the current `NextRunTime` |
+| Gate / flag                                        | OnTriggered outcome | Execution row                        | Schedule                            |
+| -------------------------------------------------- | ------------------- | ------------------------------------ | ----------------------------------- |
+| `Continue`, `InterceptExecution = false` (default) | `Proceed`           | `Succeeded` / `Failed` from the body | Advances                            |
+| `Continue`, `InterceptExecution = true`            | `Skip`              | `Skipped`                            | Advances                            |
+| `Block`                                            | `Block`             | `Blocked`                            | Frozen at the current `NextRunTime` |
 
 ## Configuration resolution
 

@@ -9,12 +9,12 @@ field masks.
 
 ## Where the code lives
 
-| Package | Role | Key types |
-| --- | --- | --- |
-| `Schemata.Mapping.Skeleton` | Contracts | `ISimpleMapper`, `SchemataMappingOptions`, `Configurations.Map<,>`, `MaskTree`, `MaskWalker` |
-| `Schemata.Mapping.Foundation` | Builder + helpers | `SchemataMappingBuilder`, `SimpleMapperHelper`, `SchemataMappingFeature<T>` |
-| `Schemata.Mapping.AutoMapper` | AutoMapper adapter | `SimpleMapper`, `AutoMapperConfigurator` |
-| `Schemata.Mapping.Mapster` | Mapster adapter | `SimpleMapper`, `MapsterConfigurator` |
+| Package                       | Role               | Key types                                                                                    |
+| ----------------------------- | ------------------ | -------------------------------------------------------------------------------------------- |
+| `Schemata.Mapping.Skeleton`   | Contracts          | `ISimpleMapper`, `SchemataMappingOptions`, `Configurations.Map<,>`, `MaskTree`, `MaskWalker` |
+| `Schemata.Mapping.Foundation` | Builder + helpers  | `SchemataMappingBuilder`, `SimpleMapperHelper`, `SchemataMappingFeature<T>`                  |
+| `Schemata.Mapping.AutoMapper` | AutoMapper adapter | `SimpleMapper`, `AutoMapperConfigurator`                                                     |
+| `Schemata.Mapping.Mapster`    | Mapster adapter    | `SimpleMapper`, `MapsterConfigurator`                                                        |
 
 ## Startup
 
@@ -51,11 +51,11 @@ public interface ISimpleMapper
 
 Three families of overload, each with distinct null behavior:
 
-| Overload | Semantics | Null source member |
-| --- | --- | --- |
-| `Map<T>(source)`, `Map<TSource, TDestination>(source)` | Produce a fresh instance | Copied to the result |
-| `Map(source, destination)` | Merge onto an existing object | Preserves the destination value |
-| `Map(source, destination, fields)` | Field-selective update | Masked fields are authoritative; unmasked preserved |
+| Overload                                               | Semantics                     | Null source member                                  |
+| ------------------------------------------------------ | ----------------------------- | --------------------------------------------------- |
+| `Map<T>(source)`, `Map<TSource, TDestination>(source)` | Produce a fresh instance      | Copied to the result                                |
+| `Map(source, destination)`                             | Merge onto an existing object | Preserves the destination value                     |
+| `Map(source, destination, fields)`                     | Field-selective update        | Masked fields are authoritative; unmasked preserved |
 
 Both adapters route the two-argument `Map(source, destination)` through
 `SimpleMapperHelper.MapMerging` and the field overload through `SimpleMapperHelper.MapWithMask`.
@@ -125,13 +125,13 @@ schema.UseAutoMapper()
       });
 ```
 
-| Method | Effect |
-| --- | --- |
-| `For(dest)` | Begin a field mapping for the destination property |
-| `From(src)` | Supply the source expression for the current field |
-| `Ignore()` | Skip the field |
-| `Ignore((s, d) => ...)` | Skip the field when the predicate holds |
-| `With(s => dest)` | Whole-object converter for the type pair |
+| Method                  | Effect                                             |
+| ----------------------- | -------------------------------------------------- |
+| `For(dest)`             | Begin a field mapping for the destination property |
+| `From(src)`             | Supply the source expression for the current field |
+| `Ignore()`              | Skip the field                                     |
+| `Ignore((s, d) => ...)` | Skip the field when the predicate holds            |
+| `With(s => dest)`       | Whole-object converter for the type pair           |
 
 `SchemataMappingOptions.AddMapping` invokes the configure action, then calls `Map<,>.Compile()`.
 `Compile()` throws `InvalidOperationException` ("Mapping for field {0} is missing a source field.")
@@ -139,8 +139,8 @@ for any field that has neither a source expression, an ignore, nor a converter.
 
 ## Feature ordering
 
-| Feature | Priority |
-| --- | --- |
+| Feature                     | Priority                                      |
+| --------------------------- | --------------------------------------------- |
 | `SchemataMappingFeature<T>` | `Orders.Extension + 60_000_000` (460,000,000) |
 
 ## Extension points

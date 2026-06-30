@@ -8,7 +8,6 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Scheduling.Skeleton;
-using Schemata.Scheduling.Skeleton.Entities;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
@@ -40,7 +39,7 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         _ = PurgeFilter.Compile<TEntity>(_services, request.Filter, request.Language);
 
         var scheduler = _services.GetService<IScheduler>();
-        if (scheduler == null) {
+        if (scheduler is null) {
             throw new InvalidOperationException("Purge requires a scheduler.");
         }
 

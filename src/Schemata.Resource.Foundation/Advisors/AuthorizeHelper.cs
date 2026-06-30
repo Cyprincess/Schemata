@@ -55,7 +55,7 @@ internal static class AuthorizeHelper
         if (await access.HasAccessAsync(default, parent, principal, ct)) {
             var permission = $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}";
             throw SchemataResourceErrors.PermissionDenied<TEntity>(
-                name: resource,
+                resource,
                 description: string.Format(PermissionDeniedTemplate, permission, resource));
         }
 

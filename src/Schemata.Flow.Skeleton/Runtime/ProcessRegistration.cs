@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
@@ -28,4 +30,16 @@ public sealed class ProcessRegistration
     ///     Registration options for this process.
     /// </summary>
     public ProcessConfiguration Configuration { get; set; } = null!;
+
+    /// <summary>Source descriptors keyed by binding name.</summary>
+    public IReadOnlyDictionary<string, FlowSourceDescriptor> SourceTypes { get; init; }
+        = new Dictionary<string, FlowSourceDescriptor>(StringComparer.Ordinal);
+
+    /// <summary>Message payload types keyed by message name.</summary>
+    public IReadOnlyDictionary<string, Type> MessagePayloadTypes { get; init; }
+        = new Dictionary<string, Type>(StringComparer.Ordinal);
+
+    /// <summary>Signal payload types keyed by signal name.</summary>
+    public IReadOnlyDictionary<string, Type> SignalPayloadTypes { get; init; }
+        = new Dictionary<string, Type>(StringComparer.Ordinal);
 }

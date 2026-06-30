@@ -12,14 +12,14 @@ adds the feature, middleware, resolvers, and the fluent builder.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Tenancy.Skeleton` | `Entities/SchemataTenant.cs`, `Entities/SchemataTenantHost.cs` |
-| `Schemata.Tenancy.Skeleton` | `ITenantResolver.cs`, `ITenantContextAccessor.cs`, `ITenantContextInitializer.cs`, `ITenantManager.cs`, `ITenantServiceScopeFactory.cs`, `ITenantServiceProviderFactory.cs`, `ITenantProviderCache.cs`, `ITenantProviderLease.cs`, `SchemataTenancyOptions.cs` |
-| `Schemata.Tenancy.Skeleton` | `Services/` — `SchemataTenantContextAccessor`, `SchemataTenantManager`, `SchemataTenantServiceProviderFactory`, `SchemataTenantServiceScopeFactory`, `MemoryCacheTenantProviderCache`, `TenantCompositeServiceProvider`, `CompositeScope`, `CompositeScopeFactory`, `TenantBoundContextAccessor` |
-| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs` |
-| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolvers), `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (overrides) |
-| `Schemata.Tenancy.Foundation` | `Resolvers/Request{Header,Host,Path,Principal,Query}Resolver.cs`, `Resolvers/TenantId.cs` |
+| Package                       | Key files                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Schemata.Tenancy.Skeleton`   | `Entities/SchemataTenant.cs`, `Entities/SchemataTenantHost.cs`                                                                                                                                                                                                                                   |
+| `Schemata.Tenancy.Skeleton`   | `ITenantResolver.cs`, `ITenantContextAccessor.cs`, `ITenantContextInitializer.cs`, `ITenantManager.cs`, `ITenantServiceScopeFactory.cs`, `ITenantServiceProviderFactory.cs`, `ITenantProviderCache.cs`, `ITenantProviderLease.cs`, `SchemataTenancyOptions.cs`                                   |
+| `Schemata.Tenancy.Skeleton`   | `Services/` — `SchemataTenantContextAccessor`, `SchemataTenantManager`, `SchemataTenantServiceProviderFactory`, `SchemataTenantServiceScopeFactory`, `MemoryCacheTenantProviderCache`, `TenantCompositeServiceProvider`, `CompositeScope`, `CompositeScopeFactory`, `TenantBoundContextAccessor` |
+| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs`                                                                                                                                                                                    |
+| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolvers), `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (overrides)                                                                                                                                                               |
+| `Schemata.Tenancy.Foundation` | `Resolvers/Request{Header,Host,Path,Principal,Query}Resolver.cs`, `Resolvers/TenantId.cs`                                                                                                                                                                                                        |
 
 ## Enabling the feature
 
@@ -101,13 +101,13 @@ public interface ITenantResolver {
 
 The fluent builder exposes five resolvers, each reading from one source:
 
-| Method | Resolver | Source |
-| --- | --- | --- |
-| `UseHeaderResolver()` | `RequestHeaderResolver` | `x-tenant-id` HTTP header |
-| `UseHostResolver()` | `RequestHostResolver<TTenant>` | `Host` header matched via `ITenantManager.FindByHost` |
-| `UsePathResolver()` | `RequestPathResolver` | `{Tenant}` route value |
-| `UsePrincipalResolver()` | `RequestPrincipalResolver` | `Tenant` claim on the principal |
-| `UseQueryResolver()` | `RequestQueryResolver` | `Tenant` query-string parameter |
+| Method                   | Resolver                       | Source                                                |
+| ------------------------ | ------------------------------ | ----------------------------------------------------- |
+| `UseHeaderResolver()`    | `RequestHeaderResolver`        | `x-tenant-id` HTTP header                             |
+| `UseHostResolver()`      | `RequestHostResolver<TTenant>` | `Host` header matched via `ITenantManager.FindByHost` |
+| `UsePathResolver()`      | `RequestPathResolver`          | `{Tenant}` route value                                |
+| `UsePrincipalResolver()` | `RequestPrincipalResolver`     | `Tenant` claim on the principal                       |
+| `UseQueryResolver()`     | `RequestQueryResolver`         | `Tenant` query-string parameter                       |
 
 Each extension calls `services.TryAddScoped<ITenantResolver, X>()`, and the accessor injects a
 single `ITenantResolver`. Only one resolver is active per host: the first `UseXxxResolver()` wins
@@ -142,11 +142,11 @@ tenant registrations so collection bindings stay coherent.
 
 `ForAll` and `ForTenant` on the builder populate these registrations:
 
-| Method | Lands in | Allowed lifetimes |
-| --- | --- | --- |
-| `ForAll(configure)` | Root `IServiceCollection` (host) | Any — these are normal host services seen by every tenant via the composite's root fallback |
-| `ForTenant(tenantId, configure)` | `SchemataTenancyOptions.TenantOverrides[tenantId]` | Singleton only |
-| `ForTenant((id, services, root) => …)` | `SchemataTenancyOptions.DynamicOverrides`, applied to every tenant container | Singleton only |
+| Method                                 | Lands in                                                                     | Allowed lifetimes                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ForAll(configure)`                    | Root `IServiceCollection` (host)                                             | Any — these are normal host services seen by every tenant via the composite's root fallback |
+| `ForTenant(tenantId, configure)`       | `SchemataTenancyOptions.TenantOverrides[tenantId]`                           | Singleton only                                                                              |
+| `ForTenant((id, services, root) => …)` | `SchemataTenancyOptions.DynamicOverrides`, applied to every tenant container | Singleton only                                                                              |
 
 A tenant-aware service that must participate in the per-request scope (an `AddDbContext`, a
 repository) belongs in `ForAll`; it reads the right tenant by consulting
@@ -187,13 +187,13 @@ a container with no bound tenant.
 
 ## Extension points
 
-| Interface | Purpose |
-| --- | --- |
-| `ITenantResolver` | Add a resolution strategy (register directly to combine sources). |
-| `ITenantManager<TTenant>` | Replace the Repository-backed manager. |
-| `ITenantServiceProviderFactory<TTenant>` | Replace the lease-based factory. |
-| `ITenantProviderCache` | Plug in a different cache while preserving lease semantics. |
-| `SchemataTenancyOptions` | Tune capacity, sliding expiration, and overrides. |
+| Interface                                | Purpose                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `ITenantResolver`                        | Add a resolution strategy (register directly to combine sources). |
+| `ITenantManager<TTenant>`                | Replace the Repository-backed manager.                            |
+| `ITenantServiceProviderFactory<TTenant>` | Replace the lease-based factory.                                  |
+| `ITenantProviderCache`                   | Plug in a different cache while preserving lease semantics.       |
+| `SchemataTenancyOptions`                 | Tune capacity, sliding expiration, and overrides.                 |
 
 ## Caveats
 

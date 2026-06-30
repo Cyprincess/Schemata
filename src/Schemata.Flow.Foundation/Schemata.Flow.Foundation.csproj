@@ -17,7 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Entity.Owner\Schemata.Entity.Owner.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
   </ItemGroup>
 

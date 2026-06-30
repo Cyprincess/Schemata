@@ -33,7 +33,7 @@ public sealed partial class DefaultScheduler
             NextRunTime   = _time.GetUtcNow().UtcDateTime,
             Replay        = false,
             State         = JobState.Active,
-            Variables     = JobVariableSerializer.Serialize(context.Variables),
+            Variables     = new(context.Variables),
         };
 
         // A trigger is a one-shot occurrence: persist its Pending row synchronously so the returned
@@ -109,6 +109,7 @@ public sealed partial class DefaultScheduler
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,
             ArgsJson      = context.ArgsJson ?? job.ArgsJson,
+            Variables     = new(context.Variables),
             State         = ExecutionState.Pending,
             StartTime     = context.StartTime!.Value,
         };

@@ -32,10 +32,10 @@ schema.UseResource()
       .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
-`WithAuthorization()` registers two advisor families per operation: the anonymous advisors at
-`Order` 100,000,000 (which mark operations allowed by an entity's `[Anonymous]` attribute) and the
-authorize advisors at 110,000,000 (which call the access and entitlement providers). Without
-`WithAuthorization()`, the providers are never invoked.
+`WithAuthorization()` registers two advisor families per operation: the anonymous advisors (which
+mark operations allowed by an entity's `[Anonymous]` attribute) run first, then the authorize
+advisors (which call the access and entitlement providers). Without `WithAuthorization()`, the
+providers are never invoked. Advisor orders are listed in [Security](../documents/security.md).
 
 ## How permissions work
 
@@ -43,13 +43,13 @@ authorize advisors at 110,000,000 (which call the access and entitlement provide
 matcher whether the principal holds it. `DefaultPermissionResolver` produces `{entity}.{operation}`
 in kebab-case. For `Student`:
 
-| Operation | Permission |
-| --- | --- |
-| List | `student.list` |
-| Get | `student.get` |
-| Create | `student.create` |
-| Update | `student.update` |
-| Delete | `student.delete` |
+| Operation | Permission       |
+| --------- | ---------------- |
+| List      | `student.list`   |
+| Get       | `student.get`    |
+| Create    | `student.create` |
+| Update    | `student.update` |
+| Delete    | `student.delete` |
 
 `DefaultPermissionMatcher` reads claims of the type in `SchemataSecurityOptions.PermissionClaimType`
 (default `"role"`) and supports exact matches plus a single `*` wildcard segment:
@@ -90,19 +90,20 @@ public sealed class StudentAccessProvider : IAccessProvider<Student, StudentRequ
 }
 ```
 
-Register it before `UseSecurity()`, since the feature uses `TryAddScoped` for the open-generic
-default:
+A closed-generic registration takes precedence over the open-generic default no matter where it
+appears in startup:
 
 ```csharp
+schema.UseSecurity();
 schema.ConfigureServices(services =>
     services.AddScoped<IAccessProvider<Student, StudentRequest>, StudentAccessProvider>());
-schema.UseSecurity();
 ```
 
 ## Row-level filtering
 
 `IEntitlementProvider<T, TRequest>` returns a LINQ predicate composed into the repository query, or
-`null` for no filter. The default returns `null`. To restrict each user to the rows they created:
+`null` for no filter. The default returns `null`. To restrict each user to their own rows, give
+`Student` the `IOwnable` trait (a `string? Owner` property) and filter on it:
 
 ```csharp
 using System;
@@ -124,15 +125,18 @@ public sealed class StudentEntitlementProvider
 
         Expression<Func<Student, bool>> filter = string.IsNullOrEmpty(id)
             ? _ => false
-            : s => s.CreatedBy == id;
+            : s => s.Owner == id;
 
         return Task.FromResult<Expression<Func<Student, bool>>?>(filter);
     }
 }
 ```
 
-Register it the same way as the access provider. Entitlement filtering applies to List, Get, Update,
-and Delete; Create has no entitlement step.
+Populating `Owner` on create is your side of the contract — set it in an add advisor, or wire the
+`Schemata.Entity.Owner` package's `UseOwner()` which fills it through an `IOwnerResolver` (see the
+[ownership cookbook](../cookbook/ownership-and-row-acl.md)). Register the provider the same way as
+the access provider. Entitlement filtering applies to List, Get, Update, and Delete; Create has no
+entitlement step.
 
 ## Verify
 
@@ -144,16 +148,16 @@ dotnet run
 # Login as Alice (Identity guide)
 curl -X POST http://localhost:5000/Authenticate/Login \
      -H "Content-Type: application/json" \
-     -d '{"username":"alice@example.com","password":"P@ssw0rd!"}'
+     -d '{"username":"alice","password":"P@ssw0rd!"}'
 
 # Create a student — succeeds with the student.* claim
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer <alice_token>" \
      -d '{"full_name":"Bob","age":22}'
 
 # Without a token the access provider denies the request: 403
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 ```
 
 ## Next steps

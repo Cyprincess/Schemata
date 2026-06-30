@@ -13,23 +13,24 @@ the always-on repository advisors in `Schemata.Entity.Repository`, the ownership
 
 ## Trait-to-advisor summary
 
-| Trait | Built-in advisor | Pipeline | Order |
-| --- | --- | --- | --- |
-| `IIdentifier` | — | — | — |
-| `ITimestamp` | `AdviceAddTimestamp<TEntity>` | Add | 100,000,000 |
-| `ITimestamp` | `AdviceUpdateTimestamp<TEntity>` | Update | 100,000,000 |
-| `IConcurrency` | `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 |
-| `ICanonicalName` | `AdviceAddCanonicalName<TEntity>` | Add | 220,000,000 |
-| `ISoftDelete` | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 |
-| `ISoftDelete` | `AdviceAddSoftDelete<TEntity>` | Add | 900,000,000 |
-| `ISoftDelete` | `AdviceRemoveSoftDelete<TEntity>` | Remove | 900,000,000 |
-| `IOwnable` | `AdviceAddOwner<TEntity>` | Add | 230,000,000 |
-| `IOwnable` | `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 |
-| `IExpiration` | — | — | — |
-| `IDescriptive` | — | — | — |
-| `IStateful` | — | — | — |
-| `ITransition` | — | — | — |
-| `ISourceReference` | — | — | — |
+| Trait              | Built-in advisor                      | Pipeline   | Order       |
+| ------------------ | ------------------------------------- | ---------- | ----------- |
+| `IIdentifier`      | —                                     | —          | —           |
+| `ITimestamp`       | `AdviceAddTimestamp<TEntity>`         | Add        | 100,000,000 |
+| `ITimestamp`       | `AdviceUpdateTimestamp<TEntity>`      | Update     | 100,000,000 |
+| `IConcurrency`     | `AdviceAddConcurrency<TEntity>`       | Add        | 110,000,000 |
+| `ICanonicalName`   | `AdviceAddCanonicalName<TEntity>`     | Add        | 120,000,000 |
+| `ISoftDelete`      | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 |
+| `ISoftDelete`      | `AdviceAddSoftDelete<TEntity>`        | Add        | 900,000,000 |
+| `ISoftDelete`      | `AdviceRemoveSoftDelete<TEntity>`     | Remove     | 900,000,000 |
+| `IOwnable`         | `AdviceAddOwner<TEntity>`             | Add        | 130,000,000 |
+| `IOwnable`         | `AdviceBuildQueryOwner<TEntity>`      | BuildQuery | 110,000,000 |
+| `IExpiration`      | —                                     | —          | —           |
+| `IDescriptive`     | —                                     | —          | —           |
+| `IAnnotatable`     | —                                     | —          | —           |
+| `IStateful`        | —                                     | —          | —           |
+| `ITransition`      | —                                     | —          | —           |
+| `ISourceReference` | —                                     | —          | —           |
 
 Traits with no built-in advisor are data contracts: application code or other subsystems read and
 write their properties. `IConcurrency` enforcement on update is provider-level, not an advisor — see
@@ -60,10 +61,10 @@ public interface ITimestamp
 
 Records creation and last-update times, per AIP-148 `create_time` / `update_time`.
 
-| Advisor | Pipeline | Order | Behavior |
-| --- | --- | --- | --- |
-| `AdviceAddTimestamp<TEntity>` | Add | 100,000,000 | Sets `CreateTime` and `UpdateTime` to one reading of the injected `TimeProvider`'s UTC clock, so both are equal on create. |
-| `AdviceUpdateTimestamp<TEntity>` | Update | 100,000,000 | Sets `UpdateTime` to the current UTC time. |
+| Advisor                          | Pipeline | Order       | Behavior                                                                                                                   |
+| -------------------------------- | -------- | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `AdviceAddTimestamp<TEntity>`    | Add      | 100,000,000 | Sets `CreateTime` and `UpdateTime` to one reading of the injected `TimeProvider`'s UTC clock, so both are equal on create. |
+| `AdviceUpdateTimestamp<TEntity>` | Update   | 100,000,000 | Sets `UpdateTime` to the current UTC time.                                                                                 |
 
 Both advisors skip when `TimestampSuppressed` is present (call `repository.SuppressTimestamp()`).
 
@@ -79,9 +80,9 @@ public interface IConcurrency
 Supports optimistic concurrency via a GUID version token, per AIP-154. The property is named
 `Timestamp` but holds a `Guid`, not a time value. `Guid.Empty` denotes an unstamped entity.
 
-| Advisor | Pipeline | Order | Behavior |
-| --- | --- | --- | --- |
-| `AdviceAddConcurrency<TEntity>` | Add | 110,000,000 | Mints a new GUID and assigns it to `Timestamp`. |
+| Advisor                         | Pipeline | Order       | Behavior                                        |
+| ------------------------------- | -------- | ----------- | ----------------------------------------------- |
+| `AdviceAddConcurrency<TEntity>` | Add      | 110,000,000 | Mints a new GUID and assigns it to `Timestamp`. |
 
 There is no add-side suppress flag and no update advisor. The update check is enforced by the database,
 gated on the concrete entity annotating its `Timestamp` with `[ConcurrencyCheck]`
@@ -123,9 +124,9 @@ Declare the pattern on the entity class:
 public class Book : ICanonicalName { /* ... */ }
 ```
 
-| Advisor | Pipeline | Order | Behavior |
-| --- | --- | --- | --- |
-| `AdviceAddCanonicalName<TEntity>` | Add | 220,000,000 | Resolves the `[CanonicalName]` pattern against entity properties via `ResourceNameDescriptor` and writes the result to `CanonicalName`. |
+| Advisor                           | Pipeline | Order       | Behavior                                                                                                                                |
+| --------------------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `AdviceAddCanonicalName<TEntity>` | Add      | 120,000,000 | Resolves the `[CanonicalName]` pattern against entity properties via `ResourceNameDescriptor` and writes the result to `CanonicalName`. |
 
 The advisor has no suppress flag and runs whenever the entity implements `ICanonicalName` and its type
 carries a registered pattern.
@@ -143,11 +144,11 @@ public interface ISoftDelete
 Enables soft deletion per AIP-164: a delete sets `DeleteTime` instead of removing the row. `PurgeTime`
 is an optional scheduled permanent-removal time the framework does not enforce.
 
-| Advisor | Pipeline | Order | Behavior |
-| --- | --- | --- | --- |
-| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 | Appends `.Where(e => e.DeleteTime == null)` to every query. |
-| `AdviceAddSoftDelete<TEntity>` | Add | 900,000,000 | Clears `DeleteTime` to `null` so a newly added entity is never marked deleted. |
-| `AdviceRemoveSoftDelete<TEntity>` | Remove | 900,000,000 | Sets `DeleteTime` to the current UTC time, calls `repository.UpdateAsync(entity)`, and returns `AdviseResult.Handle` to prevent the physical delete. |
+| Advisor                               | Pipeline   | Order       | Behavior                                                                                                                                             |
+| ------------------------------------- | ---------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 | Appends `.Where(e => e.DeleteTime == null)` to every query.                                                                                          |
+| `AdviceAddSoftDelete<TEntity>`        | Add        | 900,000,000 | Clears `DeleteTime` to `null` so a newly added entity is never marked deleted.                                                                       |
+| `AdviceRemoveSoftDelete<TEntity>`     | Remove     | 900,000,000 | Sets `DeleteTime` to the current UTC time, calls `repository.UpdateAsync(entity)`, and returns `AdviseResult.Handle` to prevent the physical delete. |
 
 The add and remove advisors skip when `SoftDeleteSuppressed` is present
 (`repository.SuppressSoftDelete()`). The query filter skips separately under `QuerySoftDeleteSuppressed`
@@ -165,10 +166,10 @@ public interface IOwnable
 Records the canonical name of the principal that owns the entity (e.g., `users/chino`). The
 `Schemata.Entity.Owner` package supplies two advisors, both registered by `UseOwner()`:
 
-| Advisor | Pipeline | Order | Behavior |
-| --- | --- | --- | --- |
-| `AdviceAddOwner<TEntity>` | Add | 230,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset. |
-| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query. |
+| Advisor                          | Pipeline   | Order       | Behavior                                                                           |
+| -------------------------------- | ---------- | ----------- | ---------------------------------------------------------------------------------- |
+| `AdviceAddOwner<TEntity>`        | Add        | 130,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset. |
+| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query.                            |
 
 Both consult `SchemataOwnerOptions.OnNullOwner` when the resolver returns `null`: `Reject` (default)
 throws `PermissionDeniedException`, `EmptyResult` blocks, `AllowAll` continues. See
@@ -191,15 +192,31 @@ Marks an entity that expires at a scheduled time, per AIP-214 `expire_time`. App
 ```csharp
 public interface IDescriptive
 {
-    string?                     DisplayName  { get; set; }
-    Dictionary<string, string>? DisplayNames { get; set; }
-    string?                     Description  { get; set; }
-    Dictionary<string, string>? Descriptions { get; set; }
+    string?                      DisplayName  { get; set; }
+    Dictionary<string, string?>? DisplayNames { get; set; }
+    string?                      Description  { get; set; }
+    Dictionary<string, string?>? Descriptions { get; set; }
 }
 ```
 
 Provides user-facing display names and descriptions per AIP-148. `DisplayNames` and `Descriptions` are
 localized variants keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`). No built-in advisor.
+
+## IAnnotatable
+
+```csharp
+using System.Collections.Generic;
+
+public interface IAnnotatable
+{
+    Dictionary<string, string?> Annotations { get; set; }
+}
+```
+
+Declares the client-managed annotations map, per AIP-148 `annotations`. Clients store small amounts
+of arbitrary data under string keys; the framework and engines only persist and serve the map. The
+property is persisted as a JSON text column through the provider dictionary conversion
+(`SchemataModelCustomizer` on EF Core, the metadata reader on LINQ to DB). No built-in advisor.
 
 ## IStateful
 
@@ -245,13 +262,13 @@ rows with no semantic source leave them empty. No built-in repository advisor.
 
 ## Common combinations
 
-| Pattern | Traits |
-| --- | --- |
-| Basic entity | `IIdentifier` + `ITimestamp` + `ISoftDelete` |
-| Concurrency-safe | adds `IConcurrency` |
-| Named resource | adds `ICanonicalName` |
-| Owned resource | adds `IOwnable` |
-| Audited resource | adds `ITransition` |
+| Pattern          | Traits                                       |
+| ---------------- | -------------------------------------------- |
+| Basic entity     | `IIdentifier` + `ITimestamp` + `ISoftDelete` |
+| Concurrency-safe | adds `IConcurrency`                          |
+| Named resource   | adds `ICanonicalName`                        |
+| Owned resource   | adds `IOwnable`                              |
+| Audited resource | adds `ITransition`                           |
 
 ## See also
 

@@ -5,12 +5,6 @@ using Xunit;
 
 namespace Schemata.Resource.Grpc.Integration.Tests;
 
-/// <summary>
-///     Verifies gRPC service behaviour when advisor pipelines block or allow operations.
-///     Uses the shared <see cref="GrpcTestCollection" /> fixture so the
-///     <see cref="WebAppFactory" /> is not re-created (avoids static <c>RuntimeTypeModel</c>
-///     configuration issues in <c>RuntimeTypeModelConfigurator</c>).
-/// </summary>
 [Collection("GrpcIntegration")]
 [Trait("Category", "Integration")]
 public class ResourceServiceBlockedShould

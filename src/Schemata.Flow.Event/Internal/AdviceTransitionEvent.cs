@@ -37,30 +37,29 @@ public sealed class AdviceTransitionEvent : IFlowTransitionAdvisor
     ) {
         _subscriptions.Join(context.UnitOfWork!);
 
-        var process     = context.Process;
-        var instance    = context.Instance;
+        var token       = context.Token;
         var definition  = context.Definition;
-        var processName = process.CanonicalName!;
+        var processName = context.Snapshot.Process.CanonicalName!;
 
-        // The instance carries the new waiting element; PreviousWaitingAtId is the only source for
-        // the element being left, so its subscription can be removed.
-        if (!string.IsNullOrEmpty(context.PreviousWaitingAtId)
-         && context.PreviousWaitingAtId != instance.WaitingAtId
+        // PreviousWaitingAtName is the only source for the element being left, so its subscription
+        // can be removed when the token moved off it.
+        if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
+         && context.PreviousWaitingAtName != token.WaitingAtName
          && definition is not null) {
-            var oldElement = definition.Elements.FirstOrDefault(e => e.Id == context.PreviousWaitingAtId);
-            foreach (var elementId in ResolveCatchElementIds(oldElement, definition)) {
-                await RemoveSubscriptionAsync(SubscriptionId(processName, elementId), ct);
+            var oldElement = definition.Elements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
+            foreach (var elementName in ResolveCatchElementNames(oldElement, definition)) {
+                await RemoveSubscriptionAsync(SubscriptionId(processName, elementName), ct);
             }
         }
 
-        if (instance.IsComplete || string.IsNullOrEmpty(instance.WaitingAtId) || definition is null) {
+        if (string.IsNullOrEmpty(token.WaitingAtName) || definition is null) {
             return AdviseResult.Continue;
         }
 
-        var newElement = definition.Elements.FirstOrDefault(e => e.Id == instance.WaitingAtId);
-        foreach (var (elementId, eventDef) in ResolveCatchEventDefinitions(newElement, definition)) {
+        var newElement = definition.Elements.FirstOrDefault(e => e.Name == token.WaitingAtName);
+        foreach (var (elementName, eventDef) in ResolveCatchEventDefinitions(newElement, definition)) {
             await UpsertSubscriptionAsync(
-                SubscriptionId(processName, elementId),
+                SubscriptionId(processName, elementName),
                 eventDef.Name,
                 eventDef is Message ? processName : null,
                 processName,
@@ -109,26 +108,26 @@ public sealed class AdviceTransitionEvent : IFlowTransitionAdvisor
         }
     }
 
-    private static string SubscriptionId(string processName, string elementId) {
-        return $"flow:{processName}:{elementId}";
+    private static string SubscriptionId(string processName, string elementName) {
+        return $"flow:{processName}:{elementName}";
     }
 
-    private static IEnumerable<string> ResolveCatchElementIds(FlowElement? element, ProcessDefinition definition) {
-        return ResolveCatchEventDefinitions(element, definition).Select(t => t.ElementId);
+    private static IEnumerable<string> ResolveCatchElementNames(FlowElement? element, ProcessDefinition definition) {
+        return ResolveCatchEventDefinitions(element, definition).Select(t => t.ElementName);
     }
 
-    private static IEnumerable<(string ElementId, IEventDefinition Definition)> ResolveCatchEventDefinitions(
+    private static IEnumerable<(string ElementName, IEventDefinition Definition)> ResolveCatchEventDefinitions(
         FlowElement?      element,
         ProcessDefinition definition
     ) {
         if (element is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: not null } evt) {
-            yield return (evt.Id, evt.Definition);
+            yield return (evt.Name, evt.Definition);
         } else if (element is EventBasedGateway gateway) {
             foreach (var flow in definition.Flows.Where(f => f.Source == gateway)) {
                 if (flow.Target is FlowEvent {
                     Position: EventPosition.IntermediateCatch, Definition: not null,
                 } catchEvt) {
-                    yield return (catchEvt.Id, catchEvt.Definition);
+                    yield return (catchEvt.Name, catchEvt.Definition);
                 }
             }
         }

@@ -38,7 +38,7 @@ public class LocalizedMessageFormatterShould
 
     [Fact]
     public void Format_PositionalTemplate_NullArgs_ReturnsTemplate() {
-        var rendered = LocalizedMessageFormatter.Format("static message", args: null);
+        var rendered = LocalizedMessageFormatter.Format("static message", null);
 
         Assert.Equal("static message", rendered);
     }
@@ -57,15 +57,15 @@ public class LocalizedMessageFormatterShould
 
     [Fact]
     public void Format_NullOrEmptyTemplate_ReturnsAsIs() {
-        Assert.Null(LocalizedMessageFormatter.Format(template: null, args: null));
-        Assert.Equal(string.Empty, LocalizedMessageFormatter.Format(string.Empty, args: null));
+        Assert.Null(LocalizedMessageFormatter.Format(null, null));
+        Assert.Equal(string.Empty, LocalizedMessageFormatter.Format(string.Empty, null));
     }
 
     [Fact]
     public void FormatInvariant_ResolvesResourceKey_AndSubstitutesArgs() {
         var rendered = LocalizedMessageFormatter.FormatInvariant(
             SchemataResources.INVALID_PARENT,
-            new Dictionary<string, string> { ["parent"] = "tenants/acme" });
+            new Dictionary<string, string?> { ["parent"] = "tenants/acme" });
 
         Assert.Equal("The parent 'tenants/acme' is invalid.", rendered);
     }

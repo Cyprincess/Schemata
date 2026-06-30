@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -47,7 +46,7 @@ public static class CelValues
     public static object? PredicateResult(object? value) { return value is true; }
 
     public static object? ConditionalError(object? value) {
-        return value is CelError error ? error : Error("no matching overload");
+        return value as CelError ?? Error("no matching overload");
     }
 
     public static object? Has(object? value) {
@@ -425,8 +424,8 @@ public static class CelValues
             uint u => (ulong)u,
             ushort u => (ulong)u,
             float f => (double)f,
-            IDictionary<string, object?> map => map.ToDictionary(pair => (object)pair.Key, pair => Normalize(pair.Value), KeyComparer),
-            IReadOnlyDictionary<string, object?> map => map.ToDictionary(pair => (object)pair.Key, pair => Normalize(pair.Value), KeyComparer),
+            IDictionary<string, object?> map => map.ToDictionary(pair => pair.Key, pair => Normalize(pair.Value), KeyComparer),
+            IReadOnlyDictionary<string, object?> map => map.ToDictionary(pair => pair.Key, pair => Normalize(pair.Value), KeyComparer),
             IEnumerable<object?> list when value is not string and not byte[] => list.Select(Normalize).ToList(),
             var other => other,
         };

@@ -192,7 +192,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         }
 
         var responseType = _registry.Resolve(ea.RoutingKey);
-        if (responseType == null) {
+        if (responseType is null) {
             return Task.CompletedTask;
         }
 

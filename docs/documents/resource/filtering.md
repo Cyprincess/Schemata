@@ -4,13 +4,13 @@
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `SchemataResourceOptions.cs`, `SchemataResourceBuilder.cs` |
+| Package                         | Key files                                                                                                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Foundation`  | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `SchemataResourceOptions.cs`, `SchemataResourceBuilder.cs`                          |
 | `Schemata.Expressions.Skeleton` | `ExpressionLanguageResolver.cs`, `ResolvedLanguage.cs`, `FilteringMode.cs`, `ResidualPage.cs`, `IExpressionCompiler.cs`, `IExpressionPushdownPlanner.cs`, `IOrderCompiler.cs` |
-| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs` |
-| `Schemata.Expressions.Cel` | `CelCompiler.cs`, `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs` |
-| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Aip`      | `AipCompiler.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
+| `Schemata.Expressions.Cel`      | `CelCompiler.cs`, `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
+| `Schemata.Expressions.Order`    | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                                                                                          |
 
 ## Enabling languages
 
@@ -109,33 +109,33 @@ Enable it with `UseOrdering()` or `services.AddOrderExpressions()`.
 
 AIP remains the default language when `UseAip()` is the first enabled entry. Its common operators are:
 
-| Operator | Syntax | Example |
-| --- | --- | --- |
-| Equality | `=` | `full_name = "alice"` |
-| Inequality | `!=` | `age != 20` |
-| Less than | `<` | `age < 25` |
-| Less than or equal | `<=` | `age <= 25` |
-| Greater than | `>` | `age > 18` |
-| Greater than or equal | `>=` | `age >= 18` |
-| Has | `:` | `full_name:"ali"` |
-| Presence | `:*` | `tags:*` |
-| Logical AND | `AND` | `age > 18 AND full_name:"ali"` |
-| Logical OR | `OR` | `age = 1 OR age = 2` |
-| Logical NOT | `NOT` / `-` | `NOT age = 3`, `-age = 3` |
-| Grouping | `(...)` | `(age > 18 OR full_name:"ali")` |
+| Operator              | Syntax      | Example                         |
+| --------------------- | ----------- | ------------------------------- |
+| Equality              | `=`         | `full_name = "alice"`           |
+| Inequality            | `!=`        | `age != 20`                     |
+| Less than             | `<`         | `age < 25`                      |
+| Less than or equal    | `<=`        | `age <= 25`                     |
+| Greater than          | `>`         | `age > 18`                      |
+| Greater than or equal | `>=`        | `age >= 18`                     |
+| Has                   | `:`         | `full_name:"ali"`               |
+| Presence              | `:*`        | `tags:*`                        |
+| Logical AND           | `AND`       | `age > 18 AND full_name:"ali"`  |
+| Logical OR            | `OR`        | `age = 1 OR age = 2`            |
+| Logical NOT           | `NOT` / `-` | `NOT age = 3`, `-age = 3`       |
+| Grouping              | `(...)`     | `(age > 18 OR full_name:"ali")` |
 
 For CEL syntax, see [CEL Expressions](../expressions/cel.md). For the full AIP grammar, see [AIP Expressions](../expressions/aip.md).
 
 ## Pagination
 
-`PageToken` carries `Parent`, `Filter`, `Language`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64. `PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException` (`InvalidPageToken`).
+`PageToken` carries `Parent`, `Filter`, `Language`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64. `PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException` (`INVALID_PAGE_TOKEN`).
 
-| Parameter | Default | Cap |
-| --- | --- | --- |
-| `page_size` | 25 | 100 |
-| `skip` | 0 | unbounded |
+| Parameter   | Default | Cap       |
+| ----------- | ------- | --------- |
+| `page_size` | 25      | 100       |
+| `skip`      | 0       | unbounded |
 
-The token must match `Parent`, `Filter`, `Language`, `OrderBy`, and `ShowDeleted` from the current request. A mismatch throws `ValidationException` (`InvalidPageToken`). A negative `page_size` throws `ValidationException` (`InvalidPageSize`).
+The token must match `Parent`, `Filter`, `Language`, `OrderBy`, and `ShowDeleted` from the current request. A mismatch throws `ValidationException` (`INVALID_PAGE_TOKEN`). A negative `page_size` throws `ValidationException` (`INVALID_PAGE_SIZE`).
 
 Without a residual predicate, paging applies in the backend query with one look-ahead row. With a residual predicate, backend paging is delayed until `ResidualPage` has applied local filtering.
 
@@ -145,12 +145,12 @@ Without a residual predicate, paging applies in the backend query with one look-
 
 `ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>`:
 
-| Method | Effect |
-| --- | --- |
-| `ApplyFiltering(predicate)` | Appends `Where(predicate)`. |
-| `ApplyOrdering(order)` | Applies the order function. |
+| Method                              | Effect                                             |
+| ----------------------------------- | -------------------------------------------------- |
+| `ApplyFiltering(predicate)`         | Appends `Where(predicate)`.                        |
+| `ApplyOrdering(order)`              | Applies the order function.                        |
 | `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row. |
-| `ApplyModification(predicate)` | Appends an arbitrary `Where` for advisors. |
+| `ApplyModification(predicate)`      | Appends an arbitrary `Where` for advisors.         |
 
 The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, and `ListAsync`.
 

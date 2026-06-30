@@ -37,9 +37,9 @@ public sealed class ExpungeHandler<TEntity> : IResourceMethodHandler<TEntity, Em
 
         if (entity.DeleteTime is null) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                name: name ?? entity.CanonicalName,
-                subject: PreconditionSubjects.StateNotDeleted,
-                description: "Resource is not deleted.");
+                name ?? entity.CanonicalName,
+                PreconditionSubjects.StateNotDeleted,
+                "Resource is not deleted.");
         }
 
         using (_repository.SuppressSoftDelete()) {

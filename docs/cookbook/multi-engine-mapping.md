@@ -74,7 +74,7 @@ the call, so the mask you send is `snake_case` and the mapper receives CLR names
 path is rejected as an invalid `update_mask`.
 
 ```shell
-curl -X PATCH http://localhost:5000/students/<name> \
+curl -X PATCH http://localhost:5000/v1/students/<name> \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Updated","update_mask":"full_name"}'
 ```

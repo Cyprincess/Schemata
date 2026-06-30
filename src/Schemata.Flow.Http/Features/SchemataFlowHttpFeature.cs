@@ -9,6 +9,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Http.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
@@ -39,11 +40,13 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
     }
 
     private static void RegisterHandlers(IServiceCollection services) {
-        services.TryAddScoped<StartProcessHandler>();
+        services.TryAddScoped<FlowHttpSourceLoader>();
+        services.TryAddScoped<FlowHttpStartProcessHandler>();
         services.TryAddScoped<CompleteActivityHandler>();
-        services.TryAddScoped<CorrelateMessageHandler>();
-        services.TryAddScoped<ThrowSignalHandler>();
+        services.TryAddScoped<FlowHttpCorrelateMessageHandler>();
+        services.TryAddScoped<FlowHttpThrowSignalHandler>();
         services.TryAddScoped<TerminateProcessHandler>();
+        services.TryAddScoped<CancelTokenHandler>();
     }
 
     private static void RegisterResources(SchemataResourceBuilder resources, string endpoint) {
@@ -52,12 +55,19 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
             resource => {
                 resource.Operations = [Operations.Get, Operations.List];
                 resource.Methods = [
-                    new("start",     typeof(StartProcessHandler), ResourceMethodScope.Collection),
+                    new("start",     typeof(FlowHttpStartProcessHandler), ResourceMethodScope.Collection),
                     new("complete",  typeof(CompleteActivityHandler)),
-                    new("correlate", typeof(CorrelateMessageHandler)),
-                    new("signal",    typeof(ThrowSignalHandler), ResourceMethodScope.Collection),
+                    new("correlate", typeof(FlowHttpCorrelateMessageHandler)),
+                    new("signal",    typeof(FlowHttpThrowSignalHandler), ResourceMethodScope.Collection),
                     new("terminate", typeof(TerminateProcessHandler)),
                 ];
+            });
+
+        resources.Use<SchemataProcessToken, SchemataProcessToken, SchemataProcessToken, SchemataProcessToken>(
+            [endpoint],
+            resource => {
+                resource.Operations = [Operations.Get, Operations.List];
+                resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
             });
 
         resources.Use<SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition>(

@@ -65,7 +65,7 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
 
         foreach (var s in requested) {
             await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
-                error: OAuthErrors.InvalidScope, resource: SchemataResources.INVALID_SCOPE);
+                OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 
         return AdviseResult.Continue;

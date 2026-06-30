@@ -7,12 +7,14 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Flow.Foundation.Advisors;
 using Schemata.Flow.Skeleton;
+using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation.Features;
 
-/// <summary>Registers the BPMN process engine, registry, runtime, and lifecycle observers.</summary>
+/// <summary>Registers the BPMN process registry, authorization, lifecycle notifier, and resource-method handlers.</summary>
 public sealed class SchemataFlowFeature : FeatureBase
 {
     /// <summary>Default <see cref="FeatureBase.Order" /> for the Flow feature.</summary>
@@ -41,8 +43,21 @@ public sealed class SchemataFlowFeature : FeatureBase
 
             return registry;
         });
-        services.TryAddSingleton<IProcessRuntime, ProcessRuntime>();
 
-        services.AddHostedService<ProcessInitializer>();
+        services.TryAddSingleton<ProcessPersistence>();
+        services.TryAddSingleton<FlowProcessAuthorization>();
+        services.TryAddScoped<ProcessLifecycleNotifier>();
+        services.TryAddScoped<FlowRunner>();
+        services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(
+            typeof(IFlowSourceAdvisor<>),
+            typeof(AdviceSourceProjection<>)));
+
+        services.TryAddScoped<StartProcessHandler>();
+        services.TryAddScoped<CompleteActivityHandler>();
+        services.TryAddScoped<CorrelateMessageHandler>();
+        services.TryAddScoped<ThrowSignalHandler>();
+        services.TryAddScoped<TerminateProcessHandler>();
+        services.TryAddScoped<CancelTokenHandler>();
     }
 }

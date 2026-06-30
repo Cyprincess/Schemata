@@ -1,136 +1,101 @@
-# Schemata Knowledge Base
+# SCHEMATA KNOWLEDGE BASE
 
-**Commit:** `486efd2f` on `master`
+**Generated:** 2026-07-10 · **Commit:** a696e55c (dirty) · **Branch:** master
 
-## Overview
+## OVERVIEW
 
-Modular .NET application framework. Ships ~60 NuGet packages organized as **feature domains** (Authorization, Caching, Entity, Event, Expressions, Flow, Identity, Insight, Mapping, Push, Resource, Scheduling, Security, Tenancy) plus a composition core (`Schemata.Core`), contracts (`Schemata.Abstractions`), an advisor runtime (`Schemata.Advice`), a module loader (`Schemata.Modular`), and 3 meta-package families (`Schemata.{Application,Business,Module}.Targets`).
+Modular .NET application framework shipped as ~60 NuGet packages (C#, `net8.0;net10.0`, ASP.NET Core). Consumers bootstrap via `WebApplicationBuilder.UseSchemata(...)`; features compose through a three-phase lifecycle (`ConfigureServices` / `ConfigureApplication` / `ConfigureEndpoints` on `ISimpleFeature`). Built with the dotnet Arcade SDK. There is no `Program.cs` in this repo — the entire public API is extension methods living in `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces.
 
-## Structure
+## STRUCTURE
 
 ```
-.
-├── src/             # 58 runtime packages (net8.0;net10.0)
-├── tests/           # 27 test projects (xUnit; unit + integration)
-├── generators/      # 2 Roslyn incremental generators (netstandard2.0)
-├── targets/         # 10 MSBuild meta-packages (consumer-facing umbrellas)
-├── docs/            # DocFX site (guides/cookbook/documents/modeling + api/)
-├── eng/             # Arcade SDK shared assets — DO NOT EDIT eng/common
-├── specs/cel/       # git submodule → google/cel-spec (conformance vectors)
-├── artifacts/       # all bin/obj/log/packages redirected here (Arcade)
-├── .github/         # build.yml, analysis.yml (SonarCloud + cocogitto), docs.yml
-├── Schemata.slnx    # solution (XML format, not legacy .sln)
-├── Directory.Build.props / .targets    # repo-wide MSBuild + Arcade import
-├── Directory.Packages.props            # central package versions (CPM)
-├── global.json                          # SDK 10.0.201, Arcade SDK pin
-└── cog.toml                             # Conventional Commits / changelog config
+src/         60 packages: <Domain>.<Layer> naming (taxonomy below)
+generators/  Roslyn source generators (netstandard2.0): Advice codegen + SKM DSL
+targets/     10 MSBuild meta-packages (Application/Business/Module × Bare/Persisting/Complex[/Modular])
+tests/       30 xUnit projects; classes named *Should, never *Tests
+eng/         Arcade build infra — eng/common/ is generated upstream, DO NOT EDIT
+docs/        DocFX site (guides/, cookbook/, documents/, modeling/, rfcs/) + cog CHANGELOG
+specs/       git submodules: google/cel-spec, bpmn-miwg-test-suite (required by tests)
+artifacts/   Arcade build drop; targets/ packages pack analyzer DLLs from here post-build
 ```
 
-## Where to Look
+### Layer taxonomy (`<Domain>.<Layer>`)
+
+| Suffix | Role |
+|---|---|
+| bare names (`Abstractions`, `Common`, `Core`, `Advice`, `Modular`) | framework kernel |
+| `.Skeleton` | contracts: entities, options, advisor interfaces — no DI wiring |
+| `.Foundation` | concrete implementation + `UseXxx()` feature registration |
+| `.Http` / `.Grpc` | transport adapters |
+| `.<Provider>` | vendor adapters: EntityFrameworkCore, LinqToDB, Redis, RabbitMq, AutoMapper, Mapster, FluentValidation, Identity |
+| bridges | two-Foundation bridges: Flow.Event, Flow.Scheduling, Scheduling.Event, Push.Scheduling |
+| engines | Flow.StateMachine (default, BPMN subset) vs Flow.Bpmn (full BPMN 2.0.2; in NO meta-target) |
+
+## WHERE TO LOOK
 
 | Task | Location |
 |---|---|
-| Add or change a built-in feature | [src/Schemata.Core/Features/](src/Schemata.Core/Features/) |
-| Add a new feature domain | new `src/Schemata.{Domain}.{Foundation,Skeleton,...}/` package + see [src/AGENTS.md](src/AGENTS.md) |
-| Change OAuth/OIDC server | [src/Schemata.Authorization.Foundation/](src/Schemata.Authorization.Foundation/) |
-| Change AIP resource CRUD | [src/Schemata.Resource.Foundation/](src/Schemata.Resource.Foundation/) |
-| Change BPMN process engine | [src/Schemata.Flow.StateMachine/](src/Schemata.Flow.StateMachine/), AST in [src/Schemata.Flow.Skeleton/](src/Schemata.Flow.Skeleton/) |
-| Edit entity / resource contracts | [src/Schemata.Abstractions/](src/Schemata.Abstractions/) |
-| Touch the advice/advisor pipeline | [src/Schemata.Advice/](src/Schemata.Advice/) + generator at [generators/Schemata.Advice.Generator/](generators/Schemata.Advice.Generator/) |
-| Touch the `.skm` DSL | [generators/Schemata.Modeling.Generator/](generators/Schemata.Modeling.Generator/) |
-| Add a feature to a meta-package | [targets/AGENTS.md](targets/AGENTS.md) |
-| Add or rename a package version | [Directory.Packages.props](Directory.Packages.props) (CPM is on, do not put `Version=` on `PackageReference`) |
-| Change CI / build matrix | [.github/workflows/build.yml](.github/workflows/build.yml) |
-| Change SonarCloud or commit lint | [.github/workflows/analysis.yml](.github/workflows/analysis.yml) |
+| Host bootstrap, feature lifecycle, built-in `UseXxx` | `src/Schemata.Core` (`SchemataBuilder`, `SchemataStartup`, `Features/ISimpleFeature.cs`) |
+| Cross-package contracts, `IAdvisor`, `SchemataConstants` | `src/Schemata.Abstractions` |
+| Advisor pipeline runtime | `src/Schemata.Advice` + `generators/Schemata.Advice.Generator` |
+| Repository/UoW + mutation advisors | `src/Schemata.Entity.Repository` (own AGENTS.md) |
+| AIP-compliant CRUD resources | `src/Schemata.Resource.Foundation` (own AGENTS.md) + `.Http` / `.Grpc` |
+| OAuth 2.0 / OIDC server | `src/Schemata.Authorization.Foundation` (own AGENTS.md) |
+| ASP.NET Identity integration | `src/Schemata.Identity.{Skeleton,Foundation}` |
+| Workflow AST, engine contracts, process builders | `src/Schemata.Flow.Skeleton` (own AGENTS.md) |
+| BPMN 2.0.2 engine | `src/Schemata.Flow.Bpmn` (own AGENTS.md) |
+| Filter/expression languages (CEL, AIP-160, order-by) | `src/Schemata.Expressions.{Skeleton,Cel,Aip,Order}` |
+| SKM DSL → C# entity codegen | `generators/Schemata.Modeling.Generator` (own AGENTS.md) |
+| Meta-package opt-in flags (`UseMapster`, `UseTenancy`, …) | `targets/*/Directory.Build.props` |
+| Feature-level pitfalls | "Common pitfalls" sections in `docs/documents/**`, `docs/cookbook/**` |
 
-## Composition Model
+## CODE MAP
 
-A host application calls `WebApplicationBuilder.UseSchemata(...)` ([src/Schemata.Core/Extensions/WebApplicationBuilderExtensions.cs](src/Schemata.Core/Extensions/WebApplicationBuilderExtensions.cs)). That yields a [`SchemataBuilder`](src/Schemata.Core/SchemataBuilder.cs) holding a staging `IServiceCollection`, a `Configurators` registry, and a `SchemataOptions` bag.
+Dependency backbone (bottom-up): `Abstractions` (zero deps) → `Common` → `Advice` → `Core` → `Modular`. `Entity.Repository` (deps: Advice, Common, Validation.Skeleton) underpins Identity/Authorization Skeletons and Resource.Foundation. Every `*.Foundation` depends on its own Skeleton + `Schemata.Core`.
 
-Each capability is an **`ISimpleFeature`** ([src/Schemata.Core/Features/ISimpleFeature.cs](src/Schemata.Core/Features/ISimpleFeature.cs)) with three lifecycle hooks: `ConfigureServices`, `ConfigureApplication`, `ConfigureEndpoints`. Features are sorted by two `int` keys:
+**Advisor pattern** (framework-wide extension point): `IAdvisor<T1..T16>.AdviseAsync(AdviceContext, …) → Continue | Block | Handle`. Resolved via `GetServices<TAdvisor>().OrderBy(a => a.Order)`, short-circuits at the first non-`Continue`. Invoked as `Advisor.For<TAdvisor>().RunAsync(...)` — the `RunAsync` overloads are emitted by `Schemata.Advice.Generator` (attached as analyzer to every `src/*` project).
 
-- `Order` → `ConfigureServices` sequence.
-- `Priority` → `ConfigureApplication` + `ConfigureEndpoints` sequence.
+## CONVENTIONS (deviations from stock .NET only)
 
-The range `[100_000_000, 900_000_000]` is **reserved** for built-in + extension features. See the full priority table in [README.md](README.md). Anchors: `+5M` = sub-feature of a built-in (only `WellKnown` today); `+100K` / `+200K` / `+300K` = bridges stacked above their later-feature anchor (e.g. `Flow.Event`, `Flow.Scheduling`).
+- `LangVersion=preview`, `Nullable=enable`, `ImplicitUsings=false` (explicit usings everywhere). No `.editorconfig`.
+- Project behavior is determined by disk location: root `Directory.Build.props` switches `IsPackable`/`SignAssembly`/analyzers on `src/`, `tests/`, `generators/`, `targets/` path segments.
+- ConfigureAwait.Fody weaves `ConfigureAwait(false)` into every await in `src/*` — never write it manually.
+- Generated `.resx` accessors are rewritten `internal` → `public` by the `OverrideResourcesVisibility` target.
+- Central package versions: `Directory.Packages.props` (separate net8.0/net10.0 blocks) + `eng/Versions.props`.
+- `Order` sequences `ConfigureServices`; `Priority` sequences the app/endpoint pipeline. Range `[100_000_000, 900_000_000]` is reserved for built-ins/extensions — application code stays outside it. Advisor anchors: `Orders.Base=100M`, `Extension=400M`, `Max=900M`; built-ins step by `+10M`.
+- Entity/trait string maps use nullable values (`Dictionary<string, string?>`). The gRPC transport writes a null map value as a key-only entry; proto3 readers see an empty string.
+- Flow execution observes exactly one scoped `IServiceProvider` per run: `FlowResolver`/`FlowConditionContext` require it; DSL contexts and advisors share it.
+- Conventional Commits enforced in CI (cocogitto); changelog generated to `docs/CHANGELOG.md` via `cog.toml`.
+- Tests: xUnit + Moq. Classes `<Subject>Should`, methods `Pascal_Snake_Case` behavior names. Integration projects: `*.Integration.Tests` + `Fixtures/WebAppFactory.cs` + `GenerateProgramFile=false`.
 
-**Modules** ([Schemata.Abstractions.Modular.IModule](src/Schemata.Abstractions/Modular/IModule.cs), [ModuleBase](src/Schemata.Abstractions/Modular/ModuleBase.cs)) are plug-in libraries discovered + run by [Schemata.Modular](src/Schemata.Modular/). They share the same `Order`/`Priority` ordering. Methods outside the three lifecycle hooks are never invoked.
+## ANTI-PATTERNS (THIS PROJECT)
 
-## Conventions
+- Never edit `eng/common/**` (Arcade-generated) or `tests/Schemata.Flow.Bpmn.Conformance.Tests/PendingCatalog.cs` (conformance exclusion source of truth).
+- Never register advisors with `AddScoped(typeof(...))` — use `TryAddEnumerable`; `AddScoped` silently replaces the chain.
+- `AdviceContext` is not thread-safe; never share one across concurrent pipelines.
+- `CommitChanges` advisors do NOT run on rollback — cache eviction can leave stale entries until TTL.
+- Flow engines (`IFlowRuntime`) never load or persist state — handlers persist the returned snapshot.
+- Referential integrity for `[ResourceReference]` is enforced at write time by `AdviceValidateResourceReferences`, deliberately not by ORM FKs — do not add ORM associations for it.
+- Event wire names must be registered via `RegisterEvent<T>(name)`; CLR type names are never used on the wire.
+- Publish domain events from committed advisors, never from mutation advisors (the outbox row is recorded pre-commit).
+- Source comments carry no TODO/FIXME/HACK markers by convention; gotchas live in XML doc remarks and docs "Common pitfalls" sections.
 
-- **Target frameworks**: runtime libs target `net8.0;net10.0`; source generators target `netstandard2.0` (Roslyn constraint); test projects mirror runtime libs.
-- **Language**: `LangVersion=preview`, `Nullable=enable`, `ImplicitUsings=false`. Write explicit `using` directives.
-- **Brace style**: opening `{` on the same line; sealed/abstract used deliberately; expression-bodied members for one-liners.
-- **Comments**: triple-slash XML docs for public API on packable assemblies (`GenerateDocumentationFile=true` on `src/*`).
-- **Packages**: Central Package Management is on (`ManagePackageVersionsCentrally=true`). Add versions in [Directory.Packages.props](Directory.Packages.props); reference them by `<PackageReference Include="..." />` **without** `Version=`.
-- **Signing**: all packable projects strong-name sign with [eng/key.snk](eng/key.snk); `SignAssembly=true` is set by `Directory.Build.props` for `src/`, `generators/`, `targets/`.
-- **Artifacts**: Arcade redirects every `bin/`/`obj/`/log/package output to `artifacts/`. Do not commit `artifacts/`.
-- **Naming**: domain prefix → role suffix. `Schemata.{Domain}.Skeleton` = contracts; `Schemata.{Domain}.Foundation` = runtime; `.Http` / `.Grpc` = transport adapter; `.Event` / `.Scheduling` = cross-domain bridge; `.EntityFrameworkCore` / `.LinqToDB` / `.Redis` / `.AutoMapper` / `.Mapster` = vendor adapter.
-- **Tests**: class name ends in `Should`; method body asserts behaviour. Integration tests carry `[Trait("Category","Integration")]`.
+## COMMANDS
 
-## Anti-Patterns (this project)
-
-- **Do NOT** add `Version=` to `<PackageReference>` — CPM owns versions ([docs/documents/packages.md:200](docs/documents/packages.md)).
-- **Do NOT** add a database column for Identity entity `Id` / `ConcurrencyStamp` — they are `[NotMapped]` ([docs/documents/identity.md:176-177](docs/documents/identity.md)).
-- **Do NOT** share an `AdviceContext` across concurrent pipelines ([docs/documents/core/advice-pipeline.md:223-225](docs/documents/core/advice-pipeline.md)).
-- **Do NOT** edit anything under [eng/common/](eng/common/) — that tree is generated/owned by `dotnet/arcade` automation.
-- **Do NOT** invent new `Order`/`Priority` values inside `[100_000_000, 900_000_000]` — that range is reserved.
-- **Do NOT** use `as any` equivalents in C#: no `#pragma warning disable` to silence real errors, no empty `catch {}` blocks, no `Suppress` attributes without a tracked reason.
-- **Do NOT** assume module hooks other than `ConfigureServices`/`ConfigureApplication`/`ConfigureEndpoints` will run.
-
-## Unique Styles
-
-- **Solution file is `.slnx`**, not `.sln`. Tools that require legacy `.sln` will not work without conversion.
-- **Build is Arcade-driven**. The entire build/test/package pipeline goes through `eng/common/Build.ps1` (or `.cmd` / `.sh`), not raw `dotnet build`.
-- **Advisor pipeline** is the cross-cutting mechanism for the whole framework. Repository CRUD, HTTP resource handlers, user registration, flow transitions all run through ordered chains of `IAdvisor`. Add cross-cutting behaviour by registering an advisor, not by subclassing.
-- **Trait-based entity modelling**. Capabilities are marker interfaces (`ITimestamp`, `ISoftDelete`, `IConcurrency`, `IOwnable`, …) under [src/Schemata.Abstractions/Entities/](src/Schemata.Abstractions/Entities/); built-in advisors react to them with `is`-checks.
-- **`.skm` DSL** compiles to C# entity/trait/enum types via [Schemata.Modeling.Generator](generators/Schemata.Modeling.Generator/); the only checked-in vector lives at [tests/Schemata.Modeling.Generator.Tests/vector1.skm](tests/Schemata.Modeling.Generator.Tests/vector1.skm).
-- **Two cross-package versioning lines** in [Directory.Packages.props](Directory.Packages.props): a single base set plus per-TFM blocks for Microsoft packages so `net8.0` gets `8.0.x` and `net10.0` gets `10.0.x`.
-
-## Commands
-
-All build/test/pack go through Arcade. From the repo root:
-
-```pwsh
-# Local build (Windows)
-.\eng\common\Build.ps1 -configuration Release -restore -build
-
-# Local build + tests
-.\eng\common\Build.ps1 -configuration Release -restore -build -test
-
-# Local build + unit + integration tests
-.\eng\common\Build.ps1 -configuration Release -restore -build -test -integrationTest
-
-# Pack NuGet artifacts → artifacts/packages/Release/Shipping/
-.\eng\common\Build.ps1 -configuration Release -restore -build -pack
-
-# CI command used by GitHub Actions (Windows runner)
-.\eng\common\CIBuild.cmd -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
-
-# Build the DocFX site (requires `dotnet tool install -g docfx`)
-docfx metadata docs/docfx.json
-docfx build docs/docfx.json   # → docs/_site
+```bash
+./eng/common/build.sh --restore --build --test        # canonical local build + unit tests
+./eng/common/build.sh --restore --build --test --integrationTest \
+  /p:RestoreDotNetWorkloads=true -c Release           # CI parity
+dotnet build src/Schemata.Core/Schemata.Core.csproj -c Release   # single project
+dotnet test tests/Schemata.Flow.Bpmn.Conformance.Tests/Schemata.Flow.Bpmn.Conformance.Tests.csproj \
+  -c Release --no-restore --filter "Pending!=true"    # BPMN MIWG conformance suite
 ```
 
-The .NET SDK is pinned to `10.0.201` ([global.json](global.json)) and bootstrapped into `.dotnet/` by `Build.ps1 -restore` — system SDKs are bypassed.
+Requires .NET SDK 10.0.201 (`global.json`; `eng/common/tools.sh` bootstraps it). Clone with `--recurse-submodules` — CEL and BPMN conformance tests read from `specs/`.
 
-## Notes
+## NOTES
 
-- **`SchemataSkipGenerators=true`** disables the advice generator's auto-attach in [Directory.Build.props](Directory.Build.props). Set this when running `docfx metadata` (already done in [docs/docfx.json](docs/docfx.json)) or any analyzer-incompatible tool.
-- **JSON wire format defaults to `snake_case`** with 53-bit-safe integer handling (`SchemataJsonSerializerFeature`). When writing entities that round-trip to JS clients, do not hand-roll a different naming policy.
-- **OfficialBuild=true** triggers on GitHub Actions for non-PR pushes — versioning then derives from `_ComputedOfficialBuildId` computed in [.github/workflows/build.yml](.github/workflows/build.yml).
-- **Conventional Commits are enforced** via the `cocogitto` job in [analysis.yml](.github/workflows/analysis.yml); see [cog.toml](cog.toml) for type config.
-- **CEL conformance corpus** is pulled from the [specs/cel](specs/cel) submodule at fixed commit `cb51b41...`. Update with `git submodule update --remote` only when intentionally rebasing onto a newer cel-spec.
-
-## Sub-directory Knowledge
-
-- [src/AGENTS.md](src/AGENTS.md) — package layout, domain→suffix→dependency map
-- [tests/AGENTS.md](tests/AGENTS.md) — test framework, fixtures, naming, layering
-- [generators/AGENTS.md](generators/AGENTS.md) — Roslyn incremental generators, hook-up via `OutputItemType=Analyzer`
-- [targets/AGENTS.md](targets/AGENTS.md) — consumer meta-packages and MSBuild assets
-- [src/Schemata.Core/AGENTS.md](src/Schemata.Core/AGENTS.md) — `SchemataBuilder` + built-in features
-- [src/Schemata.Abstractions/AGENTS.md](src/Schemata.Abstractions/AGENTS.md) — entity traits, errors, AIP resource contracts
-- [src/Schemata.Advice/AGENTS.md](src/Schemata.Advice/AGENTS.md) — advisor pipeline + generated `RunAsync`
-- [src/Schemata.Authorization.Foundation/AGENTS.md](src/Schemata.Authorization.Foundation/AGENTS.md) — OAuth 2.0 / OIDC server
-- [src/Schemata.Resource.Foundation/AGENTS.md](src/Schemata.Resource.Foundation/AGENTS.md) — AIP-compliant CRUD core
-- [src/Schemata.Flow.Skeleton/AGENTS.md](src/Schemata.Flow.Skeleton/AGENTS.md) — BPMN AST + builder DSL
+- `Schemata.Flow.Bpmn` is intentionally bundled in no meta-target; consumers add an explicit `PackageReference`.
+- `.skm` model files activate via `<AdditionalFiles Include="*.skm" />`; `Object` views, `Index` pointers, and field options are parsed but emit no C# yet.
+- Targets meta-packages pack analyzer DLLs from `artifacts/bin/...` — generators must be built first.
+- `docs/_site/` and `docs/api/` are committed DocFX outputs; never hand-edit.

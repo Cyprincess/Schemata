@@ -131,8 +131,7 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
     private static bool IsPushable(CelCall node, ExpressionCapabilities caps) {
         return node.Name == "has"
             && caps.Presence
-            && node.Args.Count == 1
-            && node.Args[0] is CelIdentifier;
+            && node.Args is [CelIdentifier];
     }
 
     private static bool IsPushable(CelMemberCall node, ExpressionCapabilities caps) {

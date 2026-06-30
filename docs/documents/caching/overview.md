@@ -4,13 +4,13 @@ The Schemata caching subsystem provides a unified `ICacheProvider` abstraction o
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
-| `ICacheProvider` | `src/Schemata.Caching.Skeleton/ICacheProvider.cs` |
-| `CacheEntryOptions` | `src/Schemata.Caching.Skeleton/CacheEntryOptions.cs` |
+| Item                       | Path                                                           |
+| -------------------------- | -------------------------------------------------------------- |
+| `ICacheProvider`           | `src/Schemata.Caching.Skeleton/ICacheProvider.cs`              |
+| `CacheEntryOptions`        | `src/Schemata.Caching.Skeleton/CacheEntryOptions.cs`           |
 | `DistributedCacheProvider` | `src/Schemata.Caching.Distributed/DistributedCacheProvider.cs` |
-| `IndexLocks` | `src/Schemata.Caching.Distributed/IndexLocks.cs` |
-| `RedisCacheProvider` | `src/Schemata.Caching.Redis/RedisCacheProvider.cs` |
+| `IndexLocks`               | `src/Schemata.Caching.Distributed/IndexLocks.cs`               |
+| `RedisCacheProvider`       | `src/Schemata.Caching.Redis/RedisCacheProvider.cs`             |
 
 ## ICacheProvider
 
@@ -60,10 +60,10 @@ All three expiration modes mirror `DistributedCacheEntryOptions`. The Redis prov
 
 ## Provider selection
 
-| Provider | Package | Backend | Collection ops | Multi-process safe |
-|---|---|---|---|---|
-| `DistributedCacheProvider` | `Schemata.Caching.Distributed` | Any `IDistributedCache` | JSON-serialized `HashSet<string>` with in-process striped locks | No |
-| `RedisCacheProvider` | `Schemata.Caching.Redis` | Redis via StackExchange.Redis | Native Redis Set commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`) | Yes |
+| Provider                   | Package                        | Backend                       | Collection ops                                                  | Multi-process safe |
+| -------------------------- | ------------------------------ | ----------------------------- | --------------------------------------------------------------- | ------------------ |
+| `DistributedCacheProvider` | `Schemata.Caching.Distributed` | Any `IDistributedCache`       | JSON-serialized `HashSet<string>` with in-process striped locks | No                 |
+| `RedisCacheProvider`       | `Schemata.Caching.Redis`       | Redis via StackExchange.Redis | Native Redis Set commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`)   | Yes                |
 
 The key difference is collection safety. `DistributedCacheProvider` uses a 64-stripe in-process `SemaphoreSlim` array (`IndexLocks`) to serialize read-modify-write on collection keys. This prevents lost writes within a single process but does not protect against concurrent writes from multiple processes sharing the same backend. Use `RedisCacheProvider` for multi-process or cluster deployments.
 

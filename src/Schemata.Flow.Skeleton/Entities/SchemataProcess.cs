@@ -13,31 +13,15 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive, ISourceReference,
-                               ISoftDelete, ITimestamp, IStateful
+public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive,
+                                ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the source definition.</summary>
     public virtual string DefinitionName { get; set; } = null!;
 
-    /// <summary>Serialized process variables in JSON format.</summary>
-    public virtual string? Variables { get; set; }
+    #region IAnnotatable Members
 
-    /// <summary>The <see cref="Models.FlowElement.Id" /> of the current element the token is at.</summary>
-    public virtual string? StateId { get; set; }
-
-    /// <summary>The <see cref="Models.FlowElement.Id" /> of the event or gateway the instance is waiting at.</summary>
-    public virtual string? WaitingAtId { get; set; }
-
-    /// <summary>The <see cref="Models.FlowElement.Name" /> of the waiting element.</summary>
-    public virtual string? WaitingAt { get; set; }
-
-    #region ISourceReference Members
-
-    public virtual string? SourceType { get; set; }
-
-    public virtual string? Source { get; set; }
-
-    public virtual Guid? SourceTimestamp { get; set; }
+    public virtual Dictionary<string, string?> Annotations { get; set; } = [];
 
     #endregion
 
@@ -60,11 +44,11 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
 
     public virtual string? DisplayName { get; set; }
 
-    public virtual Dictionary<string, string>? DisplayNames { get; set; }
+    public virtual Dictionary<string, string?>? DisplayNames { get; set; }
 
     public virtual string? Description { get; set; }
 
-    public virtual Dictionary<string, string>? Descriptions { get; set; }
+    public virtual Dictionary<string, string?>? Descriptions { get; set; }
 
     #endregion
 
@@ -83,6 +67,12 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
 
     #region IStateful Members
 
+    /// <summary>
+    ///     Aggregate lifecycle state computed by the engine from the token collection. Allowed
+    ///     values: <c>Running</c> / <c>Waiting</c> / <c>Completed</c> / <c>Failed</c> /
+    ///     <c>Terminated</c> / <c>Cancelled</c>. Per-token state lives on
+    ///     <see cref="SchemataProcessToken.State" />.
+    /// </summary>
     public virtual string? State { get; set; }
 
     #endregion

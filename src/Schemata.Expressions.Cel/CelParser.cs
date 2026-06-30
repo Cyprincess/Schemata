@@ -215,7 +215,7 @@ public static class CelParser
     }
 
     private static bool IsHexDigit(char c) {
-        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        return c is >= '0' and <= '9' || c is >= 'a' and <= 'f' || c is >= 'A' and <= 'F';
     }
 
     private static long ParseIntHex(string source) {
@@ -274,7 +274,7 @@ public static class CelParser
                     i += 8;
                     break;
                 default:
-                    if (escaped >= '0' && escaped <= '7') {
+                    if (escaped is >= '0' and <= '7') {
                         var octal = source.Substring(i, Math.Min(3, source.Length - i));
                         builder.Append((char)Convert.ToByte(octal, 8));
                         i += octal.Length - 1;
@@ -332,7 +332,7 @@ public static class CelParser
                     i += 2;
                     break;
                 default:
-                    if (escaped >= '0' && escaped <= '7') {
+                    if (escaped is >= '0' and <= '7') {
                         var octal = source.Substring(i, Math.Min(3, source.Length - i));
                         bytes.Add(Convert.ToByte(octal, 8));
                         i += octal.Length - 1;

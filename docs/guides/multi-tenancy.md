@@ -12,28 +12,28 @@ dotnet add package --prerelease Schemata.Tenancy.Foundation
 
 ## Enable tenancy
 
-Add `UseTenancy()` and pick a resolver. `SchemataTenancyFeature` has `Priority = 160_000_000` (middleware position between `Https` at 150M and `CookiePolicy` at 170M) and `Order = Orders.Max = 900_000_000` so DI registration runs after every other feature.
+Add `UseTenancy()` and pick a resolver:
 
 ```csharp
 schema.UseTenancy()
       .UseHeaderResolver();
 ```
 
-`UseTenancy()` uses `SchemataTenant` as the default tenant entity. On each request, `SchemataTenancyMiddleware` calls `ITenantContextInitializer<SchemataTenant>.InitializeAsync` to resolve the tenant, then swaps the request's `IServiceProvidersFeature` for a tenant-scoped provider for the duration of the request and restores the original afterward.
+`UseTenancy()` uses `SchemataTenant` as the default tenant entity. On each request, the tenancy middleware resolves the tenant and swaps the request's service provider for a tenant-scoped one for the duration of the request. The middleware position and feature ordering are covered in [Tenancy](../documents/tenancy.md).
 
 ## Choose a resolver
 
 Five built-in resolver strategies ship with the foundation:
 
-| Method | Source | Header / Parameter |
-| ------ | ------ | ------------------ |
-| `UseHeaderResolver()` | HTTP request header | `x-tenant-id` |
-| `UseHostResolver()` | `Host` header matched against tenant host names | (none) |
-| `UsePathResolver()` | Route parameter | `{Tenant}` |
-| `UsePrincipalResolver()` | Authenticated user claim | `Tenant` |
-| `UseQueryResolver()` | Query string parameter | `Tenant` |
+| Method                   | Source                                          | Header / Parameter |
+| ------------------------ | ----------------------------------------------- | ------------------ |
+| `UseHeaderResolver()`    | HTTP request header                             | `x-tenant-id`      |
+| `UseHostResolver()`      | `Host` header matched against tenant host names | (none)             |
+| `UsePathResolver()`      | Route parameter                                 | `{Tenant}`         |
+| `UsePrincipalResolver()` | Authenticated user claim                        | `Tenant`           |
+| `UseQueryResolver()`     | Query string parameter                          | `Tenant`           |
 
-Each `UseXxxResolver()` calls `services.TryAddScoped<ITenantResolver, X>()`. Only the first one wins — the accessor takes a single `ITenantResolver` and asks it once per request. For "header overrides path" semantics, implement a composite `ITenantResolver` and register it directly.
+Only the first `UseXxxResolver()` call wins — later calls are ignored, and the accessor asks a single `ITenantResolver` once per request. For "header overrides path" semantics, implement a composite `ITenantResolver` and register it directly.
 
 ## Custom tenant entity
 
@@ -59,11 +59,11 @@ schema.UseTenancy<Tenant>()
 
 `ForAll` and `ForTenant` on the builder register services that participate in tenant resolution. They have very different lifetime contracts:
 
-| Method | Where the registrations land | Allowed lifetimes |
-| --- | --- | --- |
-| `ForAll(configure)` | Root `IServiceCollection` | Any (Singleton / Scoped / Transient) — these become normal host services that every tenant sees through the composite provider's root fallback |
-| `ForTenant(tenantId, configure)` | Per-tenant override container, applied at provider build time | **Singleton only** |
-| `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | **Singleton only** |
+| Method                                         | Where the registrations land                                                                        | Allowed lifetimes                                                                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ForAll(configure)`                            | Root `IServiceCollection`                                                                           | Any (Singleton / Scoped / Transient) — these become normal host services that every tenant sees through the composite provider's root fallback |
+| `ForTenant(tenantId, configure)`               | Per-tenant override container, applied at provider build time                                       | **Singleton only**                                                                                                                             |
+| `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | **Singleton only**                                                                                                                             |
 
 Scoped or transient registrations in either `ForTenant` overload throw `InvalidOperationException` at provider-build time. Per-tenant services that need to participate in the request-scope lifecycle (`AddDbContext`, repositories, etc.) belong in `ForAll`; they pick up the right tenant by consulting `ITenantContextAccessor<TTenant>` at construction time.
 
@@ -84,7 +84,7 @@ schema.UseTenancy<Tenant>()
       .UseHeaderResolver();
 ```
 
-`SchemataTenantServiceProviderFactory` builds a small Singleton-only override container per tenant and wraps it in `TenantCompositeServiceProvider`. Lookups hit the tenant overrides first, then fall through to the host root. The composite is cached by tenant id; the cache is bounded by `SchemataTenancyOptions.ProviderMaxCapacity` (1000) and sliding-expired by `ProviderSlidingExpiration` (30 minutes).
+Lookups hit the per-tenant overrides first, then fall through to the host root. Tenant providers are cached with bounded capacity and sliding expiration; the composite-provider internals and cache tuning options are in [Tenancy](../documents/tenancy.md).
 
 ## Access the current tenant
 
@@ -107,13 +107,13 @@ dotnet run
 
 ```shell
 # Create a student under a specific tenant
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -H "x-tenant-id: 00000000-0000-0000-0000-000000000001" \
      -d '{"full_name":"Alice","age":20}'
 
 # List students — only returns students for this tenant
-curl http://localhost:5000/students \
+curl http://localhost:5000/v1/students \
      -H "x-tenant-id: 00000000-0000-0000-0000-000000000001"
 ```
 

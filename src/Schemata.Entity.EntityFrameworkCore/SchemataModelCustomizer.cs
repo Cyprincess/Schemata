@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -7,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.EntityFrameworkCore.Conversions;
+using Schemata.Entity.Repository.Conversions;
 
 namespace Schemata.Entity.EntityFrameworkCore;
 
@@ -24,11 +24,10 @@ namespace Schemata.Entity.EntityFrameworkCore;
 ///             relationship from the annotated property to that alternate key.
 ///         </item>
 ///         <item>
-///             For every property whose declared type is
-///             <see cref="Dictionary{TKey, TValue}" /> with string keys and either
-///             non-nullable or nullable string values, or <see cref="ICollection{T}" /> of
-///             strings, registers a JSON <see cref="EfCoreJsonValueConverter{T}" /> so EF
-///             Core stores the value as a single text column.
+        ///             For every supported scalar dictionary or scalar collection property,
+        ///             registers a JSON <see cref="EfCoreJsonValueConverter{T}" /> and a value
+        ///             comparer so EF Core stores the value as a single text column and detects
+        ///             in-place mutation.
 ///         </item>
 ///     </list>
 ///     Polymorphic <see cref="ResourceReferenceAttribute" /> properties
@@ -61,7 +60,7 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
                 continue;
             }
 
-            var reference = property.GetCustomAttribute<ResourceReferenceAttribute>(inherit: true);
+            var reference = property.GetCustomAttribute<ResourceReferenceAttribute>(true);
             if (reference?.Target is { } target) {
                 TryConfigureResourceReferenceForeignKey(modelBuilder, clrType, property, target);
             }
@@ -89,13 +88,13 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
             return;
         }
 
-        var altKey = principal.FindKey(new[] { canonical });
+        var altKey = principal.FindKey([canonical]);
         if (altKey is null) {
             modelBuilder.Entity(principalClrType).HasAlternateKey(nameof(ICanonicalName.CanonicalName));
         }
 
         modelBuilder.Entity(dependentClrType)
-                    .HasOne(principalClrType, navigationName: null)
+                    .HasOne(principalClrType)
                     .WithMany()
                     .HasForeignKey(property.Name)
                     .HasPrincipalKey(nameof(ICanonicalName.CanonicalName))
@@ -108,7 +107,7 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
         PropertyInfo property) {
         var declared = property.PropertyType;
 
-        if (!IsSupportedJsonType(declared)) {
+        if (!JsonColumnTypes.IsSupported(declared)) {
             return;
         }
 
@@ -116,22 +115,7 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
 
         modelBuilder.Entity(entityClrType)
                     .Property(property.Name)
-                    .HasConversion(converterType);
-    }
-
-    private static bool IsSupportedJsonType(Type type) {
-        if (type == typeof(string)) {
-            return false;
-        }
-
-        if (type == typeof(Dictionary<string, string>)) {
-            return true;
-        }
-
-        if (type == typeof(Dictionary<string, string?>)) {
-            return true;
-        }
-
-        return typeof(ICollection<string>).IsAssignableFrom(type);
+                    .HasConversion(converterType)
+                    .Metadata.SetValueComparer(JsonValueComparers.Create(declared));
     }
 }

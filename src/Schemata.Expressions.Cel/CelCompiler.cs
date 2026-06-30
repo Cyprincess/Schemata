@@ -23,8 +23,11 @@ public sealed class CelCompiler : IExpressionCompiler
         var key = ExpressionCacheKey.Create(Language, source, null, null, null);
         return ExpressionCache.GetOrAddTree(key, () => {
             try {
-                var node = CelParser.Expression.Parse(source)
-                        ?? throw new ExpressionException("Invalid CEL expression.");
+                var node = CelParser.Expression.Parse(source);
+                if (node is null) {
+                    throw new ExpressionException("Invalid CEL expression.");
+                }
+
                 node.Source = source;
                 return node;
             } catch (ParseException ex) {

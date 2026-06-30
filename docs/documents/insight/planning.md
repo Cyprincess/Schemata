@@ -52,12 +52,12 @@ A two-source request looks like this:
 
 Validation rules:
 
-| Rejection | Reason |
-| --- | --- |
-| `JoinKind.Unspecified` | `INVALID_ARGUMENT` |
-| unknown join alias | `INVALID_ARGUMENT` |
+| Rejection                                            | Reason             |
+| ---------------------------------------------------- | ------------------ |
+| `JoinKind.Unspecified`                               | `INVALID_ARGUMENT` |
+| unknown join alias                                   | `INVALID_ARGUMENT` |
 | joining aliases that are already in the same subtree | `INVALID_ARGUMENT` |
-| unconnected sources after all joins fold | `INVALID_ARGUMENT` |
+| unconnected sources after all joins fold             | `INVALID_ARGUMENT` |
 
 ## FilterNode
 
@@ -80,7 +80,10 @@ its expression as `ExpressionKind.Value` and stores the result under `Alias`:
 {
   "compute": {
     "fields": [
-      { "alias": "taxed", "expression": { "source": "double(s.age) + 1", "language": "cel" } }
+      {
+        "alias": "taxed",
+        "expression": { "source": "double(s.age) + 1", "language": "cel" }
+      }
     ]
   }
 }
@@ -123,10 +126,10 @@ Invalid order syntax is reported as `INVALID_ARGUMENT`.
 
 `LimitNode(Input, Skip, Take)` has two roles:
 
-| Location | Source | Behavior |
-| --- | --- | --- |
-| top-level root | `QueryInsightRequest.Skip` and `PageSize` | always added by `BuildAsync` |
-| nested selection pipeline | `TopTransform` and `SkipTransform` | allowed inside a nested `SelectionSpec.Transformations` list |
+| Location                  | Source                                    | Behavior                                                     |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| top-level root            | `QueryInsightRequest.Skip` and `PageSize` | always added by `BuildAsync`                                 |
+| nested selection pipeline | `TopTransform` and `SkipTransform`        | allowed inside a nested `SelectionSpec.Transformations` list |
 
 Top-level `TopTransform` and `SkipTransform` are rejected with `UNIMPLEMENTED`. Use request paging
 fields instead.
@@ -144,7 +147,10 @@ field path:
 A computed selection records `SelectionKind.Expression` and must provide an alias:
 
 ```json
-{ "expression": { "source": "double(s.age) * 2", "language": "cel" }, "alias": "age_score" }
+{
+  "expression": { "source": "double(s.age) * 2", "language": "cel" },
+  "alias": "age_score"
+}
 ```
 
 A flat selection with local transformations is rejected because local child transformations only make
@@ -167,7 +173,10 @@ The builder creates a child `SourceNode` whose `SourceConfig.Params` copy the pa
   ],
   "selections": [
     { "field": "o.number", "alias": "number" },
-    { "expression": { "source": "double(o.amount) * 1.1", "language": "cel" }, "alias": "total" }
+    {
+      "expression": { "source": "double(o.amount) * 1.1", "language": "cel" },
+      "alias": "total"
+    }
   ]
 }
 ```
@@ -195,26 +204,26 @@ The resolved language must have a keyed `IExpressionCompiler`. Missing compilers
 
 ## Predicate vs value slots
 
-| Slot | Kind |
-| --- | --- |
-| `FilterTransform.Predicate` | `Predicate` |
-| `JoinSpec.On` | `Predicate` |
-| `ComputedFieldSpec.Expression` | `Value` |
-| computed `SelectionSpec.Expression` | `Value` |
+| Slot                                | Kind        |
+| ----------------------------------- | ----------- |
+| `FilterTransform.Predicate`         | `Predicate` |
+| `JoinSpec.On`                       | `Predicate` |
+| `ComputedFieldSpec.Expression`      | `Value`     |
+| computed `SelectionSpec.Expression` | `Value`     |
 
 Predicate slots compile to boolean tests. Value slots compile to scalar values and require a
 value-capable language descriptor.
 
 ## Validation reasons
 
-| Reason | Raised when |
-| --- | --- |
-| `UNKNOWN_SOURCE_NAME` | no catalog resolves a source name, or `RepositoryDriver` cannot resolve a resource collection |
-| `UNKNOWN_EXPRESSION_LANGUAGE` | no keyed `IExpressionCompiler` exists for the resolved language |
-| `INVALID_EXPRESSION` | expression parsing fails |
-| `INVALID_ARGUMENT` | malformed source aliases, joins, selections, order syntax, page token, or transformation shape |
-| `UNIMPLEMENTED` | a requested plan shape has no implementation in the current phase |
-| `EXPRESSION_LANGUAGE_NOT_VALUE_CAPABLE` | a value expression uses a predicate-only language |
+| Reason                                  | Raised when                                                                                    |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `UNKNOWN_SOURCE_NAME`                   | no catalog resolves a source name, or `RepositoryDriver` cannot resolve a resource collection  |
+| `UNKNOWN_EXPRESSION_LANGUAGE`           | no keyed `IExpressionCompiler` exists for the resolved language                                |
+| `INVALID_EXPRESSION`                    | expression parsing fails                                                                       |
+| `INVALID_ARGUMENT`                      | malformed source aliases, joins, selections, order syntax, page token, or transformation shape |
+| `UNIMPLEMENTED`                         | a requested plan shape has no implementation in the current phase                              |
+| `EXPRESSION_LANGUAGE_NOT_VALUE_CAPABLE` | a value expression uses a predicate-only language                                              |
 
 ## See also
 

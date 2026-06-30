@@ -25,11 +25,12 @@ public sealed class OrderCompiler : IOrderCompiler
 
         foreach (var key in keys) {
             var        parameter = Expression.Parameter(typeof(T), "entity");
-            Expression body      = parameter;
+            Expression? body      = parameter;
             foreach (var segment in key.Path) {
-                body = MemberAccess.Resolve(body, segment)
-                    ?? throw new ArgumentException($"Unknown order field '{string.Join(".", key.Path)}'.",
-                                                   nameof(source));
+                body = MemberAccess.Resolve(body, segment);
+                if (body is null) {
+                    throw new ArgumentException($"Unknown order field '{string.Join(".", key.Path)}'.", nameof(source));
+                }
             }
 
             lambdas.Add((Expression.Lambda(body, parameter), key.Descending));

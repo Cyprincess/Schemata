@@ -4,10 +4,10 @@ A custom filter language supplies an `IExpressionCompiler`, an `ExpressionLangua
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IExpressionTree.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs` |
-| `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageDescriptor.cs`, `IExpressionLanguageBuilder.cs`, `FilteringMode.cs` |
+| Package                         | Key files                                                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IExpressionTree.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`                                   |
+| `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageDescriptor.cs`, `IExpressionLanguageBuilder.cs`, `FilteringMode.cs`                   |
 | `Schemata.Expressions.Skeleton` | `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ExpressionCapabilities.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs` |
 
 ## Implement the language identity

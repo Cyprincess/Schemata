@@ -51,7 +51,7 @@ public static class Evaluator
         }
 
         public override Expression? Visit(Expression? expression) {
-            if (expression == null) {
+            if (expression is null) {
                 return expression;
             }
 
@@ -88,7 +88,7 @@ public static class Evaluator
         internal Expression? Eval(Expression? exp) { return Visit(exp); }
 
         public override Expression? Visit(Expression? exp) {
-            if (exp == null) {
+            if (exp is null) {
                 return null;
             }
 
@@ -109,7 +109,7 @@ public static class Evaluator
             var constant = fn.DynamicInvoke(null);
 
             var type = e.Type;
-            if (constant != null && type.IsArray && type.GetElementType() == constant.GetType().GetElementType()) {
+            if (constant is not null && type.IsArray && type.GetElementType() == constant.GetType().GetElementType()) {
                 type = constant.GetType();
             }
 

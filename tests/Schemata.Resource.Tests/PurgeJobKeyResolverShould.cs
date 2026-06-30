@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;

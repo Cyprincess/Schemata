@@ -43,16 +43,16 @@ run, `LocalPipelineExecutor` wraps those rows under the source alias before eval
 
 ## DriverCapabilities
 
-| Flag | Meaning |
-| --- | --- |
-| `Filter` | driver can apply `FilterNode` |
-| `Compute` | driver can apply `ComputeNode` |
-| `Project` | driver can apply `SelectionNode` fields |
-| `Order` | driver can apply `OrderNode` |
-| `Group` | driver can apply `GroupNode` |
-| `Limit` | driver can apply `LimitNode` |
-| `Join` | driver can join sources in the same backend |
-| `Nested` | driver can own nested list projection |
+| Flag      | Meaning                                     |
+| --------- | ------------------------------------------- |
+| `Filter`  | driver can apply `FilterNode`               |
+| `Compute` | driver can apply `ComputeNode`              |
+| `Project` | driver can apply `SelectionNode` fields     |
+| `Order`   | driver can apply `OrderNode`                |
+| `Group`   | driver can apply `GroupNode`                |
+| `Limit`   | driver can apply `LimitNode`                |
+| `Join`    | driver can join sources in the same backend |
+| `Nested`  | driver can own nested list projection       |
 
 `DriverCapabilities.All` is the union of all flags. The current splitter uses the plan shape and the
 built-in barriers described below; custom drivers should still report accurate flags because the flags
@@ -155,16 +155,16 @@ The nested local pipeline then filters, orders, limits, computes, groups, and pr
 
 `SchemaBuilder.For` maps selected entity properties to `FieldDescriptor` values:
 
-| CLR type | FieldType |
-| --- | --- |
-| `string`, `Guid` | `String` |
-| integral types | `Int64` |
-| `float`, `double`, `decimal` | `Double` |
-| `bool` | `Bool` |
+| CLR type                     | FieldType   |
+| ---------------------------- | ----------- |
+| `string`, `Guid`             | `String`    |
+| integral types               | `Int64`     |
+| `float`, `double`, `decimal` | `Double`    |
+| `bool`                       | `Bool`      |
 | `DateTime`, `DateTimeOffset` | `Timestamp` |
-| `TimeSpan` | `Duration` |
-| `byte[]` | `Bytes` |
-| other types | `Object` |
+| `TimeSpan`                   | `Duration`  |
+| `byte[]`                     | `Bytes`     |
+| other types                  | `Object`    |
 
 Computed selections currently report `FieldType.Object` because the expression result type is dynamic.
 

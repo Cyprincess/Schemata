@@ -14,8 +14,8 @@ public class JobContext
     /// </summary>
     public string? Job { get; set; }
 
-    /// <summary>Caller-supplied variables, serialized to/from <see cref="Entities.SchemataJob.Variables" />.</summary>
-    public IReadOnlyDictionary<string, object?> Variables { get; set; } = new Dictionary<string, object?>();
+    /// <summary>Caller-supplied string variables, mirrored to/from <see cref="Entities.SchemataJob.Variables" />.</summary>
+    public IReadOnlyDictionary<string, string?> Variables { get; set; } = new Dictionary<string, string?>();
 
     /// <summary>
     ///     Execution UID. When set by a caller (e.g. the <c>:run</c> handler) the

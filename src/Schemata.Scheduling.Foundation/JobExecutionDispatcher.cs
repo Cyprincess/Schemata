@@ -102,8 +102,7 @@ public sealed class JobExecutionDispatcher(
 
     /// <summary>
     ///     Runs the advisor → observer → job-body pipeline for a claimed execution row, records the
-    ///     terminal state, and advances a recurring schedule. Mirrors the lifecycle that the
-    ///     in-memory timer used to run inline, but sourced entirely from the durable row.
+    ///     terminal state, and advances a recurring schedule, sourced entirely from the durable row.
     /// </summary>
     private async Task RunPipelineAsync(
         IServiceProvider                  serviceProvider,
@@ -157,7 +156,7 @@ public sealed class JobExecutionDispatcher(
 
             execution.Output = context.Execution?.Output;
             await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Succeeded, null, observers,
-                                context, ct, notifySucceeded: true);
+                                context, ct, true);
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             // Host shutdown mid-run: leave the row Running so a later pass reclaims and reruns it.
             logger?.LogInformation("Execution '{ExecutionUid}' cancelled mid-run; leaving it for re-dispatch.",
@@ -276,6 +275,7 @@ public sealed class JobExecutionDispatcher(
             Method       = execution.Method,
             JobKey       = execution.JobKey,
             ArgsJson     = execution.ArgsJson,
+            Variables    = execution.Variables ?? new Dictionary<string, string?>(),
             Execution    = execution,
         };
     }

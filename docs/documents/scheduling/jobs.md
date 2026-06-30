@@ -4,11 +4,11 @@ Every scheduled unit is an `IScheduledJob`. The scheduler persists a `SchemataJo
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduledJob.cs`, `JobContext.cs`, `JobRegistration.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `Attributes/ScheduledJobAttribute.cs`, `IJobLifecycleObserver.cs`, `JobTriggerOutcome.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Observers/SchemataJobAuditObserver.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs` |
-| `Schemata.Resource.Foundation` | `PurgeJob.cs`, `PurgeJobKeyResolver.cs`, `PurgeHandler.cs`, `PurgeOperationArgs.cs` |
+| Package                          | Key files                                                                                                                                                                                                                                                                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Skeleton`   | `IScheduledJob.cs`, `JobContext.cs`, `JobRegistration.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `Attributes/ScheduledJobAttribute.cs`, `IJobLifecycleObserver.cs`, `JobTriggerOutcome.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ExecutionState.cs` |
+| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Observers/SchemataJobAuditObserver.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs`                                                                                                      |
+| `Schemata.Resource.Foundation`   | `PurgeJob.cs`, `PurgeJobKeyResolver.cs`, `PurgeHandler.cs`, `PurgeOperationArgs.cs`                                                                                                                                                                                                                                   |
 
 ## IScheduledJob
 
@@ -50,17 +50,17 @@ Register an on-demand job without a schedule through `WithJob<T>()` or `AddSched
 
 `JobContext` is the per-fire payload passed to `IScheduledJob.ExecuteAsync`:
 
-| Property | Source and purpose |
-| --- | --- |
-| `Job` | Canonical name of the job or one-shot operation being fired; `null` when the fire has no persistent scheduler entry. |
-| `Variables` | Free-form caller variables serialized through `SchemataJob.Variables`. |
-| `ExecutionUid` | UID reserved for the execution row; `TriggerAsync` accepts a caller-provided value so the caller can return the operation name immediately. |
-| `StartTime` | Scheduler-managed due time. Future values create future-dated `Pending` rows. |
-| `Method` | Custom method verb that produced the long-running operation, for example `purge`; ordinary scheduled fires leave it `null`. |
-| `JobKey` | Stable key used by `IScheduledJobRegistry` to resolve the job type. |
-| `ArgsJson` | Serialized typed arguments replayed by the job body. `PurgeJob<TEntity>` deserializes this into `PurgeOperationArgs`. |
-| `Execution` | The `SchemataJobExecution` row currently being run. Jobs set `Execution.Output` before returning to persist an operation response. |
-| `TriggerOutcome` | Most-restrictive observer result captured for the current fire. |
+| Property         | Source and purpose                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Job`            | Canonical name of the job or one-shot operation being fired; `null` when the fire has no persistent scheduler entry.                        |
+| `Variables`      | Free-form caller variables serialized through `SchemataJob.Variables`.                                                                      |
+| `ExecutionUid`   | UID reserved for the execution row; `TriggerAsync` accepts a caller-provided value so the caller can return the operation name immediately. |
+| `StartTime`      | Scheduler-managed due time. Future values create future-dated `Pending` rows.                                                               |
+| `Method`         | Custom method verb that produced the long-running operation, for example `purge`; ordinary scheduled fires leave it `null`.                 |
+| `JobKey`         | Stable key used by `IScheduledJobRegistry` to resolve the job type.                                                                         |
+| `ArgsJson`       | Serialized typed arguments replayed by the job body. `PurgeJob<TEntity>` deserializes this into `PurgeOperationArgs`.                       |
+| `Execution`      | The `SchemataJobExecution` row currently being run. Jobs set `Execution.Output` before returning to persist an operation response.          |
+| `TriggerOutcome` | Most-restrictive observer result captured for the current fire.                                                                             |
 
 `ArgsJson` is for typed, restart-durable work. Resource purge stores the request filter, language, and force flag there, then `PurgeJob<TEntity>` deserializes the payload when the dispatcher runs the job. `Variables` remains the dictionary channel for caller-supplied values on ordinary job runs.
 
@@ -139,11 +139,11 @@ public enum JobTriggerOutcome
 
 When multiple observers run, the dispatcher keeps the most-restrictive outcome: `Block > Skip > Proceed`.
 
-| Outcome | Execution row state | Schedule |
-| --- | --- | --- |
-| `Proceed` | `Succeeded` after `ExecuteAsync` returns, or `Failed` if it throws | Advances |
-| `Skip` | `Skipped` | Advances to the next occurrence |
-| `Block` | `Blocked` | Frozen at the current `NextRunTime` |
+| Outcome   | Execution row state                                                | Schedule                            |
+| --------- | ------------------------------------------------------------------ | ----------------------------------- |
+| `Proceed` | `Succeeded` after `ExecuteAsync` returns, or `Failed` if it throws | Advances                            |
+| `Skip`    | `Skipped`                                                          | Advances to the next occurrence     |
+| `Block`   | `Blocked`                                                          | Frozen at the current `NextRunTime` |
 
 `Skip` fits work that an external system already handled. `Block` fits a prerequisite that is not met and a job that must retry at the same time.
 

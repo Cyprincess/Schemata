@@ -4,16 +4,16 @@ The `Schemata.Entity.Cache` package adds transparent query caching and automatic
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
-| `AdviceQueryCache<,,>` | `src/Schemata.Entity.Cache/Advisors/AdviceQueryCache.cs` |
-| `AdviceResultCache<,,>` | `src/Schemata.Entity.Cache/Advisors/AdviceResultCache.cs` |
-| `AdviceCommittedEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceCommittedEvictCache.cs` |
-| `ReverseIndex` | `src/Schemata.Entity.Cache/ReverseIndex.cs` |
-| `Stringizing` | `src/Schemata.Entity.Cache/Stringizing.cs` |
-| `PartialEvaluator` | `src/Schemata.Entity.Cache/PartialEvaluator.cs` |
-| `SchemataQueryCacheOptions` | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs` |
-| `UseQueryCache` extension | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
+| Item                          | Path                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `AdviceQueryCache<,,>`        | `src/Schemata.Entity.Cache/Advisors/AdviceQueryCache.cs`                      |
+| `AdviceResultCache<,,>`       | `src/Schemata.Entity.Cache/Advisors/AdviceResultCache.cs`                     |
+| `AdviceCommittedEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceCommittedEvictCache.cs`             |
+| `ReverseIndex`                | `src/Schemata.Entity.Cache/ReverseIndex.cs`                                   |
+| `Stringizing`                 | `src/Schemata.Entity.Cache/Stringizing.cs`                                    |
+| `PartialEvaluator`            | `src/Schemata.Entity.Cache/PartialEvaluator.cs`                               |
+| `SchemataQueryCacheOptions`   | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs`                      |
+| `UseQueryCache` extension     | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
 
 ## The cache advisors
 
@@ -96,17 +96,17 @@ If the transaction rolls back, committed advisors do not run. The cache retains 
 
 `SchemataQueryCacheOptions` (configured via `UseQueryCache(o => ...)`):
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `Ttl` | `TimeSpan` | 5 minutes | Sliding expiration for cached results and reverse-index entries. |
-| `EvictionEnabled` | `bool` | `true` | When `false`, committed eviction is skipped. Query and result advisors remain active; entries live until TTL expires. |
+| Property          | Type       | Default   | Description                                                                                                           |
+| ----------------- | ---------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Ttl`             | `TimeSpan` | 5 minutes | Sliding expiration for cached results and reverse-index entries.                                                      |
+| `EvictionEnabled` | `bool`     | `true`    | When `false`, committed eviction is skipped. Query and result advisors remain active; entries live until TTL expires. |
 
 ## Suppression
 
-| Method | Marker | Effect |
-|---|---|---|
-| `repository.SuppressQueryCache()` | `QueryCacheSuppressed` | Skips `AdviceQueryCache` and `AdviceResultCache`. |
-| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache`. |
+| Method                                    | Marker                         | Effect                                            |
+| ----------------------------------------- | ------------------------------ | ------------------------------------------------- |
+| `repository.SuppressQueryCache()`         | `QueryCacheSuppressed`         | Skips `AdviceQueryCache` and `AdviceResultCache`. |
+| `repository.SuppressQueryCacheEviction()` | `QueryCacheEvictionSuppressed` | Skips `AdviceCommittedEvictCache`.                |
 
 Scope a suppression with `using`:
 

@@ -54,9 +54,9 @@ public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest> : IResourceUpdate
 
         if (entity is ISoftDelete { DeleteTime: not null }) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                name: entity.CanonicalName,
-                subject: PreconditionSubjects.SoftDeleted,
-                description: "Resource is deleted and must be undeleted before it can be updated.");
+                entity.CanonicalName,
+                PreconditionSubjects.SoftDeleted,
+                "Resource is deleted and must be undeleted before it can be updated.");
         }
 
         return Task.FromResult(AdviseResult.Continue);

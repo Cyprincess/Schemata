@@ -8,6 +8,7 @@ namespace Schemata.Event.Skeleton.Entities;
 
 /// <summary>Durable event subscription row used by event dispatchers and bridge features.</summary>
 [Table("SchemataEventSubscriptions")]
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("event-subscriptions/{event_subscription}")]
 [Index(nameof(SubscriptionId), IsUnique = true)]
 [Index(nameof(EventType))]

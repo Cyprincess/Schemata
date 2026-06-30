@@ -5,13 +5,13 @@ the repository. The stage order is fixed; advisor `Order` only sequences advisor
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceOperationHandler.Get.cs` |
-| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `KeyOrdering.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs`, `Advisors/IResourceGetRequestAdvisor.cs` |
+| Package                        | Key files                                                                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceOperationHandler.Get.cs`                                                                                      |
+| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `KeyOrdering.cs`                                                                                     |
+| `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs`, `Advisors/IResourceGetRequestAdvisor.cs`                                                                        |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceListResponseReadMask.cs`, `Advisors/AdviceResponseReadMask.cs`, `Advisors/AdviceResponseParent.cs`, `Advisors/AdviceListResponseParent.cs` |
-| `Schemata.Abstractions` | `Resource/ListRequest.cs`, `Resource/GetRequest.cs`, `Resource/ListResultBase.cs` |
+| `Schemata.Abstractions`        | `Resource/ListRequest.cs`, `Resource/GetRequest.cs`, `Resource/ListResultBase.cs`                                                                          |
 
 ## List
 
@@ -31,16 +31,16 @@ here when `WithAuthorization()` is configured; an entitlement advisor adds predi
 ### 3. Parent scoping
 
 When `request.Parent` is set, `ResourceNameDescriptor.ParseParent` matches it against the entity's pattern. A
-parent that fails to match throws `ValidationException` (`InvalidParent`). A `-` wildcard segment on an entity
-without `[ReadAcross]` throws `ValidationException` (`CrossParentUnsupported`). Otherwise
+parent that fails to match throws `ValidationException` (`INVALID_PARENT`). A `-` wildcard segment on an entity
+without `[ReadAcross]` throws `ValidationException` (`CROSS_PARENT_UNSUPPORTED`). Otherwise
 `BuildParentPredicate` produces a `Where` predicate applied via `container.ApplyModification`.
 
 ### 4. Page token and paging parameters
 
 `PageToken.FromStringAsync` decodes `request.PageToken`; a token that fails to decode throws `ValidationException`
-(`InvalidPageToken`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the
-current request throws `ValidationException` (`InvalidPageToken`). A negative `page_size` throws
-`ValidationException` (`InvalidPageSize`); `<= 0` defaults to 25 and `> 100` is capped at 100. `Skip` accumulates
+(`INVALID_PAGE_TOKEN`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the
+current request throws `ValidationException` (`INVALID_PAGE_TOKEN`). A negative `page_size` throws
+`ValidationException` (`INVALID_PAGE_SIZE`); `<= 0` defaults to 25 and `> 100` is capped at 100. `Skip` accumulates
 onto the token and is floored at 0.
 
 ### 5. Filter compilation
@@ -54,7 +54,7 @@ parses and compiles the filter to `Expression<Func<TEntity, bool>>`, and applies
 
 When `request.OrderBy` is set, the handler resolves `IOrderCompiler` keyed by `AipLanguage.Name` and compiles to
 `Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>`. A parse failure becomes `ValidationException`
-(`InvalidOrderBy`). `KeyOrdering<TEntity>.Compose` appends a deterministic key ordering after any `order_by`,
+(`INVALID_ORDER_BY`). `KeyOrdering<TEntity>.Compose` appends a deterministic key ordering after any `order_by`,
 keeping page boundaries stable.
 
 ### 7. Count and fetch
@@ -83,7 +83,7 @@ Receives the principal and the token `nameof(Operations.Get)`. `Block` throws `R
 
 ### 2. Name predicates
 
-`ApplyIdentifierPredicates` resolves the name (`request.CanonicalName ?? request.Name`) into leaf and parent
+`ResourceIdentifiers.Apply` resolves the name (`request.CanonicalName ?? request.Name`) into leaf and parent
 `Where` predicates on the container.
 
 ### 3. Get request — `IResourceGetRequestAdvisor<TEntity>`

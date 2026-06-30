@@ -1,7 +1,11 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Xml;
-using Schemata.Common;
+using Humanizer;
+using Schemata.Abstractions.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
@@ -16,7 +20,6 @@ public sealed class ActivityBehavior
 {
     private readonly ProcessDefinition _definition;
 
-    /// <summary>Creates a behavior builder for <paramref name="activity" /> within <paramref name="definition" />.</summary>
     internal ActivityBehavior(ProcessDefinition definition, Activity activity) {
         _definition = definition;
         Activity    = activity;
@@ -29,13 +32,78 @@ public sealed class ActivityBehavior
     /// <summary>The current tail activity for chained behavior calls.</summary>
     internal Activity LastTarget { get; private set; }
 
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs before the configured activity is
+    ///     entered. The task name is synthesized from the activity name.
+    /// </summary>
+    /// <param name="body">The delegate executed by the procedure task.</param>
+    public ActivityBehavior OnEnter(Func<FlowTaskContext, ValueTask> body) {
+        return EnterTask($"Enter_{Activity.Name}", body);
+    }
+
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs before the configured activity is
+    ///     entered, resolving the source bound under the name derived from
+    ///     <typeparamref name="TSource" />.
+    /// </summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="body">The delegate executed with the task context and the resolved source.</param>
+    public ActivityBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
+        where TSource : class, ICanonicalName {
+        return OnEnter<TSource>(DefaultSourceName<TSource>(), body);
+    }
+
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs before the configured activity is
+    ///     entered, resolving the source bound under <paramref name="source" />.
+    /// </summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
+    /// <param name="body">The delegate executed with the task context and the resolved source.</param>
+    public ActivityBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
+        where TSource : class, ICanonicalName {
+        ArgumentException.ThrowIfNullOrEmpty(source);
+        return EnterTask($"Enter_{Activity.Name}", SourceBody(source, body));
+    }
+
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs after the current activity is left.
+    ///     The task name is synthesized from the current tail activity name.
+    /// </summary>
+    /// <param name="body">The delegate executed by the procedure task.</param>
+    public ActivityBehavior OnLeave(Func<FlowTaskContext, ValueTask> body) {
+        return LeaveTask($"Leave_{LastTarget.Name}", body);
+    }
+
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs after the current activity is left,
+    ///     resolving the source bound under the name derived from <typeparamref name="TSource" />.
+    /// </summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="body">The delegate executed with the task context and the resolved source.</param>
+    public ActivityBehavior OnLeave<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
+        where TSource : class, ICanonicalName {
+        return OnLeave<TSource>(DefaultSourceName<TSource>(), body);
+    }
+
+    /// <summary>
+    ///     Materializes an anonymous procedure task that runs after the current activity is left,
+    ///     resolving the source bound under <paramref name="source" />.
+    /// </summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
+    /// <param name="body">The delegate executed with the task context and the resolved source.</param>
+    public ActivityBehavior OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
+        where TSource : class, ICanonicalName {
+        ArgumentException.ThrowIfNullOrEmpty(source);
+        return LeaveTask($"Leave_{LastTarget.Name}", SourceBody(source, body));
+    }
+
     /// <summary>Routes the current activity to another <see cref="Activity" />.</summary>
     /// <param name="target">The next activity to transition to.</param>
     public ActivityBehavior Go(Activity target) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() {
-                                  Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = target,
-                              });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = _definition.ResolveEntry(target) });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         LastTarget = target;
         return this;
@@ -45,9 +113,7 @@ public sealed class ActivityBehavior
     /// <param name="target">The intermediate or end event to transition to.</param>
     public ActivityBehavior Go(FlowEvent target) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() {
-                                  Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = target,
-                              });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = target });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -56,12 +122,10 @@ public sealed class ActivityBehavior
     public ActivityBehavior End() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
-            Id = $"end_{Identifiers.NewUid():n}", Name = "End", Position = EventPosition.End,
+            Name = $"End_{LastTarget.Name}", Position = EventPosition.End,
         };
         _definition.Elements.Add(endEvent);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -70,9 +134,7 @@ public sealed class ActivityBehavior
     /// <param name="endEvent">The end event to route to.</param>
     public ActivityBehavior End(EndEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -81,9 +143,7 @@ public sealed class ActivityBehavior
     /// <param name="endEvent">The flow event to route to.</param>
     public ActivityBehavior End(FlowEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -92,15 +152,12 @@ public sealed class ActivityBehavior
     public ActivityBehavior Terminate() {
         EnsureNoOutgoingConflict(LastTarget);
         var endEvent = new FlowEvent {
-            Id          = $"end_{Identifiers.NewUid():n}",
-            Name        = "Terminate",
+            Name        = $"Terminate_{LastTarget.Name}",
             Position    = EventPosition.End,
             IsTerminate = true,
         };
         _definition.Elements.Add(endEvent);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = endEvent,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -109,19 +166,16 @@ public sealed class ActivityBehavior
     /// <param name="branches">The candidate branches evaluated in order; the first matching branch is taken.</param>
     public ActivityBehavior Decide(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
-        var gateway = new ExclusiveGateway {
-            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{Activity.Name}",
-        };
+        var gateway = new ExclusiveGateway { Name = $"Decision_{LastTarget.Name}" };
         _definition.Elements.Add(gateway);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = gateway });
 
-        foreach (var branch in branches) {
+        for (var i = 0; i < branches.Length; i++) {
+            var branch = branches[i];
+            branch.EnsureExitRegistered(_definition, gateway, i);
             _definition.Flows.Add(new() {
-                Id        = $"sf_{Identifiers.NewUid():n}",
                 Source    = gateway,
-                Target    = branch.Exit,
+                Target    = _definition.ResolveEntry(branch.Exit),
                 Condition = branch.Condition,
                 IsDefault = branch.IsDefault,
             });
@@ -137,19 +191,16 @@ public sealed class ActivityBehavior
     /// </summary>
     public InclusiveBranch Include(params Branch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
-        var gateway = new InclusiveGateway {
-            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Decision_{Activity.Name}",
-        };
+        var gateway = new InclusiveGateway { Name = $"Decision_{LastTarget.Name}" };
         _definition.Elements.Add(gateway);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = gateway });
 
-        foreach (var branch in branches) {
+        for (var i = 0; i < branches.Length; i++) {
+            var branch = branches[i];
+            branch.EnsureExitRegistered(_definition, gateway, i);
             _definition.Flows.Add(new() {
-                Id        = $"sf_{Identifiers.NewUid():n}",
                 Source    = gateway,
-                Target    = branch.Exit,
+                Target    = _definition.ResolveEntry(branch.Exit),
                 Condition = branch.Condition,
                 IsDefault = branch.IsDefault,
             });
@@ -165,18 +216,12 @@ public sealed class ActivityBehavior
     /// </summary>
     public ParallelFork Fork(params FlowBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
-        var gateway = new ParallelGateway {
-            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Fork_{Activity.Name}",
-        };
+        var gateway = new ParallelGateway { Name = $"Fork_{LastTarget.Name}" };
         _definition.Elements.Add(gateway);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = gateway });
 
         foreach (var branch in branches) {
-            _definition.Flows.Add(new() {
-                Id = $"sf_{Identifiers.NewUid():n}", Source = gateway, Target = branch.Entry,
-            });
+            _definition.Flows.Add(new() { Source = gateway, Target = _definition.ResolveEntry(branch.Entry) });
         }
 
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
@@ -187,13 +232,9 @@ public sealed class ActivityBehavior
     /// <param name="branches">The event branches the gateway listens on; the first to fire is taken.</param>
     public ActivityBehavior Await(params EventBranch[] branches) {
         EnsureNoOutgoingConflict(LastTarget);
-        var gateway = new EventBasedGateway {
-            Id = $"gateway_{Identifiers.NewUid():n}", Name = $"Await_{Activity.Name}",
-        };
+        var gateway = new EventBasedGateway { Name = $"Await_{LastTarget.Name}" };
         _definition.Elements.Add(gateway);
-        _definition.Flows.Add(new() {
-            Id = $"sf_{Identifiers.NewUid():n}", Source = LastTarget, Target = gateway,
-        });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = gateway });
 
         foreach (var branch in branches) {
             branch.Build(_definition, gateway);
@@ -208,6 +249,44 @@ public sealed class ActivityBehavior
             throw new InvalidOperationException($"Activity '{activity.Name}' already has an outgoing path defined. "
                                               + "An activity can only have one outgoing path type (Go, Decide, Include, Fork, Await, End, Terminate).");
         }
+    }
+
+    private static ProcedureTask Procedure(string name, Func<FlowTaskContext, ValueTask> body) {
+        return new() { Name = name, Body = body };
+    }
+
+    private ActivityBehavior EnterTask(string name, Func<FlowTaskContext, ValueTask> body) {
+        var task = Procedure(name, body);
+        _definition.Elements.Add(task);
+
+        foreach (var flow in _definition.Flows.Where(f => f.Target == Activity).ToList()) {
+            flow.Target = task;
+        }
+
+        _definition.Flows.Add(new() { Source = task, Target = Activity });
+        _definition.EnterTasks.TryAdd(Activity, task);
+
+        return this;
+    }
+
+    private ActivityBehavior LeaveTask(string name, Func<FlowTaskContext, ValueTask> body) {
+        var task = Procedure(name, body);
+        _definition.Elements.Add(task);
+        return Go(task);
+    }
+
+    private static string DefaultSourceName<TSource>() {
+        return typeof(TSource).Name.Underscore().ToLowerInvariant();
+    }
+
+    private static Func<FlowTaskContext, ValueTask> SourceBody<TSource>(
+        string                                 source,
+        Func<FlowTaskContext, TSource, ValueTask> body
+    ) where TSource : class, ICanonicalName {
+        return async ctx => {
+            var entity = await ctx.SourceAsync<TSource>(source);
+            await body(ctx, entity);
+        };
     }
 
     #region Boundary Events

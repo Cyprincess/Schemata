@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
@@ -13,4 +15,15 @@ public abstract class SubProcess : Activity
     ///     (Event Sub-Process).
     /// </summary>
     public bool TriggeredByEvent { get; set; }
+
+    /// <summary>
+    ///     Inner BPMN elements scoped to this sub-process. The sub-process must contain at least
+    ///     one <see cref="FlowEvent" /> with <see cref="EventPosition.Start" /> and at least one
+    ///     <see cref="FlowEvent" /> with <see cref="EventPosition.End" />; intermediate gateways,
+    ///     activities, and nested sub-processes are allowed.
+    /// </summary>
+    public List<FlowElement> Children { get; } = [];
+
+    /// <summary>Sequence flows wiring up <see cref="Children" />.</summary>
+    public List<SequenceFlow> ChildFlows { get; } = [];
 }

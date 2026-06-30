@@ -86,7 +86,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
         return Task.CompletedTask;
     }
 
-    public Task SetDisplayNamesAsync(TScope? scope, Dictionary<string, string>? names, CancellationToken ct = default) {
+    public Task SetDisplayNamesAsync(TScope? scope, Dictionary<string, string?>? names, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
         scope?.DisplayNames = names;
@@ -103,9 +103,9 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
     }
 
     public Task SetDescriptionsAsync(
-        TScope?                     scope,
-        Dictionary<string, string>? descriptions,
-        CancellationToken           ct = default
+        TScope?                      scope,
+        Dictionary<string, string?>? descriptions,
+        CancellationToken            ct = default
     ) {
         ct.ThrowIfCancellationRequested();
 

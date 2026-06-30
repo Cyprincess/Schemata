@@ -15,8 +15,8 @@ public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdenti
     /// <summary>Optional description for the new process instance.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Optional serialized initial variables.</summary>
-    public string? Variables { get; set; }
+    /// <summary>Optional canonical name of the source entity bound to the process instance.</summary>
+    public string? Source { get; set; }
 
     #region ICanonicalName Members
 

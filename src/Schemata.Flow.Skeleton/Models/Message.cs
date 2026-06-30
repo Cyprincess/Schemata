@@ -5,7 +5,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// <summary>
 ///     A BPMN Message event definition representing directed point-to-point communication.
 /// </summary>
-public sealed class Message : IEventDefinition
+public class Message : IEventDefinition
 {
     /// <summary>
     ///     The CLR type of the payload carried by this message.
@@ -18,4 +18,13 @@ public sealed class Message : IEventDefinition
     public string Name { get; set; } = null!;
 
     #endregion
+}
+
+/// <summary>
+///     A BPMN Message event definition carrying a statically declared payload type.
+/// </summary>
+/// <typeparam name="TPayload">The payload type delivered to typed conditions and procedure tasks.</typeparam>
+public sealed class Message<TPayload> : Message
+{
+    public Message() { PayloadType = typeof(TPayload); }
 }

@@ -1,10 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Collections;
 using Humanizer;
 using Parlot;
 using Schemata.Expressions.Cel.Expressions;
@@ -167,11 +167,11 @@ internal sealed class CelCompileVisitor
 
     private Expression BuildCall(CelCall node) {
         if (ValueMode) {
-            if (node.Name == "has" && node.Args.Count == 1) {
+            if (node is { Name: "has", Args.Count: 1 }) {
                 return Expression.Call(ValueMethod(nameof(CelValues.Has), 1), ToObject(Visit(node.Args[0])));
             }
 
-            if (node.Name == "size" && node.Args.Count == 1) {
+            if (node is { Name: "size", Args.Count: 1 }) {
                 return ValueUnary(nameof(CelValues.Size), Visit(node.Args[0]));
             }
 
@@ -183,11 +183,11 @@ internal sealed class CelCompileVisitor
             return Expression.Call(ValueMethod(nameof(CelValues.UnknownFunction), 1), Expression.Constant(node.Name));
         }
 
-        if (node.Name == "has" && node.Args.Count == 1) {
+        if (node is { Name: "has", Args.Count: 1 }) {
             return BuildHas(node.Args[0]);
         }
 
-        if (node.Name == "size" && node.Args.Count == 1) {
+        if (node is { Name: "size", Args.Count: 1 }) {
             return BuildSize(Visit(node.Args[0]));
         }
 
@@ -512,9 +512,9 @@ internal sealed class CelCompileVisitor
 
     private static Expression ValueConstant(CelConstant value) {
         var constant = value.Value switch {
-            int i => (object)(long)i,
+            int i        => (long)i,
             byte[] bytes => bytes,
-            var other => other,
+            var other    => other,
         };
 
         return Expression.Constant(constant, typeof(object));
@@ -625,7 +625,7 @@ internal sealed class CelCompileVisitor
             throw new ParseException($"CEL macro '{name}' requires iteration variables and expression.", default);
         }
 
-        if (args.Count >= 3 && args[1] is CelIdentifier second) {
+        if (args is [_, CelIdentifier second, _, ..]) {
             return BuildValueMacro2(name, source, first.Name, second.Name, args.Skip(2).ToArray());
         }
 
@@ -713,7 +713,7 @@ internal sealed class CelCompileVisitor
         var operand = Visit(node.Operand);
         return node.Operator switch {
             "!"   => Expression.Not(AsBoolean(operand)),
-            "-"   => Expression.Call(MultiplyMethod, Expression.Constant((object)-1.0, typeof(object)), ToObject(operand)),
+            "-"   => Expression.Call(MultiplyMethod, Expression.Constant(-1.0, typeof(object)), ToObject(operand)),
             var _ => throw new ParseException($"Unsupported CEL unary operator '{node.Operator}' in dynamic evaluation.",
                                              default),
         };
@@ -744,7 +744,7 @@ internal sealed class CelCompileVisitor
     }
 
     private Expression BuildDynamicCall(CelCall node) {
-        if (node.Name == "has" && node.Args.Count == 1) {
+        if (node is { Name: "has", Args.Count: 1 }) {
             return Expression.Call(IsPresentMethod, ToObject(Visit(node.Args[0])));
         }
 

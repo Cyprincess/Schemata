@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using System.Threading;
-using Moq;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Scheduling.Internal;
-using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
 using SystemTask = System.Threading.Tasks.Task;
@@ -14,22 +13,18 @@ public class FlowTimerJobShould
 {
     [Fact]
     public async SystemTask MissingProcessName_Throws() {
-        var runtime = new Mock<IProcessRuntime>();
-        var job     = new FlowTimerJob(runtime.Object);
+        var job = new FlowTimerJob(new ServiceCollection().BuildServiceProvider());
 
         await Assert.ThrowsAsync<FailedPreconditionException>(() => job.ExecuteAsync(
-                                                                  new() {
-                                                                      Variables = new Dictionary<string, object?>(),
-                                                                  }, CancellationToken.None));
+            new() { Variables = new Dictionary<string, string?>() }, CancellationToken.None));
     }
 
     [Fact]
     public async SystemTask MissingTimerDefinition_Throws() {
-        var runtime = new Mock<IProcessRuntime>();
-        var job     = new FlowTimerJob(runtime.Object);
+        var job = new FlowTimerJob(new ServiceCollection().BuildServiceProvider());
 
         var context = new JobContext {
-            Variables = new Dictionary<string, object?> { ["processName"] = "processes/p1" },
+            Variables = new Dictionary<string, string?> { ["processName"] = "processes/p1" },
         };
 
         await Assert.ThrowsAsync<FailedPreconditionException>(() => job.ExecuteAsync(context, CancellationToken.None));

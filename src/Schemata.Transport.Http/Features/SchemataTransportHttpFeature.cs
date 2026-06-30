@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Core;
@@ -84,7 +85,7 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
     ///     Returns <see langword="null" /> when the header is empty so the central
     ///     <c>EnsureLocalizedMessage</c> helper skips localization.
     /// </summary>
-    private static string? ParseAcceptLanguage(Microsoft.Extensions.Primitives.StringValues header) {
+    private static string? ParseAcceptLanguage(StringValues header) {
         foreach (var value in header) {
             if (string.IsNullOrWhiteSpace(value)) {
                 continue;

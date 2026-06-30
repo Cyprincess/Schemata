@@ -6,17 +6,17 @@ Add transparent query result caching to the `Student` repository with automatic 
 
 Three advisors intercept the repository pipeline:
 
-| Advisor | When | Behavior |
-| ------- | ---- | -------- |
-| `AdviceQueryCache` | Before query execution | Returns cached result on hit, skips the database |
-| `AdviceResultCache` | After successful query | Stores result in cache and updates the reverse index |
+| Advisor                     | When                    | Behavior                                                       |
+| --------------------------- | ----------------------- | -------------------------------------------------------------- |
+| `AdviceQueryCache`          | Before query execution  | Returns cached result on hit, skips the database               |
+| `AdviceResultCache`         | After successful query  | Stores result in cache and updates the reverse index           |
 | `AdviceCommittedEvictCache` | After successful commit | Evicts cached queries that contain updated or removed entities |
 
 Caching uses `ICacheProvider` - a pluggable abstraction with in-memory and Redis backends. The cache is opt-in: you must register a provider and call `UseQueryCache()`.
 
 ## Add the packages
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Entity.Cache`. If you are composing packages manually:
+Query caching ships outside the meta target packages, so add both packages explicitly:
 
 ```shell
 dotnet add package --prerelease Schemata.Entity.Cache
@@ -75,7 +75,7 @@ using (repository.SuppressQueryCache())
 
 ## Commit-time eviction
 
-Eviction runs through `IRepositoryCommittedAdvisor<TEntity>` after `CommitAsync` succeeds. The advisor receives a `CommitChanges<TEntity>` snapshot and evicts reverse-indexed entries for updated and removed entities. If a unit of work rolls back, committed advisors do not run and cached entries remain valid until TTL expires.
+Eviction runs after `CommitAsync` succeeds and covers the cached queries containing updated or removed entities. If a unit of work rolls back, no eviction runs and cached entries remain valid until TTL expires. The reverse index and eviction design are in [Query Cache](../documents/entity/query-cache.md).
 
 ## Production: Redis
 
@@ -101,18 +101,18 @@ dotnet run
 
 ```shell
 # First query hits the database (cache miss)
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 
 # Second identical query returns from cache
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 
 # Update a student - evicts cached queries containing that student
-curl -X PATCH "http://localhost:5000/students/<name>" \
+curl -X PATCH "http://localhost:5000/v1/students/<name>" \
      -H "Content-Type: application/json" \
      -d '{"age":22}'
 
 # Next list query hits the database again and re-caches
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 ```
 
 ## Next steps

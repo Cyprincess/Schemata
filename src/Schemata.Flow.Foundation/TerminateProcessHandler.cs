@@ -5,19 +5,16 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation;
 
 /// <summary>Resource method handler that terminates process instances.</summary>
-public sealed class TerminateProcessHandler(
-    IProcessRuntime  runtime,
-    IProcessRegistry registry
-) : IResourceMethodHandler<SchemataProcess, EmptyResourceRequest, ProcessInstance>
+public sealed class TerminateProcessHandler(FlowRunner runner)
+    : IResourceMethodHandler<SchemataProcess, EmptyResourceRequest, ProcessSnapshot>
 {
-    #region IResourceMethodHandler<SchemataProcess,EmptyResourceRequest,ProcessInstance> Members
+    #region IResourceMethodHandler<SchemataProcess,EmptyResourceRequest,ProcessSnapshot> Members
 
-    public async ValueTask<ProcessInstance> InvokeAsync(
+    public ValueTask<ProcessSnapshot> InvokeAsync(
         string?              name,
         EmptyResourceRequest request,
         SchemataProcess?     entity,
@@ -25,12 +22,7 @@ public sealed class TerminateProcessHandler(
         CancellationToken    ct
     ) {
         ArgumentNullException.ThrowIfNull(entity);
-        FlowProcessAuthorization.EnsureProcessAccess(registry, entity, principal);
-
-        var instance = await runtime.TerminateProcessInstanceAsync(name!, principal, ct);
-        instance.CanonicalName = name;
-        instance.Name = entity.Name;
-        return instance;
+        return runner.TerminateAsync(entity, principal, ct);
     }
 
     #endregion

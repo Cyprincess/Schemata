@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Flow.Foundation;
 using Schemata.Flow.Grpc.Services;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;

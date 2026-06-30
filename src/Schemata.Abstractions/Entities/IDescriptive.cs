@@ -18,7 +18,7 @@ public interface IDescriptive
     ///     Localized display names keyed by IETF BCP 47 language tag
     ///     (e.g., <c>"en"</c>, <c>"zh-Hans"</c>).
     /// </summary>
-    Dictionary<string, string>? DisplayNames { get; set; }
+    Dictionary<string, string?>? DisplayNames { get; set; }
 
     /// <summary>
     ///     The primary description, corresponding to AIP-148 <c>description</c>.
@@ -29,5 +29,5 @@ public interface IDescriptive
     ///     Localized descriptions keyed by IETF BCP 47 language tag
     ///     (e.g., <c>"en"</c>, <c>"zh-Hans"</c>).
     /// </summary>
-    Dictionary<string, string>? Descriptions { get; set; }
+    Dictionary<string, string?>? Descriptions { get; set; }
 }

@@ -105,6 +105,7 @@ An extension feature can be activated in the same way as a built-in feature.
 | 480_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
 | 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
 | 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
+| 480_500_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
 | 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
 | 490_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
 | 490_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
@@ -145,3 +146,11 @@ The default `StateMachineEngine` in `Schemata.Flow.StateMachine` runs a subset o
 Intermediate catch events bridge to runtime infrastructure: `Schemata.Flow.Event` correlates `Message` and `Signal` catches with the event bus, and `Schemata.Flow.Scheduling` fires `Timer` catches through the scheduler.
 
 The process graph is built with a strongly-typed C# DSL in `Schemata.Flow.Skeleton.Builders` (`ProcessBuilder`, `ActivityBehavior`, `BoundaryCatch`, `EventBranch`, `FlowBranch`, `InclusiveBranch`, `InclusiveMerge`, `ParallelFork`, `ParallelJoin`, `StartFlow`).
+
+### Schemata.Flow.Bpmn
+
+`Schemata.Flow.Bpmn` provides the full BPMN 2.0.2 engine for multi-token execution, including parallel, inclusive, and complex gateways; embedded, event, and transaction subprocesses; `CallActivity`; standard loops; sequential and parallel multi-instance loops; interrupting and non-interrupting boundary events; escalation; and compensation. See [BPMN engine](docs/documents/flow/bpmn-engine.md) for the feature matrix and runtime semantics.
+
+The BPMN MIWG conformance suite covers an executable subset of the spec. Collaboration, lane, and related multi-process interchange cases are structurally out of scope for this single-process engine.
+
+`Schemata.Flow.Bpmn` is intentionally not bundled into any meta target package. Consumers add it explicitly with `<PackageReference Include="Schemata.Flow.Bpmn" />`.

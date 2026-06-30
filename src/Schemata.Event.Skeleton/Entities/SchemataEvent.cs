@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Event.Skeleton.Entities;
@@ -9,6 +10,7 @@ namespace Schemata.Event.Skeleton.Entities;
 /// <summary>Persisted audit record for an event published through <see cref="IEventBus" />.</summary>
 [DisplayName("Event")]
 [Table("SchemataEvents")]
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("events/{event}")]
 public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ISourceReference, ITimestamp
 {

@@ -63,13 +63,12 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 
 ## How it works
 
-`SchemataGrpcResourceFeature` synthesizes a `ResourceService<Student, ...>` for the resource and maps it via
-`endpoints.MapGrpcService<...>()`. The service delegates to the same `ResourceOperationHandler` as HTTP, so
+The gRPC transport synthesizes a service per resource and delegates to the same operation handlers as HTTP, so
 authorization, validation, timestamps, and soft-delete apply identically across both transports. The service is
-named `StudentService` (or `{package}.StudentService` with `[ResourcePackage]`), and its RPCs are `ListStudents`,
-`GetStudent`, `CreateStudent`, `UpdateStudent`, and `DeleteStudent`. Field names match the HTTP JSON (`Name`
-suppressed, `CanonicalName` as `name`, snake_case). gRPC reflection is enabled once any gRPC resource is
-registered.
+named `StudentService` and its RPCs are `ListStudents`, `GetStudent`, `CreateStudent`, `UpdateStudent`, and
+`DeleteStudent`. Field names match the HTTP JSON, and gRPC reflection is enabled once any gRPC resource is
+registered. Service synthesis and wire naming are covered in
+[gRPC Transport](../documents/resource/grpc-transport.md).
 
 ## Verify
 

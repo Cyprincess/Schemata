@@ -9,8 +9,15 @@ public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification
     /// <summary>The <see cref="Models.Signal.Name" /> of the signal definition to throw.</summary>
     public string SignalName { get; set; } = null!;
 
-    /// <summary>Optional serialized payload merged into matched process variables.</summary>
+    /// <summary>Optional serialized signal payload.</summary>
     public string? Payload { get; set; }
+
+    /// <summary>
+    ///     Optional full canonical name of a single token to scope the broadcast to. When
+    ///     <see langword="null" />, the signal fans out to every waiting token on every matched
+    ///     process (the default broadcast semantics).
+    /// </summary>
+    public string? Token { get; set; }
 
     #region ICanonicalName Members
 

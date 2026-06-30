@@ -54,10 +54,14 @@ public sealed class InsightPlanBuilder
                                                     $"Duplicate source alias '{binding.Alias}'.");
             }
 
-            var config = await ResolveAsync(binding.Name, ct)
-                      ?? throw new InsightValidationException(InsightReasons.UnknownSourceName,
-                                                             $"Unknown source '{binding.Name}'.",
-                                                             new Dictionary<string, string> { ["name"] = binding.Name });
+            var config = await ResolveAsync(binding.Name, ct);
+            if (config is null) {
+                throw new InsightValidationException(
+                    InsightReasons.UnknownSourceName,
+                    $"Unknown source '{binding.Name}'.",
+                    new Dictionary<string, string?> { ["name"] = binding.Name }
+                );
+            }
 
             configs[binding.Alias]  = config;
             subtrees[binding.Alias] = new SourceNode(binding.Alias, config) {
@@ -68,7 +72,7 @@ public sealed class InsightPlanBuilder
         var node = FoldJoins(request, subtrees);
 
         foreach (var transform in request.Transformations) {
-            node = ApplyTransform(node, transform, request, node.SourceSet, allowLimit: false);
+            node = ApplyTransform(node, transform, request, node.SourceSet, false);
         }
 
         node = new SelectionNode(node, BuildSelections(request.Selections, request, configs)) { SourceSet = node.SourceSet };
@@ -186,17 +190,21 @@ public sealed class InsightPlanBuilder
 
     private ParsedExpression Parse(InsightExpression expression, QueryInsightRequest request, ExpressionKind kind) {
         var language = expression.Language ?? request.Language ?? _options.DefaultLanguage;
-        var compiler = _services.GetKeyedService<IExpressionCompiler>(language)
-                    ?? throw new InsightValidationException(InsightReasons.UnknownExpressionLanguage,
-                                                           $"Unknown expression language '{language}'.",
-                                                           new Dictionary<string, string> { ["language"] = language });
+        var compiler = _services.GetKeyedService<IExpressionCompiler>(language);
+        if (compiler is null) {
+            throw new InsightValidationException(
+                InsightReasons.UnknownExpressionLanguage,
+                $"Unknown expression language '{language}'.",
+                new Dictionary<string, string?> { ["language"] = language }
+            );
+        }
 
         if (kind is ExpressionKind.Value) {
             var descriptor = _services.GetKeyedService<ExpressionLanguageDescriptor>(language);
             if (descriptor is null || !descriptor.SupportsValues) {
                 throw new InsightValidationException(InsightReasons.ExpressionLanguageNotValueCapable,
                                                     $"Language '{language}' cannot compile value expressions.",
-                                                    new Dictionary<string, string> { ["language"] = language });
+                                                    new Dictionary<string, string?> { ["language"] = language });
             }
         }
 
@@ -226,9 +234,14 @@ public sealed class InsightPlanBuilder
             }
 
             if (selection.Expression is { } expression) {
-                var alias = selection.Alias
-                         ?? throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                                "A computed selection requires an alias.");
+                var alias = selection.Alias;
+                if (alias is null) {
+                    throw new InsightValidationException(
+                        InsightReasons.InvalidArgument,
+                        "A computed selection requires an alias."
+                    );
+                }
+
                 items.Add(new(alias, SelectionKind.Expression, null, ParseValue(expression, request), [], null));
                 continue;
             }
@@ -264,7 +277,7 @@ public sealed class InsightPlanBuilder
 
         PlanNode node = new SourceNode(childAlias, childConfig) { SourceSet = childSet };
         foreach (var transform in selection.Transformations) {
-            node = ApplyTransform(node, transform, request, childSet, allowLimit: true);
+            node = ApplyTransform(node, transform, request, childSet, true);
         }
 
         var childItems = BuildSelections(selection.Selections, request, childMap);

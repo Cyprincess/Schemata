@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,38 +40,34 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
     public int Order => 0;
 
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, FlowTransitionContext context, CancellationToken ct = default) {
-        var process    = context.Process;
-        var instance   = context.Instance;
+        var process    = context.Snapshot.Process;
+        var token      = context.Token;
         var definition = context.Definition;
 
-        // Resolve the timer-catch job left behind (if any), keyed by its id so sibling timers
-        // in the same instance keep distinct scheduled jobs. Non-timer elements leave the
-        // scheduler untouched.
         string? previousTimerJob = null;
-        if (!string.IsNullOrEmpty(context.PreviousWaitingAtId)
-         && context.PreviousWaitingAtId != instance.WaitingAtId
+        if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
+         && context.PreviousWaitingAtName != token.WaitingAtName
          && definition is not null
-         && definition.Elements.FirstOrDefault(e => e.Id == context.PreviousWaitingAtId) is FlowEvent {
+         && definition.Elements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName) is FlowEvent {
                 Position: EventPosition.IntermediateCatch, Definition: TimerDefinition,
             }) {
-            previousTimerJob = JobName(process, context.PreviousWaitingAtId);
+            previousTimerJob = JobName(process, context.PreviousWaitingAtName);
         }
 
-        // Resolve the timer-catch job to schedule for the element we are now waiting on (if any).
         SchemataJob?                 timerJob       = null;
-        Dictionary<string, object?>? timerVariables = null;
-        if (!instance.IsComplete
-         && !string.IsNullOrEmpty(instance.WaitingAtId)
+        Dictionary<string, string?>? timerVariables = null;
+        if (!string.IsNullOrEmpty(token.WaitingAtName)
          && definition is not null
-         && definition.Elements.FirstOrDefault(e => e.Id == instance.WaitingAtId) is FlowEvent {
+         && definition.Elements.FirstOrDefault(e => e.Name == token.WaitingAtName) is FlowEvent {
                 Position: EventPosition.IntermediateCatch, Definition: TimerDefinition timerDef,
             }) {
             timerVariables = new() {
-                ["processName"] = process.CanonicalName, ["timerDef"] = timerDef,
+                ["processName"] = process.CanonicalName,
+                ["timerDef"]    = JsonSerializer.Serialize(timerDef, SchemataJson.Default),
             };
 
             timerJob = new() {
-                Name   = JobName(process, instance.WaitingAtId),
+                Name   = JobName(process, token.WaitingAtName),
                 JobKey = typeof(FlowTimerJob).FullName,
                 State  = JobState.Active,
             };
@@ -84,16 +81,13 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
         }
 
         var scheduler = _services.GetService<IScheduler>();
-        if (scheduler == null) {
+        if (scheduler is null) {
             throw new FailedPreconditionException(
                 SchemataResources.FLOW_TIMER_REQUIRES_SCHEDULING,
-                new Dictionary<string, string> { ["name"] = process.CanonicalName ?? string.Empty });
+                new Dictionary<string, string?> { ["name"] = process.CanonicalName });
         }
 
         if (previousTimerJob is not null) {
-            // IScheduler.UnscheduleAsync expects the SchemataJob canonical name; compose it
-            // from the bare timer-job leaf so the lookup matches the in-memory entries
-            // dictionary key (canonical name).
             var collection = ResourceNameDescriptor.ForType<SchemataJob>().Collection;
             await scheduler.UnscheduleAsync($"{collection}/{previousTimerJob}", ct);
         }
@@ -107,7 +101,7 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
 
     #endregion
 
-    private static string JobName(SchemataProcess process, string elementId) {
-        return $"flow-{process.CanonicalName}-{elementId}";
+    private static string JobName(SchemataProcess process, string elementName) {
+        return $"flow-{process.CanonicalName}-{elementName}";
     }
 }

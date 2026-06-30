@@ -1,10 +1,10 @@
 # tests — Test Projects
 
-27 projects in two layers. No e2e layer.
+30 projects in two layers. No e2e layer.
 
 | Layer | Suffix | Count | Notes |
 |---|---|---|---|
-| unit | `*.Tests` | 17 | in-process xUnit, no external services |
+| unit | `*.Tests` | 20 | in-process xUnit, no external services |
 | integration | `*.Integration.Tests` | 10 | use `WebApplicationFactory<Program>` and/or real-ish backends (SQLite, EF InMemory, RabbitMQ) |
 
 ## Framework & Runner
@@ -31,6 +31,7 @@ There is **no shared test utility project**. Helpers are duplicated across proje
 ## Conventions Worth Knowing
 
 - **EF / LinqToDB integration tests** use `Fixtures/IntegrationFixture.cs` implementing `IAsyncLifetime`. They create/teardown a SQLite or in-memory DB per fixture.
+- **LinqToDB fixtures use a fixture-private `MappingSchema`.** Mutating `MappingSchema.Default` from a fixture races parallel test classes and corrupts linq2db's entity-descriptor caches (symptom: intermittent `no such table`).
 - **gRPC integration tests** wrap `WebApplicationFactory` in a shared `GrpcTestCollection.cs` so the server starts once per collection.
 - **Web integration tests** use `Fixtures/WebAppFactory.cs` which derives from `WebApplicationFactory<Program>` and overrides `ConfigureWebHost` to swap auth, DB, and clock services.
 - **CEL conformance tests** ([Schemata.Expressions.Cel.Tests/Conformance/](Schemata.Expressions.Cel.Tests/Conformance/)) read raw `.textproto` vectors from the `specs/cel` submodule via a hard-coded `../../../../../specs/cel/tests/simple/testdata/{suite}.textproto` path. A local [cel-spec-skips.txt](Schemata.Expressions.Cel.Tests/Conformance/cel-spec-skips.txt) filters out-of-scope cases.

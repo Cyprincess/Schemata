@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Flow.Event.Events;
@@ -12,6 +11,4 @@ public sealed class ProcessCompletedEvent : IEvent
     /// <summary>Registered process definition name.</summary>
     public string DefinitionName { get; init; } = null!;
 
-    /// <summary>Variables present at completion.</summary>
-    public Dictionary<string, object?>? Variables { get; init; }
 }

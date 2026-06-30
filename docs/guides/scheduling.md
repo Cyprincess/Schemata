@@ -5,8 +5,7 @@ cron expression. This guide builds on [Getting Started](getting-started.md).
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Scheduling.Foundation`. To compose
-packages manually:
+Scheduling ships outside the meta target packages, so add it explicitly:
 
 ```shell
 dotnet add package --prerelease Schemata.Scheduling.Foundation
@@ -14,17 +13,15 @@ dotnet add package --prerelease Schemata.Scheduling.Foundation
 
 ## Enable scheduling
 
-`UseScheduling()` takes no delegate and returns a `SchedulingBuilder`. `SchemataSchedulingFeature`
-runs at Priority 470,000,000:
+`UseScheduling()` takes no delegate and returns a `SchedulingBuilder`:
 
 ```csharp
 schema.UseScheduling()
       .WithJob<StudentReportJob>("*/5 * * * *");
 ```
 
-`WithJob<T>(string cronExpression)` wraps the expression in a `CronSchedule`, which calls
-`CronExpression.Parse(expression)` from the Cronos library. Cronos uses 5-field cron
-(`minute hour day-of-month month day-of-week`); a 6-field Quartz expression such as
+`WithJob<T>(string cronExpression)` parses the expression with the Cronos library, which uses
+5-field cron (`minute hour day-of-month month day-of-week`); a 6-field Quartz expression such as
 `"0/30 * * * * ?"` throws at parse time.
 
 For a one-time job, use the `DateTime` or `TimeSpan` overload — both schedule a single fire:
@@ -82,26 +79,23 @@ setup from Getting Started) for the `SchemataJob` and `SchemataJobExecution` row
 +---------------------- minute (0-59)
 ```
 
-| Expression | Meaning |
-| --- | --- |
-| `*/5 * * * *` | Every 5 minutes |
-| `0 * * * *` | Every hour |
-| `0 9 * * 1-5` | 09:00 on weekdays |
-| `0 0 1 * *` | Midnight on the first of each month |
+| Expression    | Meaning                             |
+| ------------- | ----------------------------------- |
+| `*/5 * * * *` | Every 5 minutes                     |
+| `0 * * * *`   | Every hour                          |
+| `0 9 * * 1-5` | 09:00 on weekdays                   |
+| `0 0 1 * *`   | Midnight on the first of each month |
 
 Occurrences are computed in UTC.
 
 ## Job lifecycle
 
-The scheduler drives `IJobLifecycleObserver` around each fire:
+The scheduler notifies `IJobLifecycleObserver` implementations around each fire: before execution
+(where an observer can let the run proceed, skip it, or block it), on success, and on failure. The
+gating semantics and execution-row states are in the [Cron Jobs](../cookbook/cron-jobs.md) recipe.
 
-- `OnTriggeredAsync` — before `ExecuteAsync`. Return `JobTriggerOutcome.Proceed` to run, `Skip` to
-  skip (marks the execution row `Skipped` and advances the schedule), or `Block` to skip without
-  advancing (marks the row `Blocked`).
-- `OnSucceededAsync` — after `ExecuteAsync` returns.
-- `OnFailedAsync` — when `ExecuteAsync` throws.
-
-To publish those transitions to the event bus, chain `UseEvent()`:
+To publish those transitions to the event bus, add the `Schemata.Scheduling.Event` bridge package
+and chain `UseEvent()`:
 
 ```csharp
 schema.UseScheduling()

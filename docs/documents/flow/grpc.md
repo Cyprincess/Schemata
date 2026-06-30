@@ -1,18 +1,18 @@
 # Flow gRPC Transport
 
-`Schemata.Flow.Grpc` exposes process execution over gRPC. It registers `SchemataProcess` and
-`SchemataProcessTransition` as Schemata resources — so process operations ride the standard Resource
-pipeline as AIP-136 custom methods — and maps a small code-first service that lists registered
-process definitions. `MapGrpc()` activates `SchemataFlowGrpcFeature` (priority
-`SchemataFlowFeature.DefaultPriority + 200_000` = `480_200_000`).
+`Schemata.Flow.Grpc` exposes process execution over gRPC. It registers `SchemataProcess`,
+`SchemataProcessToken`, and `SchemataProcessTransition` as Schemata resources. Process operations
+ride the standard Resource pipeline as AIP-136 custom methods, and the package maps a small code-first
+service that lists registered process definitions. `MapGrpc()` activates `SchemataFlowGrpcFeature`
+(priority `SchemataFlowFeature.DefaultPriority + 200_000` = `480_200_000`).
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Flow.Grpc` | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Extensions/SchemataBuilderExtensions.cs` |
-| `Schemata.Flow.Skeleton` | `StartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs` |
-| `Schemata.Flow.Foundation` | `ProcessRuntime.cs`, `ProcessRegistry.cs` |
+| Package                    | Key files                                                                                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Schemata.Flow.Grpc`       | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Internal/FlowGrpcPayloadHandlers.cs`, `Internal/FlowGrpcStartProcessHandler.cs`, `Extensions/SchemataBuilderExtensions.cs`               |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs`                                                  |
+| `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
 
@@ -29,67 +29,112 @@ builder.UseSchemata(schema => {
 ```
 
 `SchemataFlowGrpcFeature` declares `[DependsOn<SchemataFlowFeature>]` and
-`[DependsOn<SchemataGrpcResourceFeature>]`; the resource gRPC transport supplies the code-first gRPC
-stack, the exception-mapping interceptor, server reflection, and the shared `RuntimeTypeModel`.
+`[DependsOn<SchemataGrpcResourceFeature>]`; the resource gRPC transport supplies the code-first
+gRPC stack, the exception-mapping interceptor, server reflection, and the shared `RuntimeTypeModel`.
 
 ## Feature registration
 
 `SchemataFlowGrpcFeature.ConfigureServices`:
 
-1. Registers the five resource method handlers as scoped services.
-2. Registers `SchemataProcess` and `SchemataProcessTransition` as resources on the gRPC endpoint —
-   the same registration as the HTTP feature.
+1. Registers seven scoped services.
+2. Registers three resources (`SchemataProcess`, `SchemataProcessToken`,
+   `SchemataProcessTransition`) on the gRPC endpoint, the same registration as the HTTP feature.
 3. Registers `ProcessDefinitionService` as scoped.
-4. Registers `FlowProtoTypeContributor` as a singleton `IProtoTypeContributor`, contributing
-   `ProcessDefinitionInfo` to the shared protobuf model.
+4. Registers `FlowProtoTypeContributor` as a singleton `IProtoTypeContributor`.
 
 `ConfigureEndpoints` maps the definitions service via `endpoints.MapGrpcService<ProcessDefinitionService>()`.
 
-`SchemataProcess` is registered with `Operations.Get` and `Operations.List` plus five custom methods:
+`RegisterHandlers` registers `FlowGrpcSourceLoader`, `FlowGrpcStartProcessHandler`,
+`CompleteActivityHandler`, `FlowGrpcCorrelateMessageHandler`, `FlowGrpcThrowSignalHandler`,
+`TerminateProcessHandler`, and `CancelTokenHandler`. The Flow-prefixed types live in
+`Schemata.Flow.Grpc.Internal`; the three unprefixed handlers (`CompleteActivityHandler`,
+`TerminateProcessHandler`, `CancelTokenHandler`) live in `Schemata.Flow.Foundation` and are reused
+unchanged across transports.
+
+`SchemataProcess` carries `Operations.Get`, `Operations.List`, and five custom methods:
 
 ```csharp
+using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
+using Schemata.Flow.Foundation;
+using Schemata.Flow.Grpc.Internal;
+
 resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
-    new("start",     typeof(StartProcessHandler),    ResourceMethodScope.Collection),
-    new("complete",  typeof(CompleteActivityHandler)),                 // Instance
-    new("correlate", typeof(CorrelateMessageHandler)),                 // Instance
-    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
-    new("terminate", typeof(TerminateProcessHandler)),                 // Instance
+    new("start",     typeof(FlowGrpcStartProcessHandler),    ResourceMethodScope.Collection),
+    new("complete",  typeof(CompleteActivityHandler)),
+    new("correlate", typeof(FlowGrpcCorrelateMessageHandler)),
+    new("signal",    typeof(FlowGrpcThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("terminate", typeof(TerminateProcessHandler)),
 ];
+```
+
+`SchemataProcessToken` carries `Operations.Get`, `Operations.List`, and one custom method:
+
+```csharp
+using Schemata.Abstractions.Entities;
+using Schemata.Flow.Foundation;
+
+resource.Operations = [Operations.Get, Operations.List];
+resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
 ```
 
 `SchemataProcessTransition` is registered read-only (`Get`, `List`).
 
 ## Service synthesis
 
-The Resource gRPC transport synthesizes a `ProcessService` from the `SchemataProcess` registration
-with `ListProcesses` and `GetProcess` RPCs. `SchemataProcessTransition` produces a separate
-`ProcessTransitionService` with `ListProcessTransitions` and `GetProcessTransition`. The closed
-`ResourceService<,,,>` types are mapped via `endpoints.MapGrpcService`; the same
+The Resource gRPC transport synthesizes one `ResourceService<,,,>` per registered resource. The
+service name comes from `GrpcResourceNaming.ServiceName` and the resource's `[DisplayName]`
+singular: `SchemataProcess` (`[DisplayName("Process")]`) becomes `ProcessService`,
+`SchemataProcessToken` (`[DisplayName("Token")]`) becomes `TokenService`, and
+`SchemataProcessTransition` (`[DisplayName("Transition")]`) becomes `TransitionService`. The
+synthesized services are mapped via `endpoints.MapGrpcService`; the same
 `ResourceOperationHandler` runs under both HTTP and gRPC.
-
-## Routing and method mapping
-
-The Resource gRPC transport synthesizes one RPC per custom method on the `ProcessService`.
-Per the AIP-136 binding, each RPC is named `{PascalVerb}{Singular}` (the singular comes from the
-resource's `[DisplayName("Process")]`):
-
-| Method | Handler | Runtime call |
-| --- | --- | --- |
-| `start` | `StartProcessHandler` | `StartProcessInstanceAsync` |
-| `complete` | `CompleteActivityHandler` | `CompleteActivityAsync` |
-| `correlate` | `CorrelateMessageHandler` | `CorrelateMessageAsync` |
-| `signal` | `ThrowSignalHandler` | `ThrowSignalAsync` |
-| `terminate` | `TerminateProcessHandler` | `TerminateProcessInstanceAsync` |
-
-Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`; the gRPC and
-HTTP transports invoke the same handler types over the same `InvokeAsync(name, request, entity,
-principal, ct)` signature. The principal comes from the gRPC call's `HttpContext.User`.
 
 ### Read RPCs
 
-`Get` and `List` come from the resource registration, producing the standard read RPCs on the
-`ProcessService` and `ProcessTransitionService`.
+`Get` and `List` come from the resource registration, producing the standard read RPCs on each
+service:
+
+| Service             | List RPC          | Get RPC         |
+| ------------------- | ----------------- | --------------- |
+| `ProcessService`    | `ListProcesses`   | `GetProcess`    |
+| `TokenService`      | `ListTokens`      | `GetToken`      |
+| `TransitionService` | `ListTransitions` | `GetTransition` |
+
+## Routing and method mapping
+
+The Resource gRPC transport synthesizes one RPC per custom method on the parent service. Per
+AIP-136, each RPC is named `{PascalVerb}{Singular}` (the singular comes from the resource's
+`[DisplayName]`):
+
+| Method      | Handler                           | Runtime call                  |
+| ----------- | --------------------------------- | ----------------------------- |
+| `start`     | `FlowGrpcStartProcessHandler`     | `FlowRunner.StartAsync`       |
+| `complete`  | `CompleteActivityHandler`         | `FlowRunner.CompleteAsync`    |
+| `correlate` | `FlowGrpcCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
+| `signal`    | `FlowGrpcThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
+| `terminate` | `TerminateProcessHandler`         | `FlowRunner.TerminateAsync`   |
+
+`start` and `signal` are collection-scoped on `ProcessService`; `complete`, `correlate`, and
+`terminate` are instance-scoped on `ProcessService`.
+
+### Token RPCs
+
+| Method   | Handler              | Runtime call                  |
+| -------- | -------------------- | ----------------------------- |
+| `cancel` | `CancelTokenHandler` | `FlowRunner.CancelTokenAsync` |
+
+`cancel` is instance-scoped on `TokenService`.
+
+Each handler implements `IResourceMethodHandler<TSummary, TRequest, TResponse>`; the gRPC and
+HTTP transports invoke the same handler types over the same `InvokeAsync(name, request, entity,
+principal, ct)` signature. The principal comes from the gRPC call's `HttpContext.User`.
+
+`FlowGrpcStartProcessHandler` resolves the optional `Source` canonical name through
+`IResourceTypeResolver` and `IProcessRegistry.SourceTypes`, loads the entity through the registered
+`IRepository<TSource>`, and calls `FlowRunner.StartAsync` with the typed source. When `Source` is
+empty, it calls the no-source `StartAsync` overload.
 
 ### Definitions service
 
@@ -104,30 +149,39 @@ public interface IProcessDefinitionService
 }
 ```
 
-The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation reads the
-registry, projecting each registered name into a `ProcessDefinitionInfo` with
-`CanonicalName = "definitions/{name}"`, `DisplayName`, and `Description` from the definition.
+The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation passes the
+registry-backed `ProcessDefinitionQueryService.ListProcessDefinitions()` results through
+unchanged; each entry has `CanonicalName = "definitions/{name}"`, plus `DisplayName` and
+`Description` from the source `ProcessDefinition`.
 
 ## Request and response wire format
 
-`FlowProtoTypeContributor` registers `ProcessDefinitionInfo` and the custom-method request and
-response types with the shared `RuntimeTypeModel`. Wire names follow `ResourceWireNameRules`
-(`Name` dropped, `CanonicalName` → `name`) and then snake_case via Humanizer `Underscore()`.
-Payloads serialize with the same field names as the HTTP JSON.
+`FlowProtoTypeContributor` registers four summary types with the shared `RuntimeTypeModel`:
+`ProcessDefinitionInfo`, `SchemataProcess`, `SchemataProcessToken`, and `SchemataProcessTransition`.
+Wire names follow `ResourceWireNameRules` (`Name` dropped, `CanonicalName` → `name`) and then
+`Humanizer.Underscore()` (snake_case). Custom-method request bodies ride the same wire shape as
+the HTTP JSON: `StartProcessInstanceRequest` (`DefinitionName` / `DisplayName` / `Description` /
+`Source` plus `ICanonicalName` + `IRequestIdentification`), `CompleteActivityRequest` (`Token`
+plus `ICanonicalName`), `CorrelateMessageRequest` (`MessageName` / `Payload` / `Token` plus
+`ICanonicalName`), `ThrowSignalRequest` (`SignalName` / `Payload` / `Token` plus `ICanonicalName`
+
+- `IRequestIdentification`).
 
 ## Error mapping
 
 `ExceptionMappingInterceptor` (registered by `SchemataTransportGrpcFeature`) wraps every flow RPC.
 A `SchemataException` becomes a `Google.Rpc.Status` mapped through `RpcStatusBuilder.MapFromCanonical`
-(`not_found` → `NotFound`, `failed_precondition` → `FailedPrecondition`, default `Internal`). Error
-details pack into `google.protobuf.Any` payloads and ride the `grpc-status-details-bin` trailer.
+(`not_found` → `NotFound`, `failed_precondition` → `FailedPrecondition`, `invalid_argument` →
+`InvalidArgument`, default `Internal`). Error details pack into `google.protobuf.Any` payloads and
+ride the `grpc-status-details-bin` trailer.
 
 ## Reflection and metadata
 
 `SchemataTransportGrpcFeature` maps `ReflectionServiceImpl` and `ReflectionV1ServiceImpl` for the
-application; `ResourceGrpcServiceDescriptorContributor` contributes the synthesized `ProcessService`
-and `ProcessTransitionService`. `FlowProtoTypeContributor` contributes `ProcessDefinitionInfo`.
-Reflection-capable clients (e.g., `grpcurl`) see the full schema.
+application; `ResourceGrpcServiceDescriptorContributor` contributes the synthesized
+`ProcessService`, `TokenService`, and `TransitionService` descriptors. `FlowProtoTypeContributor`
+contributes the four Flow summary types. Reflection-capable clients (e.g., `grpcurl`) see the
+full schema.
 
 ## Extension points
 

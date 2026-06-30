@@ -169,7 +169,7 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         bool dispose;
         lock (_gate) {
             entry.ActiveLeases--;
-            dispose = entry.Retired && entry.ActiveLeases == 0;
+            dispose = entry is { Retired: true, ActiveLeases: 0 };
         }
 
         if (dispose) {

@@ -7,12 +7,12 @@ the MVC `JsonOptions` — so every endpoint serializes the same way.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Core` | `Features/SchemataJsonSerializerFeature.cs` |
-| `Schemata.Core` | `Json/JsonStringNumberConverter.cs`, `Json/PolymorphicTypeResolver.cs` |
-| `Schemata.Abstractions` | `Json/PolymorphicAttribute.cs`, `SchemataConstants.cs` (`Parameters.Type`) |
-| `Schemata.Transport.Http` | `SchemataJsonTraits.cs`, `Features/SchemataTransportHttpFeature.cs` |
+| Package                   | Key files                                                                  |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `Schemata.Core`           | `Features/SchemataJsonSerializerFeature.cs`                                |
+| `Schemata.Core`           | `Json/JsonStringNumberConverter.cs`, `Json/PolymorphicTypeResolver.cs`     |
+| `Schemata.Abstractions`   | `Json/PolymorphicAttribute.cs`, `SchemataConstants.cs` (`Parameters.Type`) |
+| `Schemata.Transport.Http` | `SchemataJsonTraits.cs`, `Features/SchemataTransportHttpFeature.cs`        |
 
 Two layers configure JSON. `SchemataJsonSerializerFeature` (`Schemata.Core`, Priority 240M)
 installs the base policies — snake_case names, kebab-case enums, long-as-string, null omission.
@@ -25,15 +25,15 @@ installs the base policies — snake_case names, kebab-case enums, long-as-strin
 then registers a `Configure` delegate that applies these defaults and finally invokes the user
 delegate:
 
-| Setting | Value | Effect |
-| --- | --- | --- |
-| `MaxDepth` | `32` | Caps object-graph traversal at 32 levels |
-| `PropertyNamingPolicy` | `JsonNamingPolicy.SnakeCaseLower` | Property names written as `snake_case` |
-| `DictionaryKeyPolicy` | `JsonNamingPolicy.SnakeCaseLower` | Dictionary keys written as `snake_case` |
-| `NumberHandling` | `JsonNumberHandling.AllowReadingFromString` | Accepts numbers encoded as JSON strings on read |
-| `DefaultIgnoreCondition` | `JsonIgnoreCondition.WhenWritingNull` | Omits `null` properties from output |
-| Enum converter | `JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower)` | Enums serialize as `kebab-case` strings (`"not-found"`) |
-| Number converter | `JsonStringNumberConverter.Instance` | Writes every `long` as a JSON string |
+| Setting                  | Value                                                      | Effect                                                  |
+| ------------------------ | ---------------------------------------------------------- | ------------------------------------------------------- |
+| `MaxDepth`               | `32`                                                       | Caps object-graph traversal at 32 levels                |
+| `PropertyNamingPolicy`   | `JsonNamingPolicy.SnakeCaseLower`                          | Property names written as `snake_case`                  |
+| `DictionaryKeyPolicy`    | `JsonNamingPolicy.SnakeCaseLower`                          | Dictionary keys written as `snake_case`                 |
+| `NumberHandling`         | `JsonNumberHandling.AllowReadingFromString`                | Accepts numbers encoded as JSON strings on read         |
+| `DefaultIgnoreCondition` | `JsonIgnoreCondition.WhenWritingNull`                      | Omits `null` properties from output                     |
+| Enum converter           | `JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower)` | Enums serialize as `kebab-case` strings (`"not-found"`) |
+| Number converter         | `JsonStringNumberConverter.Instance`                       | Writes every `long` as a JSON string                    |
 
 The feature applies `Configure` to `JsonSerializerOptions` and
 `Microsoft.AspNetCore.Http.Json.JsonOptions` unconditionally, and to
@@ -80,11 +80,11 @@ application domain (via `AppDomainTypeCache`) for every `[Polymorphic]` type and
 `BaseType`. `GetTypeInfo` configures `JsonPolymorphismOptions` for any base type with registered
 derived types:
 
-| Option | Value |
-| --- | --- |
-| `TypeDiscriminatorPropertyName` | `"@type"` (`SchemataConstants.Parameters.Type`) |
-| `IgnoreUnrecognizedTypeDiscriminators` | `true` |
-| `UnknownDerivedTypeHandling` | `JsonUnknownDerivedTypeHandling.FailSerialization` |
+| Option                                 | Value                                              |
+| -------------------------------------- | -------------------------------------------------- |
+| `TypeDiscriminatorPropertyName`        | `"@type"` (`SchemataConstants.Parameters.Type`)    |
+| `IgnoreUnrecognizedTypeDiscriminators` | `true`                                             |
+| `UnknownDerivedTypeHandling`           | `JsonUnknownDerivedTypeHandling.FailSerialization` |
 
 The discriminator is emitted directly as `@type`; there is no separate rename step. The resolver
 is a singleton, `PolymorphicTypeResolver.Instance`, applied by the HTTP transport.
@@ -95,15 +95,15 @@ is a singleton, `PolymorphicTypeResolver.Instance`, applied by the HTTP transpor
 chains a modifier onto the active `TypeInfoResolver` that rewrites trait-driven properties on the
 wire:
 
-| Trait | Property | Wire effect |
-| --- | --- | --- |
-| `ICanonicalName` | `Name` | Hidden — the short identifier is server-managed |
-| `ICanonicalName` | `CanonicalName` | Renamed to `name` (AIP-122) |
-| `IFreshness` | `EntityTag` | Renamed to `etag` (AIP-154) |
-| `IEntitiesResult<TItem>` | `Entities` | Renamed to the entity plural from `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
+| Trait                    | Property        | Wire effect                                                                                                                                  |
+| ------------------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ICanonicalName`         | `Name`          | Hidden — the short identifier is server-managed                                                                                              |
+| `ICanonicalName`         | `CanonicalName` | Renamed to `name` (AIP-122)                                                                                                                  |
+| `IFreshness`             | `EntityTag`     | Renamed to `etag` (AIP-154)                                                                                                                  |
+| `IEntitiesResult<TItem>` | `Entities`      | Renamed to the entity plural from `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
 
 The traits layer is HTTP-only. The gRPC transport (`Schemata.Transport.Grpc`) applies equivalent
-renames at the protobuf-net level via `SchemataProtoTraits`.
+renames at the protobuf-net level via `SchemataProtoModelConfigurator`.
 
 ## Customizing serialization
 

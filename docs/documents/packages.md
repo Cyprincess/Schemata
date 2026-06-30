@@ -14,30 +14,30 @@ This split keeps optional runtimes direct-referenceable. A provider depends on t
 
 ## Where the code lives
 
-| Folder | Files |
-| --- | --- |
+| Folder                                  | Files                                                                                                                                                                                                          |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `targets/Schemata.Application.Targets/` | `Schemata.Application.Targets.csproj`, `Schemata.Application.Persisting.Targets.csproj`, `Schemata.Application.Modular.Targets.csproj`, `Schemata.Application.Complex.Targets.csproj`, `Directory.Build.props` |
-| `targets/Schemata.Business.Targets/` | `Schemata.Business.Targets.csproj`, `Schemata.Business.Persisting.Targets.csproj`, `Schemata.Business.Complex.Targets.csproj`, `Directory.Build.props` |
-| `targets/Schemata.Module.Targets/` | `Schemata.Module.Targets.csproj`, `Schemata.Module.Persisting.Targets.csproj`, `Schemata.Module.Complex.Targets.csproj`, `Directory.Build.props` |
+| `targets/Schemata.Business.Targets/`    | `Schemata.Business.Targets.csproj`, `Schemata.Business.Persisting.Targets.csproj`, `Schemata.Business.Complex.Targets.csproj`, `Directory.Build.props`                                                         |
+| `targets/Schemata.Module.Targets/`      | `Schemata.Module.Targets.csproj`, `Schemata.Module.Persisting.Targets.csproj`, `Schemata.Module.Complex.Targets.csproj`, `Directory.Build.props`                                                               |
 
 ## MSBuild flag reference
 
 Each `.csproj` sets one or more of these flags. The `Directory.Build.props` in the same folder translates each flag into a project reference or packed analyzer:
 
-| Flag | Package or asset added |
-| --- | --- |
-| `UseDSLTargets=true` | Packs `Schemata.Modeling.Generator.dll` and `Parlot.dll` as analyzers |
-| `UseModularTargets=true` | `Schemata.Modular` and `Schemata.Application.Modular.Targets.targets` under `build/` (Application only) |
-| `UseTenancy=true` | `Schemata.Tenancy.Foundation` (Application only) |
-| `UseAuthorization=true` | `Schemata.Authorization.Foundation` (Application) or `Schemata.Authorization.Skeleton` (Business/Module) |
-| `UseIdentity=true` | `Schemata.Identity.Foundation` (Application) or `Schemata.Identity.Skeleton` (Business/Module) |
-| `UseMapster=true` | `Schemata.Mapping.Mapster` (Application only) |
-| `UseMapping=true` | `Schemata.Mapping.Skeleton` (Business/Module) |
-| `UseRepository=true` | `Schemata.Entity.Repository` |
-| `UseResourceGrpc=true` | `Schemata.Resource.Foundation` and `Schemata.Resource.Grpc` (Application only) |
-| `UseResourceHttp=true` | `Schemata.Resource.Foundation` and `Schemata.Resource.Http` (Application only) |
-| `UseSecurity=true` | `Schemata.Security.Foundation` (Application) or `Schemata.Security.Skeleton` (Business/Module) |
-| `UseValidation=true` | `Schemata.Validation.FluentValidation` (Application/Module) |
+| Flag                     | Package or asset added                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `UseDSLTargets=true`     | Packs `Schemata.Modeling.Generator.dll` and `Parlot.dll` as analyzers                                    |
+| `UseModularTargets=true` | `Schemata.Modular` and `Schemata.Application.Modular.Targets.targets` under `build/` (Application only)  |
+| `UseTenancy=true`        | `Schemata.Tenancy.Foundation` (Application only)                                                         |
+| `UseAuthorization=true`  | `Schemata.Authorization.Foundation` (Application) or `Schemata.Authorization.Skeleton` (Business/Module) |
+| `UseIdentity=true`       | `Schemata.Identity.Foundation` (Application) or `Schemata.Identity.Skeleton` (Business/Module)           |
+| `UseMapster=true`        | `Schemata.Mapping.Mapster` (Application only)                                                            |
+| `UseMapping=true`        | `Schemata.Mapping.Skeleton` (Business/Module)                                                            |
+| `UseRepository=true`     | `Schemata.Entity.Repository`                                                                             |
+| `UseResourceGrpc=true`   | `Schemata.Resource.Foundation` and `Schemata.Resource.Grpc` (Application only)                           |
+| `UseResourceHttp=true`   | `Schemata.Resource.Foundation` and `Schemata.Resource.Http` (Application only)                           |
+| `UseSecurity=true`       | `Schemata.Security.Foundation` (Application) or `Schemata.Security.Skeleton` (Business/Module)           |
+| `UseValidation=true`     | `Schemata.Validation.FluentValidation` (Application/Module)                                              |
 
 ## Application targets
 
@@ -162,27 +162,27 @@ Effective references, all of base plus:
 
 ## Comparison matrix
 
-| Package | App | App.P | App.M | App.C | Biz | Biz.P | Biz.C | Mod | Mod.P | Mod.C |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Schemata.Core | x | x | x | x | | | | | | |
-| Schemata.Abstractions | | | | | x | x | x | x | x | x |
-| Schemata.Advice.Generator | x | x | x | x | x | x | x | x | x | x |
-| Schemata.Entity.Repository | | x | | x | | x | x | | x | x |
-| Schemata.Modular | | | x | x | | | | | | |
-| Schemata.Tenancy.Foundation | | | | x | | | | | | |
-| Schemata.Authorization.Foundation | | | | x | | | | | | |
-| Schemata.Authorization.Skeleton | | | | | | | x | | | x |
-| Schemata.Identity.Foundation | | | | x | | | | | | |
-| Schemata.Identity.Skeleton | | | | | | | x | | | x |
-| Schemata.Mapping.Mapster | | | | x | | | | | | |
-| Schemata.Mapping.Skeleton | | | | | | | x | | | x |
-| Schemata.Resource.Foundation | | | | x | | | | | | |
-| Schemata.Resource.Grpc | | | | x | | | | | | |
-| Schemata.Resource.Http | | | | x | | | | | | |
-| Schemata.Security.Foundation | | | | x | | | | | | |
-| Schemata.Security.Skeleton | | | | | | | x | | | x |
-| Schemata.Validation.FluentValidation | | | | x | | | | | | x |
-| Schemata.Modeling.Generator | | | | x | | | x | | | x |
+| Package                              | App | App.P | App.M | App.C | Biz | Biz.P | Biz.C | Mod | Mod.P | Mod.C |
+| ------------------------------------ | --- | ----- | ----- | ----- | --- | ----- | ----- | --- | ----- | ----- |
+| Schemata.Core                        | x   | x     | x     | x     |     |       |       |     |       |       |
+| Schemata.Abstractions                |     |       |       |       | x   | x     | x     | x   | x     | x     |
+| Schemata.Advice.Generator            | x   | x     | x     | x     | x   | x     | x     | x   | x     | x     |
+| Schemata.Entity.Repository           |     | x     |       | x     |     | x     | x     |     | x     | x     |
+| Schemata.Modular                     |     |       | x     | x     |     |       |       |     |       |       |
+| Schemata.Tenancy.Foundation          |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Authorization.Foundation    |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Authorization.Skeleton      |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Identity.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Identity.Skeleton           |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Mapping.Mapster             |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Mapping.Skeleton            |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Resource.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Resource.Grpc               |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Resource.Http               |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Security.Foundation         |     |       |       | x     |     |       |       |     |       |       |
+| Schemata.Security.Skeleton           |     |       |       |       |     |       | x     |     |       | x     |
+| Schemata.Validation.FluentValidation |     |       |       | x     |     |       |       |     |       | x     |
+| Schemata.Modeling.Generator          |     |       |       | x     |     |       | x     |     |       | x     |
 
 **Legend:** App = Application, Biz = Business, Mod = Module, P = Persisting, M = Modular, C = Complex.
 

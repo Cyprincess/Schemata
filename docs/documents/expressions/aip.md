@@ -4,12 +4,12 @@
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Expressions.Aip` | `AipLanguage.cs`, `AipParser.cs` |
-| `Schemata.Expressions.Aip` | `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipBuiltInFunctions.cs` |
-| `Schemata.Expressions.Aip` | `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
-| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs` |
+| Package                      | Key files                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Schemata.Expressions.Aip`   | `AipLanguage.cs`, `AipParser.cs`                                                                    |
+| `Schemata.Expressions.Aip`   | `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipBuiltInFunctions.cs`                                  |
+| `Schemata.Expressions.Aip`   | `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
+| `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                |
 
 ## Registration
 
@@ -24,10 +24,10 @@ services.AddAipExpressions(options => {
 
 `AddAipExpressions` registers three keyed services under `AipLanguage.Name` (`"aip"`):
 
-| Service | Implementation / value |
-| --- | --- |
-| `IExpressionCompiler` | `AipCompiler` |
-| `IExpressionPushdownPlanner` | `AipPushdownPlanner` |
+| Service                        | Implementation / value                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `IExpressionCompiler`          | `AipCompiler`                                                                                          |
+| `IExpressionPushdownPlanner`   | `AipPushdownPlanner`                                                                                   |
 | `ExpressionLanguageDescriptor` | `Language = "aip"`, configured `Filtering`, configured `MaxResidualScanRows`, `SupportsValues = false` |
 
 Modules should prefer the language-builder seam:
@@ -66,29 +66,29 @@ value       = integer | number | TRUE | FALSE | NULL | unquoted | quoted
 
 ### Operators
 
-| Operator | Symbol | Notes |
-| --- | --- | --- |
-| Equality | `=` | String and numeric equality. |
-| Inequality | `!=` | String and numeric inequality. |
-| Less / less-or-equal | `<`, `<=` | Numeric comparison. |
-| Greater / greater-or-equal | `>`, `>=` | Numeric comparison. |
-| Has | `:` | Substring on strings, membership on collections, presence with `*`. |
-| Logical AND | `AND` | Case-insensitive; adjacent terms are ANDed. |
-| Logical OR | `OR` | Case-insensitive. |
-| Logical NOT | `NOT`, `-` | Case-insensitive. |
+| Operator                   | Symbol     | Notes                                                               |
+| -------------------------- | ---------- | ------------------------------------------------------------------- |
+| Equality                   | `=`        | String and numeric equality.                                        |
+| Inequality                 | `!=`       | String and numeric inequality.                                      |
+| Less / less-or-equal       | `<`, `<=`  | Numeric comparison.                                                 |
+| Greater / greater-or-equal | `>`, `>=`  | Numeric comparison.                                                 |
+| Has                        | `:`        | Substring on strings, membership on collections, presence with `*`. |
+| Logical AND                | `AND`      | Case-insensitive; adjacent terms are ANDed.                         |
+| Logical OR                 | `OR`       | Case-insensitive.                                                   |
+| Logical NOT                | `NOT`, `-` | Case-insensitive.                                                   |
 
 `AND` binds tighter than `OR`; adjacent terms with no explicit operator are implicitly ANDed.
 
 ### Literals
 
-| Type | Examples |
-| --- | --- |
-| Integer | `42`, `-7` |
-| Number | `3.14`, `-0.5` |
-| Boolean | `TRUE`, `FALSE` |
-| Null | `NULL` |
+| Type            | Examples                  |
+| --------------- | ------------------------- |
+| Integer         | `42`, `-7`                |
+| Number          | `3.14`, `-0.5`            |
+| Boolean         | `TRUE`, `FALSE`           |
+| Null            | `NULL`                    |
 | Unquoted string | `alice`, `les-miserables` |
-| Quoted string | `"hello world"` |
+| Quoted string   | `"hello world"`           |
 
 ### Member access
 
@@ -102,10 +102,10 @@ AIP-132 order-by is implemented by `Schemata.Expressions.Order.OrderCompiler` an
 
 `AipBuiltInFunctions.Resolve` checks `ExpressionCompileOptions.Functions` first, then the built-ins:
 
-| Function | Argument | Returns |
-| --- | --- | --- |
+| Function       | Argument           | Returns                                              |
+| -------------- | ------------------ | ---------------------------------------------------- |
 | `timestamp(s)` | One string literal | `DateTime.Parse(s, InvariantCulture, RoundtripKind)` |
-| `duration(s)` | One string literal | `TimeSpan` summed from `h`/`m`/`s` units |
+| `duration(s)`  | One string literal | `TimeSpan` summed from `h`/`m`/`s` units             |
 
 ```text
 create_time > timestamp("2024-01-01T00:00:00Z")

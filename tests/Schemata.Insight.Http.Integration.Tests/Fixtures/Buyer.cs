@@ -1,7 +1,6 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 
 namespace Schemata.Insight.Http.Integration.Tests.Fixtures;
 

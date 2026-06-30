@@ -45,7 +45,7 @@ public class PermissionDeniedException : SchemataException
     /// </summary>
     /// <param name="resourceKey">The <see cref="SchemataResources" /> data name.</param>
     /// <param name="args">Optional named arguments substituted into the template.</param>
-    public PermissionDeniedException(string resourceKey, IReadOnlyDictionary<string, string>? args = null)
+    public PermissionDeniedException(string resourceKey, IReadOnlyDictionary<string, string?>? args = null)
         : this(message: LocalizedMessageFormatter.FormatInvariant(resourceKey, args), reason: resourceKey) {
         AttachMetadata(args);
     }

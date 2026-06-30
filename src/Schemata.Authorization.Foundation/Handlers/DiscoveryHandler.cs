@@ -104,7 +104,7 @@ public sealed class DiscoveryHandler<TScope>(
     ///     .
     /// </summary>
     public AuthorizationResult GetJwks() {
-        if (options.Value.SigningKey == null) {
+        if (options.Value.SigningKey is null) {
             throw new InvalidOperationException(
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing key")
             );

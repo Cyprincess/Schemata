@@ -1,5 +1,4 @@
 using System;
-using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Builders;
@@ -11,7 +10,6 @@ public sealed class EventBranch
     private          Branch[]?        _decisionBranches;
     private          FlowElement?     _target;
 
-    /// <summary>Creates an event branch waiting on <paramref name="eventDefinition" />.</summary>
     internal EventBranch(IEventDefinition eventDefinition) { _eventDefinition = eventDefinition; }
 
     /// <summary>Routes the branch to <paramref name="target" /> when the event fires.</summary>
@@ -44,44 +42,39 @@ public sealed class EventBranch
         return this;
     }
 
-    /// <summary>Adds the catch event and outgoing branch flows to <paramref name="definition" />.</summary>
+    /// <summary>
+    ///     Adds the catch event and outgoing branch flows to <paramref name="definition" />.
+    ///     The catch name is scoped by the owning gateway so two catches on the same event
+    ///     definition under different gateways stay distinct.
+    /// </summary>
     internal void Build(ProcessDefinition definition, EventBasedGateway gateway) {
         var catchEvent = new FlowEvent {
-            Id         = $"catch_{Identifiers.NewUid():n}",
-            Name       = _eventDefinition.Name,
+            Name       = $"Catch_{gateway.Name}_{_eventDefinition.Name}",
             Position   = EventPosition.IntermediateCatch,
             Definition = _eventDefinition,
         };
 
         definition.Elements.Add(catchEvent);
-        definition.Flows.Add(new() {
-                                 Id = $"sf_{Identifiers.NewUid():n}", Source = gateway, Target = catchEvent,
-                             });
+        definition.Flows.Add(new() { Source = gateway, Target = catchEvent });
 
         if (_decisionBranches is not null) {
-            var exclusiveGw = new ExclusiveGateway {
-                Id   = $"gateway_{Identifiers.NewUid():n}",
-                Name = $"Decision_{_eventDefinition.Name}",
-            };
+            var exclusiveGw = new ExclusiveGateway { Name = $"Decision_{catchEvent.Name}" };
             definition.Elements.Add(exclusiveGw);
 
-            definition.Flows.Add(new() {
-                Id = $"sf_{Identifiers.NewUid():n}", Source = catchEvent, Target = exclusiveGw,
-            });
+            definition.Flows.Add(new() { Source = catchEvent, Target = exclusiveGw });
 
-            foreach (var branch in _decisionBranches) {
+            for (var i = 0; i < _decisionBranches.Length; i++) {
+                var branch = _decisionBranches[i];
+                branch.EnsureExitRegistered(definition, exclusiveGw, i);
                 definition.Flows.Add(new() {
-                    Id        = $"sf_{Identifiers.NewUid():n}",
                     Source    = exclusiveGw,
-                    Target    = branch.Exit,
+                    Target    = definition.ResolveEntry(branch.Exit),
                     Condition = branch.Condition,
                     IsDefault = branch.IsDefault,
                 });
             }
         } else if (_target is not null) {
-            definition.Flows.Add(new() {
-                Id = $"sf_{Identifiers.NewUid():n}", Source = catchEvent, Target = _target,
-            });
+            definition.Flows.Add(new() { Source = catchEvent, Target = definition.ResolveEntry(_target) });
         }
     }
 }

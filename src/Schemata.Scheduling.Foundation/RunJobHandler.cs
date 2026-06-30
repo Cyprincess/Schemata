@@ -51,7 +51,7 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
         }
 
         var jobType = _registry.Resolve(entity.JobKey);
-        if (jobType == null) {
+        if (jobType is null) {
             throw JobNotRunnable(entity);
         }
 
@@ -61,7 +61,7 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
 
         var context = new JobContext {
             Job          = entity.CanonicalName ?? jobType.Name,
-            Variables    = request.Variables ?? new Dictionary<string, object?>(),
+            Variables    = request.Variables ?? new Dictionary<string, string?>(),
             ExecutionUid = Identifiers.NewUid(),
         };
 

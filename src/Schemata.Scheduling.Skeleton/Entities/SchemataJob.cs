@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -39,8 +40,8 @@ public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
     /// <summary>Serialized typed argument payload consumed by the job body through <see cref="JobContext.ArgsJson" />.</summary>
     public virtual string? ArgsJson { get; set; }
 
-    /// <summary>Serialized free-form <see cref="JobContext.Variables" /> for callers that use the dictionary channel.</summary>
-    public virtual string? Variables { get; set; }
+    /// <summary>Free-form string variables mirrored to <see cref="JobContext.Variables" />; persisted as a provider-managed JSON column.</summary>
+    public virtual Dictionary<string, string?>? Variables { get; set; }
 
     /// <summary>
     ///     Whether the scheduler may re-fire this job after a missed window or

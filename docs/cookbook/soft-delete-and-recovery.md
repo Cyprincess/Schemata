@@ -3,18 +3,19 @@
 ## What you'll build
 
 An API where deleting a resource sets `DeleteTime` instead of removing the
-row, normal queries exclude deleted rows automatically, and a dedicated restore
-endpoint clears `DeleteTime` to bring a resource back. The recipe uses the
-`Student` entity from [Getting Started](../guides/getting-started.md) and
-walks through the three advisors that implement AIP-164 soft delete, plus the
-suppression mechanism needed to build the restore endpoint.
+row, normal queries exclude deleted rows automatically, and the built-in
+`:undelete` method brings a resource back. The recipe uses the `Student` entity
+from [Getting Started](../guides/getting-started.md) and walks through the
+three advisors that implement AIP-164 soft delete, plus the suppression
+markers you need when purging or listing tombstoned rows from application
+code.
 
 ## Prerequisites
 
 - Completed [Getting Started](../guides/getting-started.md) — `Student`
   already implements `ISoftDelete` and the EF Core repository is wired up.
-- No additional packages are required; soft-delete support is built into
-  `Schemata.Entity.Repository`.
+- Soft-delete support is built into `Schemata.Entity.Repository`, so the
+  getting-started packages already cover this recipe.
 
 ## Step 1 — Verify `ISoftDelete` is on the entity
 
@@ -46,23 +47,24 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 
 `ISoftDelete` requires two properties:
 
-| Property | Meaning |
-| --- | --- |
-| `DeleteTime` | Non-null when the entity is logically deleted |
-| `PurgeTime` | When the row will be permanently removed (optional; set by your purge policy) |
+| Property     | Meaning                                                                       |
+| ------------ | ----------------------------------------------------------------------------- |
+| `DeleteTime` | Non-null when the entity is logically deleted                                 |
+| `PurgeTime`  | When the row will be permanently removed (optional; set by your purge policy) |
 
 Three advisors activate automatically for any entity that implements
 `ISoftDelete`:
 
-| Advisor | Pipeline | Order | What it does |
-| --- | --- | --- | --- |
-| `AdviceAddSoftDelete<TEntity>` | Add | `Orders.Max` (900M) | Clears `DeleteTime` to null on insert |
-| `AdviceRemoveSoftDelete<TEntity>` | Remove | `Orders.Max` (900M) | Sets `DeleteTime = UtcNow`, calls `UpdateAsync`, returns `Handle` |
-| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | `Orders.Base` (100M) | Appends `WHERE DeleteTime IS NULL` to every query |
+| Advisor                               | Pipeline   | Order                | What it does                                                      |
+| ------------------------------------- | ---------- | -------------------- | ----------------------------------------------------------------- |
+| `AdviceAddSoftDelete<TEntity>`        | Add        | `Orders.Max` (900M)  | Clears `DeleteTime` to null on insert                             |
+| `AdviceRemoveSoftDelete<TEntity>`     | Remove     | `Orders.Max` (900M)  | Sets `DeleteTime = UtcNow`, calls `UpdateAsync`, returns `Handle` |
+| `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | `Orders.Base` (100M) | Appends `WHERE DeleteTime IS NULL` to every query                 |
 
-**Verify:** `DELETE /students/{name}` returns 204. A subsequent
-`GET /students` does not include the deleted student. A direct database query
-confirms the row still exists with `DeleteTime` set.
+**Verify:** `DELETE /v1/students/{name}` returns 200 with the tombstoned row —
+the body carries a non-null `delete_time`, per AIP-164. A subsequent
+`GET /v1/students` filters the deleted student out of the results. A direct
+database query confirms the row still exists with `DeleteTime` set.
 
 ## Step 2 — Understand the remove pipeline
 
@@ -81,74 +83,34 @@ intercepts it:
 The result is that the row is updated, not deleted. The EF Core repository
 does not call `Context.Remove(entity)`.
 
-## Step 3 — Build a restore endpoint
+## Step 3 — Restore a deleted student
 
-To restore a soft-deleted student, you need to:
+Every `ISoftDelete` resource gets the AIP-164 `Undelete` method on its HTTP
+surface for free — `SchemataResourceFeature` registers `UndeleteHandler` for
+it during startup:
 
-1. Load the entity including soft-deleted rows (suppress the query filter).
-2. Clear `DeleteTime`.
-3. Persist via `UpdateAsync`.
-
-Create a controller action that does this:
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using Schemata.Entity.Repository;
-
-[ApiController]
-public class StudentRestoreController(IRepository<Student> repository) : ControllerBase
-{
-    [HttpPost("{name=students/*}:restore")]
-    public async Task<IActionResult> RestoreAsync(
-        string            name,
-        CancellationToken ct)
-    {
-        Student? student;
-
-        // Suppress the soft-delete query filter for this read so the
-        // WHERE DeleteTime IS NULL clause is not applied.
-        using (repository.SuppressQuerySoftDelete())
-        {
-            student = await repository.FirstOrDefaultAsync<Student>(
-                q => q.Where(s => s.CanonicalName == name), ct);
-        }
-
-        if (student is null)
-            return NotFound();
-
-        if (student.DeleteTime is null)
-            return Conflict("Resource is not deleted.");
-
-        student.DeleteTime = null;
-        student.PurgeTime  = null;
-
-        await repository.UpdateAsync(student, ct);
-        await repository.CommitAsync(ct);
-
-        return Ok(student);
-    }
-}
+```shell
+curl -X POST http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6:undelete \
+     -H "Content-Type: application/json" \
+     -d '{}'
 ```
 
-Key points:
+The handler clears `DeleteTime` and `PurgeTime`, persists the update, and
+returns the restored resource. Calling it on a live (undeleted) resource
+throws `FailedPreconditionException`. Internally the restore is a plain
+update — the method pipeline loads the tombstoned row with the query filter
+suppressed, then the handler clears the two fields and commits — the restore
+rides the ordinary update path end to end.
 
-- `SuppressQuerySoftDelete()` sets `QuerySoftDeleteSuppressed` in the
-  repository's `AdviceContext` and returns an `IDisposable`. The `using` scope
-  restores the prior state on exit, so the suppression covers only the read.
-  `AdviceBuildQuerySoftDelete` checks `ctx.Has<QuerySoftDeleteSuppressed>()`
-  and skips the filter while the marker is present.
-- Clearing `DeleteTime` and calling `UpdateAsync` is the restore — there is no
-  dedicated repository undelete method; it is a plain update. (The resource
-  layer exposes this as the AIP-164 Undelete operation.)
-- `CommitAsync` flushes the change to the database.
-
-**Verify:** After deleting a student, `POST /students/{name}:restore` returns
-200 and the student reappears in `GET /students`.
+**Verify:** After deleting a student, `POST /v1/students/{name}:undelete`
+returns 200 and the student reappears in `GET /v1/students`.
 
 ## Step 4 — Suppress soft delete for physical deletes
 
-Some operations need to permanently remove a row, bypassing the soft-delete
-advisor. Scope `SuppressSoftDelete()` around the remove:
+On the HTTP surface, `POST /v1/students/{name}:expunge` physically removes an
+already-tombstoned row — it is registered automatically alongside `:undelete`.
+For application code that needs to permanently remove a row, bypass the
+soft-delete advisor by scoping `SuppressSoftDelete()` around the remove:
 
 ```csharp
 public async Task PurgeAsync(Student student, CancellationToken ct)
@@ -210,17 +172,17 @@ tombstoned rows to later queries.
 pre-set `DeleteTime` (e.g., importing archived records) loses it unless you
 scope `SuppressSoftDelete()` around the `AddAsync`.
 
-**`PurgeTime` is not enforced by the framework.** The `PurgeTime` property is
-a convention field. The framework does not automatically purge rows when
-`PurgeTime` is reached. You must implement a background job or scheduled task
-that queries for rows where `PurgeTime <= UtcNow` and calls `RemoveAsync`
-with `SoftDeleteSuppressed` set.
+**`PurgeTime` is a convention field.** The framework stores it and leaves
+enforcement to you. The built-in `POST /v1/students:purge` method is
+filter-driven (AIP-165) — it removes rows matching the request filter on
+demand. Time-based reaping needs a scheduled job of your own that queries for
+rows where `PurgeTime <= UtcNow` and calls `RemoveAsync` with
+`SuppressSoftDelete()` scoped around it.
 
-**Restore does not re-run the add pipeline.** Clearing `DeleteTime` and
-calling `UpdateAsync` goes through the update advisor pipeline, not the add
-pipeline. `AdviceAddSoftDelete` does not run. If your add pipeline sets other
-fields (e.g., `CanonicalName` via `AdviceAddCanonicalName`), those are not
-re-applied on restore. The entity retains whatever values it had when it was
+**Undelete rides the update pipeline.** The restore goes through the update
+advisor pipeline, so add-time advisors such as `AdviceAddSoftDelete` stay out
+of the run. Fields your add pipeline set at creation (e.g., `CanonicalName`
+via `AdviceAddCanonicalName`) keep whatever values the entity had when it was
 first created.
 
 ## See also

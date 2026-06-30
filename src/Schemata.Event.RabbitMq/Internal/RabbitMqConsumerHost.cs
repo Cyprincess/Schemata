@@ -141,7 +141,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         // Routing-key -> registered Type. Unregistered names are poison messages.
         var eventType = registry.Resolve(eventTypeName);
-        if (eventType == null) {
+        if (eventType is null) {
             _logger?.LogWarning(
                 "Received message with unregistered routing key '{RoutingKey}'; routing to dead-letter.",
                 eventTypeName);
@@ -167,7 +167,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         context.SetSubscriptions(matched);
 
         var eventInstance = JsonSerializer.Deserialize(body, eventType, _json);
-        if (eventInstance == null) {
+        if (eventInstance is null) {
             return false;
         }
 
@@ -237,12 +237,12 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         CancellationToken  ct
     ) {
         var responseType = GetResponseType(requestType);
-        if (responseType == null) {
+        if (responseType is null) {
             return false;
         }
 
         var request = JsonSerializer.Deserialize(body, requestType, _json);
-        if (request == null) {
+        if (request is null) {
             return false;
         }
 

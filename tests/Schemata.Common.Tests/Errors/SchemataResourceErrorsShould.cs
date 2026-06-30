@@ -2,8 +2,8 @@ using System.Linq;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common.Errors;
-using static Schemata.Abstractions.SchemataConstants;
 using Xunit;
+using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Common.Tests.Errors;
 
@@ -45,8 +45,8 @@ public class SchemataResourceErrorsShould
     public void PreconditionFailed_Attaches_PreconditionFailure_With_Single_Violation() {
         var exception = SchemataResourceErrors.PreconditionFailed<Book>(
             "books/x",
-            subject: "ETAG_MISMATCH",
-            description: "expected etag did not match");
+            "ETAG_MISMATCH",
+            "expected etag did not match");
 
         Assert.IsType<FailedPreconditionException>(exception);
         Assert.Equal(ErrorCodes.FailedPrecondition, exception.Status);
@@ -69,7 +69,7 @@ public class SchemataResourceErrorsShould
     public void PermissionDenied_Sets_Owner_When_Provided() {
         var exception = SchemataResourceErrors.PermissionDenied<Book>(
             "books/x",
-            owner: "users/alice");
+            "users/alice");
 
         Assert.IsType<PermissionDeniedException>(exception);
         Assert.Equal(ErrorCodes.PermissionDenied, exception.Status);

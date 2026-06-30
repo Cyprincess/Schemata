@@ -34,7 +34,7 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
 
     public IServiceScope CreateScope() {
         if (_accessor.Tenant is null) {
-            return _root is IServiceScope existing ? existing : _root.CreateScope();
+            return _root as IServiceScope ?? _root.CreateScope();
         }
 
         var lease = _factory.CreateServiceProvider(_accessor);

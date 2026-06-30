@@ -44,8 +44,11 @@ internal static class IdentityValidation
     /// <returns>The resolved user.</returns>
     public static async Task<TUser> RequireUserAsync<TUser>(SchemataUserManager<TUser> users, ClaimsPrincipal principal)
         where TUser : SchemataUser, new() {
-        return await users.GetUserAsync(principal) is { } user
-            ? user
-            : throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+        var user = await users.GetUserAsync(principal);
+        if (user is null) {
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+        }
+
+        return user;
     }
 }

@@ -8,12 +8,12 @@ them through the authorize advisors that `WithAuthorization()` installs.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Security.Skeleton` | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs`, `AnonymousAccess.cs`, `AnonymousGranted.cs` |
-| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseSecurity`), `Features/SchemataSecurityFeature.cs`, `SchemataSecurityOptions.cs` |
-| `Schemata.Security.Foundation` | `DefaultAccessProvider.cs`, `DefaultEntitlementProvider.cs`, `DefaultPermissionResolver.cs`, `DefaultPermissionMatcher.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/Advice{List,Get,Create,Update,Delete}RequestAuthorize.cs`, `SchemataResourceBuilder.WithAuthorization` |
+| Package                        | Key files                                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Security.Skeleton`   | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs`, `AnonymousAccess.cs`, `AnonymousGranted.cs` |
+| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseSecurity`), `Features/SchemataSecurityFeature.cs`, `SchemataSecurityOptions.cs`                                      |
+| `Schemata.Security.Foundation` | `DefaultAccessProvider.cs`, `DefaultEntitlementProvider.cs`, `DefaultPermissionResolver.cs`, `DefaultPermissionMatcher.cs`                                          |
+| `Schemata.Resource.Foundation` | `Advisors/Advice{List,Get,Create,Update,Delete}RequestAuthorize.cs`, `SchemataResourceBuilder.WithAuthorization`                                                    |
 
 ## The two providers
 
@@ -70,9 +70,13 @@ services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,
 services.TryAddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
 ```
 
-Because every registration uses `TryAdd`, a provider registered before `UseSecurity()` wins. To
-authorize a specific entity, register a closed-generic `IAccessProvider<Student, StudentRequest>`
-first; the open-generic default fills in the rest.
+Replacement works differently per shape. For `IPermissionResolver` and `IPermissionMatcher`, a
+custom registration wins wherever it lands: added before the feature, the feature's `TryAdd`
+becomes a no-op; added after, the later descriptor wins single resolution. For the two
+open-generic providers, a closed-generic registration such as
+`IAccessProvider<Student, StudentRequest>` always takes precedence — the container matches the
+exact constructed type before falling back to the open generic — and the open-generic default
+fills in every other entity.
 
 ## Default access decision
 
@@ -99,13 +103,13 @@ kebab-case via Humanizer's `Kebaberize()`. `Resolve("Create", typeof(OrderItem))
 So `student.*` grants every operation on `Student`, and `*.list` grants `List` on any single-word
 entity, while a bare `*` matches nothing.
 
-| Claim | Matches `student.create`? |
-| --- | --- |
-| `student.create` | yes (exact) |
-| `student.*` | yes |
-| `*.create` | yes |
-| `*` | no |
-| `student.*.*` | no (two wildcards) |
+| Claim            | Matches `student.create`? |
+| ---------------- | ------------------------- |
+| `student.create` | yes (exact)               |
+| `student.*`      | yes                       |
+| `*.create`       | yes                       |
+| `*`              | no                        |
+| `student.*.*`    | no (two wildcards)        |
 
 ## Default entitlement
 
@@ -127,10 +131,10 @@ schema.UseResource()
 `SchemataResourceBuilder.WithAuthorization(string? scheme = null)` registers two advisor families
 per operation via `TryAddEnumerable`:
 
-| Advisor family | Order | Role |
-| --- | --- | --- |
+| Advisor family                                                 | Order                       | Role                                                                                                         |
+| -------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `Advice{List,Get,Create,Update,Delete,Method}RequestAnonymous` | `Orders.Base` = 100,000,000 | Stashes `AnonymousGranted` in `AdviceContext` when the entity's `[Anonymous]` attribute covers the operation |
-| `Advice{List,Get,Create,Update,Delete,Method}RequestAuthorize` | 110,000,000 | Calls the access and entitlement providers |
+| `Advice{List,Get,Create,Update,Delete,Method}RequestAuthorize` | 110,000,000                 | Calls the access and entitlement providers                                                                   |
 
 Each authorize advisor builds an `AccessContext<TRequest>` with the operation name, then:
 
@@ -151,12 +155,12 @@ the providers are never called.
 
 ## Extension points
 
-| Interface | Purpose |
-| --- | --- |
-| `IAccessProvider<T, TRequest>` | Decide whether a principal may run an operation. Register a closed generic before `UseSecurity()`. |
-| `IEntitlementProvider<T, TRequest>` | Return a query predicate for row-level filtering. Same registration pattern. |
-| `IPermissionResolver` | Map operation + entity type to a permission string. |
-| `IPermissionMatcher` | Decide whether a principal holds a resolved permission. |
+| Interface                           | Purpose                                                                                                               |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `IAccessProvider<T, TRequest>`      | Decide whether a principal may run an operation. A closed-generic registration overrides the default for that entity. |
+| `IEntitlementProvider<T, TRequest>` | Return a query predicate for row-level filtering. Same registration pattern.                                          |
+| `IPermissionResolver`               | Map operation + entity type to a permission string.                                                                   |
+| `IPermissionMatcher`                | Decide whether a principal holds a resolved permission.                                                               |
 
 `SchemataSecurityOptions` carries one property, `PermissionClaimType` (default `"role"`), used by
 `DefaultPermissionMatcher`.

@@ -73,6 +73,13 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
         run: ./eng/common/cibuild.sh -configuration Release -prepareMachine -integrationTest /p:RestoreDotNetWorkloads=true
 
+      - name: Run full BPMN conformance tests
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $dotnet = if (Test-Path .\.dotnet\dotnet.exe) { '.\.dotnet\dotnet.exe' } else { 'dotnet' }
+          & $dotnet test tests\Schemata.Flow.Bpmn.Conformance.Tests\Schemata.Flow.Bpmn.Conformance.Tests.csproj -c Release --no-restore --filter "Pending!=true"
+
       - name: Publish logs
         continue-on-error: true
         uses: actions/upload-artifact@v5

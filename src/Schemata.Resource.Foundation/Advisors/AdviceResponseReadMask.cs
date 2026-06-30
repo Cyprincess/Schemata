@@ -13,7 +13,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Mapping.Skeleton;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -60,7 +59,7 @@ public static class AdviceResponseReadMask
             Field       = nameof(GetRequest.ReadMask).Underscore(),
             Description = LocalizedMessageFormatter.FormatInvariant(
                 SchemataResources.INVALID_READ_MASK,
-                new Dictionary<string, string> { ["path"] = path, ["reason"] = reason }),
+                new Dictionary<string, string?> { ["path"] = path, ["reason"] = reason }),
             Reason      = SchemataResources.INVALID_READ_MASK,
         }]);
     }

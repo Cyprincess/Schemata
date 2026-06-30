@@ -8,12 +8,9 @@ public sealed class TransitionMadeEvent : IEvent
     /// <summary>Canonical name of the process instance.</summary>
     public string ProcessCanonicalName { get; init; } = null!;
 
-    /// <summary>Previous state identifier.</summary>
-    public string? FromStateId { get; init; }
+    /// <summary>Previous element name.</summary>
+    public string? FromStateName { get; init; }
 
-    /// <summary>New state identifier.</summary>
-    public string? ToStateId { get; init; }
-
-    /// <summary>Current waiting element identifier, if any.</summary>
-    public string? WaitingAtId { get; init; }
+    /// <summary>New element name.</summary>
+    public string? ToStateName { get; init; }
 }

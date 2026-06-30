@@ -23,21 +23,20 @@ public class IntegrationFixture : IAsyncLifetime
     #region IAsyncLifetime Members
 
     public Task InitializeAsync() {
-        MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
+        // A fixture-private schema keeps parallel test classes from mutating
+        // MappingSchema.Default concurrently, which invalidates linq2db's
+        // global entity-descriptor caches mid-flight.
+        var schema = new MappingSchema();
+        schema.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
 
         var services = new ServiceCollection();
 
         var connectionString = $"Data Source={_dbPath}";
+        var options          = new DataOptions().UseSQLite(connectionString).UseMappingSchema(schema);
 
-        services.TryAddScoped(_ => {
-            var options = new DataOptions().UseSQLite(connectionString);
-            return new TestDataConnection(options);
-        });
+        services.TryAddScoped(_ => new TestDataConnection(options));
 
-        services.TryAddSingleton<Func<TestDataConnection>>(sp => () => {
-            var options = new DataOptions().UseSQLite(connectionString);
-            return new(options);
-        });
+        services.TryAddSingleton<Func<TestDataConnection>>(sp => () => new(options));
 
         services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();
         services.AddRepository<Course, LinqToDbRepository<TestDataConnection, Course>>();

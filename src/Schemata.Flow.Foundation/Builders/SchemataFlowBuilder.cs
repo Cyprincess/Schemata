@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Expressions.Skeleton;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
 
@@ -13,22 +12,14 @@ namespace Schemata.Flow.Foundation.Builders;
 ///     Fluent builder for configuring the flow system. Process definitions registered through
 ///     <c>Use&lt;TProcess&gt;</c> are written directly to <see cref="SchemataFlowOptions" />.
 /// </summary>
-public sealed class SchemataFlowBuilder : IExpressionLanguageBuilder
+public sealed class SchemataFlowBuilder
 {
     /// <summary>Initializes the builder bound to the given options and service collection.</summary>
-    /// <param name="schemata">The <see cref="SchemataOptions" />.</param>
+    /// <param name="schemata">Receives the feature registrations added through <see cref="AddFeature{T}" />.</param>
     /// <param name="services">The service collection that receives process registrations.</param>
     public SchemataFlowBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
-
-        // Bind only when this builder enables a language so a builder that registers processes
-        // without conditions does not clear another's profile.
-        Services.Configure<SchemataFlowOptions>(o => {
-            if (Languages.Languages.Count > 0) {
-                o.Expressions = Languages;
-            }
-        });
     }
 
     private SchemataOptions Schemata { get; }
@@ -36,13 +27,9 @@ public sealed class SchemataFlowBuilder : IExpressionLanguageBuilder
     /// <summary>Service collection that receives process registrations.</summary>
     public IServiceCollection Services { get; }
 
-    /// <inheritdoc />
-    public ExpressionLanguageProfile Languages { get; } = new();
-
     /// <summary>
     ///     Adds a feature to the Schemata configuration.
     /// </summary>
-    /// <typeparam name="T">The <see cref="ISimpleFeature" /> type.</typeparam>
     public void AddFeature<T>()
         where T : ISimpleFeature {
         Schemata.AddFeature<T>();
@@ -54,8 +41,6 @@ public sealed class SchemataFlowBuilder : IExpressionLanguageBuilder
     ///     builder so multiple definitions chain; configure the definition through
     ///     <paramref name="configure" />.
     /// </summary>
-    /// <typeparam name="TProcess">The process definition type.</typeparam>
-    /// <param name="configure">An optional callback to configure the process definition.</param>
     /// <returns>This builder for chaining.</returns>
     public SchemataFlowBuilder Use<TProcess>(Action<ProcessConfiguration>? configure = null)
         where TProcess : ProcessDefinition {
@@ -66,9 +51,8 @@ public sealed class SchemataFlowBuilder : IExpressionLanguageBuilder
     ///     Registers a code-first process definition type against a specific engine, writing its
     ///     <see cref="ProcessConfiguration" /> to <see cref="SchemataFlowOptions" />.
     /// </summary>
-    /// <typeparam name="TProcess">The process definition type.</typeparam>
     /// <param name="engine">The engine name; <see langword="null" /> uses the state-machine engine.</param>
-    /// <param name="configure">An optional callback to configure the process definition.</param>
+    /// <param name="configure">Mutates the prepared <see cref="ProcessConfiguration" /> after its defaults are set and before it is added to the options.</param>
     /// <returns>This builder for chaining.</returns>
     public SchemataFlowBuilder Use<TProcess>(string? engine, Action<ProcessConfiguration>? configure = null)
         where TProcess : ProcessDefinition {

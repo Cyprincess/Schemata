@@ -67,8 +67,8 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
 
         if (tag != expected) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                name: entity.CanonicalName,
-                subject: PreconditionSubjects.EtagMismatch);
+                entity.CanonicalName,
+                PreconditionSubjects.EtagMismatch);
         }
 
         return Task.FromResult(AdviseResult.Continue);

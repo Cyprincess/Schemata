@@ -75,7 +75,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
         }
 
-        if (entity == null) {
+        if (entity is null) {
             throw ResourceNotFound(name);
         }
 

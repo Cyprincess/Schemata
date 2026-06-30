@@ -6,13 +6,13 @@ only sequences advisors within a stage.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Create.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs`, `Advisors/AdviceCreateRequestValidation.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs` |
+| Package                        | Key files                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Create.cs`                                                                               |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs`, `Advisors/AdviceCreateRequestValidation.cs`                             |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`                                 |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs`, `Advisors/AdviceResponseParent.cs` |
-| `Schemata.Abstractions` | `Resource/CreateResultBase.cs` |
+| `Schemata.Abstractions`        | `Resource/CreateResultBase.cs`                                                                                     |
 
 ## Stages
 
@@ -28,12 +28,12 @@ throws `CollectionNotFound()` (a `NotFoundException` naming the collection). `Ha
 Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Built-in advisors run in
 `Order` sequence:
 
-| Advisor | What it does |
-| --- | --- |
-| `AdviceCreateRequestAnonymous` | Grants anonymous access when the resource is configured for it |
-| `AdviceCreateRequestAuthorize` | Authorizes the request through the access provider |
-| `AdviceCreateRequestSanitize` | Clears server-managed fields on the request |
-| `AdviceCreateRequestValidation` | Runs validation; skipped when `CreateRequestValidationSuppressed` is present |
+| Advisor                          | What it does                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| `AdviceCreateRequestAnonymous`   | Grants anonymous access when the resource is configured for it                      |
+| `AdviceCreateRequestAuthorize`   | Authorizes the request through the access provider                                  |
+| `AdviceCreateRequestSanitize`    | Clears server-managed fields on the request                                         |
+| `AdviceCreateRequestValidation`  | Runs validation; skipped when `CreateRequestValidationSuppressed` is present        |
 | `AdviceCreateRequestIdempotency` | On an AIP-155 `RequestId` hit returns the cached result; on a miss reserves the key |
 
 `AdviceCreateRequestSanitize.SystemFields` is the property-name list cleared from the request:
@@ -63,12 +63,12 @@ response advisors.
 `_mapper.Map<TEntity, TDetail>(entity)` maps the persisted entity (with server-assigned fields populated), then
 `IResourceResponseAdvisor<TEntity, TDetail>` runs:
 
-| Advisor | What it does |
-| --- | --- |
-| `AdviceResponseParent` | Derives `IChild.Parent` from the entity's canonical name; runs before freshness |
-| `AdviceResponseFreshness` | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
-| `AdviceResponseReadMask` | Trims the detail to the requested AIP-157 `read_mask` fields |
-| `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key |
+| Advisor                     | What it does                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `AdviceResponseParent`      | Derives `IChild.Parent` from the entity's canonical name; runs before freshness                           |
+| `AdviceResponseFreshness`   | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
+| `AdviceResponseReadMask`    | Trims the detail to the requested AIP-157 `read_mask` fields                                              |
+| `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key                                                      |
 
 ## Extension points
 

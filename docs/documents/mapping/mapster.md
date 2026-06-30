@@ -88,7 +88,7 @@ matches map automatically, under the global `IgnoreNullValues(true)`.
   mappings at startup: `Map<,>.Compile()` throws when a non-ignored, non-converter field lacks a
   source expression.
 - A field mapping that must copy null source values needs `config.NewConfig<TSource, TDestination>()
-  .IgnoreNullValues(false)`, applied to the resolved `TypeAdapterConfig`.
+.IgnoreNullValues(false)`, applied to the resolved `TypeAdapterConfig`.
 
 ## See also
 

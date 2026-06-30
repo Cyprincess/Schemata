@@ -13,12 +13,12 @@ Two opt-in packages extend the entity layer with the same advisor pattern: `Sche
 
 ## Where the code lives
 
-| Item | Path |
-| --- | --- |
-| Trait interfaces | `src/Schemata.Abstractions/Entities/` |
-| `CanonicalNameAttribute` | `src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs` |
-| Built-in repository advisors | `src/Schemata.Entity.Repository/Advisors/` |
-| Key resolution | `src/Schemata.Entity.Repository/RepositoryBase.cs` |
+| Item                         | Path                                                           |
+| ---------------------------- | -------------------------------------------------------------- |
+| Trait interfaces             | `src/Schemata.Abstractions/Entities/`                          |
+| `CanonicalNameAttribute`     | `src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs` |
+| Built-in repository advisors | `src/Schemata.Entity.Repository/Advisors/`                     |
+| Key resolution               | `src/Schemata.Entity.Repository/RepositoryBase.cs`             |
 
 ## How traits activate behavior
 
@@ -87,7 +87,7 @@ The pipeline runs each advisor in `Order` sequence. Advisors that do not apply t
   `IRepositoryRemoveAdvisor<TEntity>`, or `IRepositoryBuildQueryAdvisor<TEntity>` and register with
   `TryAddEnumerable`. Pick an `Order` outside the built-in chain's `[100_000_000, 900_000_000]` window.
 - **Custom trait** — define a marker interface, write an advisor that checks `entity is IMyTrait`, and
-  register it. No framework change is required.
+  register it. The framework treats it like any built-in trait.
 - **Suppression** — call the matching `Suppress*()` scope on the repository before a mutation to skip a
   specific advisor for the duration of the returned handle. See
   [repository/overview.md](../repository/overview.md) for the full table.

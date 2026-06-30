@@ -18,7 +18,7 @@ public sealed class RunJobRequest : ICanonicalName
     ///     Variables forwarded to <see cref="JobContext.Variables" /> for this
     ///     trigger. Overrides any defaults persisted on the job row.
     /// </summary>
-    public Dictionary<string, object?>? Variables { get; set; }
+    public Dictionary<string, string?>? Variables { get; set; }
 
     #region ICanonicalName Members
 

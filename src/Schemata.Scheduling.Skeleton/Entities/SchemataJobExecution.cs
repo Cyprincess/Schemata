@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -41,6 +42,14 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
 
     /// <summary>Serialized typed arguments replayed by cron, periodic, one-time, and durable operation fires.</summary>
     public virtual string? ArgsJson { get; set; }
+
+    /// <summary>
+    ///     Free-form string variables carried to the dispatched job through
+    ///     <see cref="JobContext.Variables" />. Copied from the trigger context (one-shot fires)
+    ///     or the <see cref="SchemataJob.Variables" /> row (durable fires) when the Pending row is
+    ///     materialized, so the dispatch path replays them after a restart. Provider-managed JSON column.
+    /// </summary>
+    public virtual Dictionary<string, string?>? Variables { get; set; }
 
     /// <summary>Lifecycle state of this execution.</summary>
     public virtual ExecutionState State { get; set; }

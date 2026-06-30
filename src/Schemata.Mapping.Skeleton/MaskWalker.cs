@@ -63,7 +63,7 @@ public static class MaskWalker
             }
 
             var path = Append(prefix, property);
-            if (traverseCollections && value is IEnumerable items && value is not string) {
+            if (traverseCollections && value is IEnumerable items and not string) {
                 foreach (var item in items) {
                     if (item is not null) {
                         WalkUnmasked(item, node.Children, path, traverseCollections, onUnmasked);

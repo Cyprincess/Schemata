@@ -6,10 +6,10 @@ carries a `[CanonicalName("...")]` pattern.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Common` | `ResourceNameDescriptor.cs`, `ResourceWireNameRules.cs` |
-| `Schemata.Abstractions` | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs` |
+| Package                 | Key files                                                                 |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `Schemata.Common`       | `ResourceNameDescriptor.cs`, `ResourceWireNameRules.cs`                   |
+| `Schemata.Abstractions` | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`        |
 | `Schemata.Abstractions` | `Resource/ResourcePackageAttribute.cs`, `Resource/ReadAcrossAttribute.cs` |
 
 ## `ICanonicalName`
@@ -56,28 +56,28 @@ Descriptors are cached per `RuntimeTypeHandle` in a `ConcurrentDictionary`. Get 
 
 ### Properties
 
-| Property | Description |
-| --- | --- |
-| `Pattern` | The full pattern, or `null` when no attribute is present |
-| `Singular` | Singular form from `[DisplayName]`, `[Table]`, or the type name (Humanizer `Singularize()`) |
-| `Plural` | `Singular.Pluralize()` |
-| `Collection` | The last collection segment, e.g. `"books"` |
-| `CollectionPath` | Everything up to and including the last collection segment, e.g. `"publishers/{publisher}/books"` — the basis of the HTTP route |
-| `Package` | The `[ResourcePackage]` value (route and gRPC service prefix), or `null` |
-| `HasParent` | `true` when the pattern has parent segments |
-| `SupportsReadAcross` | `true` when the entity has `[ReadAcross]` (AIP-159 opt-in) |
+| Property             | Description                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Pattern`            | The full pattern, or `null` when no attribute is present                                                                        |
+| `Singular`           | Singular form from `[DisplayName]`, `[Table]`, or the type name (Humanizer `Singularize()`)                                     |
+| `Plural`             | `Singular.Pluralize()`                                                                                                          |
+| `Collection`         | The last collection segment, e.g. `"books"`                                                                                     |
+| `CollectionPath`     | Everything up to and including the last collection segment, e.g. `"publishers/{publisher}/books"` — the basis of the HTTP route |
+| `Package`            | The `[ResourcePackage]` value (route and gRPC service prefix), or `null`                                                        |
+| `HasParent`          | `true` when the pattern has parent segments                                                                                     |
+| `SupportsReadAcross` | `true` when the entity has `[ReadAcross]` (AIP-159 opt-in)                                                                      |
 
 ### Methods
 
-| Method | Description |
-| --- | --- |
-| `Resolve(entity)` | Builds the full canonical name by reading the placeholder properties from an entity |
-| `ParseCanonicalName(name)` | Splits a full name into `(ParentValues, LeafName)`; `null` on mismatch |
-| `ParseParent(parent)` | Parses a parent path into a placeholder-to-value dictionary |
-| `BuildParentPredicate<T>(values)` | Builds a `Where` predicate from parent values, skipping `"-"` (AIP-159) |
-| `ResolveParent(routeValues)` | Builds a parent path string from ASP.NET route values |
-| `SetParentFromRouteValues(target, routeValues)` | Sets parent properties on a DTO from route values |
-| `ClearParentProperties(target)` | Nulls all parent-segment properties (used by `UpdateAsync`) |
+| Method                                          | Description                                                                         |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `Resolve(entity)`                               | Builds the full canonical name by reading the placeholder properties from an entity |
+| `ParseCanonicalName(name)`                      | Splits a full name into `(ParentValues, LeafName)`; `null` on mismatch              |
+| `ParseParent(parent)`                           | Parses a parent path into a placeholder-to-value dictionary                         |
+| `BuildParentPredicate<T>(values)`               | Builds a `Where` predicate from parent values, skipping `"-"` (AIP-159)             |
+| `ResolveParent(routeValues)`                    | Builds a parent path string from ASP.NET route values                               |
+| `SetParentFromRouteValues(target, routeValues)` | Sets parent properties on a DTO from route values                                   |
+| `ClearParentProperties(target)`                 | Nulls all parent-segment properties (used by `UpdateAsync`)                         |
 
 ## Wire-name rules
 
@@ -97,7 +97,7 @@ properties the response serializes them from.
 
 With `[ReadAcross]`, a parent segment value of `-` is allowed in `ListAsync`. `BuildParentPredicate` skips `-`
 segments, so the query is not scoped to one parent. Without `[ReadAcross]`, a `-` parent throws
-`ValidationException` (`CrossParentUnsupported`).
+`ValidationException` (`CROSS_PARENT_UNSUPPORTED`).
 
 ## Extension points
 

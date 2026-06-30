@@ -1,8 +1,8 @@
 using System;
 using Microsoft.Extensions.Options;
 using Moq;
-using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Foundation.Services;
+using Schemata.Tenancy.Skeleton;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;

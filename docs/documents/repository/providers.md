@@ -7,13 +7,13 @@ stays provider-agnostic.
 
 ## Where the code lives
 
-| Item | Path |
-| --- | --- |
-| `EfCoreRepository<TContext,TEntity>` | `src/Schemata.Entity.EntityFrameworkCore/EfCoreRepository.cs` |
-| `EfCoreUnitOfWork<TContext>` | `src/Schemata.Entity.EntityFrameworkCore/EfCoreUnitOfWork.cs` |
-| `LinqToDbRepository<TContext,TEntity>` | `src/Schemata.Entity.LinqToDB/LinqToDbRepository.cs` |
-| `LinqToDbUnitOfWork<TContext>` | `src/Schemata.Entity.LinqToDB/LinqToDbUnitOfWork.cs` |
-| `AddRepository` extension | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
+| Item                                   | Path                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `EfCoreRepository<TContext,TEntity>`   | `src/Schemata.Entity.EntityFrameworkCore/EfCoreRepository.cs`              |
+| `EfCoreUnitOfWork<TContext>`           | `src/Schemata.Entity.EntityFrameworkCore/EfCoreUnitOfWork.cs`              |
+| `LinqToDbRepository<TContext,TEntity>` | `src/Schemata.Entity.LinqToDB/LinqToDbRepository.cs`                       |
+| `LinqToDbUnitOfWork<TContext>`         | `src/Schemata.Entity.LinqToDB/LinqToDbUnitOfWork.cs`                       |
+| `AddRepository` extension              | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
 
 ## Registration
 
@@ -108,14 +108,14 @@ is logged at warning level.
 
 ## Provider comparison
 
-| Aspect | EF Core | LinqToDB |
-| --- | --- | --- |
-| Context type | `DbContext` | `DataConnection` |
-| Change tracking | Full EF Core tracker | None |
-| Write execution | Buffered in the tracker, flushed at commit | Immediate, inside the open transaction |
-| Read-your-own-writes before commit | No | Yes |
-| `UpdateAsync` | Detach, `Context.Update`, bump token | `UpdateOptimisticAsync` or `UpdateAsync` |
-| Concurrency on update | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
+| Aspect                             | EF Core                                             | LinqToDB                                              |
+| ---------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| Context type                       | `DbContext`                                         | `DataConnection`                                      |
+| Change tracking                    | Full EF Core tracker                                | None                                                  |
+| Write execution                    | Buffered in the tracker, flushed at commit          | Immediate, inside the open transaction                |
+| Read-your-own-writes before commit | No                                                  | Yes                                                   |
+| `UpdateAsync`                      | Detach, `Context.Update`, bump token                | `UpdateOptimisticAsync` or `UpdateAsync`              |
+| Concurrency on update              | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
 
 ## Extension points
 

@@ -5,6 +5,7 @@ using Grpc.Core;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using static Schemata.Abstractions.SchemataConstants;
+using Status = Google.Rpc.Status;
 
 namespace Schemata.Transport.Grpc.Proto;
 
@@ -24,7 +25,7 @@ internal static class RpcStatusBuilder
     ///     <see cref="LocalizedMessageDetail" /> when resolvable.
     /// </param>
     /// <returns>The gRPC status message.</returns>
-    public static Google.Rpc.Status Build(SchemataException ex, string? requestId, string? locale = null) {
+    public static Status Build(SchemataException ex, string? requestId, string? locale = null) {
         var response = ex.CreateErrorResponse(requestId, locale: locale);
         if (response is not ErrorResponse error) {
             return new() {
@@ -33,7 +34,7 @@ internal static class RpcStatusBuilder
             };
         }
 
-        var status = new Google.Rpc.Status {
+        var status = new Status {
             Code    = MapFromCanonical(error.Error?.Status),
             Message = error.Error?.Message,
         };

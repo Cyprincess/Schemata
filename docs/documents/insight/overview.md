@@ -8,12 +8,12 @@ surface.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Insight.Skeleton` | `IInsightService.cs`, `Wire/QueryInsightRequest.cs`, `Wire/QueryInsightResponse.cs`, `Wire/SelectionSpec.cs`, `Wire/Transformations.cs`, `Drivers/ISourceDriver.cs`, `Drivers/DriverCapabilities.cs`, `Catalog/IInsightSourceCatalog.cs`, `Catalog/SourceConfig.cs`, `Entities/SchemataInsightSource.cs`, `Plan/*.cs` |
+| Package                       | Key files                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Insight.Skeleton`   | `IInsightService.cs`, `Wire/QueryInsightRequest.cs`, `Wire/QueryInsightResponse.cs`, `Wire/SelectionSpec.cs`, `Wire/Transformations.cs`, `Drivers/ISourceDriver.cs`, `Drivers/DriverCapabilities.cs`, `Catalog/IInsightSourceCatalog.cs`, `Catalog/SourceConfig.cs`, `Entities/SchemataInsightSource.cs`, `Plan/*.cs`                                                                              |
 | `Schemata.Insight.Foundation` | `SchemataInsightBuilder.cs`, `SchemataInsightOptions.cs`, `Features/SchemataInsightFeature.cs`, `Planning/InsightPlanBuilder.cs`, `Execution/DefaultInsightService.cs`, `Execution/PlanExecutor.cs`, `Execution/LocalPipelineExecutor*.cs`, `Drivers/RepositoryDriver.cs`, `Catalog/InMemoryInsightSourceCatalog.cs`, `Catalog/DatabaseInsightSourceCatalog.cs`, `Security/InsightSecurityGate.cs` |
-| `Schemata.Insight.Http` | `InsightController.cs`, `Features/SchemataInsightHttpFeature.cs`, `Extensions/SchemataInsightBuilderExtensions.cs` |
-| `Schemata.Insight.Grpc` | `IInsightGrpcService.cs`, `InsightGrpcService.cs`, `InsightServiceMethodProvider.cs`, `InsightGrpcMethods.cs`, `Mapping/InsightStructMapper.cs`, `Wire/*.cs`, `Features/SchemataInsightGrpcFeature.cs` |
+| `Schemata.Insight.Http`       | `InsightController.cs`, `Features/SchemataInsightHttpFeature.cs`, `Extensions/SchemataInsightBuilderExtensions.cs`                                                                                                                                                                                                                                                                                 |
+| `Schemata.Insight.Grpc`       | `IInsightGrpcService.cs`, `InsightGrpcService.cs`, `InsightServiceMethodProvider.cs`, `InsightGrpcMethods.cs`, `Mapping/InsightStructMapper.cs`, `Wire/*.cs`, `Features/SchemataInsightGrpcFeature.cs`                                                                                                                                                                                             |
 
 ## Startup
 
@@ -59,15 +59,15 @@ in `SchemataInsightSource` can resolve names and builder-registered names remain
 
 ## SchemataInsightBuilder
 
-| Member | Effect |
-| --- | --- |
-| `DefaultLanguage(string language)` | Sets the expression language used when a slot and the request omit `language`; default is `ExpressionLanguages.Aip`. |
-| `WithTotalSize(TotalSizeMode mode)` | Sets the `total_size` behavior. `Default` is treated as `Exact`. |
-| `AddSource(string name, string driver, IReadOnlyDictionary<string, object?>? parameters = null)` | Adds an in-memory source binding. |
-| `AddRepositorySource(string name, string resource)` | Adds a source served by `RepositoryDriver` with the `resource` parameter. |
-| `AddSourceDriver<TDriver>(string name)` | Registers a keyed singleton `ISourceDriver`. |
-| `UseDatabaseCatalog()` | Resolves source names through `IRepository<SchemataInsightSource>` before the in-memory catalog. |
-| `AddFeature<T>()` | Adds a feature to the Schemata configuration. |
+| Member                                                                                           | Effect                                                                                                               |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `DefaultLanguage(string language)`                                                               | Sets the expression language used when a slot and the request omit `language`; default is `ExpressionLanguages.Aip`. |
+| `WithTotalSize(TotalSizeMode mode)`                                                              | Sets the `total_size` behavior. `Default` is treated as `Exact`.                                                     |
+| `AddSource(string name, string driver, IReadOnlyDictionary<string, object?>? parameters = null)` | Adds an in-memory source binding.                                                                                    |
+| `AddRepositorySource(string name, string resource)`                                              | Adds a source served by `RepositoryDriver` with the `resource` parameter.                                            |
+| `AddSourceDriver<TDriver>(string name)`                                                          | Registers a keyed singleton `ISourceDriver`.                                                                         |
+| `UseDatabaseCatalog()`                                                                           | Resolves source names through `IRepository<SchemataInsightSource>` before the in-memory catalog.                     |
+| `AddFeature<T>()`                                                                                | Adds a feature to the Schemata configuration.                                                                        |
 
 Insight also implements `IExpressionLanguageBuilder`, so expression packages can attach their languages
 to the same builder with `UseAip()`, `UseCel()`, and `UseOrdering()`.
@@ -76,24 +76,24 @@ to the same builder with `UseAip()`, `UseCel()`, and `UseOrdering()`.
 
 `QueryInsightRequest` carries the query graph:
 
-| Field | Meaning |
-| --- | --- |
-| `Sources` | `SourceBinding(alias, name)` entries. `name` is catalog-facing; `alias` is request-facing. |
-| `Joins` | `JoinSpec(left, right, kind, on)` entries over source aliases. |
-| `Transformations` | Ordered `Filter`, `Compute`, `GroupBy`, `OrderBy`, `Top`, or `Skip` operations. |
-| `Selections` | GraphQL-style `SelectionSpec` items for fields, computed expressions, and nested child lists. |
-| `PageSize`, `Skip`, `PageToken` | Top-level paging controls. |
-| `Language` | Request-level default for expression slots. |
+| Field                           | Meaning                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `Sources`                       | `SourceBinding(alias, name)` entries. `name` is catalog-facing; `alias` is request-facing.    |
+| `Joins`                         | `JoinSpec(left, right, kind, on)` entries over source aliases.                                |
+| `Transformations`               | Ordered `Filter`, `Compute`, `GroupBy`, `OrderBy`, `Top`, or `Skip` operations.               |
+| `Selections`                    | GraphQL-style `SelectionSpec` items for fields, computed expressions, and nested child lists. |
+| `PageSize`, `Skip`, `PageToken` | Top-level paging controls.                                                                    |
+| `Language`                      | Request-level default for expression slots.                                                   |
 
 `QueryInsightResponse` returns:
 
-| Field | Meaning |
-| --- | --- |
-| `Rows` | Nested string-keyed row dictionaries. |
-| `Schema` | `FieldDescriptor` tree for response fields. |
-| `NextPageToken` | Opaque continuation token, currently an encoded skip offset. |
-| `TotalSize` | Exact or estimated count, depending on `SchemataInsightOptions.TotalSize`. |
-| `Unreachable` | Source names that could not be reached; reserved for AIP-217 partial responses. |
+| Field           | Meaning                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| `Rows`          | Nested string-keyed row dictionaries.                                           |
+| `Schema`        | `FieldDescriptor` tree for response fields.                                     |
+| `NextPageToken` | Opaque continuation token, currently an encoded skip offset.                    |
+| `TotalSize`     | Exact or estimated count, depending on `SchemataInsightOptions.TotalSize`.      |
+| `Unreachable`   | Source names that could not be reached; reserved for AIP-217 partial responses. |
 
 ## Catalog and driver model
 
@@ -125,9 +125,9 @@ the backend query when the provider returns an expression.
 
 ## Feature priority table
 
-| Feature | Priority |
-| --- | --- |
-| `SchemataInsightFeature` | 495,000,000 |
+| Feature                      | Priority    |
+| ---------------------------- | ----------- |
+| `SchemataInsightFeature`     | 495,000,000 |
 | `SchemataInsightHttpFeature` | 495,100,000 |
 | `SchemataInsightGrpcFeature` | 495,200,000 |
 

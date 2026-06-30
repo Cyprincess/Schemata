@@ -36,15 +36,15 @@ addresses users, groups, tags, or any principal. The unique index on
 Because the entity implements the standard traits, the repository advisor pipeline activates by trait
 detection once a persistence provider is configured:
 
-| Trait | Advisor behaviour |
-| --- | --- |
-| `ITimestamp` | `CreateTime` / `UpdateTime` stamped on add and update |
-| `ISoftDelete` | delete becomes a soft delete; queries exclude soft-deleted rows |
-| `IConcurrency` | `Timestamp` drives the AIP-154 etag |
-| `IOwnable` | ownership advisors apply when the host enabled `UseOwner()` (see below) |
+| Trait          | Advisor behaviour                                                       |
+| -------------- | ----------------------------------------------------------------------- |
+| `ITimestamp`   | `CreateTime` / `UpdateTime` stamped on add and update                   |
+| `ISoftDelete`  | delete becomes a soft delete; queries exclude soft-deleted rows         |
+| `IConcurrency` | `Timestamp` drives the AIP-154 etag                                     |
+| `IOwnable`     | ownership advisors apply when the host enabled `UseOwner()` (see below) |
 
-No per-entity registration is needed for timestamp, soft delete, or concurrency; the advisors detect
-the trait.
+The timestamp, soft-delete, and concurrency advisors detect their traits on the entity itself, so
+implementing the interface is the whole registration.
 
 ## IPushSubscriptionManager
 
@@ -68,12 +68,12 @@ public interface IPushSubscriptionManager
 
 `DefaultPushSubscriptionManager` wraps `IRepository<SchemataPushSubscription>`:
 
-| Method | Behaviour |
-| --- | --- |
-| `GetForOwnerAsync` | `ListAsync` over `Owner == owner && (provider == null || Provider == provider)` |
-| `AddAsync` | idempotent on the triple: returns the existing row if present, otherwise creates, adds, and commits |
-| `RemoveAsync` | finds the matching row and removes + commits; a no-op when absent |
-| `ExistsAsync` | `AnyAsync` over the triple |
+| Method             | Behaviour                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `GetForOwnerAsync` | `ListAsync` over `Owner == owner && (provider == null \|\| Provider == provider)`                   |
+| `AddAsync`         | idempotent on the triple: returns the existing row if present, otherwise creates, adds, and commits |
+| `RemoveAsync`      | finds the matching row and removes + commits; a no-op when absent                                   |
+| `ExistsAsync`      | `AnyAsync` over the triple                                                                          |
 
 `AddAsync` sets `Owner` explicitly from its argument and assigns a fresh `Uid`. Each mutating method
 performs one repository mutation followed by `CommitAsync`, matching the manager pattern used across

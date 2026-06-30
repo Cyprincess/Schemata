@@ -13,7 +13,11 @@ public sealed class ExpressionFunction
     ///     Creates a function binding from an expression factory.
     /// </summary>
     public ExpressionFunction(Func<IReadOnlyList<Expression>, Expression> factory) {
-        Factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        if (factory is null) {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        Factory = factory;
     }
 
     /// <summary>

@@ -6,7 +6,6 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Push.Skeleton;
 using Schemata.Scheduling.Skeleton;
-using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Push.Scheduling.Internal;
 

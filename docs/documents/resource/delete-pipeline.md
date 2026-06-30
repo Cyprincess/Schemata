@@ -7,12 +7,12 @@ entity loads, per AIP-211. The stage order is fixed; advisor `Order` only sequen
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Delete.cs` |
+| Package                        | Key files                                                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Delete.cs`                                                                                   |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceDeleteFreshness.cs`, `Advisors/IResourceDeleteRequestAdvisor.cs`, `Advisors/IResourceDeleteAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `UndeleteHandler.cs`, `ExpungeHandler.cs`, `PurgeHandler.cs` |
-| `Schemata.Abstractions` | `Resource/DeleteRequest.cs`, `Resource/DeleteResultBase.cs`, `Entities/ISoftDelete.cs` |
+| `Schemata.Resource.Foundation` | `UndeleteHandler.cs`, `ExpungeHandler.cs`, `PurgeHandler.cs`                                                           |
+| `Schemata.Abstractions`        | `Resource/DeleteRequest.cs`, `Resource/DeleteResultBase.cs`, `Entities/ISoftDelete.cs`                                 |
 
 ## Stages
 
@@ -24,7 +24,7 @@ builds a `DeleteRequest { Name, Etag, AllowMissing }`.
 
 ### 2. Name predicates
 
-`ApplyIdentifierPredicates` adds the leaf and parent `Where` predicates to the
+`ResourceIdentifiers.Apply` adds the leaf and parent `Where` predicates to the
 `ResourceRequestContainer<TEntity>`.
 
 ### 3. Delete request — `IResourceDeleteRequestAdvisor<TEntity>`
@@ -32,9 +32,9 @@ builds a `DeleteRequest { Name, Etag, AllowMissing }`.
 Receives the `DeleteRequest`, the container, and the principal. Authorization advisors run here when
 `WithAuthorization()` is configured:
 
-| Advisor | What it does |
-| --- | --- |
-| `AdviceDeleteRequestAnonymous` | Grants anonymous access when configured |
+| Advisor                        | What it does                                       |
+| ------------------------------ | -------------------------------------------------- |
+| `AdviceDeleteRequestAnonymous` | Grants anonymous access when configured            |
 | `AdviceDeleteRequestAuthorize` | Authorizes the request through the access provider |
 
 ### 4. Entity load
@@ -46,8 +46,8 @@ hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRe
 
 ### 5. Delete entity — `IResourceDeleteAdvisor<TEntity>`
 
-| Advisor | What it does |
-| --- | --- |
+| Advisor                 | What it does                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `AdviceDeleteFreshness` | Validates `DeleteRequest.Etag` against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
 `AdviceDeleteFreshness` fires when `Etag` is non-empty: any value differing from the entity's current weak tag
@@ -64,10 +64,10 @@ returns an empty `DeleteResultBase<TDetail>`.
 
 ## Soft delete vs. hard delete
 
-| Scenario | Result |
-| --- | --- |
-| Entity implements `ISoftDelete` | Row tombstoned (`DeleteTime` set); `Detail` carries the updated resource |
-| Entity does not implement `ISoftDelete` | Row removed; `Detail` is null |
+| Scenario                                | Result                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| Entity implements `ISoftDelete`         | Row tombstoned (`DeleteTime` set); `Detail` carries the updated resource |
+| Entity does not implement `ISoftDelete` | Row removed; `Detail` is null                                            |
 
 The transport renders this split: HTTP returns `200` with the JSON body for a soft delete and `204 No Content`
 for a hard delete; gRPC returns the detail message or `google.protobuf.Empty`.
@@ -77,11 +77,11 @@ for a hard delete; gRPC returns the detail message or `google.protobuf.Empty`.
 `SchemataResourceFeature.RegisterResource` adds three AIP-164/165 custom methods to every `ISoftDelete` resource.
 Each is skipped when the `Operations` whitelist excludes it or the entity already declares the same verb.
 
-| Method | Route | Handler | Behavior |
-| --- | --- | --- | --- |
-| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException` |
-| `:expunge` | `POST /v1/{collection}/{name}:expunge` | `ExpungeHandler<TEntity>` | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException` |
-| `:purge` | `POST /v1/{collection}:purge` | `PurgeHandler<TEntity>` | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the job and its `ScheduledJobBinding` are registered only when the built-in purge method is active, and the handler throws `FAILED_PRECONDITION` when no scheduler is enabled |
+| Method      | Route                                   | Handler                             | Behavior                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                                                               |
+| `:expunge`  | `POST /v1/{collection}/{name}:expunge`  | `ExpungeHandler<TEntity>`           | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                         |
+| `:purge`    | `POST /v1/{collection}:purge`           | `PurgeHandler<TEntity>`             | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the open-generic job and its `PurgeJobKeyResolver` (mapping the stable `purge:{collection}` key back to the closed type after a restart) are registered by the resource feature, and the handler throws `InvalidOperationException` when no scheduler is registered |
 
 ## Extension points
 

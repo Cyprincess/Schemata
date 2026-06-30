@@ -7,13 +7,13 @@ repository that mutates without enlisting opens its own implicit unit of work, s
 
 ## Where the code lives
 
-| Item | Path |
-| --- | --- |
-| `IUnitOfWork`, `IUnitOfWork<TContext>` | `src/Schemata.Entity.Repository/IUnitOfWork.cs` |
-| `IUnitOfWorkSink` | `src/Schemata.Entity.Repository/IUnitOfWorkSink.cs` |
-| `IRepository.Begin` / `Join` / `CommitAsync` | `src/Schemata.Entity.Repository/IRepository.cs` |
-| `CommitChanges<TEntity>` | `src/Schemata.Entity.Repository/CommitChanges.cs` |
-| `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
+| Item                                         | Path                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `IUnitOfWork`, `IUnitOfWork<TContext>`       | `src/Schemata.Entity.Repository/IUnitOfWork.cs`                          |
+| `IUnitOfWorkSink`                            | `src/Schemata.Entity.Repository/IUnitOfWorkSink.cs`                      |
+| `IRepository.Begin` / `Join` / `CommitAsync` | `src/Schemata.Entity.Repository/IRepository.cs`                          |
+| `CommitChanges<TEntity>`                     | `src/Schemata.Entity.Repository/CommitChanges.cs`                        |
+| `IRepositoryCommittedAdvisor<TEntity>`       | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
 
 ## IUnitOfWork interface
 
@@ -30,12 +30,12 @@ public interface IUnitOfWork<TContext> : IUnitOfWork
 }
 ```
 
-| Member | Purpose |
-| --- | --- |
-| `CommitAsync` | Persists the enlisted repositories' changes, commits the transaction, then dispatches each repository's committed advisors. |
-| `RollbackAsync` | Rolls back the transaction and resets each enlisted repository's tracking lists. |
-| `Context` | The provider context (`DbContext` or `DataConnection`). First access opens the connection; the transaction opens per the provider's execution model. |
-| `Dispose` / `DisposeAsync` | Rolls back when never committed, then releases the context. |
+| Member                     | Purpose                                                                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CommitAsync`              | Persists the enlisted repositories' changes, commits the transaction, then dispatches each repository's committed advisors.                          |
+| `RollbackAsync`            | Rolls back the transaction and resets each enlisted repository's tracking lists.                                                                     |
+| `Context`                  | The provider context (`DbContext` or `DataConnection`). First access opens the connection; the transaction opens per the provider's execution model. |
+| `Dispose` / `DisposeAsync` | Rolls back when never committed, then releases the context.                                                                                          |
 
 A unit of work is one-shot: after `CommitAsync` or `RollbackAsync`, resolve a fresh `IUnitOfWork` from
 DI to start another transaction. `IUnitOfWork<TContext>` binds the type parameter to a concrete context

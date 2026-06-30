@@ -10,7 +10,6 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common.Errors;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -108,7 +107,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 Reason      = SchemataResources.INVALID_REFERENCE,
                 Description = LocalizedMessageFormatter.FormatInvariant(
                     SchemataResources.INVALID_REFERENCE,
-                    new Dictionary<string, string> { ["value"] = value }),
+                    new Dictionary<string, string?> { ["value"] = value }),
             });
         }
 
@@ -126,7 +125,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 continue;
             }
 
-            var attribute = property.GetCustomAttribute<ResourceReferenceAttribute>(inherit: true);
+            var attribute = property.GetCustomAttribute<ResourceReferenceAttribute>(true);
             if (attribute is null) {
                 continue;
             }

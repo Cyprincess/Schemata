@@ -10,9 +10,9 @@ custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSc
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Grpc` | `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
+| Package                        | Key files                                                                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Grpc`     | `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                         |
 | `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
 
 ## Activation
@@ -62,13 +62,13 @@ identically across transports.
 
 The Resource gRPC transport names custom-method RPCs `{PascalVerb}{Singular}`:
 
-| Service | RPC | Handler |
-| --- | --- | --- |
-| `JobService` | `ListJobs` / `GetJob` / `CreateJob` / `UpdateJob` / `DeleteJob` | synthesized |
-| `JobService` | `RunJob` | `RunJobHandler` |
-| `OperationService` | `ListOperations` / `GetOperation` / `DeleteOperation` | synthesized |
-| `OperationService` | `CancelOperation` | `CancelOperationHandler` |
-| `OperationService` | `WaitOperation` | `WaitOperationHandler` |
+| Service            | RPC                                                             | Handler                  |
+| ------------------ | --------------------------------------------------------------- | ------------------------ |
+| `JobService`       | `ListJobs` / `GetJob` / `CreateJob` / `UpdateJob` / `DeleteJob` | synthesized              |
+| `JobService`       | `RunJob`                                                        | `RunJobHandler`          |
+| `OperationService` | `ListOperations` / `GetOperation` / `DeleteOperation`           | synthesized              |
+| `OperationService` | `CancelOperation`                                               | `CancelOperationHandler` |
+| `OperationService` | `WaitOperation`                                                 | `WaitOperationHandler`   |
 
 `Operations` on the execution resource is set to `[Get, List, Delete]`; `Create` and `Update` are
 not exposed. `RunJob` returns an `Operation` representing the queued execution; the caller polls

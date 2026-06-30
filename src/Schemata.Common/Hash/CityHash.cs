@@ -308,8 +308,9 @@ public class CityHash {
     /// CityHash is designed for string data.
     /// </remarks>
     protected internal static uint CityHash32(byte[] value) {
-        if (value == null)
-            throw new ArgumentNullException("value");
+        if (value is null) {
+            throw new ArgumentNullException(nameof(value));
+        }
 
         var len = (uint)value.Length;
 

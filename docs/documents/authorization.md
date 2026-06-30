@@ -9,11 +9,11 @@ registers the core, and each `Use*Flow` / `Use*` call on the returned builder ad
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Authorization.Skeleton` | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope,SchemataToken}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs` |
+| Package                             | Key files                                                                                                                                                                                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Authorization.Skeleton`   | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope,SchemataToken}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs`                                                                            |
 | `Schemata.Authorization.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseAuthorization`), `Extensions/SchemataAuthorizationBuilderExtensions.cs` (flow methods), `Features/`, `Controllers/ConnectController*.cs`, `Authentication/SchemataAuthorizationOptions.cs`, `Managers/`, `Services/`, `Advisors/` |
-| `Schemata.Authorization.Identity` | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceClaimsSubject.cs`, the `UseIdentity()` builder extension |
+| `Schemata.Authorization.Identity`   | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceClaimsSubject.cs`, the `UseIdentity()` builder extension                                                                                                                       |
 
 ## Enabling the server
 
@@ -70,16 +70,16 @@ endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`,
 `ConnectController` is routed at `~/Connect`. The actions a deployment actually serves depend on
 which flow methods are enabled, but the routes are fixed:
 
-| Method | Route | Action | Spec |
-| --- | --- | --- | --- |
-| `GET` / `POST` | `/Connect/Authorize` | `AuthorizeGet` / `AuthorizePost` | RFC 6749 §4.1 |
-| `POST` | `/Connect/Token` | `Token` | RFC 6749 §3.2 |
-| `POST` | `/Connect/Device` | `Device` | RFC 8628 |
-| `GET` / `POST` / `DELETE` | `/Connect/Interact` | `Interact` / `ApproveInteraction` / `DenyInteraction` | consent interaction |
-| `POST` | `/Connect/Introspect` | `Introspect` | RFC 7662 |
-| `POST` | `/Connect/Revoke` | `Revoke` | RFC 7009 |
-| `GET` / `POST` | `/Connect/Profile` | `Profile` (bearer-authorized) | OIDC Core §5.3 UserInfo |
-| `GET` / `POST` | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost` | OIDC RP-Initiated Logout |
+| Method                    | Route                 | Action                                                | Spec                     |
+| ------------------------- | --------------------- | ----------------------------------------------------- | ------------------------ |
+| `GET` / `POST`            | `/Connect/Authorize`  | `AuthorizeGet` / `AuthorizePost`                      | RFC 6749 §4.1            |
+| `POST`                    | `/Connect/Token`      | `Token`                                               | RFC 6749 §3.2            |
+| `POST`                    | `/Connect/Device`     | `Device`                                              | RFC 8628                 |
+| `GET` / `POST` / `DELETE` | `/Connect/Interact`   | `Interact` / `ApproveInteraction` / `DenyInteraction` | consent interaction      |
+| `POST`                    | `/Connect/Introspect` | `Introspect`                                          | RFC 7662                 |
+| `POST`                    | `/Connect/Revoke`     | `Revoke`                                              | RFC 7009                 |
+| `GET` / `POST`            | `/Connect/Profile`    | `Profile` (bearer-authorized)                         | OIDC Core §5.3 UserInfo  |
+| `GET` / `POST`            | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost`                    | OIDC RP-Initiated Logout |
 
 `GET /.well-known/openid-configuration` and `GET /.well-known/jwks` are mapped through
 `WellKnownOptions` (the `SchemataWellKnownFeature` pipeline), backed by `DiscoveryHandler<TScope>`.
@@ -91,19 +91,19 @@ types and endpoints reflect exactly which flows are enabled.
 Each method on `SchemataAuthorizationBuilder` adds one or more flow features. The grant types and
 endpoints below are the ones the code implements:
 
-| Builder method | Grant type / endpoint | Flow feature |
-| --- | --- | --- |
-| `UseCodeFlow()` | `authorization_code` (+ PKCE), `/Connect/Authorize` | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
-| `UseClientCredentialsFlow()` | `client_credentials` | `ClientCredentialsFlowFeature` |
-| `UseRefreshTokenFlow()` | `refresh_token` | `RefreshTokenFlowFeature` |
-| `UseDeviceFlow()` | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` | `DeviceFlowFeature` (+ `InteractionFeature`) |
-| `UseTokenExchange()` | `urn:ietf:params:oauth:grant-type:token-exchange` | `TokenExchangeFeature` |
-| `UseIntrospection()` | `/Connect/Introspect` (RFC 7662) | `IntrospectionFeature` |
-| `UseRevocation()` | `/Connect/Revoke` (RFC 7009) | `RevocationFeature` |
-| `UseUserInfo()` | `/Connect/Profile` (OIDC UserInfo) | `UserInfoFeature` |
-| `UseEndSession()` | `/Connect/EndSession` (RP-Initiated Logout) | `EndSessionFeature` |
-| `UseFrontChannelLogout()` | front-channel logout metadata | `FrontChannelLogoutFeature` |
-| `UseBackChannelLogout()` | back-channel logout queue + notifier | `BackChannelLogoutFeature` |
+| Builder method               | Grant type / endpoint                                             | Flow feature                                                            |
+| ---------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `UseCodeFlow()`              | `authorization_code` (+ PKCE), `/Connect/Authorize`               | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
+| `UseClientCredentialsFlow()` | `client_credentials`                                              | `ClientCredentialsFlowFeature`                                          |
+| `UseRefreshTokenFlow()`      | `refresh_token`                                                   | `RefreshTokenFlowFeature`                                               |
+| `UseDeviceFlow()`            | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` | `DeviceFlowFeature` (+ `InteractionFeature`)                            |
+| `UseTokenExchange()`         | `urn:ietf:params:oauth:grant-type:token-exchange`                 | `TokenExchangeFeature`                                                  |
+| `UseIntrospection()`         | `/Connect/Introspect` (RFC 7662)                                  | `IntrospectionFeature`                                                  |
+| `UseRevocation()`            | `/Connect/Revoke` (RFC 7009)                                      | `RevocationFeature`                                                     |
+| `UseUserInfo()`              | `/Connect/Profile` (OIDC UserInfo)                                | `UserInfoFeature`                                                       |
+| `UseEndSession()`            | `/Connect/EndSession` (RP-Initiated Logout)                       | `EndSessionFeature`                                                     |
+| `UseFrontChannelLogout()`    | front-channel logout metadata                                     | `FrontChannelLogoutFeature`                                             |
+| `UseBackChannelLogout()`     | back-channel logout queue + notifier                              | `BackChannelLogoutFeature`                                              |
 
 `UseCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
 `Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
@@ -112,36 +112,36 @@ endpoints below are the ones the code implements:
 `POST /Connect/Token` dispatches by `grant_type` to the registered `IGrantHandler`. Before the
 grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request:
 
-| Advisor | Checks |
-| --- | --- |
-| `AdviceRequestEndpointPermission<TApp>` | The client holds the `e:/Connect/Token` permission |
-| `AdviceRequestGrantPermission<TApp>` | The client holds `g:{grant_type}` |
-| `AdviceRequestScopeValidation<TApp>` | Requested scopes are within the client's `s:{scope}` grants |
+| Advisor                                 | Checks                                                      |
+| --------------------------------------- | ----------------------------------------------------------- |
+| `AdviceRequestEndpointPermission<TApp>` | The client holds the `e:/Connect/Token` permission          |
+| `AdviceRequestGrantPermission<TApp>`    | The client holds `g:{grant_type}`                           |
+| `AdviceRequestScopeValidation<TApp>`    | Requested scopes are within the client's `s:{scope}` grants |
 
 ## Advisor families
 
 Six advisor families extend the pipeline; all are registered via `TryAddEnumerable` and run as
 ordered chains.
 
-| Interface | Generic params | Role | Built-ins |
-| --- | --- | --- | --- |
-| `IDiscoveryAdvisor` | — | Populate the discovery document | `AdviceDiscoveryBase` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …) |
-| `IClaimsAdvisor` | — | Enrich the principal before token issuance | `AdviceClaimsAudience`, `AdviceClaimsPairwise<TApp>`, and `AdviceClaimsSubject` (Identity bridge) |
-| `IDestinationAdvisor` | — | Route each claim to access token, ID token, and/or UserInfo | `AdviceDestinationSubject`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination` |
-| `ITokenRequestAdvisor<TApp>` | `TApp` | Validate the token request | `AdviceRequestEndpointPermission`, `AdviceRequestGrantPermission`, `AdviceRequestScopeValidation` |
-| `IAuthorizeAdvisor<TApp>` | `TApp` | Validate the authorize request | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
-| `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp`(, `TToken`) | Validate each endpoint's request | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*` |
+| Interface                                                                                                                                                                        | Generic params     | Role                                                        | Built-ins                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IDiscoveryAdvisor`                                                                                                                                                              | —                  | Populate the discovery document                             | `AdviceDiscoveryBase` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …)                                                          |
+| `IClaimsAdvisor`                                                                                                                                                                 | —                  | Enrich the principal before token issuance                  | `AdviceClaimsAudience`, `AdviceClaimsPairwise<TApp>`, and `AdviceClaimsSubject` (Identity bridge)                                                                                                                                                                                                                |
+| `IDestinationAdvisor`                                                                                                                                                            | —                  | Route each claim to access token, ID token, and/or UserInfo | `AdviceDestinationSubject`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination`                                                                                                                                                                                                                           |
+| `ITokenRequestAdvisor<TApp>`                                                                                                                                                     | `TApp`             | Validate the token request                                  | `AdviceRequestEndpointPermission`, `AdviceRequestGrantPermission`, `AdviceRequestScopeValidation`                                                                                                                                                                                                                |
+| `IAuthorizeAdvisor<TApp>`                                                                                                                                                        | `TApp`             | Validate the authorize request                              | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
+| `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp`(, `TToken`) | Validate each endpoint's request                            | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*`                                                                                                                                                           |
 
 ## Permissions
 
 A client's capabilities are a list of permission strings on `SchemataApplication.Permissions`,
 prefixed per `SchemataConstants.PermissionPrefixes`:
 
-| Prefix | Constant | Example |
-| --- | --- | --- |
-| `e:` | `Endpoint` | `e:/Connect/Token`, `e:/Connect/Authorize` |
-| `g:` | `GrantType` | `g:authorization_code`, `g:client_credentials`, `g:refresh_token` |
-| `s:` | `Scope` | `s:openid`, `s:profile` |
+| Prefix | Constant    | Example                                                           |
+| ------ | ----------- | ----------------------------------------------------------------- |
+| `e:`   | `Endpoint`  | `e:/Connect/Token`, `e:/Connect/Authorize`                        |
+| `g:`   | `GrantType` | `g:authorization_code`, `g:client_credentials`, `g:refresh_token` |
+| `s:`   | `Scope`     | `s:openid`, `s:profile`                                           |
 
 `IApplicationManager<TApp>.HasPermissionAsync(app, permission, ct)` is the lookup the permission
 advisors use.
@@ -157,7 +157,7 @@ method. Key lookups:
 - `IAuthorizationManager<TAuth>`: `CreateAsync` and lifecycle queries.
 - `ITokenManager<TToken>`: `FindByReferenceIdAsync`, `FindByNameAsync`, `ListBySubjectAsync`,
   `ListBySessionAsync`, `CreateAsync`, `RevokeByAuthorizationAsync`, and `PruneAsync(threshold,
-  ct)` for cleanup.
+ct)` for cleanup.
 
 ## Background jobs
 
@@ -189,44 +189,44 @@ and adds `AdviceClaimsSubject` to the `IClaimsAdvisor` chain. `IdentitySubjectPr
 
 All four entities use `Guid Uid` as the primary key and carry `[PrimaryKey(nameof(Uid))]`:
 
-| Entity | Table | Canonical name | Notable properties |
-| --- | --- | --- | --- |
-| `SchemataApplication` | `SchemataApplications` | `applications/{application}` | `ClientId`, `ClientSecret`, `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
-| `SchemataAuthorization` | `SchemataAuthorizations` | `authorizations/{authorization}` | `Application`, `Subject`, `Type`, `Status`, `Scopes`, `CodeChallengeMethod` |
-| `SchemataScope` | `SchemataScopes` | `scopes/{scope}` | `Name`, `Resources` |
-| `SchemataToken` | `SchemataTokens` | `tokens/{token}` | `Application`, `Authorization`, `Subject`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `ExpireTime` |
+| Entity                  | Table                    | Canonical name                   | Notable properties                                                                                                                                      |
+| ----------------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SchemataApplication`   | `SchemataApplications`   | `applications/{application}`     | `ClientId`, `ClientSecret`, `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
+| `SchemataAuthorization` | `SchemataAuthorizations` | `authorizations/{authorization}` | `Application`, `Subject`, `Type`, `Status`, `Scopes`, `CodeChallengeMethod`                                                                             |
+| `SchemataScope`         | `SchemataScopes`         | `scopes/{scope}`                 | `Name`, `Resources`                                                                                                                                     |
+| `SchemataToken`         | `SchemataTokens`         | `tokens/{token}`                 | `Application`, `Authorization`, `Subject`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `ExpireTime`                              |
 
 ## SchemataAuthorizationOptions
 
 Key material is required; lifetimes and formats have defaults:
 
-| Property | Default | Notes |
-| --- | --- | --- |
-| `Issuer` | — | Required (`iss` claim, discovery base URL) |
-| `SigningKey` / `SigningAlgorithm` | — | Required; `AddEphemeralSigningKey(alg)` generates a dev key |
-| `EncryptionKey` / `EncryptionAlgorithm` | `null` | Optional JWE; `AddEphemeralEncryptionKey(alg)` available |
-| `AccessTokenFormat` | `Jwe` | `Jwt`, `Jwe`, or `Reference` |
-| `RefreshTokenFormat` | `Reference` | |
-| `AccessTokenLifetime` / `IdTokenLifetime` | 1 hour | |
-| `RefreshTokenLifetime` | 14 days | |
-| `AuthorizationCodeLifetime` | 10 minutes | |
-| `DeviceCodeLifetime` / `DeviceCodeInterval` | 15 minutes / 5 s | |
-| `SubjectType` | `Public` | `Public` or `Pairwise` (with `PairwiseSalt`) |
-| `DeviceVerificationUri` | `null` | Required by the device flow |
-| `BearerScheme` / `CodeScheme` | scheme constants | Authentication scheme names |
+| Property                                    | Default          | Notes                                                       |
+| ------------------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `Issuer`                                    | —                | Required (`iss` claim, discovery base URL)                  |
+| `SigningKey` / `SigningAlgorithm`           | —                | Required; `AddEphemeralSigningKey(alg)` generates a dev key |
+| `EncryptionKey` / `EncryptionAlgorithm`     | `null`           | Optional JWE; `AddEphemeralEncryptionKey(alg)` available    |
+| `AccessTokenFormat`                         | `Jwe`            | `Jwt`, `Jwe`, or `Reference`                                |
+| `RefreshTokenFormat`                        | `Reference`      |                                                             |
+| `AccessTokenLifetime` / `IdTokenLifetime`   | 1 hour           |                                                             |
+| `RefreshTokenLifetime`                      | 14 days          |                                                             |
+| `AuthorizationCodeLifetime`                 | 10 minutes       |                                                             |
+| `DeviceCodeLifetime` / `DeviceCodeInterval` | 15 minutes / 5 s |                                                             |
+| `SubjectType`                               | `Public`         | `Public` or `Pairwise` (with `PairwiseSalt`)                |
+| `DeviceVerificationUri`                     | `null`           | Required by the device flow                                 |
+| `BearerScheme` / `CodeScheme`               | scheme constants | Authentication scheme names                                 |
 
 `PermitResponseType(...)` and `AddEphemeral*Key(...)` are fluent helpers on the options object.
 
 ## Extension points
 
-| Interface | Purpose |
-| --- | --- |
-| `IAuthorizationFlowFeature` | Add a grant type or endpoint as an ordered flow feature. |
-| `IGrantHandler` | Implement a token-endpoint grant. |
-| `IClaimsAdvisor` / `IDestinationAdvisor` | Add claims and route them to tokens. |
-| `IDiscoveryAdvisor` | Add discovery-document entries. |
-| `IClientAuthentication<TApp>` | Add a client authentication method. |
-| `ISubjectProvider` | Provide the subject identifier (wired by the Identity bridge). |
+| Interface                                | Purpose                                                        |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| `IAuthorizationFlowFeature`              | Add a grant type or endpoint as an ordered flow feature.       |
+| `IGrantHandler`                          | Implement a token-endpoint grant.                              |
+| `IClaimsAdvisor` / `IDestinationAdvisor` | Add claims and route them to tokens.                           |
+| `IDiscoveryAdvisor`                      | Add discovery-document entries.                                |
+| `IClientAuthentication<TApp>`            | Add a client authentication method.                            |
+| `ISubjectProvider`                       | Provide the subject identifier (wired by the Identity bridge). |
 
 ## Caveats
 

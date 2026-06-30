@@ -13,14 +13,14 @@ property and run in sequence. Each returns an `AdviseResult`:
 
 ## Where the code lives
 
-| Item | Path |
-| --- | --- |
-| `IRepositoryAddAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryAddAdvisor.cs` |
-| `IRepositoryUpdateAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryUpdateAdvisor.cs` |
-| `IRepositoryRemoveAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryRemoveAdvisor.cs` |
-| `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
-| Built-in advisors | `src/Schemata.Entity.Repository/Advisors/Advice{Add,Update,Remove}*.cs` |
-| Registration | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
+| Item                                   | Path                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `IRepositoryAddAdvisor<TEntity>`       | `src/Schemata.Entity.Repository/Advisors/IRepositoryAddAdvisor.cs`         |
+| `IRepositoryUpdateAdvisor<TEntity>`    | `src/Schemata.Entity.Repository/Advisors/IRepositoryUpdateAdvisor.cs`      |
+| `IRepositoryRemoveAdvisor<TEntity>`    | `src/Schemata.Entity.Repository/Advisors/IRepositoryRemoveAdvisor.cs`      |
+| `IRepositoryCommittedAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs`   |
+| Built-in advisors                      | `src/Schemata.Entity.Repository/Advisors/Advice{Add,Update,Remove}*.cs`    |
+| Registration                           | `src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs` |
 
 ## Advisor interfaces
 
@@ -49,29 +49,31 @@ public interface IRepositoryCommittedAdvisor<TEntity>
 
 Built-in add advisors, in execution order:
 
-| Order | Advisor | Trait | Behavior |
-| --- | --- | --- | --- |
-| 100,000,000 | `AdviceAddTimestamp<TEntity>` | `ITimestamp` | Sets `CreateTime` and `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`. |
-| 110,000,000 | `AdviceAddConcurrency<TEntity>` | `IConcurrency` | Mints a new GUID for `Timestamp`. |
-| 220,000,000 | `AdviceAddCanonicalName<TEntity>` | `ICanonicalName` | Resolves the `[CanonicalName]` pattern and writes `CanonicalName`. No suppress flag. |
-| 230,000,000 | `AdviceAddOwner<TEntity>` | `IOwnable` | Calls `IOwnerResolver<TEntity>.ResolveAsync` and sets `Owner`. Registered by `UseOwner()`. Suppressed by `OwnerSuppressed`. |
-| 230,000,000 | `AdviceAddValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Create`. Throws `ValidationException` when an advisor blocks. Suppressed by `AddValidationSuppressed`. |
-| 240,000,000 | `AdviceAddUniqueness<TEntity>` | (any) | Looks up the entity by key (with the query soft-delete filter suppressed); throws `AlreadyExistsException` when a row already exists. Suppressed by `UniquenessSuppressed`. |
-| 900,000,000 | `AdviceAddSoftDelete<TEntity>` | `ISoftDelete` | Clears `DeleteTime` to `null`. Suppressed by `SoftDeleteSuppressed`. |
+| Order       | Advisor                                     | Trait            | Behavior                                                                                                                                                                    |
+| ----------- | ------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 100,000,000 | `AdviceAddTimestamp<TEntity>`               | `ITimestamp`     | Sets `CreateTime` and `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`.                                                                            |
+| 110,000,000 | `AdviceAddConcurrency<TEntity>`             | `IConcurrency`   | Mints a new GUID for `Timestamp`.                                                                                                                                           |
+| 120,000,000 | `AdviceAddCanonicalName<TEntity>`           | `ICanonicalName` | Resolves the `[CanonicalName]` pattern and writes `CanonicalName`. No suppress flag.                                                                                        |
+| 130,000,000 | `AdviceAddOwner<TEntity>`                   | `IOwnable`       | Calls `IOwnerResolver<TEntity>.ResolveAsync` and sets `Owner`. Registered by `UseOwner()`. Suppressed by `OwnerSuppressed`.                                                 |
+| 130,000,000 | `AdviceAddValidation<TEntity>`              | (any)            | Runs `IValidationAdvisor<TEntity>` for `Operations.Create`. Throws `ValidationException` when an advisor blocks. Suppressed by `AddValidationSuppressed`.                   |
+| 135,000,000 | `AdviceValidateResourceReferences<TEntity>` | (any)            | Verifies every `[ResourceReference]` value points at an existing row. Throws `ValidationException` on a dangling reference.                                                 |
+| 140,000,000 | `AdviceAddUniqueness<TEntity>`              | (any)            | Looks up the entity by key (with the query soft-delete filter suppressed); throws `AlreadyExistsException` when a row already exists. Suppressed by `UniquenessSuppressed`. |
+| 900,000,000 | `AdviceAddSoftDelete<TEntity>`              | `ISoftDelete`    | Clears `DeleteTime` to `null`. Suppressed by `SoftDeleteSuppressed`.                                                                                                        |
 
 After every advisor returns `Continue`, the entity is staged for the store: EF Core calls
 `Context.AddAsync(entity)`; LinqToDB inserts immediately inside the active transaction.
 
-`AdviceAddOwner` is in scope only when `UseOwner()` has registered it; it shares order 230,000,000 with
+`AdviceAddOwner` is in scope only when `UseOwner()` has registered it; it shares order 130,000,000 with
 `AdviceAddValidation`. `AdviceAddUniqueness` is optimistic — a concurrent insert between its lookup and
 the commit still surfaces as the provider's own constraint error.
 
 ## Update pipeline
 
-| Order | Advisor | Trait | Behavior |
-| --- | --- | --- | --- |
-| 100,000,000 | `AdviceUpdateTimestamp<TEntity>` | `ITimestamp` | Sets `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`. |
-| 110,000,000 | `AdviceUpdateValidation<TEntity>` | (any) | Runs `IValidationAdvisor<TEntity>` for `Operations.Update`. Throws `ValidationException` when an advisor blocks. Suppressed by `UpdateValidationSuppressed`. |
+| Order       | Advisor                                     | Trait        | Behavior                                                                                                                                                     |
+| ----------- | ------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 100,000,000 | `AdviceUpdateTimestamp<TEntity>`            | `ITimestamp` | Sets `UpdateTime` to the current UTC time. Suppressed by `TimestampSuppressed`.                                                                              |
+| 110,000,000 | `AdviceUpdateValidation<TEntity>`           | (any)        | Runs `IValidationAdvisor<TEntity>` for `Operations.Update`. Throws `ValidationException` when an advisor blocks. Suppressed by `UpdateValidationSuppressed`. |
+| 135,000,000 | `AdviceValidateResourceReferences<TEntity>` | (any)        | Verifies every `[ResourceReference]` value points at an existing row, as on add.                                                                             |
 
 There is no update-side concurrency advisor. Optimistic concurrency on update is enforced by the
 database when the concrete entity annotates `IConcurrency.Timestamp` with `[ConcurrencyCheck]`. EF Core
@@ -82,8 +84,8 @@ issues a guarded `UPDATE ... WHERE Timestamp = @original`; a zero-row result bec
 
 ## Remove pipeline
 
-| Order | Advisor | Trait | Behavior |
-| --- | --- | --- | --- |
+| Order       | Advisor                           | Trait         | Behavior                                                                                                                                                                      |
+| ----------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 900,000,000 | `AdviceRemoveSoftDelete<TEntity>` | `ISoftDelete` | Sets `DeleteTime` to the current UTC time, calls `repository.UpdateAsync(entity)`, and returns `Handle` to prevent the physical delete. Suppressed by `SoftDeleteSuppressed`. |
 
 When `AdviceRemoveSoftDelete` returns `Handle`, the row stays with a non-null `DeleteTime`, and later

@@ -6,8 +6,7 @@ consumer, and handle the event with a typed handler. This guide builds on
 
 ## Add the package
 
-`Schemata.Application.Complex.Targets` already includes `Schemata.Event.Foundation`. To compose
-packages manually:
+The event bus ships outside the meta target packages, so add it explicitly:
 
 ```shell
 dotnet add package --prerelease Schemata.Event.Foundation
@@ -125,7 +124,7 @@ dotnet run
 ```
 
 ```shell
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20}'
 ```

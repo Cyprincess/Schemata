@@ -59,9 +59,9 @@ public interface IApplicationManager<TApplication>
 
     /// <summary>Sets localized display names for the application.</summary>
     Task SetDisplayNamesAsync(
-        TApplication?               application,
-        Dictionary<string, string>? names,
-        CancellationToken           ct = default
+        TApplication?                application,
+        Dictionary<string, string?>? names,
+        CancellationToken            ct = default
     );
 
     /// <summary>Sets the description for the application.</summary>
@@ -69,9 +69,9 @@ public interface IApplicationManager<TApplication>
 
     /// <summary>Sets localized descriptions for the application.</summary>
     Task SetDescriptionsAsync(
-        TApplication?               application,
-        Dictionary<string, string>? descriptions,
-        CancellationToken           ct = default
+        TApplication?                application,
+        Dictionary<string, string?>? descriptions,
+        CancellationToken            ct = default
     );
 
     /// <summary>Sets the registered redirect URIs for the application.</summary>

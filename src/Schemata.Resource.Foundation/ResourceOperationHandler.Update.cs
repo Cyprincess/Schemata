@@ -99,7 +99,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
         }
 
-        if (entity == null) {
+        if (entity is null) {
             throw ResourceNotFound(name);
         }
 
@@ -150,7 +150,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 Field       = nameof(IUpdateMask.UpdateMask).Underscore(),
                 Description = LocalizedMessageFormatter.FormatInvariant(
                     SchemataResources.INVALID_UPDATE_MASK,
-                    new Dictionary<string, string> { ["path"] = path, ["reason"] = reason }),
+                    new Dictionary<string, string?> { ["path"] = path, ["reason"] = reason }),
                 Reason      = SchemataResources.INVALID_UPDATE_MASK,
             },
         ]);

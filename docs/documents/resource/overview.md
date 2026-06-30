@@ -8,24 +8,24 @@ both call it, passing a `ClaimsPrincipal?` pulled from their own request context
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` + `.Create.cs`, `.Get.cs`, `.List.cs`, `.Update.cs`, `.Delete.cs` |
+| Package                        | Key files                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` + `.Create.cs`, `.Get.cs`, `.List.cs`, `.Update.cs`, `.Delete.cs`  |
 | `Schemata.Resource.Foundation` | `SchemataResourceBuilder.cs`, `ResourceRequestContainer.cs`, `ResourceMethodOperationHandler.cs` |
-| `Schemata.Resource.Foundation` | `Features/SchemataResourceFeature.cs`, `Extensions/SchemataBuilderExtensions.cs` |
-| `Schemata.Abstractions` | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`, `Entities/Operations.cs` |
-| `Schemata.Abstractions` | `Resource/ResourceAttribute.cs`, `Resource/CreateResultBase.cs` (and the other `*ResultBase`) |
+| `Schemata.Resource.Foundation` | `Features/SchemataResourceFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                 |
+| `Schemata.Abstractions`        | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`, `Entities/Operations.cs`     |
+| `Schemata.Abstractions`        | `Resource/ResourceAttribute.cs`, `Resource/CreateResultBase.cs` (and the other `*ResultBase`)    |
 
 ## The four type parameters
 
 A resource is defined by four types, each constrained to `class, ICanonicalName`:
 
-| Parameter | Role |
-| --- | --- |
-| `TEntity` | The persistent entity stored in the repository |
-| `TRequest` | The DTO accepted on Create and Update |
-| `TDetail` | The DTO returned from Get, Create, and Update |
-| `TSummary` | The DTO returned from each List item |
+| Parameter  | Role                                           |
+| ---------- | ---------------------------------------------- |
+| `TEntity`  | The persistent entity stored in the repository |
+| `TRequest` | The DTO accepted on Create and Update          |
+| `TDetail`  | The DTO returned from Get, Create, and Update  |
+| `TSummary` | The DTO returned from each List item           |
 
 `ICanonicalName` requires `string? Name` and `string? CanonicalName`. A resource is addressed externally by its
 AIP-122 canonical name; internal identity (`Uid`) stays in the persistence layer.
@@ -136,13 +136,13 @@ sequence with verb-scoped advisor sockets. See [Custom Methods](custom-methods.m
 
 Each operation returns a thin result base carrying the response DTO:
 
-| Operation | Result type | Members |
-| --- | --- | --- |
-| Create | `CreateResultBase<TDetail>` | `TDetail? Detail` |
-| Get | `GetResultBase<TDetail>` | `TDetail? Detail` |
-| Update | `UpdateResultBase<TDetail>` | `TDetail? Detail` |
-| Delete | `DeleteResultBase<TDetail>` | `TDetail? Detail` (set only for a soft delete) |
-| List | `ListResultBase<TSummary>` | `IList<TSummary>? Entities`, `int? TotalSize`, `string? NextPageToken` |
+| Operation | Result type                 | Members                                                                |
+| --------- | --------------------------- | ---------------------------------------------------------------------- |
+| Create    | `CreateResultBase<TDetail>` | `TDetail? Detail`                                                      |
+| Get       | `GetResultBase<TDetail>`    | `TDetail? Detail`                                                      |
+| Update    | `UpdateResultBase<TDetail>` | `TDetail? Detail`                                                      |
+| Delete    | `DeleteResultBase<TDetail>` | `TDetail? Detail` (set only for a soft delete)                         |
+| List      | `ListResultBase<TSummary>`  | `IList<TSummary>? Entities`, `int? TotalSize`, `string? NextPageToken` |
 
 `ListResultBase<TSummary>` implements `IEntitiesResult<TSummary>`, which drives the plural wire-name rename of
 `Entities` (see [HTTP Transport](http-transport.md)).
@@ -151,22 +151,22 @@ Each operation returns a thin result base carrying the response DTO:
 
 `SchemataResourceFeature.ConfigureServices` registers these advisors for every resource:
 
-| Advisor | Stage |
-| --- | --- |
-| `AdviceCreateRequestSanitize<TEntity, TRequest>` | Create request |
-| `AdviceCreateRequestValidation<TEntity, TRequest>` | Create request |
-| `AdviceUpdateRequestSanitize<TEntity, TRequest>` | Update request |
-| `AdviceUpdateRequestValidation<TEntity, TRequest>` | Update request |
-| `AdviceApplyChildParent<TEntity, TRequest>` | Create / Update entity |
-| `AdviceUpdateSoftDeleted<TEntity, TRequest>` | Update entity |
-| `AdviceUpdateFreshness<TEntity, TRequest>` | Update entity |
-| `AdviceDeleteFreshness<TEntity>` | Delete entity |
-| `AdviceResponseParent<TEntity, TDetail>` | Response |
-| `AdviceResponseFreshness<TEntity, TDetail>` | Response |
-| `AdviceResponseReadMask<TEntity, TDetail>` | Response |
-| `AdviceListResponseParent<TSummary>` | List response |
-| `AdviceListResponseReadMask<TSummary>` | List response |
-| `AdviceResponseIdempotency<TEntity, TDetail>` | Response |
+| Advisor                                            | Stage                  |
+| -------------------------------------------------- | ---------------------- |
+| `AdviceCreateRequestSanitize<TEntity, TRequest>`   | Create request         |
+| `AdviceCreateRequestValidation<TEntity, TRequest>` | Create request         |
+| `AdviceUpdateRequestSanitize<TEntity, TRequest>`   | Update request         |
+| `AdviceUpdateRequestValidation<TEntity, TRequest>` | Update request         |
+| `AdviceApplyChildParent<TEntity, TRequest>`        | Create / Update entity |
+| `AdviceUpdateSoftDeleted<TEntity, TRequest>`       | Update entity          |
+| `AdviceUpdateFreshness<TEntity, TRequest>`         | Update entity          |
+| `AdviceDeleteFreshness<TEntity>`                   | Delete entity          |
+| `AdviceResponseParent<TEntity, TDetail>`           | Response               |
+| `AdviceResponseFreshness<TEntity, TDetail>`        | Response               |
+| `AdviceResponseReadMask<TEntity, TDetail>`         | Response               |
+| `AdviceListResponseParent<TSummary>`               | List response          |
+| `AdviceListResponseReadMask<TSummary>`             | List response          |
+| `AdviceResponseIdempotency<TEntity, TDetail>`      | Response               |
 
 `RegisterResource` adds the per-entity Create/Update idempotency advisors
 (`AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>`,
@@ -177,16 +177,16 @@ Each operation returns a thin result base carrying the response DTO:
 
 `UseResource()` returns a `SchemataResourceBuilder` with these methods:
 
-| Method | Effect |
-| --- | --- |
-| `WithAuthorization(scheme?)` | Registers anonymous + authorize advisors for all operations; sets `AuthenticationScheme` when `scheme` is given |
-| `WithoutCreateValidation()` | Sets `SchemataResourceOptions.SuppressCreateValidation = true` |
-| `WithoutUpdateValidation()` | Sets `SchemataResourceOptions.SuppressUpdateValidation = true` |
-| `WithoutFreshness()` | Sets `SchemataResourceOptions.SuppressFreshness = true` |
-| `Use<TEntity, TRequest, TDetail, TSummary>(endpoints?)` | Registers a resource imperatively |
-| `Use<TEntity...>(Action<ResourceEndpointSelector>)` | Registers a resource restricted to the selected transports |
-| `MapHttp()` | Adds `SchemataHttpResourceFeature`, returns the same `SchemataResourceBuilder` |
-| `MapGrpc()` | Adds `SchemataGrpcResourceFeature`, returns the same `SchemataResourceBuilder` |
+| Method                                                  | Effect                                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `WithAuthorization(scheme?)`                            | Registers anonymous + authorize advisors for all operations; sets `AuthenticationScheme` when `scheme` is given |
+| `WithoutCreateValidation()`                             | Sets `SchemataResourceOptions.SuppressCreateValidation = true`                                                  |
+| `WithoutUpdateValidation()`                             | Sets `SchemataResourceOptions.SuppressUpdateValidation = true`                                                  |
+| `WithoutFreshness()`                                    | Sets `SchemataResourceOptions.SuppressFreshness = true`                                                         |
+| `Use<TEntity, TRequest, TDetail, TSummary>(endpoints?)` | Registers a resource imperatively                                                                               |
+| `Use<TEntity...>(Action<ResourceEndpointSelector>)`     | Registers a resource restricted to the selected transports                                                      |
+| `MapHttp()`                                             | Adds `SchemataHttpResourceFeature`, returns the same `SchemataResourceBuilder`                                  |
+| `MapGrpc()`                                             | Adds `SchemataGrpcResourceFeature`, returns the same `SchemataResourceBuilder`                                  |
 
 ## Extension points
 

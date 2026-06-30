@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests.Conformance;

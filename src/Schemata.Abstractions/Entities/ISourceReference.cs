@@ -1,3 +1,5 @@
+using System;
+
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
@@ -33,5 +35,5 @@ public interface ISourceReference
     ///     The source entity's <c>IConcurrency.Timestamp</c> snapshot at capture time, or
     ///     <see langword="null" /> for sources outside <c>IConcurrency</c>.
     /// </summary>
-    System.Guid? SourceTimestamp { get; set; }
+    Guid? SourceTimestamp { get; set; }
 }

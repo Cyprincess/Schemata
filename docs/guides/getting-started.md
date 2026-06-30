@@ -14,10 +14,14 @@ running application that creates, lists, reads, updates, and soft-deletes studen
 dotnet new web -n StudentApp
 cd StudentApp
 dotnet add package --prerelease Schemata.Application.Complex.Targets
+dotnet add package --prerelease Schemata.Entity.EntityFrameworkCore
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite
 ```
 
-`Schemata.Application.Complex.Targets` bundles the core framework, Entity Framework Core, Mapster,
-resource services, and the common packages.
+`Schemata.Application.Complex.Targets` bundles the core framework, the repository abstraction,
+Mapster, resource services, identity, and validation. The persistence provider is a separate
+choice: `Schemata.Entity.EntityFrameworkCore` adapts the repository to EF Core, and the SQLite
+package supplies the database driver used in this guide.
 
 ## Define the entity
 
@@ -53,12 +57,12 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 
 Each trait enables behavior through built-in repository advisors:
 
-| Trait | Behavior |
-| --- | --- |
-| `IIdentifier` | Supplies a `Guid` primary key via the `Uid` property |
-| `ICanonicalName` | Provides `Name` (short identifier) and `CanonicalName` (fully-qualified resource name) |
-| `ITimestamp` | Sets `CreateTime` on add and `UpdateTime` on update |
-| `ISoftDelete` | Sets `DeleteTime` on delete instead of removing the row; queries exclude soft-deleted rows |
+| Trait            | Behavior                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `IIdentifier`    | Supplies a `Guid` primary key via the `Uid` property                                       |
+| `ICanonicalName` | Provides `Name` (short identifier) and `CanonicalName` (fully-qualified resource name)     |
+| `ITimestamp`     | Sets `CreateTime` on add and `UpdateTime` on update                                        |
+| `ISoftDelete`    | Sets `DeleteTime` on delete instead of removing the row; queries exclude soft-deleted rows |
 
 `[CanonicalName("students/{student}")]` defines the resource-name pattern: `students` is the
 collection segment (the HTTP route prefix) and `{student}` is a variable resolved from the entity's
@@ -181,42 +185,42 @@ dotnet run
 
 These endpoints are now available:
 
-| Method | Path | AIP | Description |
-| --- | --- | --- | --- |
-| `GET` | `/students` | AIP-132 | List students |
-| `POST` | `/students` | AIP-133 | Create a student |
-| `GET` | `/{name=students/*}` | AIP-131 | Get a student by name |
-| `PATCH` | `/{name=students/*}` | AIP-134 | Update a student |
-| `DELETE` | `/{name=students/*}` | AIP-135 | Soft-delete a student |
+| Method   | Path                     | AIP     | Description           |
+| -------- | ------------------------ | ------- | --------------------- |
+| `GET`    | `/v1/students`           | AIP-132 | List students         |
+| `POST`   | `/v1/students`           | AIP-133 | Create a student      |
+| `GET`    | `/v1/students/{student}` | AIP-131 | Get a student by name |
+| `PATCH`  | `/v1/students/{student}` | AIP-134 | Update a student      |
+| `DELETE` | `/v1/students/{student}` | AIP-135 | Soft-delete a student |
 
 ```shell
 # Create a student
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20}'
 # Response includes "name" (e.g. "students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6")
 
 # List students
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 
-# Get by name (copy the "name" value from the create response)
-curl http://localhost:5000/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+# Get by name (append the "name" value from the create response to /v1/)
+curl http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
 
 # Update
-curl -X PATCH http://localhost:5000/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6 \
+curl -X PATCH http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6 \
      -H "Content-Type: application/json" \
      -d '{"age":21}'
 
 # Soft-delete
-curl -X DELETE http://localhost:5000/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+curl -X DELETE http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
 
 # The deleted student no longer appears in the list
-curl http://localhost:5000/students
+curl http://localhost:5000/v1/students
 ```
 
-The `name` field is the full resource name (`"students/a1b2c3d4..."`). The route pattern
-`{name=students/*}` captures it as one parameter constrained to the `students/` prefix. Request and
-response bodies use `snake_case` property names (`full_name`, `create_time`).
+The `name` field is the full resource name (`"students/a1b2c3d4..."`), so a resource URL is
+`/v1/` followed by the `name` value. Request and response bodies use `snake_case` property names
+(`full_name`, `create_time`).
 
 ## Next steps
 

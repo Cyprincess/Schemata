@@ -4,13 +4,13 @@ Every query method on `IRepository<TEntity>` — `ListAsync`, `FirstOrDefaultAsy
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
-| `IRepositoryBuildQueryAdvisor<TEntity>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryBuildQueryAdvisor.cs` |
-| `IRepositoryQueryAdvisor<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryQueryAdvisor.cs` |
-| `IRepositoryResultAdvisor<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryResultAdvisor.cs` |
-| `QueryContext<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/QueryContext.cs` |
-| `AdviceBuildQuerySoftDelete<TEntity>` | `src/Schemata.Entity.Repository/Advisors/AdviceBuildQuerySoftDelete.cs` |
+| Item                                          | Path                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| `IRepositoryBuildQueryAdvisor<TEntity>`       | `src/Schemata.Entity.Repository/Advisors/IRepositoryBuildQueryAdvisor.cs` |
+| `IRepositoryQueryAdvisor<TEntity,TResult,T>`  | `src/Schemata.Entity.Repository/Advisors/IRepositoryQueryAdvisor.cs`      |
+| `IRepositoryResultAdvisor<TEntity,TResult,T>` | `src/Schemata.Entity.Repository/Advisors/IRepositoryResultAdvisor.cs`     |
+| `QueryContext<TEntity,TResult,T>`             | `src/Schemata.Entity.Repository/QueryContext.cs`                          |
+| `AdviceBuildQuerySoftDelete<TEntity>`         | `src/Schemata.Entity.Repository/Advisors/AdviceBuildQuerySoftDelete.cs`   |
 
 ## Stages
 
@@ -76,12 +76,12 @@ For `ListAsync`, the build-query stage is identical, but the query and result ad
 
 ### AdviceBuildQuerySoftDelete
 
-| Property | Value |
-|---|---|
-| Interface | `IRepositoryBuildQueryAdvisor<TEntity>` |
-| Order | 100,000,000 (`SchemataConstants.Orders.Base`) |
-| Trait | `ISoftDelete` |
-| Suppressed by | `QuerySoftDeleteSuppressed` |
+| Property      | Value                                         |
+| ------------- | --------------------------------------------- |
+| Interface     | `IRepositoryBuildQueryAdvisor<TEntity>`       |
+| Order         | 100,000,000 (`SchemataConstants.Orders.Base`) |
+| Trait         | `ISoftDelete`                                 |
+| Suppressed by | `QuerySoftDeleteSuppressed`                   |
 
 When the entity type implements `ISoftDelete`, appends a filter that excludes rows where `DeleteTime` is non-null:
 
@@ -103,13 +103,13 @@ using (repository.SuppressQuerySoftDelete())
 
 ### AdviceBuildQueryOwner
 
-| Property | Value |
-|---|---|
-| Interface | `IRepositoryBuildQueryAdvisor<TEntity>` |
-| Order | 110,000,000 |
-| Trait | `IOwnable` |
-| Suppressed by | `QueryOwnerSuppressed` |
-| Registered by | `UseOwner()` |
+| Property      | Value                                   |
+| ------------- | --------------------------------------- |
+| Interface     | `IRepositoryBuildQueryAdvisor<TEntity>` |
+| Order         | 110,000,000                             |
+| Trait         | `IOwnable`                              |
+| Suppressed by | `QueryOwnerSuppressed`                  |
+| Registered by | `UseOwner()`                            |
 
 Restricts results to entities owned by the current caller. Resolves the owner via `IOwnerResolver<TEntity>` and appends `.Where(e => e.Owner == owner)`. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`. See [ownership.md](ownership.md).
 

@@ -1,6 +1,6 @@
 # Schemata.Abstractions — Root Contracts
 
-97 source files. The bottom of the dependency graph: no package outside `Microsoft.Extensions.*` is referenced. Every other Schemata package depends on this one.
+101 source files. The bottom of the dependency graph: no package outside `Microsoft.Extensions.*` is referenced. Every other Schemata package depends on this one.
 
 ## Layout
 
@@ -32,7 +32,8 @@ All in [Entities/](Entities/). A trait is a marker interface; advisors react to 
 | `IExpiration` | `ExpireTime` filtering |
 | `IStateful` | `State` enum + transition support |
 | `ITransition` | history of state transitions |
-| `IDescriptive` | `Title` / `Description` text |
+| `IDescriptive` | AIP-148 `DisplayName` / `Description` plus localized `DisplayNames` / `Descriptions` maps (`Dictionary<string, string?>?`) |
+| `IAnnotatable` | AIP-148 `Annotations` map (`Dictionary<string, string?>`) |
 | `ISourceReference` | external system back-link |
 | `ICanonicalName` | AIP resource name parsing (paired with `[CanonicalName]`) |
 | `IChild` | DTO-only marker exposing a derived `Parent` canonical (AIP-132 / 133); never implement on persisted entities |

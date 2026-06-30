@@ -13,5 +13,5 @@ public sealed class JobTriggered : IEvent
     public string? Job { get; init; }
 
     /// <summary>Variables carried by the job.</summary>
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
 }

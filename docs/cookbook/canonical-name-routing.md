@@ -64,7 +64,7 @@ publishers/{publisher}/books/{book}
 ```
 
 The result is stored in `entity.CanonicalName`. If `entity.Name` is empty when `Resolve` runs, it throws
-`ValidationException` with field `name` and reason `not_empty`.
+`ValidationException` with field `name` and reason `NOT_EMPTY`.
 
 **Assertion:** `POST /v1/publishers/acme/books` with body `{ "title": "Les Misérables", "name": "les-miserables" }`
 returns a detail whose `name` is `"publishers/acme/books/les-miserables"`.

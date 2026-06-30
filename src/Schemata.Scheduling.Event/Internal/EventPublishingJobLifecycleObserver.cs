@@ -7,7 +7,6 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Event.Skeleton;
 using Schemata.Scheduling.Event.Attributes;
 using Schemata.Scheduling.Event.Events;
-using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -49,7 +48,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
         await _eventBus.PublishAsync(new JobScheduled {
             Job         = job.CanonicalName,
-            Variables   = JobVariableSerializer.Deserialize(job.Variables),
+            Variables   = job.Variables,
             ScheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
@@ -128,7 +127,7 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
         }
 
         var jobType = _registry.Resolve(job.JobKey);
-        if (jobType == null) {
+        if (jobType is null) {
             return (_options.DefaultPublishEventResult, false);
         }
 

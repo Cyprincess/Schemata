@@ -9,16 +9,16 @@ public class StateMachineValidatorShould
 {
     [Fact]
     public void Validate_ValidDefinition_Passes() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
-        var task       = new NoneTask { Id  = "task", Name  = "Task" };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Name  = "Task" };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, endEvent, task },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = task },
-                new() { Id = "f2", Source = task, Target       = endEvent },
+                new() { Source = startEvent, Target = task },
+                new() { Source = task, Target       = endEvent },
             },
         };
 
@@ -30,7 +30,7 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_MissingStartEvent_Throws() {
-        var endEvent = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var endEvent = new FlowEvent { Name = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition { Name = "test", Elements = { endEvent } };
 
@@ -39,15 +39,55 @@ public class StateMachineValidatorShould
     }
 
     [Fact]
+    public void Validate_UnnamedElement_Throws() {
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask();
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, endEvent, task },
+            Flows = {
+                new() { Source = startEvent, Target = task },
+                new() { Source = task, Target       = endEvent },
+            },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("non-empty name", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_DuplicateElementName_Throws() {
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Name  = "Task" };
+        var duplicate  = new NoneTask { Name  = "Task" };
+
+        var definition = new ProcessDefinition {
+            Name     = "test",
+            Elements = { startEvent, endEvent, task, duplicate },
+            Flows = {
+                new() { Source = startEvent, Target = task },
+                new() { Source = task, Target       = duplicate },
+                new() { Source = duplicate, Target  = endEvent },
+            },
+        };
+
+        var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("unique", ex.Message);
+    }
+
+    [Fact]
     public void Validate_ParallelGateway_Throws() {
-        var startEvent = new FlowEvent { Id       = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id       = "end", Name   = "End", Position   = EventPosition.End };
-        var gateway    = new ParallelGateway { Id = "gw", Name    = "GW" };
+        var startEvent = new FlowEvent { Name       = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name       = "End", Position   = EventPosition.End };
+        var gateway    = new ParallelGateway { Name = "GW" };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, endEvent, gateway },
-            Flows    = { new() { Id = "f1", Source = startEvent, Target = gateway } },
+            Flows    = { new() { Source = startEvent, Target = gateway } },
         };
 
         Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
@@ -55,11 +95,10 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_BoundaryEvent_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
-        var task       = new NoneTask { Id  = "task", Name  = "Task" };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Name  = "Task" };
         var boundaryEvent = new FlowEvent {
-            Id         = "be",
             Name       = "BE",
             Position   = EventPosition.Boundary,
             AttachedTo = task,
@@ -73,7 +112,7 @@ public class StateMachineValidatorShould
                 task,
                 boundaryEvent,
             },
-            Flows = { new() { Id = "f1", Source = startEvent, Target = endEvent } },
+            Flows = { new() { Source = startEvent, Target = endEvent } },
         };
 
         Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
@@ -81,10 +120,10 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_ParallelEventBasedGateway_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var gateway    = new EventBasedGateway { Id = "gw", Name = "GW", Parallel = true };
-        var catchEvent = new FlowEvent { Id = "catch", Name = "Catch", Position = EventPosition.IntermediateCatch };
-        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var gateway    = new EventBasedGateway { Name = "GW", Parallel = true };
+        var catchEvent = new FlowEvent { Name = "Catch", Position = EventPosition.IntermediateCatch };
+        var endEvent   = new FlowEvent { Name = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name = "test",
@@ -95,9 +134,9 @@ public class StateMachineValidatorShould
                 endEvent,
             },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = gateway },
-                new() { Id = "f2", Source = gateway, Target    = catchEvent },
-                new() { Id = "f3", Source = catchEvent, Target = endEvent },
+                new() { Source = startEvent, Target = gateway },
+                new() { Source = gateway, Target    = catchEvent },
+                new() { Source = catchEvent, Target = endEvent },
             },
         };
 
@@ -106,16 +145,16 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_FlowUnknownSource_Throws() {
-        var startEvent  = new FlowEvent { Id = "start", Name   = "Start", Position = EventPosition.Start };
-        var endEvent    = new FlowEvent { Id = "end", Name     = "End", Position   = EventPosition.End };
-        var unknownTask = new NoneTask { Id  = "unknown", Name = "Unknown" };
+        var startEvent  = new FlowEvent { Name  = "Start", Position = EventPosition.Start };
+        var endEvent    = new FlowEvent { Name  = "End", Position   = EventPosition.End };
+        var unknownTask = new NoneTask { Name   = "Unknown" };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, endEvent },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target  = endEvent },
-                new() { Id = "f2", Source = unknownTask, Target = endEvent },
+                new() { Source = startEvent, Target  = endEvent },
+                new() { Source = unknownTask, Target = endEvent },
             },
         };
 
@@ -124,16 +163,16 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_FlowUnknownTarget_Throws() {
-        var startEvent  = new FlowEvent { Id = "start", Name   = "Start", Position = EventPosition.Start };
-        var endEvent    = new FlowEvent { Id = "end", Name     = "End", Position   = EventPosition.End };
-        var unknownTask = new NoneTask { Id  = "unknown", Name = "Unknown" };
+        var startEvent  = new FlowEvent { Name  = "Start", Position = EventPosition.Start };
+        var endEvent    = new FlowEvent { Name  = "End", Position   = EventPosition.End };
+        var unknownTask = new NoneTask { Name   = "Unknown" };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, endEvent },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = endEvent },
-                new() { Id = "f2", Source = startEvent, Target = unknownTask },
+                new() { Source = startEvent, Target = endEvent },
+                new() { Source = startEvent, Target = unknownTask },
             },
         };
 
@@ -142,16 +181,16 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_EndEventWithOutgoing_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
-        var task       = new NoneTask { Id  = "task", Name  = "Task" };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Name  = "Task" };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, endEvent, task },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = endEvent },
-                new() { Id = "f2", Source = endEvent, Target   = task },
+                new() { Source = startEvent, Target = endEvent },
+                new() { Source = endEvent, Target   = task },
             },
         };
 
@@ -160,16 +199,16 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_IntermediateCatchNotFromEventBasedGateway_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var catchEvent = new FlowEvent { Id = "catch", Name = "Catch", Position = EventPosition.IntermediateCatch };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position   = EventPosition.End };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var catchEvent = new FlowEvent { Name = "Catch", Position = EventPosition.IntermediateCatch };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, catchEvent, endEvent },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = catchEvent },
-                new() { Id = "f2", Source = catchEvent, Target = endEvent },
+                new() { Source = startEvent, Target = catchEvent },
+                new() { Source = catchEvent, Target = endEvent },
             },
         };
 
@@ -178,14 +217,14 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_ExclusiveGatewayWithoutOutgoing_Throws() {
-        var startEvent = new FlowEvent { Id        = "start", Name = "Start", Position = EventPosition.Start };
-        var gateway    = new ExclusiveGateway { Id = "gw", Name    = "Gateway" };
-        var endEvent   = new FlowEvent { Id        = "end", Name   = "End", Position = EventPosition.End };
+        var startEvent = new FlowEvent { Name        = "Start", Position = EventPosition.Start };
+        var gateway    = new ExclusiveGateway { Name = "Gateway" };
+        var endEvent   = new FlowEvent { Name        = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name     = "test",
             Elements = { startEvent, gateway, endEvent },
-            Flows    = { new() { Id = "f1", Source = startEvent, Target = gateway } },
+            Flows    = { new() { Source = startEvent, Target = gateway } },
         };
 
         var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
@@ -194,10 +233,10 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_IntermediateCatchWithoutOutgoing_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var gateway    = new EventBasedGateway { Id = "gw", Name = "Gateway" };
-        var catchEvent = new FlowEvent { Id = "catch", Name = "Catch", Position = EventPosition.IntermediateCatch };
-        var endEvent   = new FlowEvent { Id = "end", Name = "End", Position = EventPosition.End };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var gateway    = new EventBasedGateway { Name = "Gateway" };
+        var catchEvent = new FlowEvent { Name = "Catch", Position = EventPosition.IntermediateCatch };
+        var endEvent   = new FlowEvent { Name = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name = "test",
@@ -208,8 +247,8 @@ public class StateMachineValidatorShould
                 endEvent,
             },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = gateway },
-                new() { Id = "f2", Source = gateway, Target    = catchEvent },
+                new() { Source = startEvent, Target = gateway },
+                new() { Source = gateway, Target    = catchEvent },
             },
         };
 
@@ -219,11 +258,11 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void Validate_ActivityMultipleDirectOutgoing_Throws() {
-        var startEvent = new FlowEvent { Id = "start", Name = "Start", Position = EventPosition.Start };
-        var task       = new NoneTask { Id  = "task", Name  = "Task" };
-        var task2      = new NoneTask { Id  = "task2", Name = "Task2" };
-        var task3      = new NoneTask { Id  = "task3", Name = "Task3" };
-        var endEvent   = new FlowEvent { Id = "end", Name   = "End", Position = EventPosition.End };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var task       = new NoneTask { Name  = "Task" };
+        var task2      = new NoneTask { Name  = "Task2" };
+        var task3      = new NoneTask { Name  = "Task3" };
+        var endEvent   = new FlowEvent { Name = "End", Position = EventPosition.End };
 
         var definition = new ProcessDefinition {
             Name = "test",
@@ -235,9 +274,9 @@ public class StateMachineValidatorShould
                 endEvent,
             },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = task },
-                new() { Id = "f2", Source = task, Target       = task2 },
-                new() { Id = "f3", Source = task, Target       = task3 },
+                new() { Source = startEvent, Target = task },
+                new() { Source = task, Target       = task2 },
+                new() { Source = task, Target       = task3 },
             },
         };
 
@@ -246,10 +285,10 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void UnreachableElement_Rejected() {
-        var startEvent = new FlowEvent { Id = "start", Name  = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id = "end", Name    = "End", Position   = EventPosition.End };
-        var task       = new NoneTask { Id  = "task", Name   = "Task" };
-        var orphan     = new NoneTask { Id  = "orphan", Name = "Orphan" };
+        var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name = "End", Position   = EventPosition.End };
+        var task       = new NoneTask { Name  = "Task" };
+        var orphan     = new NoneTask { Name  = "Orphan" };
 
         var definition = new ProcessDefinition {
             Name = "test",
@@ -260,10 +299,10 @@ public class StateMachineValidatorShould
                 orphan,
             },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = task },
-                new() { Id = "f2", Source = task, Target       = endEvent },
+                new() { Source = startEvent, Target = task },
+                new() { Source = task, Target       = endEvent },
                 // The orphan has an outgoing flow but remains unreachable from the start event.
-                new() { Id = "f3", Source = orphan, Target = endEvent },
+                new() { Source = orphan, Target = endEvent },
             },
         };
 
@@ -273,10 +312,10 @@ public class StateMachineValidatorShould
 
     [Fact]
     public void NoViableEdge_Rejected() {
-        var startEvent = new FlowEvent { Id        = "start", Name = "Start", Position = EventPosition.Start };
-        var endEvent   = new FlowEvent { Id        = "end", Name   = "End", Position   = EventPosition.End };
-        var gateway    = new ExclusiveGateway { Id = "gw", Name    = "GW" };
-        var deadEnd    = new NoneTask { Id         = "dead", Name  = "DeadEnd" };
+        var startEvent = new FlowEvent { Name        = "Start", Position = EventPosition.Start };
+        var endEvent   = new FlowEvent { Name        = "End", Position   = EventPosition.End };
+        var gateway    = new ExclusiveGateway { Name = "GW" };
+        var deadEnd    = new NoneTask { Name         = "DeadEnd" };
 
         var definition = new ProcessDefinition {
             Name = "test",
@@ -287,9 +326,9 @@ public class StateMachineValidatorShould
                 deadEnd,
             },
             Flows = {
-                new() { Id = "f1", Source = startEvent, Target = gateway },
-                new() { Id = "f2", Source = gateway, Target    = deadEnd },
-                new() { Id = "f3", Source = gateway, Target    = endEvent },
+                new() { Source = startEvent, Target = gateway },
+                new() { Source = gateway, Target    = deadEnd },
+                new() { Source = gateway, Target    = endEvent },
             },
         };
 

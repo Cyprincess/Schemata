@@ -4,10 +4,10 @@
 
 ## Where the code lives
 
-| Item | Path |
-|---|---|
+| Item                       | Path                                                           |
+| -------------------------- | -------------------------------------------------------------- |
 | `DistributedCacheProvider` | `src/Schemata.Caching.Distributed/DistributedCacheProvider.cs` |
-| `IndexLocks` | `src/Schemata.Caching.Distributed/IndexLocks.cs` |
+| `IndexLocks`               | `src/Schemata.Caching.Distributed/IndexLocks.cs`               |
 
 ## Mechanism
 

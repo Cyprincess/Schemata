@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Models;
 
@@ -101,7 +100,11 @@ public class PageToken
             await using var gz = new BrotliStream(ms, CompressionMode.Decompress);
 
             var parsed = await JsonSerializer.DeserializeAsync<PageToken>(gz);
-            return parsed ?? throw new JsonException("Page token payload deserialized to null.");
+            if (parsed is null) {
+                throw new JsonException("Page token payload deserialized to null.");
+            }
+
+            return parsed;
         } catch (Exception ex) when (ex is FormatException
                                         or CryptographicException
                                         or JsonException

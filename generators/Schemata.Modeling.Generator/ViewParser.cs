@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Schemata.Modeling.Generator.Expressions;
@@ -30,15 +31,15 @@ public static partial class Parser
             }
         }
 
-        return new(type, nullable, name, options, (EquatableArray<Note>)notes.ToImmutable(),
-                   (EquatableArray<ViewField>)children.ToImmutable(), assignment);
+        return new(type, nullable, name, options, notes.ToImmutable(),
+                   children.ToImmutable(), assignment);
     }
 
     private static ViewOption ParseViewOption(string normalized) {
         return normalized switch {
             "omit"    => ViewOption.Omit,
             "omitall" => ViewOption.OmitAll,
-            var _     => throw new System.InvalidOperationException($"Unknown view option: {normalized}"),
+            var _     => throw new InvalidOperationException($"Unknown view option: {normalized}"),
         };
     }
 }

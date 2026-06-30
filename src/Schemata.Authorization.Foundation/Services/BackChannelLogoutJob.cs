@@ -29,8 +29,8 @@ public sealed class BackChannelLogoutJob(
             return;
         }
 
-        var uri = uriRaw.ToString();
-        var jwt = jwtRaw.ToString();
+        var uri = uriRaw;
+        var jwt = jwtRaw;
 
         if (string.IsNullOrWhiteSpace(uri) || string.IsNullOrWhiteSpace(jwt)) {
             return;

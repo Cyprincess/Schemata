@@ -8,13 +8,13 @@ detail entries on the exception itself. The HTTP exception-handler middleware tu
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Abstractions` | `Exceptions/SchemataException.cs` and one file per subclass |
-| `Schemata.Abstractions` | `Errors/ErrorResponse.cs`, `Errors/ErrorBody.cs`, `Errors/IErrorDetail.cs` |
-| `Schemata.Abstractions` | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs`, `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
-| `Schemata.Abstractions` | `SchemataConstants.cs` (`ErrorCodes` for `google.rpc.Code` names; `ErrorReasons` for framework-default `ErrorInfo.reason` identifiers) |
-| `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs` |
+| Package                   | Key files                                                                                                                                                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Abstractions`   | `Exceptions/SchemataException.cs` and one file per subclass                                                                                                                                                                      |
+| `Schemata.Abstractions`   | `Errors/ErrorResponse.cs`, `Errors/ErrorBody.cs`, `Errors/IErrorDetail.cs`                                                                                                                                                       |
+| `Schemata.Abstractions`   | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs`, `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
+| `Schemata.Abstractions`   | `SchemataConstants.cs` (`ErrorCodes` for `google.rpc.Code` names; `ErrorReasons` for framework-default `ErrorInfo.reason` identifiers)                                                                                           |
+| `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`                                                                                                                                                                                       |
 
 ## Envelope
 
@@ -49,12 +49,12 @@ specific value such as `USER_NOT_FOUND`.
 
 `ErrorResponse` holds a single `Error` property of type `ErrorBody`. `ErrorBody` carries:
 
-| Property | Type | Description |
-| --- | --- | --- |
-| `code` | `int` | The HTTP status code (mirrors `google.rpc.Status.code`, e.g. `404`) |
-| `status` | `string?` | The canonical `google.rpc.Code` name (e.g. `"NOT_FOUND"`) for client-side branching |
-| `message` | `string?` | Developer-oriented diagnostic message, not localized for display |
-| `details` | `List<IErrorDetail>?` | Typed detail entries; each serializes with an `@type` discriminator |
+| Property  | Type                  | Description                                                                         |
+| --------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `code`    | `int`                 | The HTTP status code (mirrors `google.rpc.Status.code`, e.g. `404`)                 |
+| `status`  | `string?`             | The canonical `google.rpc.Code` name (e.g. `"NOT_FOUND"`) for client-side branching |
+| `message` | `string?`             | Developer-oriented diagnostic message, not localized for display                    |
+| `details` | `List<IErrorDetail>?` | Typed detail entries; each serializes with an `@type` discriminator                 |
 
 ### IErrorDetail
 
@@ -80,11 +80,11 @@ Exception
 
 The constructor is `SchemataException(int code, string? status = null, string? message = null)`:
 
-| Property | Type | Holds |
-| --- | --- | --- |
-| `Code` | `int` | The HTTP response status code |
-| `Status` | `string?` | The canonical `google.rpc.Code` string |
-| `Details` | `List<IErrorDetail>?` | Typed detail entries |
+| Property  | Type                  | Holds                                  |
+| --------- | --------------------- | -------------------------------------- |
+| `Code`    | `int`                 | The HTTP response status code          |
+| `Status`  | `string?`             | The canonical `google.rpc.Code` string |
+| `Details` | `List<IErrorDetail>?` | Typed detail entries                   |
 
 ### Status vs Reason
 
@@ -157,19 +157,19 @@ throw SchemataResourceErrors.PermissionDenied<Book>(
 
 ### Exception types
 
-| Exception | HTTP code | Canonical status | Default message |
-| --- | --- | --- | --- |
-| `InvalidArgumentException` | 400 | `INVALID_ARGUMENT` | The request contains an invalid argument. |
-| `ValidationException` | 422 | `INVALID_ARGUMENT` | One or more validation errors occurred. |
-| `NotFoundException` | 404 | `NOT_FOUND` | The requested resource was not found. |
-| `AlreadyExistsException` | 409 | `ALREADY_EXISTS` | The resource already exists. |
-| `PermissionDeniedException` | 403 | `PERMISSION_DENIED` | You do not have permission to perform this action. |
-| `UnauthenticatedException` | 401 | `UNAUTHENTICATED` | The request does not have valid authentication credentials. |
-| `AbortedException` | 409 | `ABORTED` | A concurrency conflict occurred while saving to the database. |
-| `FailedPreconditionException` | 412 | `FAILED_PRECONDITION` | The request cannot be executed in the current system state. |
-| `TenantResolveException` | 400 | `FAILED_PRECONDITION` | Unable to resolve tenant for the current request. |
-| `QuotaExceededException` | 429 | `RESOURCE_EXHAUSTED` | Rate limit exceeded. |
-| `NoContentException` | 204 | `OK` | _(none)_ |
+| Exception                     | HTTP code | Canonical status      | Default message                                               |
+| ----------------------------- | --------- | --------------------- | ------------------------------------------------------------- |
+| `InvalidArgumentException`    | 400       | `INVALID_ARGUMENT`    | The request contains an invalid argument.                     |
+| `ValidationException`         | 422       | `INVALID_ARGUMENT`    | One or more validation errors occurred.                       |
+| `NotFoundException`           | 404       | `NOT_FOUND`           | The requested resource was not found.                         |
+| `AlreadyExistsException`      | 409       | `ALREADY_EXISTS`      | The resource already exists.                                  |
+| `PermissionDeniedException`   | 403       | `PERMISSION_DENIED`   | You do not have permission to perform this action.            |
+| `UnauthenticatedException`    | 401       | `UNAUTHENTICATED`     | The request does not have valid authentication credentials.   |
+| `AbortedException`            | 409       | `ABORTED`             | A concurrency conflict occurred while saving to the database. |
+| `FailedPreconditionException` | 412       | `FAILED_PRECONDITION` | The request cannot be executed in the current system state.   |
+| `TenantResolveException`      | 400       | `FAILED_PRECONDITION` | Unable to resolve tenant for the current request.             |
+| `QuotaExceededException`      | 429       | `RESOURCE_EXHAUSTED`  | Rate limit exceeded.                                          |
+| `NoContentException`          | 204       | `OK`                  | _(none)_                                                      |
 
 `ValidationException` takes a set of `ErrorFieldViolation` values and wraps them in a
 `BadRequestDetail`. `NoContentException` signals a successful body-less response, used by
@@ -177,15 +177,15 @@ validate-only requests.
 
 ## Detail types
 
-| Detail class | `@type` URL | Carries |
-| --- | --- | --- |
-| `BadRequestDetail` | `.../google.rpc.BadRequest` | `field_violations`: `List<ErrorFieldViolation>` |
-| `ErrorInfoDetail` | `.../google.rpc.ErrorInfo` | `reason`, `domain`, `metadata` |
-| `LocalizedMessageDetail` | `.../google.rpc.LocalizedMessage` | `locale`, `message` |
+| Detail class                | `@type` URL                          | Carries                                                                        |
+| --------------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| `BadRequestDetail`          | `.../google.rpc.BadRequest`          | `field_violations`: `List<ErrorFieldViolation>`                                |
+| `ErrorInfoDetail`           | `.../google.rpc.ErrorInfo`           | `reason`, `domain`, `metadata`                                                 |
+| `LocalizedMessageDetail`    | `.../google.rpc.LocalizedMessage`    | `locale`, `message`                                                            |
 | `PreconditionFailureDetail` | `.../google.rpc.PreconditionFailure` | `violations`: `List<PreconditionViolation>` (`type`, `subject`, `description`) |
-| `QuotaFailureDetail` | `.../google.rpc.QuotaFailure` | `violations`: `List<QuotaViolation>` (`subject`, `description`) |
-| `RequestInfoDetail` | `.../google.rpc.RequestInfo` | `request_id`, `serving_data` |
-| `ResourceInfoDetail` | `.../google.rpc.ResourceInfo` | `resource_type`, `resource_name`, `owner`, `description` |
+| `QuotaFailureDetail`        | `.../google.rpc.QuotaFailure`        | `violations`: `List<QuotaViolation>` (`subject`, `description`)                |
+| `RequestInfoDetail`         | `.../google.rpc.RequestInfo`         | `request_id`, `serving_data`                                                   |
+| `ResourceInfoDetail`        | `.../google.rpc.ResourceInfo`        | `resource_type`, `resource_name`, `owner`, `description`                       |
 
 Each `ErrorFieldViolation` carries `field` (snake_case path), `description`, and `reason`. With
 FluentValidation, the reason is derived from the validator's error code by stripping the

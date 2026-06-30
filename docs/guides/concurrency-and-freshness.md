@@ -6,9 +6,9 @@ Add optimistic concurrency control to the `Student` entity and see how ETags flo
 
 Schemata separates concurrency into two complementary interfaces:
 
-| Interface      | Applied to           | Purpose |
-| -------------- | -------------------- | ------- |
-| `IConcurrency` | Entity               | Adds a non-nullable `Guid Timestamp`. `AdviceAddConcurrency` mints a new GUID on create; the database guards the update when `Timestamp` carries `[ConcurrencyCheck]`. |
+| Interface      | Applied to           | Purpose                                                                                                                                                                                                                  |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IConcurrency` | Entity               | Adds a non-nullable `Guid Timestamp`. `AdviceAddConcurrency` mints a new GUID on create; the database guards the update when `Timestamp` carries `[ConcurrencyCheck]`.                                                   |
 | `IFreshness`   | Request/response DTO | Adds `string? EntityTag`. The resource pipeline derives a weak ETag from the entity's `Timestamp` and writes it to the response. On update it reads the ETag from the request and compares it to the stored `Timestamp`. |
 
 `StudentDetail` and `StudentRequest` already implement `IFreshness` from [Object Mapping](object-mapping.md). The only entity change is adding `IConcurrency`.
@@ -43,13 +43,13 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, ICo
 
 After adding this, delete `app.db` and let EF Core recreate the schema with the new `Timestamp` column.
 
-The plumbing is split between the repository pipeline and the database:
+Three things now happen without further code:
 
-1. `AdviceAddConcurrency` (add pipeline) mints `Timestamp` on create.
-2. On update, EF Core reads `[ConcurrencyCheck]` and issues `UPDATE ... WHERE Timestamp = @original` while bumping `Timestamp` to a fresh GUID. A stale token matches zero rows, which surfaces as `AbortedException` (mapped to HTTP 409). There is no update-side concurrency advisor.
-3. The resource freshness advisors bridge `Timestamp` to the HTTP ETag: the response advisor encodes `Timestamp` as a weak ETag (`W/"<base64url>"`) on the detail DTO, and the update advisor reads the request's ETag and compares it to the stored `Timestamp` before the write.
+1. A fresh `Timestamp` is minted on create.
+2. The database guards every update against the stored `Timestamp` and bumps it on success; a stale write fails with HTTP 409.
+3. The resource pipeline surfaces `Timestamp` as a weak ETag (`W/"..."`) on responses and checks the ETag a request carries before writing.
 
-Without `[ConcurrencyCheck]`, the add stamp still mints a token but the update writes unconditionally, so concurrent writers can lose updates.
+Without `[ConcurrencyCheck]`, the token is still minted but updates write unconditionally, so concurrent writers can lose updates. The advisor-by-advisor mechanics are in [Update Pipeline](../documents/resource/update-pipeline.md) and [Traits](../documents/entity/traits.md).
 
 ## Verify
 
@@ -60,7 +60,7 @@ dotnet run
 Create a student and observe the non-null `entity_tag`:
 
 ```shell
-curl -X POST http://localhost:5000/students \
+curl -X POST http://localhost:5000/v1/students \
      -H "Content-Type: application/json" \
      -d '{"full_name":"Alice","age":20}'
 ```
@@ -81,13 +81,13 @@ curl -X POST http://localhost:5000/students \
 Conditional update using `If-Match`:
 
 ```shell
-curl -X PATCH "http://localhost:5000/students/a1b2c3d4e5f6a7b8" \
+curl -X PATCH "http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8" \
      -H "Content-Type: application/json" \
      -H 'If-Match: W/"dGVzdC10aW1lc3RhbXA"' \
      -d '{"age":21}'
 ```
 
-If another request modified the entity first, the server responds with HTTP 409. Sending the current ETag (from the last read) lets the conditional update succeed.
+A stale `If-Match` value is rejected before the write with HTTP 412. When the tags match but another writer swaps the row between the comparison and the write, the database guard fires instead and the server responds with HTTP 409. Sending the current ETag (from the last read) lets the conditional update succeed.
 
 ## Next steps
 

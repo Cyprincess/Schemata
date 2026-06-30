@@ -6,11 +6,16 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Authorization checks shared by flow resource method handlers.</summary>
-internal static class FlowProcessAuthorization
+/// <summary>
+///     Authorization checks shared by flow resource method handlers. Concrete class with virtual
+///     methods so consumers can subclass and replace per-process / per-signal access rules without
+///     introducing a new interface contract. Registered as a singleton in DI;
+///     <see cref="FlowRunner" /> depends on this concrete type.
+/// </summary>
+public class FlowProcessAuthorization
 {
     /// <summary>Verifies access to a registered process definition.</summary>
-    public static void EnsureDefinitionAccess(
+    public virtual void EnsureDefinitionAccess(
         IProcessRegistry registry,
         string           definitionName,
         ClaimsPrincipal? principal
@@ -22,7 +27,7 @@ internal static class FlowProcessAuthorization
     }
 
     /// <summary>Verifies access to a persisted process instance through its source definition.</summary>
-    public static void EnsureProcessAccess(
+    public virtual void EnsureProcessAccess(
         IProcessRegistry registry,
         SchemataProcess  process,
         ClaimsPrincipal? principal
@@ -31,7 +36,7 @@ internal static class FlowProcessAuthorization
     }
 
     /// <summary>Verifies access to signal delivery when any listening process requires authorization.</summary>
-    public static void EnsureSignalAccess(
+    public virtual void EnsureSignalAccess(
         IProcessRegistry registry,
         string           signalName,
         ClaimsPrincipal? principal
@@ -46,7 +51,8 @@ internal static class FlowProcessAuthorization
         }
     }
 
-    private static void EnsureAuthenticated(ClaimsPrincipal? principal) {
+    /// <summary>Hook for subclasses: throws <see cref="NotFoundException" /> when the principal is anonymous.</summary>
+    protected virtual void EnsureAuthenticated(ClaimsPrincipal? principal) {
         if (principal?.Identity?.IsAuthenticated is true) {
             return;
         }

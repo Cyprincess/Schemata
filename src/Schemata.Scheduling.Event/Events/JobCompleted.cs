@@ -18,7 +18,7 @@ public sealed class JobCompleted : IEvent
     public string? Job { get; init; }
 
     /// <summary>Variables carried by the job at completion time.</summary>
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
 
     /// <summary>UTC timestamp when the job completed.</summary>
     public DateTime CompletedAt { get; init; }

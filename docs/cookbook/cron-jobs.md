@@ -50,13 +50,13 @@ builder.UseSchemata(schema => {
 `WithJob<T>(string cronExpression)` wraps the expression in `CronSchedule`, which calls
 `CronExpression.Parse(expression)` using the Cronos default. Cronos expects exactly 5 fields:
 
-| Field | Range | Special characters |
-| --- | --- | --- |
-| Minute | 0-59 | `*` `,` `-` `/` |
-| Hour | 0-23 | `*` `,` `-` `/` |
-| Day of month | 1-31 | `*` `,` `-` `/` |
-| Month | 1-12 | `*` `,` `-` `/` |
-| Day of week | 0-7 (0 and 7 = Sunday) | `*` `,` `-` `/` |
+| Field        | Range                  | Special characters |
+| ------------ | ---------------------- | ------------------ |
+| Minute       | 0-59                   | `*` `,` `-` `/`    |
+| Hour         | 0-23                   | `*` `,` `-` `/`    |
+| Day of month | 1-31                   | `*` `,` `-` `/`    |
+| Month        | 1-12                   | `*` `,` `-` `/`    |
+| Day of week  | 0-7 (0 and 7 = Sunday) | `*` `,` `-` `/`    |
 
 A seconds field or the Quartz `?` placeholder throws `CronFormatException` at startup.
 
@@ -79,11 +79,11 @@ builder.Services.Configure<SchemataSchedulingOptions>(o => {
 });
 ```
 
-| Policy | Behavior | When to use |
-| --- | --- | --- |
-| `Skip` | Advances `NextRunTime` without firing; logs at `Information`. | Reports or snapshots where a missed run is acceptable. |
-| `FireOnce` (default) | Fires once immediately, then advances. | Jobs needing at least one run per window. |
-| `FireAll` | Replays every missed run in sequence, capped at 1024. | Ledger jobs where every run has independent value. |
+| Policy               | Behavior                                                      | When to use                                            |
+| -------------------- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| `Skip`               | Advances `NextRunTime` without firing; logs at `Information`. | Reports or snapshots where a missed run is acceptable. |
+| `FireOnce` (default) | Fires once immediately, then advances.                        | Jobs needing at least one run per window.              |
+| `FireAll`            | Replays every missed run in sequence, capped at 1024.         | Ledger jobs where every run has independent value.     |
 
 `FireOnce` is the default. `FireAll` replays up to 1024 missed runs; beyond that it stops and advances
 from the last replayed run.

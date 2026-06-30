@@ -27,7 +27,7 @@ public interface ITenantManager<TTenant>
     ValueTask SetDisplayNameAsync(TTenant tenant, string? name, CancellationToken ct);
 
     /// <summary>Sets the localized display names.</summary>
-    ValueTask SetDisplayNamesAsync(TTenant tenant, Dictionary<string, string> names, CancellationToken ct);
+    ValueTask SetDisplayNamesAsync(TTenant tenant, Dictionary<string, string?> names, CancellationToken ct);
 
     /// <summary>Sets the host names associated with the tenant.</summary>
     ValueTask SetHostsAsync(TTenant tenant, ImmutableArray<string> hosts, CancellationToken ct);

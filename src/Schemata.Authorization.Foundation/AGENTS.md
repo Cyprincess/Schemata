@@ -1,64 +1,54 @@
-# Schemata.Authorization.Foundation — OAuth 2.0 / OpenID Connect Server
+# Schemata.Authorization.Foundation
 
-Implementation of an OIDC-compliant authorization server on top of `Schemata.Abstractions` + ASP.NET Core. Compliant with [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html). 119 source files — the largest single package.
+## OVERVIEW
 
-## Layout
+OAuth 2.0 / OpenID Connect server. 120 C# files; ~47 in `Advisors/`. Sits on `Schemata.Authorization.Skeleton` (entities, manager interfaces, endpoint contracts, advisor contracts) and bridges to ASP.NET Identity via `Schemata.Authorization.Identity` (activate with `UseIdentity()` on the authorization builder).
+
+## STRUCTURE
 
 ```
-Schemata.Authorization.Foundation/
-├── SchemataAuthorizationBuilder.cs   # fluent surface for token/grant/scope/entity wiring
-├── Advisors/         # IAuthorizationAdvisor implementations (token issuance hooks, claim mapping)
-├── Authentication/   # ASP.NET authentication handlers + bearer/cookie scheme wiring
-├── Binding/          # model binders for OAuth request shapes
-├── Controllers/      # /connect/* endpoints (authorize, token, revoke, introspect, userinfo, logout)
-├── Extensions/       # UseAuthorization + SchemataBuilder/IServiceCollection extension methods
-├── Features/         # SchemataAuthorizationFeature (priority 450_000_000) + sub-features
-├── Filters/          # MVC filters for OAuth-specific response shaping
-├── Handlers/         # grant-type handlers (authorization_code, client_credentials, refresh_token, …)
-├── Managers/         # client/scope/token managers backed by the repository pipeline
-└── Services/         # token issuer, JWKS provider, discovery document builder
+Features/         SchemataAuthorizationFeature<TApp,TAuth,TScope,TToken>;
+                  orders flow features by flow.Order
+Controllers/      ConnectController.*.cs (partial per endpoint)
+Handlers/         DiscoveryHandler + per-flow handlers
+Managers/         Schemata*Manager (Application/Authorization/Scope/Token)
+Services/         TokenService, ClientAuthenticationService,
+                  PairwiseSubjectTranslator, SubjectIdentifierService,
+                  BackChannelLogoutService, FrontChannelLogoutService,
+                  LogoutSessionHelper, ResponseModeService,
+                  TokenCleanupJob, BackChannelLogoutJob
+Authentication/   SchemataAuthenticationHandler (Bearer),
+                  SchemataAuthorizationCodeHandler (Code);
+                  CodeFlowOptions enforces PKCE downgrade protection
+Binding/          OAuthRequestBinderProvider + OAuthQuery/Form binders
+Filters/          OAuthExceptionFilter, NoCacheResponseAttribute
+Advisors/         ~30+ built-in Advice*.cs
 ```
 
-## Public Entry Points
+Skeleton surface (entities, managers, service contracts): src/AGENTS.md, Authorization domain.
 
-- [SchemataAuthorizationBuilder.cs](SchemataAuthorizationBuilder.cs) — fluent: `WithApplication<T>()`, `WithToken<T>()`, `WithScope<T>()`, `WithAuthorization<T>()`, `SetClaimMapper<T>()`, allowed-grant toggles, lifetime configuration.
-- [Extensions/SchemataBuilderExtensions.cs](Extensions/SchemataBuilderExtensions.cs) — `UseAuthorization(this SchemataBuilder, Action<SchemataAuthorizationBuilder>)`. Registers the discovery + JWKS well-known endpoints with [SchemataWellKnownFeature](../Schemata.Core/Features/SchemataWellKnownFeature.cs) and wires the OAuth controllers.
-- [Features/](Features/) — `SchemataAuthorizationFeature` (priority `450_000_000`); the `Schemata.Authorization.Identity` package bridges to ASP.NET Core Identity at `450_100_000`.
+## ENTRY POINTS
 
-## Companion Packages
+`UseAuthorization(...)` / `UseAuthorization<TApp,TAuth,TScope,TToken>(...)` in `Extensions/SchemataBuilderExtensions.cs` returns `SchemataAuthorizationBuilder<...>`.
 
-- [Schemata.Authorization.Skeleton](../Schemata.Authorization.Skeleton/) — the contracts (`IApplication`, `IScope`, `IToken`, `IAuthorization`, grant + response type enums, attribute markers). Pick implementations there before customising this package.
-- [Schemata.Authorization.Identity](../Schemata.Authorization.Identity/) — ties this package to `Schemata.Identity.Foundation` for user resolution against ASP.NET Core Identity.
+Flow opt-ins (in `Extensions/SchemataAuthorizationBuilderExtensions.cs`): `UseCodeFlow`, `UseClientCredentialsFlow`, `UseRefreshTokenFlow`, `UseDeviceFlow`, `UseTokenExchange`, `UseIntrospection`, `UseRevocation`, `UseUserInfo`, `UseFrontChannelLogout`, `UseBackChannelLogout`, `UseEndSession`.
 
-## Canonical Names + Pairwise Subjects
+Custom flows: `builder.AddFlowFeature<T>() where T : IAuthorizationFlowFeature`. The feature is ordered into `SchemataAuthorizationFeature` by `flow.Order`.
 
-Every cross-resource reference is stored as a full AIP-122 canonical name (`applications/{client}`, `authorizations/{id}`, `users/{uid}`, `jobs/{leaf}`). Every advisor and handler writes `application.CanonicalName` / `authorization.CanonicalName` end-to-end; consent + revocation + admin lookup paths read by canonical name too. Identity hands the framework a canonical `Claims.Subject` from the first sign-in step via [SchemataUserClaimsPrincipalFactory](../Schemata.Identity.Foundation/SchemataUserClaimsPrincipalFactory.cs); `IdentitySubjectProvider` accepts canonical or bare uid and always emits canonical.
+Deps: `Authorization.Skeleton`, `Schemata.Core`, `Caching.Skeleton`, `Scheduling.Skeleton`, `Security.Skeleton`, `Transport.Http`.
 
-Pairwise subject identifiers are persisted bidirectionally:
+## ADVISOR CATALOG
 
-- [Services/PairwiseSubjectTranslator.cs](Services/PairwiseSubjectTranslator.cs) — owns `EnsureMappingAsync` (forward upsert) and the public `ToPairwiseAsync` / `ToCanonicalAsync` API; resolves through `IPairwiseSubjectTranslator`.
-- [Services/SubjectIdentifierService.cs](Services/SubjectIdentifierService.cs) — single place that decides between public + pairwise.
-- [Advisors/AdviceClaimsPairwise.cs](Advisors/AdviceClaimsPairwise.cs) runs at `Orders.Max` so every OIDC wire surface (id_token, access JWT, userinfo, introspection, back-channel logout) picks up the projected `sub` automatically.
-- [Advisors/AdviceDestinationSubject.cs](Advisors/AdviceDestinationSubject.cs) routes the subject claim to the correct destination set.
-- The `(Application, CanonicalSubject)` / `(Application, PairwiseSubject)` indexes live on the `SchemataSubjectMapping` entity declared in `Schemata.Authorization.Skeleton`.
+Naming rule: `Advice<Topic><Aspect>` — e.g. `AdviceAuthorizePkce`, `AdviceClaimsSubject`, `AdviceDiscoveryCodeFlow`. `PermissionAdvice` is a static helper, not a chain member.
 
-## Conventions
+To add an advisor (root registration rule applies): implement `IAdvisor<...>`, register via `services.TryAddEnumerable(ServiceDescriptor.Scoped<IAdvisor<T>, YourAdvice>())`, drop the file in `Advisors/`. Advisors here typically `throw OAuthException` / `PermissionDeniedException` rather than returning `Block`.
 
-- **Persistence comes through `Schemata.Entity.Repository`** — every store / manager goes through `IRepository<TEntity>` and the advisor pipeline. No raw `DbContext` use.
-- **Grant types live in `Handlers/`** as one class per grant; register them via the builder. New grants extend `IGrantHandler` and slot in by handler-type discovery.
-- **Discovery + JWKS** are produced by `Services/` and surfaced through `SchemataWellKnownFeature` — never bake URLs into the controller code.
-- **Token formats**: JWTs are issued via `Microsoft.IdentityModel.JsonWebTokens` (pinned in [../../Directory.Packages.props](../../Directory.Packages.props#L17)); signing keys come from `Services/IJsonWebKeyProvider`.
+Built-in topics: PKCE, scope, nonce, prompt, response-mode, pairwise, destination, permission, per-flow discovery.
 
-## Anti-Patterns
+## GOTCHAS
 
-- **Do NOT** add a new OAuth response shape without an `OAuthErrorResponse` mapping — the AIP error envelope is the wrong shape for OAuth ([../Schemata.Abstractions/Errors/OAuthErrorResponse.cs](../Schemata.Abstractions/Errors/OAuthErrorResponse.cs)).
-- **Do NOT** issue a token outside `Services/ITokenIssuer` — bypassing it skips advisors and audit hooks.
-- **Do NOT** expose a controller route that lives outside `/connect/*` or `/.well-known/*` from this package. Routing conflicts with consumer applications.
-- **Do NOT** depend directly on `Schemata.Identity.*` from this package — bridging is the job of `Schemata.Authorization.Identity`.
-
-## Notes
-
-- The OIDC discovery document is served from `/.well-known/openid-configuration`; JWKS from `/.well-known/jwks`. Both are registered through [WellKnownOptions](../Schemata.Core/WellKnownOptions.cs).
-- Controllers are picked up by the MVC pipeline via [SchemataExtensionPart](../Schemata.Core/SchemataExtensionPart.cs) — consumers do **not** need to call `AddApplicationPart` manually.
-- This package depends on `Schemata.Entity.Repository`, which means even pure-API consumers transitively get the repository pipeline. That is intentional — token persistence is non-negotiable.
-- Integration tests: [../../tests/Schemata.Authorization.Integration.Tests/](../../tests/Schemata.Authorization.Integration.Tests/). Unit tests: [../../tests/Schemata.Authorization.Tests/](../../tests/Schemata.Authorization.Tests/).
+- `BackChannelLogoutJob` is best-effort by spec; failures are logged, never thrown. Don't rely on exceptions for retry.
+- Authorization providers never run unless `WithAuthorization()` is invoked. Silent no-op if missed.
+- Security package gotcha, surfaced through this package's claims checks: wildcard claims with two or more `*` never match (`docs/documents/security.md`).
+- PKCE downgrade protection in `CodeFlowOptions` rejects token requests where PKCE was absent at the authorization step. Don't disable it.
+- Canonical docs: `docs/documents/authorization.md`, `docs/guides/access-control.md`.

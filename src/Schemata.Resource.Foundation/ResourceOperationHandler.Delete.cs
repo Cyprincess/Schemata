@@ -98,7 +98,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct.Value);
         }
 
-        if (entity == null) {
+        if (entity is null) {
             // AIP-135 allow_missing treats deletion of an absent resource as a successful empty result.
             if (req.AllowMissing) {
                 return (new(), null);

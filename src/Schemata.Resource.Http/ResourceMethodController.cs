@@ -80,9 +80,12 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
     ) {
         // The convention binds one action per verb and tags each with its verb, so a handler shared
         // across verbs dispatches to the one whose route the request matched.
-        var verb = HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceMethodVerbMetadata>()?.Verb
-                ?? throw new InvalidOperationException(
-                       $"No resource-method verb is bound to the matched route for handler '{typeof(THandler).FullName}'.");
+        var verb = HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceMethodVerbMetadata>()?.Verb;
+        if (verb is null) {
+            throw new InvalidOperationException(
+                $"No resource-method verb is bound to the matched route for handler '{typeof(THandler).FullName}'."
+            );
+        }
 
         var fullName = string.IsNullOrEmpty(name) ? null : BuildFullName(name);
 

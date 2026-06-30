@@ -8,9 +8,9 @@ shared Schemata error model.
 
 `SchemataInsightFeature.DefaultPriority` is `Orders.Extension + 95_000_000` = 495,000,000.
 
-| Feature | Priority | Depends on |
-| --- | --- | --- |
-| `SchemataInsightFeature` | 495,000,000 | none |
+| Feature                      | Priority    | Depends on                                               |
+| ---------------------------- | ----------- | -------------------------------------------------------- |
+| `SchemataInsightFeature`     | 495,000,000 | none                                                     |
 | `SchemataInsightHttpFeature` | 495,100,000 | `SchemataInsightFeature`, `SchemataTransportHttpFeature` |
 | `SchemataInsightGrpcFeature` | 495,200,000 | `SchemataInsightFeature`, `SchemataTransportGrpcFeature` |
 
@@ -67,11 +67,11 @@ The default Schemata JSON settings use snake_case names, so `PageSize` is `page_
 
 `InsightController` catches `InsightValidationException` and throws a `SchemataException`:
 
-| Insight reason | HTTP status |
-| --- | --- |
-| `UNKNOWN_SOURCE_NAME` | 404 |
-| `UNIMPLEMENTED` | 501 |
-| any other reason | 400 |
+| Insight reason        | HTTP status |
+| --------------------- | ----------- |
+| `UNKNOWN_SOURCE_NAME` | 404         |
+| `UNIMPLEMENTED`       | 501         |
+| any other reason      | 400         |
 
 The exception message becomes the AIP-193 error message, and the reason remains the Schemata exception
 code.
@@ -97,27 +97,27 @@ with `endpoints.MapGrpcService<InsightGrpcService>()`.
 
 `InsightGrpcMethods.Query` defines the unary method:
 
-| Member | Value |
-| --- | --- |
+| Member       | Value                                |
+| ------------ | ------------------------------------ |
 | service name | `schemata.insight.v1.InsightService` |
-| method name | `Query` |
-| request | `QueryInsightGrpcRequest` |
-| response | `QueryInsightGrpcResponse` |
+| method name  | `Query`                              |
+| request      | `QueryInsightGrpcRequest`            |
+| response     | `QueryInsightGrpcResponse`           |
 
 ## gRPC wire messages
 
 The gRPC request mirrors the core request with protobuf-net message classes:
 
-| Core type | gRPC type |
-| --- | --- |
-| `InsightExpression` | `InsightExpressionMessage` |
-| `SourceBinding` | `SourceBindingMessage` |
-| `JoinSpec` | `JoinSpecMessage` |
-| `TransformationSpec` | `TransformationMessage` |
-| `ComputedFieldSpec` | `ComputedFieldMessage` |
-| `AggregationSpec` | `AggregationMessage` |
-| `SelectionSpec` | `SelectionMessage` |
-| `QueryInsightRequest` | `QueryInsightGrpcRequest` |
+| Core type             | gRPC type                  |
+| --------------------- | -------------------------- |
+| `InsightExpression`   | `InsightExpressionMessage` |
+| `SourceBinding`       | `SourceBindingMessage`     |
+| `JoinSpec`            | `JoinSpecMessage`          |
+| `TransformationSpec`  | `TransformationMessage`    |
+| `ComputedFieldSpec`   | `ComputedFieldMessage`     |
+| `AggregationSpec`     | `AggregationMessage`       |
+| `SelectionSpec`       | `SelectionMessage`         |
+| `QueryInsightRequest` | `QueryInsightGrpcRequest`  |
 
 The gRPC response uses `InsightStruct` and `InsightValue` for dynamic rows. `InsightValue` has typed
 slots for string, number, integer, bool, struct, list, and null values. `FieldDescriptorMessage` mirrors
@@ -157,10 +157,10 @@ same service name, method name, and protobuf-net marshallers.
 `InsightGrpcService` catches `InsightValidationException` and throws `SchemataException`. The shared
 gRPC interceptor maps the Schemata exception to `RpcException` status:
 
-| Insight reason | Schemata code | gRPC status |
-| --- | --- | --- |
-| `UNKNOWN_SOURCE_NAME` | 404 / `ErrorCodes.NotFound` | `NotFound` |
-| any other reason | 400 / `ErrorCodes.InvalidArgument` | `InvalidArgument` |
+| Insight reason        | Schemata code                      | gRPC status       |
+| --------------------- | ---------------------------------- | ----------------- |
+| `UNKNOWN_SOURCE_NAME` | 404 / `ErrorCodes.NotFound`        | `NotFound`        |
+| any other reason      | 400 / `ErrorCodes.InvalidArgument` | `InvalidArgument` |
 
 The current gRPC translator does not special-case `UNIMPLEMENTED`; it reports it as InvalidArgument.
 

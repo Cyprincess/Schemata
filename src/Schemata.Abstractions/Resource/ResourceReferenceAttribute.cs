@@ -17,7 +17,7 @@ namespace Schemata.Abstractions.Resource;
 ///     <c>ResourceNameDescriptor</c>. Identity parents store the bare leaf id of the
 ///     parent segment; cross-resource references store the complete canonical name.
 /// </remarks>
-[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+[AttributeUsage(AttributeTargets.Property)]
 public sealed class ResourceReferenceAttribute : Attribute
 {
     /// <summary>

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Schemata.Insight.Grpc.Integration.Tests.Fixtures;

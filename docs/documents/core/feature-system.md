@@ -7,12 +7,12 @@ deterministic ASP.NET Core pipeline regardless of call order.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Core` | `Features/ISimpleFeature.cs`, `Features/FeatureBase.cs` |
-| `Schemata.Core` | `Features/DependsOnAttribute.cs`, `Features/DependsOnAttribute\`1.cs`, `Features/InformationAttribute.cs` |
-| `Schemata.Core` | `SchemataBuilder.cs`, `Configurators.cs`, `Extensions/SchemataOptionsExtensions.cs` |
-| `Schemata.Abstractions` | `IFeature.cs`, `SchemataConstants.cs` (`Orders`) |
+| Package                 | Key files                                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Schemata.Core`         | `Features/ISimpleFeature.cs`, `Features/FeatureBase.cs`                                                   |
+| `Schemata.Core`         | `Features/DependsOnAttribute.cs`, `Features/DependsOnAttribute\`1.cs`, `Features/InformationAttribute.cs` |
+| `Schemata.Core`         | `SchemataBuilder.cs`, `Configurators.cs`, `Extensions/SchemataOptionsExtensions.cs`                       |
+| `Schemata.Abstractions` | `IFeature.cs`, `SchemataConstants.cs` (`Orders`)                                                          |
 
 ## ISimpleFeature and FeatureBase
 
@@ -71,20 +71,20 @@ position than its middleware overrides `Order` separately.
 
 ## Order vs Priority
 
-| Property | Controls | Sorted in |
-| --- | --- | --- |
-| `Order` | `ConfigureServices` sequence | `SchemataBuilder.Invoke` |
+| Property   | Controls                                                 | Sorted in                   |
+| ---------- | -------------------------------------------------------- | --------------------------- |
+| `Order`    | `ConfigureServices` sequence                             | `SchemataBuilder.Invoke`    |
 | `Priority` | `ConfigureApplication` and `ConfigureEndpoints` sequence | `SchemataStartup.Configure` |
 
 Both sorts are ascending; lower runs first. Ties resolve in dictionary iteration order.
 
 `SchemataConstants.Orders` defines three anchors:
 
-| Constant | Value | Purpose |
-| --- | --- | --- |
-| `Base` | 100,000,000 | Anchor for built-in core features and advisors |
+| Constant    | Value       | Purpose                                             |
+| ----------- | ----------- | --------------------------------------------------- |
+| `Base`      | 100,000,000 | Anchor for built-in core features and advisors      |
 | `Extension` | 400,000,000 | Anchor for extension feature chains (`Base + 300M`) |
-| `Max` | 900,000,000 | Terminal anchor for units that must run last |
+| `Max`       | 900,000,000 | Terminal anchor for units that must run last        |
 
 The range `[100_000_000, 900_000_000]` is reserved for built-in and extension features. User
 features pick values outside it. The complete table is in [Built-in Features](built-in-features.md).
@@ -113,7 +113,7 @@ Runs from `SchemataStartup` inside `app.UseEndpoints(...)`, and only when an `En
 is registered. Features are sorted by `Priority`. This is where a feature maps routes on the
 `IEndpointRouteBuilder`. Afterwards, `app.CleanSchemata()` drops the features dictionary.
 
-## Use* extension methods
+## Use\* extension methods
 
 A `Use*` method follows one pattern:
 
@@ -169,13 +169,13 @@ Only attributes in the `Schemata.Core.Features` namespace are processed; others 
 
 Key dependency chains across built-in and extension features:
 
-| Feature | Depends on |
-| --- | --- |
-| `SchemataControllersFeature` | `SchemataRoutingFeature` |
-| `SchemataWellKnownFeature` | `SchemataRoutingFeature` |
-| `SchemataSessionFeature<T>` | `SchemataCookiePolicyFeature` |
+| Feature                        | Depends on                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `SchemataControllersFeature`   | `SchemataRoutingFeature`                                                                               |
+| `SchemataWellKnownFeature`     | `SchemataRoutingFeature`                                                                               |
+| `SchemataSessionFeature<T>`    | `SchemataCookiePolicyFeature`                                                                          |
 | `SchemataTransportHttpFeature` | `SchemataControllersFeature`, `SchemataJsonSerializerFeature`, `SchemataDeveloperExceptionPageFeature` |
-| `SchemataTransportGrpcFeature` | `SchemataRoutingFeature` |
+| `SchemataTransportGrpcFeature` | `SchemataRoutingFeature`                                                                               |
 
 ## SchemataOptions
 

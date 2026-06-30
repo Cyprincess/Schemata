@@ -14,7 +14,7 @@ public sealed class JobScheduled : IEvent
     public string? Job { get; init; }
 
     /// <summary>Variables carried by the job.</summary>
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
 
     /// <summary>UTC timestamp when the job was scheduled.</summary>
     public DateTime ScheduledAt { get; init; }

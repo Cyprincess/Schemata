@@ -36,7 +36,7 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
     public async Task InitializeAsync(CancellationToken ct) {
         var id = await _resolver.ResolveAsync(ct);
 
-        if (id == null) {
+        if (id is null) {
             return;
         }
 

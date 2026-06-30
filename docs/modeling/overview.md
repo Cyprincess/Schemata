@@ -8,11 +8,11 @@ The Schemata Modeling Language (SKM) defines entities, traits, and enums in `.sk
 
 `DocumentGenerator` walks the parsed document and emits three declaration kinds:
 
-| Declaration | Generated C# |
-| --- | --- |
-| `Entity` | `public record` with one init-set auto-property per field; trait interfaces in the base list |
-| `Trait` | `public interface I{Name}` with one property per field |
-| `Enum` | `public enum` with one member per value |
+| Declaration | Generated C#                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `Entity`    | `public record` with one init-set auto-property per field; trait interfaces in the base list |
+| `Trait`     | `public interface I{Name}` with one property per field                                       |
+| `Enum`      | `public enum` with one member per value                                                      |
 
 `Object` blocks, `Index` declarations, field options, and field properties are parsed into
 the AST and carried on their declarations, but produce no C# output. The parser accepts them
@@ -61,13 +61,13 @@ Reference `Schemata.Modeling.Generator` as an analyzer and add each model file a
 
 ## Language reference
 
-| Topic | Description |
-| --- | --- |
-| [Types](types.md) | Built-in type tokens, nullable types, custom types |
-| [Fields](fields.md) | Field syntax, options, properties, notes |
-| [Traits](traits.md) | Reusable field groups, interface emission |
-| [Entities](entities.md) | Entity definitions, composition, nested members |
-| [Enums](enums.md) | Named constant types, value assignment |
-| [Objects](objects.md) | `Object` projection blocks (parsed, not emitted) |
-| [Expressions](expressions.md) | Literals, function calls, references |
-| [Grammar](grammar.md) | Complete EBNF, derived from `Parser.cs` |
+| Topic                         | Description                                        |
+| ----------------------------- | -------------------------------------------------- |
+| [Types](types.md)             | Built-in type tokens, nullable types, custom types |
+| [Fields](fields.md)           | Field syntax, options, properties, notes           |
+| [Traits](traits.md)           | Reusable field groups, interface emission          |
+| [Entities](entities.md)       | Entity definitions, composition, nested members    |
+| [Enums](enums.md)             | Named constant types, value assignment             |
+| [Objects](objects.md)         | `Object` projection blocks (parsed, not emitted)   |
+| [Expressions](expressions.md) | Literals, function calls, references               |
+| [Grammar](grammar.md)         | Complete EBNF, derived from `Parser.cs`            |

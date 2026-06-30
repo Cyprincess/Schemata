@@ -7,10 +7,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
+using LinqToDB;
 using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
 using Schemata.Abstractions;
+using Schemata.Entity.Repository.Conversions;
 using ColumnAttribute = System.ComponentModel.DataAnnotations.Schema.ColumnAttribute;
 using ConcurrencyCheckAttribute = System.ComponentModel.DataAnnotations.ConcurrencyCheckAttribute;
 using EfPrimaryKey = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
@@ -34,10 +36,8 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
 ///     concurrency token drives LINQ to DB's optimistic-update predicate.
 ///     Key discovery uses class-level <c>[PrimaryKey]</c> declarations on the entity.
-///     Properties of type <see cref="System.Collections.Generic.Dictionary{TKey, TValue}" />
-///     with string keys (non-nullable or nullable string values) or
-///     <see cref="System.Collections.Generic.ICollection{T}" /> of strings receive a JSON
-///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
+    ///     Supported scalar dictionary and scalar collection properties receive a JSON
+    ///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
 /// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {
@@ -137,7 +137,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             if (!attributes.Exists(a => a is global::LinqToDB.Mapping.ColumnAttribute)) {
                 attributes.Add(new global::LinqToDB.Mapping.ColumnAttribute {
                     Name     = member.Name,
-                    DataType = global::LinqToDB.DataType.Text,
+                    DataType = DataType.Text,
                     DbType   = "TEXT",
                 });
             }
@@ -155,23 +155,9 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
     }
 
     private static Type? TryGetJsonConverterType(Type memberType) {
-        if (memberType == typeof(Dictionary<string, string>)) {
-            return typeof(LinqToDbJsonConverter<Dictionary<string, string>>);
-        }
-
-        if (memberType == typeof(Dictionary<string, string?>)) {
-            return typeof(LinqToDbJsonConverter<Dictionary<string, string?>>);
-        }
-
-        if (memberType == typeof(string)) {
-            return null;
-        }
-
-        if (typeof(ICollection<string>).IsAssignableFrom(memberType)) {
-            return typeof(LinqToDbJsonConverter<>).MakeGenericType(memberType);
-        }
-
-        return null;
+        return JsonColumnTypes.IsSupported(memberType)
+            ? typeof(LinqToDbJsonConverter<>).MakeGenericType(memberType)
+            : null;
     }
 
     public MemberInfo[] GetDynamicColumns(Type type) { return []; }

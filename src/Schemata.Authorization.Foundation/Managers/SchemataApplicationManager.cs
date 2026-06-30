@@ -148,9 +148,9 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
     }
 
     public Task SetDisplayNamesAsync(
-        TApplication?               application,
-        Dictionary<string, string>? names,
-        CancellationToken           ct = default
+        TApplication?                application,
+        Dictionary<string, string?>? names,
+        CancellationToken            ct = default
     ) {
         ct.ThrowIfCancellationRequested();
 
@@ -168,9 +168,9 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
     }
 
     public Task SetDescriptionsAsync(
-        TApplication?               application,
-        Dictionary<string, string>? descriptions,
-        CancellationToken           ct = default
+        TApplication?                application,
+        Dictionary<string, string?>? descriptions,
+        CancellationToken            ct = default
     ) {
         ct.ThrowIfCancellationRequested();
 

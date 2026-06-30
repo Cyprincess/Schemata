@@ -1,8 +1,8 @@
 using System;
-using System.Text.Json;
+using System.Linq;
 using System.Xml;
 using Humanizer;
-using Schemata.Common;
+using Schemata.Abstractions.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -51,13 +51,11 @@ public static class ProcessBuilder
     /// <param name="definition">The process definition being built.</param>
     /// <param name="exits">The parallel branches that must all arrive before the join fires.</param>
     public static ParallelJoin Join(this ProcessDefinition definition, params Activity[] exits) {
-        var joinGateway = new ParallelGateway { Id = $"gateway_{Identifiers.NewUid():n}", Name = "Join" };
+        var joinGateway = new ParallelGateway { Name = $"Join_{StableKey(exits)}" };
         definition.Elements.Add(joinGateway);
 
         foreach (var exit in exits) {
-            definition.Flows.Add(new() {
-                Id = $"sf_{Identifiers.NewUid():n}", Source = exit, Target = joinGateway,
-            });
+            definition.Flows.Add(new() { Source = exit, Target = joinGateway });
         }
 
         return new(definition, joinGateway);
@@ -67,57 +65,114 @@ public static class ProcessBuilder
     /// <param name="definition">The process definition being built.</param>
     /// <param name="exits">The inclusive branches that must all arrive before the merge fires.</param>
     public static InclusiveMerge Merge(this ProcessDefinition definition, params Activity[] exits) {
-        var mergeGateway = new InclusiveGateway { Id = $"gateway_{Identifiers.NewUid():n}", Name = "Merge" };
+        var mergeGateway = new InclusiveGateway { Name = $"Merge_{StableKey(exits)}" };
         definition.Elements.Add(mergeGateway);
 
         foreach (var exit in exits) {
-            definition.Flows.Add(new() {
-                Id = $"sf_{Identifiers.NewUid():n}", Source = exit, Target = mergeGateway,
-            });
+            definition.Flows.Add(new() { Source = exit, Target = mergeGateway });
         }
 
         return new(definition, mergeGateway);
     }
 
-    /// <summary>Creates a branch guarded by a typed variable predicate.</summary>
-    /// <typeparam name="T">The variable type resolved from the condition context.</typeparam>
+    /// <summary>
+    ///     Derives a deterministic gateway name suffix from the joined exits. Names are sorted
+    ///     ordinally and length-prefixed so distinct exit sets can never produce the same key.
+    /// </summary>
+    private static string StableKey(Activity[] exits) {
+        var parts = exits.Select(e => e.Name ?? string.Empty)
+                         .OrderBy(n => n, StringComparer.Ordinal)
+                         .Select(n => $"{n.Length}:{n}");
+        return string.Join("_", parts);
+    }
+
+    /// <summary>Creates a branch guarded by a predicate over the default source binding.</summary>
+    /// <typeparam name="T">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="definition">The process definition being built.</param>
     /// <param name="predicate">The predicate evaluated against the typed variable value.</param>
     public static Branch When<T>(this ProcessDefinition definition, Func<T, bool> predicate)
-        where T : class {
-        var key = typeof(T).Name.Underscore().ToLowerInvariant();
+        where T : class, ICanonicalName {
+        return definition.When(typeof(T).Name.Underscore().ToLowerInvariant(), predicate);
+    }
 
-        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") },
-                   new LambdaConditionExpression {
-                       Lambda = ctx => {
-                           if (!ctx.Variables.TryGetValue(key, out var value)) {
-                               return new(false);
-                           }
+    /// <summary>Creates a branch guarded by a predicate over an explicitly named source binding.</summary>
+    /// <typeparam name="T">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
+    /// <param name="predicate">The predicate evaluated against the typed variable value.</param>
+    public static Branch When<T>(this ProcessDefinition definition, string source, Func<T, bool> predicate)
+        where T : class, ICanonicalName {
+        ArgumentException.ThrowIfNullOrEmpty(source);
 
-                           // Condition variables may arrive from legacy payloads with casing that differs
-                           // from the process model, so bind with the case-insensitive shared options.
-                           var entity = value switch {
-                               T t              => t,
-                               JsonElement json => JsonSerializer.Deserialize<T>(json.GetRawText(), SchemataJson.Default),
-                               var _            => null,
-                           };
+        return new(new NoneTask(), new SourceConditionExpression<T>(source, predicate));
+    }
 
-                           return new(entity is not null && predicate(entity));
-                       },
-                   });
+    /// <summary>Creates a branch guarded by a string expression over the default source binding.</summary>
+    /// <typeparam name="T">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="expression">The expression text, compiled at registration with the configured Language.</param>
+    public static Branch When<T>(this ProcessDefinition definition, string expression)
+        where T : class, ICanonicalName {
+        return definition.When<T>(typeof(T).Name.Underscore().ToLowerInvariant(), expression);
+    }
+
+    /// <summary>Creates a branch guarded by a string expression over an explicitly named source binding.</summary>
+    /// <typeparam name="T">The source entity type resolved from the flow task context.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
+    /// <param name="expression">The expression text, compiled at registration with the configured Language.</param>
+    public static Branch When<T>(this ProcessDefinition definition, string source, string expression)
+        where T : class, ICanonicalName {
+        ArgumentException.ThrowIfNullOrEmpty(source);
+        ArgumentException.ThrowIfNullOrEmpty(expression);
+
+        return new(new NoneTask(), new SourceStringConditionExpression<T>(source, expression));
+    }
+
+    /// <summary>Creates a branch guarded by a source and typed message payload predicate.</summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <typeparam name="TPayload">The message payload type.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="message">The message definition whose payload type is accepted by the predicate.</param>
+    /// <param name="predicate">The predicate evaluated against the source entity and payload.</param>
+    public static Branch When<TSource, TPayload>(
+        this ProcessDefinition definition,
+        Message<TPayload>      message,
+        Func<TSource, TPayload, bool> predicate
+    ) where TSource : class, ICanonicalName {
+        return definition.When(typeof(TSource).Name.Underscore().ToLowerInvariant(), message, predicate);
+    }
+
+    /// <summary>Creates a branch guarded by an explicitly named source and typed message payload predicate.</summary>
+    /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
+    /// <typeparam name="TPayload">The message payload type.</typeparam>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
+    /// <param name="message">The message definition whose payload type is accepted by the predicate.</param>
+    /// <param name="predicate">The predicate evaluated against the source entity and payload.</param>
+    public static Branch When<TSource, TPayload>(
+        this ProcessDefinition definition,
+        string                 source,
+        Message<TPayload>      message,
+        Func<TSource, TPayload, bool> predicate
+    ) where TSource : class, ICanonicalName {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentException.ThrowIfNullOrEmpty(source);
+
+        return new(new NoneTask(), new SourcePayloadConditionExpression<TSource, TPayload>(source, predicate));
     }
 
     /// <summary>Creates a branch guarded by an <see cref="IConditionExpression" />.</summary>
     /// <param name="definition">The process definition being built.</param>
     /// <param name="condition">The condition expression that must evaluate to true for this branch to be taken.</param>
     public static Branch When(this ProcessDefinition definition, IConditionExpression condition) {
-        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") }, condition);
+        return new(new NoneTask(), condition);
     }
 
     /// <summary>Creates the default branch taken when no other condition in a gateway matches.</summary>
     /// <param name="definition">The process definition being built.</param>
     public static Branch Otherwise(this ProcessDefinition definition) {
-        return new(new NoneTask { Name = "branch", Id = Identifiers.NewUid().ToString("n") }, isDefault: true);
+        return new(new NoneTask(), isDefault: true);
     }
 
     /// <summary>Creates an event-based gateway branch that fires when <paramref name="message" /> is received.</summary>

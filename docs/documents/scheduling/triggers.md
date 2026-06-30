@@ -7,10 +7,10 @@ scheduler can reconstruct them after a restart.
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Scheduling.Skeleton` | `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `Entities/ScheduleType.cs` |
-| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Execute.cs` |
+| Package                          | Key files                                                                                                                                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Skeleton`   | `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `Entities/ScheduleType.cs` |
+| `Schemata.Scheduling.Foundation` | `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Execute.cs`                                                                                                                            |
 
 ## IScheduleDefinition
 
@@ -121,11 +121,11 @@ When the scheduler arms a timer and `NextRunTime` is already in the past, the po
 replayable jobs (`SchemataJob.Replay == true`); single-fire audit jobs from `TriggerAsync` ignore it
 and fire immediately.
 
-| Policy | Behavior |
-| --- | --- |
-| `Skip` | Advance `NextRunTime` without firing; log at `Information`. |
-| `FireOnce` (default) | Fire once immediately, then advance to the next occurrence. |
-| `FireAll` | Replay every missed occurrence in sequence, capped at 1024 iterations. |
+| Policy               | Behavior                                                               |
+| -------------------- | ---------------------------------------------------------------------- |
+| `Skip`               | Advance `NextRunTime` without firing; log at `Information`.            |
+| `FireOnce` (default) | Fire once immediately, then advance to the next occurrence.            |
+| `FireAll`            | Replay every missed occurrence in sequence, capped at 1024 iterations. |
 
 `FireOnce` is the default. Use `Skip` for snapshots where a missed window is acceptable, and `FireAll`
 only when every missed occurrence has independent business value — a 1-minute job paused for a day

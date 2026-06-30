@@ -8,12 +8,12 @@ runs at Priority 520,000,000 and drives a three-phase lifecycle on every discove
 
 ## Where the code lives
 
-| Package | Key files |
-| --- | --- |
-| `Schemata.Abstractions` | `Modular/IModule.cs`, `Modular/ModuleBase.cs`, `Modular/ModuleAttribute.cs` |
-| `Schemata.Modular` | `Extensions/SchemataBuilderExtensions.cs` (three `UseModular` overloads), `Features/SchemataModulesFeature.cs`, `DefaultModulesProvider.cs`, `DefaultModulesRunner.cs`, `ModuleDescriptor.cs`, `IModulesProvider.cs`, `IModulesRunner.cs` |
-| `targets/Schemata.Application.Targets` | `Schemata.Application.Modular.Targets.targets` — stamps the discovery attributes |
-| `targets/Schemata.Module.Targets` | `Schemata.Module.Targets.targets` (`GetModuleProjectName`), `Package.Build.props` (`ModulePackageNames`) |
+| Package                                | Key files                                                                                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Abstractions`                | `Modular/IModule.cs`, `Modular/ModuleBase.cs`, `Modular/ModuleAttribute.cs`                                                                                                                                                               |
+| `Schemata.Modular`                     | `Extensions/SchemataBuilderExtensions.cs` (three `UseModular` overloads), `Features/SchemataModulesFeature.cs`, `DefaultModulesProvider.cs`, `DefaultModulesRunner.cs`, `ModuleDescriptor.cs`, `IModulesProvider.cs`, `IModulesRunner.cs` |
+| `targets/Schemata.Application.Targets` | `Schemata.Application.Modular.Targets.targets` — stamps the discovery attributes                                                                                                                                                          |
+| `targets/Schemata.Module.Targets`      | `Schemata.Module.Targets.targets` (`GetModuleProjectName`), `Package.Build.props` (`ModulePackageNames`)                                                                                                                                  |
 
 ## IModule and ModuleBase
 
@@ -81,6 +81,7 @@ not set `UseModularTargets=true`, so no module attributes are stamped.
 `Priority = SchemataConstants.Orders.Extension + 120_000_000` (520,000,000).
 
 **ConfigureServices.**
+
 1. `Utilities.CreateInstance<IModulesProvider>(TProvider, logger, configuration, environment)`
    builds the provider.
 2. `provider.GetModules()` returns descriptors. `DefaultModulesProvider` scans the entry assembly
@@ -137,11 +138,11 @@ The host then references the module as a `ProjectReference` or `PackageReference
 
 ## Extension points
 
-| Interface | Purpose |
-| --- | --- |
+| Interface          | Purpose                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `IModulesProvider` | Replace `DefaultModulesProvider` to discover modules from a non-attribute source (database, plugin directory, custom configuration). |
-| `IModulesRunner` | Replace `DefaultModulesRunner` to change how lifecycle methods are invoked. |
-| `IModule` | Implement directly for independent `Order` and `Priority`; use `ModuleBase` when they match. |
+| `IModulesRunner`   | Replace `DefaultModulesRunner` to change how lifecycle methods are invoked.                                                          |
+| `IModule`          | Implement directly for independent `Order` and `Priority`; use `ModuleBase` when they match.                                         |
 
 `UseModular` has three overloads (runner first, provider second):
 

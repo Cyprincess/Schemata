@@ -20,7 +20,7 @@ Add `UseIdentity()` inside the `UseSchemata` block in `Program.cs`:
 schema.UseIdentity();
 ```
 
-`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. It installs `SchemataIdentityFeature` at priority 430,000,000 and depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`, which are pulled in automatically.
+`UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. The authentication and HTTP transport features it depends on are pulled in automatically.
 
 All four parameters are optional:
 
@@ -33,12 +33,12 @@ schema.UseIdentity(
 );
 ```
 
-| Parameter   | Type | Purpose |
-| ----------- | ---- | ------- |
+| Parameter   | Type                              | Purpose                                                        |
+| ----------- | --------------------------------- | -------------------------------------------------------------- |
 | `identify`  | `Action<SchemataIdentityOptions>` | Enable/disable registration, password reset, email change, 2FA |
-| `configure` | `Action<IdentityOptions>` | Password policy, lockout, sign-in requirements |
-| `build`     | `Action<IdentityBuilder>` | Add token providers or custom stores |
-| `bearer`    | `Action<BearerTokenOptions>` | Token expiration, refresh behavior |
+| `configure` | `Action<IdentityOptions>`         | Password policy, lockout, sign-in requirements                 |
+| `build`     | `Action<IdentityBuilder>`         | Add token providers or custom stores                           |
+| `bearer`    | `Action<BearerTokenOptions>`      | Token expiration, refresh behavior                             |
 
 To use custom user or role types, use the generic overloads:
 
@@ -78,11 +78,11 @@ dotnet run
 
 The following endpoints are now available:
 
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| `POST` | `/Authenticate/Register` | Register a new user |
-| `POST` | `/Authenticate/Login` | Sign in, receive bearer token |
-| `POST` | `/Authenticate/Refresh` | Exchange refresh token for new bearer token |
+| Method | Path                     | Description                                 |
+| ------ | ------------------------ | ------------------------------------------- |
+| `POST` | `/Authenticate/Register` | Register a new user                         |
+| `POST` | `/Authenticate/Login`    | Sign in, receive bearer token               |
+| `POST` | `/Authenticate/Refresh`  | Exchange refresh token for new bearer token |
 
 ```shell
 # Register (snake_case bodies via UseJsonSerializer)
@@ -90,13 +90,13 @@ curl -X POST http://localhost:5000/Authenticate/Register \
      -H "Content-Type: application/json" \
      -d '{"username":"alice","email_address":"alice@example.com","password":"P@ssw0rd!"}'
 
-# Login
+# Login (the handler looks the user up by username, not email)
 curl -X POST http://localhost:5000/Authenticate/Login \
      -H "Content-Type: application/json" \
-     -d '{"username":"alice@example.com","password":"P@ssw0rd!"}'
+     -d '{"username":"alice","password":"P@ssw0rd!"}'
 
 # Call a protected endpoint with the access token
-curl http://localhost:5000/students \
+curl http://localhost:5000/v1/students \
      -H "Authorization: Bearer <access_token>"
 ```
 

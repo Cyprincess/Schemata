@@ -30,7 +30,9 @@ public class SubjectIdentifierServiceShould
         string  subjectType  = SubjectTypes.Public,
         string? pairwiseSalt = null
     ) {
-        if (subjectType == null) throw new ArgumentNullException(nameof(subjectType));
+        if (subjectType is null) {
+            throw new ArgumentNullException(nameof(subjectType));
+        }
         var options = Options.Create(
             new SchemataAuthorizationOptions { SubjectType = subjectType, PairwiseSalt = pairwiseSalt });
         return new(options);

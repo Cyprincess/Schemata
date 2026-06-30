@@ -9,7 +9,7 @@ namespace Schemata.Advice;
 /// <summary>
 ///     Runs advisor pipelines that pass fifteen arguments to each advisor.
 /// </summary>
-/// <typeparam name="TAdvisor">An advisor interface implementing <see cref="IAdvisor{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15}" />.</typeparam>
+/// <typeparam name="TAdvisor">An advisor interface implementing <see cref="IAdvisor{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15}" />.</typeparam>
 /// <typeparam name="T1">The type of the first advisor argument.</typeparam>
 /// <typeparam name="T2">The type of the second advisor argument.</typeparam>
 /// <typeparam name="T3">The type of the third advisor argument.</typeparam>

@@ -11,7 +11,6 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Common;
 
@@ -32,7 +31,7 @@ public sealed class ResourceNameDescriptor
     private ResourceNameDescriptor(Type type) {
         var canonical = type.GetCustomAttribute<CanonicalNameAttribute>(false);
 
-        Singular = type.GetCustomAttribute<DisplayNameAttribute>(false)?.DisplayName.Singularize()
+        Singular = type.GetCustomAttribute<DisplayNameAttribute>(false)?.DisplayName
                 ?? type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize()
                 ?? type.Name;
 
@@ -192,7 +191,7 @@ public sealed class ResourceNameDescriptor
                 }]);
             }
 
-            parts[i] = value!;
+            parts[i] = value;
         }
 
         return string.Join("/", parts);

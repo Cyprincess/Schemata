@@ -20,5 +20,5 @@ public sealed class LinqToDbJsonConverter<T> : ValueConverter<T?, string?>
     public LinqToDbJsonConverter() : base(
         v => JsonValueConverter.ToProvider(v),
         v => JsonValueConverter.FromProvider<T>(v),
-        handlesNulls: false) { }
+        false) { }
 }

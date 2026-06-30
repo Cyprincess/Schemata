@@ -95,8 +95,8 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
         }
 
         return node.Comparator switch {
-            Has                                                              => caps.Presence && caps.Membership,
-            Equal or NotEqual when HasWildcard(arg)                          => caps.Comparison && caps.Wildcard,
+            Has                                                              => caps is { Presence: true, Membership: true },
+            Equal or NotEqual when HasWildcard(arg)                          => caps is { Comparison: true, Wildcard: true },
             Equal or NotEqual                                                => caps.Comparison,
             LessThan or LessThanOrEqual or GreaterThan or GreaterThanOrEqual => caps.Comparison,
             var _                                                            => false,
