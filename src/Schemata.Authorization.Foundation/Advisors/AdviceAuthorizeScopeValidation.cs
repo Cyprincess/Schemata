@@ -29,7 +29,7 @@ public static class AdviceAuthorizeScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <seealso cref="AdviceTokenScopeValidation{TApp}" />
+/// <seealso cref="AdviceRequestScopeValidation{TApp}" />
 public sealed class AdviceAuthorizeScopeValidation<TApp>(
     IApplicationManager<TApp> apps
 ) : IAuthorizeAdvisor<TApp>

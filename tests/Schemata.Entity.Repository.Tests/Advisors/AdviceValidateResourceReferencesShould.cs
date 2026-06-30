@@ -124,7 +124,7 @@ public class AdviceValidateResourceReferencesShould
         var ctx        = new AdviceContext(services.BuildServiceProvider());
         var repository = new Mock<IRepository<PlainEntity>>().Object;
 
-        var result = await advisor.AdviseAsync(ctx, repository, new PlainEntity(), CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, new(), CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         resolver.VerifyNoOtherCalls();

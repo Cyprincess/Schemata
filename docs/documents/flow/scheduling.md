@@ -1,7 +1,7 @@
 # Flow Scheduling Integration
 
 `Schemata.Flow.Scheduling` bridges intermediate timer catches to the scheduler. As a process
-transitions, `FlowTimerTransitionAdvisor` schedules or cancels a one-shot job for the timer the
+transitions, `AdviceTransitionTimer` schedules or cancels a one-shot job for the timer the
 instance is waiting on. When the job fires, `FlowTimerJob` triggers the timer event back through
 `IProcessRuntime` and the instance advances past the catch.
 
@@ -9,7 +9,7 @@ instance is waiting on. When the job fires, `FlowTimerJob` triggers the timer ev
 
 | Package | Key files |
 | --- | --- |
-| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerTransitionAdvisor.cs`, `Internal/FlowTimerJob.cs`, `Internal/TimerDefinitionConverter.cs`, `Extensions/FlowSchedulingBuilderExtensions.cs` |
+| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/AdviceTransitionTimer.cs`, `Internal/FlowTimerJob.cs`, `Internal/TimerDefinitionConverter.cs`, `Extensions/FlowSchedulingBuilderExtensions.cs` |
 | `Schemata.Flow.Skeleton` | `Observers/IFlowTransitionAdvisor.cs`, `Models/TimerDefinition.cs` |
 | `Schemata.Scheduling.Skeleton` | `IScheduler.cs`, `IScheduledJob.cs`, `Entities/SchemataJob.cs` |
 
@@ -36,15 +36,15 @@ in if missing.
 `SchemataFlowSchedulingFeature.ConfigureServices` registers one advisor:
 
 ```csharp
-services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowTimerTransitionAdvisor>());
+services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionTimer>());
 ```
 
 `FlowTimerJob` is not registered here. The scheduler activates it from the DI scope by its job key
 (the type's full name) when the timer fires.
 
-## FlowTimerTransitionAdvisor
+## AdviceTransitionTimer
 
-`FlowTimerTransitionAdvisor` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
+`AdviceTransitionTimer` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
 `AdviseAsync` runs in the transition's pre-commit window and reconciles the scheduler against the new
 waiting state, returning `AdviseResult.Continue`. Only timer-catch transitions touch the scheduler;
 other transitions pass through untouched.

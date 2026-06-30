@@ -55,7 +55,7 @@ Authorization/Identity/Security/Validation/Mapping skeletons, and the advice gen
 
 ## Move the entity and its advisor into the module
 
-Move `Student.cs`, `AppDbContext.cs`, and `StudentNameAdvisor.cs` from Getting Started into the
+Move `Student.cs`, `AppDbContext.cs`, and `AdviceAddStudentName.cs` from Getting Started into the
 `StudentModule` project, then add a module entry point that inherits `ModuleBase`:
 
 ```csharp
@@ -84,7 +84,7 @@ public sealed class StudentModule : ModuleBase
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
         services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+            ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
     }
 }
 ```

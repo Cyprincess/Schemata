@@ -16,9 +16,10 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceUpdateFreshness
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" />.
+    ///     Default order: chained after <see cref="AdviceUpdateSoftDeleted" /> so the
+    ///     soft-delete guard rejects deleted entities before any concurrency comparison.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceUpdateSoftDeleted.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

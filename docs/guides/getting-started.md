@@ -90,7 +90,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
-public sealed class StudentNameAdvisor : IRepositoryAddAdvisor<Student>
+public sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
 {
     public int Order => 0;
 
@@ -138,7 +138,7 @@ var builder = WebApplication.CreateBuilder(args)
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
             services.TryAddEnumerable(
-                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
         });
 
         schema.UseResource()

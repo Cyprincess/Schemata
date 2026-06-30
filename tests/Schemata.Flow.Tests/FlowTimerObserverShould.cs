@@ -32,7 +32,7 @@ public class FlowTimerObserverShould
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
         var provider = services.BuildServiceProvider();
-        var advisor  = new FlowTimerTransitionAdvisor(provider);
+        var advisor  = new AdviceTransitionTimer(provider);
         var advice   = new AdviceContext(provider);
 
         var definition = new ProcessDefinition();
@@ -69,7 +69,7 @@ public class FlowTimerObserverShould
     public async SystemTask NonTimerTransition_WithoutScheduler_DoesNotThrow() {
         // A scheduler-free service provider still allows transitions outside timer catches.
         var provider = new ServiceCollection().BuildServiceProvider();
-        var advisor  = new FlowTimerTransitionAdvisor(provider);
+        var advisor  = new AdviceTransitionTimer(provider);
         var advice   = new AdviceContext(provider);
 
         var definition = new ProcessDefinition();

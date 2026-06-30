@@ -34,8 +34,8 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<Trash, EfCoreRepository<TestDbContext, Trash>>();
 
     // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, TrashNameAdvisor>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, AdviceAddTrashName>());
 });
 
 var app = builder.Build();

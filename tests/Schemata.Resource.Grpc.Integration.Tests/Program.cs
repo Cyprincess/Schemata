@@ -33,7 +33,7 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
 
     // Supply the leaf name before canonical-name advice builds students/{slug}.
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
 });
 
 var app = builder.Build();

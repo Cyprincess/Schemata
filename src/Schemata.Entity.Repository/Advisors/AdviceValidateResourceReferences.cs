@@ -103,7 +103,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
             }
 
             violations ??= [];
-            violations.Add(new ErrorFieldViolation {
+            violations.Add(new() {
                 Field       = reference.Property.Name,
                 Reason      = SchemataResources.INVALID_REFERENCE,
                 Description = LocalizedMessageFormatter.FormatInvariant(
@@ -135,7 +135,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 continue;
             }
 
-            list.Add(new Reference(property, attribute.Target));
+            list.Add(new(property, attribute.Target));
         }
 
         return list;

@@ -219,7 +219,7 @@ public class SchemataExceptionShould
     }
 
     private static SchemataException BuildException(string reason) {
-        return new SchemataException(404, ErrorCodes.NotFound) {
+        return new(404, ErrorCodes.NotFound) {
             Details = [new ErrorInfoDetail { Reason = reason }],
         };
     }

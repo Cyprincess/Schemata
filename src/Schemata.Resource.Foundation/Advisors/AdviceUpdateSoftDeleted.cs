@@ -15,10 +15,12 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceUpdateSoftDeleted
 {
     /// <summary>
-    ///     Default order: runs before <see cref="AdviceUpdateFreshness{TEntity, TRequest}" />
-    ///     so a soft-deleted entity is rejected before any concurrency comparison.
+    ///     Default order: chained after <see cref="AdviceApplyChildParent" /> so the
+    ///     mode A parent field is in place before the soft-delete guard inspects the
+    ///     entity, and before <see cref="AdviceUpdateFreshness{TEntity, TRequest}" /> runs
+    ///     the concurrency comparison.
     /// </summary>
-    public const int DefaultOrder = AdviceUpdateFreshness.DefaultOrder - 10_000_000;
+    public const int DefaultOrder = AdviceApplyChildParent.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

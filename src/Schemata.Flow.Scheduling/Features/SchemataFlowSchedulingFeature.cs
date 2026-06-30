@@ -28,7 +28,7 @@ public sealed class SchemataFlowSchedulingFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, FlowTimerTransitionAdvisor>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionTimer>());
         services.AddScheduledJob<FlowTimerJob>();
     }
 }

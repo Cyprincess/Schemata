@@ -110,18 +110,18 @@ registers these built-ins:
 
 | Advisor | Request | Validates |
 | --- | --- | --- |
-| `AdviceIdentityFeatureGate<T>` | all | The matching `SchemataIdentityOptions` flag is enabled; throws `NotFoundException` otherwise |
-| `AdviceConfirmRequestValidation` | `ConfirmRequest` | A code plus at least one of email/phone is present |
-| `AdviceChangeEmailValidation<TUser>` | `ProfileRequest` | New email differs from current (on `ChangeEmail`) |
-| `AdviceChangePhoneValidation<TUser>` | `ProfileRequest` | New phone differs from current |
-| `AdviceChangePasswordValidation<TUser>` | `ProfileRequest` | Old/new password fields are coherent |
-| `AdviceEnrollValidation<TUser>` | `AuthenticatorRequest` | A valid 2FA code is supplied for enrollment |
-| `AdviceDowngradeValidation` | `AuthenticatorRequest` | A valid 2FA code is supplied for downgrade |
+| `AdviceRequestFeature<T>` | all | The matching `SchemataIdentityOptions` flag is enabled; throws `NotFoundException` otherwise |
+| `AdviceRequestConfirmValidation` | `ConfirmRequest` | A code plus at least one of email/phone is present |
+| `AdviceRequestEmailValidation<TUser>` | `ProfileRequest` | New email differs from current (on `ChangeEmail`) |
+| `AdviceRequestPhoneValidation<TUser>` | `ProfileRequest` | New phone differs from current |
+| `AdviceRequestPasswordValidation<TUser>` | `ProfileRequest` | Old/new password fields are coherent |
+| `AdviceRequestEnrollValidation<TUser>` | `AuthenticatorRequest` | A valid 2FA code is supplied for enrollment |
+| `AdviceRequestDowngradeValidation` | `AuthenticatorRequest` | A valid 2FA code is supplied for downgrade |
 
-`AdviceIdentityFeatureGate<T>` runs at `Orders.Base = 100,000,000`; the validation advisors at
+`AdviceRequestFeature<T>` runs at `Orders.Base = 100,000,000`; the validation advisors at
 110,000,000. Operation-specific advisor interfaces — `IIdentityRegisterAdvisor<TUser>`,
 `IIdentityLoginAdvisor`, `IIdentityRefreshAdvisor`, `IIdentityProfileChangeAdvisor`,
-`IIdentity2FaAdvisor`, `IIdentityRecoveryAdvisor`, `IIdentityProfileResponseAdvisor<TUser>` — let
+`IIdentityTwoFactorAdvisor`, `IIdentityRecoveryAdvisor`, `IIdentityProfileResponseAdvisor<TUser>` — let
 you hook a single phase without filtering on the operation enum.
 
 ## SchemataUserManager
@@ -152,7 +152,7 @@ Seven booleans, all defaulting to `true`, gate the endpoint groups:
 | `AllowPhoneNumberChange` | `~/Account/Profile/Phone` |
 | `AllowTwoFactorAuthentication` | `Authenticator`, `Enroll`, `Downgrade` |
 
-A disabled operation returns `NotFoundException` (HTTP 404) from `AdviceIdentityFeatureGate`.
+A disabled operation returns `NotFoundException` (HTTP 404) from `AdviceRequestFeature`.
 
 ## Extension points
 

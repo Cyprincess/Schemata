@@ -13,7 +13,7 @@ registers the core, and each `Use*Flow` / `Use*` call on the returned builder ad
 | --- | --- |
 | `Schemata.Authorization.Skeleton` | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope,SchemataToken}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs` |
 | `Schemata.Authorization.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseAuthorization`), `Extensions/SchemataAuthorizationBuilderExtensions.cs` (flow methods), `Features/`, `Controllers/ConnectController*.cs`, `Authentication/SchemataAuthorizationOptions.cs`, `Managers/`, `Services/`, `Advisors/` |
-| `Schemata.Authorization.Identity` | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceSubjectClaims.cs`, the `UseIdentity()` builder extension |
+| `Schemata.Authorization.Identity` | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceClaimsSubject.cs`, the `UseIdentity()` builder extension |
 
 ## Enabling the server
 
@@ -114,9 +114,9 @@ grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request:
 
 | Advisor | Checks |
 | --- | --- |
-| `AdviceTokenEndpointPermission<TApp>` | The client holds the `e:/Connect/Token` permission |
-| `AdviceTokenGrantPermission<TApp>` | The client holds `g:{grant_type}` |
-| `AdviceTokenScopeValidation<TApp>` | Requested scopes are within the client's `s:{scope}` grants |
+| `AdviceRequestEndpointPermission<TApp>` | The client holds the `e:/Connect/Token` permission |
+| `AdviceRequestGrantPermission<TApp>` | The client holds `g:{grant_type}` |
+| `AdviceRequestScopeValidation<TApp>` | Requested scopes are within the client's `s:{scope}` grants |
 
 ## Advisor families
 
@@ -126,9 +126,9 @@ ordered chains.
 | Interface | Generic params | Role | Built-ins |
 | --- | --- | --- | --- |
 | `IDiscoveryAdvisor` | — | Populate the discovery document | `AdviceDiscoveryBase` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …) |
-| `IClaimsAdvisor` | — | Enrich the principal before token issuance | `AdviceAudienceClaims`, `AdvicePairwiseProjection<TApp>`, and `AdviceSubjectClaims` (Identity bridge) |
-| `IDestinationAdvisor` | — | Route each claim to access token, ID token, and/or UserInfo | `AdviceSubjectClaimDestination`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination` |
-| `ITokenRequestAdvisor<TApp>` | `TApp` | Validate the token request | `AdviceTokenEndpointPermission`, `AdviceTokenGrantPermission`, `AdviceTokenScopeValidation` |
+| `IClaimsAdvisor` | — | Enrich the principal before token issuance | `AdviceClaimsAudience`, `AdviceClaimsPairwise<TApp>`, and `AdviceClaimsSubject` (Identity bridge) |
+| `IDestinationAdvisor` | — | Route each claim to access token, ID token, and/or UserInfo | `AdviceDestinationSubject`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination` |
+| `ITokenRequestAdvisor<TApp>` | `TApp` | Validate the token request | `AdviceRequestEndpointPermission`, `AdviceRequestGrantPermission`, `AdviceRequestScopeValidation` |
 | `IAuthorizeAdvisor<TApp>` | `TApp` | Validate the authorize request | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
 | `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp`(, `TToken`) | Validate each endpoint's request | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*` |
 
@@ -181,7 +181,7 @@ adds `SchemataAuthorizationIdentityFeature` (`Priority = Orders.Extension + 50_1
 `SchemataAuthorizationFeature`4` and `SchemataIdentityFeature`4` (it cannot reference the open
 generics directly across assemblies). At configure time it discovers the registered user type from
 the `IUserValidator<>` descriptor, registers `IdentitySubjectProvider<TUser>` as `ISubjectProvider`,
-and adds `AdviceSubjectClaims` to the `IClaimsAdvisor` chain. `IdentitySubjectProvider` projects
+and adds `AdviceClaimsSubject` to the `IClaimsAdvisor` chain. `IdentitySubjectProvider` projects
 `sub`, `preferred_username`, `email` (+`email_verified`), `phone_number` (+`phone_number_verified`),
 `nickname`, and `role` claims from the user.
 

@@ -3,7 +3,7 @@
 ## What you'll build
 
 A BPMN process that parks at an intermediate timer catch and resumes automatically after a delay.
-`UseScheduling()` on the flow builder wires `FlowTimerTransitionAdvisor`, which schedules a one-shot
+`UseScheduling()` on the flow builder wires `AdviceTransitionTimer`, which schedules a one-shot
 job as the instance starts waiting. When the job fires, `FlowTimerJob` triggers the timer event and
 the instance advances.
 
@@ -65,7 +65,7 @@ builder.UseSchemata(schema => {
 
 The flow-builder `UseScheduling()` adds `SchemataFlowSchedulingFeature` (priority `480_400_000`). It
 depends on `SchemataFlowFeature` and `SchemataSchedulingFeature`, so both are pulled in if missing.
-The feature registers `FlowTimerTransitionAdvisor` as a scoped `IFlowTransitionAdvisor`.
+The feature registers `AdviceTransitionTimer` as a scoped `IFlowTransitionAdvisor`.
 
 **Check:** the app starts with no missing-feature errors.
 
@@ -85,7 +85,7 @@ public sealed class ApprovalsController(IProcessRuntime runtime) : ControllerBas
 ```
 
 The engine advances through `Review` and stops at the timer catch, setting `WaitingAtId`. In the
-transition's pre-commit window, `FlowTimerTransitionAdvisor` resolves `IScheduler`, converts the
+transition's pre-commit window, `AdviceTransitionTimer` resolves `IScheduler`, converts the
 `TimerDefinition` to a schedule, and schedules a `SchemataJob`:
 
 - `Name` = `flow-{process.CanonicalName}-{timerCatchElementId}`.
@@ -144,7 +144,7 @@ gateway after the catch to leave the cycle once a process variable says so.
 scope when the job fires. The default container constructs it from its `IProcessRuntime` dependency;
 a container that refuses unregistered types needs `services.AddScoped<FlowTimerJob>()`.
 
-**The job is scheduled before the transition commits.** `FlowTimerTransitionAdvisor` runs in the
+**The job is scheduled before the transition commits.** `AdviceTransitionTimer` runs in the
 pre-commit window. If the commit later fails, the scheduled job outlives the rolled-back instance;
 reconcile by dropping scheduler jobs with no matching waiting instance.
 
