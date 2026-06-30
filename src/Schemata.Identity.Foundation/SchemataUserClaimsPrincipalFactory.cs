@@ -47,7 +47,7 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
         var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
             ? user.CanonicalName!
             : $"users/{user.Uid}";
-        identity.AddClaim(new Claim(Options.ClaimsIdentity.UserIdClaimType, canonical));
+        identity.AddClaim(new(Options.ClaimsIdentity.UserIdClaimType, canonical));
 
         return identity;
     }

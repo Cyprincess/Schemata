@@ -243,8 +243,8 @@ aborts the transition so an instance never persists into a state whose timer job
 subscription was never created. The `Previous*` fields are the only source of the pre-transition
 values, because `Process` already reflects the engine result by the time the advisor runs.
 
-`Schemata.Flow.Event` registers `FlowEventTransitionAdvisor` to maintain `SchemataEventSubscription`
-rows; `Schemata.Flow.Scheduling` registers `FlowTimerTransitionAdvisor` to schedule and cancel
+`Schemata.Flow.Event` registers `AdviceTransitionEvent` to maintain `SchemataEventSubscription`
+rows; `Schemata.Flow.Scheduling` registers `AdviceTransitionTimer` to schedule and cancel
 timer jobs. Both register through `TryAddEnumerable`, so additional advisors stack alongside.
 
 ## IProcessLifecycleObserver

@@ -3,7 +3,7 @@
 ## What you'll build
 
 A BPMN process that parks at an event-based gateway and resumes when either a message or a signal
-arrives on the event bus. `UseEvent()` on the flow builder wires `FlowEventTransitionAdvisor`, which
+arrives on the event bus. `UseEvent()` on the flow builder wires `AdviceTransitionEvent`, which
 keeps `IRepository<SchemataEventSubscription>` in sync as the instance waits and advances. Publishing
 through `IEventBus` then lets `FlowEventHandler` correlate the event back to the waiting instance.
 
@@ -90,7 +90,7 @@ builder.UseSchemata(schema => {
 depends on both `SchemataFlowFeature` and `SchemataEventFeature`, so call order does not matter — but
 the event bus still needs a producer and consumer for events to flow.
 
-`SchemataFlowEventFeature.ConfigureServices` registers `FlowEventTransitionAdvisor` (a scoped
+`SchemataFlowEventFeature.ConfigureServices` registers `AdviceTransitionEvent` (a scoped
 `IFlowTransitionAdvisor`) and `FlowEventHandler` (a scoped `IEventHandler<IEvent>`, the fallback
 handler).
 
@@ -112,7 +112,7 @@ public sealed class OrdersController(IProcessRuntime runtime, IEventBus bus) : C
 ```
 
 After `StartProcessInstanceAsync`, the engine advances through the start event and parks at the
-event-based gateway. In the transition's pre-commit window, `FlowEventTransitionAdvisor` adds two
+event-based gateway. In the transition's pre-commit window, `AdviceTransitionEvent` adds two
 subscriptions:
 
 - `flow:{name}:{payElementId}` with `CorrelationKey = {name}` (message).

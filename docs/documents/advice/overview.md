@@ -69,7 +69,7 @@ implementation type registers once while many advisor types share one interface.
 ```csharp
 // Closed-type registration
 services.TryAddEnumerable(
-    ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+    ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
 
 // Open-generic registration
 services.TryAddEnumerable(

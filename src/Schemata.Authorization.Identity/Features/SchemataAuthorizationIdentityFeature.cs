@@ -43,6 +43,6 @@ public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
         var provider = typeof(IdentitySubjectProvider<>).MakeGenericType(user);
 
         services.TryAddScoped(typeof(ISubjectProvider), provider);
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceSubjectClaims>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsSubject>());
     }
 }

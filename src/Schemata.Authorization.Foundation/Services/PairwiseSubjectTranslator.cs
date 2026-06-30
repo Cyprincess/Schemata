@@ -19,7 +19,7 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     <para>
 ///         Forward (<see cref="ToPairwiseAsync" />) and the
 ///         <see cref="EnsureMappingAsync" /> seed (called from
-///         <c>AdvicePairwiseProjection</c>) both write a row in
+///         <c>AdviceClaimsPairwise</c>) both write a row in
 ///         <c>SchemataSubjectMappings</c> the first time an
 ///         <c>(application, canonical_subject)</c> pair is seen, then return the stored
 ///         pairwise hash on every subsequent call. The unique indexes on
@@ -112,7 +112,7 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
     /// <summary>
     ///     Returns the stored pairwise subject for <paramref name="canonicalSubject" /> under
     ///     <paramref name="application" />, inserting a new row when one does not yet exist.
-    ///     Called from <c>AdvicePairwiseProjection</c> during claim assembly so OAuth wire
+    ///     Called from <c>AdviceClaimsPairwise</c> during claim assembly so OAuth wire
     ///     endpoints (id_token, access_token, userinfo, introspection, back-channel logout)
     ///     implicitly seed the reverse-lookup table without extra plumbing.
     /// </summary>
@@ -145,7 +145,7 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
 
         var pairwise = _subjects.Resolve(canonicalSubject, application);
         if (existing is null) {
-            await _mappings.AddAsync(new SchemataSubjectMapping {
+            await _mappings.AddAsync(new() {
                 Application      = key,
                 CanonicalSubject = canonicalSubject,
                 PairwiseSubject  = pairwise,

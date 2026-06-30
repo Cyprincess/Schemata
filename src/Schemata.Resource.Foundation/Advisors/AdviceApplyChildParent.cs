@@ -17,10 +17,11 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceApplyChildParent
 {
     /// <summary>
-    ///     Default order: runs early in both the Create and Update entity chains so the
-    ///     mode A parent field is populated before later advisors inspect or persist it.
+    ///     Default order anchored at <see cref="SchemataConstants.Orders.Base" /> so the
+    ///     mode A parent field is populated before <see cref="AdviceUpdateSoftDeleted" />
+    ///     and <see cref="AdviceUpdateFreshness" />, both of which chain off this constant.
     /// </summary>
-    public const int DefaultOrder = AdviceUpdateSoftDeleted.DefaultOrder - 1_000_000;
+    public const int DefaultOrder = SchemataConstants.Orders.Base;
 }
 
 /// <summary>
@@ -87,7 +88,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
         foreach (var segment in child.Parent!.Split('/')) {
             if (segment == "-") {
                 throw new ValidationException([
-                    new ErrorFieldViolation {
+                    new() {
                         Field       = nameof(IChild.Parent).ToLowerInvariant(),
                         Description = LocalizedMessageFormatter.FormatInvariant(
                             SchemataResources.CROSS_PARENT_UNSUPPORTED,
@@ -104,7 +105,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
         var parsed   = descriptor.ParseCanonicalName(sentinel);
         if (parsed is null) {
             throw new ValidationException([
-                new ErrorFieldViolation {
+                new() {
                     Field       = nameof(IChild.Parent).ToLowerInvariant(),
                     Description = LocalizedMessageFormatter.FormatInvariant(
                         SchemataResources.INVALID_PARENT,

@@ -95,18 +95,18 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretPostAuthentication<TApp>>());
         services.TryAddScoped<IClientAuthenticationService<TApp>, ClientAuthenticationService<TApp>>();
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenEndpointPermission<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenGrantPermission<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenScopeValidation<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestEndpointPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestGrantPermission<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestScopeValidation<TApp>>());
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceAudienceClaims>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdvicePairwiseProjection<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceSubjectClaimDestination>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceProfileClaimDestination>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceEmailClaimDestination>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdvicePhoneClaimDestination>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceAddressClaimDestination>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceRoleClaimDestination>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsPairwise<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationSubject>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationProfile>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationEmail>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationPhone>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationAddress>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationRole>());
 
         services.TryAddScoped<DiscoveryHandler<TScope>>();
 
@@ -115,7 +115,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         // Pairwise (application × canonical-subject) → pairwise-hash mapping lives in
         // SchemataSubjectMapping. The hosting startup must register a repository for that
-        // entity against its DbContext so AdvicePairwiseProjection (writer) and
+        // entity against its DbContext so AdviceClaimsPairwise (writer) and
         // IPairwiseSubjectTranslator (reader / reverse-lookup) share the same durable table.
         services.TryAddScoped<PairwiseSubjectTranslator<TApp>>();
         services.TryAddScoped<IPairwiseSubjectTranslator>(

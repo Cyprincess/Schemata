@@ -38,8 +38,8 @@ Pairwise subject identifiers are persisted bidirectionally:
 
 - [Services/PairwiseSubjectTranslator.cs](Services/PairwiseSubjectTranslator.cs) — owns `EnsureMappingAsync` (forward upsert) and the public `ToPairwiseAsync` / `ToCanonicalAsync` API; resolves through `IPairwiseSubjectTranslator`.
 - [Services/SubjectIdentifierService.cs](Services/SubjectIdentifierService.cs) — single place that decides between public + pairwise.
-- [Advisors/AdvicePairwiseProjection.cs](Advisors/AdvicePairwiseProjection.cs) runs at `Orders.Max` so every OIDC wire surface (id_token, access JWT, userinfo, introspection, back-channel logout) picks up the projected `sub` automatically.
-- [Advisors/AdviceSubjectClaimDestination.cs](Advisors/AdviceSubjectClaimDestination.cs) routes the subject claim to the correct destination set.
+- [Advisors/AdviceClaimsPairwise.cs](Advisors/AdviceClaimsPairwise.cs) runs at `Orders.Max` so every OIDC wire surface (id_token, access JWT, userinfo, introspection, back-channel logout) picks up the projected `sub` automatically.
+- [Advisors/AdviceDestinationSubject.cs](Advisors/AdviceDestinationSubject.cs) routes the subject claim to the correct destination set.
 - The `(Application, CanonicalSubject)` / `(Application, PairwiseSubject)` indexes live on the `SchemataSubjectMapping` entity declared in `Schemata.Authorization.Skeleton`.
 
 ## Conventions

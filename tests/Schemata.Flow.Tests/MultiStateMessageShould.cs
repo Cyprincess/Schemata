@@ -51,13 +51,13 @@ public class MultiStateMessageShould
 
         var fromA = await engine.TriggerAsync(
             definition,
-            new SchemataProcess { StateId = definition.A.Id },
+            new() { StateId = definition.A.Id },
             definition.Cancel,
             null);
 
         var fromB = await engine.TriggerAsync(
             definition,
-            new SchemataProcess { StateId = definition.B.Id },
+            new() { StateId = definition.B.Id },
             definition.Cancel,
             null);
 

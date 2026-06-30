@@ -21,7 +21,7 @@ public static class AdviceAuthorizeEndpointPermission
 ///     processes the request.
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <seealso cref="AdviceTokenEndpointPermission{TApp}" />
+/// <seealso cref="AdviceRequestEndpointPermission{TApp}" />
 public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<TApp> manager) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {

@@ -15,8 +15,8 @@ keyed `IFlowRuntime` services.
 | `Schemata.Flow.Skeleton` | `Models/ProcessDefinition.cs`, `Models/FlowElement.cs`, `Builders/ProcessBuilder.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessTransition.cs`, `Runtime/IFlowRuntime.cs`, `Runtime/IProcessRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs` |
 | `Schemata.Flow.Foundation` | `Features/SchemataFlowFeature.cs`, `Builders/SchemataFlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `ProcessRegistry.cs`, `ProcessRuntime.cs`, `ProcessPersistence.cs`, `ProcessInitializer.cs` |
 | `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs` |
-| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventTransitionAdvisor.cs`, `Internal/FlowEventHandler.cs` |
-| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerTransitionAdvisor.cs`, `Internal/FlowTimerJob.cs` |
+| `Schemata.Flow.Event` | `Features/SchemataFlowEventFeature.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs` |
+| `Schemata.Flow.Scheduling` | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/AdviceTransitionTimer.cs`, `Internal/FlowTimerJob.cs` |
 | `Schemata.Flow.Http` | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs` |
 | `Schemata.Flow.Grpc` | `Features/SchemataFlowGrpcFeature.cs`, `Services/ProcessDefinitionService.cs` |
 

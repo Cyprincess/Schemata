@@ -90,7 +90,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
         using var scope = _root!.CreateScope();
         var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
-        db.Books.Add(new Book {
+        db.Books.Add(new() {
             Uid           = Identifiers.NewUid(),
             Name          = "duplicate",
             CanonicalName = "books/duplicate",
@@ -99,7 +99,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
         // Adding a second Book with the same CanonicalName should fail the alternate-key
         // uniqueness check that SchemataModelCustomizer registers; EF Core reports this
         // at change-tracker time rather than at SaveChanges time.
-        var exception = Assert.Throws<InvalidOperationException>(() => db.Books.Add(new Book {
+        var exception = Assert.Throws<InvalidOperationException>(() => db.Books.Add(new() {
             Uid           = Identifiers.NewUid(),
             Name          = "another",
             CanonicalName = "books/duplicate",

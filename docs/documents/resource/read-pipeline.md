@@ -10,7 +10,7 @@ the repository. The stage order is fixed; advisor `Order` only sequences advisor
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceOperationHandler.Get.cs` |
 | `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `KeyOrdering.cs` |
 | `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs`, `Advisors/IResourceGetRequestAdvisor.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceListResponseReadMask.cs`, `Advisors/AdviceResponseReadMask.cs`, `Advisors/AdviceFillChildParentResponse.cs`, `Advisors/AdviceFillChildParentListResponse.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceListResponseReadMask.cs`, `Advisors/AdviceResponseReadMask.cs`, `Advisors/AdviceResponseParent.cs`, `Advisors/AdviceListResponseParent.cs` |
 | `Schemata.Abstractions` | `Resource/ListRequest.cs`, `Resource/GetRequest.cs`, `Resource/ListResultBase.cs` |
 
 ## List
@@ -68,7 +68,7 @@ omits it per AIP-158. When `request.ShowDeleted` is true the repository is wrapp
 
 ### 8. List response — `IResourceListResponseAdvisor<TSummary>`
 
-Receives the immutable summary array and the principal. `AdviceFillChildParentListResponse` derives
+Receives the immutable summary array and the principal. `AdviceListResponseParent` derives
 `IChild.Parent` on each summary, then `AdviceListResponseReadMask` trims each summary to the
 requested AIP-157 fields.
 
@@ -97,7 +97,7 @@ caller can inspect `DeleteTime`. A null result throws `ResourceNotFound(name)` c
 
 ### 5. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
-The entity is mapped to `TDetail`, then the response chain runs: `AdviceFillChildParentResponse` derives
+The entity is mapped to `TDetail`, then the response chain runs: `AdviceResponseParent` derives
 `IChild.Parent`, `AdviceResponseFreshness` sets the ETag, `AdviceResponseReadMask` trims to the `read_mask`
 fields, `AdviceResponseIdempotency` is a no-op for reads.
 

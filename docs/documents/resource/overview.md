@@ -161,10 +161,10 @@ Each operation returns a thin result base carrying the response DTO:
 | `AdviceUpdateSoftDeleted<TEntity, TRequest>` | Update entity |
 | `AdviceUpdateFreshness<TEntity, TRequest>` | Update entity |
 | `AdviceDeleteFreshness<TEntity>` | Delete entity |
-| `AdviceFillChildParentResponse<TEntity, TDetail>` | Response |
+| `AdviceResponseParent<TEntity, TDetail>` | Response |
 | `AdviceResponseFreshness<TEntity, TDetail>` | Response |
 | `AdviceResponseReadMask<TEntity, TDetail>` | Response |
-| `AdviceFillChildParentListResponse<TSummary>` | List response |
+| `AdviceListResponseParent<TSummary>` | List response |
 | `AdviceListResponseReadMask<TSummary>` | List response |
 | `AdviceResponseIdempotency<TEntity, TDetail>` | Response |
 

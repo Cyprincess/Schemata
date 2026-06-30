@@ -135,7 +135,7 @@ public static class SchemataResourceErrors
             },
             new PreconditionFailureDetail {
                 Violations = [
-                    new PreconditionViolation {
+                    new() {
                         Type        = descriptor.Singular,
                         Subject     = subject,
                         Description = description,

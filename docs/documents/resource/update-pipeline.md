@@ -74,7 +74,7 @@ and copies only those fields. An unknown segment throws `ValidationException` (`
 
 ### 8. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
-The updated entity is mapped to `TDetail` and the response chain runs (`AdviceFillChildParentResponse` derives
+The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseParent` derives
 `IChild.Parent`; `AdviceResponseFreshness` writes the new ETag; `AdviceResponseReadMask` trims to `read_mask`).
 
 ## Field masks (AIP-161)

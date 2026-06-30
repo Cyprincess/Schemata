@@ -13,7 +13,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public static class AdviceDeviceAuthorizeGrantPermission
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceDeviceEndpointPermission.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceDeviceAuthorizeEndpointPermission.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -26,7 +26,7 @@ public static class AdviceDeviceAuthorizeGrantPermission
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <seealso cref="AdviceDeviceEndpointPermission{TApp}" />
+/// <seealso cref="AdviceDeviceAuthorizeEndpointPermission{TApp}" />
 public sealed class AdviceDeviceAuthorizeGrantPermission<TApp>(IApplicationManager<TApp> apps) : IDeviceAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {

@@ -45,7 +45,7 @@ public sealed class SchemataQuotaFeature : FeatureBase
                 }
 
                 throw new QuotaExceededException(violations: [
-                    new QuotaViolation {
+                    new() {
                         Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
                     },
                 ]);

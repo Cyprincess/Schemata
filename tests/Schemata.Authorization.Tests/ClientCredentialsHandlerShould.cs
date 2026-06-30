@@ -74,7 +74,7 @@ public class ClientCredentialsHandlerShould
         services.AddSingleton(manager.Object);
         services.TryAddEnumerable(ServiceDescriptor
                                      .Scoped<ITokenRequestAdvisor<SchemataApplication>,
-                                          AdviceTokenGrantPermission<SchemataApplication>>());
+                                          AdviceRequestGrantPermission<SchemataApplication>>());
         var sp = services.BuildServiceProvider();
 
         var handler = new ClientCredentialsHandler<SchemataApplication>(clientAuth.Object, sp);

@@ -11,7 +11,7 @@ only sequences advisors within a stage.
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.Create.cs` |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs`, `Advisors/AdviceCreateRequestValidation.cs` |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs` |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs`, `Advisors/AdviceFillChildParentResponse.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs`, `Advisors/AdviceResponseParent.cs` |
 | `Schemata.Abstractions` | `Resource/CreateResultBase.cs` |
 
 ## Stages
@@ -65,7 +65,7 @@ response advisors.
 
 | Advisor | What it does |
 | --- | --- |
-| `AdviceFillChildParentResponse` | Derives `IChild.Parent` from the entity's canonical name; runs before freshness |
+| `AdviceResponseParent` | Derives `IChild.Parent` from the entity's canonical name; runs before freshness |
 | `AdviceResponseFreshness` | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
 | `AdviceResponseReadMask` | Trims the detail to the requested AIP-157 `read_mask` fields |
 | `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key |

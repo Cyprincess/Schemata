@@ -22,7 +22,7 @@ public static class AdviceAuthorizeGrantPermission
 ///     Even though the grant permission is also checked at the token endpoint, this advisor validates it at
 ///     the authorize endpoint so that misconfigured clients are rejected early.
 /// </remarks>
-/// <seealso cref="AdviceTokenGrantPermission{TApp}" />
+/// <seealso cref="AdviceRequestGrantPermission{TApp}" />
 public sealed class AdviceAuthorizeGrantPermission<TApp>(IApplicationManager<TApp> manager) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {

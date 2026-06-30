@@ -41,7 +41,7 @@ var builder = WebApplication.CreateBuilder(args)
                 .UseQueryCache();
 
             services.TryAddEnumerable(
-                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, StudentNameAdvisor>());
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
         });
         // ...
     });

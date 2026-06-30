@@ -254,7 +254,7 @@ public sealed partial class IdentityHandler<TUser>
 
         await _users.SetTwoFactorEnabledAsync(found, true);
 
-        switch (await Advisor.For<IIdentity2FaAdvisor>()
+        switch (await Advisor.For<IIdentityTwoFactorAdvisor>()
                              .RunAsync(ctx, found, IdentityOperation.Enroll, ct)) {
             case AdviseResult.Continue:
                 break;
@@ -304,7 +304,7 @@ public sealed partial class IdentityHandler<TUser>
         await _users.SetTwoFactorEnabledAsync(found, false);
         await _users.ResetAuthenticatorKeyAsync(found);
 
-        switch (await Advisor.For<IIdentity2FaAdvisor>()
+        switch (await Advisor.For<IIdentityTwoFactorAdvisor>()
                              .RunAsync(ctx, found, IdentityOperation.Downgrade, ct)) {
             case AdviseResult.Continue:
                 break;

@@ -76,14 +76,14 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
                  });
 
         services.TryAddScoped<IdentityHandler<TUser>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceIdentityFeatureGate<>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceRequestFeature<>)));
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ConfirmRequest>, AdviceConfirmRequestValidation>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangeEmailValidation<TUser>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangePhoneValidation<TUser>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceChangePasswordValidation<TUser>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceEnrollValidation<TUser>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceDowngradeValidation>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ConfirmRequest>, AdviceRequestConfirmValidation>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceRequestEmailValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceRequestPhoneValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceRequestPasswordValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceRequestEnrollValidation<TUser>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<AuthenticatorRequest>, AdviceRequestDowngradeValidation>());
 
         services.TryAddScoped(typeof(IMailSender<>), typeof(NoOpMailSender<>));
         services.TryAddScoped(typeof(IMessageSender<>), typeof(NoOpMessageSender<>));

@@ -14,9 +14,10 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceResponseFreshness
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" />.
+    ///     Default order: chained after <see cref="AdviceResponseParent" /> so
+    ///     <see cref="IChild.Parent" /> is populated before the ETag is computed.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceResponseParent.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
