@@ -19,7 +19,7 @@ namespace Schemata.Flow.Foundation;
 ///     <see cref="TransitionKind.Cancel" /> / <see cref="TransitionKind.Fail" /> rows, which this
 ///     helper turns into the matching token observer calls.
 /// </summary>
-public class ProcessLifecycleNotifier
+public sealed class ProcessLifecycleNotifier
 {
     private readonly ILogger<ProcessLifecycleNotifier> _logger;
     private readonly IList<IProcessLifecycleObserver>  _processObservers;
@@ -37,7 +37,7 @@ public class ProcessLifecycleNotifier
     }
 
     /// <summary>Fires <see cref="IProcessLifecycleObserver.OnStartedAsync" /> for every registered observer.</summary>
-    public virtual async ValueTask NotifyStartedAsync(ProcessSnapshot snapshot, CancellationToken ct) {
+    public async ValueTask NotifyStartedAsync(ProcessSnapshot snapshot, CancellationToken ct) {
         var process = snapshot.Process;
         foreach (var observer in _processObservers) {
             try {
@@ -55,7 +55,7 @@ public class ProcessLifecycleNotifier
     ///     in <paramref name="snapshot" />, then derives matching token-level events for the BPMN /
     ///     state-machine engines.
     /// </summary>
-    public virtual async ValueTask NotifyTransitionedAsync(ProcessSnapshot snapshot, CancellationToken ct) {
+    public async ValueTask NotifyTransitionedAsync(ProcessSnapshot snapshot, CancellationToken ct) {
         var process = snapshot.Process;
         foreach (var transition in snapshot.Transitions) {
             foreach (var observer in _processObservers) {
@@ -75,7 +75,7 @@ public class ProcessLifecycleNotifier
     }
 
     /// <summary>Fires <see cref="IProcessLifecycleObserver.OnTerminatedAsync" /> for every registered observer.</summary>
-    public virtual async ValueTask NotifyTerminatedAsync(SchemataProcess process, CancellationToken ct) {
+    public async ValueTask NotifyTerminatedAsync(SchemataProcess process, CancellationToken ct) {
         foreach (var observer in _processObservers) {
             try {
                 await observer.OnTerminatedAsync(process, ct);
@@ -88,7 +88,7 @@ public class ProcessLifecycleNotifier
     }
 
     /// <summary>Fires <see cref="IProcessLifecycleObserver.OnFailedAsync" /> for every registered observer.</summary>
-    public virtual async ValueTask NotifyFailedAsync(
+    public async ValueTask NotifyFailedAsync(
         SchemataProcess   process,
         Exception         exception,
         CancellationToken ct

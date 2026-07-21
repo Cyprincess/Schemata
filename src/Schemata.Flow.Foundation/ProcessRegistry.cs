@@ -155,7 +155,8 @@ public sealed class ProcessRegistry : IProcessRegistry
 
         var created = ActivatorUtilities.CreateInstance(_services, configuration.DefinitionType);
         if (created is not ProcessDefinition instance) {
-            throw new InvalidArgumentException(SchemataResources.PROCESS_NAME_REQUIRED);
+            throw new InvalidArgumentException(
+                message: $"Process definition type '{configuration.DefinitionType.FullName}' must derive from ProcessDefinition.");
         }
 
         instance.Name = configuration.Name;

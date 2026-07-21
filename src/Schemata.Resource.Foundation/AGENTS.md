@@ -31,7 +31,6 @@ Verified ordering facts (full sequence: `docs/documents/resource/create-pipeline
 
 ## GOTCHAS
 
-- Sanitization runs BEFORE validation. Validators never see server-managed fields clients shouldn't supply (`docs/documents/resource/create-pipeline.md`).
 - Dry-run after validation passes raises `NoContentException` without persisting.
 - Expressions package gotcha, surfaced through this package's filtering: AIP-160 (`aip`) and CEL (`cel`) compilers, pushdown planning + residual scan. AIP-160 inner wildcards (`A*B`) are rejected.
 - Error model deliberately more specific than `google.rpc.Code`. `ALREADY_EXISTS` omitted per AIP-211 (`SchemataResourceErrors` lives in Schemata.Common).

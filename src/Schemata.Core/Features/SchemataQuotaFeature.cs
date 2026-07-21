@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,9 +37,7 @@ public sealed class SchemataQuotaFeature : FeatureBase
             var rejected = options.OnRejected;
             options.OnRejected = async (ctx, ct) => {
                 if (rejected is null) {
-                    throw new QuotaExceededException(
-                        [new() { Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}", },]
-                    );
+                    throw CreateQuotaExceededException(ctx.HttpContext);
                 }
 
                 await rejected(ctx, ct);
@@ -47,13 +46,13 @@ public sealed class SchemataQuotaFeature : FeatureBase
                     return;
                 }
 
-                throw new QuotaExceededException([
-                    new() {
-                        Subject = $"client:{ctx.HttpContext.Connection.RemoteIpAddress}",
-                    },
-                ]);
+                throw CreateQuotaExceededException(ctx.HttpContext);
             };
         });
+    }
+
+    private static QuotaExceededException CreateQuotaExceededException(HttpContext context) {
+        return new([new() { Subject = $"client:{context.Connection.RemoteIpAddress}", }]);
     }
 
     public override void ConfigureApplication(

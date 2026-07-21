@@ -92,7 +92,7 @@ public class CompensationBoundaryHandlerShould
     }
 
     [Fact]
-    public async Task InvokeAsync_BoundaryHandlerWithStubExecutor_DrivesCompensationTargetAndWritesCompensateTransition() {
+    public async Task InvokeAsync_BoundaryHandlerWithStubExecutor_ForwardsCompensationInvocation() {
         var scenario = BoundaryScenario(1, false);
         var boundary = CompensationBoundaryHandler.FindCompensationBoundaries(scenario.Definition, scenario.Host).Single();
         var executor = new RecordingCompensationExecutor();
@@ -101,14 +101,10 @@ public class CompensationBoundaryHandlerShould
 
         await handler.InvokeAsync(context);
 
-        var transition = Assert.Single(executor.Transitions);
         Assert.Same(context, executor.Contexts.Single());
         Assert.Same(scenario.Host, executor.Activities.Single());
         Assert.Same(scenario.CompensationTargets[0], executor.Targets.Single());
-        Assert.Equal(TransitionKind.Compensate, transition.Kind);
-        Assert.Equal(boundary.Name, transition.Event);
-        Assert.Equal(scenario.Host.Name, transition.Previous);
-        Assert.Equal(scenario.CompensationTargets[0].Name, transition.Posterior);
+        Assert.Equal(boundary.Name, executor.EventNames.Single());
     }
 
     [Fact]
@@ -197,7 +193,7 @@ public class CompensationBoundaryHandlerShould
 
         public List<CompensationInvocationContext> Contexts { get; } = [];
 
-        public List<SchemataProcessTransition> Transitions { get; } = [];
+        public List<string> EventNames { get; } = [];
 
         public ValueTask ExecuteAsync(
             Activity                      activity,
@@ -208,13 +204,7 @@ public class CompensationBoundaryHandlerShould
             Activities.Add(activity);
             Targets.Add(compensationTarget);
             Contexts.Add(context);
-            Transitions.Add(new() {
-                Process   = context.Process.Name,
-                Kind      = TransitionKind.Compensate,
-                Previous  = activity.Name,
-                Posterior = compensationTarget.Name,
-                Event     = eventName,
-            });
+            EventNames.Add(eventName);
             return default;
         }
     }

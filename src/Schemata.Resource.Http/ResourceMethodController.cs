@@ -30,7 +30,7 @@ namespace Schemata.Resource.Http;
 [Route("~/Resource")]
 public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : ControllerBase
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
+    where TRequest : class
     where TResponse : class, ICanonicalName
     where THandler : class, IResourceMethodHandler<TEntity, TRequest, TResponse>
 {

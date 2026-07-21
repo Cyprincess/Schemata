@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Schemata.Scheduling.Skeleton;
@@ -22,4 +23,7 @@ public class SchemataSchedulingOptions
     ///     <see cref="MissedFirePolicy.FireOnce" />.
     /// </summary>
     public MissedFirePolicy MissedFirePolicy { get; set; } = MissedFirePolicy.FireOnce;
+
+    /// <summary>Interval between persisted operation state reads while waiting in-process.</summary>
+    public TimeSpan OperationPollInterval { get; set; } = TimeSpan.FromMilliseconds(500);
 }

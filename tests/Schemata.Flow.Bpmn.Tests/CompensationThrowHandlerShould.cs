@@ -19,7 +19,7 @@ public class CompensationThrowHandlerShould
         var calls    = new List<string>();
         var scenario = NewScenario(NewHandlers(calls));
 
-        var transitions = await new CompensationThrowHandler().FireAsync(
+        await new CompensationThrowHandler().FireAsync(
             scenario.Engine,
             scenario.Definition,
             scenario.Process,
@@ -30,8 +30,6 @@ public class CompensationThrowHandlerShould
             CancellationToken.None);
 
         Assert.Equal(new[] { "E", "D", "C", "B", "A" }, calls);
-        Assert.Equal(5, transitions.Count);
-        Assert.All(transitions, t => Assert.Equal(TransitionKind.Compensate, t.Kind));
     }
 
     [Fact]
@@ -71,9 +69,6 @@ public class CompensationThrowHandlerShould
             CancellationToken.None);
 
         Assert.Equal(new[] { "Y" }, calls);
-        var transition = Assert.Single(transitions);
-        Assert.Equal(TransitionKind.Compensate, transition.Kind);
-        Assert.Equal("Y", transition.Previous);
     }
 
     [Fact]
@@ -254,4 +249,3 @@ public class CompensationThrowHandlerShould
         }
     }
 }
-

@@ -65,14 +65,43 @@ public sealed class PlanExecutor
         var mode = _options.TotalSize is TotalSizeMode.Default ? TotalSizeMode.Exact : _options.TotalSize;
 
         return root.SourceSet.Count > 1
-            ? await ExecuteJoinAsync(root, request, principal, skip, pageSize, mode, ct).ConfigureAwait(false)
-            : await ExecuteSingleAsync(root, request, principal, skip, pageSize, mode, ct).ConfigureAwait(false);
+            ? await ExecuteJoinAsync(root, request, principal, true, skip, pageSize, mode, ct)
+            : await ExecuteSingleAsync(root, request, principal, true, skip, pageSize, mode, ct);
+    }
+
+    /// <summary>
+    ///     Opens an unpaged, single-pass row stream for a plan. The top-level pagination limit and all
+    ///     request pagination fields are ignored; nested limits remain part of the query plan.
+    /// </summary>
+    /// <param name="plan">The logical plan to execute.</param>
+    /// <param name="request">The source request context.</param>
+    /// <param name="principal">The execution principal, when security is enforced.</param>
+    /// <param name="enforceSecurity">Whether source drivers enforce their security checks.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>The opened schema and unpaged row stream.</returns>
+    public ValueTask<MaterializedQuery> MaterializeAsync(
+        PlanNode            plan,
+        QueryInsightRequest request,
+        ClaimsPrincipal?    principal,
+        bool                enforceSecurity = true,
+        CancellationToken   ct = default
+    ) {
+        var root = plan is LimitNode limit ? limit.Input : plan;
+        if (root.SourceSet.Count > 1) {
+            return ValueTask.FromResult(new MaterializedQuery(
+                JoinSchema(root),
+                Evaluate(root, request, principal, enforceSecurity, ct)
+            ));
+        }
+
+        return MaterializeSingleAsync(root, request, principal, enforceSecurity, ct);
     }
 
     private async ValueTask<QueryInsightResponse> ExecuteSingleAsync(
         PlanNode            root,
         QueryInsightRequest request,
         ClaimsPrincipal?    principal,
+        bool                enforceSecurity,
         int                 skip,
         int                 pageSize,
         TotalSizeMode       mode,
@@ -92,9 +121,9 @@ public sealed class PlanExecutor
         }
 
         var (pushable, localStages) = Split(root);
-        var subPlan = new SubPlan(pushable, source.Alias, source.Config);
+        var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
-        await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct).ConfigureAwait(false);
+        await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
 
         // An Estimated total over a local pipeline is the pushed-superset size: an upper bound on the
         // post-local row count, never the exact final count. The driver rows are buffered once so the
@@ -105,7 +134,7 @@ public sealed class PlanExecutor
         int?                                                   estimate = null;
         if (estimateSuperset) {
             var buffer = new List<IReadOnlyDictionary<string, object?>>();
-            await foreach (var row in result.Rows.WithCancellation(ct).ConfigureAwait(false)) {
+            await foreach (var row in result.Rows.WithCancellation(ct)) {
                 buffer.Add(row);
             }
 
@@ -126,8 +155,7 @@ public sealed class PlanExecutor
                                                pageSize,
                                                _options.MaxResidualScanRows,
                                                countExact,
-                                               ct)
-                                          .ConfigureAwait(false);
+                                               ct);
 
         return new() {
             Rows          = page,
@@ -137,16 +165,52 @@ public sealed class PlanExecutor
         };
     }
 
+    private async ValueTask<MaterializedQuery> MaterializeSingleAsync(
+        PlanNode            root,
+        QueryInsightRequest request,
+        ClaimsPrincipal?    principal,
+        bool                enforceSecurity,
+        CancellationToken   ct
+    ) {
+        var source = FindSource(root);
+        if (source is null) {
+            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+        }
+
+        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
+        if (driver is null) {
+            throw new InsightValidationException(
+                InsightReasons.Unimplemented,
+                $"No driver '{source.Config.DriverName}' is registered."
+            );
+        }
+
+        var (pushable, localStages) = Split(root);
+        var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
+        var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
+        try {
+            var rows = localStages.Count == 0
+                ? result.Rows
+                : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
+
+            return new([..result.Schema], rows, result);
+        } catch {
+            await result.DisposeAsync();
+            throw;
+        }
+    }
+
     private async ValueTask<QueryInsightResponse> ExecuteJoinAsync(
         PlanNode            root,
         QueryInsightRequest request,
         ClaimsPrincipal?    principal,
+        bool                enforceSecurity,
         int                 skip,
         int                 pageSize,
         TotalSizeMode       mode,
         CancellationToken   ct
     ) {
-        var rows       = Evaluate(root, request, principal, ct);
+        var rows       = Evaluate(root, request, principal, enforceSecurity, ct);
         var countExact = mode is not TotalSizeMode.None;
 
         var (page, hasMore, total) = await ResidualPage.ScanAsync(
@@ -156,8 +220,7 @@ public sealed class PlanExecutor
                                                pageSize,
                                                _options.MaxResidualScanRows,
                                                countExact,
-                                               ct)
-                                          .ConfigureAwait(false);
+                                               ct);
 
         return new() {
             Rows          = page,
@@ -176,10 +239,11 @@ public sealed class PlanExecutor
         PlanNode                                  node,
         QueryInsightRequest                       request,
         ClaimsPrincipal?                          principal,
+        bool                                      enforceSecurity,
         [EnumeratorCancellation] CancellationToken ct
     ) {
         if (node.SourceSet.Count <= 1) {
-            await foreach (var row in DriveSubtree(node, request, principal, ct).ConfigureAwait(false)) {
+            await foreach (var row in DriveSubtree(node, request, principal, enforceSecurity, ct)) {
                 yield return row;
             }
 
@@ -187,17 +251,17 @@ public sealed class PlanExecutor
         }
 
         if (node is JoinNode join) {
-            var left  = Evaluate(join.Left, request, principal, ct);
-            var right = Evaluate(join.Right, request, principal, ct);
-            await foreach (var row in _local.JoinAsync(left, right, join.On, join.Kind, ct).ConfigureAwait(false)) {
+            var left  = Evaluate(join.Left, request, principal, enforceSecurity, ct);
+            var right = Evaluate(join.Right, request, principal, enforceSecurity, ct);
+            await foreach (var row in _local.JoinAsync(left, right, join.On, join.Kind, ct)) {
                 yield return row;
             }
 
             yield break;
         }
 
-        var input = Evaluate(Child(node), request, principal, ct);
-        await foreach (var row in _local.RunStagesAsync(input, [node], ct).ConfigureAwait(false)) {
+        var input = Evaluate(Child(node), request, principal, enforceSecurity, ct);
+        await foreach (var row in _local.RunStagesAsync(input, [node], ct)) {
             yield return row;
         }
     }
@@ -206,6 +270,7 @@ public sealed class PlanExecutor
         PlanNode                                  node,
         QueryInsightRequest                       request,
         ClaimsPrincipal?                          principal,
+        bool                                      enforceSecurity,
         [EnumeratorCancellation] CancellationToken ct
     ) {
         var source = FindSource(node);
@@ -222,11 +287,11 @@ public sealed class PlanExecutor
         }
 
         var (pushable, localStages) = Split(node);
-        var subPlan = new SubPlan(pushable, source.Alias, source.Config);
+        var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
-        await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct).ConfigureAwait(false);
+        await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
 
-        await foreach (var row in _local.RunAsync(result.Rows, source.Alias, localStages, ct).ConfigureAwait(false)) {
+        await foreach (var row in _local.RunAsync(result.Rows, source.Alias, localStages, ct)) {
             yield return row;
         }
     }
@@ -334,7 +399,7 @@ public sealed class PlanExecutor
             yield return row;
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
     }
 
     private static PlanNode Child(PlanNode node) {

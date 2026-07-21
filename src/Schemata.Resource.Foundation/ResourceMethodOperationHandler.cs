@@ -8,6 +8,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Internal;
@@ -30,7 +31,7 @@ namespace Schemata.Resource.Foundation;
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
 public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
+    where TRequest : class
     where TResponse : class, ICanonicalName
 {
     private readonly IRepository<TEntity> _repository;
@@ -116,7 +117,9 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
 
             // The URI target identifies the resource for AIP-155 idempotency; carry it on the request
             // so the key distinguishes the same verb invoked against different resources.
-            request.CanonicalName = name;
+            if (request is ICanonicalName canonical) {
+                canonical.CanonicalName = name;
+            }
         }
 
         var requestResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
@@ -134,7 +137,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             }
 
             if (entity is null) {
-                throw ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name);
+                throw ResourceNotFound(name);
             }
 
             var methodResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
@@ -156,6 +159,10 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     }
 
     private static NotFoundException Blocked(string? name) {
-        return ResourceOperationHandler<TEntity, TRequest, TResponse, TResponse>.ResourceNotFound(name ?? ResourceNameDescriptor.ForType<TEntity>().Collection);
+        return ResourceNotFound(name ?? ResourceNameDescriptor.ForType<TEntity>().Collection);
+    }
+
+    private static NotFoundException ResourceNotFound(string? name) {
+        return SchemataResourceErrors.NotFound<TEntity>(name);
     }
 }

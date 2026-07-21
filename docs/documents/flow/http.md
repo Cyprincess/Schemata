@@ -99,8 +99,9 @@ collection; instance-scoped verbs bind to `{name}`:
 
 Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`. Its
 `InvokeAsync(name, request, entity, principal, ct)` receives the resolved entity (null for
-collection-scoped verbs), checks access via `FlowProcessAuthorization`, resolves source or payload
-types through the registry, and calls the runner. `principal` is the request's `ClaimsPrincipal`.
+collection-scoped verbs), resolves source or payload types through the registry, and calls the
+runner. `principal` is the request's `ClaimsPrincipal`; authorization runs earlier in the resource
+advisor pipeline when the host enables `WithAuthorization` on the resource builder.
 
 `FlowHttpStartProcessHandler` resolves the optional `Source` canonical name through
 `IResourceTypeResolver` and `IProcessRegistry.SourceTypes`, loads the entity through the registered

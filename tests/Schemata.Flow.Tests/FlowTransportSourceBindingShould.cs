@@ -166,7 +166,7 @@ public class FlowTransportSourceBindingShould
 
             services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? new Runtime());
             Services = services.BuildServiceProvider();
-            Runner = new(Registry.Object, new(), new(), Notifier(), Services);
+            Runner = new(Registry.Object, new(), Notifier(), Services);
         }
 
         public Order Order { get; }

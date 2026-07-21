@@ -13,7 +13,7 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 | Package                      | Key files                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Flow.Skeleton`     | `Models/` (AST: `ProcessDefinition.cs`, elements, requests), `Builders/` (DSL: `ProcessBuilder.cs`, `ActivityBehavior.cs`), `Runtime/` (`IFlowRuntime.cs`, contexts, registration), `Observers/` (`IFlowTransitionAdvisor.cs`, `IFlowSourceAdvisor.cs`), `Entities/` (process, token, source, transition rows)                 |
-| `Schemata.Flow.Foundation`   | `Features/SchemataFlowFeature.cs`, `Builders/SchemataFlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `IFlowRunner.cs`, `FlowRunner.cs`, `StartProcessOptions.cs`, `ProcessRegistry.cs`, `ProcessPersistence.cs`, `ProcessLifecycleNotifier.cs`, `FlowProcessAuthorization.cs`, `Advisors/AdviceSourceProjection.cs` |
+| `Schemata.Flow.Foundation`   | `Features/SchemataFlowFeature.cs`, `Builders/SchemataFlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `IFlowRunner.cs`, `FlowRunner.cs`, `StartProcessOptions.cs`, `ProcessRegistry.cs`, `ProcessPersistence.cs`, `ProcessLifecycleNotifier.cs`, `Advisors/AdviceSourceProjection.cs` |
 | `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs`, `Features/SchemataFlowStateMachineFeature.cs`, `Extensions/FlowStateMachineBuilderExtensions.cs`                                                                                                                                    |
 | `Schemata.Flow.Bpmn`         | `BpmnEngine.cs`, `BpmnValidator.cs`, `BpmnFlowEngineValidator.cs`, `Features/SchemataFlowBpmnFeature.cs`, `Extensions/FlowBpmnBuilderExtensions.cs`, `Runtime/`                                                                                                                                                                |
 | `Schemata.Flow.Event`        | `Features/SchemataFlowEventFeature.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs`                                                                                                                                                                                                                    |
@@ -26,7 +26,7 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 | Package                      | Role                                                                                |
 | ---------------------------- | ----------------------------------------------------------------------------------- |
 | `Schemata.Flow.Skeleton`     | AST, entity types, builders, runtime and observer contracts                         |
-| `Schemata.Flow.Foundation`   | `UseFlow` feature, registry, runner, persistence, lifecycle notifier, authorization |
+| `Schemata.Flow.Foundation`   | `UseFlow` feature, registry, runner, persistence, lifecycle notifier                |
 | `Schemata.Flow.StateMachine` | Default single-token engine and its validator; activated by `UseStateMachine()`     |
 | `Schemata.Flow.Bpmn`         | Full BPMN 2.0.2 multi-token engine and validator; activated by `UseBpmn()`          |
 | `Schemata.Flow.Event`        | Bridges message/signal catches to the event bus                                     |
@@ -54,8 +54,7 @@ using Schemata.Flow.StateMachine.Extensions;
 builder.UseSchemata(schema => {
     schema.UseFlow()
           .Use<OrderProcess>()                          // default StateMachine engine
-          .Use<ComplexProcess>("my-engine")             // custom keyed engine
-          .Use<AuditedProcess>(c => c.WithAuthorization());
+          .Use<ComplexProcess>("my-engine");            // custom keyed engine
 });
 ```
 
@@ -68,7 +67,7 @@ builder.UseSchemata(schema => {
 1. `IProcessRegistry` (`ProcessRegistry`, singleton). The factory eagerly registers every
    configuration through `RegisterAsync`, which validates the definition and resolves its keyed
    engine.
-2. `ProcessPersistence`, `FlowProcessAuthorization` (singletons); `ProcessLifecycleNotifier` (scoped).
+2. `ProcessPersistence` (singleton); `ProcessLifecycleNotifier` (scoped).
 3. `FlowRunner` and `IFlowRunner` (scoped).
 4. `IFlowSourceAdvisor<>` (scoped, enumerable) for source-bound advisors.
 5. The six resource-method handlers: `StartProcessHandler`, `CompleteActivityHandler`,
@@ -77,6 +76,15 @@ builder.UseSchemata(schema => {
 
 The engine, its validator, and the `IFlowRuntime` keyed registrations come from
 `SchemataFlowStateMachineFeature`, which `[DependsOn<SchemataFlowFeature]`.
+
+## Authorization
+
+Flow endpoints ride the Resource pipeline: enable authorization through the resource builder —
+`schema.UseResource().WithAuthorization(scheme)` — and the flow resources and verbs pass through
+the resource anonymous + authorize advisors, which call the access and entitlement providers with
+the verb as the operation. Per-definition rules belong to custom `IAccessProvider` implementations
+reading the request; in-process engine paths (event and scheduling bridges) carry no principal and
+no authorization. See [Security](../security.md).
 
 ## Feature priority table
 

@@ -84,7 +84,6 @@ public class BpmnEngine_TransactionSubProcessShould
             beforeCancel.Tokens.Single(t => t.StateName == "cancel-task").CanonicalName,
             CancellationToken.None);
 
-        Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "B" });
         Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "error-boundary", Posterior: "error-handler" });
         Assert.Equal("Running", snapshot.Process.State);
     }

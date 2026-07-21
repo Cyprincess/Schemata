@@ -24,7 +24,6 @@ namespace Schemata.Flow.Foundation;
 /// <summary>Executes Flow runtime operations and persists their results.</summary>
 public sealed class FlowRunner(
     IProcessRegistry         registry,
-    FlowProcessAuthorization auth,
     ProcessPersistence       persistence,
     ProcessLifecycleNotifier notifier,
     IServiceProvider         services
@@ -44,7 +43,7 @@ public sealed class FlowRunner(
             throw new InvalidOperationException($"Source entity type '{typeof(TState).FullName}' has no canonical name.");
         }
 
-        return StartCoreAsync(definitionName, options, null, source, source.CanonicalName, ct);
+        return StartCoreAsync(definitionName, options, source, source.CanonicalName, ct);
     }
 
     public ValueTask<SchemataProcess> StartAsync(
@@ -52,7 +51,7 @@ public sealed class FlowRunner(
         StartProcessOptions? options = null,
         CancellationToken    ct      = default
     ) {
-        return StartCoreAsync<object>(definitionName, options, null, null, null, ct);
+        return StartCoreAsync<object>(definitionName, options, null, null, ct);
     }
 
     #endregion
@@ -65,7 +64,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) {
-        return StartCoreAsync<object>(definitionName, options, principal, null, source, ct);
+        return StartCoreAsync<object>(definitionName, options, null, source, ct);
     }
 
     /// <summary>Starts a process from a resource request without a source entity.</summary>
@@ -75,7 +74,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) {
-        return StartCoreAsync<object>(definitionName, options, principal, null, null, ct);
+        return StartCoreAsync<object>(definitionName, options, null, null, ct);
     }
 
     /// <summary>Starts a process from a resource request and binds a loaded source entity.</summary>
@@ -90,7 +89,7 @@ public sealed class FlowRunner(
             throw new InvalidOperationException($"Source entity type '{typeof(TState).FullName}' has no canonical name.");
         }
 
-        return StartCoreAsync(definitionName, options, principal, source, source.CanonicalName, ct);
+        return StartCoreAsync(definitionName, options, source, source.CanonicalName, ct);
     }
 
     /// <summary>Completes the addressed token on a process.</summary>
@@ -100,23 +99,18 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        var reg    = ResolveProcess(process, principal);
+        var reg    = ResolveRegistration(process.DefinitionName);
         var engine = ResolveEngine(reg);
         ProcessSnapshot? snapshot = null;
 
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                var tokens = await LoadTokensAsync(scope, process.Name!, c);
-                var before = WaitingMap(tokens);
-                var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
-                snapshot = await engine.AdvanceAsync(reg.Definition, process, tokens, ctx, token, c);
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-            }, ct);
-        } catch (Exception ex) {
-            await notifier.NotifyFailedAsync(process, ex, ct);
-            throw;
-        }
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            var tokens = await LoadTokensAsync(scope, process.Name!, c);
+            var before = WaitingMap(tokens);
+            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
+            snapshot = await engine.AdvanceAsync(reg.Definition, process, tokens, ctx, token, c);
+            await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+            await persistence.PersistSnapshotAsync(scope, snapshot, c);
+        }, ct);
 
         await NotifyTransitionResultAsync(snapshot!, ct);
         return snapshot!;
@@ -131,7 +125,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        var reg     = ResolveProcess(process, principal);
+        var reg   = ResolveRegistration(process.DefinitionName);
         var value = DeserializePayload(payload, reg.MessagePayloadTypes.GetValueOrDefault(messageName));
         return await CorrelateCoreAsync(process, reg, messageName, value, token, ct);
     }
@@ -145,7 +139,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        var reg = ResolveProcess(process, principal);
+        var reg = ResolveRegistration(process.DefinitionName);
         return CorrelateCoreAsync(process, reg, messageName, payload, token, ct);
     }
 
@@ -168,20 +162,15 @@ public sealed class FlowRunner(
 
         ProcessSnapshot? snapshot = null;
 
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                var tokens = await LoadTokensAsync(scope, process.Name!, c);
-                var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
-                var target = await ResolveTargetAsync(engine, reg.Definition, process, tokens, ctx, message, token, c);
-                var before = WaitingMap(tokens);
-                snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, message, payload, target, c);
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-            }, ct);
-        } catch (Exception ex) {
-            await notifier.NotifyFailedAsync(process, ex, ct);
-            throw;
-        }
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            var tokens = await LoadTokensAsync(scope, process.Name!, c);
+            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
+            var target = await ResolveTargetAsync(engine, reg.Definition, process, tokens, ctx, message, token, c);
+            var before = WaitingMap(tokens);
+            snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, message, payload, target, c);
+            await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+            await persistence.PersistSnapshotAsync(scope, snapshot, c);
+        }, ct);
 
         await NotifyTransitionResultAsync(snapshot!, ct);
         return snapshot!;
@@ -195,7 +184,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, true);
+        await ThrowSignalCoreAsync(signalName, payload, token, ct, true);
     }
 
     /// <summary>Broadcasts a signal with a typed payload to waiting processes.</summary>
@@ -206,18 +195,16 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, false);
+        await ThrowSignalCoreAsync(signalName, payload, token, ct, false);
     }
 
     private async ValueTask ThrowSignalCoreAsync(
         string           signalName,
         object?          payload,
         string?          token,
-        ClaimsPrincipal? principal,
         CancellationToken ct,
         bool             deserialize
     ) {
-        auth.EnsureSignalAccess(registry, signalName, principal);
         await foreach (var process in persistence.ListWaitingAsync(services, ct)) {
             var reg = registry.GetRegistration(process.DefinitionName);
             if (reg is null) {
@@ -247,32 +234,27 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        var reg = ResolveProcess(process, principal);
+        var reg = ResolveRegistration(process.DefinitionName);
         ProcessSnapshot? snapshot = null;
 
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                var tokens      = await LoadTokensAsync(scope, process.Name!, c);
-                var before      = WaitingMap(tokens);
-                var ctx         = new FlowExecutionContext(scope.UnitOfWork, services);
-                var transitions = new List<SchemataProcessTransition>();
-                foreach (var item in tokens) {
-                    var previous = item.WaitingAtName ?? item.StateName;
-                    item.State         = "Cancelled";
-                    item.WaitingAtName = null;
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            var tokens      = await LoadTokensAsync(scope, process.Name!, c);
+            var before      = WaitingMap(tokens);
+            var ctx         = new FlowExecutionContext(scope.UnitOfWork, services);
+            var transitions = new List<SchemataProcessTransition>();
+            foreach (var item in tokens) {
+                var previous = item.WaitingAtName ?? item.StateName;
+                item.State         = "Cancelled";
+                item.WaitingAtName = null;
 
-                    transitions.Add(CancelTransition(process, item, previous, "Terminated", "Terminate", principal));
-                }
+                transitions.Add(CancelTransition(process, item, previous, "Terminated", "Terminate", principal));
+            }
 
-                process.State = "Terminated";
-                snapshot = new() { Process = process, Tokens = tokens, Transitions = transitions };
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-            }, ct);
-        } catch (Exception ex) {
-            await notifier.NotifyFailedAsync(process, ex, ct);
-            throw;
-        }
+            process.State = "Terminated";
+            snapshot = new() { Process = process, Tokens = tokens, Transitions = transitions };
+            await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+            await persistence.PersistSnapshotAsync(scope, snapshot, c);
+        }, ct);
 
         await notifier.NotifyTransitionedAsync(snapshot!, ct);
         await notifier.NotifyTerminatedAsync(process, ct);
@@ -293,48 +275,43 @@ public sealed class FlowRunner(
             );
         }
 
-        var reg = ResolveProcess(process, principal);
+        var reg = ResolveRegistration(process.DefinitionName);
         ProcessSnapshot? snapshot = null;
 
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                var tokens = await LoadTokensAsync(scope, process.Name!, c);
-                var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
-                var target = tokens.FirstOrDefault(t => t.CanonicalName == token.CanonicalName);
-                if (target is null) {
-                    throw new NotFoundException(
-                        SchemataResources.PROCESS_TOKEN_NOT_FOUND,
-                        new Dictionary<string, string?> {
-                            ["token"] = token.CanonicalName, ["process"] = process.CanonicalName,
-                        }
-                    );
-                }
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            var tokens = await LoadTokensAsync(scope, process.Name!, c);
+            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
+            var target = tokens.FirstOrDefault(t => t.CanonicalName == token.CanonicalName);
+            if (target is null) {
+                throw new NotFoundException(
+                    SchemataResources.PROCESS_TOKEN_NOT_FOUND,
+                    new Dictionary<string, string?> {
+                        ["token"] = token.CanonicalName, ["process"] = process.CanonicalName,
+                    }
+                );
+            }
 
-                if (TokenStates.IsTerminal(target.State)) {
-                    throw new FailedPreconditionException(
-                        message: SchemataResources.GetResourceString(SchemataResources.PROCESS_TOKEN_NOT_READY),
-                        reason: SchemataResources.PROCESS_TOKEN_NOT_READY);
-                }
+            if (TokenStates.IsTerminal(target.State)) {
+                throw new FailedPreconditionException(
+                    message: SchemataResources.GetResourceString(SchemataResources.PROCESS_TOKEN_NOT_READY),
+                    reason: SchemataResources.PROCESS_TOKEN_NOT_READY);
+            }
 
-                var before   = WaitingMap(tokens);
-                var previous = target.WaitingAtName ?? target.StateName;
-                target.State         = "Cancelled";
-                target.WaitingAtName = null;
+            var before   = WaitingMap(tokens);
+            var previous = target.WaitingAtName ?? target.StateName;
+            target.State         = "Cancelled";
+            target.WaitingAtName = null;
 
-                var transition = CancelTransition(process, target, previous, "Cancelled", "CancelToken", principal);
+            var transition = CancelTransition(process, target, previous, "Cancelled", "CancelToken", principal);
 
-                if (tokens.All(t => TokenStates.IsTerminal(t.State))) {
-                    process.State = "Cancelled";
-                }
+            if (tokens.All(t => TokenStates.IsTerminal(t.State))) {
+                process.State = "Cancelled";
+            }
 
-                snapshot = new() { Process = process, Tokens = tokens, Transitions = [transition] };
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-            }, ct);
-        } catch (Exception ex) {
-            await notifier.NotifyFailedAsync(process, ex, ct);
-            throw;
-        }
+            snapshot = new() { Process = process, Tokens = tokens, Transitions = [transition] };
+            await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+            await persistence.PersistSnapshotAsync(scope, snapshot, c);
+        }, ct);
 
         await NotifyTransitionResultAsync(snapshot!, ct);
         return snapshot!;
@@ -343,29 +320,22 @@ public sealed class FlowRunner(
     private async ValueTask<SchemataProcess> StartCoreAsync<TState>(
         string               definitionName,
         StartProcessOptions? options,
-        ClaimsPrincipal?     principal,
         TState?              source,
         string?              sourceName,
         CancellationToken    ct
     ) where TState : class {
-        auth.EnsureDefinitionAccess(registry, definitionName, principal);
         var reg    = ResolveRegistration(definitionName);
         var engine = ResolveEngine(reg);
         var process = NewProcess(definitionName, options);
         ProcessSnapshot? snapshot = null;
 
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                await BindStartSourceAsync(scope, reg, process, source, sourceName, c);
-                var ctx = new FlowExecutionContext(scope.UnitOfWork, services);
-                snapshot = await engine.StartAsync(reg.Definition, process, ctx, c);
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, new Dictionary<string, string?>(), c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-            }, ct);
-        } catch (Exception ex) {
-            await notifier.NotifyFailedAsync(process, ex, ct);
-            throw;
-        }
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            await BindStartSourceAsync(scope, reg, process, source, sourceName, c);
+            var ctx = new FlowExecutionContext(scope.UnitOfWork, services);
+            snapshot = await engine.StartAsync(reg.Definition, process, ctx, c);
+            await RunAdvisorsAsync(reg, scope, ctx, snapshot, new Dictionary<string, string?>(), c);
+            await persistence.PersistSnapshotAsync(scope, snapshot, c);
+        }, ct);
 
         await notifier.NotifyStartedAsync(snapshot!, ct);
         await notifier.NotifyTransitionedAsync(snapshot!, ct);
@@ -381,22 +351,30 @@ public sealed class FlowRunner(
         string?             token,
         CancellationToken   ct
     ) {
-        try {
-            await persistence.ExecuteAsync(services, async (scope, c) => {
-                var tokens  = await LoadTokensAsync(scope, process.Name!, c);
-                var ctx     = new FlowExecutionContext(scope.UnitOfWork, services);
-                var targets = await engine.FindTriggerTargetsAsync(reg.Definition, process, tokens, ctx, signal, c);
-                foreach (var target in FilterTargets(targets, token)) {
-                    var before = WaitingMap(tokens);
-                    var snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, signal, payload, target, c);
-                    await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                    await persistence.PersistSnapshotAsync(scope, snapshot, c);
-                    await notifier.NotifyTransitionedAsync(snapshot, c);
-                    if (ProcessStates.IsTerminal(snapshot.Process.State)) {
-                        await notifier.NotifyTerminatedAsync(snapshot.Process, c);
-                    }
+        await ExecuteWithNotificationAsync(process, async (scope, c) => {
+            var tokens  = await LoadTokensAsync(scope, process.Name!, c);
+            var ctx     = new FlowExecutionContext(scope.UnitOfWork, services);
+            var targets = await engine.FindTriggerTargetsAsync(reg.Definition, process, tokens, ctx, signal, c);
+            foreach (var target in FilterTargets(targets, token)) {
+                var before = WaitingMap(tokens);
+                var snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, signal, payload, target, c);
+                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+                await persistence.PersistSnapshotAsync(scope, snapshot, c);
+                await notifier.NotifyTransitionedAsync(snapshot, c);
+                if (ProcessStates.IsTerminal(snapshot.Process.State)) {
+                    await notifier.NotifyTerminatedAsync(snapshot.Process, c);
                 }
-            }, ct);
+            }
+        }, ct);
+    }
+
+    private async ValueTask ExecuteWithNotificationAsync(
+        SchemataProcess                                   process,
+        Func<FlowPersistenceScope, CancellationToken, Task> action,
+        CancellationToken                                ct
+    ) {
+        try {
+            await persistence.ExecuteAsync(services, action, ct);
         } catch (Exception ex) {
             await notifier.NotifyFailedAsync(process, ex, ct);
             throw;
@@ -556,8 +534,7 @@ public sealed class FlowRunner(
         var types = reg.SourceTypes.ToList();
         if (types.Count != 1) {
             throw new FailedPreconditionException(
-                SchemataResources.PROCESS_NOT_REGISTERED,
-                new Dictionary<string, string?> { ["name"] = reg.Name });
+                message: $"Process '{reg.Name}' binds {types.Count} source types; specify a source name.");
         }
 
         return (types[0].Key, types[0].Value.SourceType.FullName ?? types[0].Value.SourceType.Name, sourceName!, null);
@@ -658,11 +635,6 @@ public sealed class FlowRunner(
             DisplayName    = string.IsNullOrWhiteSpace(options?.DisplayName) ? null : options.DisplayName,
             Description    = string.IsNullOrWhiteSpace(options?.Description) ? null : options.Description,
         };
-    }
-
-    private ProcessRegistration ResolveProcess(SchemataProcess process, ClaimsPrincipal? principal) {
-        auth.EnsureProcessAccess(registry, process, principal);
-        return ResolveRegistration(process.DefinitionName);
     }
 
     private ProcessRegistration ResolveRegistration(string definitionName) {

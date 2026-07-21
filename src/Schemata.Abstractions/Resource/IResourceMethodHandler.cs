@@ -15,7 +15,7 @@ namespace Schemata.Abstractions.Resource;
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
 public interface IResourceMethodHandler<TEntity, in TRequest, TResponse>
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
+    where TRequest : class
     where TResponse : class, ICanonicalName
 {
     /// <summary>

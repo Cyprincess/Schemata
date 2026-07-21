@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Report Foundation</Description>
+    <PackageTags>application;business;framework;report;analytics</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
+    <ProjectReference Include="..\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

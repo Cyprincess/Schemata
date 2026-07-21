@@ -81,7 +81,7 @@ internal static class ResourceCustomMethod
     )
         where TService : class
         where TEntity : class, ICanonicalName
-        where TRequest : class, ICanonicalName
+        where TRequest : class
         where TResponse : class, ICanonicalName {
         var rpc = new Method<TRequest, TResponse>(
             MethodType.Unary,
@@ -100,14 +100,14 @@ internal static class ResourceCustomMethod
         Type              handlerType
     )
         where TEntity : class, ICanonicalName
-        where TRequest : class, ICanonicalName
+        where TRequest : class
         where TResponse : class, ICanonicalName {
         var http      = ctx.GetHttpContext();
         var sp        = http.RequestServices;
         var operation = sp.GetRequiredService<ResourceMethodOperationHandler<TEntity, TRequest, TResponse>>();
         var handler   = (IResourceMethodHandler<TEntity, TRequest, TResponse>)sp.GetRequiredService(handlerType);
 
-        var name = request.CanonicalName;
+        var name = (request as ICanonicalName)?.CanonicalName;
 
         return await operation.InvokeAsync(handler, verb, name, request, http.User, ctx.CancellationToken);
     }

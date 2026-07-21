@@ -127,6 +127,6 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 
 ## Notes
 
-- File counts: hot spots are `Schemata.Authorization.Foundation` (120), `Schemata.Flow.Skeleton` (102), `Schemata.Abstractions` (101), `Schemata.Resource.Foundation` (90), `Schemata.Authorization.Skeleton` (72). Each has its own `AGENTS.md` where present.
+- File counts: hot spots are `Schemata.Authorization.Foundation` (120), `Schemata.Flow.Skeleton` (107), `Schemata.Abstractions` (101), `Schemata.Resource.Foundation` (90), `Schemata.Authorization.Skeleton` (72). Each has its own `AGENTS.md` where present.
 - The advice generator is auto-attached as an analyzer to every `src/*` project via [../Directory.Build.props](../Directory.Build.props#L90-L94). Skip with `-p:SchemataSkipGenerators=true`.
 - All packages share `Schemata.png` / `LICENSE` / root `README.md` for the NuGet display via `PackageIconFullPath` + `PackageReadmeFile` resolved in [../Directory.Build.props](../Directory.Build.props#L120-L130).

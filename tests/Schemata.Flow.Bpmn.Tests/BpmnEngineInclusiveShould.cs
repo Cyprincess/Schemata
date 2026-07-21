@@ -75,8 +75,6 @@ public class BpmnEngineInclusiveShould
 
     [Fact]
     public async Task InclusiveMerge_DeadPath_FiresWithFewerArrivalsThanIncomingCount() {
-        // Branch spawns only task-a and task-b (cond-c false); merge has 3 incoming flows but only
-        // 2 are live. Dead-path detection must let the merge fire after 2 arrivals.
         var definition = InclusiveBranchMergeDefinition(true, true, false);
         var process    = NewProcess(definition.Name);
         var engine     = new BpmnEngine();

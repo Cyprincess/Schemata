@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="protobuf-net.Grpc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="../../src/Schemata.Caching.Distributed/Schemata.Caching.Distributed.csproj" />
+    <ProjectReference Include="../../src/Schemata.Expressions.Aip/Schemata.Expressions.Aip.csproj" />
+    <ProjectReference Include="../../src/Schemata.Expressions.Cel/Schemata.Expressions.Cel.csproj" />
+    <ProjectReference Include="../../src/Schemata.Expressions.Order/Schemata.Expressions.Order.csproj" />
+    <ProjectReference Include="../../src/Schemata.Insight.Foundation/Schemata.Insight.Foundation.csproj" />
+    <ProjectReference Include="../../src/Schemata.Mapping.Foundation/Schemata.Mapping.Foundation.csproj" />
+    <ProjectReference Include="../../src/Schemata.Mapping.Mapster/Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="../../src/Schemata.Report.Grpc/Schemata.Report.Grpc.csproj" />
+    <ProjectReference Include="../../src/Schemata.Report.Http/Schemata.Report.Http.csproj" />
+    <ProjectReference Include="../../src/Schemata.Report.Scheduling/Schemata.Report.Scheduling.csproj" />
+    <ProjectReference Include="../../src/Schemata.Resource.Grpc/Schemata.Resource.Grpc.csproj" />
+    <ProjectReference Include="../../src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />
+    <ProjectReference Include="../../src/Schemata.Scheduling.Grpc/Schemata.Scheduling.Grpc.csproj" />
+    <ProjectReference Include="../../src/Schemata.Scheduling.Http/Schemata.Scheduling.Http.csproj" />
+  </ItemGroup>
+</Project>

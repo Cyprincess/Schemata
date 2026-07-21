@@ -19,7 +19,7 @@ public sealed partial class LocalPipelineExecutor
     ) {
         var cap    = MaxScan();
         var buffer = new List<IReadOnlyDictionary<string, object?>>();
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             if (buffer.Count >= cap) {
                 throw new InvalidOperationException($"Join buffer exceeded the maximum of {cap} rows.");
             }
@@ -68,7 +68,7 @@ public sealed partial class LocalPipelineExecutor
         string                                                 alias,
         [EnumeratorCancellation] CancellationToken             ct
     ) {
-        await foreach (var row in source.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in source.WithCancellation(ct)) {
             yield return new Dictionary<string, object?>(StringComparer.Ordinal) { [alias] = row };
         }
     }

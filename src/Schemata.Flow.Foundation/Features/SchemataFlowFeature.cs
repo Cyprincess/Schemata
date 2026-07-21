@@ -14,7 +14,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation.Features;
 
-/// <summary>Registers the BPMN process registry, authorization, lifecycle notifier, and resource-method handlers.</summary>
+/// <summary>Registers the BPMN process registry, lifecycle notifier, and resource-method handlers.</summary>
 public sealed class SchemataFlowFeature : FeatureBase
 {
     /// <summary>Default <see cref="FeatureBase.Order" /> for the Flow feature.</summary>
@@ -45,7 +45,6 @@ public sealed class SchemataFlowFeature : FeatureBase
         });
 
         services.TryAddSingleton<ProcessPersistence>();
-        services.TryAddSingleton<FlowProcessAuthorization>();
         services.TryAddScoped<ProcessLifecycleNotifier>();
         services.TryAddScoped<FlowRunner>();
         services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());

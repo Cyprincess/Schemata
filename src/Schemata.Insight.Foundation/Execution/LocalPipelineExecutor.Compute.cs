@@ -22,7 +22,7 @@ public sealed partial class LocalPipelineExecutor
                                                     .Compile()))
                             .ToArray();
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             var next = new Dictionary<string, object?>(row, StringComparer.Ordinal);
             foreach (var (alias, value) in fields) {
                 next[alias] = value(row);

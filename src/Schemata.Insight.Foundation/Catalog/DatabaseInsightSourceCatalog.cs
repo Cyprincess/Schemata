@@ -32,7 +32,7 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
 
         var record = await repository
                           .FirstOrDefaultAsync<SchemataInsightSource>(q => q.Where(s => s.Name == name), ct)
-                          .ConfigureAwait(false);
+                          ;
 
         return record?.Driver is { } driver
             ? new SourceConfig(driver, ParseParams(record.Params))
@@ -44,7 +44,7 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataInsightSource>>();
 
         var names = new List<string>();
-        await foreach (var record in repository.ListAsync<SchemataInsightSource>(null, ct).ConfigureAwait(false)) {
+        await foreach (var record in repository.ListAsync<SchemataInsightSource>(null, ct)) {
             if (record.Name is { } name) {
                 names.Add(name);
             }

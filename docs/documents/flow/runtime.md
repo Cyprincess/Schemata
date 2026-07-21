@@ -43,8 +43,8 @@ ProcessRegistration? GetRegistration(string processName);
 
 ## FlowRunner
 
-`FlowRunner` implements `IFlowRunner` and is scoped. Resource handlers call it after authorization
-and after resolving the addressed `SchemataProcess` or token row.
+`FlowRunner` implements `IFlowRunner` and is scoped. Resource handlers call it after the resource
+request advisors run and after resolving the addressed `SchemataProcess` or token row.
 
 ### IFlowRunner
 

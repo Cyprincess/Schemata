@@ -1,10 +1,10 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Entity.Repository;
+using Schemata.Abstractions.Resource;
 using Schemata.Scheduling.Foundation;
+using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 
@@ -14,24 +14,27 @@ public class WaitOperationHandlerShould
 {
     [Fact]
     public async Task ReturnCurrentSnapshot_WhenRequestTimeoutElapses() {
-        var executions = new Mock<IRepository<SchemataJobExecution>>();
-        executions.Setup(r => r.FirstOrDefaultAsync(
-                             It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns(new ValueTask<SchemataJobExecution?>(new SchemataJobExecution {
-                       Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"), State = ExecutionState.Running,
-                   }));
-        var handler = new WaitOperationHandler(executions.Object);
         var entity = new SchemataJobExecution {
-            Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"), State = ExecutionState.Running,
+            Uid           = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            CanonicalName = "operations/11111111111111111111111111111111",
+            State         = ExecutionState.Running,
         };
-        var started = DateTime.UtcNow;
+        var operations = new Mock<IOperationService>();
+        operations.Setup(s => s.WaitAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
+                  .Returns(async (string _, CancellationToken ct) => {
+                      await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                      return new Operation();
+                  });
+        operations.Setup(s => s.GetAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
+                  .Returns(new ValueTask<Operation>(OperationMapper.FromExecution(entity)));
+        var handler = new WaitOperationHandler(operations.Object);
 
         var result = await handler.InvokeAsync(entity.CanonicalName, new() { Timeout = TimeSpan.FromMilliseconds(10) },
                                                entity, null, CancellationToken.None);
 
         Assert.False(result.Done);
-        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(1));
+        operations.Verify(s => s.WaitAsync(entity.CanonicalName, It.IsAny<CancellationToken>()), Times.Once);
+        operations.Verify(s => s.GetAsync(entity.CanonicalName, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

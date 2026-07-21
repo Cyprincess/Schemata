@@ -24,7 +24,6 @@ internal static class FlowFixtureServices
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddIdentifier<>)));
         services.TryAddSingleton<IProcessRegistry, ProcessRegistry>();
         services.TryAddSingleton<ProcessPersistence>();
-        services.TryAddSingleton<FlowProcessAuthorization>();
         services.TryAddScoped<ProcessLifecycleNotifier>();
         services.TryAddScoped<FlowRunner>();
         services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());

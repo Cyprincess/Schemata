@@ -24,10 +24,10 @@ namespace Schemata.Entity.EntityFrameworkCore;
 ///             relationship from the annotated property to that alternate key.
 ///         </item>
 ///         <item>
-        ///             For every supported scalar dictionary or scalar collection property,
-        ///             registers a JSON <see cref="EfCoreJsonValueConverter{T}" /> and a value
-        ///             comparer so EF Core stores the value as a single text column and detects
-        ///             in-place mutation.
+///             For every supported scalar dictionary or scalar collection property,
+///             registers a JSON <see cref="EfCoreJsonValueConverter{T}" /> and a value
+///             comparer so EF Core stores the value as a single text column and detects
+///             in-place mutation.
 ///         </item>
 ///     </list>
 ///     Polymorphic <see cref="ResourceReferenceAttribute" /> properties

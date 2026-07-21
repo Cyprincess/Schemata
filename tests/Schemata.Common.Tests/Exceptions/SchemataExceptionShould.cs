@@ -112,10 +112,6 @@ public class SchemataExceptionShould
 
     [Fact]
     public void CreateErrorResponse_NamedPlaceholders_ResolveByMetadataKey() {
-        // The INVALID_UPDATE_MASK resx template is
-        // "The update_mask path '{path}' is invalid: {reason}." — metadata is inserted
-        // in the opposite order of the placeholders to prove substitution resolves by
-        // key, not by insertion order.
         var exception = new SchemataException(400, ErrorCodes.InvalidArgument) {
             Details = [
                 new ErrorInfoDetail {
@@ -136,8 +132,6 @@ public class SchemataExceptionShould
 
     [Fact]
     public void CreateErrorResponse_NamedPlaceholders_MissingKeyLeavesPlaceholderLiteral() {
-        // A named placeholder whose metadata key is absent stays literal so a partially
-        // populated metadata bag never breaks the response.
         var exception = new SchemataException(400, ErrorCodes.InvalidArgument) {
             Details = [
                 new ErrorInfoDetail {

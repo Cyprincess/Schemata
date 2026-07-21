@@ -109,6 +109,10 @@ An extension feature can be activated in the same way as a built-in feature.
 | 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
 | 490_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
 | 490_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
+| 500_000_000 | Schemata.Report.Foundation         | Report                   | Report definitions, snapshots, and generation                     |
+| 500_100_000 | Schemata.Report.Http               | Report (`MapHttp`)       | HTTP resource bridge for reports and snapshots                    |
+| 500_200_000 | Schemata.Report.Grpc               | Report (`MapGrpc`)       | gRPC resource bridge for reports and snapshots                    |
+| 500_400_000 | Schemata.Report.Scheduling         | Report.Scheduling        | Periodic report generation bridge                                  |
 | 520_000_000 | Schemata.Modular                   | Modular                  | Module discovery and loading                                       |
 
 ## Compliance

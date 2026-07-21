@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using Schemata.Common;
 using Schemata.Core.Tests.Fixtures;
 using Xunit;
@@ -106,7 +107,7 @@ public class ResourceNameDescriptorShould
 
     [Fact]
     public void Singular_PreserveDisplayNameThatSingularizesToDifferentValue() {
-        var descriptor = ResourceNameDescriptor.ForType<Process>();
+        var descriptor = ResourceNameDescriptor.ForType<ProcessDescriptor>();
 
         Assert.Equal("Process", descriptor.Singular);
     }
@@ -135,4 +136,7 @@ public class ResourceNameDescriptorShould
 
         Assert.Equal("processes/p1/steps/s1", resolved);
     }
+
+    [DisplayName("Process")]
+    private sealed class ProcessDescriptor { }
 }

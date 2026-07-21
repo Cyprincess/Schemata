@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Report HTTP</Description>
+    <PackageTags>application;business;framework;report;analytics;http</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Report.Foundation\Schemata.Report.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -36,6 +36,7 @@ public sealed class JobExecutionDispatcher(
     private const           int           BatchSize = 100;
     private static readonly TimeSpan      Interval  = TimeSpan.FromSeconds(30);
     private readonly        SemaphoreSlim _pending  = new(0, int.MaxValue);
+    private readonly        IServiceScopeFactory _scopes = services.GetRequiredService<IServiceScopeFactory>();
     private readonly        TimeProvider  _time     = time ?? TimeProvider.System;
 
     /// <summary>Wakes the dispatch loop after a producer commits (or a timer arms) a due execution row.</summary>
@@ -84,7 +85,7 @@ public sealed class JobExecutionDispatcher(
         CancellationToken                 ct
     ) {
         if (string.IsNullOrWhiteSpace(execution.JobKey)) {
-            await MarkFailedAsync(executions, execution, "Job execution is missing its JobKey.", ct);
+            await MarkFailedAsync(execution, "Job execution is missing its JobKey.", ct);
             return;
         }
 
@@ -97,23 +98,23 @@ public sealed class JobExecutionDispatcher(
             return;
         }
 
-        await RunPipelineAsync(serviceProvider, executions, execution, ct);
+        await RunPipelineAsync(serviceProvider, execution, ct);
     }
 
     /// <summary>
     ///     Runs the advisor → observer → job-body pipeline for a claimed execution row, records the
-    ///     terminal state, and advances a recurring schedule, sourced entirely from the durable row.
+    ///     terminal state, and advances recurring schedules. Pipeline context and scheduling state
+    ///     are sourced from the durable row.
     /// </summary>
     private async Task RunPipelineAsync(
-        IServiceProvider                  serviceProvider,
-        IRepository<SchemataJobExecution> executions,
-        SchemataJobExecution              execution,
-        CancellationToken                 ct
+        IServiceProvider     serviceProvider,
+        SchemataJobExecution execution,
+        CancellationToken    ct
     ) {
         var registry = serviceProvider.GetRequiredService<IScheduledJobRegistry>();
         var jobType  = registry.Resolve(execution.JobKey!);
         if (jobType is null) {
-            await MarkFailedAsync(executions, execution, $"Job key '{execution.JobKey}' is not registered.", ct);
+            await MarkFailedAsync(execution, $"Job key '{execution.JobKey}' is not registered.", ct);
             return;
         }
 
@@ -132,20 +133,20 @@ public sealed class JobExecutionDispatcher(
             default:
                 // An advisor handled or blocked the fire before it ran; leave no terminal row churn
                 // beyond the claim and advance the schedule so the next occurrence is materialized.
-                await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Blocked, null, observers,
+                await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Blocked, null, observers,
                                     context, ct);
                 return;
         }
 
         var outcome = await ResolveTriggerOutcomeAsync(observers, job, context, ct);
         if (outcome == JobTriggerOutcome.Block) {
-            await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Blocked, null, observers,
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Blocked, null, observers,
                                 context, ct, notifyBlocked: true);
             return;
         }
 
         if (outcome == JobTriggerOutcome.Skip) {
-            await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Skipped, null, observers,
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Skipped, null, observers,
                                 context, ct, notifySkipped: true);
             return;
         }
@@ -155,25 +156,26 @@ public sealed class JobExecutionDispatcher(
             await scheduledJob.ExecuteAsync(context, ct);
 
             execution.Output = context.Execution?.Output;
-            await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Succeeded, null, observers,
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Succeeded, null, observers,
                                 context, ct, true);
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             // Host shutdown mid-run: leave the row Running so a later pass reclaims and reruns it.
             logger?.LogInformation("Execution '{ExecutionUid}' cancelled mid-run; leaving it for re-dispatch.",
                                    execution.Uid);
         } catch (Exception ex) {
-            await FinalizeAsync(serviceProvider, executions, job, execution, ExecutionState.Failed, ex, observers,
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Failed, ex, observers,
                                 context, ct, notifyFailed: true);
         }
     }
 
     /// <summary>
-    ///     Writes the terminal execution row, runs the matching lifecycle observers, and asks the
-    ///     scheduler to advance a recurring job to its next occurrence.
+    ///     Writes the terminal execution row through a fresh repository scope after the claim's unit
+    ///     of work completes. The claimed <paramref name="execution" /> instance retains its expected
+    ///     concurrency token so a concurrent cancellation aborts finalization instead of being overwritten.
+    ///     Then runs the matching lifecycle observers and advances a recurring job to its next occurrence.
     /// </summary>
     private async Task FinalizeAsync(
         IServiceProvider                  serviceProvider,
-        IRepository<SchemataJobExecution> executions,
         SchemataJob                       job,
         SchemataJobExecution              execution,
         ExecutionState                    state,
@@ -190,6 +192,8 @@ public sealed class JobExecutionDispatcher(
         execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = exception?.Message;
 
+        await using var scope = _scopes.CreateAsyncScope();
+        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);
@@ -308,15 +312,18 @@ public sealed class JobExecutionDispatcher(
     }
 
     private async Task MarkFailedAsync(
-        IRepository<SchemataJobExecution> executions,
-        SchemataJobExecution              execution,
-        string                            error,
-        CancellationToken                 ct
+        SchemataJobExecution execution,
+        string               error,
+        CancellationToken    ct
     ) {
         execution.State       = ExecutionState.Failed;
         execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = error;
 
+        // Write through a fresh scope: the unregistered-job-key path runs after the claim's unit of
+        // work has already committed, so reusing that repository would flush a completed unit of work.
+        await using var scope = _scopes.CreateAsyncScope();
+        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);

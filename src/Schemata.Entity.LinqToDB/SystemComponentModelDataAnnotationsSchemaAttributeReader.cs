@@ -36,8 +36,8 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
 ///     concurrency token drives LINQ to DB's optimistic-update predicate.
 ///     Key discovery uses class-level <c>[PrimaryKey]</c> declarations on the entity.
-    ///     Supported scalar dictionary and scalar collection properties receive a JSON
-    ///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
+///     Supported scalar dictionary and scalar collection properties receive a JSON
+///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
 /// </remarks>
 public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : IMetadataReader
 {

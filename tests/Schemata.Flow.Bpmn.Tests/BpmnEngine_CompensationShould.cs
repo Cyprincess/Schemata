@@ -79,10 +79,9 @@ public class BpmnEngine_CompensationShould
 
         var snapshot = await AdvanceTokenAsync(scenario, beforeThrow, TokenByState(beforeThrow, "c"));
 
-        var compensations = snapshot.Transitions.Where(t => t.Kind == TransitionKind.Compensate).ToList();
-        Assert.Equal(2, compensations.Count);
-        Assert.Equal(["c", "b"], compensations.Select(t => t.Previous));
-        Assert.DoesNotContain(compensations, t => t.Previous == "a");
+        Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "c", Posterior: "undo-c" });
+        Assert.DoesNotContain(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "a" });
+        Assert.Equal(["b"], scenario.Log);
         Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "inner-error-boundary", Posterior: "inner-error-handler" });
         Assert.Equal("Running", snapshot.Process.State);
     }
@@ -410,16 +409,6 @@ public class BpmnEngine_CompensationShould
 
         public ValueTask InvokeAsync(CompensationInvocationContext context, CancellationToken ct = default) {
             log.Add(Activity.Name!);
-
-            context.Transitions.Add(new() {
-                Name      = Guid.NewGuid().ToString("n"),
-                Process   = context.Process.Name!,
-                Token     = context.Scope.CanonicalName,
-                Previous  = Activity.Name,
-                Posterior = CompensationTarget.Name,
-                Kind      = TransitionKind.Compensate,
-                Event     = "ThrowingHandler",
-            });
             throw failure;
         }
     }

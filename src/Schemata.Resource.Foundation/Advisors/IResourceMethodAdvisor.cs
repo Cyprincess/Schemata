@@ -18,5 +18,5 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
 public interface IResourceMethodAdvisor<TEntity, TRequest, TResponse> : IAdvisor<TRequest, TEntity, ClaimsPrincipal?>
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
+    where TRequest : class
     where TResponse : class, ICanonicalName;

@@ -170,6 +170,8 @@
       href: insight/drivers.md
     - name: Transports
       href: insight/transports.md
+- name: Report
+  href: report.md
 - name: Mapping
   href: mapping/overview.md
   items:

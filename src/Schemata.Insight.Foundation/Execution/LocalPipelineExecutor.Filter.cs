@@ -17,7 +17,7 @@ public sealed partial class LocalPipelineExecutor
                        .Compile<IReadOnlyDictionary<string, object?>, bool>(filter.Predicate.Tree)
                        .Compile();
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             if (predicate(row)) {
                 yield return row;
             }

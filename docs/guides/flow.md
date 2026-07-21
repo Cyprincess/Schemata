@@ -33,14 +33,14 @@ schema.UseFlow()
 `UseStateMachine`, the engine runtime is never registered and start calls resolve to nothing.
 Feature priorities and engine keys are covered in [Flow Overview](../documents/flow/overview.md).
 
-`Use<TProcess>()` returns the builder, so multiple processes chain. Pass an optional
-`Action<ProcessConfiguration>` to configure a single definition without breaking the chain:
+`Use<TProcess>()` returns the builder, so multiple processes chain; an optional
+`Action<ProcessConfiguration>` configures a single definition:
 
 ```csharp
 schema.UseFlow()
       .UseStateMachine()
       .Use<EnrollmentProcess>()
-      .Use<GraduationProcess>(c => c.WithAuthorization());
+      .Use<GraduationProcess>();
 ```
 
 ## Define the process

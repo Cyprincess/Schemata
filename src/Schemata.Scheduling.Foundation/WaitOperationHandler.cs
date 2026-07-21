@@ -1,10 +1,8 @@
 using System;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
-using Schemata.Entity.Repository;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -16,11 +14,9 @@ namespace Schemata.Scheduling.Foundation;
 ///     current snapshot once the row reaches a terminal state or the deadline
 ///     elapses.
 /// </summary>
-public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> executions, TimeProvider? time = null)
+public sealed class WaitOperationHandler(IOperationService operations, TimeProvider? time = null)
     : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation>
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
-
     /// <summary>Maximum server-side wait duration accepted by the handler.</summary>
     public static readonly  TimeSpan MaxWait      = TimeSpan.FromSeconds(30);
 
@@ -37,41 +33,18 @@ public sealed class WaitOperationHandler(IRepository<SchemataJobExecution> execu
     ) {
         ArgumentNullException.ThrowIfNull(entity);
 
-        if (IsTerminal(entity.State)) {
-            return OperationMapper.FromExecution(entity);
+        var operation = entity.CanonicalName ?? $"operations/{entity.Uid:n}";
+        using var deadline = new CancellationTokenSource(GetEffectiveTimeout(request.Timeout), _time);
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
+
+        try {
+            return await operations.WaitAsync(operation, bounded.Token);
+        } catch (OperationCanceledException) when (!ct.IsCancellationRequested) {
+            return await operations.GetAsync(operation, ct);
         }
-
-        var deadline = _time.GetUtcNow().UtcDateTime + GetEffectiveTimeout(request.Timeout);
-        var uid      = entity.Uid;
-
-        while (_time.GetUtcNow().UtcDateTime < deadline) {
-            var remaining = deadline - _time.GetUtcNow().UtcDateTime;
-            if (remaining > TimeSpan.Zero) {
-                await Task.Delay(remaining < PollInterval ? remaining : PollInterval, _time, ct);
-            }
-
-            var snapshot = await executions.FirstOrDefaultAsync<SchemataJobExecution>(
-                q => q.Where(e => e.Uid == uid), ct);
-
-            if (snapshot is null) {
-                return OperationMapper.FromExecution(entity);
-            }
-
-            if (IsTerminal(snapshot.State)) {
-                return OperationMapper.FromExecution(snapshot);
-            }
-
-            entity = snapshot;
-        }
-
-        return OperationMapper.FromExecution(entity);
     }
 
     #endregion
-
-    private static bool IsTerminal(ExecutionState state) {
-        return state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
-    }
 
     /// <summary>Returns the bounded wait duration used for a request.</summary>
     public static TimeSpan GetEffectiveTimeout(TimeSpan? requested) {

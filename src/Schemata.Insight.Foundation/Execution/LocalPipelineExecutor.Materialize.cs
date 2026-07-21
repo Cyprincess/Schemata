@@ -23,7 +23,7 @@ public sealed partial class LocalPipelineExecutor
                                                        .Compile()))
                                 .ToArray();
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             if (selection.Items.IsDefaultOrEmpty) {
                 yield return Flatten(row);
                 continue;
@@ -36,7 +36,7 @@ public sealed partial class LocalPipelineExecutor
                         projected[item.Alias] = Resolve(row, path);
                         break;
                     case SelectionKind.Nested when item.Nested is not null:
-                        projected[item.Alias] = await ProjectNested(row, item, ct).ConfigureAwait(false);
+                        projected[item.Alias] = await ProjectNested(row, item, ct);
                         break;
                 }
             }
@@ -58,7 +58,7 @@ public sealed partial class LocalPipelineExecutor
         var rawChildren = FindChildList(parent, item.Alias);
 
         var projected = new List<IReadOnlyDictionary<string, object?>>(rawChildren.Count);
-        await foreach (var child in RunAsync(ToAsync(rawChildren, ct), childAlias, childStages, ct).ConfigureAwait(false)) {
+        await foreach (var child in RunAsync(ToAsync(rawChildren, ct), childAlias, childStages, ct)) {
             projected.Add(child);
         }
 
@@ -110,6 +110,6 @@ public sealed partial class LocalPipelineExecutor
             yield return row;
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
     }
 }

@@ -29,8 +29,8 @@ public sealed class DefaultInsightService : IInsightService
         ClaimsPrincipal?    principal,
         CancellationToken   ct = default
     ) {
-        var plan = await _planner.BuildAsync(request, ct).ConfigureAwait(false);
-        return await _executor.ExecuteAsync(plan, request, principal, ct).ConfigureAwait(false);
+        var plan = await _planner.BuildAsync(request, ct);
+        return await _executor.ExecuteAsync(plan, request, principal, ct);
     }
 
     #endregion

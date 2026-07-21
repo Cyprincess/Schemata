@@ -17,13 +17,4 @@ public sealed class ProcessConfiguration
 
     /// <summary>The default expression language for this process's string conditions.</summary>
     public string? Language { get; set; }
-
-    /// <summary>When <c>true</c>, process operations enforce authorization.</summary>
-    public bool RequiresAuthorization { get; set; }
-
-    /// <summary>Requires an authenticated principal for operations on this definition's processes; anonymous callers receive a not-found response.</summary>
-    public ProcessConfiguration WithAuthorization() {
-        RequiresAuthorization = true;
-        return this;
-    }
 }

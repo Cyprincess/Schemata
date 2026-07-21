@@ -83,7 +83,7 @@ public sealed class InsightPlanBuilder
     // Resolves a name against the catalogs in priority order, returning the first match.
     private async ValueTask<SourceConfig?> ResolveAsync(string name, CancellationToken ct) {
         foreach (var catalog in _catalogs) {
-            var config = await catalog.ResolveAsync(name, ct).ConfigureAwait(false);
+            var config = await catalog.ResolveAsync(name, ct);
             if (config is not null) {
                 return config;
             }

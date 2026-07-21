@@ -58,7 +58,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
                                              .MakeGenericMethod(entityType);
         var task = (Task<ISourceResult>)method.Invoke(this, [subPlan, request, principal, ct])!;
 
-        return await task.ConfigureAwait(false);
+        return await task;
     }
 
     private static Type ResolveEntityType(string resource) {
@@ -83,47 +83,56 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         ClaimsPrincipal?    principal,
         CancellationToken   ct
     ) where TEntity : class {
-        var entitlement = await InsightSecurityGate.AuthorizeAsync(typeof(TEntity), request, principal, _services, ct)
-                                             .ConfigureAwait(false);
-        var shape = Lower(subPlan.Root);
-        var residuals = new List<Func<TEntity, bool>>();
-
-        IQueryable<TEntity> Query(IQueryable<TEntity> source) {
-            var query = source;
-            if (entitlement is Expression<Func<TEntity, bool>> e) {
-                query = query.Where(e);
+        var scope = _services.CreateAsyncScope();
+        try {
+            var services = scope.ServiceProvider;
+            Expression? entitlement = null;
+            if (subPlan.EnforceSecurity) {
+                entitlement = await InsightSecurityGate.AuthorizeAsync(typeof(TEntity), request, principal, services, ct);
             }
+            var shape = Lower(subPlan.Root);
+            var residuals = new List<Func<TEntity, bool>>();
 
-            foreach (var filter in shape.Filters) {
-                var compiler = _services.GetRequiredKeyedService<IExpressionCompiler>(filter.Predicate.Language);
-                var planner = _services.GetRequiredKeyedService<IExpressionPushdownPlanner>(filter.Predicate.Language);
-                var plan = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
-                if (plan.Pushed is not null) {
-                    query = query.Where(compiler.Compile<TEntity, bool>(plan.Pushed));
+            IQueryable<TEntity> Query(IQueryable<TEntity> source) {
+                var query = source;
+                if (entitlement is Expression<Func<TEntity, bool>> e) {
+                    query = query.Where(e);
                 }
 
-                if (plan.Residual is not null) {
-                    residuals.Add(compiler.Compile<TEntity, bool>(plan.Residual).Compile());
+                foreach (var filter in shape.Filters) {
+                    var compiler = services.GetRequiredKeyedService<IExpressionCompiler>(filter.Predicate.Language);
+                    var planner = services.GetRequiredKeyedService<IExpressionPushdownPlanner>(filter.Predicate.Language);
+                    var plan = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
+                    if (plan.Pushed is not null) {
+                        query = query.Where(compiler.Compile<TEntity, bool>(plan.Pushed));
+                    }
+
+                    if (plan.Residual is not null) {
+                        residuals.Add(compiler.Compile<TEntity, bool>(plan.Residual).Compile());
+                    }
                 }
+
+                if (shape.Order is not null) {
+                    query = services.GetRequiredService<IOrderCompiler>().CompileOrder<TEntity>(shape.Order.OrderBy)(query);
+                }
+
+                foreach (var navigation in NavigationNames(shape.Items, subPlan.SourceAlias)) {
+                    query = Include(query, navigation);
+                }
+
+                return query;
             }
 
-            if (shape.Order is not null) {
-                query = _services.GetRequiredService<IOrderCompiler>().CompileOrder<TEntity>(shape.Order.OrderBy)(query);
-            }
+            var repo = services.GetRequiredService<IRepository<TEntity>>();
+            var entities = repo.ListAsync<TEntity>(q => Query(q), ct);
+            var rows = Rows(entities, residuals, shape.Items, subPlan.SourceAlias, ct);
+            var schema = SchemaBuilder.For(typeof(TEntity), shape.Items, subPlan.SourceAlias);
 
-            foreach (var navigation in NavigationNames(shape.Items, subPlan.SourceAlias)) {
-                query = Include(query, navigation);
-            }
-
-            return query;
+            return new RepositorySourceResult(rows, schema, scope);
+        } catch {
+            await scope.DisposeAsync();
+            throw;
         }
-
-        var repo = _services.GetRequiredService<IRepository<TEntity>>();
-        var entities = repo.ListAsync<TEntity>(q => Query(q), ct);
-        var rows = Rows(entities, residuals, shape.Items, subPlan.SourceAlias, ct);
-        var schema = SchemaBuilder.For(typeof(TEntity), shape.Items, subPlan.SourceAlias);
-
-        return new RepositorySourceResult(rows, schema);
     }
 
     private static IEnumerable<string> NavigationNames(ImmutableArray<SelectionItem> items, string alias) {
@@ -213,7 +222,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         string                             alias,
         [EnumeratorCancellation] CancellationToken ct
     ) where TEntity : class {
-        await foreach (var entity in entities.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var entity in entities.WithCancellation(ct)) {
             if (residuals.All(residual => residual(entity))) {
                 yield return RowMaterializer.ToRow(entity, items, alias);
             }

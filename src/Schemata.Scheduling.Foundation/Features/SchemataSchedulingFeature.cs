@@ -29,6 +29,7 @@ public sealed class SchemataSchedulingFeature : FeatureBase
         services.TryAddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         services.TryAddSingleton<JobExecutionDispatcher>();
         services.TryAddSingleton<IScheduler, DefaultScheduler>();
+        services.TryAddSingleton<IOperationService, DefaultOperationService>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IJobLifecycleObserver, SchemataJobAuditObserver>());
 
         services.AddHostedService<SchedulingInitializer>();

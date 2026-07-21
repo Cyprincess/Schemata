@@ -61,7 +61,6 @@ public class FlowTimerObserverShould
 
     [Fact]
     public async SystemTask NonTimerTransition_WithoutScheduler_PassesThrough() {
-        // A scheduler-free service provider still allows transitions outside timer catches.
         var provider = new ServiceCollection().BuildServiceProvider();
         var advisor  = new AdviceTransitionTimer(provider);
         var advice   = new AdviceContext(provider);

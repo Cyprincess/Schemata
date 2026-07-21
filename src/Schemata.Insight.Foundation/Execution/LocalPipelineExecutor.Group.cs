@@ -18,7 +18,7 @@ public sealed partial class LocalPipelineExecutor
         var buckets = new Dictionary<string, List<IReadOnlyDictionary<string, object?>>>(StringComparer.Ordinal);
         var order   = new List<string>();
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             var key = string.Join('\u001f', group.Keys.Select(k => Resolve(row, k)?.ToString() ?? "\u0000"));
             if (!buckets.TryGetValue(key, out var bucket)) {
                 bucket       = [];

@@ -45,7 +45,7 @@ public sealed partial class LocalPipelineExecutor
             rows = Apply(stage, rows, ct);
         }
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             yield return row;
         }
     }
@@ -63,7 +63,7 @@ public sealed partial class LocalPipelineExecutor
             rows = Apply(stage, rows, ct);
         }
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             yield return row;
         }
     }
@@ -87,10 +87,10 @@ public sealed partial class LocalPipelineExecutor
 
         var buildRight = kind is JoinKind.Inner or JoinKind.Left or JoinKind.Full;
         var probe      = buildRight ? left : right;
-        var buffered   = await Buffer(buildRight ? right : left, ct).ConfigureAwait(false);
+        var buffered   = await Buffer(buildRight ? right : left, ct);
         var matched    = new bool[buffered.Count];
 
-        await foreach (var outer in probe.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var outer in probe.WithCancellation(ct)) {
             var any = false;
             for (var i = 0; i < buffered.Count; i++) {
                 var merged = buildRight ? Merge(outer, buffered[i]) : Merge(buffered[i], outer);

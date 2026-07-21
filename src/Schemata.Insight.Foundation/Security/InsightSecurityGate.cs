@@ -64,7 +64,7 @@ public static class InsightSecurityGate
 
     private static async Task<object?> InvokeAsync(Type contract, object provider, string method, object?[] args) {
         var task = (Task)contract.GetMethod(method)!.Invoke(provider, args)!;
-        await task.ConfigureAwait(false);
+        await task;
         return task.GetType().GetProperty("Result")!.GetValue(task);
     }
 }

@@ -71,7 +71,7 @@ public class SchemataException : Exception
             return;
         }
 
-        info.Metadata = args.ToDictionary(kv => kv.Key, kv => kv.Value ?? string.Empty);
+        info.Metadata = LocalizedMessageFormatter.NormalizeMetadata(args);
     }
 
     /// <summary>

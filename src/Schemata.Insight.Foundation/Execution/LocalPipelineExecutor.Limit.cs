@@ -19,7 +19,7 @@ public sealed partial class LocalPipelineExecutor
         var emitted = 0;
         var seen    = 0;
 
-        await foreach (var row in rows.WithCancellation(ct).ConfigureAwait(false)) {
+        await foreach (var row in rows.WithCancellation(ct)) {
             if (seen++ < skip) {
                 continue;
             }

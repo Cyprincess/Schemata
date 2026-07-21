@@ -7,4 +7,11 @@ namespace Schemata.Insight.Skeleton;
 /// <param name="Root">The subtree root.</param>
 /// <param name="SourceAlias">The single source alias the subtree references.</param>
 /// <param name="Config">The resolved source configuration.</param>
-public sealed record SubPlan(PlanNode Root, string SourceAlias, SourceConfig Config);
+public sealed record SubPlan(PlanNode Root, string SourceAlias, SourceConfig Config)
+{
+    /// <summary>
+    ///     Determines whether the driver enforces source-level access and row-level entitlement for this
+    ///     execution.
+    /// </summary>
+    public bool EnforceSecurity { get; init; } = true;
+}

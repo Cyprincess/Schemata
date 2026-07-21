@@ -1920,8 +1920,14 @@ public static class SchemataConstants
         /// <summary>Physically removes a soft-deleted resource, per AIP-164.</summary>
         public const string Expunge = "expunge";
 
+        /// <summary>Generates a report snapshot or inline result.</summary>
+        public const string Generate = "generate";
+
         /// <summary>Deletes resources matching a filter, per AIP-165.</summary>
         public const string Purge = "purge";
+
+        /// <summary>Reads a page of report snapshot rows.</summary>
+        public const string Read = "read";
 
         /// <summary>Triggers a job, per AIP-152.</summary>
         public const string Run = "run";

@@ -8,7 +8,8 @@ namespace Schemata.Insight.Skeleton;
 ///     Lowers a single-source plan subtree into a backend-native query and streams the result. A
 ///     driver enforces its own source-level access and row-level entitlement (it knows the concrete
 ///     row type), so Insight Foundation passes the request and principal rather than a pre-typed
-///     entitlement expression.
+///     entitlement expression. Custom drivers must honor <see cref="SubPlan.EnforceSecurity" /> and
+///     skip both checks when it is <see langword="false" />.
 /// </summary>
 public interface ISourceDriver
 {

@@ -16,4 +16,4 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// <typeparam name="TRequest">The custom method's request DTO type.</typeparam>
 public interface IResourceMethodRequestAdvisor<TEntity, TRequest> : IAdvisor<TRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName;
+    where TRequest : class;
