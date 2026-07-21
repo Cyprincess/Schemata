@@ -61,7 +61,7 @@ public class OrderCompilerShould
     [InlineData("a asc", new[] { "a" }, new[] { false })]
     [InlineData("a,b", new[] { "a", "b" }, new[] { false, false })]
     [InlineData("a DESC,b ASC", new[] { "a", "b" }, new[] { true, false })]
-    public void Parse_ReturnsExpectedKeys(string input, string[] fields, bool[] descending) {
+    public void Parse_FieldListWithAscOrDescSuffixes_BindsPathAndDescendingFlagPerKey(string input, string[] fields, bool[] descending) {
         var keys = new OrderCompiler().Parse(input);
 
         Assert.Equal(fields.Length, keys.Count);

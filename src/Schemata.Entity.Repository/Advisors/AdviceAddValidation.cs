@@ -14,8 +14,7 @@ namespace Schemata.Entity.Repository.Advisors;
 public static class AdviceAddValidation
 {
     /// <summary>
-    ///     Default execution order: after <see cref="AdviceAddCanonicalName{TEntity}" />
-    ///     (220,000,000 + 10,000,000 = 230,000,000).
+    ///     Default execution order: 130,000,000.
     /// </summary>
     public const int DefaultOrder = AdviceAddCanonicalName.DefaultOrder + 10_000_000;
 }

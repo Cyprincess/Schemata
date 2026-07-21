@@ -14,11 +14,26 @@ namespace Schemata.Tenancy.Foundation.Services;
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
-///     Tenant overrides must be Singleton; Scoped/Transient are rejected at build time.
-///     Overrides win at top-level resolution only - services injected into host-scoped
-///     constructors still see the host's view of their dependencies. Tenant-aware services
-///     that must participate in injection chains should consult
-///     <see cref="ITenantContextAccessor{TTenant}" /> at call time.
+///     <para>
+///         Tenant overrides must be Singleton; Scoped/Transient and open-generic descriptors are
+///         rejected while building the tenant container. Tenant singleton constructors may safely
+///         capture host singletons. A host Scoped or Transient service resolved through fallback is
+///         retained by the tenant singleton for the tenant provider's lifetime.
+///     </para>
+///     <para>
+///         Overrides win for tenant-side top-level resolution. Host service constructors resolve
+///         from the host container, so their dependencies are not tenant-overridable. Tenant-aware
+///         host services should consult <see cref="ITenantContextAccessor{TTenant}" /> at call time.
+///         <see cref="ITenantContextAccessor{TTenant}.GetBaseServiceProviderAsync" /> returns the
+///         host root provider.
+///     </para>
+///     <para>
+///         Keyed services resolve from tenant overrides before the host root. A keyed
+///         <see cref="System.Collections.Generic.IEnumerable{T}" /> resolves the tenant collection
+///         when it contains a matching key and otherwise resolves the host collection. Non-keyed
+///         <see cref="System.Collections.Generic.IEnumerable{T}" /> resolution keeps host-first
+///         concatenation with tenant additions after it.
+///     </para>
 /// </remarks>
 public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProviderFactory<TTenant>
     where TTenant : SchemataTenant
@@ -58,55 +73,89 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
         overrides.AddSingleton(tenant);
         overrides.AddSingleton<ITenantContextAccessor<TTenant>>(_ => new TenantBoundContextAccessor<TTenant>(_root, tenant));
 
-        var baseline = overrides.Count;
-
         if (_options.TenantOverrides.TryGetValue(id, out var tenantOverrides)) {
             foreach (var apply in tenantOverrides) {
-                var snapshot = overrides.Count;
                 apply(overrides);
-                EnforceSingletonOverride(id, overrides, snapshot);
             }
         }
 
         foreach (var apply in _options.DynamicOverrides) {
-            var snapshot = overrides.Count;
             apply(id, overrides, _root);
-            EnforceSingletonOverride(id, overrides, snapshot);
         }
 
-        // The tenant container holds only override registrations. Activate each override through
-        // the composite provider so host-root fallback supplies dependencies outside the tenant container.
         TenantCompositeServiceProvider composite = null!;
-        for (var i = baseline; i < overrides.Count; i++) {
-            var descriptor = overrides[i];
-            if (descriptor.IsKeyedService) {
-                continue;
-            }
-
-            if (descriptor.ImplementationType is { IsGenericTypeDefinition: false } implementationType) {
-                overrides[i] = ServiceDescriptor.Singleton(descriptor.ServiceType,
-                                                           _ => ActivatorUtilities.CreateInstance(composite, implementationType));
-            } else if (descriptor.ImplementationFactory is { } factory) {
-                overrides[i] = ServiceDescriptor.Singleton(descriptor.ServiceType, _ => factory(composite));
-            }
-        }
+        ValidateAndWrapOverrides(id, overrides, () => composite);
 
         var container = overrides.BuildServiceProvider();
         composite = new(container, _root);
         return composite;
     }
 
-    private static void EnforceSingletonOverride(string id, IServiceCollection container, int snapshot) {
-        for (var i = snapshot; i < container.Count; i++) {
-            var descriptor = container[i];
-            if (descriptor.Lifetime == ServiceLifetime.Singleton) {
-                continue;
-            }
+    private static void ValidateAndWrapOverrides(
+        string                 id,
+        IServiceCollection     overrides,
+        Func<IServiceProvider> composite
+    ) {
+        for (var i = 0; i < overrides.Count; i++) {
+            var descriptor = overrides[i];
+            ValidateDescriptor(id, descriptor);
+            overrides[i] = WrapDescriptor(descriptor, composite);
+        }
+    }
 
+    private static void ValidateDescriptor(string id, ServiceDescriptor descriptor) {
+        if (descriptor.Lifetime != ServiceLifetime.Singleton) {
             throw new InvalidOperationException(
                 $"Tenant override for '{id}' registered '{descriptor.ServiceType}' as {descriptor.Lifetime}; "
               + "tenant-specific registrations must be Singleton. Resolve Scoped/Transient services "
               + "from the host scope instead.");
         }
+
+        var implementationType = descriptor.IsKeyedService
+            ? descriptor.KeyedImplementationType
+            : descriptor.ImplementationType;
+        if (descriptor.ServiceType.ContainsGenericParameters || implementationType?.ContainsGenericParameters == true) {
+            throw new InvalidOperationException(
+                $"Tenant override for '{id}' registered open-generic service '{descriptor.ServiceType}'; "
+              + "tenant-specific registrations must be closed types.");
+        }
+    }
+
+    private static ServiceDescriptor WrapDescriptor(
+        ServiceDescriptor      descriptor,
+        Func<IServiceProvider> composite
+    ) {
+        if (descriptor.IsKeyedService) {
+            if (descriptor.KeyedImplementationType is { } implementationType) {
+                return ServiceDescriptor.KeyedSingleton(
+                    descriptor.ServiceType,
+                    descriptor.ServiceKey,
+                    (_, _) => ActivatorUtilities.CreateInstance(composite(), implementationType)
+                );
+            }
+
+            if (descriptor.KeyedImplementationFactory is { } factory) {
+                return ServiceDescriptor.KeyedSingleton(
+                    descriptor.ServiceType,
+                    descriptor.ServiceKey,
+                    (_, key) => factory(composite(), key)
+                );
+            }
+
+            return descriptor;
+        }
+
+        if (descriptor.ImplementationType is { } type) {
+            return ServiceDescriptor.Singleton(
+                descriptor.ServiceType,
+                _ => ActivatorUtilities.CreateInstance(composite(), type)
+            );
+        }
+
+        if (descriptor.ImplementationFactory is { } implementationFactory) {
+            return ServiceDescriptor.Singleton(descriptor.ServiceType, _ => implementationFactory(composite()));
+        }
+
+        return descriptor;
     }
 }

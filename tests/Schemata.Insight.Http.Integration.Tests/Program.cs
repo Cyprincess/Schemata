@@ -1,10 +1,10 @@
 using System;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
@@ -16,8 +16,8 @@ using Schemata.Insight.Skeleton;
 var options = new WebApplicationOptions { Args = args };
 
 var builder = WebApplication.CreateBuilder(options);
-
-var dbName = "insight-integration-" + Identifiers.NewUid();
+using var connection = new SqliteConnection("Data Source=:memory:");
+connection.Open();
 
 builder.UseSchemata(schema => {
     var insight = schema.UseInsight(i => {
@@ -33,7 +33,7 @@ builder.UseSchemata(schema => {
     insight.MapHttp();
 
     schema.Services.AddDbContextFactory<TestDbContext>(opts => {
-        opts.UseInMemoryDatabase(dbName);
+        opts.UseSqlite(connection);
         opts.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
     });
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
@@ -48,6 +48,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope()) {
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<TestDbContext>>();
     using var context = factory.CreateDbContext();
+    context.Database.EnsureCreated();
     context.Students.AddRange(
         new Student { Uid = Guid.NewGuid(), Name = "ada", FullName = "Ada", Age = 36 },
         new Student { Uid = Guid.NewGuid(), Name = "bob", FullName = "Bob", Age = 19 },

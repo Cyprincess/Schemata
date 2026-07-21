@@ -15,9 +15,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceListResponseParent
 {
     /// <summary>
-    ///     Default order anchored at <see cref="SchemataConstants.Orders.Base" /> so
-    ///     <see cref="IChild.Parent" /> is populated on each summary before
-    ///     <see cref="AdviceListResponseReadMask" /> trims fields off the list.
+    ///     Default order at <see cref="SchemataConstants.Orders.Base" />.
     /// </summary>
     public const int DefaultOrder = SchemataConstants.Orders.Base;
 }

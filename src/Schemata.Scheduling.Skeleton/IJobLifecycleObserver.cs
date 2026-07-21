@@ -23,7 +23,17 @@ public interface IJobLifecycleObserver
     ///     <see cref="JobContext.ExecutionUid" /> and <see cref="JobContext.StartTime" />
     ///     are populated.
     /// </summary>
-    Task<JobTriggerOutcome> OnTriggeredAsync(SchemataJob job, JobContext context, CancellationToken ct = default);
+    Task OnTriggeredAsync(SchemataJob job, JobContext context, CancellationToken ct = default);
+
+    /// <summary>Fires when an execution advisor blocks a job before its body runs.</summary>
+    Task OnBlockedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Fires when an execution advisor handles a job before its body runs.</summary>
+    Task OnSkippedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return Task.CompletedTask;
+    }
 
     /// <summary>Fires after <see cref="IScheduledJob.ExecuteAsync" /> returns successfully.</summary>
     Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default);

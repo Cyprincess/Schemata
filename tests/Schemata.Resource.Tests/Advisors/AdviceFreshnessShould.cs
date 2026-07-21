@@ -28,13 +28,13 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task UpdateFreshness_MismatchedETag_ThrowsFailedPrecondition() {
+    public async Task UpdateFreshness_MismatchedETag_ThrowsAborted() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
         var request = new Student { EntityTag = "W/\"intentionally-wrong\"" };
 
-        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+        var ex = await Assert.ThrowsAsync<AbortedException>(
             () => advisor.AdviseAsync(ctx, request, entity, null));
         AssertEtagMismatch(ex);
     }
@@ -69,13 +69,13 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task UpdateFreshness_StrongFormatETag_ThrowsFailedPrecondition() {
+    public async Task UpdateFreshness_StrongFormatETag_ThrowsAborted() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
         var request = new Student { EntityTag = "\"strong-tag\"" };
 
-        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+        var ex = await Assert.ThrowsAsync<AbortedException>(
             () => advisor.AdviseAsync(ctx, request, entity, null));
         AssertEtagMismatch(ex);
     }
@@ -93,21 +93,20 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task DeleteFreshness_StrongFormatETag_ThrowsFailedPrecondition() {
+    public async Task DeleteFreshness_StrongFormatETag_ThrowsAborted() {
         var advisor = new AdviceDeleteFreshness<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var entity  = new Student { Timestamp = Identifiers.NewUid() };
 
-        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(
+        var ex = await Assert.ThrowsAsync<AbortedException>(
             () => advisor.AdviseAsync(ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
         AssertEtagMismatch(ex);
     }
 
-    private static void AssertEtagMismatch(FailedPreconditionException exception) {
+    private static void AssertEtagMismatch(AbortedException exception) {
         Assert.NotNull(exception.Details);
-        var precondition = Assert.Single(exception.Details!.OfType<PreconditionFailureDetail>());
-        var violation    = Assert.Single(precondition.Violations!);
-        Assert.Equal(SchemataConstants.PreconditionSubjects.EtagMismatch, violation.Subject);
+        var error = Assert.Single(exception.Details!.OfType<ErrorInfoDetail>());
+        Assert.Equal(SchemataConstants.ErrorReasons.ConcurrencyMismatch, error.Reason);
     }
 
     [Fact]

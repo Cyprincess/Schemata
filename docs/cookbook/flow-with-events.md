@@ -121,10 +121,16 @@ The engine advances through the start event and parks at the event-based gateway
 `AdviceTransitionEvent` runs inside the transition's unit of work and adds two subscriptions that
 commit atomically with the transition:
 
-- `flow:{processName}:{payElementId}` with `CorrelationKey = {processName}` for the message catch.
-- `flow:{processName}:{shutdownElementId}` with `CorrelationKey = null` for the signal catch.
+- `flow:{processName}:{payElementId}:{tokenName}` with `CorrelationKey = {processName}` and the
+  waiting token's canonical name in the `Token` column, for the message catch.
+- `flow:{processName}:{shutdownElementId}:broadcast` with `CorrelationKey = null` and
+  `Token = null`, for the signal catch.
 
-The registered process name is the type name, `OrderProcess`.
+The registered process name is the type name, `OrderProcess`. Message subscriptions are
+token-scoped so two tokens waiting on the same message correlate deterministically; signals stay
+process-level broadcasts. Boundary message and signal catches attached to the activity hosting an
+active token are armed the same way — the advisor follows the token's active state rather than a
+waiting element for those.
 
 **Check:** `POST /v1/processes:start` returns `200 OK` with the process row; two
 `SchemataEventSubscription` rows appear in the repository.
@@ -150,11 +156,11 @@ public sealed class OrdersController(IEventBus bus) : ControllerBase
 ```
 
 When the consumer dispatches `PaymentReceived`, the bus populates
-`IEventDispatchContext.MatchedSubscriptions`. `FlowEventHandler.HandleAsync` iterates them. Because
-the subscription's `CorrelationKey` is non-null, it invokes `CorrelateMessageHandler` with
-`MessageName = sub.EventType` and `Payload = null`. `FlowEventHandler` forwards only the BPMN-level
-event name and drops the event body; a process that needs the payload takes it through a separate
-`IEventHandler<TEvent>` you write, which binds the source itself.
+`IEventDispatchContext.MatchedSubscriptions`. `FlowEventHandler.HandleAsync` serializes the
+inbound event to JSON once, then iterates the matches. Because the subscription's
+`CorrelationKey` is non-null, it invokes `CorrelateMessageHandler` with
+`MessageName = sub.EventType`, the serialized payload, and `Token = sub.Token`, so the waiting
+instance receives both the BPMN-level event name and the event body.
 
 The correlated instance advances from the gateway to `Fulfill`, then to the end event.
 
@@ -174,9 +180,9 @@ public async Task<IActionResult> Shutdown(CancellationToken ct) {
 ```
 
 For signal subscriptions, `CorrelationKey` is null. `FlowEventHandler` invokes `ThrowSignalHandler`
-once per distinct `EventType`, with `Payload = null`. The handler drives `FlowRunner.ThrowSignalAsync`,
-which enumerates waiting processes whose definition declares the named signal and advances each one
-through `Cancel` to its end.
+once per distinct `EventType`, again forwarding the serialized payload. The handler drives
+`FlowRunner.ThrowSignalAsync`, which enumerates waiting processes whose definition declares the
+named signal and advances each one through `Cancel` to its end.
 
 **Check:** every instance parked at the gateway transitions to complete via the `Cancel` path.
 
@@ -197,11 +203,11 @@ subscription `EventType`. The wire name registered with `RegisterEvent<T>` (`ord
 is the transport routing key. They are separate identifiers; the handler bridges from the routed
 event to the BPMN-level name through the matched subscription row.
 
-**`Payload = null` on Flow dispatch.** `FlowEventHandler` invokes `CorrelateMessageHandler` and
-`ThrowSignalHandler` with a null payload. The process receives only the BPMN-level event name; the
-CLR `PaymentReceived` instance the publisher passed to `bus.PublishAsync` stays on the bus side. To
-carry the payload onto the BPMN side, register `Message<TPayload>` and let the typed message flow
-through your own handler.
+**The payload crosses onto the BPMN side as JSON.** `FlowEventHandler` serializes the CLR event
+the publisher passed to `bus.PublishAsync` and forwards the JSON as `Payload` to
+`CorrelateMessageHandler` / `ThrowSignalHandler`. What the engine does with the payload is the
+runtime's business — a typed `Message<TPayload>` / `Signal<TPayload>` declaration lets the engine
+bind it back to a typed value; without one, treat the payload as an opaque JSON string.
 
 **A bound source shows the business node, never the gateway.** While the instance waits at the
 event-based gateway, a projected source state member carries the name of the activity the token

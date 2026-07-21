@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,9 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="vector1.skm">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <EmbeddedResource Include="vector1.skm">
+      <LogicalName>Schemata.Modeling.Generator.Tests.vector1.skm</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

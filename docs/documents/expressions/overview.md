@@ -18,7 +18,7 @@ The expression stack turns user filter text into LINQ expression trees, keeps la
 | `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IOrderCompiler.cs`, `IExpressionTree.cs`                                                                                                                                                                                                                   |
 | `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageResolver.cs`, `ExpressionLanguageDescriptor.cs`, `ExpressionLanguageOptions.cs`, `ResolvedLanguage.cs`                                                                                                                             |
 | `Schemata.Expressions.Skeleton` | `FilteringMode.cs`, `ExpressionCapabilities.cs`, `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ResidualPage.cs`                                                                                                                                                      |
-| `Schemata.Expressions.Skeleton` | `DynamicValues.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`, `ExpressionRuntime.cs`                                                                                                                                     |
+| `Schemata.Expressions.Skeleton` | `DynamicValues.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`                                                                                                                                                           |
 | `Schemata.Expressions.Aip`      | `AipLanguage.cs`, `AipParser.cs`, `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs`                                                                                                       |
 | `Schemata.Expressions.Cel`      | `CelLanguage.cs`, `CelParser.cs`, `CelCompiler.cs`, `CelCompileVisitor.cs`, `CelValues.cs`, `CelDuration.cs`, `CelTimestamp.cs`, `CelError.cs`, `CelType.cs`, `CelPushdownPlanner.cs`, `Expressions/*.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
 | `Schemata.Expressions.Order`    | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                                                                                                                                                                                                  |
@@ -131,18 +131,17 @@ AIP registers `SupportsValues: false` because it is predicate-only. CEL register
 
 `ExpressionCapabilities` tells a pushdown planner what a backend can translate:
 
-| Flag          | Meaning                                          |
-| ------------- | ------------------------------------------------ |
-| `Comparison`  | Equality and ordering comparisons.               |
-| `Logical`     | Boolean composition: and, or, and not.           |
-| `Presence`    | Field presence checks.                           |
-| `Wildcard`    | Wildcard text matching.                          |
-| `Arithmetic`  | Numeric arithmetic.                              |
-| `Membership`  | Collection membership checks.                    |
-| `StringMatch` | String helper functions.                         |
-| `Functions`   | Extra named functions the backend can translate. |
+| Flag          | Meaning                            |
+| ------------- | ---------------------------------- |
+| `Comparison`  | Equality and ordering comparisons. |
+| `Logical`     | Boolean composition: and, or, and not. |
+| `Presence`    | Field presence checks.             |
+| `Wildcard`    | Wildcard text matching.            |
+| `Arithmetic`  | Numeric arithmetic.                |
+| `Membership`  | Collection membership checks.      |
+| `StringMatch` | String helper functions.           |
 
-`ExpressionCapabilities.Relational` is the default preset. Its flags are all true and `Functions` is empty, covering constructs relational repositories normally translate while leaving language-specific functions in the residual.
+`ExpressionCapabilities.Relational` is the default preset. All of its flags are true, covering the constructs relational repositories normally translate; language-specific extras (regex, macros, custom functions) are excluded and therefore run in the residual.
 
 ## Cache and compile options
 

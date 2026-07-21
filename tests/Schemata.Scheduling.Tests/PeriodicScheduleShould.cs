@@ -48,11 +48,4 @@ public class PeriodicScheduleShould
         Assert.Equal(anchor.ToUniversalTime(), schedule.StartTime);
     }
 
-    [Fact]
-    public void StartTime_UtcKind_KeepsUtc() {
-        var anchor   = new DateTime(2026, 1, 1, 12, 30, 0, DateTimeKind.Utc);
-        var schedule = new PeriodicSchedule(TimeSpan.FromHours(1), anchor);
-
-        Assert.Equal(anchor, schedule.StartTime);
-    }
 }

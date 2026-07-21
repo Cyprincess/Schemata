@@ -7,7 +7,6 @@ namespace Schemata.Flow.Skeleton.Runtime;
 
 /// <summary>
 ///     Side-effect hook for process-level lifecycle events fired by the runtime after persistence succeeds.
-///     Token-level events are delivered via <see cref="ITokenLifecycleObserver" />.
 /// </summary>
 /// <remarks>
 ///     All methods provide a no-op default so implementations only override the hooks they care about.

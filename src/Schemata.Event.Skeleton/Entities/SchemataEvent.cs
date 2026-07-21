@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Event.Skeleton.Entities;

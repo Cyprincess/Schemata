@@ -74,6 +74,15 @@ schema.UseEvent()
 singleton. On the consumer it registers `RabbitMqConsumerHost` as a hosted service and a
 `CorrelationTracker` singleton.
 
+### Connection lifecycle
+
+Neither `RabbitMqEventBus` nor `RabbitMqEventOutboxPublisher` opens the broker connection in its
+constructor. The connection (and, for the bus, the reply channel and consumer) is created lazily on
+first use — `InitializeAsync` on the bus, `ConnectAsync` on the outbox publisher — guarded by a
+`SemaphoreSlim(1, 1)` so concurrent first publishers share one connection attempt. A failed attempt
+rolls the channel and connection back to null so the next publish retries cleanly. A host with an
+unreachable broker starts normally; only the first publish observes the connection failure.
+
 ### RabbitMqEventOptions
 
 ```csharp

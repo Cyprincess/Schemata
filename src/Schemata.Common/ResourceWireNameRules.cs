@@ -72,7 +72,8 @@ public static class ResourceWireNameRules
             return nameof(IEntitiesResult<>.Entities);
         }
 
-        var member = MemberAccess.Resolve(Expression.Parameter(owner), wireSegment) as MemberExpression;
-        return member?.Member.Name ?? wireSegment.Pascalize();
+        return MemberAccess.Resolve(Expression.Parameter(owner), wireSegment) is MemberExpression member
+                   ? member.Member.Name
+                   : wireSegment.Pascalize();
     }
 }

@@ -69,25 +69,30 @@ an `Owner` column to the `Students` table.
 
 ```csharp
 schema.ConfigureServices(services => {
-    services.AddRepository(typeof(EfCoreRepository<,>))
+    services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
             .UseEntityFrameworkCore<AppDbContext>(
                 (_, opts) => opts.UseSqlite("Data Source=app.db"))
             .UseOwner();
 });
 ```
 
-`UseOwner()` registers two open-generic advisors as `Scoped`:
+`UseOwner()` registers three open-generic advisors as `Scoped`:
 
-| Advisor                          | Pipeline   | What it does                                                        |
-| -------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `AdviceAddOwner<TEntity>`        | Add        | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner` |
-| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | Appends `WHERE Owner = <resolved>` to every query                   |
+| Advisor                                          | Pipeline     | What it does                                                                                  |
+| ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------- |
+| `AdviceAddOwner<TEntity>`                        | Add          | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner`                           |
+| `AdviceBuildQueryOwner<TEntity>`                 | BuildQuery   | Appends `WHERE Owner = <resolved>` to every query                                             |
+| `AdviceValidateResourceReferenceExistence<TEntity>` | Add + Update | Resolves `[ResourceReference(ValidateExistence = true)]` targets and throws NotFound on a miss |
 
-Both advisors check `IOwnable` at runtime — entities that don't implement it
-are skipped. `AdviceAddOwner` runs after `AdviceAddCanonicalName` (its
-`Order` is `AdviceAddCanonicalName.DefaultOrder + 10_000_000`).
+Both owner advisors check `IOwnable` at runtime — entities that don't implement it
+are skipped. `AdviceAddOwner` runs right after `AdviceAddCanonicalName` (its
+`Order` is `AdviceAddCanonicalName.DefaultOrder + 1_000_000`).
 `AdviceBuildQueryOwner` runs after `AdviceBuildQuerySoftDelete` (its `Order`
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
+`AdviceValidateResourceReferenceExistence` runs at
+`AdviceValidateResourceReferences.DefaultOrder + 10_000_000` on both the add and update
+pipelines; entities whose reference properties carry no `ValidateExistence = true` opt-in are
+skipped.
 
 **Verify:** Start the app. A `POST /v1/students` request without authentication
 throws `PermissionDeniedException` (the default `OnNullOwner` policy is

@@ -1,4 +1,3 @@
-using System.Threading;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,7 +37,7 @@ public sealed class SchemataFlowFeature : FeatureBase
             var registry = ActivatorUtilities.CreateInstance<ProcessRegistry>(sp);
             var configs  = sp.GetRequiredService<IOptions<SchemataFlowOptions>>().Value.Configurations;
             foreach (var config in configs) {
-                registry.RegisterAsync(config, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                registry.Register(config);
             }
 
             return registry;
@@ -48,11 +47,11 @@ public sealed class SchemataFlowFeature : FeatureBase
         services.TryAddScoped<ProcessLifecycleNotifier>();
         services.TryAddScoped<FlowRunner>();
         services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
+        services.TryAddScoped<ProcessDefinitionQueryService>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped(
             typeof(IFlowSourceAdvisor<>),
             typeof(AdviceSourceProjection<>)));
 
-        services.TryAddScoped<StartProcessHandler>();
         services.TryAddScoped<CompleteActivityHandler>();
         services.TryAddScoped<CorrelateMessageHandler>();
         services.TryAddScoped<ThrowSignalHandler>();

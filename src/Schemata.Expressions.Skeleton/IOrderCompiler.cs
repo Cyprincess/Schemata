@@ -12,7 +12,7 @@ public interface IOrderCompiler
     /// <summary>
     ///     Compiles source text into a function that applies ordering to a query.
     /// </summary>
-    Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(string source, ExpressionCompileOptions? options = null);
+    Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(string source);
 
     /// <summary>
     ///     Parses source text into ordered sort keys.

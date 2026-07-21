@@ -19,6 +19,10 @@ namespace Schemata.Authorization.Tests;
 
 public class DeviceInteractionHandlerShould
 {
+    private static readonly DateTime Anchor = new(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
+    private static readonly TimeProvider Clock = new FixedClock(Anchor);
+
     private static Fixture CreateFixture() {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
         var authOpts = Options.Create(new SchemataAuthorizationOptions { SessionIdClaimType = "sid" });
@@ -42,7 +46,7 @@ public class DeviceInteractionHandlerShould
             Status      = TokenStatuses.Valid,
             ReferenceId = "dev-ref",
             Payload     = devicePayload,
-            ExpireTime  = DateTime.UtcNow.AddMinutes(10),
+            ExpireTime  = Anchor.AddMinutes(10),
         };
 
         var userCodePayload = JsonSerializer.Serialize(
@@ -57,7 +61,7 @@ public class DeviceInteractionHandlerShould
             Status      = TokenStatuses.Valid,
             ReferenceId = "user-ref",
             Payload     = userCodePayload,
-            ExpireTime  = DateTime.UtcNow.AddMinutes(10),
+            ExpireTime  = Anchor.AddMinutes(10),
         };
 
         var tokens = new Mock<ITokenManager<SchemataToken>>();
@@ -75,7 +79,7 @@ public class DeviceInteractionHandlerShould
 
         var handler
             = new DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(
-                apps.Object, tokens.Object, scopes.Object, authzMgr.Object, authOpts, jsonOpts);
+                apps.Object, tokens.Object, scopes.Object, authzMgr.Object, authOpts, jsonOpts, Clock);
 
         return new(handler, tokens, authzMgr, device, userCode);
     }
@@ -131,4 +135,9 @@ public class DeviceInteractionHandlerShould
     );
 
     #endregion
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() { return now; }
+    }
 }

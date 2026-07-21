@@ -11,8 +11,9 @@ both call it, passing a `ClaimsPrincipal?` pulled from their own request context
 | Package                        | Key files                                                                                        |
 | ------------------------------ | ------------------------------------------------------------------------------------------------ |
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` + `.Create.cs`, `.Get.cs`, `.List.cs`, `.Update.cs`, `.Delete.cs`  |
-| `Schemata.Resource.Foundation` | `SchemataResourceBuilder.cs`, `ResourceRequestContainer.cs`, `ResourceMethodOperationHandler.cs` |
+| `Schemata.Resource.Foundation` | `SchemataResourceBuilder.cs`, `ResourceMethodOperationHandler.cs`                                |
 | `Schemata.Resource.Foundation` | `Features/SchemataResourceFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                 |
+| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceIdentifiers.cs`, `IPagination.cs`                        |
 | `Schemata.Abstractions`        | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`, `Entities/Operations.cs`     |
 | `Schemata.Abstractions`        | `Resource/ResourceAttribute.cs`, `Resource/CreateResultBase.cs` (and the other `*ResultBase`)    |
 
@@ -62,9 +63,10 @@ builder.UseSchemata(schema => {
 });
 ```
 
-`SchemataResourceFeature.DefaultPriority` is `Orders.Extension + 90_000_000` (490M). It declares `[DependsOn]`
-on `SchemataRoutingFeature`, `Schemata.Mapping.Foundation.Features.SchemataMappingFeature\`1`, and
-`Schemata.Security.Foundation.Features.SchemataSecurityFeature`, so those features auto-register.
+`SchemataResourceFeature.DefaultPriority` is `Orders.Extension + 90_000_000` (490M). It declares
+`[DependsOn<SchemataRoutingFeature>]` and `[DependsOn(typeof(SchemataMappingFeature<>))]`, so those
+features auto-register. Anonymous-access plumbing (`AnonymousAccess`, `AnonymousGranted`) lives in
+`Schemata.Security.Skeleton`; the resource feature no longer depends on `SchemataSecurityFeature`.
 
 `ConfigureServices` registers the open-generic `ResourceOperationHandler<,,,>` and
 `ResourceMethodOperationHandler<,,>` as scoped, calls `services.AddAipExpressions()`, adds the HTTP context
@@ -103,6 +105,38 @@ same scan reads `[ResourceMethod]` attributes and stores them in `SchemataResour
 `RegisterResource` keys the `ResourceAttribute` on `entity.TypeHandle`, registers per-entity Create/Update
 idempotency advisors, and — for `ISoftDelete` entities — adds the built-in `undelete`, `expunge`, and `purge`
 methods (each skipped when the `Operations` whitelist excludes it or the entity already declares that verb).
+
+## Cross-resource references
+
+A string property annotated with `[ResourceReference]` carries the full AIP-122 canonical name of an
+independent resource. Write-time validation runs in the repository pipeline
+(`AdviceValidateResourceReferences`, order 140M): typed references (`[ResourceReference(typeof(Book))]`)
+must resolve to that exact type through `IResourceTypeResolver`; polymorphic references must resolve to
+some registered type.
+
+Setting `ValidateExistence = true` on the attribute additionally requires the referenced row to exist.
+`AdviceValidateResourceReferenceExistence` (add and update, order 150M, registered by `UseOwner()` in
+`Schemata.Entity.Owner`) queries the target repository by canonical name with owner filtering
+suppressed, so cross-owner references resolve. A missing row throws `NotFoundException`; an
+unregistered `IResourceTypeResolver` throws `InvalidOperationException`. Polymorphic targets that do
+not implement `ICanonicalName` are skipped.
+
+## Filtering requests
+
+List and custom-method requests that carry an AIP-160 `filter` implement
+`Schemata.Abstractions.Resource.IFilterRequest` (`string? Filter { get; }`). Inside an advisor,
+`QueryableExtensions.ApplyFilter(query, request, services)` compiles the filter through the
+`IExpressionCompiler` keyed `aip` and appends it to the query; a malformed filter throws
+`InvalidArgumentException` (`INVALID_FILTER`) with field violations on `filter`. The List operation's
+full filter pipeline (language resolution, residual evaluation, ordering) is covered in
+[Filtering](filtering.md).
+
+## Purge scoping
+
+`PurgeRequest` carries an optional `Parent` that narrows an AIP-165 purge to the child collection of
+one parent resource, applied through `ResourceIdentifiers.ApplyParent`. `Force = false` is a preview:
+the `PurgeJob` reports the matching rows (up to a 100-row sample) without deleting them. See
+[Delete Pipeline](delete-pipeline.md).
 
 ## Handler stages
 
@@ -163,9 +197,7 @@ Each operation returns a thin result base carrying the response DTO:
 | `AdviceDeleteFreshness<TEntity>`                   | Delete entity          |
 | `AdviceResponseParent<TEntity, TDetail>`           | Response               |
 | `AdviceResponseFreshness<TEntity, TDetail>`        | Response               |
-| `AdviceResponseReadMask<TEntity, TDetail>`         | Response               |
 | `AdviceListResponseParent<TSummary>`               | List response          |
-| `AdviceListResponseReadMask<TSummary>`             | List response          |
 | `AdviceResponseIdempotency<TEntity, TDetail>`      | Response               |
 
 `RegisterResource` adds the per-entity Create/Update idempotency advisors
@@ -194,7 +226,7 @@ Each operation returns a thin result base carrying the response DTO:
   (authorization, sanitization, validation, idempotency).
 - Implement `IResource{Create|Update|Delete}Advisor<...>` for entity-stage logic that runs after mapping and
   before persistence.
-- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the response DTO (freshness, mask,
+- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the response DTO (freshness,
   idempotency cache).
 - Implement `IResourceMethodHandler<TEntity, TRequest, TResponse>` for AIP-136 custom verbs; see
   [Custom Methods](custom-methods.md).

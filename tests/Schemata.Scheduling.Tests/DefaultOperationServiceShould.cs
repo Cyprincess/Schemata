@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,9 +21,8 @@ public class DefaultOperationServiceShould
     [Fact]
     public async Task Waits_Until_Terminal_State() {
         var row = CreateExecution(ExecutionState.Pending);
-        var firstRead = new ManualResetEventSlim();
+        var firstRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = 0;
-        var reads = 0;
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
@@ -42,9 +42,7 @@ public class DefaultOperationServiceShould
                               Output        = row.Output,
                           };
                       var snapshot = predicate!(new[] { source }.AsQueryable()).SingleOrDefault();
-                      if (Interlocked.Increment(ref reads) == 1) {
-                          firstRead.Set();
-                      }
+                      firstRead.TrySetResult();
 
                       return new ValueTask<SchemataJobExecution?>(snapshot);
                   });
@@ -52,8 +50,9 @@ public class DefaultOperationServiceShould
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         var wait = service.WaitAsync(row.CanonicalName!, cts.Token).AsTask();
-        var complete = Task.Run(() => {
-            Assert.True(firstRead.Wait(TimeSpan.FromSeconds(1)));
+        var complete = Task.Run(async () => {
+            // Timeout guard only: bounds the handshake so a stuck service fails instead of hanging CI.
+            await firstRead.Task.WaitAsync(TimeSpan.FromSeconds(1));
             row.EndTime = DateTime.UtcNow;
             row.Output  = "{\"complete\":true}";
             row.State   = ExecutionState.Succeeded;
@@ -68,7 +67,7 @@ public class DefaultOperationServiceShould
     }
 
     [Fact]
-    public async Task Get_Returns_Snapshot_Without_Waiting() {
+    public async Task Get_Pending_Row_Returns_Not_Done_Snapshot() {
         var row = CreateExecution(ExecutionState.Pending);
         var executions = CreateRepositoryReturning(row);
         var service = CreateService(executions);
@@ -83,8 +82,8 @@ public class DefaultOperationServiceShould
     }
 
     [Fact]
-    public async Task Cancel_Marks_Row_And_Unschedules() {
-        var row = CreateExecution(ExecutionState.Running);
+    public async Task Cancel_Pending_Row_Marks_Row_And_Unschedules() {
+        var row = CreateExecution(ExecutionState.Pending);
         row.Job = "jobs/report";
         var executions = CreateRepositoryReturning(row);
         executions.Setup(r => r.UpdateAsync(row, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -118,16 +117,36 @@ public class DefaultOperationServiceShould
     }
 
     [Fact]
+    public async Task Cancel_Running_Row_Cancels_Local_Execution_Without_Unscheduling() {
+        var row = CreateExecution(ExecutionState.Running);
+        var executions = CreateRepositoryReturning(row);
+        executions.Setup(r => r.UpdateAsync(row, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        using var source = new CancellationTokenSource();
+        var running = new ConcurrentDictionary<string, CancellationTokenSource> {
+            [row.Uid.ToString("n")] = source,
+        };
+        var scheduler = new Mock<IScheduler>();
+        var service = CreateService(executions, scheduler, running: running);
+
+        await service.CancelAsync(row.CanonicalName!, CancellationToken.None);
+
+        Assert.True(source.IsCancellationRequested);
+        Assert.Equal(ExecutionState.Cancelled, row.State);
+        scheduler.Verify(s => s.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Wait_Honors_Cancellation_Token() {
         var row = CreateExecution(ExecutionState.Pending);
-        var firstRead = new ManualResetEventSlim();
+        var firstRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
                             CancellationToken _) => {
-                      firstRead.Set();
+                      firstRead.TrySetResult();
                       return new ValueTask<SchemataJobExecution?>(
                           predicate!(new[] { row }.AsQueryable()).SingleOrDefault());
                   });
@@ -135,7 +154,8 @@ public class DefaultOperationServiceShould
         using var cts = new CancellationTokenSource();
 
         var wait = service.WaitAsync(row.CanonicalName!, cts.Token).AsTask();
-        Assert.True(await Task.Run(() => firstRead.Wait(TimeSpan.FromSeconds(1))));
+        // Timeout guard only: bounds the handshake so a stuck service fails instead of hanging CI.
+        await firstRead.Task.WaitAsync(TimeSpan.FromSeconds(1));
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -188,9 +208,15 @@ public class DefaultOperationServiceShould
     private static DefaultOperationService CreateService(
         Mock<IRepository<SchemataJobExecution>> executions,
         Mock<IScheduler>?                      scheduler = null,
-        TimeSpan?                               pollInterval = null
+        TimeSpan?                               pollInterval = null,
+        ConcurrentDictionary<string, CancellationTokenSource>? running = null
     ) {
-        var services = new ServiceCollection().AddSingleton(executions.Object).BuildServiceProvider();
+        var collection = new ServiceCollection().AddSingleton(executions.Object);
+        if (running is not null) {
+            collection.AddSingleton(running);
+        }
+
+        var services = collection.BuildServiceProvider();
         return new(
             services.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new SchemataSchedulingOptions {

@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public enum FieldOption
+internal enum FieldOption
 {
     Required,
     Unique,

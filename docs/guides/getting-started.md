@@ -28,7 +28,6 @@ package supplies the database driver used in this guide.
 Create `Student.cs`. Implement the trait interfaces for the capabilities you want:
 
 ```csharp
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 [PrimaryKey(nameof(Uid))]
@@ -137,7 +136,7 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseJsonSerializer();
 
         schema.ConfigureServices(services => {
-            services.AddRepository(typeof(EfCoreRepository<,>))
+            services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
 
@@ -167,9 +166,10 @@ The key pieces:
 - `UseSchemata` registers Schemata services and middleware on the `WebApplicationBuilder`.
 - `UseJsonSerializer()` configures `System.Text.Json` with snake_case names and long-as-string
   output.
-- `AddRepository(typeof(EfCoreRepository<,>))` registers the EF Core repository as an open generic
-  and adds the built-in advisors (timestamp, concurrency, canonical name, validation, uniqueness,
-  soft-delete).
+- `AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()` registers the closed-generic
+  EF Core repository for `Student` and adds the built-in advisors (timestamp, concurrency,
+  canonical name, validation, uniqueness, soft-delete). Each entity type takes its own
+  registration call.
 - `UseEntityFrameworkCore<AppDbContext>(...)` registers an `IDbContextFactory<AppDbContext>` for the
   chosen provider.
 - `UseResource().MapHttp().Use<Student>()` exposes the entity as HTTP endpoints.

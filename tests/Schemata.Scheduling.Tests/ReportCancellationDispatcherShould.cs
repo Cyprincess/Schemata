@@ -22,9 +22,16 @@ public class ReportCancellationDispatcherShould
         var storage = new CancellationStorage();
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<CancellingJob>("schemata.report.generate");
+        var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.FirstOrDefaultAsync(
+                       It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                       It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.FromResult<SchemataJob?>(null));
         var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => CreateRepository(storage).Object)
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(new CancellingJob(storage.Cancel))
+                                               .AddSingleton(jobs.Object)
+                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
                                                .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 

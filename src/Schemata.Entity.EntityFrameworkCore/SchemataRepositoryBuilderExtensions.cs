@@ -40,32 +40,6 @@ public static class SchemataRepositoryBuilderExtensions
     }
 
     /// <summary>
-    ///     Registers an Entity Framework Core <see cref="DbContext" /> factory for
-    ///     <typeparamref name="TContextImplementation" /> as the repository data provider. The factory is keyed to the
-    ///     implementation type only; <typeparamref name="TContextService" /> constrains the implementation to a shared
-    ///     abstraction and is not registered as a separately resolvable context service.
-    /// </summary>
-    /// <typeparam name="TContextService">The abstraction the implementation context must satisfy.</typeparam>
-    /// <typeparam name="TContextImplementation">The concrete <see cref="DbContext" /> whose factory is registered.</typeparam>
-    /// <param name="builder">The repository builder.</param>
-    /// <param name="configure">Optional callback to configure <see cref="DbContextOptionsBuilder" /> per service provider.</param>
-    /// <returns>The same builder for chaining.</returns>
-    public static SchemataRepositoryBuilder UseEntityFrameworkCore<TContextService, TContextImplementation>(
-        this SchemataRepositoryBuilder                     builder,
-        Action<IServiceProvider, DbContextOptionsBuilder>? configure
-    )
-        where TContextImplementation : DbContext, TContextService {
-        var user = configure ?? ((_, _) => { });
-
-        builder.Services.AddDbContextFactory<TContextImplementation>((sp, options) => {
-            options.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
-            user(sp, options);
-        });
-
-        return builder;
-    }
-
-    /// <summary>
     ///     Registers a unit of work for the specified Entity Framework Core <see cref="DbContext" />,
     ///     enabling cross-repository transactions.
     /// </summary>

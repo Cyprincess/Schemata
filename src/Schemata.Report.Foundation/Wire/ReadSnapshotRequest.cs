@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Report.Foundation;
@@ -7,11 +6,9 @@ namespace Schemata.Report.Foundation;
 public sealed class ReadSnapshotRequest : ICanonicalName
 {
     /// <summary>Maximum number of rows returned in the page.</summary>
-    [FromQuery(Name = "page_size")]
     public int? PageSize { get; set; }
 
     /// <summary>Opaque continuation token returned by the preceding page.</summary>
-    [FromQuery(Name = "page_token")]
     public string? PageToken { get; set; }
 
     string? ICanonicalName.Name { get; set; }

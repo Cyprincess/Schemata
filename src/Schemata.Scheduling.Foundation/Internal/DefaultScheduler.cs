@@ -29,6 +29,8 @@ public sealed partial class DefaultScheduler : IScheduler
     private readonly TimeProvider                                 _time;
     private          bool                                         _stopped = true;
 
+    internal int EntryCount => _entries.Count;
+
     public DefaultScheduler(
         IServiceProvider                    services,
         IOptions<SchemataSchedulingOptions> options,
@@ -79,13 +81,16 @@ public sealed partial class DefaultScheduler : IScheduler
 
     private sealed class ScheduledEntry
     {
-        public ScheduledEntry(SchemataJob job, CancellationTokenSource cts) {
-            Job = job;
-            Cts = cts;
+        public ScheduledEntry(SchemataJob job, CancellationTokenSource cts, int replayedMisses = 0) {
+            Job            = job;
+            Cts            = cts;
+            ReplayedMisses = replayedMisses;
         }
 
         public SchemataJob             Job { get; }
 
         public CancellationTokenSource Cts { get; }
+
+        public int ReplayedMisses { get; }
     }
 }

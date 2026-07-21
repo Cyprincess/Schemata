@@ -59,12 +59,12 @@ public sealed class SchemataJobAuditObserver(IRepository<SchemataJob> jobs) : IJ
         await jobs.CommitAsync(ct);
     }
 
-    public Task<JobTriggerOutcome> OnTriggeredAsync(
+    public Task OnTriggeredAsync(
         SchemataJob       job,
         JobContext        context,
         CancellationToken ct = default
     ) {
-        return Task.FromResult(JobTriggerOutcome.Proceed);
+        return Task.CompletedTask;
     }
 
     public Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {

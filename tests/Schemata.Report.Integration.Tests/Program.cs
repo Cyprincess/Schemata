@@ -1,20 +1,17 @@
 using System;
+using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions.Advisors;
 using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
 using Schemata.Insight.Foundation;
-using Schemata.Report.Foundation;
-using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Report.Skeleton;
@@ -22,11 +19,12 @@ using Schemata.Report.Integration.Tests.Fixtures;
 
 var options = new WebApplicationOptions { Args = args };
 var builder = WebApplication.CreateBuilder(options);
+var dbPath = Path.Combine(Path.GetTempPath(), $"report-integration-{Identifiers.NewUid():n}.db");
 var useScheduling = !string.Equals(builder.Environment.EnvironmentName, "WithoutScheduling", StringComparison.Ordinal);
 builder.UseSchemata(schema => {
     schema.UseDeveloperExceptionPage();
     schema.Services.AddDbContextFactory<TestDbContext>(options => {
-        options.UseInMemoryDatabase("report-integration-" + Identifiers.NewUid());
+        options.UseSqlite($"Data Source={dbPath}");
         options.ReplaceService<IModelCustomizer, SchemataModelCustomizer>();
     });
     schema.Services.AddRepository<SourceRecord, EfCoreRepository<TestDbContext, SourceRecord>>();
@@ -70,6 +68,7 @@ builder.UseSchemata(schema => {
 var app = builder.Build();
 using (var scope = app.Services.CreateScope()) {
     var database = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+    database.Database.EnsureCreated();
     database.SourceRecords.AddRange(
         new SourceRecord { Uid = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "one", Value = 1 },
         new SourceRecord { Uid = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = "two", Value = 2 },

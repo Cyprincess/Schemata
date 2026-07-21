@@ -14,8 +14,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Grpc.Internal;
-using Schemata.Flow.Http.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -27,9 +25,9 @@ namespace Schemata.Flow.Tests;
 public class FlowTransportSourceBindingShould
 {
     [Fact]
-    public async Task Http_Start_Loads_Source_Entity_And_Persists_Binding() {
+    public async Task Start_Loads_Source_Entity_And_Persists_Binding() {
         var harness = new Harness();
-        var handler = new FlowHttpStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
+        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         var process = await handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
 
@@ -43,54 +41,32 @@ public class FlowTransportSourceBindingShould
     }
 
     [Fact]
-    public async Task Grpc_Start_Loads_Source_Entity_And_Persists_Binding() {
-        var harness = new Harness();
-        var handler = new FlowGrpcStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
-
-        var process = await handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
-
-        Assert.Equal("approval", process.DefinitionName);
-        var source = Assert.Single(harness.Sources);
-        Assert.Equal(process.CanonicalName, source.Process);
-        Assert.Equal("order", source.Name);
-        Assert.Equal(typeof(Order).FullName, source.SourceType);
-        Assert.Equal("orders/o1", source.Source);
-    }
-
-    [Fact]
-    public async Task Http_Start_Returns_NotFound_When_Source_Name_Does_Not_Resolve() {
+    public async Task Start_Returns_NotFound_When_Source_Name_Does_Not_Resolve() {
         var harness = new Harness(false);
-        var handler = new FlowHttpStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
+        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
     }
 
     [Fact]
-    public async Task Grpc_Start_Returns_NotFound_When_Source_Name_Does_Not_Resolve() {
-        var harness = new Harness(false);
-        var handler = new FlowGrpcStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
-
-        await Assert.ThrowsAsync<NotFoundException>(() =>
-            handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
-    }
-
-    [Fact]
-    public async Task Http_Start_Returns_NotFound_When_Source_Type_Is_Not_Registered() {
+    public async Task Start_Returns_NotFound_When_Source_Type_Is_Not_Registered() {
         var harness = new Harness(resolvedType: typeof(Customer));
-        var handler = new FlowHttpStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
+        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
     }
 
     [Fact]
-    public async Task Grpc_Start_Returns_NotFound_When_Source_Type_Is_Not_Registered() {
-        var harness = new Harness(resolvedType: typeof(Customer));
-        var handler = new FlowGrpcStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
+    public async Task Start_Fails_When_Resolved_Source_Repository_Is_Not_Registered() {
+        var harness = new Harness(registerOrderRepository: false);
+        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
-        await Assert.ThrowsAsync<NotFoundException>(() =>
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
+
+        Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
 
     [Fact]
@@ -124,7 +100,7 @@ public class FlowTransportSourceBindingShould
                           It.IsAny<Order>(),
                           It.IsAny<CancellationToken>()))
                .ReturnsAsync(AdviseResult.Continue);
-        var harness = new Harness(runtime: new DuplicateTransitionRuntime(), sourceAdvisor: advisor.Object);
+        var harness = new Harness(runtime: DuplicateTransitionRuntime(), sourceAdvisor: advisor.Object);
 
         await harness.Runner.StartAsync("approval", harness.Order);
 
@@ -133,6 +109,16 @@ public class FlowTransportSourceBindingShould
                            It.IsAny<FlowTransitionContext>(),
                            It.IsAny<Order>(),
                            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Start_Fails_When_Source_WriteBack_Repository_Is_Not_Registered() {
+        var harness = new Harness(registerOrderRepository: false, runtime: DuplicateTransitionRuntime());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Runner.StartAsync("approval", harness.Order).AsTask());
+
+        Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
 
     private static StartProcessInstanceRequest Request() {
@@ -146,7 +132,8 @@ public class FlowTransportSourceBindingShould
             Type?                                          resolvedType = null,
             IReadOnlyDictionary<string, FlowSourceDescriptor>? sourceTypes = null,
             IFlowRuntime?                                   runtime = null,
-            IFlowSourceAdvisor<Order>?                      sourceAdvisor = null
+            IFlowSourceAdvisor<Order>?                      sourceAdvisor = null,
+            bool                                           registerOrderRepository = true
         ) {
             Order = new() { Name = "o1", CanonicalName = "orders/o1", Timestamp = Guid.NewGuid() };
             Sources = [];
@@ -155,16 +142,19 @@ public class FlowTransportSourceBindingShould
             Registry = RegistryMock(sourceTypes);
 
             var services = new ServiceCollection();
-            services.AddSingleton(Repository([Order]).Object);
+            if (registerOrderRepository) {
+                services.AddSingleton(Repository([Order]).Object);
+            }
             services.AddSingleton(Repository(new List<SchemataProcess>(), true).Object);
             services.AddSingleton(Repository(new List<SchemataProcessToken>()).Object);
             services.AddSingleton(Repository(new List<SchemataProcessTransition>()).Object);
             services.AddSingleton(SourceRepository(Sources).Object);
+            services.AddSingleton(Repository(new List<SchemataProcessCompensation>()).Object);
             if (sourceAdvisor is not null) {
                 services.AddSingleton(sourceAdvisor);
             }
 
-            services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? new Runtime());
+            services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? DefaultRuntime());
             Services = services.BuildServiceProvider();
             Runner = new(Registry.Object, new(), Notifier(), Services);
         }
@@ -197,7 +187,7 @@ public class FlowTransportSourceBindingShould
     }
 
     private static ProcessLifecycleNotifier Notifier() {
-        return new([], [], new NullLogger<ProcessLifecycleNotifier>());
+        return new([], new NullLogger<ProcessLifecycleNotifier>());
     }
 
     private static FlowSourceDescriptor Descriptor(string name) {
@@ -257,128 +247,60 @@ public class FlowTransportSourceBindingShould
         return uow;
     }
 
-    private sealed class Runtime : IFlowRuntime
-    {
-        public string EngineName => "StateMachine";
-
-        public ValueTask<ProcessSnapshot> StartAsync(
-            ProcessDefinition definition,
-            SchemataProcess   process,
-            FlowExecutionContext context,
-            CancellationToken ct = default
-        ) {
-            process.State = "Waiting";
-            var token = new SchemataProcessToken {
-                Name          = "root",
-                CanonicalName = $"{process.CanonicalName}/tokens/root",
-                Process       = process.Name!,
-                ScopeName     = process.Name!,
-                StateName     = "review",
-                WaitingAtName = "review",
-                State         = "Waiting",
-            };
-            return new(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
-        }
-
-        public ValueTask<ProcessSnapshot> TriggerAsync(
-            ProcessDefinition definition,
-            SchemataProcess process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext context,
-            IEventDefinition trigger,
-            object? payload,
-            string? tokenName = null,
-            CancellationToken ct = default
-        ) {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<ProcessSnapshot> AdvanceAsync(
-            ProcessDefinition definition,
-            SchemataProcess process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext context,
-            string? tokenName = null,
-            CancellationToken ct = default
-        ) {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<IReadOnlyList<string>> FindTriggerTargetsAsync(
-            ProcessDefinition definition,
-            SchemataProcess process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext context,
-            IEventDefinition trigger,
-            CancellationToken ct = default
-        ) {
-            throw new NotSupportedException();
-        }
+    private static IFlowRuntime DefaultRuntime() {
+        var runtime = new Mock<IFlowRuntime>();
+        runtime.SetupGet(value => value.EngineName).Returns("StateMachine");
+        runtime.SetupGet(value => value.Capabilities).Returns(FlowRuntimeCapabilities.None);
+        runtime.Setup(value => value.StartAsync(
+                      It.IsAny<ProcessDefinition>(),
+                      It.IsAny<SchemataProcess>(),
+                      It.IsAny<FlowExecutionContext>(),
+                      It.IsAny<CancellationToken>()))
+               .Returns((ProcessDefinition definition, SchemataProcess process, FlowExecutionContext context, CancellationToken ct) => {
+                   process.State = "Waiting";
+                   var token = new SchemataProcessToken {
+                       Name          = "root",
+                       CanonicalName = $"{process.CanonicalName}/tokens/root",
+                       Process       = process.Name!,
+                       ScopeName     = process.Name!,
+                       StateName     = "review",
+                       WaitingAtName = "review",
+                       State         = "Waiting",
+                   };
+                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
+               });
+        return runtime.Object;
     }
 
-    private sealed class DuplicateTransitionRuntime : IFlowRuntime
-    {
-        public string EngineName => "StateMachine";
-
-        public ValueTask<ProcessSnapshot> StartAsync(
-            ProcessDefinition    definition,
-            SchemataProcess      process,
-            FlowExecutionContext context,
-            CancellationToken    ct = default
-        ) {
-            process.State = "Running";
-            var token = new SchemataProcessToken {
-                Name          = "root",
-                CanonicalName = $"{process.CanonicalName}/tokens/root",
-                Process       = process.Name!,
-                ScopeName     = process.Name!,
-                StateName     = "review",
-                State         = "Active",
-            };
-            return new(new ProcessSnapshot {
-                Process = process,
-                Tokens = [token],
-                Transitions = [
-                    new() { Token = token.CanonicalName, Event = "Start" },
-                    new() { Token = token.CanonicalName, Event = "Start" },
-                ],
-            });
-        }
-
-        public ValueTask<ProcessSnapshot> TriggerAsync(
-            ProcessDefinition                   definition,
-            SchemataProcess                     process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext                context,
-            IEventDefinition                    trigger,
-            object?                             payload,
-            string?                             tokenName = null,
-            CancellationToken                   ct        = default
-        ) {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<ProcessSnapshot> AdvanceAsync(
-            ProcessDefinition                   definition,
-            SchemataProcess                     process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext                context,
-            string?                             tokenName = null,
-            CancellationToken                   ct        = default
-        ) {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<IReadOnlyList<string>> FindTriggerTargetsAsync(
-            ProcessDefinition                   definition,
-            SchemataProcess                     process,
-            IReadOnlyList<SchemataProcessToken> tokens,
-            FlowExecutionContext                context,
-            IEventDefinition                    trigger,
-            CancellationToken                   ct = default
-        ) {
-            throw new NotSupportedException();
-        }
+    private static IFlowRuntime DuplicateTransitionRuntime() {
+        var runtime = new Mock<IFlowRuntime>();
+        runtime.SetupGet(value => value.EngineName).Returns("StateMachine");
+        runtime.SetupGet(value => value.Capabilities).Returns(FlowRuntimeCapabilities.None);
+        runtime.Setup(value => value.StartAsync(
+                      It.IsAny<ProcessDefinition>(),
+                      It.IsAny<SchemataProcess>(),
+                      It.IsAny<FlowExecutionContext>(),
+                      It.IsAny<CancellationToken>()))
+               .Returns((ProcessDefinition definition, SchemataProcess process, FlowExecutionContext context, CancellationToken ct) => {
+                   process.State = "Running";
+                   var token = new SchemataProcessToken {
+                       Name          = "root",
+                       CanonicalName = $"{process.CanonicalName}/tokens/root",
+                       Process       = process.Name!,
+                       ScopeName     = process.Name!,
+                       StateName     = "review",
+                       State         = "Active",
+                   };
+                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot {
+                       Process = process,
+                       Tokens = [token],
+                       Transitions = [
+                           new() { Token = token.CanonicalName, Event = "Start" },
+                           new() { Token = token.CanonicalName, Event = "Start" },
+                       ],
+                   });
+               });
+        return runtime.Object;
     }
 
     [CanonicalName("orders/{order}")]

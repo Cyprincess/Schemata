@@ -7,4 +7,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     When present, <see cref="AdviceMethodRequestIdempotency{TEntity, TRequest, TResponse}" /> skips
 ///     the cached-response lookup and treats every request as new.
 /// </summary>
+/// <remarks>
+///     Opt in with <c>AdviceContext.Set&lt;T&gt;(...)</c> or scope suppression with
+///     <c>AdviceContext.Use&lt;T&gt;()</c>. No builder toggle controls this marker.
+/// </remarks>
 public sealed class MethodIdempotencySuppressed;

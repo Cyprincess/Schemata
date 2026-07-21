@@ -41,7 +41,7 @@ public sealed class EscalationBoundaryHandler
         var outgoing    = definition.FirstOutgoing(throwEvent);
         if (outgoing is null) {
             BpmnEngine.ApplyAggregateState(process, working);
-            return BpmnEngine.Snapshot(process, working, transitions);
+            return BpmnEngine.Snapshot(process, working, transitions, execution);
         }
 
             var variables = new Dictionary<string, int>(throwing.Bookkeeping, StringComparer.Ordinal);
@@ -64,7 +64,7 @@ public sealed class EscalationBoundaryHandler
             escalation.Name));
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     internal async ValueTask<ProcessSnapshot> ThrowEndAsync(
@@ -103,7 +103,7 @@ public sealed class EscalationBoundaryHandler
             escalation.Name));
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     internal async ValueTask<List<SchemataProcessTransition>> TryFireErrorBoundaryAsync(
@@ -152,7 +152,7 @@ public sealed class EscalationBoundaryHandler
 
             foreach (var candidate in scopeMap.EventSubProcessesInScope(scopeName)) {
                 var start = candidate.FindMatchingStart(definition => definition is EscalationDefinition startEscalation
-                                                                   && BpmnEngine.EventMatches(startEscalation, escalation));
+                                                                   && FlowEventMatcher.Matches(startEscalation, escalation));
                 if (start is not null) {
                     return await FireEventSubProcessAsync(engine, definition, process, throwing, working, candidate, start, scopeName, escalation, scopeMap, execution);
                 }
@@ -316,7 +316,7 @@ public sealed class EscalationBoundaryHandler
                        .FirstOrDefault(e => e.Position == EventPosition.Boundary
                                          && ReferenceEquals(e.AttachedTo, hostActivity)
                                          && e.Definition is EscalationDefinition boundaryEscalation
-                                         && BpmnEngine.EventMatches(boundaryEscalation, escalation));
+                                         && FlowEventMatcher.Matches(boundaryEscalation, escalation));
     }
 
     private static FlowEvent? FindMatchingErrorBoundary(string scopeName, ProcessScopeMap scopeMap, Exception error) {

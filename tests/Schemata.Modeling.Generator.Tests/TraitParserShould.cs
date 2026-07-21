@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class TraitParserShould
 {
     [Fact]
-    public void Parse_BasicTrait() {
+    public void Parse_TraitWithNoteAndPrimaryKeyField_BindsNameFieldsNotesAndOption() {
         var input  = "Trait Identifier {\n  Note 'Primary Key'\n  long id [primary key]\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -19,7 +19,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_TraitWithBases() {
+    public void Parse_TraitWithCommaSeparatedBases_BindsBaseNamesInOrder() {
         var input  = "Trait Entity : Identifier, Timestamp {\n  long id\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -29,7 +29,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_TraitWithUses() {
+    public void Parse_TraitWithCommaSeparatedUses_BindsQualifiedNames() {
         var input  = "Trait Entity {\n  Use Identifier, Timestamp\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -40,7 +40,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_CaseInsensitive() {
+    public void Parse_LowercaseTraitKeyword_StillBindsPascalCaseName() {
         var input  = "trait Foo {\n  string bar\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -48,7 +48,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_TraitWithMultipleFields() {
+    public void Parse_TraitWithTwoNullableFields_BindsBothAsNullable() {
         var input  = "Trait Timestamp {\n  timestamp? creation_date\n  timestamp? modification_date\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -58,7 +58,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_TraitWithNoteAndUseAndField() {
+    public void Parse_TraitWithNoteUseAndField_RegistersAllThreeMembers() {
         var input  = "Trait Auditable {\n  Note 'Audit trail'\n  Use Timestamp\n  string modified_by\n}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);
@@ -68,7 +68,7 @@ public class TraitParserShould
     }
 
     [Fact]
-    public void Parse_TraitEmptyBody() {
+    public void Parse_EmptyBodyTrait_BindsNameAndZeroFieldCount() {
         var input  = "Trait Marker {}";
         var result = Parser.Trait.Parse(input);
         Assert.NotNull(result);

@@ -54,8 +54,8 @@ public sealed partial class LocalPipelineExecutor
         SelectionItem                        item,
         CancellationToken                    ct
     ) {
-        var (childAlias, childStages) = LowerChild(item.Nested!);
-        var rawChildren = FindChildList(parent, item.Alias);
+        var (childAlias, childStages, driverName) = LowerChild(item.Nested!);
+        var rawChildren = FindChildren(parent, item, driverName);
 
         var projected = new List<IReadOnlyDictionary<string, object?>>(rawChildren.Count);
         await foreach (var child in RunAsync(ToAsync(rawChildren, ct), childAlias, childStages, ct)) {
@@ -65,10 +65,10 @@ public sealed partial class LocalPipelineExecutor
         return projected;
     }
 
-    private static (string Alias, IReadOnlyList<PlanNode> Stages) LowerChild(PlanNode root) {
+    private static (string Alias, IReadOnlyList<PlanNode> Stages, string DriverName) LowerChild(PlanNode root) {
         var stages = new List<PlanNode>();
         var node   = root;
-        while (node is not SourceNode source) {
+        while (node is not SourceNode) {
             stages.Add(node);
             node = node switch {
                 FilterNode filter       => filter.Input,
@@ -83,22 +83,74 @@ public sealed partial class LocalPipelineExecutor
         }
 
         stages.Reverse();
-        return (((SourceNode)node).Alias, stages);
+        var source = (SourceNode)node;
+        return (source.Alias, stages, source.Config.DriverName);
     }
 
-    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> FindChildList(
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> FindChildren(
         IReadOnlyDictionary<string, object?> parent,
-        string                               alias
+        SelectionItem                        item,
+        string                               driverName
     ) {
-        foreach (var (_, value) in parent) {
-            if (value is IReadOnlyDictionary<string, object?> source
-             && source.TryGetValue(alias, out var nested)
-             && nested is IReadOnlyList<IReadOnlyDictionary<string, object?>> children) {
-                return children;
+        var (source, path) = AnchorSource(parent, item);
+
+        if (source.TryGetValue(item.Alias, out var pushed)) {
+            return ToChildRows(pushed, item);
+        }
+
+        if (path is not null && TryResolve(source, path, out var resolved)) {
+            return ToChildRows(resolved, item);
+        }
+
+        throw new InsightValidationException(InsightReasons.Unimplemented,
+                                             $"Driver '{driverName}' returned no child collection for nested selection '{item.Alias}' (path '{item.FieldPath}'); declare Nested or include the child collection in raw rows.");
+    }
+
+    private static (IReadOnlyDictionary<string, object?> Source, string? Path) AnchorSource(
+        IReadOnlyDictionary<string, object?> parent,
+        SelectionItem                        item
+    ) {
+        var path = item.FieldPath;
+        if (path is not null) {
+            var separator = path.IndexOf('.');
+            var first     = separator < 0 ? path : path[..separator];
+            if (parent.TryGetValue(first, out var prefixed)
+             && prefixed is IReadOnlyDictionary<string, object?> anchored) {
+                return (anchored, separator < 0 ? null : path[(separator + 1)..]);
             }
         }
 
-        return [];
+        IReadOnlyDictionary<string, object?>? single = null;
+        var count = 0;
+        foreach (var (_, value) in parent) {
+            if (value is IReadOnlyDictionary<string, object?> candidate) {
+                single = candidate;
+                count++;
+            }
+        }
+
+        if (count == 1) {
+            return (single!, path);
+        }
+
+        throw new InsightValidationException(InsightReasons.InvalidArgument,
+                                             $"Nested selection '{item.Alias}' (path '{item.FieldPath}') cannot be anchored to a single source.");
+    }
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ToChildRows(object? value, SelectionItem item) {
+        return value switch {
+            null => [],
+            IReadOnlyList<IReadOnlyDictionary<string, object?>> rows => rows,
+            string => throw NonCollection(item),
+            IReadOnlyDictionary<string, object?> => throw NonCollection(item),
+            System.Collections.IEnumerable children => RowMaterializer.ToChildRows(children),
+            var _ => throw NonCollection(item),
+        };
+    }
+
+    private static InsightValidationException NonCollection(SelectionItem item) {
+        return new(InsightReasons.InvalidArgument,
+                   $"Nested selection '{item.Alias}' (path '{item.FieldPath}') targets a non-collection value.");
     }
 
     private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ToAsync(

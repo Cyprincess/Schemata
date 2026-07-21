@@ -45,4 +45,20 @@ public sealed class ResourceReferenceAttribute : Attribute
     ///     The referenced entity type, or <see langword="null" /> for polymorphic references.
     /// </summary>
     public Type? Target { get; }
+
+    /// <summary>
+    ///     When <see langword="true" />, write-time validation also verifies the referenced
+    ///     row exists, in addition to type resolvability. The existence query runs against
+    ///     the target repository by <see cref="ICanonicalName.CanonicalName" /> with
+    ///     owner-query suppression, so cross-owner references resolve. A missing row
+    ///     surfaces as <c>NOT_FOUND</c> for the target type.
+    /// </summary>
+    /// <remarks>
+    ///     Existence validation is performed by
+    ///     <c>Schemata.Entity.Owner.Advisors.AdviceValidateResourceReferenceExistence{TEntity}</c>
+    ///     and therefore activates only when the ownership pipeline (<c>UseOwner()</c>) is
+    ///     registered. The referenced entity must implement <see cref="ICanonicalName" />
+    ///     and have its <c>IRepository{T}</c> registered in the container.
+    /// </remarks>
+    public bool ValidateExistence { get; set; }
 }

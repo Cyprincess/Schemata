@@ -5,6 +5,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -63,7 +64,7 @@ public sealed class AdviceListRequestAuthorize<TEntity> : IResourceListRequestAd
         var context = new AccessContext<ListRequest> { Operation = nameof(Operations.List), Request = request };
 
         var expression = await _entitlement.GenerateEntitlementExpressionAsync(context, principal, ct);
-        container.ApplyModification(expression);
+        container.ApplyWhere(expression);
 
         if (ctx.Has<AnonymousGranted>()) {
             return AdviseResult.Continue;

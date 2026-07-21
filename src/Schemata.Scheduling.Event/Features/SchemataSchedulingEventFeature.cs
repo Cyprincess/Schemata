@@ -39,6 +39,8 @@ public sealed class SchemataSchedulingEventFeature : FeatureBase
             options.Registrations.Add((typeof(JobTriggered), "schemata/scheduling/job.triggered"));
             options.Registrations.Add((typeof(JobCompleted), "schemata/scheduling/job.completed"));
             options.Registrations.Add((typeof(JobFailed), "schemata/scheduling/job.failed"));
+            options.Registrations.Add((typeof(JobBlocked), "schemata/scheduling/job.blocked"));
+            options.Registrations.Add((typeof(JobSkipped), "schemata/scheduling/job.skipped"));
         });
     }
 }

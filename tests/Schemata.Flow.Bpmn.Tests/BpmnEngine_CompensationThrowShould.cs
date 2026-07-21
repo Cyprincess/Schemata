@@ -1,10 +1,7 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Flow.Bpmn.Runtime.Compensation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Xunit;
@@ -66,24 +63,6 @@ public class BpmnEngine_CompensationThrowShould
                             .Select(t => t.Previous)
                             .ToList();
         Assert.Equal(new[] { "E", "D", "C", "B", "A" }, order);
-    }
-
-    [Fact]
-    public async Task Throw_CompensationHandlerThrows_PropagatesError() {
-        var scenario = CompensationScenario(1, null, false);
-        var beforeThrow = await AdvanceUntilBeforeThrowAsync(scenario);
-        var failure = new InvalidOperationException("compensation failed");
-        RegisterHandler(scenario.Engine, beforeThrow.Process.CanonicalName!, new ThrowingHandler(failure));
-
-        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await scenario.Engine.AdvanceAsync(
-                scenario.Definition,
-                beforeThrow.Process,
-                beforeThrow.Tokens,
-                beforeThrow.Tokens.Single().CanonicalName,
-                CancellationToken.None));
-
-        Assert.Same(failure, thrown);
     }
 
     private static async Task<ProcessSnapshot> AdvanceIntoThrowAsync(CompensationEngineScenario scenario) {
@@ -165,31 +144,10 @@ public class BpmnEngine_CompensationThrowShould
         return new(new(), definition, process, activities);
     }
 
-    private static void RegisterHandler(BpmnEngine engine, string scopeOwner, ICompensationHandler handler) {
-        var ensure = typeof(BpmnEngine).GetMethod(
-            "EnsureCompensationScope",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(ensure);
-
-        var stack = Assert.IsType<CompensationStack>(ensure.Invoke(engine, [scopeOwner]));
-        stack.Register(handler);
-    }
-
     private sealed record CompensationEngineScenario(
         BpmnEngine          Engine,
         ProcessDefinition  Definition,
         SchemataProcess    Process,
         IReadOnlyList<Activity> Activities);
 
-    private sealed class ThrowingHandler(Exception failure) : ICompensationHandler
-    {
-        public Activity Activity { get; } = new NoneTask { Name = "throwing" };
-
-        public FlowElement CompensationTarget { get; } = new NoneTask { Name = "undo-throwing" };
-
-        public ValueTask InvokeAsync(CompensationInvocationContext context, CancellationToken ct = default) {
-            throw failure;
-        }
-    }
 }
-

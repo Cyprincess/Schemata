@@ -8,7 +8,7 @@ namespace Microsoft.AspNetCore.Builder;
 /// <summary><see cref="SchemataBuilder"/> extensions for the Flow.Event bridge.</summary>
 public static class FlowEventBuilderExtensions
 {
-    /// <summary>Registers <see cref="Schemata.Flow.Event.Features.SchemataFlowEventFeature"/>.</summary>
+    /// <summary>Registers <see cref="SchemataFlowEventFeature"/>.</summary>
     public static SchemataFlowBuilder UseEvent(this SchemataFlowBuilder builder) {
         builder.AddFeature<SchemataFlowEventFeature>();
         return builder;

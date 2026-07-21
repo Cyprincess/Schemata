@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,7 +11,6 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
-using Schemata.Scheduling.Foundation.Observers;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -36,8 +36,11 @@ public sealed class JobExecutionDispatcher(
     private const           int           BatchSize = 100;
     private static readonly TimeSpan      Interval  = TimeSpan.FromSeconds(30);
     private readonly        SemaphoreSlim _pending  = new(0, int.MaxValue);
+    private readonly        ConcurrentDictionary<string, CancellationTokenSource> _running =
+        services.GetService<ConcurrentDictionary<string, CancellationTokenSource>>() ?? new();
     private readonly        IServiceScopeFactory _scopes = services.GetRequiredService<IServiceScopeFactory>();
     private readonly        TimeProvider  _time     = time ?? TimeProvider.System;
+
 
     /// <summary>Wakes the dispatch loop after a producer commits (or a timer arms) a due execution row.</summary>
     public void NotifyPending() {
@@ -129,36 +132,40 @@ public sealed class JobExecutionDispatcher(
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
-            case AdviseResult.Block:
             default:
                 // An advisor handled or blocked the fire before it ran; leave no terminal row churn
                 // beyond the claim and advance the schedule so the next occurrence is materialized.
+                await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Skipped, null, observers,
+                                    context, ct, notifySkipped: true);
+                return;
+            case AdviseResult.Block:
                 await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Blocked, null, observers,
-                                    context, ct);
+                                    context, ct, notifyBlocked: true);
                 return;
         }
 
-        var outcome = await ResolveTriggerOutcomeAsync(observers, job, context, ct);
-        if (outcome == JobTriggerOutcome.Block) {
-            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Blocked, null, observers,
-                                context, ct, notifyBlocked: true);
-            return;
-        }
-
-        if (outcome == JobTriggerOutcome.Skip) {
-            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Skipped, null, observers,
-                                context, ct, notifySkipped: true);
-            return;
+        foreach (var observer in observers) {
+            await observer.OnTriggeredAsync(job, context, ct);
         }
 
         try {
             var scheduledJob = (IScheduledJob)serviceProvider.GetRequiredService(jobType);
-            await scheduledJob.ExecuteAsync(context, ct);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var key = execution.Uid.ToString("n");
+            if (!_running.TryAdd(key, linked)) {
+                return;
+            }
+
+            try {
+                await scheduledJob.ExecuteAsync(context, linked.Token);
+            } finally {
+                _running.TryRemove(key, out _);
+            }
 
             execution.Output = context.Execution?.Output;
             await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Succeeded, null, observers,
                                 context, ct, true);
-        } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+        } catch (OperationCanceledException) {
             // Host shutdown mid-run: leave the row Running so a later pass reclaims and reruns it.
             logger?.LogInformation("Execution '{ExecutionUid}' cancelled mid-run; leaving it for re-dispatch.",
                                    execution.Uid);
@@ -206,7 +213,7 @@ public sealed class JobExecutionDispatcher(
         job.RecentRunTime = execution.EndTime;
         job.RecentError   = state == ExecutionState.Failed ? exception?.Message : null;
 
-        var scheduler = serviceProvider.GetService<IScheduler>();
+        var scheduler = serviceProvider.GetRequiredService<IScheduler>();
         var recurring = job.ScheduleType is ScheduleType.Cron or ScheduleType.Periodic;
 
         if (state == ExecutionState.Failed) {
@@ -222,10 +229,10 @@ public sealed class JobExecutionDispatcher(
                     await observer.OnSucceededAsync(job, context, ct);
                 } else if (notifyFailed) {
                     await observer.OnFailedAsync(job, context, exception!, ct);
-                } else if (notifyBlocked && observer is SchemataJobAuditObserver audit) {
-                    await audit.OnBlockedAsync(job, context, ct);
-                } else if (notifySkipped && observer is SchemataJobAuditObserver auditSkip) {
-                    await auditSkip.OnSkippedAsync(job, context, ct);
+                } else if (notifyBlocked) {
+                    await observer.OnBlockedAsync(job, context, ct);
+                } else if (notifySkipped) {
+                    await observer.OnSkippedAsync(job, context, ct);
                 }
             } catch (Exception observerEx) {
                 logger?.LogWarning(observerEx, "Lifecycle observer threw while finalizing job '{JobName}'.", job.Name);
@@ -233,7 +240,7 @@ public sealed class JobExecutionDispatcher(
         }
 
         // Recurring jobs re-arm their next occurrence; the scheduler materializes the next Pending row.
-        if (recurring && scheduler is not null && job is { State: JobState.Active, Name: not null }) {
+        if (recurring && job is { State: JobState.Active, Name: not null }) {
             job.NextRunTime = ComputeNextRunTime(job);
             if (job.NextRunTime is not null) {
                 await scheduler.ScheduleAsync(job, ct);
@@ -246,15 +253,13 @@ public sealed class JobExecutionDispatcher(
         SchemataJobExecution execution,
         CancellationToken    ct
     ) {
+        var jobs      = serviceProvider.GetRequiredService<IRepository<SchemataJob>>();
         var canonical = execution.Job;
         if (!string.IsNullOrWhiteSpace(canonical)) {
-            var jobs = serviceProvider.GetService<IRepository<SchemataJob>>();
-            if (jobs is not null) {
-                var existing = await jobs.FirstOrDefaultAsync(
-                    q => q.Where(j => j.CanonicalName == canonical), ct);
-                if (existing is not null) {
-                    return existing;
-                }
+            var existing = await jobs.FirstOrDefaultAsync(
+                q => q.Where(j => j.CanonicalName == canonical), ct);
+            if (existing is not null) {
+                return existing;
             }
         }
 
@@ -284,22 +289,17 @@ public sealed class JobExecutionDispatcher(
         };
     }
 
-    private static async Task<JobTriggerOutcome> ResolveTriggerOutcomeAsync(
-        List<IJobLifecycleObserver> observers,
-        SchemataJob                 job,
-        JobContext                  context,
-        CancellationToken           ct
-    ) {
-        var outcome = JobTriggerOutcome.Proceed;
-        foreach (var observer in observers) {
-            var result = await observer.OnTriggeredAsync(job, context, ct);
-            if (result > outcome) {
-                outcome = result;
-            }
+    internal bool TryCancel(Guid executionUid) {
+        if (!_running.TryGetValue(executionUid.ToString("n"), out var source)) {
+            return false;
         }
 
-        context.TriggerOutcome = outcome;
-        return outcome;
+        try {
+            source.Cancel();
+            return true;
+        } catch (ObjectDisposedException) {
+            return false;
+        }
     }
 
     private DateTime? ComputeNextRunTime(SchemataJob job) {
@@ -308,7 +308,7 @@ public sealed class JobExecutionDispatcher(
         }
 
         var schedule = ScheduleDefinitionMapper.ToDefinition(job);
-        return schedule.GetNextRunTime(_time.GetUtcNow().UtcDateTime);
+        return schedule.GetNextRunTime(job.NextRunTime ?? _time.GetUtcNow().UtcDateTime);
     }
 
     private async Task MarkFailedAsync(

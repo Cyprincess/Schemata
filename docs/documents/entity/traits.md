@@ -23,7 +23,7 @@ the always-on repository advisors in `Schemata.Entity.Repository`, the ownership
 | `ISoftDelete`      | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 |
 | `ISoftDelete`      | `AdviceAddSoftDelete<TEntity>`        | Add        | 900,000,000 |
 | `ISoftDelete`      | `AdviceRemoveSoftDelete<TEntity>`     | Remove     | 900,000,000 |
-| `IOwnable`         | `AdviceAddOwner<TEntity>`             | Add        | 130,000,000 |
+| `IOwnable`         | `AdviceAddOwner<TEntity>`             | Add        | 121,000,000 |
 | `IOwnable`         | `AdviceBuildQueryOwner<TEntity>`      | BuildQuery | 110,000,000 |
 | `IExpiration`      | —                                     | —          | —           |
 | `IDescriptive`     | —                                     | —          | —           |
@@ -46,8 +46,11 @@ public interface IIdentifier
 ```
 
 Provides a `Guid` primary key. `RepositoryBase.ResolveKeyProperties` falls back to `Uid` when no
-class-level `[PrimaryKey]` attribute resolves. No advisor assigns `Uid`; application code or a custom
-add advisor sets it before `AddAsync`.
+class-level `[PrimaryKey]` attribute resolves. `[PrimaryKey]` and the repeatable `[Index]` are
+Schemata's own attributes in `Schemata.Abstractions.Entities` (class-level; `Properties` carries the
+property names, `Index` adds `IsUnique`) — see
+[overview.md](overview.md#primary-key-convention). No advisor assigns `Uid`; application code or a
+custom add advisor sets it before `AddAsync`.
 
 ## ITimestamp
 
@@ -164,16 +167,20 @@ public interface IOwnable
 ```
 
 Records the canonical name of the principal that owns the entity (e.g., `users/chino`). The
-`Schemata.Entity.Owner` package supplies two advisors, both registered by `UseOwner()`:
+`Schemata.Entity.Owner` package supplies these advisors, all registered by `UseOwner()`:
 
-| Advisor                          | Pipeline   | Order       | Behavior                                                                           |
-| -------------------------------- | ---------- | ----------- | ---------------------------------------------------------------------------------- |
-| `AdviceAddOwner<TEntity>`        | Add        | 130,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset. |
-| `AdviceBuildQueryOwner<TEntity>` | BuildQuery | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query.                            |
+| Advisor                                               | Pipeline     | Order       | Behavior                                                                                                        |
+| ----------------------------------------------------- | ------------ | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `AdviceAddOwner<TEntity>`                             | Add          | 121,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset.                              |
+| `AdviceBuildQueryOwner<TEntity>`                      | BuildQuery   | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query.                                                         |
+| `AdviceValidateResourceReferenceExistence<TEntity>`   | Add + Update | 150,000,000 | Resolves `[ResourceReference(ValidateExistence = true)]` targets and throws `NotFoundException` when missing.  |
 
-Both consult `SchemataOwnerOptions.OnNullOwner` when the resolver returns `null`: `Reject` (default)
-throws `PermissionDeniedException`, `EmptyResult` blocks, `AllowAll` continues. See
-[ownership.md](../repository/ownership.md).
+`AdviceValidateResourceReferenceExistence` is not trait-gated; it drives off the
+`[ResourceReference]` attribute. See [ownership.md](../repository/ownership.md).
+
+`AdviceAddOwner` and `AdviceBuildQueryOwner` consult `SchemataOwnerOptions.OnNullOwner` when the
+resolver returns `null`: `Reject` (default) throws `PermissionDeniedException`, `EmptyResult` blocks,
+`AllowAll` continues.
 
 ## IExpiration
 

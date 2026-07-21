@@ -90,9 +90,14 @@ Occurrences are computed in UTC.
 
 ## Job lifecycle
 
-The scheduler notifies `IJobLifecycleObserver` implementations around each fire: before execution
-(where an observer can let the run proceed, skip it, or block it), on success, and on failure. The
-gating semantics and execution-row states are in the [Cron Jobs](../cookbook/cron-jobs.md) recipe.
+Before a job body runs, the scheduler invokes the `IJobExecutionAdvisor` pipeline
+(`Schemata.Scheduling.Skeleton.Advisors`). An advisor returning `Continue` lets the fire proceed;
+`Handle` marks the execution `Skipped`; `Block` marks it `Blocked`. `IJobLifecycleObserver`
+implementations are then notified around the fire — `OnTriggeredAsync` before `ExecuteAsync`,
+`OnSucceededAsync` after it returns, `OnFailedAsync` when it throws, plus `OnBlockedAsync` and
+`OnSkippedAsync` for the two gated outcomes. Observers are notification-only: they return `Task`
+and cannot change the outcome. The gating semantics and execution-row states are in the
+[Cron Jobs](../cookbook/cron-jobs.md) recipe.
 
 To publish those transitions to the event bus, add the `Schemata.Scheduling.Event` bridge package
 and chain `UseEvent()`:
@@ -104,7 +109,8 @@ schema.UseScheduling()
 ```
 
 This registers `EventPublishingJobLifecycleObserver`, which publishes `JobScheduled`,
-`JobUnscheduled`, `JobTriggered`, `JobCompleted`, and `JobFailed` events through `IEventBus`.
+`JobUnscheduled`, `JobTriggered`, `JobCompleted`, `JobFailed`, `JobBlocked`, and `JobSkipped`
+events through `IEventBus`.
 
 ## Verify
 

@@ -43,8 +43,8 @@ public static class InsightSecurityGate
         var accessType     = typeof(IAccessProvider<,>).MakeGenericType(rowType, typeof(QueryInsightRequest));
         var accessProvider = services.GetService(accessType);
         if (accessProvider is not null) {
-            var allowed = (bool)(await InvokeAsync(accessType, accessProvider, "HasAccessAsync",
-                                                   [null, context, principal, ct]))!;
+            var allowed = (bool)(await InvokeAsync(accessType, accessProvider, nameof(IAccessProvider<,>.HasAccessAsync),
+                                                    [null, context, principal, ct]))!;
             if (!allowed) {
                 throw new PermissionDeniedException(
                     SchemataResources.INSIGHT_ACCESS_DENIED,
@@ -59,12 +59,12 @@ public static class InsightSecurityGate
         }
 
         return (Expression?)await InvokeAsync(entitlementType, entitlementProvider,
-                                              "GenerateEntitlementExpressionAsync", [context, principal, ct]);
+                                               nameof(IEntitlementProvider<,>.GenerateEntitlementExpressionAsync), [context, principal, ct]);
     }
 
     private static async Task<object?> InvokeAsync(Type contract, object provider, string method, object?[] args) {
         var task = (Task)contract.GetMethod(method)!.Invoke(provider, args)!;
         await task;
-        return task.GetType().GetProperty("Result")!.GetValue(task);
+        return task.GetType().GetProperty(nameof(Task<int>.Result))!.GetValue(task);
     }
 }

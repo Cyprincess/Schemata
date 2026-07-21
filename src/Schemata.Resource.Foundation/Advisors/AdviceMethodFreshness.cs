@@ -5,7 +5,6 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -15,10 +14,9 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceMethodFreshness
 {
     /// <summary>
-    ///     Default order at <see cref="Orders.Base" /> -- parallel to
-    ///     <see cref="AdviceUpdateFreshness{TEntity, TRequest}" />.
+    ///     Default order: runs after <see cref="AdviceMethodEntityAuthorize{TEntity,TRequest,TResponse}" />.
     /// </summary>
-    public const int DefaultOrder = Orders.Base;
+    public const int DefaultOrder = AdviceMethodEntityAuthorize.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

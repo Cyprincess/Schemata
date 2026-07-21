@@ -67,7 +67,7 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
         QueryContext<TEntity, TResult, T> context,
         CancellationToken                 ct = default
     ) {
-        if (ctx.Has<QueryCacheSuppressed>()) {
+        if (ctx.Has<QueryCacheSuppressed>() || context.HasOpenWriteUnitOfWork) {
             return AdviseResult.Continue;
         }
 

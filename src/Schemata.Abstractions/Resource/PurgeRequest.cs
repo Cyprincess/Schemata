@@ -25,8 +25,13 @@ public sealed class PurgeRequest : ICanonicalName, IRequestIdentification
     public string? Language { get; set; }
 
     /// <summary>
-    ///     When <see langword="true" />, physically removes matching resources; otherwise
-    ///     the operation reports a preview count and sample.
+    ///     Parent resource name that narrows the purge to its child collection.
+    /// </summary>
+    public string? Parent { get; set; }
+
+    /// <summary>
+    ///     When <see langword="true" />, physically removes matching resources. When
+    ///     <see langword="false" />, the operation reports a preview count and sample.
     /// </summary>
     public bool Force { get; set; }
 

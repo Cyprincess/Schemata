@@ -1,9 +1,11 @@
 # Flow Scheduling Integration
 
-`Schemata.Flow.Scheduling` bridges intermediate timer catches to the scheduler. As a process
-transitions, `AdviceTransitionTimer` schedules or cancels a one-shot job for the timer the instance
-is waiting on. When the job fires, `FlowTimerJob` loads the process, resolves the keyed engine,
-triggers the timer event, persists the snapshot, and notifies lifecycle observers.
+`Schemata.Flow.Scheduling` bridges intermediate and boundary timer catches to the scheduler. As a
+process transitions, `AdviceTransitionTimer` schedules or cancels a one-shot job for the timer the
+instance is waiting on (or the boundary timers attached to the activity a token sits on). When the
+job fires, `FlowTimerJob` delegates to `FlowRunner.RunEventAsync`, which loads the process, resolves
+the keyed engine, triggers the timer event on the addressed token, persists the snapshot, and
+notifies lifecycle observers.
 
 ## Where the code lives
 
@@ -52,21 +54,27 @@ other transitions pass through untouched.
 
 ### Timer lifecycle
 
-1. **Cancel the previous timer** when `PreviousWaitingAtName` was a timer catch and differs from
-   the new `WaitingAtName`.
+1. **Cancel the previous timer** when `PreviousWaitingAtName` was an intermediate timer catch and
+   differs from the new `WaitingAtName`. Boundary timers follow the host activity instead: when the
+   token's previous state was an `Activity` carrying boundary timer catches, every one of those jobs
+   is cancelled.
 2. **Schedule a new timer** when the new waiting element is an intermediate catch whose definition
-   is a `TimerDefinition`. The advisor builds a `SchemataJob`:
-   - `Name` = `flow-{process.CanonicalName}-{elementName}` (keyed by element name, so sibling
-     timers in one instance keep distinct jobs).
+   is a `TimerDefinition`. When the token is `Active` and parked on an `Activity`, every boundary
+   timer catch attached to that activity also gets a job. The advisor builds a `SchemataJob` per
+   timer:
+   - `Name` = `flow-{process.CanonicalName}-{elementName}-{token}` (keyed by element and token leaf,
+     so sibling timers and concurrent branches in one instance keep distinct jobs).
    - `JobKey` = `typeof(FlowTimerJob).FullName`.
    - `State` = `JobState.Active`.
    - The schedule comes from `TimerDefinitionConverter.ToSchedule(timerDef)` and is applied via
      `ScheduleDefinitionMapper.ApplyToJob`.
-   - Job variables carry `processName` (the canonical name) and `timerDef` (the timer definition).
+   - Job variables carry `processName` (the canonical name), `tokenName` (the token canonical name),
+     and `timerDef` (the timer definition serialized to JSON).
 3. The advisor resolves `IScheduler`, calls
    `UnscheduleAsync($"{ResourceNameDescriptor.ForType<SchemataJob>().Collection}/{previousJobName}", ct)`
    and `ScheduleAsync(job, variables, ct)`. The scheduler owns the `SchemataJob` row.
 
+The element walk uses `ProcessDefinition.AllElements`, so timers nested in sub-processes are covered.
 A timer-catch transition with no `IScheduler` registered throws `FailedPreconditionException`,
 aborting the transition before the instance parks on a timer nothing will fire.
 
@@ -83,22 +91,12 @@ aborting the transition before the instance parks on a timer nothing will fire.
 ## FlowTimerJob
 
 `FlowTimerJob` implements `IScheduledJob`. The scheduler activates it from the DI scope by its job
-key when the timer fires. `ExecuteAsync` runs through these steps:
-
-1. Extracts `processName` and `timerDef` from `JobContext.Variables`. Variables may arrive as a
-   `string` / `TimerDefinition` or as a `JsonElement` (deserialized through `JsonSerializer` for
-   `TimerDefinition`). A missing variable throws `FailedPreconditionException`.
-2. Opens a fresh DI scope and resolves `ProcessPersistence`, `IProcessRegistry`, and
-   `ProcessLifecycleNotifier`.
-3. Loads the process via `ProcessPersistence.FindAsync`. A missing process throws `NotFoundException`.
-4. Looks up `ProcessRegistration` via `IProcessRegistry.GetRegistration` and resolves the keyed
-   `IFlowRuntime` engine through `GetKeyedService<IFlowRuntime>(reg.Engine)`.
-5. Inside `persistence.ExecuteAsync`, lists the process's tokens, builds a `FlowExecutionContext`,
-   and calls `engine.TriggerAsync(reg.Definition, process, tokens, execution, timerDef, payload: null,
-tokenName: null, ct)`. The returned snapshot is persisted through `PersistSnapshotAsync`.
-6. On exception, calls `notifier.NotifyFailedAsync(process, ex, ct)` and rethrows.
-7. On success, calls `notifier.NotifyTransitionedAsync(snapshot, ct)`. If `process.State` equals
-   `"Completed"` (case-insensitive), also calls `notifier.NotifyTerminatedAsync(process, ct)`.
+key when the timer fires. `ExecuteAsync` reads `processName`, `tokenName`, and `timerDef` from
+`JobContext.Variables` (a missing variable, or a `timerDef` that fails to deserialize, throws
+`FailedPreconditionException`), opens a fresh DI scope, and calls
+`FlowRunner.RunEventAsync(processName, tokenName, timerDef, payload: null, ct)`. The runner advances
+the addressed token through the full transition unit of work — advisor chain, source projection,
+and follow-up event subscriptions — so a timer fire behaves exactly like any other transition.
 
 The instance advances past the timer catch. A `OneTimeSchedule` does not reschedule; a
 `CronSchedule` fires again on its next occurrence.
@@ -113,8 +111,9 @@ The instance advances past the timer catch. A `OneTimeSchedule` does not resched
 - The advisor runs inside the transition unit of work, but the scheduler write is an external side
   effect outside that unit of work. A failed commit rolls back the instance row while the scheduled
   job survives; reconcile by dropping jobs without a matching waiting instance.
-- The job name `flow-{process.CanonicalName}-{elementName}` is deterministic per waiting element and
-  per definition rebuild, so a transition out of a timer catch cancels exactly the job it scheduled.
+- The job name `flow-{process.CanonicalName}-{elementName}-{token}` is deterministic per waiting
+  element, token, and definition rebuild, so a transition out of a timer catch cancels exactly the
+  job it scheduled.
 
 ## See also
 

@@ -183,7 +183,7 @@ public sealed class Configurators
     /// </summary>
     /// <param name="services">The service collection to register into.</param>
     /// <returns>The given service collection for chaining.</returns>
-    public IServiceCollection Invoke(IServiceCollection services) {
+    internal IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);

@@ -18,6 +18,9 @@ public interface IFlowRuntime
     /// <summary>The unique name of this engine, used for keyed registration and lookup.</summary>
     string EngineName { get; }
 
+    /// <summary>The execution features supported by this runtime.</summary>
+    FlowRuntimeCapabilities Capabilities { get; }
+
     /// <summary>
     ///     Creates the initial token by locating the <c>Start</c> event and following its outgoing
     ///     <see cref="SequenceFlow" />. The handler persists every entity in the returned snapshot.

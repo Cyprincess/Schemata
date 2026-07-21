@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public sealed record Field(
+internal sealed record Field(
     string                      Type,
     bool                        Nullable,
     string                      Name,

@@ -16,6 +16,7 @@ using Schemata.Authorization.Skeleton.Extensions;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -223,6 +224,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         // [ResourceReference] contracts on SchemataAuthorization / SchemataToken; the OAuth
         // wire `client_id` keeps mapping to SchemataApplication.Name via FindByClientIdAsync.
         var authorization = new TAuth {
+            Name                = Identifiers.NewUid().ToString("n"),
             Application         = application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,

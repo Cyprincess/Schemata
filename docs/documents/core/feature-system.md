@@ -156,7 +156,12 @@ A feature declares prerequisites with two attribute forms, processed during
 - **`[DependsOn<T>]`** (`DependsOnAttribute<T>`) — typed dependency. When the dependency is not
   already registered, `AddFeature` registers it first, recursively. `UseControllers()` pulls in
   `SchemataRoutingFeature` this way.
-- **`[DependsOn("Fully.Qualified.Name")]`** (`DependsOnAttribute`) — string dependency for
+- **`[DependsOn(typeof(SomeFeature))]`** (`DependsOnAttribute(Type)`) — type-reference dependency
+  for cases where the generic form is awkward, including open generics such as
+  `[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]`. The attribute exposes the reference
+  through its `Type` property and falls back to the type's full name for `Name`. Like the string
+  form, `AddFeature` only checks `HasFeature(dependency)`; it does **not** auto-register.
+- **`[DependsOn("Fully.Qualified.Name")]`** (`DependsOnAttribute(string)`) — string dependency for
   cross-assembly cases where the type cannot be referenced. The name resolves through
   `AppDomainTypeCache.GetType`, and `AddFeature` only checks `HasFeature(dependency)`; it does
   **not** auto-register. A missing required dependency logs at `LogLevel.Error`; setting
@@ -165,7 +170,9 @@ A feature declares prerequisites with two attribute forms, processed during
   `SchemataLoggingFeature` is registered. `Level` defaults to `Information`.
   `SchemataHttpLoggingFeature` carries two such warnings about performance and PII logging.
 
-Only attributes in the `Schemata.Core.Features` namespace are processed; others are ignored.
+Dispatch is by type identity: generic attributes whose definition is `DependsOnAttribute<>` are
+handled as typed dependencies, and non-generic attributes matching `DependsOnAttribute` or
+`InformationAttribute` are handled by their own branches. Anything else is ignored.
 
 Key dependency chains across built-in and extension features:
 

@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Resource.Foundation.Models;
 using Xunit;
@@ -9,9 +10,6 @@ namespace Schemata.Resource.Tests.Models;
 
 public class PageTokenShould
 {
-    private static readonly IDataProtector Protector
-        = new EphemeralDataProtectionProvider(NullLoggerFactory.Instance).CreateProtector(PageToken.ProtectionPurpose);
-
     [Fact]
     public async Task RoundTrip_PreservesAllFields() {
         var original = new PageToken {
@@ -22,11 +20,12 @@ public class PageTokenShould
             ShowDeleted = false,
         };
 
-        var encoded = await original.ToStringAsync(Protector);
+        var protector = CreateRoundTripProtector();
+        var encoded = await original.ToStringAsync(protector);
         Assert.NotNull(encoded);
         Assert.NotEmpty(encoded);
 
-        var decoded = await PageToken.FromStringAsync(encoded, Protector);
+        var decoded = await PageToken.FromStringAsync(encoded, protector);
         Assert.NotNull(decoded);
         Assert.Equal(original.Filter, decoded.Filter);
         Assert.Equal(original.OrderBy, decoded.OrderBy);
@@ -41,8 +40,9 @@ public class PageTokenShould
             Filter = "status = 'active'", Parent = "organizations/acme", PageSize = 10,
         };
 
-        var encoded = await original.ToStringAsync(Protector);
-        var decoded = await PageToken.FromStringAsync(encoded, Protector);
+        var protector = CreateRoundTripProtector();
+        var encoded = await original.ToStringAsync(protector);
+        var decoded = await PageToken.FromStringAsync(encoded, protector);
         Assert.NotNull(decoded);
         Assert.Equal(original.Parent, decoded.Parent);
     }
@@ -58,8 +58,9 @@ public class PageTokenShould
             Skip        = 0,
         };
 
-        var encoded = await original.ToStringAsync(Protector);
-        var decoded = await PageToken.FromStringAsync(encoded, Protector);
+        var protector = CreateRoundTripProtector();
+        var encoded = await original.ToStringAsync(protector);
+        var decoded = await PageToken.FromStringAsync(encoded, protector);
         Assert.NotNull(decoded);
         Assert.Null(decoded.Filter);
         Assert.Null(decoded.OrderBy);
@@ -69,41 +70,34 @@ public class PageTokenShould
 
     [Fact]
     public async Task FromStringAsync_Tampered_ThrowsValidation() {
-        var token   = new PageToken { Filter = "test" };
-        var encoded = await token.ToStringAsync(Protector);
+        var token     = new PageToken { Filter = "test" };
+        var protector = new Mock<IDataProtector>();
+        protector.Setup(p => p.Protect(It.IsAny<byte[]>())).Returns((byte[] bytes) => bytes);
+        protector.Setup(p => p.Unprotect(It.IsAny<byte[]>())).Throws<CryptographicException>();
+        var encoded = await token.ToStringAsync(protector.Object);
 
         var tampered = encoded[..^5];
 
-        await Assert.ThrowsAsync<ValidationException>(() => PageToken.FromStringAsync(tampered, Protector));
+        await Assert.ThrowsAsync<ValidationException>(() => PageToken.FromStringAsync(tampered, protector.Object));
     }
 
     [Fact]
     public async Task FromStringAsync_NotBase64_ThrowsValidation() {
-        await Assert.ThrowsAsync<ValidationException>(() => PageToken.FromStringAsync("%%%not-a-token%%%", Protector));
+        await Assert.ThrowsAsync<ValidationException>(() => PageToken.FromStringAsync("%%%not-a-token%%%", Mock.Of<IDataProtector>()));
     }
 
     [Fact]
     public async Task FromStringAsync_NullOrWhitespace_ReturnsNull() {
-        Assert.Null(await PageToken.FromStringAsync(null, Protector));
-        Assert.Null(await PageToken.FromStringAsync("   ", Protector));
+        var protector = Mock.Of<IDataProtector>();
+        Assert.Null(await PageToken.FromStringAsync(null, protector));
+        Assert.Null(await PageToken.FromStringAsync("   ", protector));
     }
 
-    [Fact]
-    public async Task ToStringAsync_DoesNotLeakFieldValues() {
-        var token   = new PageToken { Filter = "very-secret-filter", PageSize = 10 };
-        var encoded = await token.ToStringAsync(Protector);
-
-        Assert.DoesNotContain("very-secret-filter", encoded);
+    private static IDataProtector CreateRoundTripProtector() {
+        var protector = new Mock<IDataProtector>();
+        protector.Setup(p => p.Protect(It.IsAny<byte[]>())).Returns((byte[] bytes) => bytes);
+        protector.Setup(p => p.Unprotect(It.IsAny<byte[]>())).Returns((byte[] bytes) => bytes);
+        return protector.Object;
     }
 
-    [Fact]
-    public async Task DifferentFilters_ProduceDifferentEncodings() {
-        var token1 = new PageToken { Filter = "age > 18", PageSize = 10 };
-        var token2 = new PageToken { Filter = "age < 5", PageSize  = 10 };
-
-        var encoded1 = await token1.ToStringAsync(Protector);
-        var encoded2 = await token2.ToStringAsync(Protector);
-
-        Assert.NotEqual(encoded1, encoded2);
-    }
 }

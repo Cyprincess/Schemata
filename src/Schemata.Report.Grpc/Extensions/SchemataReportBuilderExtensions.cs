@@ -1,5 +1,6 @@
 using Schemata.Report.Foundation;
 using Schemata.Report.Grpc.Features;
+using Schemata.Report.Skeleton;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -7,7 +8,7 @@ namespace Microsoft.AspNetCore.Builder;
 /// <summary>Extensions that compose Report resources with gRPC endpoints.</summary>
 public static class SchemataReportBuilderExtensions
 {
-    /// <summary>Adds <see cref="SchemataReportGrpcFeature" /> and returns the same Report builder.</summary>
+    /// <summary>Adds <see cref="SchemataReportGrpcFeature{TReport, TSnapshot, TChunk}" /> and returns the same Report builder.</summary>
     /// <typeparam name="TReport">The report-definition entity type.</typeparam>
     /// <typeparam name="TSnapshot">The report snapshot entity type.</typeparam>
     /// <typeparam name="TChunk">The report snapshot chunk entity type.</typeparam>
@@ -15,8 +16,11 @@ public static class SchemataReportBuilderExtensions
     /// <returns>The builder for chaining.</returns>
     public static SchemataReportBuilder<TReport, TSnapshot, TChunk> MapGrpc<TReport, TSnapshot, TChunk>(
         this SchemataReportBuilder<TReport, TSnapshot, TChunk> builder
-    ) {
-        builder.AddFeature<SchemataReportGrpcFeature>();
+    )
+        where TReport : SchemataReport, new()
+        where TSnapshot : SchemataReportSnapshot, new()
+        where TChunk : SchemataReportSnapshotChunk, new() {
+        builder.AddFeature<SchemataReportGrpcFeature<TReport, TSnapshot, TChunk>>();
 
         return builder;
     }

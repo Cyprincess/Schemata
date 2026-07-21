@@ -26,7 +26,7 @@ var builder = WebApplication.CreateBuilder(args)
             services.AddDistributedMemoryCache();   // IDistributedCache backed by memory
             services.AddDistributedCache();         // wraps IDistributedCache as ICacheProvider
 
-            services.AddRepository(typeof(EfCoreRepository<,>))
+            services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                     .UseEntityFrameworkCore<AppDbContext>(
                         (_, opts) => opts.UseSqlite("Data Source=app.db"))
                     .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(5));
@@ -47,7 +47,7 @@ var builder = WebApplication.CreateBuilder(args)
 `SchemataQueryCacheOptions.Ttl` is the sliding expiration applied to cached results and reverse-index entries (default 5 minutes). The cache key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree — so the filter, ordering, and `Skip`/`Take` operators all factor into the key — appends `typeof(T).FullName`, and hashes the result. Two queries with different LINQ produce different keys.
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseEntityFrameworkCore<AppDbContext>(
             (_, opts) => opts.UseSqlite("Data Source=app.db"))
         .UseQueryCache(o => o.Ttl = TimeSpan.FromSeconds(30)); // short TTL for hot data

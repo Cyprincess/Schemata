@@ -116,8 +116,7 @@ the merge by calling `BpmnEngine.ParkAtGateway`, which sets `State = "Waiting"` 
 `WaitingAtName` to the gateway name. When it returns `false`, the method calls
 `BpmnEngine.FireJoinAsync` with the arriving token plus the captured waiting siblings.
 `FireJoinAsync` marks the inputs `Completed`, follows the merge's outgoing flow, creates one output
-token, fires the `ITokenLifecycleObserver.OnTokenJoinedAsync` notification, and writes a
-`TransitionKind.Join` row.
+token, and writes a `TransitionKind.Join` row.
 
 ### End-to-end walk
 

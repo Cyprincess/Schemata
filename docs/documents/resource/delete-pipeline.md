@@ -51,8 +51,8 @@ hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRe
 | `AdviceDeleteFreshness` | Validates `DeleteRequest.Etag` against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
 `AdviceDeleteFreshness` fires when `Etag` is non-empty: any value differing from the entity's current weak tag
-throws `FailedPreconditionException` with an `ETAG_MISMATCH` precondition violation. Only an absent or
-whitespace tag opts out.
+throws `AbortedException` with reason `CONCURRENCY_MISMATCH` (transports surface 409 / `ABORTED`). Only an
+absent or whitespace tag opts out.
 
 ### 6. Persistence and soft-delete branching
 
@@ -82,6 +82,11 @@ Each is skipped when the `Operations` whitelist excludes it or the entity alread
 | `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                                                               |
 | `:expunge`  | `POST /v1/{collection}/{name}:expunge`  | `ExpungeHandler<TEntity>`           | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                         |
 | `:purge`    | `POST /v1/{collection}:purge`           | `PurgeHandler<TEntity>`             | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the open-generic job and its `PurgeJobKeyResolver` (mapping the stable `purge:{collection}` key back to the closed type after a restart) are registered by the resource feature, and the handler throws `InvalidOperationException` when no scheduler is registered |
+
+`PurgeRequest.Parent` narrows the purge to the child collection of one parent resource (applied through
+`ResourceIdentifiers.ApplyParent`). `PurgeRequest.Force = false` runs a preview: the job reports
+`PurgeCount` plus a sample of up to 100 matching canonical names and expunges nothing; `Force = true`
+permanently removes every soft-deleted row matching the filter.
 
 ## Extension points
 

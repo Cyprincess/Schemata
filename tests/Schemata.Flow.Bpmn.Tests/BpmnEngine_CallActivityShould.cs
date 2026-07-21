@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -23,7 +23,7 @@ public class BpmnEngine_CallActivityShould
 
         await harness.StartParentAsync();
 
-        var child = Assert.Single(harness.Processes.Rows, p => p.DefinitionName == "called");
+        var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
         Assert.Equal("called", child.DefinitionName);
         Assert.StartsWith("processes/", child.CanonicalName, StringComparison.Ordinal);
     }
@@ -46,9 +46,9 @@ public class BpmnEngine_CallActivityShould
 
         var snapshot = await harness.StartParentAsync();
 
-        var transition = Assert.Single(harness.Transitions.Rows, t => t.Process == snapshot.Process.Name
+        var transition = Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name
                                                        && t.Kind == TransitionKind.Spawn);
-        var child = Assert.Single(harness.Processes.Rows, p => p.DefinitionName == "called");
+        var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
         Assert.Equal(snapshot.Tokens[0].CanonicalName, transition.Token);
         Assert.Equal(child.CanonicalName, transition.Posterior);
         Assert.Equal("call", transition.Note);
@@ -121,18 +121,24 @@ public class BpmnEngine_CallActivityShould
             ParentDefinition = ParentDefinition();
             CalledDefinition = CalledDefinition();
 
-            Processes   = new();
-            Tokens      = new();
-            Transitions = new();
-            Registry = new(
+            Processes   = [];
+            Tokens      = [];
+            Transitions = [];
+            var registry = new[] {
                 Registration("parent", ParentDefinition),
-                Registration("called", CalledDefinition));
+                Registration("called", CalledDefinition),
+            };
+            var processRegistry = new Mock<IProcessRegistry>();
+            processRegistry.Setup(r => r.GetRegistration(It.IsAny<string>()))
+                           .Returns((string name) => registry.FirstOrDefault(r => r.Name == name));
+            processRegistry.Setup(r => r.IsRegistered(It.IsAny<string>()))
+                           .Returns((string name) => registry.Any(r => r.Name == name));
 
             var services = new ServiceCollection();
-            services.AddSingleton<IProcessRegistry>(Registry);
-            services.AddSingleton<IRepository<SchemataProcess>>(Processes);
-            services.AddSingleton<IRepository<SchemataProcessToken>>(Tokens);
-            services.AddSingleton<IRepository<SchemataProcessTransition>>(Transitions);
+            services.AddSingleton<IProcessRegistry>(processRegistry.Object);
+            services.AddSingleton<IRepository<SchemataProcess>>(CreateRepository(Processes).Object);
+            services.AddSingleton<IRepository<SchemataProcessToken>>(CreateRepository(Tokens).Object);
+            services.AddSingleton<IRepository<SchemataProcessTransition>>(CreateRepository(Transitions).Object);
             Services = services.BuildServiceProvider();
             Engine   = new();
         }
@@ -143,13 +149,11 @@ public class BpmnEngine_CallActivityShould
 
         public BpmnEngine Engine { get; }
 
-        public TestRepository<SchemataProcess> Processes { get; }
+        public List<SchemataProcess> Processes { get; }
 
-        public TestRepository<SchemataProcessToken> Tokens { get; }
+        public List<SchemataProcessToken> Tokens { get; }
 
-        public TestRepository<SchemataProcessTransition> Transitions { get; }
-
-        public TestProcessRegistry Registry { get; }
+        public List<SchemataProcessTransition> Transitions { get; }
 
         private ServiceProvider Services { get; }
 
@@ -166,16 +170,16 @@ public class BpmnEngine_CallActivityShould
         }
 
         public async Task CompleteChildAsync() {
-            var child = Processes.Rows.Single(p => p.DefinitionName == "called");
-            var childTokens = Tokens.Rows.Where(t => t.Process == child.Name).ToList();
+            var child = Processes.Single(p => p.DefinitionName == "called");
+            var childTokens = Tokens.Where(t => t.Process == child.Name).ToList();
             var completed = await Engine.AdvanceAsync(CalledDefinition, child, childTokens, Context(), childTokens[0].CanonicalName, CancellationToken.None);
-            Processes.Upsert(completed.Process, p => p.CanonicalName);
+            Upsert(Processes, completed.Process, p => p.CanonicalName);
             foreach (var token in completed.Tokens) {
-                Tokens.Upsert(token, t => t.CanonicalName);
+                Upsert(Tokens, token, t => t.CanonicalName);
             }
 
             foreach (var transition in completed.Transitions) {
-                Transitions.Rows.Add(transition);
+                Transitions.Add(transition);
             }
         }
 
@@ -190,9 +194,9 @@ public class BpmnEngine_CallActivityShould
         }
 
         public void FailChild() {
-            var child = Processes.Rows.Single(p => p.DefinitionName == "called");
+            var child = Processes.Single(p => p.DefinitionName == "called");
             child.State     = "Failed";
-            foreach (var token in Tokens.Rows.Where(t => t.Process == child.Name)) {
+            foreach (var token in Tokens.Where(t => t.Process == child.Name)) {
                 token.State       = "Failed";
                 token.WaitingAtName = null;
             }
@@ -207,157 +211,50 @@ public class BpmnEngine_CallActivityShould
             };
         }
 
-        private FlowExecutionContext Context() { return new(new TestUnitOfWork(), Services); }
-    }
+        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
 
-    private sealed class TestProcessRegistry(params ProcessRegistration[] registrations) : IProcessRegistry
-    {
-        private readonly Dictionary<string, ProcessRegistration> _registrations = registrations.ToDictionary(r => r.Name, StringComparer.Ordinal);
-
-        public ValueTask RegisterAsync<TProcess>(string? engine = null, Action<ProcessConfiguration>? configure = null, CancellationToken ct = default)
-            where TProcess : ProcessDefinition {
-            throw new NotSupportedException();
+        private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(List<TEntity> rows)
+            where TEntity : class {
+            var repository = new Mock<IRepository<TEntity>>(MockBehavior.Strict);
+            repository.Setup(value => value.Join(It.IsAny<IUnitOfWork>()));
+            repository.Setup(value => value.FirstOrDefaultAsync<TEntity>(
+                          It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
+                          It.IsAny<CancellationToken>()))
+                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                          ValueTask.FromResult<TEntity?>(
+                              (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).FirstOrDefault()));
+            repository.Setup(value => value.ListAsync<TEntity>(
+                          It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
+                          It.IsAny<CancellationToken>()))
+                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct) =>
+                          ToAsync<TEntity>(predicate is null ? rows : predicate(rows.AsQueryable()), ct));
+            repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
+                      .Callback<TEntity, CancellationToken>((entity, _) => rows.Add(entity))
+                      .Returns(Task.CompletedTask);
+            repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
+                      .Returns(Task.CompletedTask);
+            return repository;
         }
 
-        public ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default) { throw new NotSupportedException(); }
-
-        public ValueTask UnregisterAsync(string processName, CancellationToken ct = default) {
-            _registrations.Remove(processName);
-            return default;
-        }
-
-        public IReadOnlyCollection<string> GetRegisteredProcesses() { return _registrations.Keys.ToList(); }
-
-        public bool IsRegistered(string processName) { return _registrations.ContainsKey(processName); }
-
-        public ProcessRegistration? GetRegistration(string processName) {
-            _registrations.TryGetValue(processName, out var registration);
-            return registration;
-        }
-    }
-
-    private sealed class TestRepository<TEntity> : IRepository<TEntity>
-        where TEntity : class
-    {
-        public List<TEntity> Rows { get; } = [];
-
-        public AdviceContext AdviceContext { get; } = new(new ServiceCollection().BuildServiceProvider());
-
-        public IUnitOfWork Begin() { return new TestUnitOfWork(); }
-
-        public void Join(IUnitOfWork uow) { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public IDisposable SuppressAddValidation() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressUpdateValidation() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressQuerySoftDelete() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressSoftDelete() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressTimestamp() { return NoopDisposable.Instance; }
-
-        public ValueTask DisposeAsync() { return default; }
-
-        public void Dispose() { }
-
-        public async IAsyncEnumerable<TResult> ListAsync<TResult>(
-            Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-            [EnumeratorCancellation] CancellationToken ct = default
+        private static async IAsyncEnumerable<TEntity> ToAsync<TEntity>(
+            IEnumerable<TEntity> rows,
+            [EnumeratorCancellation] CancellationToken ct
         ) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            foreach (var item in query.ToList()) {
+            foreach (var row in rows.ToList()) {
                 ct.ThrowIfCancellationRequested();
-                yield return item;
+                yield return row;
                 await Task.Yield();
             }
         }
 
-        public ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default) { return new(entity); }
-
-        public ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default) { return new(entity is TResult result ? result : default); }
-
-        public ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) { return new(Rows.FirstOrDefault()); }
-
-        public ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default) { return new(Rows.OfType<TResult>().FirstOrDefault()); }
-
-        public ValueTask<TResult?> FirstOrDefaultAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.FirstOrDefault());
-        }
-
-        public ValueTask<TResult?> SingleOrDefaultAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.SingleOrDefault());
-        }
-
-        public ValueTask<bool> AnyAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.Any());
-        }
-
-        public ValueTask<int> CountAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.Count());
-        }
-
-        public ValueTask<long> LongCountAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.LongCount());
-        }
-
-        public Task AddAsync(TEntity entity, CancellationToken ct = default) {
-            Rows.Add(entity);
-            return Task.CompletedTask;
-        }
-
-        public Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
-            Rows.AddRange(entities);
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateAsync(TEntity entity, CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-            Rows.Remove(entity);
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
-            foreach (var entity in entities) {
-                Rows.Remove(entity);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Upsert(TEntity entity, Func<TEntity, string?> key) {
-            var existing = Rows.FirstOrDefault(row => string.Equals(key(row), key(entity), StringComparison.Ordinal));
+        private static void Upsert<TEntity>(List<TEntity> rows, TEntity entity, Func<TEntity, string?> key) {
+            var existing = rows.FirstOrDefault(row => string.Equals(key(row), key(entity), StringComparison.Ordinal));
             if (existing is not null) {
-                Rows.Remove(existing);
+                rows.Remove(existing);
             }
 
-            Rows.Add(entity);
+            rows.Add(entity);
         }
     }
 
-    private sealed class TestUnitOfWork : IUnitOfWork
-    {
-        public ValueTask DisposeAsync() { return default; }
-
-        public void Dispose() { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RollbackAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-    }
-
-    private sealed class NoopDisposable : IDisposable
-    {
-        public static readonly NoopDisposable Instance = new();
-
-        public void Dispose() { }
-    }
 }

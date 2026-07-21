@@ -11,10 +11,8 @@ using Schemata.Common;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
-using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Internal;
 using Schemata.Resource.Foundation.Models;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
 
@@ -72,14 +70,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
     private static NotFoundException CollectionNotFound() {
         return ResourceNotFound(ResourceNameDescriptor.ForType<TEntity>().Collection);
-    }
-
-    private static void StashReadMask(AdviceContext ctx, string? mask) {
-        if (string.IsNullOrWhiteSpace(mask) || mask.Trim() == Wildcards.Any) {
-            return;
-        }
-
-        ctx.Set(new ReadMaskRequested(mask));
     }
 
     private TotalSizeMode ResolveTotalSizeMode() {

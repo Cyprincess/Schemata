@@ -89,14 +89,19 @@ public sealed partial class LocalPipelineExecutor
     }
 
     private static object? Resolve(IReadOnlyDictionary<string, object?> row, string path) {
-        object? value = row;
+        return TryResolve(row, path, out var value) ? value : null;
+    }
+
+    private static bool TryResolve(IReadOnlyDictionary<string, object?> row, string path, out object? value) {
+        value = row;
         foreach (var segment in path.Split('.', StringSplitOptions.RemoveEmptyEntries)) {
             if (value is not IReadOnlyDictionary<string, object?> map || !map.TryGetValue(segment, out value)) {
-                return null;
+                value = null;
+                return false;
             }
         }
 
-        return value;
+        return true;
     }
 
     private static object? Aggregate(
@@ -113,8 +118,8 @@ public sealed partial class LocalPipelineExecutor
             AggregationFunction.CountDistinct => values.Distinct().Count(),
             AggregationFunction.Sum           => values.Sum(ToDouble),
             AggregationFunction.Avg           => values.Length == 0 ? null : values.Average(ToDouble),
-            AggregationFunction.Min           => values.Length == 0 ? null : values.Min(),
-            AggregationFunction.Max           => values.Length == 0 ? null : values.Max(),
+            AggregationFunction.Min           => values.Length == 0 ? null : values.Min(RowComparer.Instance),
+            AggregationFunction.Max           => values.Length == 0 ? null : values.Max(RowComparer.Instance),
             var _ => throw new InsightValidationException(InsightReasons.InvalidArgument,
                                                          $"Unsupported aggregation '{aggregation.Function}'."),
         };

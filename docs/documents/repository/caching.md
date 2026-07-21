@@ -16,7 +16,7 @@ For the full query-cache reference, see [entity/query-cache.md](../entity/query-
 ## Enabling query caching
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Book, EfCoreRepository<AppDbContext, Book>>()
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
@@ -58,6 +58,15 @@ using (repository.SuppressQueryCache())
 ## Commit-time eviction
 
 `AdviceCommittedEvictCache` receives `CommitChanges<TEntity>` after a successful standalone repository commit or unit-of-work commit. It evicts reverse-indexed entries for updated and removed entities. If the transaction rolls back, committed advisors do not run and the cache retains the pre-mutation entries until TTL expires.
+
+## Open write units of work
+
+While a repository has an open write unit of work — enlisted in a shared `IUnitOfWork`, or holding an
+implicit one with pending adds, updates, or removes, and not yet completed — both cache advisors stand
+down: `AdviceQueryCache` skips cache reads and `AdviceResultCache` skips cache writes. The flag
+(`QueryContext.HasOpenWriteUnitOfWork`, surfaced from the repository) keeps uncommitted state out of
+the cache, so a rollback can never leave phantom entries behind. After the commit completes, the next
+query repopulates the cache as usual.
 
 ## See also
 

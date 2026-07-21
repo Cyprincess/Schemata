@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public enum ViewOption
+internal enum ViewOption
 {
     Omit,
     OmitAll,

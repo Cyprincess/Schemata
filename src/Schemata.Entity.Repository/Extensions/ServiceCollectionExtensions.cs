@@ -1,6 +1,4 @@
-using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -12,46 +10,6 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    ///     Registers the specified repository implementation as <see cref="IRepository{TEntity}" />
-    ///     and adds all built-in advisors: timestamp per
-    ///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>, concurrency per
-    ///     <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>,
-    ///     query soft-delete filter per <seealso href="https://google.aip.dev/160">AIP-160: Filtering</seealso>
-    ///     and <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>,
-    ///     soft-delete on add/remove per AIP-164 and
-    ///     <seealso href="https://google.aip.dev/214">AIP-214: Resource expiration</seealso>,
-    ///     validation, canonical name resolution, and optimistic duplicate protection per
-    ///     <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="type">A type that implements <see cref="IRepository{TEntity}" />.</param>
-    /// <returns>A <see cref="SchemataRepositoryBuilder" /> for fluent configuration.</returns>
-    /// <exception cref="ArgumentException">
-    ///     Thrown when <paramref name="type" /> does not implement the required
-    ///     repository interfaces.
-    /// </exception>
-    public static SchemataRepositoryBuilder AddRepository(this IServiceCollection services, Type type) {
-        var service = typeof(IRepository<>);
-
-        var implementation = type.GetInterface(service.Name);
-        if (implementation?.GetGenericTypeDefinition() != service) {
-            throw new ArgumentException(
-                string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.IMPLEMENTATION_REQUIRED),
-                    type,
-                    service
-                )
-            );
-        }
-
-        services.TryAddTransient(service, implementation);
-
-        RegisterAdvisors(services);
-
-        return new(services);
-    }
-
     /// <summary>
     ///     Registers a closed-generic repository implementation for a specific entity type.
     ///     This allows multiple different repository implementations to coexist in the same DI container.

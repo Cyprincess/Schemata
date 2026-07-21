@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Schemata.Common;
 
 namespace Schemata.Entity.Cache;
 
@@ -33,15 +35,15 @@ public class Stringizing : ExpressionVisitor
     /// <summary>Converts <paramref name="expression" /> to its deterministic string representation.</summary>
     /// <remarks>
     ///     Captured local variables and other closed sub-expressions are folded to constants
-    ///     via <see cref="PartialEvaluator.Eval" /> before serialization, so different
-    ///     values of a captured variable produce different keys.
+    ///     via <see cref="Evaluator.PartialEval(Expression, Func{Expression, bool})" /> before
+    ///     serialization, so different values of a captured variable produce different keys.
     /// </remarks>
     /// <param name="expression">The expression to serialize.</param>
     /// <returns>The deterministic string representation.</returns>
     public static string ToString(Expression expression) {
         var stringizing = new Stringizing();
 
-        stringizing.Visit(PartialEvaluator.Eval(expression));
+        stringizing.Visit(Evaluator.PartialEval(expression, CanBeEvaluatedLocally));
 
         return stringizing.ToString();
     }
@@ -289,6 +291,25 @@ public class Stringizing : ExpressionVisitor
     }
 
     public override string ToString() { return _builder.ToString(); }
+
+    // Composite nodes (New, MemberInit, ListInit, NewArray, Lambda, Quote) are kept structural
+    // rather than folded to a constant: the visitor renders their type/binding/element leaves, so
+    // collapsing them into a ConstantExpression would stringize a non-IFormattable object as its
+    // bare type name and collide distinct values.
+    private static bool CanBeEvaluatedLocally(Expression node) {
+        return node.NodeType switch {
+            ExpressionType.Parameter      => false,
+            ExpressionType.Lambda         => false,
+            ExpressionType.Quote          => false,
+            ExpressionType.New            => false,
+            ExpressionType.NewArrayInit   => false,
+            ExpressionType.NewArrayBounds => false,
+            ExpressionType.MemberInit     => false,
+            ExpressionType.ListInit       => false,
+            ExpressionType.Extension      => false,
+            var _                         => true,
+        };
+    }
 
     private void AppendMethodHead(string name, int arity) {
         _builder.Append('.').Append(name).Append(':').Append(arity).Append('(');

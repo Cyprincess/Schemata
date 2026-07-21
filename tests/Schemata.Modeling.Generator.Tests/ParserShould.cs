@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using Schemata.Modeling.Generator.Expressions;
 using Xunit;
@@ -8,20 +7,20 @@ namespace Schemata.Modeling.Generator.Tests;
 public class ParserShould
 {
     private static Document ParseVector1() {
-        var text = File.ReadAllText("vector1.skm");
+        var text = VectorResources.ReadText(VectorResources.Vector1Skm);
         var doc  = Parser.Document.Parse(text);
         Assert.NotNull(doc);
         return doc;
     }
 
     [Fact]
-    public void Parse_Namespace() {
+    public void Parse_Vector1Document_BindsNamespace() {
         var doc = ParseVector1();
         Assert.Equal("DSL.Tests.Vectors", doc.Namespace);
     }
 
     [Fact]
-    public void Parse_ThreeTraits() {
+    public void Parse_Vector1Document_BindsThreeTraits() {
         var doc = ParseVector1();
         Assert.Equal(3, doc.Traits.Length);
         Assert.Contains(doc.Traits, t => t.Name == "Identifier");
@@ -30,7 +29,7 @@ public class ParserShould
     }
 
     [Fact]
-    public void Parse_ThreeEntities() {
+    public void Parse_Vector1Document_BindsThreeEntities() {
         var doc = ParseVector1();
         Assert.Equal(3, doc.Entities.Length);
         Assert.Contains(doc.Entities, e => e.Name == "User");
@@ -39,7 +38,7 @@ public class ParserShould
     }
 
     [Fact]
-    public void Parse_NoTopLevelEnumerations() {
+    public void Parse_Vector1Document_HasNoTopLevelEnumerations() {
         var doc = ParseVector1();
         Assert.Equal(0, doc.Enumerations.Length);
     }

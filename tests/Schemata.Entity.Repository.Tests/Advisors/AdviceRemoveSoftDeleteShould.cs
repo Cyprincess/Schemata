@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository.Advisors;
@@ -14,19 +15,17 @@ public class AdviceRemoveSoftDeleteShould
 {
     [Fact]
     public async Task Advise_SoftDeleteEntity_SetsDeleteTimeAndReturnsHandle() {
-        var advisor = new AdviceRemoveSoftDelete<Student>();
+        var now     = new DateTimeOffset(2026, 7, 24, 12, 0, 0, TimeSpan.Zero);
+        var advisor = new AdviceRemoveSoftDelete<Student>(new FakeTimeProvider(now));
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var mock    = new Mock<IRepository<Student>>();
         mock.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var entity = new Student { DeleteTime = null };
-        var before = DateTime.UtcNow;
 
         var result = await advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None);
 
-        var after = DateTime.UtcNow;
         Assert.Equal(AdviseResult.Handle, result);
-        Assert.NotNull(entity.DeleteTime);
-        Assert.InRange(entity.DeleteTime!.Value, before, after);
+        Assert.Equal(now.UtcDateTime, entity.DeleteTime);
         mock.Verify(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>()), Times.Once);
     }
 

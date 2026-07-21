@@ -11,6 +11,8 @@ using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Concurrency;
 using LinqToDB.Data;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
@@ -36,6 +38,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TEntity : class
 {
     private readonly Func<TContext>   _factory;
+    private readonly ILogger?         _logger;
     private          TContext         _context;
 
     /// <summary>
@@ -45,6 +48,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     /// <param name="factory">A factory that creates a new <typeparamref name="TContext" /> instance.</param>
     public LinqToDbRepository(IServiceProvider sp, Func<TContext> factory) : base(sp) {
         _factory = factory;
+        _logger  = sp.GetService<ILogger<LinqToDbRepository<TContext, TEntity>>>();
         _context = factory();
 
         var entity = typeof(TEntity);
@@ -172,6 +176,57 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return query.LongCountAsync(ct);
     }
 
+    public override async ValueTask<long> EstimateCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    ) {
+        try {
+            var query    = await BuildQueryAsync(predicate, ct);
+            var provider = EstimateQueries.GetProvider(Context.DataProvider.Name);
+            if (provider is EstimateProvider.None) {
+                return await base.EstimateCountAsync(predicate, ct);
+            }
+
+            if ((provider is EstimateProvider.SqlServer or EstimateProvider.Sqlite) && EstimateQueries.HasWhere(query.Expression)) {
+                return await base.EstimateCountAsync(predicate, ct);
+            }
+
+            var table = Context.GetTable<TEntity>();
+            switch (provider) {
+                case EstimateProvider.PostgreSql: {
+                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
+                    var json = Context.Execute<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, sql.Parameters.ToArray());
+                    if (EstimateQueries.TryParsePostgreSql(json, out var rows)) return rows;
+                    break;
+                }
+                case EstimateProvider.MySql: {
+                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
+                    var json = Context.Execute<string>("EXPLAIN FORMAT=JSON " + sql.Sql, sql.Parameters.ToArray());
+                    if (EstimateQueries.TryParseMySql(json, out var rows)) return rows;
+                    break;
+                }
+                case EstimateProvider.SqlServer: {
+                    var full = $"{table.SchemaName ?? "dbo"}.{table.TableName}";
+                    var rows = Context.Execute<long>(
+                        "SELECT COALESCE(SUM(p.[rows]), 0) FROM sys.partitions p WHERE p.object_id = OBJECT_ID(@full) AND p.index_id IN (0,1)",
+                        new DataParameter("@full", full));
+                    return rows;
+                }
+                case EstimateProvider.Sqlite: {
+                    var rows = Context.Execute<long?>(
+                        "SELECT MAX(stat) FROM sqlite_stat1 WHERE tbl = @t",
+                        new DataParameter("@t", table.TableName));
+                    if (rows is not null) return rows.Value;
+                    break;
+                }
+            }
+        } catch (Exception ex) {
+            _logger?.LogWarning(ex, "Count estimate failed; falling back to an exact count.");
+        }
+
+        return await base.EstimateCountAsync(predicate, ct);
+    }
+
     protected override IUnitOfWork CreateUnitOfWork() {
         return new LinqToDbUnitOfWork<TContext>(_factory, ServiceProvider);
     }
@@ -193,27 +248,4 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     protected override void DisposeContext() { _context.Dispose(); }
 
     protected override ValueTask DisposeContextAsync() { return _context.DisposeAsync(); }
-
-    protected override async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct
-    ) {
-        ct.ThrowIfCancellationRequested();
-
-        var container = AsQueryContainer();
-
-        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, container, ct)) {
-            case AdviseResult.Continue:
-            case AdviseResult.Handle:
-            default:
-                break;
-            case AdviseResult.Block:
-                container = AsQueryContainer();
-                container.ApplyModification(q => q.Where(_ => false));
-                break;
-        }
-
-        return BuildQuery(container.Query, predicate);
-    }
 }

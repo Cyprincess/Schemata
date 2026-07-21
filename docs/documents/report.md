@@ -130,7 +130,7 @@ Canonical names follow AIP-122:
 | `reports/{report}/snapshots` | list / get | Snapshot headers; list items serialize under the collection field `snapshots`. |
 | `snapshots/{snapshot}:read` | AIP-136 custom method | Paginated snapshot rows; response carries `rows` and `next_page_token`. |
 
-`GenerateReportRequest` wire fields (snake_case on the wire): `name`, `query`, `persist`, `sync`. Supply exactly one of `name` or `query`. `sync = true` runs the generation and returns a completed operation; `sync = false` returns a pending operation the caller polls at `operations/{id}`. `:read` pages through chunk rows with `page_size` / `page_token`, decoding the opaque token via `ReportReadPageToken`; a `page_size` above `MaxReadPageSize` is clamped to that bound.
+`GenerateReportRequest` wire fields (snake_case on the wire): `name`, `query`, `persist`, `sync`. Supply exactly one of `name` or `query`. `sync = true` runs the generation and returns a completed operation; `sync = false` returns a pending operation the caller polls at `operations/{id}`. `:read` pages through chunk rows with `page_size` / `page_token`, decoding the opaque token via `ReportReadPageToken`; a `page_size` above `MaxReadPageSize` is clamped to that bound. A malformed token throws `InvalidArgumentException` carrying the underlying `FormatException` detail, so the caller sees why the token failed to decode.
 
 The handler surfaces precondition and validation failures as framework exceptions: a missing `IOperationService` yields `FailedPreconditionException` (HTTP 412), and specifying both or neither of `name`/`query` yields `InvalidArgumentException` (HTTP 400).
 

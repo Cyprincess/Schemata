@@ -153,27 +153,4 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
     protected override void DisposeContext() { _context.Dispose(); }
 
     protected override ValueTask DisposeContextAsync() { return _context.DisposeAsync(); }
-
-    protected override async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
-        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct
-    ) {
-        ct.ThrowIfCancellationRequested();
-
-        var container = AsQueryContainer();
-
-        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, container, ct)) {
-            case AdviseResult.Continue:
-            case AdviseResult.Handle:
-            default:
-                break;
-            case AdviseResult.Block:
-                container = AsQueryContainer();
-                container.ApplyModification(q => q.Where(_ => false));
-                break;
-        }
-
-        return BuildQuery(container.Query, predicate);
-    }
 }

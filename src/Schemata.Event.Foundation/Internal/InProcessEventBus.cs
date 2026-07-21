@@ -140,13 +140,18 @@ public sealed class InProcessEventBus : IEventBus
         _dispatcher?.NotifyPending();
     }
 
-    private static async Task NotifyPublishedAsync(
+    private async Task NotifyPublishedAsync(
         IReadOnlyList<IEventLifecycleObserver> observers,
         EventContext                           context,
         CancellationToken                      ct
     ) {
         foreach (var observer in observers) {
-            await observer.OnPublishedAsync(context, ct);
+            try {
+                await observer.OnPublishedAsync(context, ct);
+            } catch (Exception ex) {
+                _logger?.LogWarning(ex, "IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.",
+                                    context.EventType);
+            }
         }
     }
 

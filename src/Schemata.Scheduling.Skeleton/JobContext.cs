@@ -49,11 +49,4 @@ public class JobContext
     /// </summary>
     public SchemataJobExecution? Execution { get; set; }
 
-    /// <summary>
-    ///     Most-restrictive <see cref="JobTriggerOutcome" /> captured when
-    ///     <see cref="IScheduler.TriggerAsync{TJob}" /> invoked
-    ///     <see cref="IJobLifecycleObserver.OnTriggeredAsync" />, so the execution path honours a
-    ///     Block/Skip while preserving the observer result. Reserved for scheduler assignment.
-    /// </summary>
-    public JobTriggerOutcome? TriggerOutcome { get; set; }
 }

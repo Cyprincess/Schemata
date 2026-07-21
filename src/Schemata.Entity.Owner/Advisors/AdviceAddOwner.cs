@@ -13,7 +13,7 @@ namespace Schemata.Entity.Owner.Advisors;
 public static class AdviceAddOwner
 {
     /// <summary>Default execution order.</summary>
-    public const int DefaultOrder = AdviceAddCanonicalName.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceAddCanonicalName.DefaultOrder + 1_000_000;
 }
 
 /// <summary>

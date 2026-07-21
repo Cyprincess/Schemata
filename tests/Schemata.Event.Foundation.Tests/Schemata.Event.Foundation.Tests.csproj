@@ -5,12 +5,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Moq" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="SQLitePCLRaw.core" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Event.Foundation\Schemata.Event.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>

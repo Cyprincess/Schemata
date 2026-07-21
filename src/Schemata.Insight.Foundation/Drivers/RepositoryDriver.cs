@@ -37,11 +37,9 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
 
     public DriverCapabilities Capabilities
         => DriverCapabilities.Filter
-         | DriverCapabilities.Compute
          | DriverCapabilities.Project
          | DriverCapabilities.Order
-         | DriverCapabilities.Group
-         | DriverCapabilities.Limit;
+         | DriverCapabilities.Nested;
 
     public async ValueTask<ISourceResult> ExecuteAsync(
         SubPlan             subPlan,
@@ -108,7 +106,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
                     }
 
                     if (plan.Residual is not null) {
-                        residuals.Add(compiler.Compile<TEntity, bool>(plan.Residual).Compile());
+                        residuals.Add(ExpressionCache.GetOrAddDelegate(compiler.Compile<TEntity, bool>(plan.Residual)));
                     }
                 }
 

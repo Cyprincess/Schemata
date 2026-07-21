@@ -13,11 +13,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
-    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Caching.Skeleton\Schemata.Caching.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
   </ItemGroup>
 

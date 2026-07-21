@@ -89,7 +89,7 @@ public sealed class MultiInstanceExecutor
                                              && t.State == "Waiting"
                                              && t.WaitingAtName == activity.Name);
         if (parent is null) {
-            return BpmnEngine.Snapshot(process, working, []);
+            return BpmnEngine.Snapshot(process, working, [], context);
         }
 
         instance.State         = "Completed";
@@ -139,7 +139,7 @@ public sealed class MultiInstanceExecutor
         }
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, context);
     }
 
     private async ValueTask<ProcessSnapshot> ExecuteSequentialAsync(
@@ -272,7 +272,7 @@ public sealed class MultiInstanceExecutor
         }
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, context);
     }
 
     private async ValueTask<ProcessSnapshot> ExitSequentialAsync(
@@ -293,7 +293,7 @@ public sealed class MultiInstanceExecutor
         }
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     private static async ValueTask<SchemataProcessTransition?> ExitParentAsync(

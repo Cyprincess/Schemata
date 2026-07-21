@@ -34,6 +34,11 @@ public class QueryContext<TEntity, TResult, T>
     public IRepository<TEntity> Repository { get; private set; }
 
     /// <summary>
+    ///     Indicates whether the repository has pending mutations or an open implicit write unit of work.
+    /// </summary>
+    public bool HasOpenWriteUnitOfWork => Repository is RepositoryBase<TEntity> repository && repository.HasOpenWriteUnitOfWork;
+
+    /// <summary>
     ///     The queryable ready for execution.
     /// </summary>
     public IQueryable<TResult> Query { get; private set; }

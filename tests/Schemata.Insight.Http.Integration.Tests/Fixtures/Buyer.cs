@@ -1,11 +1,10 @@
 using System;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Insight.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("buyers/{buyer}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Buyer : IIdentifier, ICanonicalName
 {
     public int     Id       { get; set; }
@@ -26,7 +25,7 @@ public class Buyer : IIdentifier, ICanonicalName
 }
 
 [CanonicalName("purchases/{purchase}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Purchase : IIdentifier, ICanonicalName
 {
     public int     BuyerId { get; set; }

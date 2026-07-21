@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Schemata.Abstractions.Resource;
+using Schemata.Resource.Foundation;
+using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
 
@@ -36,13 +37,12 @@ public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatur
                 continue;
             }
 
-            if (resource.Endpoints?.Count != 0
-             && resource.Endpoints?.All(e => e != HttpResourceAttribute.Name) == true) {
+            if (!HttpResourceHelper.IsHttpEnabled(resource)) {
                 continue;
             }
 
             foreach (var method in methods) {
-                var handlerInterface = FindHandlerInterface(method.Handler);
+                var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
                 if (handlerInterface is null) {
                     continue;
                 }
@@ -66,13 +66,4 @@ public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatur
     }
 
     #endregion
-
-    private static Type? FindHandlerInterface(Type handler) {
-        foreach (var iface in handler.GetInterfaces()) {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
-                return iface;
-            }
-        }
-        return null;
-    }
 }

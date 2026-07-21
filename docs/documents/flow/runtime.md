@@ -4,7 +4,7 @@
 framework. `ProcessRegistry` holds compiled definitions and resolves the engine for each.
 `FlowRunner` loads persisted state, creates a `FlowExecutionContext`, drives the engine, runs the
 advisor pipeline inside the transition unit of work, persists the returned snapshot, and notifies
-observers. `ProcessPersistence` coordinates process, token, transition, and source-binding
+observers. `ProcessPersistence` coordinates process, token, transition, source-binding, and compensation
 repositories under one unit of work.
 
 ## Where the code lives
@@ -12,7 +12,7 @@ repositories under one unit of work.
 | Package                    | Key files                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Flow.Foundation` | `FlowRunner.cs`, `IFlowRunner.cs`, `ProcessRegistry.cs`, `ProcessPersistence.cs`, `ProcessLifecycleNotifier.cs`, `FlowHandlerSupport.cs`, `Advisors/AdviceSourceProjection.cs`, `StartProcessOptions.cs`                                                                                                                                                                                                                                                                               |
-| `Schemata.Flow.Skeleton`   | `Runtime/IFlowRuntime.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Runtime/ITokenLifecycleObserver.cs`, `Runtime/TokenStates.cs`, `Runtime/FlowSourceDescriptor.cs`, `Runtime/ProcessStates.cs`, `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/IFlowSourceAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessSource.cs`, `Entities/SchemataProcessTransition.cs` |
+| `Schemata.Flow.Skeleton`   | `Runtime/IFlowRuntime.cs`, `Runtime/FlowRuntimeCapabilities.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Runtime/TokenStates.cs`, `Runtime/FlowSourceDescriptor.cs`, `Runtime/ProcessStates.cs`, `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/IFlowSourceAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessSource.cs`, `Entities/SchemataProcessTransition.cs`, `Entities/SchemataProcessCompensation.cs` |
 
 ## ProcessRegistry
 
@@ -22,13 +22,19 @@ repositories under one unit of work.
 Registering a configuration:
 
 1. Instantiates the `ProcessDefinition` subclass, running its DSL constructor.
-2. Calls `Validate` on every `IFlowEngineValidator` whose `EngineName` matches the configuration's
-   engine.
-3. Compiles every string condition expression with the keyed `IExpressionCompiler` selected by the
+2. Resolves the keyed `IFlowRuntime` for the configuration's engine; a missing engine throws
+   `InvalidOperationException`.
+3. Validates the definition against the engine's declared `Capabilities` and the activated bridges:
+   message/signal catches require `Schemata.Flow.Event`, timer catches require
+   `Schemata.Flow.Scheduling`. The first unsupported shape throws `InvalidOperationException` naming
+   the shape, the engine, and the missing capability (see [Runtime capabilities](#runtime-capabilities)).
+4. Calls `Validate` on every `IFlowEngineValidator` whose `EngineName` matches the configuration's
+   engine. Both built-in validators reject inert AST (`AdHocSubProcess`, `LinkDefinition`,
+   `MultipleDefinition`) rather than letting it execute with degraded semantics.
+5. Compiles every string condition expression with the keyed `IExpressionCompiler` selected by the
    configuration's `Language`. A missing or unregistered language throws
    `FailedPreconditionException`; a malformed expression throws `InvalidArgumentException`.
-4. Resolves the keyed `IFlowRuntime` for that engine; a missing engine throws `NotSupportedException`.
-5. Adds the `ProcessRegistration`; a duplicate name throws `AlreadyExistsException`.
+6. Adds the `ProcessRegistration`; a duplicate name throws `AlreadyExistsException`.
 
 ```csharp
 ValueTask RegisterAsync<TProcess>(string? engine = null,
@@ -40,6 +46,32 @@ IReadOnlyCollection<string> GetRegisteredProcesses();
 bool IsRegistered(string processName);
 ProcessRegistration? GetRegistration(string processName);
 ```
+
+## Runtime capabilities
+
+Every engine declares what it can execute through `IFlowRuntime.Capabilities`, a
+`FlowRuntimeCapabilities` flag set:
+
+| Flag                      | Covers                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `ProcedureTasks`          | `ProcedureTaskBase` execution (DSL `OnEnter` / `OnLeave` bodies)                                |
+| `MultiToken`              | Parallel / inclusive / complex gateways and parallel event-based forks                          |
+| `NestedEvents`            | Message / signal catches nested below the root scope (including boundary events on nested hosts) |
+| `NestedTimers`            | Timer catches nested below the root scope                                                       |
+| `Compensation`            | Compensation boundary events and throw events                                                   |
+| `SubProcesses`            | `SubProcess` and `CallActivity`                                                                 |
+| `Loops`                   | Standard and multi-instance loop characteristics                                                |
+| `NonInterruptingBoundaries` | Non-interrupting boundary events                                                              |
+
+The default `StateMachineEngine` declares `ProcedureTasks` only; `BpmnEngine` declares `All`.
+Registration validates the definition against the selected engine's flags and the bridges activated in
+the host, so an unsupported shape fails at startup with an exact message instead of degrading silently
+at runtime.
+
+`ProcedureTaskBase` executes on both engines with identical semantics: the engine builds a
+`FlowTaskContext` (definition, process, token, execution context, payload), awaits `InvokeAsync`, then
+resolves the outgoing auto-flow. When no auto-flow resolves, the token parks at the procedure name.
+`StateMachineEngine` is the reference implementation; `BpmnEngine` mirrors it point for point.
 
 ## FlowRunner
 
@@ -119,13 +151,15 @@ ValueTask<ProcessSnapshot> CancelTokenAsync(
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `StartAsync`       | Creates a `SchemataProcess`, optionally binds a source entity via `BindStartSourceAsync`, calls `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
 | `CompleteAsync`    | Loads tokens, calls `engine.AdvanceAsync`, runs advisors, persists, and returns the snapshot.                                                                                           |
-| `CorrelateAsync`   | Resolves the `Message` definition by name, calls `engine.FindTriggerTargetsAsync` to pick a target, calls `engine.TriggerAsync`, runs advisors, persists, and returns the snapshot.     |
+| `CorrelateAsync`   | Resolves the `Message` definition by name, picks the target token (the supplied `token` argument, or `engine.FindTriggerTargetsAsync` when omitted), calls `engine.TriggerAsync` for that token, runs advisors, persists, and returns the snapshot.     |
 | `ThrowSignalAsync` | Lists every persisted process that has a waiting token, matches each against the signal definition, and calls `engine.TriggerAsync` for every accepted target.                          |
 | `TerminateAsync`   | Marks every live token `Cancelled`, sets the process state to `Terminated`, runs advisors, persists, and notifies observers.                                                            |
 | `CancelTokenAsync` | Cancels one token, sets the process state to `Cancelled` only when every token is terminal, runs advisors, and persists.                                                                |
 
-`StartProcessOptions` carries `DisplayName` and `Description`, copied onto the process row at start.
-The `StartAsync<TState>` overload binds the source row to the process through
+`StartProcessOptions` carries `DisplayName`, `Description`, and `IdempotencyKey`. The display fields
+are copied onto the process row at start; the idempotency key is stored on the row and guarded by the
+unique `(DefinitionName, IdempotencyKey)` index described below. The `StartAsync<TState>` overload
+binds the source row to the process through
 `SchemataProcessSource`, so source advisors can find and update it during later transitions.
 
 ### Per-transition core
@@ -160,17 +194,18 @@ back to `Identity.Name`.
 ```csharp
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(DefinitionName), nameof(IdempotencyKey), IsUnique = true)]
 public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive,
                                 ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {
     public virtual string  DefinitionName { get; set; }  // registered definition name
+    public virtual string? IdempotencyKey { get; set; }  // start idempotency key; released on terminal state
     public virtual string? DisplayName    { get; set; }  // optional human-readable label
     public virtual string? Description    { get; set; }  // optional description
     public virtual string? State          { get; set; }  // Running / Waiting / Completed / Failed / Terminated / Cancelled
@@ -182,14 +217,16 @@ It implements `ISoftDelete`, so the default query filter hides tombstoned instan
 inside a `using (repository.SuppressQuerySoftDelete())` scope. `IConcurrency` carries the optimistic
 `Timestamp`. The aggregate state on `SchemataProcess.State` is computed by
 `TokenAggregator.ApplyAndAggregate`; per-token state lives on `SchemataProcessToken.StateName`,
-`SchemataProcessToken.WaitingAtName`, and `SchemataProcessToken.State`.
+`SchemataProcessToken.WaitingAtName`, and `SchemataProcessToken.State`. Start idempotency is enforced
+by the unique `(DefinitionName, IdempotencyKey)` index: a duplicate live key surfaces as
+`AlreadyExistsException`, and when the process reaches a terminal state the key moves into
+`Annotations["schemata/flow/idempotency-key"]` so the same key can start again.
 
 ## SchemataProcessToken entity
 
 ```csharp
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
@@ -220,7 +257,6 @@ of live states (`Active`, `Waiting`) and join-counted states (`Waiting`, `Failed
 
 ```csharp
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Skeleton.Models;
@@ -247,14 +283,24 @@ The state-machine engine emits `Move`, `Cancel`, and `Fail`; the BPMN engine add
 ## Persistence
 
 `ProcessPersistence.ExecuteAsync` opens a unit of work over `IRepository<SchemataProcess>`, joins
-the token, transition, and source-binding repositories into the same unit of work, executes the
+the token, transition, source-binding, and compensation repositories into the same unit of work, executes the
 supplied runtime work, and commits. `PersistSnapshotAsync` upserts the process and token rows and
 appends transition rows. Source-binding rows are written through `BindStartSourceAsync` on the
 start path and through `FlowTaskContext.BindSourceAsync` for token-scoped rows; their concurrency
-stamps are refreshed by the source advisor pipeline on every transition. All four writes commit or
-roll back together because the repositories share the same unit of work. There is no persistence
+stamps are refreshed by the source advisor pipeline on every transition. All five repositories commit or
+roll back together because they share the same unit of work. There is no persistence
 observer; durability is built into the runtime's commit path, and lifecycle observers are
 post-commit notifications.
+
+### Persisted compensation bindings
+
+Compensation registrations are data, not engine memory. `ProcessSnapshot.CompensationBindings` carries
+the scope owner, activity name, and registration order of every armed compensation; each persist
+replaces the process's rows in the `SchemataProcessCompensations` table inside the same unit of work
+(terminal processes and empty binding lists clear the rows). When the runner loads a process, the
+persisted bindings come back through `FlowExecutionContext.LoadedCompensationBindings`, so a throw
+after a host restart still resolves its handlers. A missing binding or handler is an explicit
+`InvalidOperationException` from the throw path, never a silent no-op.
 
 ## Source advisors
 
@@ -330,6 +376,7 @@ projection pass.
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Auto` (default) | The business node name while the binding's scope is live; on a process-level binding, the process lifecycle state (`Completed`, `Failed`, `Terminated`, `Cancelled`) once the process is terminal. |
 | `BusinessState` | The business node name while the scope is live. Terminal lifecycle is never written, so the last business value survives process completion.                    |
+| `Terminal`      | The business node name while the scope is live (identical to `BusinessState`); on a process-level binding, the terminal process state once the process terminates. |
 | `Lifecycle`     | The scope lifecycle on every pass (`Process.State` or the token status), in place of a node name.                                                            |
 | `None`          | Nothing, on either slot. Write-back and the stamp protocol still run.                                                                                         |
 
@@ -411,7 +458,11 @@ the advisor runs.
 `Schemata.Flow.Event` registers `AdviceTransitionEvent` to maintain
 `IRepository<SchemataEventSubscription>` rows; `Schemata.Flow.Scheduling` registers
 `AdviceTransitionTimer` to schedule and cancel timer jobs. Both register through
-`TryAddEnumerable`, so additional advisors stack alongside.
+`TryAddEnumerable`, so additional advisors stack alongside. Subscriptions are token-scoped: arming
+walks the full element tree, so nested message catches and boundary events on nested hosts each get a
+row whose `Token` column names the armed token, while signals keep a process-wide row
+(`Token = null`) and broadcast. Correlation therefore routes a bus event to exactly the waiting
+token, and two tokens parked on the same message name correlate independently.
 
 ## IProcessLifecycleObserver
 
@@ -442,40 +493,11 @@ public interface IProcessLifecycleObserver
 Each method provides a no-op default body so implementations override only the hooks they care
 about. The runtime fires the observers after `ProcessPersistence` commits. Each observer call is
 wrapped in its own try/catch; thrown observers are logged at warning and never affect the committed
-transition. `Schemata.Flow.Event` registers `ProcessEventLifecycleObserver`, which implements both
-`IProcessLifecycleObserver` and `ITokenLifecycleObserver`, to publish the process events
-(`ProcessStartedEvent`, `TransitionMadeEvent`, `ProcessCompletedEvent`, `ProcessFailedEvent`) and
-the token events (`TokenForkedEvent`, `TokenJoinedEvent`, `TokenCancelledEvent`) on the event bus.
-
-Token lifecycle is a separate interface. Fork and join events come from
-`BpmnEngine.NotifyTokenForkedAsync` and `BpmnEngine.NotifyTokenJoinedAsync`, which call every
-registered `ITokenLifecycleObserver` and swallow exceptions. Cancel and fail events are derived from
-`SchemataProcessTransition` rows whose `Kind` is `Cancel` or `Fail`, and are fanned out through
-`ProcessLifecycleNotifier.NotifyTokenLifecycleAsync`.
-
-```csharp
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Schemata.Flow.Skeleton.Entities;
-using Schemata.Flow.Skeleton.Models;
-
-public interface ITokenLifecycleObserver
-{
-    Task OnTokenForkedAsync(SchemataProcess process, TokenSnapshot token,
-        TokenSnapshot? spawner, CancellationToken ct = default) => Task.CompletedTask;
-
-    Task OnTokenJoinedAsync(SchemataProcess process, TokenSnapshot output,
-        IReadOnlyList<TokenSnapshot> inputs, CancellationToken ct = default) => Task.CompletedTask;
-
-    Task OnTokenFailedAsync(SchemataProcess process, TokenSnapshot token,
-        Exception exception, CancellationToken ct = default) => Task.CompletedTask;
-
-    Task OnTokenCancelledAsync(SchemataProcess process, TokenSnapshot token,
-        CancellationToken ct = default) => Task.CompletedTask;
-}
-```
+transition. `Schemata.Flow.Event` registers `ProcessEventLifecycleObserver`, which publishes the
+process events (`ProcessStartedEvent`, `TransitionMadeEvent`, `ProcessCompletedEvent`,
+`ProcessFailedEvent`) on the event bus. It is the only lifecycle observer interface — the per-token
+observer path and its fork/join/cancel events were removed, so lifecycle reactions belong here or in
+a transition advisor.
 
 ## Extension points
 
@@ -483,8 +505,6 @@ public interface ITokenLifecycleObserver
   or veto a transition before it commits.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to react after the
   commit.
-- Implement `ITokenLifecycleObserver` and register via `TryAddEnumerable` to react to token fork,
-  join, fail, or cancel events.
 - Implement `IFlowSourceAdvisor<TSource>` and register it via `TryAddEnumerable` to project runtime
   state onto bound source entities in the transition unit of work.
 - Call `IProcessRegistry.RegisterAsync` to add a definition after startup.

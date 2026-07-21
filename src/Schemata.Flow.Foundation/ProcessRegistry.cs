@@ -29,7 +29,9 @@ public sealed class ProcessRegistry : IProcessRegistry
     private readonly IServiceProvider _services;
 
     /// <summary>Creates a new <see cref="ProcessRegistry"/> resolving dependencies from <paramref name="services"/>.</summary>
-    public ProcessRegistry(IServiceProvider services) { _services = services; }
+    public ProcessRegistry(IServiceProvider services) {
+        _services = services;
+    }
 
     #region IProcessRegistry Members
 
@@ -56,7 +58,7 @@ public sealed class ProcessRegistry : IProcessRegistry
     }
 
     public IReadOnlyCollection<string> GetRegisteredProcesses() {
-        return _registrations.Keys.ToList();
+        return [.. _registrations.Keys];
     }
 
     public bool IsRegistered(string name) { return _registrations.ContainsKey(name); }
@@ -67,6 +69,11 @@ public sealed class ProcessRegistry : IProcessRegistry
     }
 
     public ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default) {
+        Register(configuration);
+        return default;
+    }
+
+    internal void Register(ProcessConfiguration configuration) {
         ArgumentNullException.ThrowIfNull(configuration);
 
         if (string.IsNullOrWhiteSpace(configuration.Name)) {
@@ -74,6 +81,11 @@ public sealed class ProcessRegistry : IProcessRegistry
         }
 
         var definition = LoadDefinition(configuration);
+        if (_services.GetKeyedService<IFlowRuntime>(configuration.Engine) is not { } runtime) {
+            throw new InvalidOperationException($"Flow runtime '{configuration.Engine}' is not registered.");
+        }
+
+        ValidateRegistrationCapabilities(definition, runtime);
 
         foreach (var validator in _services.GetServices<IFlowEngineValidator>()) {
             if (string.Equals(validator.EngineName, configuration.Engine, StringComparison.OrdinalIgnoreCase)) {
@@ -98,11 +110,80 @@ public sealed class ProcessRegistry : IProcessRegistry
                 SchemataResources.PROCESS_ALREADY_REGISTERED,
                 new Dictionary<string, string?> { ["name"] = configuration.Name });
         }
-
-        return default;
     }
 
     #endregion
+
+    private void ValidateRegistrationCapabilities(ProcessDefinition definition, IFlowRuntime runtime) {
+        foreach (var element in definition.AllElements) {
+            switch (element) {
+                case ProcedureTaskBase:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.ProcedureTasks);
+                    break;
+                case ParallelGateway or InclusiveGateway or ComplexGateway:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.MultiToken);
+                    break;
+                case EventBasedGateway { Parallel: true }:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.MultiToken);
+                    break;
+                case CallActivity or SubProcess:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.SubProcesses);
+                    break;
+                case Activity { LoopCharacteristics: not null }:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.Loops);
+                    break;
+                case FlowEvent { Position: EventPosition.Boundary, Interrupting: false }:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NonInterruptingBoundaries);
+                    break;
+                case FlowEvent { Definition: CompensationDefinition }:
+                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.Compensation);
+                    break;
+            }
+        }
+
+        foreach (var element in NestedElements(definition)) {
+            if (element is FlowEvent { Definition: Message or Signal }) {
+                RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NestedEvents);
+            }
+
+            if (element is FlowEvent { Definition: TimerDefinition }) {
+                RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NestedTimers);
+            }
+        }
+    }
+
+    private static void RequireCapability(
+        ProcessDefinition           definition,
+        IFlowRuntime                runtime,
+        FlowElement                 element,
+        FlowRuntimeCapabilities     capability
+    ) {
+        if ((runtime.Capabilities & capability) == capability) {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Process definition '{definition.Name}' contains shape '{element.GetType().Name}'; engine '{runtime.EngineName}' lacks capability '{capability}'.");
+    }
+
+    private static IEnumerable<FlowElement> NestedElements(ProcessDefinition definition) {
+        foreach (var subProcess in definition.Elements.OfType<SubProcess>()) {
+            foreach (var element in NestedElements(subProcess)) {
+                yield return element;
+            }
+        }
+    }
+
+    private static IEnumerable<FlowElement> NestedElements(SubProcess subProcess) {
+        foreach (var child in subProcess.Children) {
+            yield return child;
+            if (child is SubProcess nested) {
+                foreach (var element in NestedElements(nested)) {
+                    yield return element;
+                }
+            }
+        }
+    }
 
     private void CompileConditions(ProcessDefinition definition, ProcessConfiguration configuration) {
         IExpressionCompiler? compiler = null;

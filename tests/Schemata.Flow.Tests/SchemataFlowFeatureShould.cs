@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions;
 using Schemata.Core.Features;
+using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine;
 using Schemata.Flow.StateMachine.Features;
@@ -12,10 +14,21 @@ using Xunit;
 
 namespace Schemata.Flow.Tests;
 
-public class SchemataFlowFeatureShould
+public sealed class SchemataFlowFeatureShould
 {
     [Fact]
-    public void ConfigureServices_StateMachineRuntime_NotRegistered() {
+    public void ConfigureServices_Registers_ProcessDefinitionQueryService() {
+        var services = new ServiceCollection();
+        services.AddOptions<SchemataFlowOptions>();
+
+        Configure(new SchemataFlowFeature(), services);
+
+        using var provider = services.BuildServiceProvider();
+        Assert.IsType<ProcessDefinitionQueryService>(provider.GetRequiredService<ProcessDefinitionQueryService>());
+    }
+
+    [Fact]
+    public void FlowFeature_WithoutStateMachineFeature_LeavesRuntimeUnregistered() {
         var services = new ServiceCollection();
 
         Configure(new SchemataFlowFeature(), services);
@@ -27,7 +40,7 @@ public class SchemataFlowFeatureShould
     }
 
     [Fact]
-    public void ConfigureServices_StateMachineFeature_RegistersRuntimeAndValidator() {
+    public void StateMachineFeature_RegistersRuntimeAndValidator() {
         var services = new ServiceCollection();
 
         Configure(new SchemataFlowStateMachineFeature(), services);

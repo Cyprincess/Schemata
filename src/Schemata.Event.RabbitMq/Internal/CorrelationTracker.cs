@@ -10,6 +10,11 @@ namespace Schemata.Event.RabbitMq.Internal;
 public sealed class CorrelationTracker : IDisposable
 {
     private readonly ConcurrentDictionary<string, Pending> _pending = new();
+    private readonly TimeProvider                          _timeProvider;
+
+    public CorrelationTracker(TimeProvider? timeProvider = null) {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     #region IDisposable Members
 
@@ -32,7 +37,7 @@ public sealed class CorrelationTracker : IDisposable
 
         _pending[correlationId] = new(wrapper, cts);
 
-        _ = Task.Delay(timeout, cts.Token).ContinueWith(task => {
+        _ = Task.Delay(timeout, _timeProvider, cts.Token).ContinueWith(task => {
             // Replies and disposal cancel the delay before it elapses; an elapsed timeout fails
             // the request if it wins the race to remove the entry.
             if (task.IsCanceled) {

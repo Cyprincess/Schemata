@@ -10,8 +10,8 @@ service that lists registered process definitions. `MapGrpc()` activates `Schema
 
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Schemata.Flow.Grpc`       | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Internal/FlowGrpcPayloadHandlers.cs`, `Internal/FlowGrpcStartProcessHandler.cs`, `Extensions/SchemataBuilderExtensions.cs`               |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs`                                                  |
+| `Schemata.Flow.Grpc`       | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                               |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `FlowPayloadHandlers.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -44,12 +44,13 @@ gRPC stack, the exception-mapping interceptor, server reflection, and the shared
 
 `ConfigureEndpoints` maps the definitions service via `endpoints.MapGrpcService<ProcessDefinitionService>()`.
 
-`RegisterHandlers` registers `FlowGrpcSourceLoader`, `FlowGrpcStartProcessHandler`,
-`CompleteActivityHandler`, `FlowGrpcCorrelateMessageHandler`, `FlowGrpcThrowSignalHandler`,
-`TerminateProcessHandler`, and `CancelTokenHandler`. The Flow-prefixed types live in
-`Schemata.Flow.Grpc.Internal`; the three unprefixed handlers (`CompleteActivityHandler`,
-`TerminateProcessHandler`, `CancelTokenHandler`) live in `Schemata.Flow.Foundation` and are reused
-unchanged across transports.
+`RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
+`CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
+`TerminateProcessHandler`, and `CancelTokenHandler`. All seven live in `Schemata.Flow.Foundation`:
+`FlowSourceLoader` and `FlowStartProcessHandler` are public, while `FlowCorrelateMessageHandler`
+and `FlowThrowSignalHandler` are internal. Both transports call the same internal
+`FlowResourceRegistration.RegisterHandlers` / `RegisterMethods`, so the gRPC and HTTP features wire
+an identical handler set.
 
 `SchemataProcess` carries `Operations.Get`, `Operations.List`, and five custom methods:
 
@@ -57,14 +58,13 @@ unchanged across transports.
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Grpc.Internal;
 
 resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
-    new("start",     typeof(FlowGrpcStartProcessHandler),    ResourceMethodScope.Collection),
+    new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
-    new("correlate", typeof(FlowGrpcCorrelateMessageHandler)),
-    new("signal",    typeof(FlowGrpcThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("correlate", typeof(FlowCorrelateMessageHandler)),
+    new("signal",    typeof(FlowThrowSignalHandler),     ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
@@ -108,13 +108,13 @@ The Resource gRPC transport synthesizes one RPC per custom method on the parent 
 AIP-136, each RPC is named `{PascalVerb}{Singular}` (the singular comes from the resource's
 `[DisplayName]`):
 
-| Method      | Handler                           | Runtime call                  |
-| ----------- | --------------------------------- | ----------------------------- |
-| `start`     | `FlowGrpcStartProcessHandler`     | `FlowRunner.StartAsync`       |
-| `complete`  | `CompleteActivityHandler`         | `FlowRunner.CompleteAsync`    |
-| `correlate` | `FlowGrpcCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
-| `signal`    | `FlowGrpcThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
-| `terminate` | `TerminateProcessHandler`         | `FlowRunner.TerminateAsync`   |
+| Method      | Handler                       | Runtime call                  |
+| ----------- | ----------------------------- | ----------------------------- |
+| `start`     | `FlowStartProcessHandler`     | `FlowRunner.StartAsync`       |
+| `complete`  | `CompleteActivityHandler`     | `FlowRunner.CompleteAsync`    |
+| `correlate` | `FlowCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
+| `signal`    | `FlowThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
+| `terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
 `start` and `signal` are collection-scoped on `ProcessService`; `complete`, `correlate`, and
 `terminate` are instance-scoped on `ProcessService`.
@@ -131,10 +131,11 @@ Each handler implements `IResourceMethodHandler<TSummary, TRequest, TResponse>`;
 HTTP transports invoke the same handler types over the same `InvokeAsync(name, request, entity,
 principal, ct)` signature. The principal comes from the gRPC call's `HttpContext.User`.
 
-`FlowGrpcStartProcessHandler` resolves the optional `Source` canonical name through
-`IResourceTypeResolver` and `IProcessRegistry.SourceTypes`, loads the entity through the registered
-`IRepository<TSource>`, and calls `FlowRunner.StartAsync` with the typed source. When `Source` is
-empty, it calls the no-source `StartAsync` overload.
+`FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
+optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against
+`IProcessRegistry.SourceTypes`, loads the entity through the registered `IRepository<TSource>`,
+and calls `FlowRunner.StartAsync` with the typed source. When `Source` is empty, the handler calls
+the no-source `StartAsync` overload.
 
 ### Definitions service
 

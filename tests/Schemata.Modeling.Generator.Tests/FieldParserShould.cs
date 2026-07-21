@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class FieldParserShould
 {
     [Fact]
-    public void Parse_BasicField() {
+    public void Parse_NonNullableTypedField_BindsTypeNameAndNullableFalse() {
         var result = Parser.Field.Parse("string email_address");
         Assert.NotNull(result);
         Assert.Equal("string", result.Type);
@@ -15,7 +15,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_NullableField() {
+    public void Parse_NullableTypedField_BindsTypeNameAndNullableTrue() {
         var result = Parser.Field.Parse("timestamp? creation_date");
         Assert.NotNull(result);
         Assert.Equal("timestamp", result.Type);
@@ -24,7 +24,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_PrimaryKeyOption() {
+    public void Parse_FieldWithPrimaryKeyOption_RegistersPrimaryKeyFlag() {
         var result = Parser.Field.Parse("long id [primary key]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -32,7 +32,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_MultipleOptions() {
+    public void Parse_FieldWithTwoOptions_RegistersPrimaryKeyAndAutoIncrement() {
         var result = Parser.Field.Parse("long id [primary key, auto increment]");
         Assert.NotNull(result);
         Assert.Equal(2, result.Options.Length);
@@ -41,7 +41,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_RequiredOption() {
+    public void Parse_FieldWithRequiredOption_RegistersRequiredFlag() {
         var result = Parser.Field.Parse("string name [required]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -57,7 +57,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_UniqueOption() {
+    public void Parse_FieldWithUniqueOption_RegistersUniqueFlag() {
         var result = Parser.Field.Parse("string email [unique]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -65,7 +65,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_BTreeOption() {
+    public void Parse_FieldWithBTreeOption_RegistersBTreeFlag() {
         var result = Parser.Field.Parse("string email [b tree]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -73,7 +73,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_HashOption() {
+    public void Parse_FieldWithHashOption_RegistersHashFlag() {
         var result = Parser.Field.Parse("string email [hash]");
         Assert.NotNull(result);
         Assert.Single(result.Options);
@@ -81,7 +81,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_DefaultProperty() {
+    public void Parse_FieldWithDefaultProperty_BindsDefaultLiteralValue() {
         var input  = "Status status {\n  Default 'Published'\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);
@@ -92,7 +92,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_LengthProperty() {
+    public void Parse_FieldWithLengthProperty_BindsLengthNumberLiteral() {
         var input  = "string password [required] {\n  Length 128\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);
@@ -104,7 +104,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_FieldWithSingleNote() {
+    public void Parse_FieldWithSingleNote_RegistersNoteText() {
         var input  = "string title {\n  Note 'Title of the post'\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);
@@ -113,7 +113,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_FieldWithMultipleNotes() {
+    public void Parse_FieldWithTwoNotes_RegistersBothNoteTexts() {
         var input  = "timestamp? creation_date {\n  Note 'First note'\n  Note 'Second note'\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);
@@ -121,7 +121,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_QualifiedTypeName() {
+    public void Parse_FieldWithQualifiedTypeName_PreservesDottedType() {
         var result = Parser.Field.Parse("Post.Status status");
         Assert.NotNull(result);
         Assert.Equal("Post.Status", result.Type);
@@ -129,7 +129,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_OptionsAndProperties() {
+    public void Parse_FieldWithOptionAndProperty_RegistersBoth() {
         var input  = "string password [required] {\n  Length 128\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);
@@ -138,7 +138,7 @@ public class FieldParserShould
     }
 
     [Fact]
-    public void Parse_NoteAndProperty() {
+    public void Parse_FieldWithNoteAndProperty_RegistersBoth() {
         var input  = "Status status {\n  Note 'The status field'\n  Default 'Published'\n}";
         var result = Parser.Field.Parse(input);
         Assert.NotNull(result);

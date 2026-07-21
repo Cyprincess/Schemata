@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Moq" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Bpmn\Schemata.Flow.Bpmn.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
   </ItemGroup>

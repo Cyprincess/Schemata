@@ -94,7 +94,23 @@ public static class SchemataResourceErrors
         string? name        = null,
         string? description = null,
         string  reason      = ErrorReasons.ResourceAlreadyExists) {
-        var descriptor = ResourceNameDescriptor.ForType<T>();
+        return AlreadyExists(typeof(T), name, description, reason);
+    }
+
+    /// <summary>
+    ///     Builds an <see cref="AlreadyExistsException" /> when the resource type is only known at runtime.
+    /// </summary>
+    /// <param name="type">The resource entity type.</param>
+    /// <param name="name">The canonical resource name of the conflicting resource.</param>
+    /// <param name="description">Optional human-readable context.</param>
+    /// <param name="reason">Domain-specific reason; defaults to <see cref="ErrorReasons.ResourceAlreadyExists" />.</param>
+    /// <returns>The constructed exception, ready to <c>throw</c>.</returns>
+    public static AlreadyExistsException AlreadyExists(
+        Type type,
+        string?     name        = null,
+        string?     description = null,
+        string      reason      = ErrorReasons.ResourceAlreadyExists) {
+        var descriptor = ResourceNameDescriptor.ForType(type);
         var exception  = new AlreadyExistsException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },

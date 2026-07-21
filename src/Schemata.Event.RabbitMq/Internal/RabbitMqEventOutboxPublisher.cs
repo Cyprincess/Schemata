@@ -18,12 +18,13 @@ namespace Schemata.Event.RabbitMq.Internal;
 /// </summary>
 public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsyncDisposable
 {
-    private readonly IConnection                            _connection;
+    private readonly SemaphoreSlim                          _initializationLock = new(1, 1);
     private readonly JsonSerializerOptions                  _json;
     private readonly ILogger<RabbitMqEventOutboxPublisher>? _logger;
     private readonly IOptions<RabbitMqEventOptions>         _options;
     private readonly IEventTypeRegistry                     _registry;
     private readonly IServiceProvider                       _services;
+    private          IConnection?                           _connection;
 
     /// <summary>Initializes an outbox publisher over the configured RabbitMQ connection.</summary>
     public RabbitMqEventOutboxPublisher(
@@ -38,23 +39,20 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
         _registry = registry;
         _json     = json.Value;
         _logger   = logger;
-
-        var factory = new ConnectionFactory {
-            HostName                   = options.Value.HostName,
-            Port                       = options.Value.Port,
-            UserName                   = options.Value.UserName,
-            Password                   = options.Value.Password,
-            VirtualHost                = options.Value.VirtualHost,
-            RequestedConnectionTimeout = TimeSpan.FromMilliseconds(options.Value.ConnectionTimeoutMs),
-        };
-
-        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
     }
 
     #region IAsyncDisposable Members
 
-    public ValueTask DisposeAsync() {
-        return _connection.DisposeAsync();
+    public async ValueTask DisposeAsync() {
+        await _initializationLock.WaitAsync();
+        try {
+            if (_connection is { } connection) {
+                _connection = null;
+                await connection.DisposeAsync();
+            }
+        } finally {
+            _initializationLock.Release();
+        }
     }
 
     #endregion
@@ -64,7 +62,8 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
     public async Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
         // Publisher confirms make BasicPublishAsync complete only when the broker accepts the
         // message, so the dispatcher marks the row delivered only after a durable publish.
-        await using var channel = await _connection.CreateChannelAsync(new(true, true), ct);
+        var connection = await ConnectAsync(ct);
+        await using var channel = await connection.CreateChannelAsync(new(true, true), ct);
 
         var exchange = _options.Value.ExchangeName;
         var body     = Encoding.UTF8.GetBytes(message.Payload ?? string.Empty);
@@ -95,17 +94,17 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
             return;
         }
 
-        IEvent? @event;
+        IEvent @event;
         try {
-            @event = JsonSerializer.Deserialize(message.Payload ?? string.Empty, eventType, _json) as IEvent;
+            if (JsonSerializer.Deserialize(message.Payload ?? string.Empty, eventType, _json) is not IEvent parsedEvent) {
+                return;
+            }
+
+            @event = parsedEvent;
         } catch (Exception ex) {
             _logger?.LogWarning(ex,
                                 "Could not deserialize payload for '{EventType}'; skipping OnDeliveredAsync notification.",
                                 message.EventType);
-            return;
-        }
-
-        if (@event is null) {
             return;
         }
 
@@ -124,6 +123,35 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
                                     "IEventLifecycleObserver.OnDeliveredAsync threw for event '{EventType}'.",
                                     message.EventType);
             }
+        }
+    }
+
+    private async ValueTask<IConnection> ConnectAsync(CancellationToken ct) {
+        if (_connection is { } existingConnection) {
+            return existingConnection;
+        }
+
+        await _initializationLock.WaitAsync(ct);
+        try {
+            if (_connection is { } initializedConnection) {
+                return initializedConnection;
+            }
+
+            var options = _options.Value;
+            var factory = new ConnectionFactory {
+                HostName                   = options.HostName,
+                Port                       = options.Port,
+                UserName                   = options.UserName,
+                Password                   = options.Password,
+                VirtualHost                = options.VirtualHost,
+                RequestedConnectionTimeout = TimeSpan.FromMilliseconds(options.ConnectionTimeoutMs),
+            };
+
+            var newConnection = await factory.CreateConnectionAsync(ct);
+            _connection = newConnection;
+            return newConnection;
+        } finally {
+            _initializationLock.Release();
         }
     }
 }

@@ -1,12 +1,13 @@
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Event.Skeleton.Entities;
 
 /// <summary>Durable event subscription row used by event dispatchers and bridge features.</summary>
+[DisplayName("EventSubscription")]
 [Table("SchemataEventSubscriptions")]
 [PrimaryKey(nameof(Uid))]
 [CanonicalName("event-subscriptions/{event_subscription}")]
@@ -22,6 +23,9 @@ public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurren
 
     /// <summary>Subscription target identifier consumed by the delivering handler.</summary>
     public virtual string Target { get; set; } = null!;
+
+    /// <summary>Canonical name of the token targeted by a message subscription.</summary>
+    public virtual string? Token { get; set; }
 
     /// <summary>Stable subscription identifier; the unique lookup key used by the dispatcher.</summary>
     public virtual string SubscriptionId { get; set; } = null!;

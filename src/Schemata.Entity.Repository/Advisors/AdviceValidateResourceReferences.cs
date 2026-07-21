@@ -21,7 +21,7 @@ public static class AdviceValidateResourceReferences
     ///     entity validation has cleared, but before uniqueness so a typed reference
     ///     mismatch surfaces as <c>NOT_FOUND</c> rather than a duplicate lookup.
     /// </summary>
-    public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 5_000_000;
+    public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 10_000_000;
 }
 
 /// <summary>

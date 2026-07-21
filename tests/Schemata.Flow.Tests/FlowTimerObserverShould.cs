@@ -20,12 +20,16 @@ public class FlowTimerObserverShould
     [Fact]
     public async SystemTask MultipleTimersOneInstance_DistinctJobNames() {
         var scheduled = new List<string>();
+        var variables = new Dictionary<string, IReadOnlyDictionary<string, string?>?>();
         var scheduler = new Mock<IScheduler>();
         scheduler
            .Setup(s => s.ScheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<IReadOnlyDictionary<string, string?>?>(),
                                        It.IsAny<CancellationToken>()))
            .Callback<SchemataJob, IReadOnlyDictionary<string, string?>?,
-                CancellationToken>((job, _, _) => scheduled.Add(job.Name!))
+                CancellationToken>((job, vars, _) => {
+                    scheduled.Add(job.Name!);
+                    variables[job.Name!] = vars;
+                })
            .Returns(SystemTask.CompletedTask);
         scheduler.Setup(s => s.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                  .Returns(SystemTask.CompletedTask);
@@ -55,8 +59,44 @@ public class FlowTimerObserverShould
 
         Assert.Equal(2, scheduled.Count);
         Assert.Equal(2, scheduled.Distinct().Count());
-        Assert.Contains("flow-processes/p1-timer-a", scheduled);
-        Assert.Contains("flow-processes/p1-timer-b", scheduled);
+        Assert.Contains("flow-p1-timer-a-t1", scheduled);
+        Assert.Contains("flow-p1-timer-b-t1", scheduled);
+        Assert.Equal("processes/p1/tokens/t1", variables["flow-p1-timer-a-t1"]!["tokenName"]);
+        Assert.Equal("processes/p1/tokens/t1", variables["flow-p1-timer-b-t1"]!["tokenName"]);
+    }
+
+    [Fact]
+    public async SystemTask SchedulesBoundaryTimer_ForHostNestedInSubProcess() {
+        var jobs      = new List<SchemataJob>();
+        var scheduler = new Mock<IScheduler>();
+        scheduler
+           .Setup(s => s.ScheduleAsync(It.IsAny<SchemataJob>(), It.IsAny<IReadOnlyDictionary<string, string?>?>(),
+                                       It.IsAny<CancellationToken>()))
+           .Callback<SchemataJob, IReadOnlyDictionary<string, string?>?, CancellationToken>((job, _, _) => jobs.Add(job))
+           .Returns(SystemTask.CompletedTask);
+
+        var services = new ServiceCollection().AddSingleton(scheduler.Object).BuildServiceProvider();
+        var advisor  = new AdviceTransitionTimer(services);
+        var advice   = new AdviceContext(services);
+
+        var host = new UserTask { Name = "review" };
+        var boundary = new FlowEvent {
+            Name       = "review-timeout",
+            Position   = EventPosition.Boundary,
+            AttachedTo = host,
+            Definition = new TimerDefinition { Name = "timeout", TimerType = TimerType.Duration, TimeExpression = "PT1H" },
+        };
+        var nested = new EmbeddedSubProcess { Name = "subprocess" };
+        nested.Children.Add(host);
+        nested.Children.Add(boundary);
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(nested);
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(advice, Context(process, definition, null, "review"));
+
+        var scheduled = Assert.Single(jobs);
+        Assert.Contains("review-timeout", scheduled.Name);
     }
 
     [Fact]
@@ -78,12 +118,13 @@ public class FlowTimerObserverShould
     private static FlowTransitionContext Context(
         SchemataProcess   process,
         ProcessDefinition definition,
-        string?           waitingAtName
+        string?           waitingAtName,
+        string?           stateName = null
     ) {
         var token = new TokenSnapshot {
             CanonicalName = "processes/p1/tokens/t1",
             ScopeName     = "p1",
-            StateName     = waitingAtName ?? "post-wait",
+            StateName     = stateName ?? waitingAtName ?? "post-wait",
             WaitingAtName = waitingAtName,
             Status        = waitingAtName is null ? "Active" : "Waiting",
         };

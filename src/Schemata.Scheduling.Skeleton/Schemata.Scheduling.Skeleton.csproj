@@ -12,14 +12,13 @@
 
   <ItemGroup>
     <PackageReference Include="Cronos" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
-    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+    <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
   </ItemGroup>
 
 </Project>

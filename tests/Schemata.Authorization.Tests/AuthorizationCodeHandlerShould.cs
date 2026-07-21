@@ -33,6 +33,10 @@ public class AuthorizationCodeHandlerShould
 
     private static readonly JsonSerializerOptions JsonOptions = new();
 
+    private static readonly DateTime Anchor = new(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
+    private static readonly TimeProvider Clock = new FixedClock(Anchor);
+
     private static SchemataToken CreateToken(
         string?   status     = TokenStatuses.Valid,
         DateTime? expireTime = null,
@@ -53,7 +57,7 @@ public class AuthorizationCodeHandlerShould
             Uid         = Identifiers.NewUid(),
             Type        = TokenTypes.AuthorizationCode,
             Status      = status,
-            ExpireTime  = expireTime ?? DateTime.UtcNow.AddMinutes(5),
+            ExpireTime  = expireTime ?? Anchor.AddMinutes(5),
             Subject     = subject,
             Application = clientId,
             Payload     = JsonSerializer.Serialize(payload, JsonOptions),
@@ -90,7 +94,7 @@ public class AuthorizationCodeHandlerShould
         var services = new ServiceCollection();
         services.AddSingleton(tokens.Object);
         services.AddSingleton<ICodeExchangeAdvisor<SchemataApplication, SchemataToken>>(
-            new AdviceCodeExchangeValidation<SchemataApplication, SchemataToken>());
+            new AdviceCodeExchangeValidation<SchemataApplication, SchemataToken>(Clock));
         var sp = services.BuildServiceProvider();
 
         return new(clientAuth.Object, tokens.Object, sp, jsonOpts, codeOpts);
@@ -143,7 +147,7 @@ public class AuthorizationCodeHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidGrant_WhenCodeExpired() {
-        var token  = CreateToken(expireTime: DateTime.UtcNow.AddMinutes(-1));
+        var token  = CreateToken(expireTime: Anchor.AddMinutes(-1));
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
@@ -202,7 +206,7 @@ public class AuthorizationCodeHandlerShould
     }
 
     [Fact]
-    public async Task ReturnsSignIn_WithCorrectProperties() {
+    public async Task HandleAsync_WithValidCodeAndMatchingClient_ReturnsSignInWithGrantTypeScopeNonceAndSubjectClaim() {
         var token  = CreateToken();
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
@@ -225,5 +229,10 @@ public class AuthorizationCodeHandlerShould
         Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity!.AuthenticationType);
         Assert.Contains(identity.Claims, c => c is { Type: Claims.ClientId, Value: TestClientId });
         Assert.Contains(identity.Claims, c => c is { Type: Claims.Subject, Value : "user-1" });
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() { return now; }
     }
 }

@@ -1,13 +1,12 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 
 [CanonicalName("students/{Student}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IValidation, IUpdateMask
 {
     public string? FullName { get; set; }

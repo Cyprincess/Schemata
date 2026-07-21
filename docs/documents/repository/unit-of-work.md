@@ -10,7 +10,6 @@ repository that mutates without enlisting opens its own implicit unit of work, s
 | Item                                         | Path                                                                     |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `IUnitOfWork`, `IUnitOfWork<TContext>`       | `src/Schemata.Entity.Repository/IUnitOfWork.cs`                          |
-| `IUnitOfWorkSink`                            | `src/Schemata.Entity.Repository/IUnitOfWorkSink.cs`                      |
 | `IRepository.Begin` / `Join` / `CommitAsync` | `src/Schemata.Entity.Repository/IRepository.cs`                          |
 | `CommitChanges<TEntity>`                     | `src/Schemata.Entity.Repository/CommitChanges.cs`                        |
 | `IRepositoryCommittedAdvisor<TEntity>`       | `src/Schemata.Entity.Repository/Advisors/IRepositoryCommittedAdvisor.cs` |
@@ -20,6 +19,8 @@ repository that mutates without enlisting opens its own implicit unit of work, s
 ```csharp
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
+    void AddCommitSink(Func<CancellationToken, Task> sink);
+    void AddRollbackSink(Action reset);
     Task CommitAsync(CancellationToken ct = default);
     Task RollbackAsync(CancellationToken ct = default);
 }
@@ -32,10 +33,15 @@ public interface IUnitOfWork<TContext> : IUnitOfWork
 
 | Member                     | Purpose                                                                                                                                              |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AddCommitSink`            | Registers a callback that runs after the unit of work commits its transaction; enlisted repositories use it to dispatch their committed advisors.    |
+| `AddRollbackSink`          | Registers a callback that runs when the unit of work rolls back or is disposed before completion; enlisted repositories use it to reset tracking.    |
 | `CommitAsync`              | Persists the enlisted repositories' changes, commits the transaction, then dispatches each repository's committed advisors.                          |
 | `RollbackAsync`            | Rolls back the transaction and resets each enlisted repository's tracking lists.                                                                     |
 | `Context`                  | The provider context (`DbContext` or `DataConnection`). First access opens the connection; the transaction opens per the provider's execution model. |
 | `Dispose` / `DisposeAsync` | Rolls back when never committed, then releases the context.                                                                                          |
+
+The sink registrations are required members of the contract, so every compliant `IUnitOfWork`
+implementation carries commit and rollback semantics — there is no optional side interface to miss.
 
 A unit of work is one-shot: after `CommitAsync` or `RollbackAsync`, resolve a fresh `IUnitOfWork` from
 DI to start another transaction. `IUnitOfWork<TContext>` binds the type parameter to a concrete context
@@ -68,8 +74,9 @@ public sealed class EnrollmentService(
 }
 ```
 
-`Join` replaces the repository's owned context with the unit of work's context and registers commit and
-rollback sinks through `IUnitOfWorkSink`. While enlisted, `repository.CommitAsync()` throws
+`Join` replaces the repository's owned context with the unit of work's context and registers the
+repository's commit and rollback sinks through the required `AddCommitSink` / `AddRollbackSink`
+members. While enlisted, `repository.CommitAsync()` throws
 `InvalidOperationException` — commit through `uow.CommitAsync()`. `Join` also throws if the repository
 already holds uncommitted work or is already enlisted.
 
@@ -124,12 +131,13 @@ of work does not dispose that unit of work — the caller owns its lifetime.
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlite(connectionString))
         .WithUnitOfWork<AppDbContext>();
 ```
 
-`.WithUnitOfWork<TContext>()` registers `IUnitOfWork<TContext>` as scoped with `TryAddScoped`, so a
+`AddRepository<TEntity, TImplementation>()` is the only registration overload: call it once per
+entity type. `.WithUnitOfWork<TContext>()` registers `IUnitOfWork<TContext>` as scoped with `TryAddScoped`, so a
 prior registration wins. Both providers expose the same method.
 
 ## See also

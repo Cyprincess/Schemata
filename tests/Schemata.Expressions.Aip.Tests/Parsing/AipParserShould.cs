@@ -86,7 +86,7 @@ public class AipParserShould
     [InlineData("msg != \"\\\"\"", @"[!= " + "\"" + @"msg" + "\"" + @" " + "\"\"\"" + @"]", false)]
     [InlineData("msg != \"\\\\\"", @"[!= " + "\"" + @"msg" + "\"" + @" " + "\"" + @"\" + "\"" + @"]", false)]
     [InlineData("msg != \"[ 'hello' ]\"", """[!= "msg" "[ 'hello' ]"]""", false)]
-    public void ParseFilter_ReturnsExpected(string input, string expectedToString, bool expectedConstant) {
+    public void Parse_Aip160FilterText_RendersCanonicalStringAndConstantFlag(string input, string expectedToString, bool expectedConstant) {
         var result = AipParser.Filter.Parse(input);
 
         Assert.NotNull(result);

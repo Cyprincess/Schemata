@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
-using Schemata.Resource.Http.Internal;
 using Xunit;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http.Integration.Tests;
 
@@ -12,7 +12,7 @@ public class ResourceIdentifiersShould
     public void BuildFullName_SimpleResource_ReturnsCollectionAndName() {
         var descriptor = ResourceNameDescriptor.ForType<SimpleThing>();
 
-        var name = ResourceIdentifiers.BuildFullName(descriptor, new(), "one");
+        var name = HttpResourceIdentifiers.BuildFullName(descriptor, new(), "one");
 
         Assert.Equal("simplethings/one", name);
     }
@@ -22,7 +22,7 @@ public class ResourceIdentifiersShould
         var descriptor = ResourceNameDescriptor.ForType<ChildThing>();
         var route      = new RouteValueDictionary { ["org"] = "acme", ["project"] = "alpha" };
 
-        var name = ResourceIdentifiers.BuildFullName(descriptor, route, "item1");
+        var name = HttpResourceIdentifiers.BuildFullName(descriptor, route, "item1");
 
         Assert.Equal("orgs/acme/projects/alpha/children/item1", name);
     }
@@ -32,7 +32,7 @@ public class ResourceIdentifiersShould
         var descriptor = ResourceNameDescriptor.ForType<ChildThing>();
         var route      = new RouteValueDictionary { ["org"] = "-", ["project"] = "alpha" };
 
-        var name = ResourceIdentifiers.BuildFullName(descriptor, route, "item1");
+        var name = HttpResourceIdentifiers.BuildFullName(descriptor, route, "item1");
 
         Assert.Equal("orgs/-/projects/alpha/children/item1", name);
     }

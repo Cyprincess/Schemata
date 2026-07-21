@@ -4,7 +4,7 @@ using Schemata.Modeling.Generator.Expressions;
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-public static class EnumGenerator
+internal static class EnumGenerator
 {
     public static void Generate(StringBuilder sb, Enumeration @enum, Document? doc) {
         if (doc is not null && !string.IsNullOrWhiteSpace(doc.Namespace)) {

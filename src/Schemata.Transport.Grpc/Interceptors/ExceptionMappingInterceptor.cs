@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -13,10 +14,10 @@ namespace Schemata.Transport.Grpc.Interceptors;
 
 /// <summary>
 ///     Maps <see cref="SchemataException" /> to <see cref="RpcException" /> with
-///     <c>google.rpc.Status</c> details (AIP-193). Unhandled exceptions surface as
+///     <c>google.rpc.Status</c> details (AIP-193). Unhandled exceptions are logged and surface as
 ///     <see cref="StatusCode.Internal" /> with a non-disclosing message.
 /// </summary>
-public class ExceptionMappingInterceptor : Interceptor
+public class ExceptionMappingInterceptor(ILogger<ExceptionMappingInterceptor> logger) : Interceptor
 {
     public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(
         TRequest                               request,
@@ -29,7 +30,8 @@ public class ExceptionMappingInterceptor : Interceptor
             throw;
         } catch (SchemataException ex) {
             throw BuildRpcException(ex, context);
-        } catch (Exception) {
+        } catch (Exception ex) {
+            logger.LogError(ex, "Unhandled exception in gRPC call {Method}.", context.Method);
             throw BuildRpcException(
                 new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.GENERIC_ERROR)),
                 context

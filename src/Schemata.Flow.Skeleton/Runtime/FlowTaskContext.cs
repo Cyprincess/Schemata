@@ -75,7 +75,11 @@ public sealed class FlowTaskContext
         }
 
         var repository = Repository<TEntity>();
-        var source = await repository.SingleOrDefaultAsync(q => q.Where(e => e.CanonicalName == binding.Source), ct);
+        TEntity? source;
+        using (_execution.SourceReadGuard?.Invoke(repository)) {
+            source = await repository.SingleOrDefaultAsync(q => q.Where(e => e.CanonicalName == binding.Source), ct);
+        }
+
         if (source is null) {
             throw new InvalidOperationException($"Source entity '{binding.Source}' was not found for binding '{name}'.");
         }

@@ -121,8 +121,9 @@ builder.UseSchemata(schema => {
 
 ## Feature dependencies
 
-Declared via `[DependsOn<T>]` (typed, auto-registers) or `[DependsOn("type.name")]` (string,
-check-only):
+Declared via `[DependsOn<T>]` (typed, auto-registers), `[DependsOn(typeof(SomeFeature))]` (type
+reference, check-only; open generics such as `typeof(SchemataMappingFeature<>)` match any closed
+instantiation), or `[DependsOn("type.name")]` (string, check-only):
 
 | Feature                          | Depends on                                                                                             |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -133,7 +134,7 @@ check-only):
 | `SchemataTransportGrpcFeature`   | `SchemataRoutingFeature`                                                                               |
 | `SchemataIdentityFeature`        | `SchemataAuthenticationFeature`, `SchemataTransportHttpFeature`                                        |
 | `SchemataAuthorizationFeature`   | `SchemataAuthenticationFeature`, `SchemataTransportHttpFeature`, `SchemataWellKnownFeature`            |
-| `SchemataResourceFeature`        | `SchemataRoutingFeature`, `SchemataMappingFeature<T>`, `SchemataSecurityFeature`                       |
+| `SchemataResourceFeature`        | `SchemataRoutingFeature`, `SchemataMappingFeature<>`                                                 |
 | `SchemataFlowFeature`            | `SchemataEventFeature`                                                                                 |
 | `SchemataFlowHttpFeature`        | `SchemataFlowFeature`, `SchemataHttpResourceFeature`                                                   |
 | `SchemataFlowGrpcFeature`        | `SchemataFlowFeature`, `SchemataGrpcResourceFeature`                                                   |

@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository.Advisors;
@@ -41,7 +41,7 @@ public class CommitFailureShould : IAsyncLifetime
                                               });
                 }
 
-                await Assert.ThrowsAsync<DbUpdateException>(() => repository.CommitAsync());
+                await Assert.ThrowsAsync<AlreadyExistsException>(() => repository.CommitAsync());
             }
         }
 

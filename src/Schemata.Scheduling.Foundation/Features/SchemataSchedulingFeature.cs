@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,7 @@ public sealed class SchemataSchedulingFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
+        services.TryAddSingleton<ConcurrentDictionary<string, CancellationTokenSource>>();
         services.TryAddSingleton<JobExecutionDispatcher>();
         services.TryAddSingleton<IScheduler, DefaultScheduler>();
         services.TryAddSingleton<IOperationService, DefaultOperationService>();

@@ -93,7 +93,7 @@ public static class InclusiveGatewayHandler
         var liveUpstream = BpmnEngine.HasLiveUpstreamReachableTo(definition, ig, working, token);
 
         if (liveUpstream) {
-            return engine.ParkAtGateway(process, token, working, ig, previousState);
+            return engine.ParkAtGateway(process, token, working, ig, previousState, execution);
         }
 
         return await engine.FireJoinAsync(definition, process, token, working, ig, waitingHere, previousState, execution);

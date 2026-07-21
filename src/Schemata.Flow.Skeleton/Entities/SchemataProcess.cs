@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Flow.Skeleton.Entities;
@@ -13,11 +12,18 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(DefinitionName), nameof(IdempotencyKey), IsUnique = true)]
 public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive,
-                                ISoftDelete, ITimestamp, IStateful, IAnnotatable
+                               ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the source definition.</summary>
     public virtual string DefinitionName { get; set; } = null!;
+
+    /// <summary>
+    ///     Per-process idempotency key copied from start options and released once the process
+    ///     reaches a terminal state.
+    /// </summary>
+    public virtual string? IdempotencyKey { get; set; }
 
     #region IAnnotatable Members
 

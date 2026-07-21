@@ -6,7 +6,9 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation.Features;
 using Schemata.Flow.Scheduling.Internal;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation.Features;
 
 namespace Schemata.Flow.Scheduling.Features;
@@ -28,6 +30,7 @@ public sealed class SchemataFlowSchedulingFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.Configure<SchemataFlowOptions>(options => options.Bridges.Add(SchemataFlowOptions.TimersBridge));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionTimer>());
         services.AddScheduledJob<FlowTimerJob>();
     }

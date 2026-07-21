@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public sealed record FunctionCall(string Name, EquatableArray<IExpression> Arguments) : IExpression
+internal sealed record FunctionCall(string Name, EquatableArray<IExpression> Arguments) : IExpression
 {
     #region IExpression Members
 

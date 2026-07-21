@@ -23,7 +23,7 @@
 ## Layout Inside a Test Project
 
 - `Fixtures/` — `IClassFixture` / `ICollectionFixture` types plus seed-data helpers.
-- `Program.cs` + `Properties/AssemblyInfo.cs` — required only for integration tests that use `WebApplicationFactory<Program>`. The `Program.cs` is the test host startup; `AssemblyInfo.cs` opens visibility to `WebApplicationFactory`.
+- `Program.cs` — required only for integration tests that use `WebApplicationFactory<Program>`; it is the test host startup. `WebApplicationFactory` locates the project root through the `Microsoft.AspNetCore.Testing.ApplicationRootPath` metadata, declared as an `<AssemblyMetadata>` item in the test csproj (path relative to the build output directory).
 - `*Should.cs` files in feature-named folders (e.g. `Common/`, `Conformance/`, `Resource/`).
 
 There is **no shared test utility project**. Helpers are duplicated across projects as a deliberate choice — keeps each test project self-contained.

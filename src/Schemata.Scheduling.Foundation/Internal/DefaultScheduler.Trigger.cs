@@ -117,13 +117,9 @@ public sealed partial class DefaultScheduler
 
     private async Task PersistExecutionAsync(SchemataJobExecution execution, CancellationToken ct) {
         using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
-        if (executions is null) {
-            return;
-        }
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
 
-        await using var uow = executions.Begin();
         await executions.AddAsync(execution, ct);
-        await uow.CommitAsync(ct);
+        await executions.CommitAsync(ct);
     }
 }

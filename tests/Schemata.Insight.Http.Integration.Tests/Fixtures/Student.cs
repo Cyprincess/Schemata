@@ -1,11 +1,10 @@
 using System;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Insight.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("students/{student}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Student : IIdentifier, ICanonicalName
 {
     public string? FullName { get; set; }

@@ -5,11 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 
@@ -83,9 +85,11 @@ public class JobExecutionDispatcherShould
         var capturing = new CapturingJob();
 
         var services = new ServiceCollection().AddSingleton(executions.Object)
-                                              .AddSingleton<IScheduledJobRegistry>(registry)
-                                              .AddSingleton(capturing)
-                                              .BuildServiceProvider();
+                                               .AddSingleton<IScheduledJobRegistry>(registry)
+                                               .AddSingleton(capturing)
+                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .BuildServiceProvider();
 
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -103,9 +107,11 @@ public class JobExecutionDispatcherShould
         registry.Register<CompletingJob>("jobs.completing");
 
         var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
-                                              .AddSingleton<IScheduledJobRegistry>(registry)
-                                              .AddSingleton<CompletingJob>()
-                                              .BuildServiceProvider();
+                                               .AddSingleton<IScheduledJobRegistry>(registry)
+                                               .AddSingleton<CompletingJob>()
+                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
         await dispatcher.DispatchPendingAsync(CancellationToken.None);
@@ -139,6 +145,117 @@ public class JobExecutionDispatcherShould
         Assert.NotNull(persisted);
         Assert.Equal(ExecutionState.Failed, persisted.State);
         Assert.Contains("not registered", persisted.RecentError);
+    }
+
+    [Theory]
+    [InlineData(AdviseResult.Block, ExecutionState.Blocked)]
+    [InlineData(AdviseResult.Handle, ExecutionState.Skipped)]
+    public async Task DispatchPendingAsync_AdvisorGate_WritesExpectedTerminalState(
+        AdviseResult outcome,
+        ExecutionState expected
+    ) {
+        var execution = new SchemataJobExecution {
+            Uid = Identifiers.NewUid(), JobKey = "jobs.gated", State = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        executions.Setup(r => r.ListAsync(
+                             It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
+                            CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<CompletingJob>("jobs.gated");
+        var gate = new Mock<IJobExecutionAdvisor>();
+        gate.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(outcome);
+        var observer = new Mock<IJobLifecycleObserver>();
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                               .AddSingleton<IScheduledJobRegistry>(registry)
+                                               .AddSingleton<IJobExecutionAdvisor>(gate.Object)
+                                               .AddSingleton<IJobLifecycleObserver>(observer.Object)
+                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(expected, execution.State);
+        observer.Verify(o => o.OnBlockedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()),
+                        Times.Exactly(outcome == AdviseResult.Block ? 1 : 0));
+        observer.Verify(o => o.OnSkippedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()),
+                        Times.Exactly(outcome == AdviseResult.Handle ? 1 : 0));
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_MissingJobRepository_Throws() {
+        var execution = new SchemataJobExecution {
+            Uid       = Identifiers.NewUid(),
+            JobKey    = "jobs.completing",
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionRepository(execution);
+        var registry   = new DefaultScheduledJobRegistry();
+        registry.Register<CompletingJob>("jobs.completing");
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<CompletingJob>()
+                                              .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                              .BuildServiceProvider();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None));
+
+        Assert.Contains(nameof(IRepository<SchemataJob>), exception.Message);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_MissingScheduler_Throws() {
+        var execution = new SchemataJobExecution {
+            Uid       = Identifiers.NewUid(),
+            JobKey    = "jobs.completing",
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionRepository(execution);
+        var registry   = new DefaultScheduledJobRegistry();
+        registry.Register<CompletingJob>("jobs.completing");
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<CompletingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .BuildServiceProvider();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None));
+
+        Assert.Contains(nameof(IScheduler), exception.Message);
+    }
+
+    private static Mock<IRepository<SchemataJobExecution>> ExecutionRepository(SchemataJobExecution execution) {
+        var repository = new Mock<IRepository<SchemataJobExecution>>();
+        repository.Setup(r => r.ListAsync(
+                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
+                            CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
+        repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        return repository;
+    }
+
+    private static IRepository<SchemataJob> EmptyJobRepository() {
+        var repository = new Mock<IRepository<SchemataJob>>();
+        repository.Setup(r => r.FirstOrDefaultAsync(
+                              It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns(ValueTask.FromResult<SchemataJob?>(null));
+        return repository.Object;
     }
 
     private static async IAsyncEnumerable<SchemataJobExecution> ToAsync(IEnumerable<SchemataJobExecution> rows) {

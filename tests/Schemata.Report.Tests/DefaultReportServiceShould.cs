@@ -5,10 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Insight.Skeleton;
-using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Xunit;
 
@@ -18,8 +18,8 @@ public class DefaultReportServiceShould
 {
     [Fact]
     public async Task Run_Inline_Returns_Rows_Under_Cap() {
-        var probe = new ReportMaterializerProbe(ReportTestRows.Create(3));
-        using var provider = ReportTestHost.Create(probe, maxInlineRows: 3);
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(3));
+        using var provider = ReportTestHost.Create(driver, maxInlineRows: 3);
         var service = provider.GetRequiredService<IReportService>();
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest());
@@ -31,8 +31,8 @@ public class DefaultReportServiceShould
 
     [Fact]
     public async Task Run_Inline_Beyond_MaxInlineRows_Throws_With_Persist_Hint() {
-        var probe = new ReportMaterializerProbe(ReportTestRows.Create(3));
-        using var provider = ReportTestHost.Create(probe, maxInlineRows: 2);
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(3));
+        using var provider = ReportTestHost.Create(driver, maxInlineRows: 2);
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<ReportException>(async () => {
@@ -45,8 +45,8 @@ public class DefaultReportServiceShould
     [Fact]
     public async Task Run_Persist_Writes_Header_And_Chunks_With_Fresh_Scope_Per_Chunk() {
         var state = new ReportPersistenceState();
-        var probe = new ReportMaterializerProbe(ReportTestRows.Create(5));
-        using var provider = ReportTestHost.Create(probe, state, chunkSize: 2);
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(5));
+        using var provider = ReportTestHost.Create(driver, state, chunkSize: 2);
         var service = provider.GetRequiredService<IReportService>();
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
@@ -63,8 +63,8 @@ public class DefaultReportServiceShould
     [Fact]
     public async Task Failed_Materialization_Marks_Header_Failed_And_Keeps_Chunks() {
         var state = new ReportPersistenceState();
-        var probe = new ReportMaterializerProbe(ReportTestRows.ThrowAfter(2, "source failed"));
-        using var provider = ReportTestHost.Create(probe, state, chunkSize: 2);
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.ThrowAfter(2, "source failed"));
+        using var provider = ReportTestHost.Create(driver, state, chunkSize: 2);
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => {
@@ -80,11 +80,18 @@ public class DefaultReportServiceShould
 
     [Fact]
     public async Task Run_Propagates_Generate_Advisor_Rejection() {
-        var probe = new ReportMaterializerProbe(ReportTestRows.Create(1));
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
+        var advisor = new Mock<IReportGenerateAdvisor>();
+        advisor.SetupGet(value => value.Order).Returns(0);
+        advisor.Setup(value => value.AdviseAsync(
+                    It.IsAny<AdviceContext>(),
+                    It.IsAny<ReportGenerateContext>(),
+                    It.IsAny<CancellationToken>()))
+               .Throws(new PermissionDeniedException());
         using var provider = ReportTestHost.Create(
-            probe,
+            driver,
             configure: services => services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IReportGenerateAdvisor>(new RejectingAdvisor())));
+                ServiceDescriptor.Singleton<IReportGenerateAdvisor>(advisor.Object)));
         var service = provider.GetRequiredService<IReportService>();
 
         await Assert.ThrowsAsync<PermissionDeniedException>(async () => {
@@ -93,37 +100,53 @@ public class DefaultReportServiceShould
     }
 
     [Fact]
-    public async Task Run_Forwards_Caller_Principal_To_Materializer() {
-        var probe     = new ReportMaterializerProbe(ReportTestRows.Create(1));
+    public async Task Run_Forwards_Caller_Principal_To_Source_Driver() {
+        var driver    = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
-        using var provider = ReportTestHost.Create(probe);
+        using var provider = ReportTestHost.Create(driver);
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.InlineRequest(), principal);
 
-        Assert.Same(principal, probe.Principal);
+        driver.Verify(value => value.ExecuteAsync(
+                          It.IsAny<SubPlan>(),
+                          It.IsAny<QueryInsightRequest>(),
+                          principal,
+                          It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Generate_Advisor_May_Replace_The_Principal() {
-        var probe       = new ReportMaterializerProbe(ReportTestRows.Create(1));
+        var driver      = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
         var substituted = new ClaimsPrincipal(new ClaimsIdentity("service"));
+        var advisor = new Mock<IReportGenerateAdvisor>();
+        advisor.SetupGet(value => value.Order).Returns(0);
+        advisor.Setup(value => value.AdviseAsync(
+                    It.IsAny<AdviceContext>(),
+                    It.IsAny<ReportGenerateContext>(),
+                    It.IsAny<CancellationToken>()))
+               .Callback((AdviceContext context, ReportGenerateContext reportContext, CancellationToken cancellationToken) => reportContext.Principal = substituted)
+               .Returns(Task.FromResult(AdviseResult.Continue));
         using var provider = ReportTestHost.Create(
-            probe,
+            driver,
             configure: services => services.TryAddEnumerable(
-                ServiceDescriptor.Singleton<IReportGenerateAdvisor>(new SubstitutingAdvisor(substituted))));
+                ServiceDescriptor.Singleton<IReportGenerateAdvisor>(advisor.Object)));
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.InlineRequest(), new ClaimsPrincipal(new ClaimsIdentity("caller")));
 
-        Assert.Same(substituted, probe.Principal);
+        driver.Verify(value => value.ExecuteAsync(
+                          It.IsAny<SubPlan>(),
+                          It.IsAny<QueryInsightRequest>(),
+                          substituted,
+                          It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task ReadRows_Streams_Chunks_In_Index_Order() {
         var state = new ReportPersistenceState();
-        var probe = new ReportMaterializerProbe(ReportTestRows.Create(5));
-        using var provider = ReportTestHost.Create(probe, state, chunkSize: 2);
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(5));
+        using var provider = ReportTestHost.Create(driver, state, chunkSize: 2);
         var service = provider.GetRequiredService<IReportService>();
         var store = provider.GetRequiredService<IReportSnapshotStore>();
 
@@ -137,8 +160,38 @@ public class DefaultReportServiceShould
     }
 
     [Fact]
+    public async Task Run_Inline_Disposes_Source_Result() {
+        var result = new Mock<ISourceResult>();
+        result.SetupGet(value => value.Rows).Returns(ReportTestRows.Create(1));
+        result.SetupGet(value => value.Schema).Returns([]);
+        result.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        var driver = ReportTestHost.CreateDriver(result.Object);
+        using var provider = ReportTestHost.Create(driver);
+        var service = provider.GetRequiredService<IReportService>();
+
+        await service.RunAsync(ReportTestHost.InlineRequest());
+
+        result.Verify(value => value.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Run_Persist_Disposes_Source_Result() {
+        var result = new Mock<ISourceResult>();
+        result.SetupGet(value => value.Rows).Returns(ReportTestRows.Create(1));
+        result.SetupGet(value => value.Schema).Returns([]);
+        result.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        var driver = ReportTestHost.CreateDriver(result.Object);
+        using var provider = ReportTestHost.Create(driver, new ReportPersistenceState());
+        var service = provider.GetRequiredService<IReportService>();
+
+        await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
+
+        result.Verify(value => value.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
     public async Task Generate_Without_Scheduler_Throws_FailedPrecondition() {
-        using var provider = ReportTestHost.Create(new(ReportTestRows.Create(1)));
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => {
@@ -150,7 +203,7 @@ public class DefaultReportServiceShould
 
     [Fact]
     public async Task Run_With_Name_And_Query_Throws_InvalidArgument() {
-        using var provider = ReportTestHost.Create(new(ReportTestRows.Create(1)));
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
         var service = provider.GetRequiredService<IReportService>();
         var request = ReportTestHost.InlineRequest();
         request.Name = "reports/daily";
@@ -162,7 +215,7 @@ public class DefaultReportServiceShould
 
     [Fact]
     public async Task Run_Unknown_Named_Report_Throws_NotFound() {
-        using var provider = ReportTestHost.Create(new(ReportTestRows.Create(1)));
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(async () => {
@@ -172,30 +225,4 @@ public class DefaultReportServiceShould
         Assert.Equal("Report 'daily' was not found.", exception.Message);
     }
 
-    private sealed class RejectingAdvisor : IReportGenerateAdvisor
-    {
-        public int Order => 0;
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext         ctx,
-            ReportGenerateContext context,
-            CancellationToken     ct = default
-        ) {
-            throw new PermissionDeniedException();
-        }
-    }
-
-    private sealed class SubstitutingAdvisor(ClaimsPrincipal principal) : IReportGenerateAdvisor
-    {
-        public int Order => 0;
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext         ctx,
-            ReportGenerateContext context,
-            CancellationToken     ct = default
-        ) {
-            context.Principal = principal;
-            return Task.FromResult(AdviseResult.Continue);
-        }
-    }
 }

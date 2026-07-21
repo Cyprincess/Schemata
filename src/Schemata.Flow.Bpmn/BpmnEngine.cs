@@ -53,11 +53,11 @@ namespace Schemata.Flow.Bpmn;
 /// </remarks>
 public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 {
-    private readonly Dictionary<string, CompensationStack> _compensationScopes = new(StringComparer.Ordinal);
-
     #region IFlowRuntime Members
 
     public string EngineName => SchemataConstants.FlowEngines.Bpmn;
+
+    public FlowRuntimeCapabilities Capabilities => FlowRuntimeCapabilities.All;
 
     public async ValueTask<ProcessSnapshot> StartAsync(
         ProcessDefinition definition,
@@ -65,7 +65,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         FlowExecutionContext context,
         CancellationToken ct = default
     ) {
-        EnsureCompensationScope(process.CanonicalName);
+        LoadCompensationBindings(context);
 
         var (_, outgoing) = definition.RequireStart();
         var firstTarget = outgoing.Target;
@@ -82,11 +82,15 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         if (firstTarget is EventBasedGateway eb) {
-            return StartIntoEventBased(process, eb);
+            return StartIntoEventBased(process, eb, context);
         }
 
         if (firstTarget is TransactionSubProcess tx) {
             return await StartIntoTransactionAsync(definition, process, tx, context);
+        }
+
+        if (firstTarget is AdHocSubProcess adHoc) {
+            throw new InvalidOperationException($"BPMN definition shape '{adHoc.GetType().Name}' is not supported.");
         }
 
         if (firstTarget is SubProcess sp) {
@@ -105,9 +109,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             return await StartIntoStandardLoopAsync(definition, process, loopActivity, standardLoop, context, ct);
         }
 
-        var resolved = await ResolveTargetAsync(definition, firstTarget, variables, EmptyTokenView(process), context, process);
-
-        var token = NewRootToken(process, resolved);
+        var token = NewRootToken(process, new(firstTarget.Name, null, false));
+        var resolved = await ResolveTargetAsync(definition, firstTarget, variables, TokenView(token), context, process, token);
+        ApplyResolvedToToken(token, resolved);
         var transition = NewTransition(
             process.Name!,
             token.CanonicalName,
@@ -119,9 +123,10 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         ApplyAggregateState(process, [token]);
 
         return new() {
-            Process     = process,
-            Tokens      = [token],
-            Transitions = [transition],
+            Process              = process,
+            Tokens               = [token],
+            Transitions          = [transition],
+            CompensationBindings = [..context.CompensationBindings],
         };
     }
 
@@ -137,7 +142,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
     ) {
         ArgumentNullException.ThrowIfNull(trigger);
 
-        EnsureCompensationScope(process.CanonicalName);
+        LoadCompensationBindings(context);
 
         var token   = ResolveAddressedToken(process, tokens, tokenName);
         var working = tokens.ToList();
@@ -147,11 +152,11 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             if (current is Activity hostActivity) {
                 var boundary = FindMatchingBoundary(definition, hostActivity, trigger);
                 if (boundary is not null) {
-                    return await FireBoundaryAsync(definition, process, token, working, hostActivity, boundary, trigger, context);
+                    return await FireBoundaryAsync(definition, process, token, working, hostActivity, boundary, trigger, payload, context);
                 }
             }
 
-            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, context);
+            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, payload, context);
             if (eventSubProcess is not null) {
                 return eventSubProcess;
             }
@@ -167,32 +172,32 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var waitingAt = definition.FindElementByName(token.WaitingAtName);
         if (waitingAt is EventBasedGateway eb) {
             if (definition.Outgoing(eb).Any(f => f.Target is FlowEvent { Position: EventPosition.IntermediateCatch } ev
-                                              && EventMatches(ev.Definition, trigger))) {
-                return await EventBasedGatewayHandler.TriggerAsync(this, definition, process, token, working, eb, trigger, context);
+                                              && FlowEventMatcher.Matches(ev.Definition, trigger))) {
+                return await EventBasedGatewayHandler.TriggerAsync(this, definition, process, token, working, eb, trigger, payload, context);
             }
 
-            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, context);
+            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, payload, context);
             if (eventSubProcess is not null) {
                 return eventSubProcess;
             }
 
-            return await EventBasedGatewayHandler.TriggerAsync(this, definition, process, token, working, eb, trigger, context);
+            return await EventBasedGatewayHandler.TriggerAsync(this, definition, process, token, working, eb, trigger, payload, context);
         }
 
         if (waitingAt is FlowEvent { Position: EventPosition.IntermediateCatch } catchEvent) {
-            if (EventMatches(catchEvent.Definition, trigger)) {
-                return await TriggerIntermediateCatchAsync(definition, process, token, working, catchEvent, trigger, context);
+            if (FlowEventMatcher.Matches(catchEvent.Definition, trigger)) {
+                return await TriggerIntermediateCatchAsync(definition, process, token, working, catchEvent, trigger, payload, context);
             }
 
-            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, context);
+            var eventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, payload, context);
             if (eventSubProcess is not null) {
                 return eventSubProcess;
             }
 
-            return await TriggerIntermediateCatchAsync(definition, process, token, working, catchEvent, trigger, context);
+            return await TriggerIntermediateCatchAsync(definition, process, token, working, catchEvent, trigger, payload, context);
         }
 
-        var waitingEventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, context);
+        var waitingEventSubProcess = await FireEventSubProcessAsync(definition, process, token, working, trigger, payload, context);
         if (waitingEventSubProcess is not null) {
             return waitingEventSubProcess;
         }
@@ -214,7 +219,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
               .OfType<FlowEvent>()
               .FirstOrDefault(e => e.Position == EventPosition.Boundary
                                 && e.AttachedTo == hostActivity
-                                && EventMatches(e.Definition, trigger));
+                                && FlowEventMatcher.Matches(e.Definition, trigger));
     }
 
     private static bool CanConsumeTrigger(ProcessDefinition definition, SchemataProcessToken token, IEventDefinition trigger) {
@@ -226,17 +231,17 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
             return definition.AllElements.OfType<EventSubProcess>()
                              .SelectMany(sp => sp.Children.OfType<FlowEvent>())
-                             .Any(e => e.Position == EventPosition.Start && EventMatches(e.Definition, trigger));
+                             .Any(e => e.Position == EventPosition.Start && FlowEventMatcher.Matches(e.Definition, trigger));
         }
 
         var waitingAt = definition.FindElementByName(token.WaitingAtName);
         if (waitingAt is EventBasedGateway gateway) {
             return definition.Outgoing(gateway).Any(f => f.Target is FlowEvent { Position: EventPosition.IntermediateCatch } ev
-                                                      && EventMatches(ev.Definition, trigger));
+                                                      && FlowEventMatcher.Matches(ev.Definition, trigger));
         }
 
         return waitingAt is FlowEvent { Position: EventPosition.IntermediateCatch } catchEvent
-            && EventMatches(catchEvent.Definition, trigger);
+            && FlowEventMatcher.Matches(catchEvent.Definition, trigger);
     }
 
     private async ValueTask<ProcessSnapshot?> FireEventSubProcessAsync(
@@ -245,10 +250,11 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         SchemataProcessToken       token,
         List<SchemataProcessToken> working,
         IEventDefinition           trigger,
+        object?                    payload,
         FlowExecutionContext       execution
     ) {
         var executor = new EventSubProcessExecutor();
-        return await executor.TryFireAsync(this, definition, process, token, working, trigger, execution);
+        return await executor.TryFireAsync(this, definition, process, token, working, trigger, payload, execution);
     }
 
     private async ValueTask<ProcessSnapshot> FireBoundaryAsync(
@@ -259,6 +265,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         Activity                   hostActivity,
         FlowEvent                  boundary,
         IEventDefinition           trigger,
+        object?                    payload,
         FlowExecutionContext       execution
     ) {
             var boundaryOutgoing = definition.FirstOutgoing(boundary);
@@ -269,7 +276,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         var variables = new Dictionary<string, int>();
-        var resolved  = await ResolveTargetAsync(definition, boundaryOutgoing.Target, variables, TokenView(hostToken), execution, process, hostToken);
+        var resolved  = await ResolveTargetAsync(definition, boundaryOutgoing.Target, variables, TokenView(hostToken), execution, process, hostToken, payload);
 
         var transitions = new List<SchemataProcessTransition>();
 
@@ -304,15 +311,12 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                 resolved,
                 trigger);
             transitions.Add(spawn);
-            if (working.FirstOrDefault(t => t.CanonicalName == spawn.Token) is { } spawned) {
-                await NotifyTokenForkedAsync(process, spawned, hostToken, execution);
-            }
         }
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
+        ClearCompletedRootScope(process, execution);
 
-        return Snapshot(process, working, transitions);
+        return Snapshot(process, working, transitions, execution);
     }
 
     public async ValueTask<ProcessSnapshot> AdvanceAsync(
@@ -323,7 +327,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         string?                             tokenName = null,
         CancellationToken                   ct        = default
     ) {
-        EnsureCompensationScope(process.CanonicalName);
+        LoadCompensationBindings(context);
 
         var token   = ResolveAddressedToken(process, tokens, tokenName);
         var working = tokens.ToList();
@@ -342,7 +346,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                 return await TryResumeCallActivityAsync(definition, process, token, working, callWait, context, ct);
             }
 
-            return Snapshot(process, working, []);
+            return Snapshot(process, working, [], context);
         }
 
         var current = definition.FindElementByName(token.StateName);
@@ -357,7 +361,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                 return await CompleteMultiInstanceAsync(definition, process, token, working, currentMultiActivity, currentMultiLoop, context, ct);
             }
 
-            return Snapshot(process, working, []);
+            return Snapshot(process, working, [], context);
         }
 
         if (current is Activity { LoopCharacteristics: StandardLoopCharacteristics currentLoop } currentLoopActivity) {
@@ -369,7 +373,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var variables = new Dictionary<string, int>();
         var outFlow   = await ResolveOutgoingAsync(definition, current, TokenView(token), variables, context, process, token);
         if (outFlow is null) {
-            return Snapshot(process, working, []);
+            return Snapshot(process, working, [], context);
         }
 
         if (outFlow.Target is FlowEvent { Position: EventPosition.End, IsTerminate: true } terminateEndEvent) {
@@ -378,7 +382,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         if (outFlow.Target is FlowEvent { Position: EventPosition.IntermediateThrow, Definition: CompensationDefinition compensationThrow } compensationThrowEvent) {
             if (current is Activity compensationActivity) {
-                RegisterCompensationBoundaries(definition, process, token, working, compensationActivity);
+                RegisterCompensationBoundaries(definition, process, token, working, compensationActivity, context);
             }
 
             return await ThrowIntermediateCompensationAsync(
@@ -393,7 +397,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         if (outFlow.Target is FlowEvent { Position: EventPosition.End, Definition: CancelDefinition } cancelEndEvent) {
             if (current is Activity cancelActivity) {
-                RegisterCompensationBoundaries(definition, process, token, working, cancelActivity);
+                RegisterCompensationBoundaries(definition, process, token, working, cancelActivity, context);
             }
 
             var transaction = await new TransactionExecutor().TryHandleCancelEndAsync(
@@ -413,7 +417,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         if (outFlow.Target is FlowEvent { Position: EventPosition.End, Definition: CompensationDefinition compensationEnd } compensationEndEvent) {
             if (current is Activity compensationActivity) {
-                RegisterCompensationBoundaries(definition, process, token, working, compensationActivity);
+                RegisterCompensationBoundaries(definition, process, token, working, compensationActivity, context);
             }
 
             return await ThrowEndCompensationAsync(
@@ -506,11 +510,15 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         if (outFlow.Target is EventBasedGateway ebGw) {
-            return EventBasedGatewayHandler.ArriveAtGateway(process, token, working, ebGw, current.Name);
+            return EventBasedGatewayHandler.ArriveAtGateway(process, token, working, ebGw, current.Name, context);
         }
 
         if (outFlow.Target is TransactionSubProcess tx) {
             return await EnterTransactionAsync(definition, process, token, working, tx, current.Name, context);
+        }
+
+        if (outFlow.Target is AdHocSubProcess adHoc) {
+            throw new InvalidOperationException($"BPMN definition shape '{adHoc.GetType().Name}' is not supported.");
         }
 
         if (outFlow.Target is SubProcess sp) {
@@ -536,7 +544,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var resolved = await ResolveTargetAsync(definition, outFlow.Target, variables, TokenView(token), context, process, token);
 
         if (current is Activity completedActivity) {
-            RegisterCompensationBoundaries(definition, process, token, working, completedActivity);
+            RegisterCompensationBoundaries(definition, process, token, working, completedActivity, context);
         }
 
         ApplyResolvedToToken(token, resolved);
@@ -559,9 +567,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
+        ClearCompletedRootScope(process, context);
 
-        return Snapshot(process, working, transitions);
+        return Snapshot(process, working, transitions, context);
     }
 
     public ValueTask<IReadOnlyList<string>> FindTriggerTargetsAsync(
@@ -610,12 +618,43 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
     }
 
     internal CompensationStack? TryGetCompensationStack(
+        ProcessDefinition                          definition,
         SchemataProcess                     process,
         SchemataProcessToken                token,
-        IReadOnlyList<SchemataProcessToken> working
+        IReadOnlyList<SchemataProcessToken> working,
+        FlowExecutionContext                execution
     ) {
         var owner = ScopeOwnerCanonicalName(process, token, working);
-        return owner is not null && _compensationScopes.TryGetValue(owner, out var stack) ? stack : null;
+        if (owner is null) {
+            return null;
+        }
+
+        var bindings = execution.CompensationBindings
+                                .Where(binding => binding.ScopeOwnerCanonicalName == owner)
+                                .OrderBy(binding => binding.RegistrationOrder)
+                                .ToList();
+        if (bindings.Count == 0) {
+            return null;
+        }
+
+        var stack = new CompensationStack();
+        foreach (var binding in bindings) {
+            if (definition.FindElementByName(binding.ActivityName) is not Activity activity) {
+                throw new InvalidOperationException(
+                    $"Compensation binding for activity '{binding.ActivityName}' is missing from process definition '{definition.Name}'.");
+            }
+
+            var boundary = CompensationBoundaryHandler.FindCompensationBoundaries(definition, activity).FirstOrDefault();
+            var handler = boundary is null ? null : CompensationBoundaryHandler.Build(definition, activity, boundary, this);
+            if (handler is null) {
+                throw new InvalidOperationException(
+                    $"Compensation binding for activity '{binding.ActivityName}' has no executable boundary handler.");
+            }
+
+            stack.Register(handler);
+        }
+
+        return stack;
     }
 
     private async ValueTask<ProcessSnapshot> ThrowIntermediateCompensationAsync(
@@ -634,7 +673,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             throwing,
             working,
             compensation,
+            execution,
             CompensationObservers(execution));
+        RemoveCompensatedBindings(process, throwing, working, execution, result.Transitions);
         var transitions = result.Transitions.ToList();
         if (result.FailureReason is not null) {
             return await RouteCompensationFailureAsync(definition, process, throwing, working, transitions, result, execution);
@@ -643,7 +684,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var outgoing = definition.FirstOutgoing(throwEvent);
         if (outgoing is null) {
             ApplyAggregateState(process, working);
-            return Snapshot(process, working, transitions);
+            return Snapshot(process, working, transitions, execution);
         }
 
         var variables = new Dictionary<string, int>();
@@ -666,8 +707,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             compensation.Name));
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
-        return Snapshot(process, working, transitions);
+        ClearCompletedRootScope(process, execution);
+        return Snapshot(process, working, transitions, execution);
     }
 
     private async ValueTask<ProcessSnapshot> ThrowEndCompensationAsync(
@@ -687,7 +728,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             throwing,
             working,
             compensation,
+            execution,
             CompensationObservers(execution));
+        RemoveCompensatedBindings(process, throwing, working, execution, result.Transitions);
         var transitions = result.Transitions.ToList();
         if (result.FailureReason is not null) {
             return await RouteCompensationFailureAsync(definition, process, throwing, working, transitions, result, execution);
@@ -708,8 +751,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             compensation.Name));
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
-        return Snapshot(process, working, transitions);
+        ClearCompletedRootScope(process, execution);
+        return Snapshot(process, working, transitions, execution);
     }
 
     private async ValueTask<ProcessSnapshot> RouteCompensationFailureAsync(
@@ -734,8 +777,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         if (routed.Count > 0) {
             transitions.AddRange(routed);
             ApplyAggregateState(process, working);
-            ClearCompletedRootScope(process);
-            return Snapshot(process, working, transitions);
+            ClearCompletedRootScope(process, execution);
+            return Snapshot(process, working, transitions, execution);
         }
 
         throwing.State       = "Failed";
@@ -746,42 +789,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
     internal IEnumerable<ICompensationLifecycleObserver> CompensationObservers(FlowExecutionContext execution) {
         return execution.Services.GetService<IEnumerable<ICompensationLifecycleObserver>>() ?? [];
-    }
-
-    private static IEnumerable<ITokenLifecycleObserver> TokenObservers(FlowExecutionContext execution) {
-        return execution.Services.GetService<IEnumerable<ITokenLifecycleObserver>>() ?? [];
-    }
-
-    private async Task NotifyTokenForkedAsync(
-        SchemataProcess      process,
-        SchemataProcessToken token,
-        SchemataProcessToken? spawner,
-        FlowExecutionContext execution
-    ) {
-        var tokenView   = TokenView(token);
-        var spawnerView = spawner is null ? null : TokenView(spawner);
-        foreach (var observer in TokenObservers(execution)) {
-            try {
-                await observer.OnTokenForkedAsync(process, tokenView, spawnerView);
-            } catch {
-            }
-        }
-    }
-
-    private async Task NotifyTokenJoinedAsync(
-        SchemataProcess                     process,
-        SchemataProcessToken                output,
-        IReadOnlyList<SchemataProcessToken> inputs,
-        FlowExecutionContext                execution
-    ) {
-        var outputView = TokenView(output);
-        var inputViews = inputs.Select(TokenView).ToList();
-        foreach (var observer in TokenObservers(execution)) {
-            try {
-                await observer.OnTokenJoinedAsync(process, outputView, inputViews);
-            } catch {
-            }
-        }
     }
 
     private async ValueTask<SchemataProcessTransition?> TryResumeParentAsync(
@@ -818,13 +825,13 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         var outFlow = definition.FirstOutgoing(sp);
         if (outFlow is null) {
-            RemoveCompensationScope(parent.CanonicalName);
+            RemoveCompensationScope(parent.CanonicalName, execution);
             parent.State       = "Completed";
             parent.WaitingAtName = null;
             return null;
         }
 
-        RemoveCompensationScope(parent.CanonicalName);
+        RemoveCompensationScope(parent.CanonicalName, execution);
 
         if (sp is EventSubProcess && completed.Spawner is not null) {
             var spawning = working.FirstOrDefault(t => t.CanonicalName == completed.Spawner);
@@ -847,7 +854,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             "ExitSubProcess");
     }
 
-    private static ProcessSnapshot StartIntoEventBased(SchemataProcess process, EventBasedGateway eb) {
+    private static ProcessSnapshot StartIntoEventBased(SchemataProcess process, EventBasedGateway eb, FlowExecutionContext execution) {
         var token      = NewRootToken(process, new(eb.Name, eb.Name, false));
         var transition = NewTransition(
             process.Name!,
@@ -860,9 +867,10 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         process.State = "Waiting";
 
         return new() {
-            Process     = process,
-            Tokens      = [token],
-            Transitions = [transition],
+            Process              = process,
+            Tokens               = [token],
+            Transitions          = [transition],
+            CompensationBindings = [..execution.CompensationBindings],
         };
     }
 
@@ -890,9 +898,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
+        ClearCompletedRootScope(process, execution);
 
-        return Snapshot(process, working, transitions);
+        return Snapshot(process, working, transitions, execution);
     }
 
     private async ValueTask<ProcessSnapshot> StartIntoTransactionAsync(
@@ -925,7 +933,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [parentTransition, spawn]);
+        return Snapshot(process, working, [parentTransition, spawn], context);
     }
 
     private async ValueTask<ProcessSnapshot> StartIntoMultiInstanceAsync(
@@ -981,7 +989,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [arrivalTransition, spawn]);
+        return Snapshot(process, working, [arrivalTransition, spawn], context);
     }
 
     private async ValueTask<ProcessSnapshot> EnterTransactionAsync(
@@ -1071,7 +1079,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var executor = new CallActivityExecutor(context.Services, context.UnitOfWork);
         var completion = await executor.TryCompleteAsync(process, token, call, ct);
         if (completion is null) {
-            return Snapshot(process, working, []);
+            return Snapshot(process, working, [], context);
         }
 
         if (completion.Failed) {
@@ -1089,7 +1097,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             failTransition.Note = completion.ChildProcess;
 
             ApplyAggregateState(process, working);
-            return Snapshot(process, working, [failTransition]);
+            return Snapshot(process, working, [failTransition], context);
         }
 
         var outFlow = definition.FirstOutgoing(call);
@@ -1097,7 +1105,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             token.State       = "Completed";
             token.WaitingAtName = null;
             ApplyAggregateState(process, working);
-            return Snapshot(process, working, []);
+            return Snapshot(process, working, [], context);
         }
 
         var variables = new Dictionary<string, int>();
@@ -1115,7 +1123,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [transition]);
+        return Snapshot(process, working, [transition], context);
     }
 
 
@@ -1134,7 +1142,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         parent.State       = "Waiting";
         parent.StateName     = sp.Name;
         parent.WaitingAtName = sp.Name;
-        EnsureCompensationScope(parent.CanonicalName);
 
         var parkTransition = includeParkTransition
             ? NewTransition(
@@ -1161,7 +1168,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         };
 
         working.Add(child);
-        await NotifyTokenForkedAsync(process, child, parent, execution);
 
         var spawnTransition = NewTransition(
             process.Name!,
@@ -1195,7 +1201,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [arrivalTransition, spawned.spawnTransition]);
+        return Snapshot(process, working, [arrivalTransition, spawned.spawnTransition], execution);
     }
 
     internal async ValueTask<ProcessSnapshot> SpawnFromGatewayAsync(
@@ -1214,7 +1220,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             var resolved = await ResolveTargetAsync(definition, flow.Target, variables, EmptyTokenView(process), execution, process);
             var child    = NewRootToken(process, resolved);
             spawned.Add(child);
-            await NotifyTokenForkedAsync(process, child, null, execution);
             transitions.Add(NewTransition(
                 process.Name!,
                 child.CanonicalName,
@@ -1237,11 +1242,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, spawned);
 
-        return new() {
-            Process     = process,
-            Tokens      = [..spawned],
-            Transitions = [..allTransitions],
-        };
+        return Snapshot(process, spawned, allTransitions, execution);
     }
 
     internal async ValueTask<ProcessSnapshot> BranchFromTokenAsync(
@@ -1274,7 +1275,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             var resolved = await ResolveTargetAsync(definition, flow.Target, variables, TokenView(token), execution, process, token);
             var child    = NewChildToken(process, resolved, token);
             working.Add(child);
-            await NotifyTokenForkedAsync(process, child, token, execution);
 
             transitions.Add(NewTransition(
                 process.Name!,
@@ -1287,11 +1287,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return new() {
-            Process     = process,
-            Tokens      = [..working],
-            Transitions = [..transitions],
-        };
+        return Snapshot(process, working, transitions, execution);
     }
 
     internal async ValueTask<ProcessSnapshot> FireJoinAsync(
@@ -1332,7 +1328,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var resolved  = await ResolveTargetAsync(definition, outFlow.Target, variables, TokenView(token), execution, process, token);
         var output    = NewChildToken(process, resolved, token);
         working.Add(output);
-        await NotifyTokenJoinedAsync(process, output, [token, .. captured], execution);
 
         var joinTransition = NewTransition(
             process.Name!,
@@ -1344,7 +1339,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [arrivalTransition, joinTransition]);
+        return Snapshot(process, working, [arrivalTransition, joinTransition], execution);
     }
 
     internal async ValueTask<ProcessSnapshot> RouteSingleEventBasedAsync(
@@ -1355,6 +1350,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         EventBasedGateway          gateway,
         SequenceFlow               matchedFlow,
         IEventDefinition           trigger,
+        object?                    payload,
         FlowExecutionContext       execution
     ) {
         if (matchedFlow.Target is not FlowEvent catchEvent) {
@@ -1363,7 +1359,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                 new Dictionary<string, string?> { ["name"] = matchedFlow.Target.Name });
         }
         var variables  = new Dictionary<string, int>();
-        var resolved   = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token);
+        var resolved   = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token, payload);
 
         ApplyResolvedToToken(token, resolved);
         ApplyAggregateState(process, working);
@@ -1376,7 +1372,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             TransitionKind.Move,
             trigger.Name);
 
-        return Snapshot(process, working, [transition]);
+        return Snapshot(process, working, [transition], execution);
     }
 
     internal async ValueTask<ProcessSnapshot> SpawnFromEventBasedAsync(
@@ -1387,6 +1383,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         EventBasedGateway           gateway,
         IReadOnlyList<SequenceFlow> matched,
         IEventDefinition            trigger,
+        object?                     payload,
         FlowExecutionContext        execution
     ) {
         token.State       = "Completed";
@@ -1408,10 +1405,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             if (flow.Target is not FlowEvent catchEvent) {
                 continue;
             }
-            var resolved   = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token);
+            var resolved   = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token, payload);
             var child      = NewChildToken(process, resolved, token);
             working.Add(child);
-            await NotifyTokenForkedAsync(process, child, token, execution);
 
             transitions.Add(NewTransition(
                 process.Name!,
@@ -1423,9 +1419,9 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         ApplyAggregateState(process, working);
-        ClearCompletedRootScope(process);
+        ClearCompletedRootScope(process, execution);
 
-        return Snapshot(process, working, transitions);
+        return Snapshot(process, working, transitions, execution);
     }
 
     private async ValueTask<ProcessSnapshot> TriggerIntermediateCatchAsync(
@@ -1435,9 +1431,10 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         List<SchemataProcessToken> working,
         FlowEvent                  catchEvent,
         IEventDefinition           trigger,
+        object?                    payload,
         FlowExecutionContext       execution
     ) {
-        if (!EventMatches(catchEvent.Definition, trigger)) {
+        if (!FlowEventMatcher.Matches(catchEvent.Definition, trigger)) {
             throw new InvalidArgumentException(
                 SchemataResources.BPMN_INVALID_TRIGGER,
                 new Dictionary<string, string?> {
@@ -1447,7 +1444,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         var variables = new Dictionary<string, int>();
-        var resolved  = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token);
+        var resolved  = await ResolveCatchDownstreamAsync(definition, catchEvent, TokenView(token), variables, execution, process, token, payload);
 
         ApplyResolvedToToken(token, resolved);
         ApplyAggregateState(process, working);
@@ -1460,7 +1457,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             TransitionKind.Move,
             trigger.Name);
 
-        return Snapshot(process, working, [transition]);
+        return Snapshot(process, working, [transition], execution);
     }
 
     private async ValueTask<TargetState> ResolveCatchDownstreamAsync(
@@ -1470,14 +1467,15 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         Dictionary<string, int>     variables,
         FlowExecutionContext        execution,
         SchemataProcess             process,
-        SchemataProcessToken?       tokenEntity = null
+        SchemataProcessToken?       tokenEntity = null,
+        object?                     payload     = null
     ) {
         var outgoing = definition.Outgoing(catchEvent).ToList();
         if (outgoing.Count == 0) {
             return new(catchEvent.Name, null, false);
         }
 
-        return await ResolveTargetAsync(definition, outgoing[0].Target, variables, token, execution, process, tokenEntity);
+        return await ResolveTargetAsync(definition, outgoing[0].Target, variables, token, execution, process, tokenEntity, payload);
     }
 
     internal ProcessSnapshot ParkAtGateway(
@@ -1485,7 +1483,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         SchemataProcessToken       token,
         List<SchemataProcessToken> working,
         FlowElement                gateway,
-        string?                    previousState
+        string?                    previousState,
+        FlowExecutionContext       execution
     ) {
         var arrivalTransition = NewTransition(
             process.Name!,
@@ -1501,7 +1500,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, working);
 
-        return Snapshot(process, working, [arrivalTransition]);
+        return Snapshot(process, working, [arrivalTransition], execution);
     }
 
     private async ValueTask<ProcessSnapshot> PassThroughGatewayAsync(
@@ -1528,7 +1527,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
             TransitionKind.Move,
             "Advance");
 
-        return Snapshot(process, working, [transition]);
+        return Snapshot(process, working, [transition], execution);
     }
 
     private async ValueTask<ProcessSnapshot> TerminateScopeAsync(
@@ -1578,12 +1577,12 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
             ApplyAggregateState(process, working);
         } else {
-            RemoveCompensationScope(scopeOwner);
+            RemoveCompensationScope(scopeOwner, execution);
             ApplyAggregateState(process, working);
             process.State = "Terminated";
         }
 
-        return Snapshot(process, working, transitions);
+        return Snapshot(process, working, transitions, execution);
     }
 
     private async ValueTask<SequenceFlow?> ResolveOutgoingAsync(
@@ -1593,7 +1592,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         Dictionary<string, int>     variables,
         FlowExecutionContext        execution,
         SchemataProcess             process,
-        SchemataProcessToken?       tokenEntity = null
+        SchemataProcessToken?       tokenEntity = null,
+        object?                     payload     = null
     ) {
         var outgoing = definition.Outgoing(source).ToList();
 
@@ -1606,7 +1606,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         if (source is ExclusiveGateway xg) {
-            return await ResolveExclusiveAsync(definition, xg, outgoing, token, variables, execution, process, tokenEntity);
+            return await ResolveExclusiveAsync(definition, xg, outgoing, token, variables, execution, process, tokenEntity, payload);
         }
 
         if (source is Activity) {
@@ -1628,9 +1628,10 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         Dictionary<string, int>     variables,
         FlowExecutionContext        execution,
         SchemataProcess?            process     = null,
-        SchemataProcessToken?       tokenEntity = null
+        SchemataProcessToken?       tokenEntity = null,
+        object?                     payload     = null
     ) {
-        var ctx = BuildConditionContext(definition, token, gateway.Name, execution, variables, process, tokenEntity);
+        var ctx = BuildConditionContext(definition, token, gateway.Name, execution, variables, process, tokenEntity, payload);
 
         SequenceFlow? defaultFlow = null;
 
@@ -1699,6 +1700,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         FlowExecutionContext        execution,
         SchemataProcess?            process     = null,
         SchemataProcessToken?       tokenEntity = null,
+        object?                     payload     = null,
         HashSet<FlowElement>?       visited = null
     ) {
         visited ??= [];
@@ -1709,6 +1711,19 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         switch (target) {
+            case ProcedureTaskBase procedure when process is not null && tokenEntity is not null: {
+                var task = new FlowTaskContext(definition, process, tokenEntity, execution, payload);
+                await procedure.InvokeAsync(task);
+
+                var flow = await ResolveOutgoingAsync(definition, procedure, token, variables, execution, process, tokenEntity, payload);
+                return flow is null
+                    ? new(procedure.Name, null, false)
+                    : await ResolveTargetAsync(definition, flow.Target, variables, token, execution, process, tokenEntity, payload, visited);
+            }
+
+            case AdHocSubProcess adHoc:
+                throw new InvalidOperationException($"BPMN definition shape '{adHoc.GetType().Name}' is not supported.");
+
             case SubProcess sp:
                 return new(sp.Name, sp.Name, false);
 
@@ -1745,14 +1760,14 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
             case ExclusiveGateway xg: {
                 var outgoing = definition.Outgoing(xg).ToList();
-                var flow     = await ResolveExclusiveAsync(definition, xg, outgoing, token, variables, execution, process, tokenEntity);
+                var flow     = await ResolveExclusiveAsync(definition, xg, outgoing, token, variables, execution, process, tokenEntity, payload);
                 if (flow is null) {
                     throw new FailedPreconditionException(
                         SchemataResources.STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING,
                         new Dictionary<string, string?> { ["name"] = xg.Name });
                 }
 
-                return await ResolveTargetAsync(definition, flow.Target, variables, token, execution, process, tokenEntity, visited);
+                return await ResolveTargetAsync(definition, flow.Target, variables, token, execution, process, tokenEntity, payload, visited);
             }
 
             case EventBasedGateway eb:
@@ -1806,32 +1821,6 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         };
     }
 
-    internal static bool EventMatches(IEventDefinition? definition, IEventDefinition trigger) {
-        if (definition is null) {
-            return false;
-        }
-
-        if (ReferenceEquals(definition, trigger)) {
-            return true;
-        }
-
-        if (definition is ErrorDefinition expectedError && trigger is ErrorDefinition actualError) {
-            return expectedError.ExceptionType == actualError.ExceptionType
-                || string.Equals(expectedError.Name, actualError.Name, StringComparison.Ordinal);
-        }
-
-        if (definition is EscalationDefinition expectedEscalation && trigger is EscalationDefinition actualEscalation) {
-            if (expectedEscalation.EscalationCode is null) {
-                return true;
-            }
-
-            return string.Equals(expectedEscalation.EscalationCode, actualEscalation.EscalationCode, StringComparison.Ordinal);
-        }
-
-        return string.Equals(definition.Name, trigger.Name, StringComparison.Ordinal)
-            && definition.GetType() == trigger.GetType();
-    }
-
     private static bool IsJoin(ProcessDefinition definition, Gateway gateway) {
         return definition.Incoming(gateway).Count > 1;
     }
@@ -1850,44 +1839,68 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         SchemataProcess            process,
         SchemataProcessToken       completed,
         IReadOnlyList<SchemataProcessToken> working,
-        Activity                   activity
+        Activity                   activity,
+        FlowExecutionContext       execution
     ) {
         var owner = ScopeOwnerCanonicalName(process, completed, working);
         if (owner is null) {
             return;
         }
 
-        var stack = EnsureCompensationScope(owner);
-        CompensationBoundaryHandler.RegisterAll(definition, activity, stack, this);
+        var order = execution.CompensationBindings
+                             .Where(binding => binding.ScopeOwnerCanonicalName == owner)
+                             .Select(binding => binding.RegistrationOrder)
+                             .DefaultIfEmpty(-1)
+                             .Max() + 1;
+        foreach (var boundary in CompensationBoundaryHandler.FindCompensationBoundaries(definition, activity)) {
+            if (CompensationBoundaryHandler.Build(definition, activity, boundary, this) is not null) {
+                execution.CompensationBindings.Add(new(owner, activity.Name, order++));
+            }
+        }
     }
 
-    internal CompensationStack EnsureCompensationScope(string? scopeOwnerCanonicalName) {
-        if (string.IsNullOrEmpty(scopeOwnerCanonicalName)) {
-            throw new InvalidOperationException("A compensation scope owner canonical name is required.");
-        }
-
-        if (!_compensationScopes.TryGetValue(scopeOwnerCanonicalName, out var stack)) {
-            stack = new();
-            _compensationScopes.Add(scopeOwnerCanonicalName, stack);
-        }
-
-        return stack;
-    }
-
-    internal void RemoveCompensationScope(string? scopeOwnerCanonicalName) {
+    internal void RemoveCompensationScope(string? scopeOwnerCanonicalName, FlowExecutionContext execution) {
         if (string.IsNullOrEmpty(scopeOwnerCanonicalName)) {
             return;
         }
 
-        if (_compensationScopes.Remove(scopeOwnerCanonicalName, out var stack)) {
-            stack.Clear();
+        execution.CompensationBindings.RemoveAll(binding => binding.ScopeOwnerCanonicalName == scopeOwnerCanonicalName);
+    }
+
+    internal static void RemoveCompensatedBindings(
+        SchemataProcess                     process,
+        SchemataProcessToken                throwing,
+        IReadOnlyList<SchemataProcessToken> working,
+        FlowExecutionContext                execution,
+        IReadOnlyList<SchemataProcessTransition> transitions
+    ) {
+        var owner = ScopeOwnerCanonicalName(process, throwing, working);
+        if (owner is null) {
+            return;
+        }
+
+        foreach (var transition in transitions.Where(transition => transition.Kind == TransitionKind.Compensate && transition.Previous is not null)) {
+            var index = execution.CompensationBindings.FindLastIndex(binding =>
+                binding.ScopeOwnerCanonicalName == owner && binding.ActivityName == transition.Previous);
+            if (index >= 0) {
+                execution.CompensationBindings.RemoveAt(index);
+            }
         }
     }
 
-    internal void ClearCompletedRootScope(SchemataProcess process) {
+    internal void ClearCompletedRootScope(SchemataProcess process, FlowExecutionContext execution) {
         if (string.Equals(process.State, "Completed", StringComparison.OrdinalIgnoreCase)) {
-            RemoveCompensationScope(process.CanonicalName);
+            RemoveCompensationScope(process.CanonicalName, execution);
         }
+    }
+
+    private static void LoadCompensationBindings(FlowExecutionContext execution) {
+        if (execution.CompensationBindingsLoaded) {
+            return;
+        }
+
+        execution.CompensationBindings.AddRange(execution.LoadedCompensationBindings);
+        execution.CompensationBindingsLoaded = true;
     }
 
     private static string? ScopeOwnerCanonicalName(
@@ -2066,12 +2079,14 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
     internal static ProcessSnapshot Snapshot(
         SchemataProcess                          process,
         IReadOnlyList<SchemataProcessToken>      tokens,
-        IReadOnlyList<SchemataProcessTransition> transitions
+        IReadOnlyList<SchemataProcessTransition> transitions,
+        FlowExecutionContext                     execution
     ) {
         return new() {
-            Process     = process,
-            Tokens      = [..tokens],
-            Transitions = [..transitions],
+            Process              = process,
+            Tokens               = [..tokens],
+            Transitions          = [..transitions],
+            CompensationBindings = [..execution.CompensationBindings],
         };
     }
 

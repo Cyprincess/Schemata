@@ -129,4 +129,14 @@ public class RepositoryQueryShould : IAsyncLifetime
             Assert.Equal(3L, count);
         }
     }
+
+    [Fact]
+    public async Task EstimateCountAsync_ReturnsExactPipelinedCount() {
+        var (repository, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            var count = await repository.EstimateCountAsync(q => q.Where(student => student.Grade == 2));
+
+            Assert.Equal(2L, count);
+        }
+    }
 }

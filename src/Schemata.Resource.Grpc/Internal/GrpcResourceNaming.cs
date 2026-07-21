@@ -68,6 +68,14 @@ public static class GrpcResourceNaming
     /// <param name="verb">The AIP-136 custom method verb.</param>
     /// <returns>The custom RPC method name.</returns>
     public static string CustomMethodName(ResourceNameDescriptor descriptor, string verb) {
-        return ResourceMethodNaming.GetRpcName(verb, descriptor.Singular);
+        return GetRpcName(verb, descriptor.Singular);
+    }
+
+    private static string GetRpcName(string verb, string singular) {
+        if (string.IsNullOrEmpty(verb)) {
+            return singular;
+        }
+
+        return $"{char.ToUpperInvariant(verb[0])}{verb[1..]}{singular}";
     }
 }

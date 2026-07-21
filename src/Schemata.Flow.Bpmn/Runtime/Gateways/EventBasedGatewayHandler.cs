@@ -30,12 +30,13 @@ public static class EventBasedGatewayHandler
         List<SchemataProcessToken> working,
         EventBasedGateway         gateway,
         IEventDefinition          trigger,
+        object?                    payload,
         FlowExecutionContext      execution
     ) {
         var outgoing = definition.Outgoing(gateway).ToList();
         var matched  = outgoing
                      .Where(f => f.Target is FlowEvent { Position: EventPosition.IntermediateCatch } ev
-                              && BpmnEngine.EventMatches(ev.Definition, trigger))
+                              && FlowEventMatcher.Matches(ev.Definition, trigger))
                      .ToList();
 
         if (matched.Count == 0) {
@@ -48,10 +49,10 @@ public static class EventBasedGatewayHandler
         }
 
         if (gateway.Parallel) {
-            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, execution);
+            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, payload, execution);
         }
 
-        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, execution);
+        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, payload, execution);
     }
 
     /// <summary>
@@ -64,7 +65,8 @@ public static class EventBasedGatewayHandler
         SchemataProcessToken       token,
         List<SchemataProcessToken> working,
         EventBasedGateway          eb,
-        string?                    previousState
+        string?                    previousState,
+        FlowExecutionContext       execution
     ) {
         var parked = previousState ?? eb.Name;
         var arrivalTransition = BpmnEngine.NewTransition(
@@ -81,6 +83,6 @@ public static class EventBasedGatewayHandler
 
         BpmnEngine.ApplyAggregateState(process, working);
 
-        return BpmnEngine.Snapshot(process, working, [arrivalTransition]);
+        return BpmnEngine.Snapshot(process, working, [arrivalTransition], execution);
     }
 }

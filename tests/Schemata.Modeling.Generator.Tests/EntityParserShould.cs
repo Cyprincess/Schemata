@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class EntityParserShould
 {
     [Fact]
-    public void Parse_BasicEntity() {
+    public void Parse_EntityWithSingleField_BindsNameAndFieldName() {
         var input  = "Entity User {\n  string email_address\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -16,7 +16,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithBases() {
+    public void Parse_EntityWithCommaSeparatedBases_BindsBaseNamesInOrder() {
         var input  = "Entity User : BaseEntity, Auditable {\n  string name\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -26,7 +26,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithUses() {
+    public void Parse_EntityWithSingleUse_RegistersUseReference() {
         var input  = "Entity User {\n  Use Entity\n  string name\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -35,7 +35,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithMultipleUses() {
+    public void Parse_EntityWithCommaSeparatedUses_BindsQualifiedNames() {
         var input  = "Entity User {\n  Use Identifier, Timestamp\n  string name\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -44,7 +44,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithNestedEnum() {
+    public void Parse_EntityWithNestedEnum_RegistersEnumerationAndSiblingFields() {
         var input  = "Entity Post {\n  Enum Status {\n    Draft\n    Published\n  }\n  string title\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -54,7 +54,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithView() {
+    public void Parse_EntityWithObjectView_BindsViewNameAndFieldCount() {
         var input  = "Entity User {\n  string name\n  Object response {\n    name\n  }\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -64,7 +64,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithPointer() {
+    public void Parse_EntityWithBTreePointer_RegistersPointerAndField() {
         var input  = "Entity Post {\n  long category_id\n  Index category_id [b tree]\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -75,7 +75,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithNote() {
+    public void Parse_EntityWithSingleNote_RegistersNoteText() {
         var input  = "Entity User {\n  Note 'A user entity'\n  string name\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -84,7 +84,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithAllMembers() {
+    public void Parse_EntityWithAllMemberKinds_RegistersNoteUseEnumFieldsPointerAndView() {
         var input = """
             Entity Post {
               Note 'A blog post'
@@ -120,7 +120,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_CaseInsensitive() {
+    public void Parse_LowercaseEntityKeyword_StillBindsPascalCaseName() {
         var input  = "entity User {\n  string name\n}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);
@@ -128,7 +128,7 @@ public class EntityParserShould
     }
 
     [Fact]
-    public void Parse_EntityWithEmptyBody() {
+    public void Parse_EmptyBodyEntity_BindsNameAndZeroFieldCount() {
         var input  = "Entity Empty {}";
         var result = Parser.Entity.Parse(input);
         Assert.NotNull(result);

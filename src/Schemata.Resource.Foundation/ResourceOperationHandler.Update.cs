@@ -100,6 +100,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity is null) {
+            if (request is IAllowMissing { AllowMissing: true }) {
+                return await CreateMissingAsync(ctx, name, request, principal, ct, finalize);
+            }
+
             throw ResourceNotFound(name);
         }
 
@@ -133,6 +137,59 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             ctx,
             () => Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
                          .RunAsync(ctx, entity, detail, principal, ct), () => ResourceNotFound(name));
+        return responseResult ?? new() { Detail = detail };
+    }
+
+    private async Task<UpdateResultBase<TDetail>> CreateMissingAsync(
+        AdviceContext     ctx,
+        string            name,
+        TRequest          request,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct,
+        bool              finalize
+    ) {
+        var container = new ResourceRequestContainer<TEntity>();
+        ResourceIdentifiers.Apply(container, name);
+
+        var requestResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
+            ctx,
+            () => Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
+                         .RunAsync(ctx, request, container, principal, ct), CollectionNotFound);
+        if (requestResult is not null) {
+            return requestResult;
+        }
+
+        var entity = _mapper.Map<TRequest, TEntity>(request);
+        if (entity is null) {
+            throw new ValidationException([new() {
+                Field       = nameof(request),
+                Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAYLOAD),
+                Reason      = SchemataResources.INVALID_PAYLOAD,
+            }]);
+        }
+
+        var entityResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
+            ctx,
+            () => Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
+                         .RunAsync(ctx, request, entity, principal, ct), CollectionNotFound);
+        if (entityResult is not null) {
+            return entityResult;
+        }
+
+        await _repository.AddAsync(entity, ct);
+
+        if (!finalize) {
+            var staged = _mapper.Map<TEntity, TDetail>(entity);
+            return new() { Detail = staged };
+        }
+
+        await _repository.CommitAsync(ct);
+
+        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var responseResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
+            ctx,
+            () => Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
+                         .RunAsync(ctx, entity, detail, principal, ct), CollectionNotFound);
         return responseResult ?? new() { Detail = detail };
     }
 

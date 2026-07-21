@@ -1,23 +1,17 @@
 using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Linq;
 using System.Security.Cryptography;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
-using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
-using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Authorization.Skeleton.Models;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -25,86 +19,163 @@ namespace Schemata.Authorization.Tests;
 
 public class DiscoveryHandlerShould
 {
-    private const string Issuer = "https://auth.example.com";
+    private static readonly string[] RsaPrivateMembers  = ["d", "p", "q", "dp", "dq", "qi", "oth"];
+    private static readonly string[] EcdsaPrivateMembers = ["d"];
+    private static readonly string[] SharedSecretMembers = ["k", "key_ops"];
 
-    private static readonly RSA            Rsa        = RSA.Create(2048);
-    private static readonly RsaSecurityKey SigningKey = new(Rsa);
+    // Mirrors the options wired by SchemataJsonSerializerFeature so assertions cover the real wire.
+    private static readonly JsonSerializerOptions WireOptions = new() {
+        DictionaryKeyPolicy    = JsonNamingPolicy.SnakeCaseLower,
+        PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
-    private static DiscoveryHandler<SchemataScope> CreateHandler(
-        out DefaultHttpContext      httpContext,
-        Action<IServiceCollection>? configure = null
-    ) {
-        var options = Options.Create(new SchemataAuthorizationOptions {
-            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
+    private static DiscoveryHandler<SchemataScope> CreateHandler(SecurityKey? signingKey, string? algorithm) {
+        var opts = Options.Create(new SchemataAuthorizationOptions {
+            SigningKey = signingKey, SigningAlgorithm = algorithm,
         });
 
-        var services = new ServiceCollection();
-        services.AddSingleton(options);
-
-        configure?.Invoke(services);
-
-        var sp = services.BuildServiceProvider();
-
-        httpContext                = new() { RequestServices = sp };
-        httpContext.Request.Scheme = "https";
-        httpContext.Request.Host   = new("auth.example.com");
-
-        var scopesMock = new Mock<IScopeManager<SchemataScope>>();
-        scopesMock.Setup(m => m.ListAsync(It.IsAny<IEnumerable<string>?>(), It.IsAny<CancellationToken>()))
-                  .Returns(EmptyAsyncEnumerable<SchemataScope>());
-
-        return new(options, scopesMock.Object, sp);
+        return new(opts, new Mock<IScopeManager<SchemataScope>>().Object, new Mock<IServiceProvider>().Object);
     }
 
-    private static DiscoveryDocument ExtractDocument(AuthorizationResult result) {
-        Assert.Equal(AuthorizationStatus.Content, result.Status);
-        return Assert.IsType<DiscoveryDocument>(result.Data);
+    private static JsonElement GetOnlyKey(AuthorizationResult result) {
+        var json = JsonSerializer.Serialize(result.Data, WireOptions);
+        using var doc = JsonDocument.Parse(json);
+
+        var keys = doc.RootElement.GetProperty("keys");
+        Assert.Equal(1, keys.GetArrayLength());
+
+        return keys[0].Clone();
     }
 
-    private static async IAsyncEnumerable<T> EmptyAsyncEnumerable<T>(
-        [EnumeratorCancellation] CancellationToken ct = default
-    ) {
-        await Task.CompletedTask;
-        yield break;
+    private static string[] MemberNames(JsonElement entry) {
+        return [..entry.EnumerateObject().Select(p => p.Name)];
+    }
+
+    private static void AssertNoPrivateMaterial(JsonElement entry, params string[] members) {
+        foreach (var member in members.Concat(SharedSecretMembers)) {
+            Assert.False(entry.TryGetProperty(member, out _), $"JWKS entry must not contain '{member}'");
+        }
     }
 
     [Fact]
-    public async Task GetDiscovery_ComposesMultipleAdvisors() {
-        var handler = CreateHandler(out var http, services => {
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientCredentials>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRefreshToken>());
-            services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIntrospection>());
-        });
+    public void PublishesOnlyPublicParameters_WhenSigningKeyIsRsa() {
+        using var rsa = RSA.Create(2048);
+        var handler = CreateHandler(new RsaSecurityKey(rsa), SigningAlgorithms.RsaSha256);
 
-        var result   = await handler.GetDiscoveryDocumentAsync(Issuer, http.RequestAborted);
-        var document = ExtractDocument(result);
+        var entry = GetOnlyKey(handler.GetJwks());
 
-        Assert.Equal($"{Issuer}/Connect/Token", document.TokenEndpoint);
-        Assert.Equal($"{Issuer}/Connect/Introspect", document.IntrospectionEndpoint);
-        Assert.NotNull(document.GrantTypesSupported);
-        Assert.Contains("client_credentials", document.GrantTypesSupported);
-        Assert.Contains("refresh_token", document.GrantTypesSupported);
+        Assert.Equal(["kty", "use", "alg", "kid", "n", "e"], MemberNames(entry));
+        Assert.Equal("RSA", entry.GetProperty("kty").GetString());
+        Assert.Equal("sig", entry.GetProperty("use").GetString());
+        Assert.Equal(SigningAlgorithms.RsaSha256, entry.GetProperty("alg").GetString());
+        Assert.Equal(JsonValueKind.Null, entry.GetProperty("kid").ValueKind);
+
+        var parameters = rsa.ExportParameters(false);
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Modulus!), entry.GetProperty("n").GetString());
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Exponent!), entry.GetProperty("e").GetString());
+
+        AssertNoPrivateMaterial(entry, RsaPrivateMembers);
     }
 
     [Fact]
-    public void GetJwks_ReturnsPublicSigningKey() {
-        var handler = CreateHandler(out var _);
-        var result  = handler.GetJwks();
+    public void PublishesOnlyPublicParameters_WhenSigningKeyIsRsaParameters() {
+        using var rsa = RSA.Create(2048);
+        var handler = CreateHandler(new RsaSecurityKey(rsa.ExportParameters(true)), SigningAlgorithms.RsaSha256);
 
-        Assert.Equal(AuthorizationStatus.Content, result.Status);
-        var jwks = Assert.IsType<Dictionary<string, object>>(result.Data);
+        var entry = GetOnlyKey(handler.GetJwks());
 
-        Assert.True(jwks.ContainsKey("keys"));
-        var keys = (Dictionary<string, string?>[]?)jwks["keys"];
-        Assert.NotNull(keys);
-        Assert.Single(keys);
+        Assert.Equal(["kty", "use", "alg", "kid", "n", "e"], MemberNames(entry));
 
-        var key = keys[0];
-        Assert.Equal("RSA", key["kty"]);
-        Assert.Equal("sig", key["use"]);
-        Assert.Equal("RS256", key["alg"]);
-        Assert.NotNull(key["n"]);
-        Assert.NotNull(key["e"]);
+        var parameters = rsa.ExportParameters(false);
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Modulus!), entry.GetProperty("n").GetString());
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Exponent!), entry.GetProperty("e").GetString());
+
+        AssertNoPrivateMaterial(entry, RsaPrivateMembers);
+    }
+
+    [Fact]
+    public void PublishesOnlyPublicParameters_WhenSigningKeyIsEcdsa() {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var key = new ECDsaSecurityKey(ecdsa) { KeyId = "ec-key-1" };
+        var handler = CreateHandler(key, SigningAlgorithms.EcdsaSha256);
+
+        var entry = GetOnlyKey(handler.GetJwks());
+
+        Assert.Equal(["kty", "use", "alg", "kid", "crv", "x", "y"], MemberNames(entry));
+        Assert.Equal("EC", entry.GetProperty("kty").GetString());
+        Assert.Equal("sig", entry.GetProperty("use").GetString());
+        Assert.Equal(SigningAlgorithms.EcdsaSha256, entry.GetProperty("alg").GetString());
+        Assert.Equal("ec-key-1", entry.GetProperty("kid").GetString());
+        Assert.Equal("P-256", entry.GetProperty("crv").GetString());
+
+        var parameters = ecdsa.ExportParameters(false);
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Q.X!), entry.GetProperty("x").GetString());
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Q.Y!), entry.GetProperty("y").GetString());
+
+        AssertNoPrivateMaterial(entry, EcdsaPrivateMembers);
+    }
+
+    [Fact]
+    public void PublishesLeafCertificate_WhenSigningKeyIsX509() {
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest("cn=jwks-test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var handler = CreateHandler(new X509SecurityKey(certificate), SigningAlgorithms.RsaSha256);
+
+        var entry = GetOnlyKey(handler.GetJwks());
+
+        Assert.Equal(["kty", "use", "alg", "kid", "n", "e", "x5c", "x5t#S256"], MemberNames(entry));
+        Assert.Equal("RSA", entry.GetProperty("kty").GetString());
+        Assert.Equal("sig", entry.GetProperty("use").GetString());
+        Assert.Equal(SigningAlgorithms.RsaSha256, entry.GetProperty("alg").GetString());
+        Assert.Equal(certificate.Thumbprint, entry.GetProperty("kid").GetString());
+
+        var parameters = rsa.ExportParameters(false);
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Modulus!), entry.GetProperty("n").GetString());
+        Assert.Equal(Base64UrlEncoder.Encode(parameters.Exponent!), entry.GetProperty("e").GetString());
+
+        var x5c = entry.GetProperty("x5c");
+        Assert.Equal(1, x5c.GetArrayLength());
+        Assert.Equal(Convert.ToBase64String(certificate.RawData), x5c[0].GetString());
+
+        Assert.Equal(Base64UrlEncoder.Encode(SHA256.HashData(certificate.RawData)), entry.GetProperty("x5t#S256").GetString());
+        Assert.False(entry.TryGetProperty("x5t", out _), "SHA-1 'x5t' must not be emitted alongside 'x5t#S256'");
+
+        AssertNoPrivateMaterial(entry, RsaPrivateMembers);
+    }
+
+    [Fact]
+    public void ReturnsEmptyKeys_WhenSigningKeyIsSymmetric() {
+        var key = new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32));
+        var handler = CreateHandler(key, SigningAlgorithms.HmacSha256);
+
+        var json = JsonSerializer.Serialize(handler.GetJwks().Data, WireOptions);
+        using var doc = JsonDocument.Parse(json);
+
+        Assert.Equal(0, doc.RootElement.GetProperty("keys").GetArrayLength());
+    }
+
+    [Fact]
+    public void ThrowsNotSupported_WhenSigningKeyIsJsonWebKey() {
+        using var rsa = RSA.Create(2048);
+        var jwk = JsonWebKeyConverter.ConvertFromSecurityKey(new RsaSecurityKey(rsa));
+        var handler = CreateHandler(jwk, SigningAlgorithms.RsaSha256);
+
+        Assert.Throws<NotSupportedException>(() => handler.GetJwks());
+    }
+
+    [Fact]
+    public void ThrowsNotSupported_WhenSigningKeyIsUnknownType() {
+        var handler = CreateHandler(new Mock<SecurityKey>().Object, SigningAlgorithms.RsaSha256);
+
+        Assert.Throws<NotSupportedException>(() => handler.GetJwks());
+    }
+
+    [Fact]
+    public void ThrowsInvalidOperation_WhenSigningKeyNotConfigured() {
+        var handler = CreateHandler(null, null);
+
+        Assert.Throws<InvalidOperationException>(() => handler.GetJwks());
     }
 }

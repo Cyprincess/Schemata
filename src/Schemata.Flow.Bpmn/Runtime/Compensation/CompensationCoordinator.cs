@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Schemata.Flow.Bpmn.Runtime.Compensation;
 
@@ -13,19 +14,21 @@ public static class CompensationCoordinator
     /// <param name="context">The compensation invocation payload.</param>
     /// <param name="observers">Lifecycle observers to notify around compensation.</param>
     /// <param name="ct">Cancellation token for observer and handler calls.</param>
+    /// <param name="logger">Optional logger for non-fatal observer failures.</param>
     /// <returns>Compensated handlers and any failure for the caller to map to BPMN errors.</returns>
     public static async ValueTask<CompensationResult> InvokeAllAsync(
         CompensationStack                              stack,
         CompensationInvocationContext                  context,
         IEnumerable<ICompensationLifecycleObserver>    observers,
-        CancellationToken                              ct = default) {
+        CancellationToken                              ct = default,
+        ILogger?                                      logger = null) {
         var snapshot    = stack.Snapshot();
         var compensated = new List<ICompensationHandler>(snapshot.Count);
 
         for (var i = snapshot.Count - 1; i >= 0; i--) {
             var handler = snapshot[i];
 
-            await NotifyStartedAsync(observers, context, ct);
+            await NotifyStartedAsync(observers, context, logger, ct);
 
             try {
                 await handler.InvokeAsync(context, ct);
@@ -37,7 +40,7 @@ public static class CompensationCoordinator
             compensated.Add(handler);
         }
 
-        await NotifyCompletedAsync(observers, context, ct);
+        await NotifyCompletedAsync(observers, context, logger, ct);
 
         return new(compensated, null, null);
     }
@@ -45,13 +48,14 @@ public static class CompensationCoordinator
     private static async Task NotifyStartedAsync(
         IEnumerable<ICompensationLifecycleObserver> observers,
         CompensationInvocationContext               context,
+        ILogger?                                    logger,
         CancellationToken                           ct) {
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationStartedAsync(context.Process, context.Scope, ct);
             }
-            catch {
-                // observer exceptions are non-fatal per Schemata convention
+            catch (Exception ex) {
+                logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation start.");
             }
         }
     }
@@ -59,13 +63,14 @@ public static class CompensationCoordinator
     private static async Task NotifyCompletedAsync(
         IEnumerable<ICompensationLifecycleObserver> observers,
         CompensationInvocationContext               context,
+        ILogger?                                    logger,
         CancellationToken                           ct) {
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationCompletedAsync(context.Process, context.Scope, ct);
             }
-            catch {
-                // observer exceptions are non-fatal per Schemata convention
+            catch (Exception ex) {
+                logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation completion.");
             }
         }
     }

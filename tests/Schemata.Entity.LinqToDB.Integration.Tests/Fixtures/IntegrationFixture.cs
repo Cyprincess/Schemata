@@ -3,9 +3,13 @@ using System.IO;
 using System.Threading.Tasks;
 using LinqToDB;
 using LinqToDB.Mapping;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Caching.Distributed;
+using Schemata.Caching.Skeleton;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -15,10 +19,15 @@ namespace Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 public class IntegrationFixture : IAsyncLifetime
 {
     private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly bool _useQueryCache;
 
     private ServiceProvider? _root;
 
     public IServiceProvider ServiceProvider => _root!;
+
+    public IntegrationFixture(bool useQueryCache = false) {
+        _useQueryCache = useQueryCache;
+    }
 
     #region IAsyncLifetime Members
 
@@ -38,7 +47,16 @@ public class IntegrationFixture : IAsyncLifetime
 
         services.TryAddSingleton<Func<TestDataConnection>>(sp => () => new(options));
 
-        services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();
+        if (_useQueryCache) {
+            services.AddDistributedMemoryCache();
+            services.TryAddSingleton<ICacheProvider>(sp => new DistributedCacheProvider(sp.GetRequiredService<IDistributedCache>()));
+        }
+
+        var students = services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();
+        if (_useQueryCache) {
+            students.UseQueryCache();
+        }
+
         services.AddRepository<Course, LinqToDbRepository<TestDataConnection, Course>>();
 
         services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
@@ -47,8 +65,8 @@ public class IntegrationFixture : IAsyncLifetime
 
         using var scope      = _root.CreateScope();
         var       connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
-        connection.CreateTable<Student>(tableOptions: TableOptions.CreateIfNotExists);
-        connection.CreateTable<Course>(tableOptions: TableOptions.CreateIfNotExists);
+        connection.CreateTableWithIndexes<Student>();
+        connection.CreateTableWithIndexes<Course>();
 
         return Task.CompletedTask;
     }

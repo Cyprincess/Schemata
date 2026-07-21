@@ -65,6 +65,7 @@ Dependency backbone (bottom-up): `Abstractions` (zero deps) → `Common` → `Ad
 - `Order` sequences `ConfigureServices`; `Priority` sequences the app/endpoint pipeline. Range `[100_000_000, 900_000_000]` is reserved for built-ins/extensions — application code stays outside it. Advisor anchors: `Orders.Base=100M`, `Extension=400M`, `Max=900M`; built-ins step by `+10M`.
 - Entity/trait string maps use nullable values (`Dictionary<string, string?>`). The gRPC transport writes a null map value as a key-only entry; proto3 readers see an empty string.
 - Flow execution observes exactly one scoped `IServiceProvider` per run: `FlowResolver`/`FlowConditionContext` require it; DSL contexts and advisors share it.
+- Scheduling execution gating ships as `IJobExecutionAdvisor` (advisor idiom: `Continue` fires, `Block` records `Blocked`, `Handle` records `Skipped`). `IJobLifecycleObserver` is notification-only (`OnScheduled`/`OnUnscheduled`/`OnTriggered`/`OnSucceeded`/`OnFailed`/`OnBlocked`/`OnSkipped`; the last two carry default no-op bodies, so existing implementations compile untouched).
 - Conventional Commits enforced in CI (cocogitto); changelog generated to `docs/CHANGELOG.md` via `cog.toml`.
 - Tests: xUnit + Moq. Classes `<Subject>Should`, methods `Pascal_Snake_Case` behavior names. Integration projects: `*.Integration.Tests` + `Fixtures/WebAppFactory.cs` + `GenerateProgramFile=false`.
 

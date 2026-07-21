@@ -35,7 +35,7 @@ var builder = WebApplication.CreateBuilder(args)
             services.AddDistributedMemoryCache();
             services.AddDistributedCache();
 
-            services.AddRepository(typeof(EfCoreRepository<,>))
+            services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"))
                 .UseQueryCache();
@@ -72,6 +72,10 @@ using (repository.SuppressQueryCache())
 ```
 
 `SuppressQueryCache()` sets `QueryCacheSuppressed` in the `AdviceContext` and returns an `IDisposable`. The `using` scope restores the prior state on exit, so later operations on the same repository cache normally.
+
+## Open write units of work
+
+Cache advisors also stand down while a write unit of work is open. When a repository is enlisted via `Join(uow)` and the unit of work has uncommitted writes, the query context carries `HasOpenWriteUnitOfWork`; `AdviceQueryCache` and `AdviceResultCache` both return `AdviseResult.Continue` in that state, so reads inside the transaction hit the database and see uncommitted changes instead of a stale cached copy. No marker or suppression scope is needed — enlistment alone activates the behavior, and caching resumes once the unit of work commits or rolls back.
 
 ## Commit-time eviction
 

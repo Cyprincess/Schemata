@@ -1,13 +1,12 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("students/{student}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 [ResourceMethod("preview", typeof(PreviewHandler), Method = ResourceHttpMethod.Get)]
 public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IValidation, IUpdateMask
 {

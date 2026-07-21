@@ -59,4 +59,14 @@ public class JwksEndpointShould : IClassFixture<WebAppFactory>
         Assert.True(key.TryGetProperty("use", out var use));
         Assert.Equal("sig", use.GetString());
     }
+
+    [Fact]
+    public async Task Jwks_WithRsaSigningKey_ContainsModulusAndExponent() {
+        var response = await _client.GetAsync("/.well-known/jwks");
+        var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var key      = json.RootElement.GetProperty("keys").EnumerateArray().First();
+
+        Assert.False(string.IsNullOrWhiteSpace(key.GetProperty("n").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(key.GetProperty("e").GetString()));
+    }
 }

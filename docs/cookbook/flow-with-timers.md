@@ -73,6 +73,11 @@ depends on `SchemataFlowFeature` and `SchemataSchedulingFeature`, so both are pu
 The feature registers `AdviceTransitionTimer` as a scoped `IFlowTransitionAdvisor` and
 `FlowTimerJob` as a scheduled job keyed by its full type name.
 
+The advisor bridges both timer shapes: intermediate catches like the one in this recipe, and
+boundary timer catches attached to an activity. A boundary timer is armed while its host activity
+holds an active token and cancelled when the token leaves the host, so a deadline on a long-running
+activity fires without the process parking at a catch first.
+
 **Check:** the app starts with no missing-feature errors.
 
 ## Step 3: Start an instance

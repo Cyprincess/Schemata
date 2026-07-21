@@ -2,15 +2,16 @@
 
 `Schemata.Scheduling.Event` bridges the scheduler to the event bus. `EventPublishingJobLifecycleObserver`
 implements `IJobLifecycleObserver` and publishes a lifecycle event on each scheduler transition —
-`JobScheduled`, `JobUnscheduled`, `JobTriggered`, `JobCompleted`, `JobFailed` — through `IEventBus`.
+`JobScheduled`, `JobUnscheduled`, `JobTriggered`, `JobCompleted`, `JobFailed`, `JobBlocked`,
+`JobSkipped` — through `IEventBus`.
 Per-job behavior comes from `SchemataSchedulingEventOptions`, then a `[PublishEvent]` attribute, then
 a global default.
 
 ## Where the code lives
 
-| Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Scheduling.Event` | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `SchemataSchedulingEventOptions.cs`, `JobEventConfiguration.cs`, `Attributes/PublishEventAttribute.cs`, `Events/JobScheduled.cs`, `Events/JobUnscheduled.cs`, `Events/JobTriggered.cs`, `Events/JobCompleted.cs`, `Events/JobFailed.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs` |
+| Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schemata.Scheduling.Event` | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `SchemataSchedulingEventOptions.cs`, `JobEventConfiguration.cs`, `Attributes/PublishEventAttribute.cs`, `Events/JobScheduled.cs`, `Events/JobUnscheduled.cs`, `Events/JobTriggered.cs`, `Events/JobCompleted.cs`, `Events/JobFailed.cs`, `Events/JobBlocked.cs`, `Events/JobSkipped.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs` |
 
 ## Activation
 
@@ -33,15 +34,17 @@ per-job overrides.
 `SchemataSchedulingEventFeature.ConfigureServices` registers:
 
 1. `EventPublishingJobLifecycleObserver` as a scoped `IJobLifecycleObserver` (`TryAddEnumerable`).
-2. Wire names for the five lifecycle event types in `EventTypeRegistryConfiguration`:
+2. Wire names for the seven lifecycle event types in `EventTypeRegistryConfiguration`:
 
 | Event            | Wire name                             |
 | ---------------- | ------------------------------------- |
-| `JobScheduled`   | `schemata/scheduling/job-scheduled`   |
-| `JobUnscheduled` | `schemata/scheduling/job-unscheduled` |
-| `JobTriggered`   | `schemata/scheduling/job-triggered`   |
-| `JobCompleted`   | `schemata/scheduling/job-completed`   |
-| `JobFailed`      | `schemata/scheduling/job-failed`      |
+| `JobScheduled`   | `schemata/scheduling/job.scheduled`   |
+| `JobUnscheduled` | `schemata/scheduling/job.unscheduled` |
+| `JobTriggered`   | `schemata/scheduling/job.triggered`   |
+| `JobCompleted`   | `schemata/scheduling/job.completed`   |
+| `JobFailed`      | `schemata/scheduling/job.failed`      |
+| `JobBlocked`     | `schemata/scheduling/job.blocked`     |
+| `JobSkipped`     | `schemata/scheduling/job.skipped`     |
 
 ## EventPublishingJobLifecycleObserver
 
@@ -50,27 +53,16 @@ and a publish gate before acting:
 
 - `OnScheduledAsync` — publishes `JobScheduled` unless the gate is `Block`.
 - `OnUnscheduledAsync` — publishes `JobUnscheduled` unless the gate is `Block`.
-- `OnTriggeredAsync` — when the gate is `Block`, suppresses publishing and returns
-  `JobTriggerOutcome.Block`. Otherwise publishes `JobTriggered`, then returns
-  `JobTriggerOutcome.Skip` if `InterceptExecution` is set, else `JobTriggerOutcome.Proceed`.
+- `OnTriggeredAsync` — publishes `JobTriggered` unless the gate is `Block`.
+- `OnBlockedAsync` — publishes `JobBlocked` unless the gate is `Block`.
+- `OnSkippedAsync` — publishes `JobSkipped` unless the gate is `Block`.
 - `OnSucceededAsync` — publishes `JobCompleted` unless the gate is `Block`.
 - `OnFailedAsync` — publishes `JobFailed` unless the gate is `Block`.
 
 ## InterceptExecution
 
-`InterceptExecution = true` hands the run to an external system: `OnTriggeredAsync` publishes
-`JobTriggered`, then returns `JobTriggerOutcome.Skip`. `IScheduledJob.ExecuteAsync` is not called, the
-execution row is marked `Skipped`, and the schedule advances to the next occurrence.
-
-`Block` is not reachable through `InterceptExecution`. To freeze the schedule at the current
-`NextRunTime`, set the gate to `AdviseResult.Block` (which both suppresses publishing and returns
-`JobTriggerOutcome.Block`) or register a custom `IJobLifecycleObserver` that returns `Block`.
-
-| Gate / flag                                        | OnTriggered outcome | Execution row                        | Schedule                            |
-| -------------------------------------------------- | ------------------- | ------------------------------------ | ----------------------------------- |
-| `Continue`, `InterceptExecution = false` (default) | `Proceed`           | `Succeeded` / `Failed` from the body | Advances                            |
-| `Continue`, `InterceptExecution = true`            | `Skip`              | `Skipped`                            | Advances                            |
-| `Block`                                            | `Block`             | `Blocked`                            | Frozen at the current `NextRunTime` |
+`IJobLifecycleObserver` only publishes notifications. Execution advisors decide whether a
+job runs: `Continue` runs it, `Block` writes `Blocked`, and `Handle` writes `Skipped`.
 
 ## Configuration resolution
 
@@ -150,38 +142,55 @@ variable dictionary in `Variables`:
 ```csharp
 public sealed class JobScheduled : IEvent
 {
-    public string                               Job         { get; init; }
-    public IReadOnlyDictionary<string, object?>? Variables   { get; init; }
+    public string?                              Job         { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables   { get; init; }
     public DateTime                             ScheduledAt { get; init; }
 }
 
 public sealed class JobUnscheduled : IEvent
 {
-    public string   Job           { get; init; }
+    public string?  Job           { get; init; }
     public DateTime UnscheduledAt { get; init; }
 }
 
 public sealed class JobTriggered : IEvent
 {
-    public string                               Job       { get; init; }
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public string?                              Job       { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
 }
 
 public sealed class JobCompleted : IEvent
 {
-    public string                               Job         { get; init; }
-    public IReadOnlyDictionary<string, object?>? Variables   { get; init; }
+    public string?                              Job         { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables   { get; init; }
     public DateTime                             CompletedAt { get; init; }
 }
 
 public sealed class JobFailed : IEvent
 {
-    public string                               Job       { get; init; }
-    public IReadOnlyDictionary<string, object?>? Variables { get; init; }
+    public string?                              Job       { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
     public DateTime                             FailedAt  { get; init; }
     public string?                              Error     { get; init; }
 }
+
+public sealed class JobBlocked : IEvent
+{
+    public string?                              Job       { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
+    public DateTime                             BlockedAt { get; init; }
+}
+
+public sealed class JobSkipped : IEvent
+{
+    public string?                              Job       { get; init; }
+    public IReadOnlyDictionary<string, string?>? Variables { get; init; }
+    public DateTime                             SkippedAt { get; init; }
+}
 ```
+
+`JobBlocked` fires when an execution advisor returns `Block` (the execution row records `Blocked`);
+`JobSkipped` fires when an advisor returns `Handle` (the row records `Skipped`).
 
 ## Extension points
 
@@ -193,9 +202,10 @@ public sealed class JobFailed : IEvent
 
 ## Caveats
 
-- `InterceptExecution = true` advances the schedule. Use the `Block` gate or a custom observer when
-  the fire must stay pinned to the current `NextRunTime`.
-- The five lifecycle event types are registered in `IEventTypeRegistry` by the feature. Consumers
+- `InterceptExecution` is accepted by `[PublishEvent]`, `SchemataSchedulingEventOptions.Jobs`, and
+  `WithEventPublishing<T>`, but no built-in component reads it — gating a fire belongs to
+  `IJobExecutionAdvisor`, and suppressing a publication to the `Result` gate shown above.
+- The seven lifecycle event types are registered in `IEventTypeRegistry` by the feature. Consumers
   reach them through the event bus by their wire names; a bare `IEventHandler<T>` registration without
   the wire-name registration would not route.
 

@@ -16,8 +16,6 @@ namespace Schemata.Scheduling.Foundation.Internal;
 public sealed partial class DefaultScheduler
 {
     // Bound the missed-window walk so a misconfigured schedule cannot spin forever.
-    private const int MaxMissedWalk = 100_000;
-
     public Task ScheduleAsync(SchemataJob job, CancellationToken ct) {
         return ScheduleCoreAsync(job, ct);
     }
@@ -52,6 +50,17 @@ public sealed partial class DefaultScheduler
         await CancelFuturePendingAsync(jobCanonical, ct);
 
         if (entry is null) {
+            using var scope = _services.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+
+            var persisted = await jobs.FirstOrDefaultAsync(
+                q => q.Where(job => job.CanonicalName == jobCanonical || job.Name == jobCanonical), ct);
+            if (persisted is not null) {
+                persisted.State = JobState.Paused;
+                await jobs.UpdateAsync(persisted, ct);
+                await jobs.CommitAsync(ct);
+            }
+
             return;
         }
 
@@ -65,8 +74,7 @@ public sealed partial class DefaultScheduler
             return;
         }
 
-        ScheduledEntry? entry;
-
+        var replayedMisses = 0;
         await _lock.WaitAsync(ct);
         try {
             if (_stopped) {
@@ -74,6 +82,7 @@ public sealed partial class DefaultScheduler
             }
 
             if (_entries.TryRemove(key, out var existing)) {
+                replayedMisses = existing.ReplayedMisses;
                 await existing.Cts.CancelAsync();
                 existing.Cts.Dispose();
             }
@@ -83,16 +92,40 @@ public sealed partial class DefaultScheduler
             }
 
             // Collapse or skip a missed window per policy before the row is materialized.
-            job.NextRunTime = AdjustForMissedWindow(job, _time.GetUtcNow().UtcDateTime);
+            var now = _time.GetUtcNow().UtcDateTime;
+            if (_options.Value.MissedFirePolicy == MissedFirePolicy.FireAll
+                && job.NextRunTime <= now
+                && replayedMisses >= _options.Value.MaxMissedWalk - 1) {
+                job.NextRunTime = AdvancePastMissedWindow(job, now);
+            } else {
+                job.NextRunTime = AdjustForMissedWindow(job, now);
+            }
 
-            entry         = new(job, new());
+        } finally {
+            _lock.Release();
+        }
+
+        await NotifyScheduledAsync(job, ct);
+        await EnsurePendingExecutionAsync(job, ct);
+
+        var entry = new ScheduledEntry(job, new(), job.NextRunTime <= _time.GetUtcNow().UtcDateTime ? replayedMisses + 1 : 0);
+        await _lock.WaitAsync(ct);
+        try {
+            if (_stopped) {
+                entry.Cts.Dispose();
+                return;
+            }
+
+            if (_entries.TryRemove(key, out var existing)) {
+                await existing.Cts.CancelAsync();
+                existing.Cts.Dispose();
+            }
+
             _entries[key] = entry;
         } finally {
             _lock.Release();
         }
 
-        await NotifyScheduledAsync(entry.Job, ct);
-        await EnsurePendingExecutionAsync(entry.Job, ct);
         StartTimer(entry);
     }
 
@@ -103,10 +136,7 @@ public sealed partial class DefaultScheduler
         }
 
         using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
-        if (executions is null) {
-            return;
-        }
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
 
         // SchemataJobExecution.Job stores the SchemataJob canonical name; scheduled jobs always
         // carry CanonicalName by the time they reach this advisor (the canonical-name advisor
@@ -147,10 +177,7 @@ public sealed partial class DefaultScheduler
 
     private async Task CancelFuturePendingAsync(string jobCanonical, CancellationToken ct) {
         using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
-        if (executions is null) {
-            return;
-        }
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
 
         var now    = _time.GetUtcNow().UtcDateTime;
         var future = new List<SchemataJobExecution>();
@@ -210,7 +237,7 @@ public sealed partial class DefaultScheduler
 
         switch (_options.Value.MissedFirePolicy) {
             case MissedFirePolicy.Skip:
-                for (var i = 0; i < MaxMissedWalk && next <= now; i++) {
+                for (var i = 0; i < _options.Value.MaxMissedWalk && next <= now; i++) {
                     var advanced = ComputeAfter(job, next);
                     if (advanced <= next) {
                         break;
@@ -222,7 +249,7 @@ public sealed partial class DefaultScheduler
                 return next;
 
             case MissedFirePolicy.FireOnce:
-                for (var i = 0; i < MaxMissedWalk; i++) {
+                for (var i = 0; i < _options.Value.MaxMissedWalk; i++) {
                     var probe = ComputeAfter(job, next);
                     if (probe > now || probe <= next) {
                         break;
@@ -238,6 +265,20 @@ public sealed partial class DefaultScheduler
                 // Keep the oldest missed occurrence; the dispatcher's advance loop replays the rest.
                 return next;
         }
+    }
+
+    private DateTime AdvancePastMissedWindow(SchemataJob job, DateTime now) {
+        var next = job.NextRunTime!.Value;
+        for (var i = 0; i < _options.Value.MaxMissedWalk && next <= now; i++) {
+            var advanced = ComputeAfter(job, next);
+            if (advanced <= next) {
+                break;
+            }
+
+            next = advanced;
+        }
+
+        return next;
     }
 
     private DateTime ComputeAfter(SchemataJob job, DateTime time) {

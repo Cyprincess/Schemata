@@ -33,7 +33,7 @@ var builder = WebApplication.CreateBuilder(args)
               .UseHeaderResolver();
 
         schema.ConfigureServices(services => {
-            services.AddRepository(typeof(EfCoreRepository<,>))
+            services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
         });

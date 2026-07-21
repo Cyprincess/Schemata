@@ -6,9 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Common;
+using Schemata.Entity.Owner.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation;
 
@@ -52,17 +54,20 @@ public sealed class ProcessPersistence
         Func<FlowPersistenceScope, CancellationToken, Task> work,
         CancellationToken                                     ct
     ) {
-        var processes   = services.GetRequiredService<IRepository<SchemataProcess>>();
-        var tokens      = services.GetRequiredService<IRepository<SchemataProcessToken>>();
-        var transitions = services.GetRequiredService<IRepository<SchemataProcessTransition>>();
-        var sources     = services.GetRequiredService<IRepository<SchemataProcessSource>>();
+        var processes     = services.GetRequiredService<IRepository<SchemataProcess>>();
+        var tokens        = services.GetRequiredService<IRepository<SchemataProcessToken>>();
+        var transitions   = services.GetRequiredService<IRepository<SchemataProcessTransition>>();
+        var sources       = services.GetRequiredService<IRepository<SchemataProcessSource>>();
+        var compensations = services.GetRequiredService<IRepository<SchemataProcessCompensation>>();
 
         await using var uow = processes.Begin();
         tokens.Join(uow);
         transitions.Join(uow);
         sources.Join(uow);
+        compensations.Join(uow);
+        SuppressOwnerQueries(processes, tokens, transitions, sources, compensations);
 
-        var scope = new FlowPersistenceScope(uow, processes, tokens, transitions, sources);
+        var scope = new FlowPersistenceScope(uow, processes, tokens, transitions, sources, compensations);
         try {
             await work(scope, ct);
             await uow.CommitAsync(ct);
@@ -78,6 +83,8 @@ public sealed class ProcessPersistence
         if (string.IsNullOrWhiteSpace(process.CanonicalName)) {
             throw new InvalidOperationException("Process canonical name is required before persistence.");
         }
+
+        ReleaseIdempotencyKey(process);
 
         var existing = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
         if (existing is null) {
@@ -104,6 +111,38 @@ public sealed class ProcessPersistence
 
             await scope.Transitions.AddAsync(transition, ct);
         }
+
+        await ReplaceCompensationBindingsAsync(scope, process, snapshot.CompensationBindings, ct);
+    }
+
+    private static async Task ReplaceCompensationBindingsAsync(
+        FlowPersistenceScope                     scope,
+        SchemataProcess                          process,
+        IReadOnlyList<ProcessCompensationBinding> bindings,
+        CancellationToken                        ct
+    ) {
+        var persisted = new List<SchemataProcessCompensation>();
+        await foreach (var binding in scope.Compensations.ListAsync<SchemataProcessCompensation>(
+                           q => q.Where(row => row.Process == process.CanonicalName), ct)) {
+            persisted.Add(binding);
+        }
+
+        if (persisted.Count > 0) {
+            await scope.Compensations.RemoveRangeAsync(persisted, ct);
+        }
+
+        if (ProcessStates.IsTerminal(process.State) || bindings.Count == 0) {
+            return;
+        }
+
+        var rows = bindings.Select(binding => new SchemataProcessCompensation {
+            Name                    = Identifiers.NewUid().ToString("n"),
+            Process                 = process.CanonicalName!,
+            ScopeOwnerCanonicalName = binding.ScopeOwnerCanonicalName,
+            ActivityName            = binding.ActivityName,
+            RegistrationOrder       = binding.RegistrationOrder,
+        });
+        await scope.Compensations.AddRangeAsync(rows, ct);
     }
 
     private static void CopyEntity(object target, object source) {
@@ -113,6 +152,7 @@ public sealed class ProcessPersistence
                 dst.Name           = src.Name;
                 dst.CanonicalName  = src.CanonicalName;
                 dst.DefinitionName = src.DefinitionName;
+                dst.IdempotencyKey = src.IdempotencyKey;
                 dst.State          = src.State;
                 dst.DisplayName    = src.DisplayName;
                 dst.DisplayNames   = src.DisplayNames;
@@ -145,15 +185,31 @@ public sealed class ProcessPersistence
                 break;
         }
     }
+
+    private static void ReleaseIdempotencyKey(SchemataProcess process) {
+        if (!ProcessStates.IsTerminal(process.State) || string.IsNullOrEmpty(process.IdempotencyKey)) {
+            return;
+        }
+
+        process.Annotations["schemata/flow/idempotency-key"] = process.IdempotencyKey;
+        process.IdempotencyKey = null;
+    }
+
+    private static void SuppressOwnerQueries(params IRepository[] repositories) {
+        foreach (var repository in repositories) {
+            repository.AdviceContext?.Set(new QueryOwnerSuppressed());
+        }
+    }
 }
 
 /// <summary>Joined repositories and unit of work for a Flow operation.</summary>
 public sealed class FlowPersistenceScope(
-    IUnitOfWork                             unitOfWork,
-    IRepository<SchemataProcess>           processes,
-    IRepository<SchemataProcessToken>      tokens,
-    IRepository<SchemataProcessTransition> transitions,
-    IRepository<SchemataProcessSource>     sources
+    IUnitOfWork                              unitOfWork,
+    IRepository<SchemataProcess>            processes,
+    IRepository<SchemataProcessToken>       tokens,
+    IRepository<SchemataProcessTransition>  transitions,
+    IRepository<SchemataProcessSource>      sources,
+    IRepository<SchemataProcessCompensation> compensations
 )
 {
     /// <summary>The unit of work shared by all repositories.</summary>
@@ -166,4 +222,6 @@ public sealed class FlowPersistenceScope(
     public IRepository<SchemataProcessTransition> Transitions { get; } = transitions;
 
     public IRepository<SchemataProcessSource> Sources { get; } = sources;
+
+    public IRepository<SchemataProcessCompensation> Compensations { get; } = compensations;
 }

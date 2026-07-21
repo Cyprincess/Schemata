@@ -7,7 +7,7 @@ using Schemata.Modeling.Generator.Expressions;
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-public static class EntityGenerator
+internal static class EntityGenerator
 {
     public static void Generate(SourceProductionContext spc, Entity entity, Document doc) {
         var sb = new StringBuilder();
@@ -35,7 +35,7 @@ public static class EntityGenerator
         spc.AddSource($"{entity.Name}", sb.ToString());
     }
 
-    public static void GenerateUses(
+    internal static void GenerateUses(
         StringBuilder          sb,
         EquatableArray<Use>    uses,
         EquatableArray<string> bases,
@@ -94,7 +94,7 @@ public static class EntityGenerator
             if (clr is not null) {
                 type = clr.FullName;
 
-                if (type == "System.String") {
+                if (clr == typeof(string)) {
                     value = "string.Empty";
                 }
             }

@@ -6,8 +6,9 @@
   <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="protobuf-net.Grpc" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
@@ -25,5 +26,10 @@
     <ProjectReference Include="../../src/Schemata.Resource.Http/Schemata.Resource.Http.csproj" />
     <ProjectReference Include="../../src/Schemata.Scheduling.Grpc/Schemata.Scheduling.Grpc.csproj" />
     <ProjectReference Include="../../src/Schemata.Scheduling.Http/Schemata.Scheduling.Http.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Relative to the test assembly output directory: five levels up from artifacts/bin/.../Debug|Release/net8.0|net10.0 to the repo root. -->
+    <AssemblyMetadata Include="Microsoft.AspNetCore.Testing.ApplicationRootPath"
+                      Value="../../../../../tests/Schemata.Report.Integration.Tests" />
   </ItemGroup>
 </Project>

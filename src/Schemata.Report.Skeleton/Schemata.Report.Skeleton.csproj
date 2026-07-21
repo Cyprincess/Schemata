@@ -12,9 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
-    <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Insight.Skeleton\Schemata.Insight.Skeleton.csproj" />
-    <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

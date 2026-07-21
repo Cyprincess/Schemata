@@ -10,7 +10,7 @@ lowerCamelCase string.
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Abstractions`        | `Resource/ResourceMethodAttribute.cs`, `Resource/ResourceMethodScope.cs`, `Resource/ResourceHttpMethod.cs`, `Resource/IResourceMethodHandler.cs`                          |
 | `Schemata.Resource.Foundation` | `ResourceMethodOperationHandler.cs`, `Advisors/IResourceMethodRequestAdvisor.cs`, `Advisors/IResourceMethodAdvisor.cs`, `Advisors/ResourceMethodVerb.cs`                  |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceMethodRequestAnonymous.cs`, `Advisors/AdviceMethodRequestAuthorize.cs`, `Advisors/AdviceMethodRequestIdempotency.cs`, `Advisors/AdviceMethodFreshness.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceMethodRequestAnonymous.cs`, `Advisors/AdviceMethodRequestAuthorize.cs`, `Advisors/AdviceMethodRequestIdempotency.cs`, `Advisors/AdviceMethodEntityAuthorize.cs`, `Advisors/AdviceMethodFreshness.cs` |
 | `Schemata.Resource.Http`       | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs`                                                      |
 | `Schemata.Resource.Grpc`       | `ResourceCustomMethod.cs`, `ResourceMethodNaming.cs`                                                                                                                      |
 
@@ -81,12 +81,20 @@ idempotency key distinguishes the same verb against different resources, then lo
 
 ### Built-in method advisors
 
-| Advisor                          | Stage   | What it does                                                |
-| -------------------------------- | ------- | ----------------------------------------------------------- |
-| `AdviceMethodRequestAnonymous`   | request | Grants anonymous access when the verb is configured for it  |
-| `AdviceMethodRequestAuthorize`   | request | Authorizes with the verb as the permission token            |
-| `AdviceMethodRequestIdempotency` | request | Replays a cached response keyed by the verb and `RequestId` |
-| `AdviceMethodFreshness`          | method  | Validates the ETag against the target instance per AIP-154  |
+| Advisor                          | Stage   | What it does                                                                                                     |
+| -------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `AdviceMethodRequestAnonymous`   | request | Grants anonymous access when the verb is configured for it                                                       |
+| `AdviceMethodRequestAuthorize`   | request | Applies row-level entitlement filtering, then authorizes with the verb as the permission token                   |
+| `AdviceMethodRequestIdempotency` | request | Replays a cached response keyed by the verb and `RequestId`                                                      |
+| `AdviceMethodEntityAuthorize`    | method  | Post-load AIP-211 check against the loaded entity (primary check + parent-read probe); order 100M (`Orders.Base`) |
+| `AdviceMethodFreshness`          | method  | Validates the ETag against the target instance per AIP-154; runs after entity authorize at +10M                  |
+
+`AdviceMethodRequestAuthorize` takes both `IAccessProvider<TEntity, TRequest>` and
+`IEntitlementProvider<TEntity, TRequest>`: it first appends the entitlement expression to the
+container via `container.ApplyWhere(...)` (row-level filtering, applied even for anonymous callers),
+then runs the access check, skipping only that check when `AnonymousGranted` is present.
+`AdviceMethodEntityAuthorize` runs on instance-scoped methods after the entity loads and skips when
+`AnonymousGranted` is present.
 
 `AdviceMethodRequestIdempotency` and `AdviceMethodFreshness` are registered per verb by `RegisterResource`; the
 anonymous and authorize advisors are added by `WithAuthorization()`.

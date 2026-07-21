@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.LinqToDB;
@@ -16,7 +17,7 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="IRepository.Join" /> on an enlisted repository).
 /// </summary>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
-public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfWorkSink
+public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
     where TContext : DataConnection
 {
     private readonly Func<TContext>                      _factory;
@@ -70,8 +71,12 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitO
         }
 
         try {
-            await _transaction.CommitAsync(ct);
-        } catch {
+            try {
+                await _transaction.CommitAsync(ct);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+                throw new AlreadyExistsException();
+            }
+        } catch (Exception) {
             foreach (var reset in _rollback) {
                 reset();
             }
@@ -180,11 +185,11 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitO
         GC.SuppressFinalize(this);
     }
 
-    #region IUnitOfWorkSink Members
+    #region IUnitOfWork Members
 
-    void IUnitOfWorkSink.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
+    void IUnitOfWork.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
 
-    void IUnitOfWorkSink.AddRollbackSink(Action reset) { _rollback.Add(reset); }
+    void IUnitOfWork.AddRollbackSink(Action reset) { _rollback.Add(reset); }
 
     #endregion
 

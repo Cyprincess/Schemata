@@ -15,7 +15,9 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataRepositoryBuilderExtensions
 {
     /// <summary>
-    ///     Registers the ownership advisors.
+    ///     Registers the ownership advisors, including existence validation for
+    ///     <see cref="Schemata.Abstractions.Resource.ResourceReferenceAttribute" /> properties
+    ///     opting in via <c>ValidateExistence</c>.
     ///     Hosts should also register a real
     ///     <see cref="IOwnerResolver{TEntity}" /> or configure
     ///     <see cref="SchemataOwnerOptions.OnNullOwner" /> away from
@@ -28,6 +30,8 @@ public static class SchemataRepositoryBuilderExtensions
 
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQueryOwner<>)));
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddOwner<>)));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceValidateResourceReferenceExistence<>)));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryUpdateAdvisor<>), typeof(AdviceValidateResourceReferenceExistence<>)));
 
         return builder;
     }

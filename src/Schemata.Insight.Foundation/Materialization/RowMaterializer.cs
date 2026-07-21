@@ -10,6 +10,10 @@ namespace Schemata.Insight.Foundation;
 
 public static class RowMaterializer
 {
+    /// <remarks>
+    ///     Expression-selection values are evaluated by <see cref="LocalPipelineExecutor" /> after
+    ///     source materialization. This method supplies field values and nested child collections.
+    /// </remarks>
     public static IReadOnlyDictionary<string, object?> ToRow<TEntity>(
         TEntity                       entity,
         ImmutableArray<SelectionItem> items,
@@ -51,25 +55,33 @@ public static class RowMaterializer
 
     private static List<IReadOnlyDictionary<string, object?>> MaterializeChildren(object? parent, string path) {
         var collection = ReadPath(parent, path);
-        var children   = new List<IReadOnlyDictionary<string, object?>>();
         if (collection is not IEnumerable enumerable || collection is string) {
-            return children;
+            return [];
         }
 
-        foreach (var child in enumerable) {
-            if (child is null) {
-                continue;
+        return ToChildRows(enumerable);
+    }
+
+    internal static List<IReadOnlyDictionary<string, object?>> ToChildRows(IEnumerable children) {
+        var rows = new List<IReadOnlyDictionary<string, object?>>();
+        foreach (var child in children) {
+            switch (child) {
+                case null:
+                    continue;
+                case IReadOnlyDictionary<string, object?> row:
+                    rows.Add(row);
+                    continue;
             }
 
-            var row = new Dictionary<string, object?>(StringComparer.Ordinal);
+            var materialized = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (var property in AppDomainTypeCache.GetProperties(child.GetType()).Values) {
-                row[property.Name.Underscore()] = property.GetValue(child);
+                materialized[property.Name.Underscore()] = property.GetValue(child);
             }
 
-            children.Add(row);
+            rows.Add(materialized);
         }
 
-        return children;
+        return rows;
     }
 
     private static object? ReadPath(object? value, string path) {

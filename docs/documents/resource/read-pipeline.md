@@ -8,9 +8,10 @@ the repository. The stage order is fixed; advisor `Order` only sequences advisor
 | Package                        | Key files                                                                                                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.List.cs`, `ResourceOperationHandler.Get.cs`                                                                                      |
-| `Schemata.Resource.Foundation` | `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `KeyOrdering.cs`                                                                                     |
+| `Schemata.Resource.Foundation` | `Models/PageToken.cs`, `KeyOrdering.cs`                                                                                                                    |
+| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceIdentifiers.cs`                                                                                                    |
 | `Schemata.Resource.Foundation` | `Advisors/IResourceListRequestAdvisor.cs`, `Advisors/IResourceGetRequestAdvisor.cs`                                                                        |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceListResponseReadMask.cs`, `Advisors/AdviceResponseReadMask.cs`, `Advisors/AdviceResponseParent.cs`, `Advisors/AdviceListResponseParent.cs` |
+| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseParent.cs`, `Advisors/AdviceListResponseParent.cs`                                                                                 |
 | `Schemata.Abstractions`        | `Resource/ListRequest.cs`, `Resource/GetRequest.cs`, `Resource/ListResultBase.cs`                                                                          |
 
 ## List
@@ -19,21 +20,20 @@ the repository. The stage order is fixed; advisor `Order` only sequences advisor
 
 ### 1. Gate — `IResourceRequestAdvisor<TEntity>`
 
-Receives the principal and the token `nameof(Operations.List)`. `Block` throws `CollectionNotFound()`. The
-request's `read_mask`, when set and not `*`, is stashed on `AdviceContext` as `ReadMaskRequested` before the gate.
+Receives the principal and the token `nameof(Operations.List)`. `Block` throws `CollectionNotFound()`.
 
 ### 2. List request — `IResourceListRequestAdvisor<TEntity>`
 
 Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run
 here when `WithAuthorization()` is configured; an entitlement advisor adds predicates via
-`container.ApplyModification`.
+`container.ApplyWhere`.
 
 ### 3. Parent scoping
 
 When `request.Parent` is set, `ResourceNameDescriptor.ParseParent` matches it against the entity's pattern. A
 parent that fails to match throws `ValidationException` (`INVALID_PARENT`). A `-` wildcard segment on an entity
 without `[ReadAcross]` throws `ValidationException` (`CROSS_PARENT_UNSUPPORTED`). Otherwise
-`BuildParentPredicate` produces a `Where` predicate applied via `container.ApplyModification`.
+`BuildParentPredicate` produces a `Where` predicate applied via `container.ApplyWhere`.
 
 ### 4. Page token and paging parameters
 
@@ -47,7 +47,7 @@ onto the token and is floored at 0.
 
 When `request.Filter` is set, the handler resolves `IExpressionCompiler` keyed by `AipLanguage.Name` (`"aip"`),
 parses and compiles the filter to `Expression<Func<TEntity, bool>>`, and applies it via
-`container.ApplyFiltering`. A `ParseException` or `ArgumentException` becomes `ValidationException`
+`container.ApplyWhere`. A `ParseException` or `ArgumentException` becomes `ValidationException`
 (`InvalidFilter`). The key is fixed to AIP; see [Filtering](filtering.md).
 
 ### 6. Order compilation
@@ -69,8 +69,8 @@ omits it per AIP-158. When `request.ShowDeleted` is true the repository is wrapp
 ### 8. List response — `IResourceListResponseAdvisor<TSummary>`
 
 Receives the immutable summary array and the principal. `AdviceListResponseParent` derives
-`IChild.Parent` on each summary, then `AdviceListResponseReadMask` trims each summary to the
-requested AIP-157 fields.
+`IChild.Parent` on each summary. Responses are full: AIP-157 partial responses are not supported, and
+no response trimming runs in this chain.
 
 ## Get
 
@@ -78,8 +78,7 @@ requested AIP-157 fields.
 
 ### 1. Gate — `IResourceRequestAdvisor<TEntity>`
 
-Receives the principal and the token `nameof(Operations.Get)`. `Block` throws `ResourceNotFound(name)`. A
-`read_mask` on the `GetRequest` is stashed as `ReadMaskRequested` first.
+Receives the principal and the token `nameof(Operations.Get)`. `Block` throws `ResourceNotFound(name)`.
 
 ### 2. Name predicates
 
@@ -98,12 +97,12 @@ caller can inspect `DeleteTime`. A null result throws `ResourceNotFound(name)` c
 ### 5. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
 The entity is mapped to `TDetail`, then the response chain runs: `AdviceResponseParent` derives
-`IChild.Parent`, `AdviceResponseFreshness` sets the ETag, `AdviceResponseReadMask` trims to the `read_mask`
-fields, `AdviceResponseIdempotency` is a no-op for reads.
+`IChild.Parent`, `AdviceResponseFreshness` sets the ETag, `AdviceResponseIdempotency` is a no-op for
+reads. Responses are full; partial responses are not supported.
 
 ## Extension points
 
-- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyModification`
+- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyWhere`
   (entitlement, tenant scoping).
 - Implement `IResourceGetRequestAdvisor<TEntity>` for per-get logic.
 - Implement `IResourceListResponseAdvisor<TSummary>` or `IResourceResponseAdvisor<TEntity, TDetail>` to

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
 
@@ -37,8 +38,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
         foreach (var (_, resource) in Resources) {
-            if (resource.Endpoints?.Count != 0
-             && resource.Endpoints?.All(e => e != HttpResourceAttribute.Name) == true) {
+            if (!HttpResourceHelper.IsHttpEnabled(resource)) {
                 continue;
             }
 

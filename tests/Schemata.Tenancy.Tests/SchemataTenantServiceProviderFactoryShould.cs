@@ -127,12 +127,12 @@ public class SchemataTenantServiceProviderFactoryShould
 
     [Fact]
     public void Cached_Provider_Does_Not_Pin_First_Request_Accessor() {
-        var       factory  = Build(new());
-        using var firstAcc = AccessorScope(AccessorFor("alpha"));
-        using var first    = factory.CreateServiceProvider(firstAcc.Accessor);
+        var       factory       = Build(new());
+        var       firstAccessor = AccessorFor("alpha");
+        using var first         = factory.CreateServiceProvider(firstAccessor);
 
-        using var secondAcc = AccessorScope(AccessorFor("alpha"));
-        using var second    = factory.CreateServiceProvider(secondAcc.Accessor);
+        var       secondAccessor = AccessorFor("alpha");
+        using var second         = factory.CreateServiceProvider(secondAccessor);
 
         Assert.Same(first.Provider, second.Provider);
 
@@ -140,8 +140,8 @@ public class SchemataTenantServiceProviderFactoryShould
         // tenant-bound implementation tied to the tenant id.
         var resolved = second.Provider.GetRequiredService<ITenantContextAccessor<SchemataTenant>>();
         Assert.IsType<TenantBoundContextAccessor<SchemataTenant>>(resolved);
-        Assert.NotSame(firstAcc.Accessor, resolved);
-        Assert.NotSame(secondAcc.Accessor, resolved);
+        Assert.NotSame(firstAccessor, resolved);
+        Assert.NotSame(secondAccessor, resolved);
         Assert.Equal(DeterministicGuid("alpha"), resolved.Tenant!.Uid);
     }
 
@@ -164,32 +164,11 @@ public class SchemataTenantServiceProviderFactoryShould
         return mock.Object;
     }
 
-    private static AccessorHandle AccessorScope(ITenantContextAccessor<SchemataTenant> accessor) {
-        return new(accessor);
-    }
-
     private static Guid DeterministicGuid(string label) {
         Span<byte> bytes = stackalloc byte[16];
         Encoding.ASCII.GetBytes(label.PadRight(16, '-'), bytes);
         return new(bytes);
     }
-
-    #region Nested type: AccessorHandle
-
-    private sealed class AccessorHandle : IDisposable
-    {
-        public AccessorHandle(ITenantContextAccessor<SchemataTenant> accessor) { Accessor = accessor; }
-
-        public ITenantContextAccessor<SchemataTenant> Accessor { get; }
-
-        #region IDisposable Members
-
-        public void Dispose() { }
-
-        #endregion
-    }
-
-    #endregion
 
     #region Nested type: IConsumer
 

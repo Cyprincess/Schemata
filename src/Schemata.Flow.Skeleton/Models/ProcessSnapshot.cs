@@ -30,6 +30,9 @@ public sealed class ProcessSnapshot : ICanonicalName
     /// </summary>
     public required IReadOnlyList<SchemataProcessTransition> Transitions { get; init; }
 
+    /// <summary>Compensation handlers registered by the engine after the operation completes.</summary>
+    public IReadOnlyList<ProcessCompensationBinding> CompensationBindings { get; init; } = [];
+
     #region ICanonicalName Members
 
     /// <summary>The bare leaf name of the underlying process, delegated from <see cref="Process" />.</summary>

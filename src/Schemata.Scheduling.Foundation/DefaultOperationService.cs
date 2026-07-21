@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -75,14 +76,25 @@ public sealed class DefaultOperationService : IOperationService
         var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         var execution = await FindAsync(executions, operation, ct);
 
-        if (IsTerminal(execution.State)) {
+        if (execution.State.IsTerminal()) {
             throw new FailedPreconditionException(
                 SchemataResources.OPERATION_ALREADY_FINISHED,
                 new Dictionary<string, string?> { ["name"] = execution.CanonicalName });
         }
 
-        if (!string.IsNullOrEmpty(execution.Job)) {
+        if (execution.State == ExecutionState.Pending && !string.IsNullOrEmpty(execution.Job)) {
             await _scheduler.UnscheduleAsync(execution.Job, ct);
+        }
+
+        if (execution.State == ExecutionState.Running) {
+            var running = scope.ServiceProvider.GetService<ConcurrentDictionary<string, CancellationTokenSource>>();
+            if (running is not null && running.TryGetValue(execution.Uid.ToString("n"), out var source)) {
+                try {
+                    source.Cancel();
+                } catch (ObjectDisposedException) {
+                    // The execution completed while its cancellation was being requested.
+                }
+            }
         }
 
         execution.State   = ExecutionState.Cancelled;
@@ -143,9 +155,5 @@ public sealed class DefaultOperationService : IOperationService
             query => query.Where(e => e.CanonicalName == operation || e.Name == operation), ct);
 
         return execution ?? throw new NotFoundException(message: $"Operation '{operation}' was not found.");
-    }
-
-    private static bool IsTerminal(ExecutionState state) {
-        return state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
     }
 }

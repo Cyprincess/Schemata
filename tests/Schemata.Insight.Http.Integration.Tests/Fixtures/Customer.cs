@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Insight.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("customers/{customer}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Customer : IIdentifier, ICanonicalName
 {
     public string?     FullName { get; set; }
@@ -26,7 +25,7 @@ public class Customer : IIdentifier, ICanonicalName
     #endregion
 }
 
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Order
 {
     public Guid    Uid    { get; set; }

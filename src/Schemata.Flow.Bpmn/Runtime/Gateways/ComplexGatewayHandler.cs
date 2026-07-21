@@ -38,7 +38,7 @@ public static class ComplexGatewayHandler
             var ctx         = engine.BuildConditionContext(definition, BpmnEngine.TokenView(token), cg.Name, execution, bookkeeping, process, token);
             var ready = await cg.ActivationCount.Evaluate(ctx);
             if (!ready) {
-                return engine.ParkAtGateway(process, token, working, cg, previousState);
+                return engine.ParkAtGateway(process, token, working, cg, previousState, execution);
             }
         }
 

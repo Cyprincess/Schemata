@@ -23,16 +23,20 @@ public sealed class ReportRetentionEnforcer<TSnapshot, TChunk>
 {
     private readonly TimeSpan             _incompleteGracePeriod;
     private readonly IServiceScopeFactory _scopes;
+    private readonly TimeProvider         _time;
 
     /// <summary>Creates a write-path retention enforcer.</summary>
     /// <param name="scopes">Factory creating isolated cleanup scopes.</param>
     /// <param name="options">Retention cleanup settings.</param>
+    /// <param name="time">Clock used to evaluate retention ages.</param>
     public ReportRetentionEnforcer(
         IServiceScopeFactory            scopes,
-        IOptions<SchemataReportOptions> options
+        IOptions<SchemataReportOptions> options,
+        TimeProvider?                   time = null
     ) {
         _scopes                 = scopes;
         _incompleteGracePeriod  = options.Value.IncompleteSnapshotGracePeriod;
+        _time                   = time ?? TimeProvider.System;
     }
 
     /// <summary>Applies the parent report's retention policy to its persisted snapshots.</summary>
@@ -44,7 +48,7 @@ public sealed class ReportRetentionEnforcer<TSnapshot, TChunk>
         }
 
         var snapshots = await ListAsync(report.Name, ct);
-        var victims   = SelectVictims(snapshots, report.Retention, DateTime.UtcNow);
+        var victims   = SelectVictims(snapshots, report.Retention, _time.GetUtcNow().UtcDateTime);
         foreach (var victim in victims) {
             ct.ThrowIfCancellationRequested();
             await RemoveAsync(victim);

@@ -13,4 +13,5 @@ public sealed class TestDataConnection : DataConnection
     public ITable<SchemataProcessToken>      Tokens      => this.GetTable<SchemataProcessToken>();
     public ITable<SchemataProcessTransition> Transitions => this.GetTable<SchemataProcessTransition>();
     public ITable<SchemataProcessSource>     Sources     => this.GetTable<SchemataProcessSource>();
+    public ITable<SchemataProcessCompensation> Compensations => this.GetTable<SchemataProcessCompensation>();
 }

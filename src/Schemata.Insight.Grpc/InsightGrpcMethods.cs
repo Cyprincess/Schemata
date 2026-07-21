@@ -1,5 +1,6 @@
 using Grpc.Core;
 using ProtoBuf.Meta;
+using Schemata.Transport.Grpc;
 
 namespace Schemata.Insight.Grpc;
 
@@ -17,16 +18,6 @@ public static class InsightGrpcMethods
         MethodType.Unary,
         ServiceName,
         "Query",
-        Marshaller<QueryInsightGrpcRequest>(),
-        Marshaller<QueryInsightGrpcResponse>());
-
-    private static Marshaller<T> Marshaller<T>() {
-        var model = RuntimeTypeModel.Default;
-        return new(
-            (value, context) => {
-                model.Serialize(context.GetBufferWriter(), value);
-                context.Complete();
-            },
-            context => model.Deserialize<T>(context.PayloadAsReadOnlySequence()));
-    }
+        GrpcMarshallers.Create<QueryInsightGrpcRequest>(RuntimeTypeModel.Default),
+        GrpcMarshallers.Create<QueryInsightGrpcResponse>(RuntimeTypeModel.Default));
 }

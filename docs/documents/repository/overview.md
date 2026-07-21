@@ -63,8 +63,20 @@ var page = repository.ListAsync<BookDto>(q =>
 When `predicate` is `null`, the query falls through to `OfType<TResult>()` on the advisor-processed
 queryable. `GetAsync` reads the key properties off the supplied entity and delegates to `FindAsync`;
 `FindAsync` builds a key equality predicate and routes through `SingleOrDefaultAsync`.
-`EstimateCountAsync` defaults to `LongCountAsync` and exists for providers that can override it with a
-cheaper cardinality estimate.
+
+### EstimateCountAsync
+
+`EstimateCountAsync` is a virtual passthrough: the base implementation delegates to `LongCountAsync`
+(exact), and `EfCoreRepository` does not override it. `LinqToDbRepository` overrides it per backend:
+
+- **PostgreSQL** — `EXPLAIN (FORMAT JSON)` of the query, reading `Plan Rows`.
+- **MySQL / MariaDB** — `EXPLAIN FORMAT=JSON`, reading `rows_examined_per_scan` /
+  `rows_produced_per_join`.
+- **SQL Server** — `sys.partitions` row sum, only when the predicate carries no `Where`.
+- **SQLite** — `sqlite_stat1` max stat, only when the predicate carries no `Where`.
+
+An unrecognized backend or any failure during estimation falls back to the exact `LongCountAsync`
+passthrough, so an estimate never fails the request.
 
 ## Mutation API
 
@@ -126,18 +138,18 @@ also carries the `IServiceProvider`, giving advisors access to any registered se
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlite(connectionString))
         .WithUnitOfWork<AppDbContext>()
         .UseOwner()
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
-`AddRepository(Type)` validates that the type implements `IRepository<>`, registers it as an
-open-generic transient via `TryAddTransient`, and registers all built-in advisors with
-`TryAddEnumerable`. The closed-generic overload `AddRepository<TEntity, TImplementation>()` registers a
-single entity's repository so multiple implementations can coexist. See [providers.md](providers.md)
-for provider setup.
+`AddRepository<TEntity, TImplementation>()` is the only registration overload: it registers the
+closed-generic repository as a transient `IRepository<TEntity>`, registers all built-in advisors with
+`TryAddEnumerable`, and returns a `SchemataRepositoryBuilder` for the provider and opt-in verbs shown
+above. Call it once per entity type; multiple implementations can coexist. See
+[providers.md](providers.md) for provider setup.
 
 ## Extension points
 

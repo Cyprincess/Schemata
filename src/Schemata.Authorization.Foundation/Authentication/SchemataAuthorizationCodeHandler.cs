@@ -20,6 +20,7 @@ using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
@@ -191,6 +192,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         var reference = issuer.CreateReference();
         var now       = _time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
+            Name              = Identifiers.NewUid().ToString("n"),
             Type              = TokenTypes.AuthorizationCode,
             Status            = TokenStatuses.Valid,
             ReferenceId       = reference,

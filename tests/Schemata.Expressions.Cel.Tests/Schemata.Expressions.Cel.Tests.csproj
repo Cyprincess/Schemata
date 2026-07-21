@@ -1,11 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- F12c exemption: CelSpecLoader is a conformance harness reading specs/cel-spec vectors; real-file access is intentional (mirrors Flow.Bpmn.Conformance.Tests precedent). -->
+
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>

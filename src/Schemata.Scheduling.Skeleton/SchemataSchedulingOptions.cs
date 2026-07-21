@@ -24,6 +24,9 @@ public class SchemataSchedulingOptions
     /// </summary>
     public MissedFirePolicy MissedFirePolicy { get; set; } = MissedFirePolicy.FireOnce;
 
+    /// <summary>Maximum number of missed occurrences replayed by <see cref="MissedFirePolicy.FireAll" />.</summary>
+    public int MaxMissedWalk { get; set; } = 100_000;
+
     /// <summary>Interval between persisted operation state reads while waiting in-process.</summary>
     public TimeSpan OperationPollInterval { get; set; } = TimeSpan.FromMilliseconds(500);
 }

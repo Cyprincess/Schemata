@@ -61,7 +61,7 @@ for verbs excluded by `ResourceAttribute.Operations`.
 | -------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- | ------- |
 | `GET`    | `/v1/{collectionPath}`        | `ListAsync([FromQuery] ListRequest)`                                                                        | AIP-132 |
 | `POST`   | `/v1/{collectionPath}`        | `CreateAsync([FromBody] TRequest)` → `201 Created`                                                          | AIP-133 |
-| `GET`    | `/v1/{collectionPath}/{name}` | `GetAsync(string name, [FromQuery] string? readMask)`                                                       | AIP-131 |
+| `GET`    | `/v1/{collectionPath}/{name}` | `GetAsync(string name)`                                                                                     | AIP-131 |
 | `PATCH`  | `/v1/{collectionPath}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)`                                                             | AIP-134 |
 | `DELETE` | `/v1/{collectionPath}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery(Name = "allow_missing")] bool allowMissing)` | AIP-135 |
 

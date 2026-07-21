@@ -32,18 +32,6 @@ public class AdviceUpdateSoftDeletedShould
     }
 
     [Fact]
-    public async Task Suppressed_Continues() {
-        var advisor = new AdviceUpdateSoftDeleted<TrashStudent, TrashStudent>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SoftDeleteGuardSuppressed());
-        var entity = new TrashStudent { CanonicalName = "trashStudents/alice-1", DeleteTime = DateTime.UtcNow };
-
-        var result = await advisor.AdviseAsync(ctx, new(), entity, null);
-
-        Assert.Equal(AdviseResult.Continue, result);
-    }
-
-    [Fact]
     public async Task NonSoftDeleteEntity_Continues() {
         var advisor = new AdviceUpdateSoftDeleted<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());

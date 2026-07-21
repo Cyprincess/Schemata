@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using Xunit;
 
@@ -7,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class GeneratorOutputShould
 {
     [Fact]
-    public void Parse_MinimalDocument_ProducesDocument() {
+    public void Parse_DocumentWithNamespaceAndOneEntity_BindsNamespaceAndEntityName() {
         var input = "Namespace Test.Output\n\nEntity User {\n  string name\n}";
         var doc   = Parser.Document.Parse(input);
         Assert.NotNull(doc);
@@ -17,7 +16,7 @@ public class GeneratorOutputShould
     }
 
     [Fact]
-    public void Parse_DocumentWithEnumAndEntity() {
+    public void Parse_EntityWithNestedEnumAndTwoFields_BindsEnumerationAndFieldCount() {
         var input = """
             Namespace Test.Output
 
@@ -40,7 +39,7 @@ public class GeneratorOutputShould
     }
 
     [Fact]
-    public void Parse_DocumentWithTraitAndEntity() {
+    public void Parse_EntityUsingTrait_RegistersTraitAndEntityUseReference() {
         var input = """
             Namespace Test.Output
 
@@ -61,8 +60,8 @@ public class GeneratorOutputShould
     }
 
     [Fact]
-    public void Parse_Vector1File_ProducesCompleteDocument() {
-        var text = File.ReadAllText("vector1.skm");
+    public void Parse_Vector1Fixture_BindsNamespaceEntitiesTraitsViewsAndPointers() {
+        var text = VectorResources.ReadText(VectorResources.Vector1Skm);
         var doc  = Parser.Document.Parse(text);
         Assert.NotNull(doc);
         Assert.Equal("DSL.Tests.Vectors", doc.Namespace);

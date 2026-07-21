@@ -19,6 +19,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -104,6 +105,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
+            Name        = Identifiers.NewUid().ToString("n"),
             Application = authz.Application.CanonicalName,
             Type        = TokenTypes.Interaction,
             Status      = TokenStatuses.Valid,

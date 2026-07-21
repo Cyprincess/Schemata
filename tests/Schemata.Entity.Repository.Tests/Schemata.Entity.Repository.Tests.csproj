@@ -7,11 +7,13 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.Owner\Schemata.Entity.Owner.csproj" />
   </ItemGroup>
 
 </Project>

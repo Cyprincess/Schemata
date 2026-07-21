@@ -1,3 +1,3 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public sealed record Property(string Key, IExpression Value);
+internal sealed record Property(string Key, IExpression Value);

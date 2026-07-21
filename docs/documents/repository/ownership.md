@@ -6,13 +6,14 @@ Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the a
 
 ## Where the code lives
 
-| Item                             | Path                                                                          |
-| -------------------------------- | ----------------------------------------------------------------------------- |
-| `IOwnerResolver<TEntity>`        | `src/Schemata.Entity.Owner/IOwnerResolver.cs`                                 |
-| `SchemataOwnerOptions`           | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs`                           |
-| `AdviceAddOwner<TEntity>`        | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs`                        |
-| `AdviceBuildQueryOwner<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                 |
-| `UseOwner` extension             | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs` |
+| Item                                            | Path                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `IOwnerResolver<TEntity>`                       | `src/Schemata.Entity.Owner/IOwnerResolver.cs`                                            |
+| `SchemataOwnerOptions`                          | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs`                                      |
+| `AdviceAddOwner<TEntity>`                       | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs`                                   |
+| `AdviceBuildQueryOwner<TEntity>`                | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                            |
+| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceValidateResourceReferenceExistence.cs`     |
+| `UseOwner` extension                            | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs`            |
 
 ## IOwnerResolver
 
@@ -31,7 +32,7 @@ public interface IOwnerResolver<TEntity>
 
 `AdviceAddOwner<TEntity>` implements `IRepositoryAddAdvisor<TEntity>`. It runs during the add mutation pipeline and populates `IOwnable.Owner`.
 
-**Order:** `AdviceAddCanonicalName.DefaultOrder + 10_000_000` = 130,000,000. Runs after `AdviceAddCanonicalName` so the entity's own canonical name is settled before the owner is assigned.
+**Order:** `AdviceAddCanonicalName.DefaultOrder + 1_000_000` = 121,000,000. Runs after `AdviceAddCanonicalName` so the entity's own canonical name is settled before the owner is assigned.
 
 **Behavior:**
 
@@ -57,14 +58,36 @@ public interface IOwnerResolver<TEntity>
 3. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If non-empty, appends `.OfType<IOwnable>().Where(e => e.Owner == owner).OfType<TEntity>()`.
 4. When the resolver returns `null`, applies `SchemataOwnerOptions.OnNullOwner` (same policy as `AdviceAddOwner`).
 
+### AdviceValidateResourceReferenceExistence
+
+`AdviceValidateResourceReferenceExistence<TEntity>` implements both `IRepositoryAddAdvisor<TEntity>` and
+`IRepositoryUpdateAdvisor<TEntity>`. It lives in the ownership package because its existence queries
+must suppress the owner filter (`QueryOwnerSuppressed`), which `Schemata.Entity.Repository` cannot
+reference without a dependency cycle.
+
+**Order:** `AdviceValidateResourceReferences.DefaultOrder + 10_000_000` = 150,000,000, on both the add
+and update pipelines. Type resolvability is established before any existence query executes.
+
+**Behavior:**
+
+1. Collects the entity's string properties carrying `[ResourceReference(ValidateExistence = true)]`. An
+   entity with none is skipped in constant time.
+2. Resolves the target type: the attribute's `Target` when set, otherwise
+   `IResourceTypeResolver.Resolve(value)` for polymorphic references. Targets that do not implement
+   `ICanonicalName` are skipped; an unregistered `IResourceTypeResolver` throws
+   `InvalidOperationException`.
+3. Queries the target's `IRepository<TTarget>` for any row with the matching `CanonicalName`, with
+   `QueryOwnerSuppressed` applied so cross-owner references resolve.
+4. A missing row throws `NotFoundException` (`SchemataResourceErrors.NotFound(target, value)`).
+
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseOwner();
 ```
 
-`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` as `IRepositoryBuildQueryAdvisor<>`, and `AdviceAddOwner<>` as `IRepositoryAddAdvisor<>`. All registrations use `TryAddEnumerable` so they don't displace custom advisors.
+`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` as `IRepositoryBuildQueryAdvisor<>`, `AdviceAddOwner<>` as `IRepositoryAddAdvisor<>`, and `AdviceValidateResourceReferenceExistence<>` as both `IRepositoryAddAdvisor<>` and `IRepositoryUpdateAdvisor<>`. All registrations use `TryAddEnumerable` so they don't displace custom advisors.
 
 You must also register a concrete `IOwnerResolver<TEntity>`. A typical implementation reads the current principal from `IHttpContextAccessor`:
 

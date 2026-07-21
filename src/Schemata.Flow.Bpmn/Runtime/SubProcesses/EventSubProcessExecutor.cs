@@ -31,6 +31,7 @@ public sealed class EventSubProcessExecutor
         SchemataProcessToken          addressed,
         List<SchemataProcessToken>    working,
         IEventDefinition              trigger,
+        object?                       payload,
         FlowExecutionContext          execution
     ) {
         ArgumentNullException.ThrowIfNull(engine);
@@ -43,9 +44,9 @@ public sealed class EventSubProcessExecutor
         var scopeMap = ProcessScopeMap.Build(definition, process);
         foreach (var scopeName in scopeMap.ScopeChain(process, addressed.ScopeName)) {
             foreach (var candidate in scopeMap.EventSubProcessesInScope(scopeName)) {
-                var start = candidate.FindMatchingStart(definition => BpmnEngine.EventMatches(definition, trigger));
+                var start = candidate.FindMatchingStart(definition => FlowEventMatcher.Matches(definition, trigger));
                 if (start is not null) {
-                    return await FireAsync(engine, definition, process, addressed, working, candidate, start, scopeName, trigger, scopeMap, execution);
+                    return await FireAsync(engine, definition, process, addressed, working, candidate, start, scopeName, trigger, payload, scopeMap, execution);
                 }
             }
         }
@@ -63,6 +64,7 @@ public sealed class EventSubProcessExecutor
         FlowEvent                     start,
         string                        parentScopeName,
         IEventDefinition              trigger,
+        object?                       payload,
         ProcessScopeMap               scopeMap,
         FlowExecutionContext          execution
     ) {
@@ -97,7 +99,8 @@ public sealed class EventSubProcessExecutor
             BpmnEngine.TokenView(addressed),
             execution,
             process,
-            addressed);
+            addressed,
+            payload);
         var child = NewEventSubProcessToken(process, eventSubProcess, addressed, resolved);
         working.Add(child);
 
@@ -110,7 +113,7 @@ public sealed class EventSubProcessExecutor
             trigger.Name));
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     private static SchemataProcessToken NewEventSubProcessToken(

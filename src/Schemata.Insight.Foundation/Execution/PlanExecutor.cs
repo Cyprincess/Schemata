@@ -19,6 +19,10 @@ namespace Schemata.Insight.Foundation;
 ///     it drives each source independently and joins / aggregates locally. Pagination and the
 ///     total-size mode are applied through <see cref="ResidualPage" />.
 /// </summary>
+/// <remarks>
+///     A top-level <see cref="LimitNode" /> is applied by residual pagination. Expression-selection
+///     values are evaluated by the local pipeline; source materialization supplies their input fields.
+/// </remarks>
 public sealed class PlanExecutor
 {
     private const int DefaultPageSize = 25;
@@ -89,7 +93,7 @@ public sealed class PlanExecutor
         var root = plan is LimitNode limit ? limit.Input : plan;
         if (root.SourceSet.Count > 1) {
             return ValueTask.FromResult(new MaterializedQuery(
-                JoinSchema(root),
+                TerminalSchema(root),
                 Evaluate(root, request, principal, enforceSecurity, ct)
             ));
         }
@@ -120,7 +124,7 @@ public sealed class PlanExecutor
             );
         }
 
-        var (pushable, localStages) = Split(root);
+        var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
@@ -159,7 +163,7 @@ public sealed class PlanExecutor
 
         return new() {
             Rows          = page,
-            Schema        = [..result.Schema],
+            Schema        = ResultSchema(result.Schema, localStages),
             NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : estimate ?? total,
         };
@@ -185,7 +189,7 @@ public sealed class PlanExecutor
             );
         }
 
-        var (pushable, localStages) = Split(root);
+        var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
         var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
         try {
@@ -193,7 +197,7 @@ public sealed class PlanExecutor
                 ? result.Rows
                 : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
 
-            return new([..result.Schema], rows, result);
+            return new(ResultSchema(result.Schema, localStages), rows, result);
         } catch {
             await result.DisposeAsync();
             throw;
@@ -224,7 +228,7 @@ public sealed class PlanExecutor
 
         return new() {
             Rows          = page,
-            Schema        = JoinSchema(root),
+            Schema        = TerminalSchema(root),
             NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : total,
         };
@@ -286,7 +290,7 @@ public sealed class PlanExecutor
             );
         }
 
-        var (pushable, localStages) = Split(node);
+        var (pushable, localStages) = Split(node, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
@@ -296,17 +300,16 @@ public sealed class PlanExecutor
         }
     }
 
-    private static ImmutableArray<FieldDescriptor> JoinSchema(PlanNode root) {
-        var selection = FindSelection(root);
-        if (selection is null || selection.Items.IsDefaultOrEmpty) {
+    // Built before the lazy per-source drivers open; field descriptors stay generic and follow
+    // the local Select output's names and order.
+    private static ImmutableArray<FieldDescriptor> TerminalSchema(PlanNode root) {
+        if (FindSelection(root) is not { Items.IsDefaultOrEmpty: false } selection) {
             return [];
         }
 
         var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
-        foreach (var item in selection.Items) {
-            fields.Add(new(item.Alias, FieldType.Object, null, item.Kind is SelectionKind.Nested, []));
-        }
-
+        AddSelectionFields(selection.Items, false, [], fields);
+        AddSelectionFields(selection.Items, true, [], fields);
         return fields.ToImmutable();
     }
 
@@ -323,13 +326,13 @@ public sealed class PlanExecutor
     }
 
     /// <summary>
-    ///     Splits the plan at the lowest stage the driver cannot push. Everything from the first
-    ///     <see cref="ComputeNode" /> / <see cref="GroupNode" /> upward runs locally; the contiguous
-    ///     filter / order chain above the source is handed to the driver. When local stages follow, the
-    ///     driver streams the full source row (its selection moves to the local terminal stage) so the
-    ///     local stages can reference every source field.
+    ///     Splits a single-source plan at the first local stage, using the selected driver's declared
+    ///     capabilities to form the pushed prefix.
     /// </summary>
-    private static (PlanNode Pushable, IReadOnlyList<PlanNode> Local) Split(PlanNode root) {
+    private static (PlanNode Pushable, IReadOnlyList<PlanNode> Local) Split(
+        PlanNode           root,
+        DriverCapabilities capabilities
+    ) {
         var chain = new List<PlanNode>();
         for (var node = root; node is not SourceNode;) {
             chain.Add(node);
@@ -340,7 +343,7 @@ public sealed class PlanExecutor
 
         var barrier = -1;
         for (var i = chain.Count - 1; i >= 0; i--) {
-            if (chain[i] is ComputeNode or GroupNode || IsNestedSelection(chain[i])) {
+            if (!CanPush(chain[i], capabilities)) {
                 barrier = i;
                 break;
             }
@@ -350,22 +353,19 @@ public sealed class PlanExecutor
             return (root, []);
         }
 
-        // A nested selection materializes its child lists in the driver (entity access), then re-runs
-        // locally for the child sub-pipelines and the terminal flatten; so it lives in both halves.
-        var pushSelection = IsNestedSelection(chain[barrier]) ? chain[barrier] : null;
+        var terminalSelection = FindTerminalSelection(chain, barrier);
+        var pushSelection = terminalSelection is not null && HasNested(terminalSelection)
+                         && capabilities.HasFlag(DriverCapabilities.Nested)
+            ? terminalSelection with { Items = NestedItems(terminalSelection.Items) }
+            : null;
 
         PlanNode pushable = source;
         for (var i = chain.Count - 1; i > barrier; i--) {
-            pushable = chain[i] switch {
-                FilterNode filter => filter with { Input = pushable },
-                OrderNode order   => order with { Input = pushable },
-                var node          => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                                         $"Stage '{node.GetType().Name}' cannot precede a local barrier on the driver."),
-            };
+            pushable = WithInput(chain[i], pushable);
         }
 
-        if (pushSelection is SelectionNode selection) {
-            pushable = selection with { Input = pushable };
+        if (pushSelection is not null) {
+            pushable = pushSelection with { Input = pushable };
         }
 
         var local = new List<PlanNode>(barrier + 1);
@@ -376,18 +376,150 @@ public sealed class PlanExecutor
         return (pushable, local);
     }
 
-    private static bool IsNestedSelection(PlanNode node) {
-        if (node is not SelectionNode selection) {
+    private static bool CanPush(PlanNode node, DriverCapabilities capabilities) {
+        if (node is LimitNode) {
             return false;
         }
 
+        if (node is SelectionNode selection) {
+            var hasExpression = HasExpression(selection);
+            var hasNested     = HasNested(selection);
+
+            // Expression selections are fully local: the driver supplies raw input fields, while the
+            // local pipeline evaluates the expression and assigns its output alias.
+            if (hasExpression && !hasNested) {
+                return false;
+            }
+
+            // Nested selections are two-sided: the driver materializes child collections, and the
+            // local pipeline applies each child collection's filter, order, limit, and projection.
+            // Mixed selections retain this split so local expression evaluation never loses children.
+            if (hasNested) {
+                return false;
+            }
+
+            return capabilities.HasFlag(DriverCapabilities.Project);
+        }
+
+        var required = node switch {
+            FilterNode  => DriverCapabilities.Filter,
+            ComputeNode => DriverCapabilities.Compute,
+            GroupNode   => DriverCapabilities.Group,
+            OrderNode   => DriverCapabilities.Order,
+            var stage   => throw new InsightValidationException(
+                               InsightReasons.Unimplemented,
+                               $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+        };
+
+        return capabilities.HasFlag(required);
+    }
+
+    private static SelectionNode? FindTerminalSelection(IReadOnlyList<PlanNode> chain, int barrier) {
+        for (var i = 0; i <= barrier; i++) {
+            if (chain[i] is SelectionNode selection) {
+                return selection;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool HasExpression(SelectionNode selection) {
         foreach (var item in selection.Items) {
-            if (item.Kind is SelectionKind.Nested or SelectionKind.Expression) {
+            if (item.Kind is SelectionKind.Expression) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool HasNested(SelectionNode selection) {
+        foreach (var item in selection.Items) {
+            if (item.Kind is SelectionKind.Nested) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ImmutableArray<SelectionItem> NestedItems(ImmutableArray<SelectionItem> items) {
+        var nested = ImmutableArray.CreateBuilder<SelectionItem>();
+        foreach (var item in items) {
+            if (item.Kind is SelectionKind.Nested) {
+                nested.Add(item);
+            }
+        }
+
+        return nested.ToImmutable();
+    }
+
+    private static ImmutableArray<FieldDescriptor> ResultSchema(
+        IReadOnlyList<FieldDescriptor> driverSchema,
+        IReadOnlyList<PlanNode>        localStages
+    ) {
+        if (localStages.Count == 0 || localStages[^1] is not SelectionNode selection || selection.Items.IsDefaultOrEmpty) {
+            return [..driverSchema];
+        }
+
+        var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
+        AddSelectionFields(selection.Items, false, driverSchema, fields);
+        AddSelectionFields(selection.Items, true, driverSchema, fields);
+        return fields.ToImmutable();
+    }
+
+    private static void AddSelectionFields(
+        ImmutableArray<SelectionItem>                   items,
+        bool                                            expressions,
+        IReadOnlyList<FieldDescriptor>                  driverSchema,
+        ImmutableArray<FieldDescriptor>.Builder         fields
+    ) {
+        foreach (var item in items) {
+            if ((item.Kind is SelectionKind.Expression) != expressions) {
+                continue;
+            }
+
+            fields.Add(FieldFor(item, driverSchema));
+        }
+    }
+
+    private static FieldDescriptor FieldFor(SelectionItem item, IReadOnlyList<FieldDescriptor> driverSchema) {
+        if (item.Kind is SelectionKind.Expression) {
+            return new(item.Alias, FieldType.Object, null, false, []);
+        }
+
+        var path = item.FieldPath;
+        var name = path is null ? null : LastSegment(path);
+        foreach (var field in driverSchema) {
+            if (string.Equals(field.Name, item.Alias, StringComparison.Ordinal)
+             || (name is not null && string.Equals(field.Name, name, StringComparison.Ordinal))) {
+                return field with { Name = item.Alias };
+            }
+        }
+
+        return item.Kind is SelectionKind.Nested
+            ? new(item.Alias, FieldType.Object, null, true, [])
+            : new(item.Alias, FieldType.Object, null, false, []);
+    }
+
+    private static string LastSegment(string path) {
+        var index = path.LastIndexOf('.');
+        return index < 0 ? path : path[(index + 1)..];
+    }
+
+    private static PlanNode WithInput(PlanNode node, PlanNode input) {
+        return node switch {
+            FilterNode filter       => filter with { Input = input },
+            ComputeNode compute     => compute with { Input = input },
+            GroupNode group         => group with { Input = input },
+            OrderNode order         => order with { Input = input },
+            LimitNode limit         => limit with { Input = input },
+            SelectionNode selection => selection with { Input = input },
+            var stage               => throw new InsightValidationException(
+                                           InsightReasons.Unimplemented,
+                                           $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+        };
     }
 
     private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ToAsync(

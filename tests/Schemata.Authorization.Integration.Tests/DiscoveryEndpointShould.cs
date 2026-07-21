@@ -38,6 +38,16 @@ public class DiscoveryEndpointShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Discovery_WithEnabledGrantFlows_AdvertisesClientCredentialsAndRefreshToken() {
+        var response = await _client.GetAsync("/.well-known/openid-configuration");
+        var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var grants   = json.RootElement.GetProperty("grant_types_supported");
+
+        Assert.Contains(grants.EnumerateArray(), grant => grant.GetString() == "client_credentials");
+        Assert.Contains(grants.EnumerateArray(), grant => grant.GetString() == "refresh_token");
+    }
+
+    [Fact]
     public async Task Issuer_MatchesConfiguration() {
         var response = await _client.GetAsync("/.well-known/openid-configuration");
         var json     = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());

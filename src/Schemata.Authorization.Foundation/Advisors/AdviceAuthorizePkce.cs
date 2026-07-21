@@ -71,7 +71,7 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (!IsValidCodeChallenge(authz.Request.CodeChallenge)) {
+        if (!PkceValidation.IsValid(authz.Request.CodeChallenge)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.CodeChallenge)
@@ -111,22 +111,4 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
     }
 
     #endregion
-
-    private static bool IsValidCodeChallenge(string value) {
-        if (value.Length is < 43 or > 128) {
-            return false;
-        }
-
-        foreach (var c in value) {
-            var valid = c is >= 'A' and <= 'Z'
-                     or >= 'a' and <= 'z'
-                     or >= '0' and <= '9'
-                     or '-' or '.' or '_' or '~';
-            if (!valid) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

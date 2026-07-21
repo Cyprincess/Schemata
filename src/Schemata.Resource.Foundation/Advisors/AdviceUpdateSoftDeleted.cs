@@ -29,7 +29,6 @@ public static class AdviceUpdateSoftDeleted
 ///     deleted must be restored before it can be mutated.
 ///     Throws <see cref="FailedPreconditionException" /> when the loaded entity carries a
 ///     <see cref="ISoftDelete.DeleteTime" />.
-///     Suppressed when <see cref="SoftDeleteGuardSuppressed" /> is present.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -48,10 +47,6 @@ public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest> : IResourceUpdate
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
-        if (ctx.Has<SoftDeleteGuardSuppressed>()) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
         if (entity is ISoftDelete { DeleteTime: not null }) {
             throw SchemataResourceErrors.PreconditionFailed<TEntity>(
                 entity.CanonicalName,

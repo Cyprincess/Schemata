@@ -18,6 +18,12 @@ public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdenti
     /// <summary>Optional canonical name of the source entity bound to the process instance.</summary>
     public string? Source { get; set; }
 
+    /// <summary>
+    ///     Optional key that prevents concurrent live instances of the same process definition.
+    ///     This is distinct from <see cref="RequestId" />, which replays a transport request.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
+
     #region ICanonicalName Members
 
     public string? Name { get; set; }

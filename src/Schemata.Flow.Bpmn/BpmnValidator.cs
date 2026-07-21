@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.Skeleton.Utilities;
 
 namespace Schemata.Flow.Bpmn;
@@ -26,6 +28,8 @@ public static class BpmnValidator
         var start = ProcessStructureValidator.RequireSingleStartEvent(definition);
         ProcessStructureValidator.RequireEndEvents(definition);
 
+        ProcedureTaskPayloadValidator.Validate(definition);
+        ValidateUnsupportedShapes(definition);
         ProcessStructureValidator.ValidateFlowIntegrity(definition);
         ProcessStructureValidator.ValidateEnterTaskRouting(definition);
         ValidateExclusiveGateways(definition);
@@ -42,6 +46,16 @@ public static class BpmnValidator
         ValidateBoundaryEvents(definition);
         ValidateCancelBoundaries(definition);
         ProcessStructureValidator.ValidateReachability(definition, start);
+    }
+
+    private static void ValidateUnsupportedShapes(ProcessDefinition definition) {
+        foreach (var element in definition.AllElements) {
+            var unsupported = element is AdHocSubProcess
+                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition };
+            if (unsupported) {
+                throw new InvalidOperationException($"BPMN definition shape '{element.GetType().Name}' is not supported.");
+            }
+        }
     }
 
 

@@ -11,7 +11,7 @@ public static class AdviceAddCanonicalName
 {
     /// <summary>
     ///     Default execution order: after <see cref="AdviceAddConcurrency{TEntity}" />
-    ///     (210,000,000 + 10,000,000 = 220,000,000).
+    ///     (110,000,000 + 10,000,000 = 120,000,000).
     /// </summary>
     public const int DefaultOrder = AdviceAddConcurrency.DefaultOrder + 10_000_000;
 }

@@ -81,7 +81,7 @@ internal static class FileDescriptorBridge
         messages[listResultType] = $"List{descriptor.Plural}Response";
 
         foreach (var method in methods) {
-            var iface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
+            var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
             if (iface is null) {
                 continue;
             }
@@ -148,7 +148,7 @@ internal static class FileDescriptorBridge
         }
 
         foreach (var method in methods) {
-            var iface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
+            var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
             if (iface is null) {
                 continue;
             }

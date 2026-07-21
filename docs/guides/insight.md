@@ -149,7 +149,6 @@ Add a child collection to the Student model:
 ```csharp
 using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Bpmn.Conformance.Tests.Adapters;
@@ -67,7 +68,9 @@ public class BpmnConformanceShould
             DefinitionName = definition.Name,
         };
 
-        var execution = new FlowExecutionContext(new TestUnitOfWork(), new ServiceCollection().BuildServiceProvider());
+        var execution = new FlowExecutionContext(
+            new Mock<IUnitOfWork>(MockBehavior.Strict).Object,
+            new ServiceCollection().BuildServiceProvider());
         var snapshot = await engine.StartAsync(definition, process, execution, CancellationToken.None);
         for (var i = 0; i < 64 && !TerminalStates.Contains(snapshot.Process.State ?? string.Empty); i++) {
             var active = snapshot.Tokens.FirstOrDefault(token => string.Equals(token.State, "Active", StringComparison.OrdinalIgnoreCase));
@@ -79,17 +82,6 @@ public class BpmnConformanceShould
         }
 
         return snapshot;
-    }
-
-    private sealed class TestUnitOfWork : IUnitOfWork
-    {
-        public ValueTask DisposeAsync() { return ValueTask.CompletedTask; }
-
-        public void Dispose() { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RollbackAsync(CancellationToken ct = default) { return Task.CompletedTask; }
     }
 
     private static bool IsPendingValidation(Exception ex) {

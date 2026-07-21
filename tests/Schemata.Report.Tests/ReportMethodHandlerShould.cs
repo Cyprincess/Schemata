@@ -1,7 +1,7 @@
+// PipelineHandler is a pipeline seam participant exercised through ResourceMethodOperationHandler.
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,7 +37,7 @@ public class ReportMethodHandlerShould
                   });
 
         using var provider = ReportTestHost.Create(
-            new(ReportTestRows.Create(1)),
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
             state,
             configure: services => {
                 services.AddSingleton(operations.Object);
@@ -59,12 +59,13 @@ public class ReportMethodHandlerShould
 
     [Fact]
     public async Task Generate_Async_Returns_Pending_Operation() {
-        var scheduler  = new ReportTestScheduler();
+        JobContext? context = null;
+        var scheduler  = ReportTestHost.CreateScheduler((triggerContext, _) => context = triggerContext);
         var operations = new Mock<IOperationService>(MockBehavior.Strict);
         using var provider = ReportTestHost.Create(
-            new(ReportTestRows.Create(1)),
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
             configure: services => {
-                services.AddSingleton<IScheduler>(scheduler);
+                services.AddSingleton(scheduler.Object);
                 services.AddSingleton(operations.Object);
                 services.AddScoped<GenerateHandler<SchemataReport>>();
             });
@@ -74,7 +75,13 @@ public class ReportMethodHandlerShould
         var result = await handler.InvokeAsync(null, GenerateRequest(), null, null, default);
 
         Assert.False(result.Done);
-        Assert.Equal("generate", scheduler.Context!.Method);
+        Assert.NotNull(context);
+        Assert.Equal("generate", context!.Method);
+        scheduler.Verify(
+            value => value.TriggerAsync<ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(
+                It.IsAny<JobContext>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
         operations.VerifyNoOtherCalls();
     }
 
@@ -84,9 +91,10 @@ public class ReportMethodHandlerShould
             CanonicalName = "reports/daily/snapshots/current",
             ChunkCount    = 3,
         };
-        var store   = new SnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)]);
+        var loadedChunkIndexes = new List<int>();
+        var store = CreateSnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)], loadedChunkIndexes);
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 2_000 });
-        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store, options);
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
         var first = await handler.InvokeAsync(
             snapshot.CanonicalName,
@@ -105,16 +113,18 @@ public class ReportMethodHandlerShould
         Assert.NotNull(first.NextPageToken);
         Assert.Equal(1_500, second.Rows.Count);
         Assert.Null(second.NextPageToken);
-        Assert.Equal([0, 1, 1, 2], store.LoadedChunkIndexes);
+        Assert.Equal([0, 1, 1, 2], loadedChunkIndexes);
     }
 
     [Fact]
     public async Task Read_Invalid_Token_Throws_InvalidArgument() {
         var snapshot = new SchemataReportSnapshot { CanonicalName = "reports/daily/snapshots/current" };
         var options  = Options.Create(new SchemataReportOptions());
-        var handler  = new ReadSnapshotHandler<SchemataReportSnapshot>(new SnapshotStore(snapshot, []), options);
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(
+            CreateSnapshotStore(snapshot, [], []).Object,
+            options);
 
-        await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
+        var error = await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
             await handler.InvokeAsync(
                 snapshot.CanonicalName,
                 new ReadSnapshotRequest { PageToken = "not-a-report-token" },
@@ -122,6 +132,8 @@ public class ReportMethodHandlerShould
                 null,
                 default);
         });
+
+        Assert.Contains("not-a-report-token", error.Message);
     }
 
     [Fact]
@@ -130,9 +142,10 @@ public class ReportMethodHandlerShould
             CanonicalName = "reports/daily/snapshots/current",
             ChunkCount    = 3,
         };
-        var store   = new SnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)]);
+        var loadedChunkIndexes = new List<int>();
+        var store = CreateSnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)], loadedChunkIndexes);
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 1_000 });
-        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store, options);
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
         var page = await handler.InvokeAsync(
             snapshot.CanonicalName,
@@ -143,7 +156,7 @@ public class ReportMethodHandlerShould
 
         Assert.Equal(1_000, page.Rows.Count);
         Assert.NotNull(page.NextPageToken);
-        Assert.Equal([0], store.LoadedChunkIndexes);
+        Assert.Equal([0], loadedChunkIndexes);
     }
 
     [Fact]
@@ -230,41 +243,26 @@ public class ReportMethodHandlerShould
         }
     }
 
-    private sealed class SnapshotStore(
-        SchemataReportSnapshot            snapshot,
-        IReadOnlyList<SchemataReportSnapshotChunk> chunks
-    ) : IReportSnapshotStore
-    {
-        internal List<int> LoadedChunkIndexes { get; } = [];
-
-        public async IAsyncEnumerable<SchemataReportSnapshot> ListAsync(
-            string reportName,
-            [EnumeratorCancellation] CancellationToken ct = default
-        ) {
-            await Task.CompletedTask;
-            yield return snapshot;
-        }
-
-        public ValueTask<SchemataReportSnapshot?> GetAsync(string snapshotName, CancellationToken ct = default) {
-            return ValueTask.FromResult<SchemataReportSnapshot?>(snapshotName == snapshot.CanonicalName ? snapshot : null);
-        }
-
-        public ValueTask<SchemataReportSnapshotChunk?> GetChunkAsync(
-            string snapshotName,
-            int index,
-            CancellationToken ct = default
-        ) {
-            LoadedChunkIndexes.Add(index);
-            return ValueTask.FromResult<SchemataReportSnapshotChunk?>(
-                snapshotName == snapshot.CanonicalName ? chunks.SingleOrDefault(chunk => chunk.Index == index) : null);
-        }
-
-        public async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ReadRowsAsync(
-            string snapshotName,
-            [EnumeratorCancellation] CancellationToken ct = default
-        ) {
-            await Task.CompletedTask;
-            yield break;
-        }
+    private static Mock<IReportSnapshotStore> CreateSnapshotStore(
+        SchemataReportSnapshot                  snapshot,
+        IReadOnlyList<SchemataReportSnapshotChunk> chunks,
+        List<int>                               loadedChunkIndexes
+    ) {
+        var store = new Mock<IReportSnapshotStore>(MockBehavior.Strict);
+        store.Setup(value => value.ListAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns((string _, CancellationToken _) => ReportTestRows.ToAsync([snapshot]));
+        store.Setup(value => value.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns((string snapshotName, CancellationToken _) =>
+                 ValueTask.FromResult<SchemataReportSnapshot?>(snapshotName == snapshot.CanonicalName ? snapshot : null));
+        store.Setup(value => value.GetChunkAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+             .Returns((string snapshotName, int index, CancellationToken _) => {
+                 loadedChunkIndexes.Add(index);
+                 return ValueTask.FromResult<SchemataReportSnapshotChunk?>(
+                     snapshotName == snapshot.CanonicalName ? chunks.SingleOrDefault(chunk => chunk.Index == index) : null);
+             });
+        store.Setup(value => value.ReadRowsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns((string _, CancellationToken _) =>
+                 ReportTestRows.ToAsync(Array.Empty<IReadOnlyDictionary<string, object?>>()));
+        return store;
     }
 }

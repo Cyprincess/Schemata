@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Schemata.Expressions.Skeleton;
 using Xunit;
 
@@ -9,26 +10,18 @@ public class ExpressionLanguageBuilderExtensionsShould
     [Fact]
     public void Enables_Cel_And_Registers_Resolvable_Compiler() {
         var services = new ServiceCollection();
-        var builder  = new FakeBuilder(services);
+        var languages = new ExpressionLanguageProfile();
+        var builder = new Mock<IExpressionLanguageBuilder>(MockBehavior.Strict);
+        builder.SetupGet(value => value.Services).Returns(services);
+        builder.SetupGet(value => value.Languages).Returns(languages);
 
-        builder.UseCel(e => e.Filtering = FilteringMode.Residual);
+        builder.Object.UseCel(e => e.Filtering = FilteringMode.Residual);
 
-        var entry = Assert.Single(builder.Languages.Languages);
+        var entry = Assert.Single(languages.Languages);
         Assert.Equal(CelLanguage.Name, entry.Language);
         Assert.Equal(FilteringMode.Residual, entry.Filtering);
 
         var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetKeyedService<IExpressionCompiler>(CelLanguage.Name));
     }
-
-    #region Nested type: FakeBuilder
-
-    private sealed class FakeBuilder(IServiceCollection services) : IExpressionLanguageBuilder
-    {
-        public IServiceCollection Services { get; } = services;
-
-        public ExpressionLanguageProfile Languages { get; } = new();
-    }
-
-    #endregion
 }

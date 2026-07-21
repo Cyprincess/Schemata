@@ -6,7 +6,7 @@ namespace Schemata.Core.Tests.Core;
 public class ConfiguratorsShould
 {
     [Fact]
-    public void Set_Get_RoundTrip() {
+    public void Get_AfterSet_InvokesStoredAction() {
         var configurators = new Configurators();
         var called        = false;
 
@@ -32,7 +32,7 @@ public class ConfiguratorsShould
     }
 
     [Fact]
-    public void Set_TwoType_RoundTrip() {
+    public void Get_AfterSet_TwoArgAction_PassesBothArguments() {
         var configurators = new Configurators();
         var captured      = "";
 

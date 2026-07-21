@@ -12,30 +12,33 @@ using LinqToDB.Extensions;
 using LinqToDB.Mapping;
 using LinqToDB.Metadata;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository.Conversions;
 using ColumnAttribute = System.ComponentModel.DataAnnotations.Schema.ColumnAttribute;
 using ConcurrencyCheckAttribute = System.ComponentModel.DataAnnotations.ConcurrencyCheckAttribute;
-using EfPrimaryKey = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
+using PrimaryKeyAttribute = Schemata.Abstractions.Entities.PrimaryKeyAttribute;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
 namespace Schemata.Entity.LinqToDB;
 
 /// <summary>
 ///     LINQ to DB metadata reader that translates <c>System.ComponentModel.DataAnnotations.Schema</c>
-///     attributes and the EF Core 7+ class-level
-///     <see cref="EfPrimaryKey" /> into LINQ to DB mapping attributes.
+///     attributes and Schemata class-level key and index declarations into LINQ to DB mapping attributes.
 /// </summary>
 /// <remarks>
 ///     Translates <see cref="System.ComponentModel.DataAnnotations.Schema.TableAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.ColumnAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />, and
-///     <see cref="EfPrimaryKey" /> into their LINQ to DB equivalents, and maps
+    ///     <see cref="Abstractions.Entities.PrimaryKeyAttribute" /> and <see cref="IndexAttribute" /> into their LINQ to DB equivalents, and maps
 ///     <see cref="ConcurrencyCheckAttribute" /> to
 ///     <see cref="global::LinqToDB.Mapping.OptimisticLockPropertyAttribute" /> with
 ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
 ///     concurrency token drives LINQ to DB's optimistic-update predicate.
-///     Key discovery uses class-level <c>[PrimaryKey]</c> declarations on the entity.
+///     Key discovery uses class-level <c>[SchemataPrimaryKey]</c> declarations on the entity.
+///     Index declarations describe the model but are not emitted by LINQ to DB metadata because
+///     LINQ to DB has no index mapping attribute; applications create indexes through their schema
+///     management path.
 ///     Supported scalar dictionary and scalar collection properties receive a JSON
 ///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
 /// </remarks>
@@ -75,10 +78,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             }
         }
 
-        // EF Core class-level [PrimaryKey] is projected into LinqToDB PrimaryKey marks
-        // per-member from GetAttributes(Type, MemberInfo); nothing to add at the type level.
-
-        return attributes.ToArray();
+        return [.. attributes];
     }
 
     public MappingAttribute[] GetAttributes(Type type, MemberInfo member) {
@@ -88,12 +88,12 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
         var attributes = new List<MappingAttribute>();
 
-        var classKey = type.GetCustomAttribute<EfPrimaryKey>(true);
+        var classKey = type.GetCustomAttribute<PrimaryKeyAttribute>(true);
         if (classKey is not null) {
             var order = 0;
-            foreach (var name in classKey.PropertyNames) {
+            foreach (var name in classKey.Properties) {
                 if (string.Equals(name, member.Name, StringComparison.Ordinal)) {
-                    attributes.Add(new PrimaryKeyAttribute(order));
+                    attributes.Add(new global::LinqToDB.Mapping.PrimaryKeyAttribute(order));
                     break;
                 }
 
@@ -143,7 +143,7 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             }
         }
 
-        return attributes.ToArray();
+        return [.. attributes];
     }
 
     private static Type? TryGetMemberType(MemberInfo member) {

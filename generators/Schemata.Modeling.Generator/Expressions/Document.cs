@@ -1,6 +1,6 @@
 namespace Schemata.Modeling.Generator.Expressions;
 
-public sealed record Document(
+internal sealed record Document(
     string?                     Namespace,
     EquatableArray<Entity>      Entities,
     EquatableArray<Trait>       Traits,

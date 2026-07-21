@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.Linq.Expressions;
+using Schemata.Common;
 using Xunit;
 
 namespace Schemata.Core.Tests.Common;

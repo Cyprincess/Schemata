@@ -4,10 +4,10 @@ using Schemata.Common;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Declares a string-based feature dependency resolved at registration time via
-///     <see cref="AppDomainTypeCache" />. Set <see cref="Optional" /> to
-///     <see langword="true" /> to suppress the error-level log when the dependency is
-///     absent.
+///     Declares a feature dependency resolved at registration time. String names resolve
+///     through <see cref="AppDomainTypeCache" /> and type references are used directly.
+///     Set <see cref="Optional" /> to <see langword="true" /> to suppress the error-level
+///     log when the dependency is absent.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DependsOnAttribute : Attribute
@@ -19,9 +19,23 @@ public sealed class DependsOnAttribute : Attribute
     public DependsOnAttribute(string name) { Name = name; }
 
     /// <summary>
+    ///     Initializes a dependency declaration for a feature type.
+    /// </summary>
+    /// <param name="type">The dependency feature type.</param>
+    public DependsOnAttribute(Type type) {
+        Type = type;
+        Name = type.FullName ?? type.Name;
+    }
+
+    /// <summary>
     ///     Assembly-qualified type name of the dependent feature.
     /// </summary>
     public string Name { get; }
+
+    /// <summary>
+    ///     Dependency feature type when declared with the type-based constructor.
+    /// </summary>
+    public Type? Type { get; }
 
     /// <summary>
     ///     When <see langword="true" />, a missing dependency logs at

@@ -1,11 +1,10 @@
 using System;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Insight.Grpc.Integration.Tests.Fixtures;
 
 [CanonicalName("buyers/{buyer}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Buyer : IIdentifier, ICanonicalName
 {
     public int     Id       { get; set; }

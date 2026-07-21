@@ -81,10 +81,7 @@ public sealed class SchedulingInitializer : BackgroundService
     /// </summary>
     private async Task FailOrphanedRunningAsync(CancellationToken ct) {
         using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetService<IRepository<SchemataJobExecution>>();
-        if (executions is null) {
-            return;
-        }
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
 
         var orphaned = new List<SchemataJobExecution>();
         await foreach (var row in executions.ListAsync(q => q.Where(e => e.State == ExecutionState.Running), ct)) {
@@ -109,14 +106,10 @@ public sealed class SchedulingInitializer : BackgroundService
         await base.StopAsync(ct);
     }
 
-    private async Task ReloadPersistedJobsAsync(CancellationToken ct) {
+    internal async Task ReloadPersistedJobsAsync(CancellationToken ct) {
         using var scope = _services.CreateScope();
 
-        var jobs = scope.ServiceProvider.GetService<IRepository<SchemataJob>>();
-        if (jobs is null) {
-            // No persistence backend is configured; the in-memory schedule is all there is.
-            return;
-        }
+        var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
 
         var active = new List<SchemataJob>();
         await foreach (var job in jobs.ListAsync(q => q.Where(j => j.State == JobState.Active), ct)) {

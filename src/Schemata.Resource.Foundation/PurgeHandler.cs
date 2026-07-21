@@ -47,6 +47,7 @@ public sealed class PurgeHandler<TEntity> : IResourceMethodHandler<TEntity, Purg
         var args = JsonSerializer.Serialize(new PurgeOperationArgs {
             Filter   = request.Filter,
             Language = request.Language,
+            Parent   = request.Parent,
             Force    = request.Force,
         }, SchemataJson.Default);
 

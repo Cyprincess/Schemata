@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class EnumParserShould
 {
     [Fact]
-    public void Parse_BasicEnum() {
+    public void Parse_EnumWithUnnamedValues_BindsNameAndValueNames() {
         var input  = "Enum Status {\n  Draft\n  Published\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -17,7 +17,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_EnumWithExplicitAssignments() {
+    public void Parse_EnumWithIntegerAssignments_BindsNumberLiteralForEachValue() {
         var input  = "Enum Status {\n  Draft = 0\n  Published = 1\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -30,7 +30,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_EnumWithCommas() {
+    public void Parse_EnumWithCommaSeparatedValues_BindsBothValues() {
         var input  = "Enum Status { Draft, Published }";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -38,7 +38,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_EnumValueWithNotes() {
+    public void Parse_EnumValueWithNote_RegistersNoteOnFirstValueOnly() {
         var input  = "Enum Status {\n  Draft {\n    Note 'A draft'\n  }\n  Published\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -48,7 +48,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_EnumWithTopLevelNote() {
+    public void Parse_EnumWithTopLevelNote_BindsNoteAndValues() {
         var input  = "Enum Status {\n  Note 'Status values'\n  Draft\n  Published\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -58,7 +58,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_CaseInsensitive() {
+    public void Parse_LowercaseEnumKeyword_StillBindsPascalCaseName() {
         var input  = "enum Status { Draft }";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -66,7 +66,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_EnumValueWithStringAssignment() {
+    public void Parse_EnumValueWithStringLiteralAssignment_BindsLiteralValue() {
         var input  = "Enum Color {\n  Red = 'red'\n  Blue = 'blue'\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);
@@ -76,7 +76,7 @@ public class EnumParserShould
     }
 
     [Fact]
-    public void Parse_SingleValueEnum() {
+    public void Parse_EnumWithSingleValue_BindsNameAndValueName() {
         var input  = "Enum Singleton {\n  Only\n}";
         var result = Parser.Enumeration.Parse(input);
         Assert.NotNull(result);

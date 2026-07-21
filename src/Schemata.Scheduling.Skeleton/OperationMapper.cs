@@ -18,7 +18,7 @@ public static class OperationMapper
         var operation = new Operation {
             Name          = execution.Name ?? execution.Uid.ToString("n"),
             CanonicalName = execution.CanonicalName ?? $"operations/{execution.Uid:n}",
-            Done          = IsTerminal(execution.State),
+            Done          = execution.State.IsTerminal(),
             Metadata = new() {
                 Method    = execution.Method,
                 Job       = execution.Job,
@@ -36,9 +36,5 @@ public static class OperationMapper
         }
 
         return operation;
-    }
-
-    private static bool IsTerminal(ExecutionState state) {
-        return state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
     }
 }

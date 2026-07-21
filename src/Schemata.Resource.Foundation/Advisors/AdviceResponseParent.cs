@@ -14,10 +14,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 public static class AdviceResponseParent
 {
     /// <summary>
-    ///     Default order anchored at <see cref="SchemataConstants.Orders.Base" /> so
-    ///     <see cref="IChild.Parent" /> is populated before
-    ///     <see cref="AdviceResponseFreshness" /> and <see cref="AdviceResponseReadMask" />,
-    ///     both of which chain off this constant.
+    ///     Default order at <see cref="SchemataConstants.Orders.Base" />.
     /// </summary>
     public const int DefaultOrder = SchemataConstants.Orders.Base;
 }

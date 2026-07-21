@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Report.Skeleton;
@@ -9,16 +8,19 @@ namespace Schemata.Report.Tests;
 
 public class ReportRetentionShould
 {
+    private static readonly DateTime Anchor = new(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
     [Fact]
     public async Task Retention_MaxCount_Removes_Oldest_With_Chunks() {
-        var now = DateTime.UtcNow;
+        var clock = new MutableClock(Anchor);
         var state = new ReportPersistenceState();
-        state.SuccessfulCaptureTimes.Enqueue(now.AddMinutes(-3));
-        state.SuccessfulCaptureTimes.Enqueue(now.AddMinutes(-2));
-        state.SuccessfulCaptureTimes.Enqueue(now.AddMinutes(-1));
+        state.SuccessfulCaptureTimes.Enqueue(Anchor.AddMinutes(-3));
+        state.SuccessfulCaptureTimes.Enqueue(Anchor.AddMinutes(-2));
+        state.SuccessfulCaptureTimes.Enqueue(Anchor.AddMinutes(-1));
         var report = Report("daily", new() { MaxCount = 2 });
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)), state, chunkSize: 1, report: report);
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, chunkSize: 1, report: report,
+            configure: services => services.AddSingleton<TimeProvider>(clock));
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.NamedRequest("daily"));
@@ -34,13 +36,15 @@ public class ReportRetentionShould
 
     [Fact]
     public async Task Retention_MaxAge_Removes_Expired() {
+        var clock = new MutableClock(Anchor);
         var state = new ReportPersistenceState();
-        var expired = Snapshot("daily", "expired", SnapshotState.Succeeded, DateTime.UtcNow.AddDays(-2));
+        var expired = Snapshot("daily", "expired", SnapshotState.Succeeded, Anchor.AddDays(-2));
         state.Snapshots.Add(expired);
         state.Chunks.Add(Chunk(expired));
         var report = Report("daily", new() { MaxAgeDays = 1 });
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)), state, report: report);
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: report,
+            configure: services => services.AddSingleton<TimeProvider>(clock));
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.NamedRequest("daily"));
@@ -50,14 +54,37 @@ public class ReportRetentionShould
     }
 
     [Fact]
+    public async Task Retention_MaxAge_Cutoff_Is_Exact_To_A_Tick() {
+        var clock  = new MutableClock(Anchor);
+        var state  = new ReportPersistenceState();
+        var cutoff = Anchor.AddDays(-1);
+        var stale  = Snapshot("daily", "stale", SnapshotState.Succeeded, cutoff.AddTicks(-1));
+        var fresh  = Snapshot("daily", "fresh", SnapshotState.Succeeded, cutoff.AddTicks(1));
+        state.Snapshots.AddRange([stale, fresh]);
+        state.Chunks.AddRange([Chunk(stale), Chunk(fresh)]);
+        var report = Report("daily", new() { MaxAgeDays = 1 });
+        using var provider = ReportTestHost.Create(
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: report,
+            configure: services => services.AddSingleton<TimeProvider>(clock));
+        var service = provider.GetRequiredService<IReportService>();
+
+        await service.RunAsync(ReportTestHost.NamedRequest("daily"));
+
+        Assert.DoesNotContain(state.Snapshots, snapshot => snapshot.Name == stale.Name);
+        Assert.Contains(state.Snapshots, snapshot => snapshot.Name == fresh.Name);
+    }
+
+    [Fact]
     public async Task Failed_Snapshot_Chunks_Reclaimed() {
+        var clock = new MutableClock(Anchor);
         var state = new ReportPersistenceState();
-        var failed = Snapshot("daily", "failed", SnapshotState.Failed, DateTime.UtcNow.AddDays(-2));
-        var cancelled = Snapshot("daily", "cancelled", SnapshotState.Cancelled, DateTime.UtcNow.AddDays(-2));
+        var failed = Snapshot("daily", "failed", SnapshotState.Failed, Anchor.AddDays(-2));
+        var cancelled = Snapshot("daily", "cancelled", SnapshotState.Cancelled, Anchor.AddDays(-2));
         state.Snapshots.AddRange([failed, cancelled]);
         state.Chunks.AddRange([Chunk(failed), Chunk(cancelled)]);
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)), state, report: Report("daily", new()));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: Report("daily", new()),
+            configure: services => services.AddSingleton<TimeProvider>(clock));
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.NamedRequest("daily"));
@@ -70,7 +97,7 @@ public class ReportRetentionShould
     public async Task No_Retention_Config_Keeps_All() {
         var state = new ReportPersistenceState();
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)), state, report: Report("daily", null));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: Report("daily", null));
         var service = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.NamedRequest("daily"));
@@ -103,5 +130,14 @@ public class ReportRetentionShould
             Snapshot = snapshot.Name,
             Name     = "chunk-0",
         };
+    }
+
+    private sealed class MutableClock(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset _now = start;
+
+        public override DateTimeOffset GetUtcNow() { return _now; }
+
+        public void Advance(TimeSpan delta) { _now += delta; }
     }
 }

@@ -61,4 +61,39 @@ internal static class AuthorizeHelper
 
         throw SchemataResourceErrors.NotFound<TEntity>(resource);
     }
+
+    /// <summary>
+    ///     Executes the AIP-211 check against a loaded entity. The primary operation and parent-read
+    ///     probe both receive the entity so access providers can make instance-aware decisions.
+    /// </summary>
+    public static async Task EnsureAsync<TEntity, TRequest>(
+        IAccessProvider<TEntity, TRequest> access,
+        TEntity                            entity,
+        AccessContext<TRequest>            context,
+        string                             resource,
+        ClaimsPrincipal?                   principal,
+        CancellationToken                  ct
+    ) {
+        if (await access.HasAccessAsync(entity, context, principal, ct)) {
+            return;
+        }
+
+        if (context.Operation == nameof(Operations.Get)) {
+            throw SchemataResourceErrors.NotFound<TEntity>(resource);
+        }
+
+        var parent = new AccessContext<TRequest> {
+            Operation = nameof(Operations.Get),
+            Request   = context.Request,
+        };
+
+        if (await access.HasAccessAsync(entity, parent, principal, ct)) {
+            var permission = $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}";
+            throw SchemataResourceErrors.PermissionDenied<TEntity>(
+                resource,
+                description: string.Format(PermissionDeniedTemplate, permission, resource));
+        }
+
+        throw SchemataResourceErrors.NotFound<TEntity>(resource);
+    }
 }

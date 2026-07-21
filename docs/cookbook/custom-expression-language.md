@@ -163,7 +163,7 @@ var tree = compiler.Parse("title = 'Les Misérables'");
 var filter = compiler.Compile<Book, bool>(tree);
 
 var results = books.Where(filter).ToList();
-var matches = ExpressionRuntime.Evaluate(filter, book);
+var matches = ExpressionCache.GetOrAddDelegate(filter)(book);
 ```
 
 **Assertion:** the compiled filter applies to an `IQueryable<Book>` and evaluates against a single `Book`.

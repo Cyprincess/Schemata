@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.EntityFrameworkCore;
@@ -18,7 +20,7 @@ namespace Schemata.Entity.EntityFrameworkCore;
 ///     writers serialize at save time after staging completes.
 /// </summary>
 /// <typeparam name="TContext">The <see cref="DbContext" /> type.</typeparam>
-public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfWorkSink
+public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>
     where TContext : DbContext
 {
     private readonly IDbContextFactory<TContext>         _factory;
@@ -63,7 +65,11 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfW
         }
 
         try {
-            await _context.SaveChangesAsync(ct);
+            try {
+                await _context.SaveChangesAsync(ct);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+                throw CreateAlreadyExistsException(ex);
+            }
         } catch (Exception ex) {
             foreach (var reset in _rollback) reset();
 
@@ -95,6 +101,17 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfW
         if (errors is not null) {
             throw errors.Count == 1 ? errors.First() : new AggregateException(errors);
         }
+    }
+
+    private static AlreadyExistsException CreateAlreadyExistsException(Exception exception) {
+        if (exception is not DbUpdateException ex) {
+            return new();
+        }
+
+        var entity = ex.Entries.FirstOrDefault()?.Entity;
+        return entity is null
+                   ? new()
+                   : SchemataResourceErrors.AlreadyExists(entity.GetType(), (entity as ICanonicalName)?.CanonicalName);
     }
 
     public Task RollbackAsync(CancellationToken ct = default) {
@@ -158,11 +175,11 @@ public sealed class EfCoreUnitOfWork<TContext> : IUnitOfWork<TContext>, IUnitOfW
 
     #endregion
 
-    #region IUnitOfWorkSink Members
+    #region IUnitOfWork Members
 
-    void IUnitOfWorkSink.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
+    void IUnitOfWork.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
 
-    void IUnitOfWorkSink.AddRollbackSink(Action reset) { _rollback.Add(reset); }
+    void IUnitOfWork.AddRollbackSink(Action reset) { _rollback.Add(reset); }
 
     #endregion
 }

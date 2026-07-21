@@ -56,7 +56,7 @@ current executable subset. `Subset` means the element class is supported with ex
 | Escalation end event                                                   | Event         | Full          | `EscalationBoundaryHandler.ThrowEndAsync` propagates through scope boundaries.                                                                                   |
 | Cancel end event                                                       | Event         | Full          | `TransactionExecutor.TryHandleCancelEndAsync` handles cancel-end compensation and boundary activation.                                                           |
 | Compensation end event                                                 | Event         | Full          | `ThrowEndCompensationAsync` invokes `CompensationThrowHandler.FireForEngineAsync`.                                                                               |
-| Intermediate catch event                                               | Event         | Full          | `TriggerIntermediateCatchAsync` resumes a waiting token when `EventMatches` accepts the trigger.                                                                 |
+| Intermediate catch event                                               | Event         | Full          | `TriggerIntermediateCatchAsync` resumes a waiting token when `FlowEventMatcher.Matches` accepts the trigger.                                                                 |
 | Intermediate throw event                                               | Event         | Subset        | Compensation and escalation throw definitions execute; other throw definitions are model-only.                                                                   |
 | Boundary event, interrupting                                           | Event         | Full          | `FireBoundaryAsync` cancels the host token and routes a replacement token.                                                                                       |
 | Boundary event, non-interrupting                                       | Event         | Full          | `NonInterruptingBoundaryHandler` spawns a sibling token and leaves the host live.                                                                                |
@@ -65,11 +65,11 @@ current executable subset. `Subset` means the element class is supported with ex
 | Timer boundary event                                                   | Event         | Full          | Engine routes the token; `AdviceTransitionTimer` provisions the scheduler wake-up.                                                                               |
 | Message boundary event                                                 | Event         | Full          | Engine routes the token; `AdviceTransitionEvent` provisions the subscription.                                                                                    |
 | Signal boundary event                                                  | Event         | Full          | Same routing as message; `FlowEventHandler` dispatches matching signals.                                                                                         |
-| Conditional boundary event                                             | Event         | Full          | Boundary matching uses `BpmnEngine.EventMatches`.                                                                                                                |
+| Conditional boundary event                                             | Event         | Full          | Boundary matching uses `FlowEventMatcher.Matches`.                                                                                                                |
 | Compensation boundary event                                            | Event         | Full          | `RegisterCompensationBoundaries` records handlers through `CompensationBoundaryHandler.RegisterAll`.                                                             |
 | Cancel boundary event                                                  | Event         | Subset        | `BpmnValidator.ValidateCancelBoundaries` requires the host to be a `TransactionSubProcess`.                                                                      |
 | Link event definition                                                  | Event         | Not supported | AST shape accepted; no runtime executor.                                                                                                                         |
-| Multiple event definition                                              | Event         | Not supported | `BpmnEngine.EventMatches` matches single definitions only.                                                                                                       |
+| Multiple event definition                                              | Event         | Not supported | `FlowEventMatcher.Matches` matches single definitions only.                                                                                                       |
 | Parallel event definition                                              | Event         | Subset        | `EventBasedGateway.Parallel` mode forks one child per matched catch; arbitrary parallel catch events are outside the subset.                                     |
 | None task                                                              | Task          | Full          | `BpmnEngine.ResolveTargetAsync` returns the activity as the next state.                                                                                          |
 | Service / User / Send / Receive / Script / Manual / Business rule task | Task          | Full          | Same `ResolveTargetAsync` activity case; task subtype is engine-neutral.                                                                                         |
@@ -180,9 +180,11 @@ through the same boundary error path used by other BPMN failures; it does not ma
 operation complete. `ICompensationLifecycleObserver` receives start notifications per handler and a
 completion notification only after the whole compensation operation succeeds.
 
-Compensation handler state lives in runtime memory only. `BpmnEngine._compensationScopes` is a
-`Dictionary<string, CompensationStack>` that is not rehydrated after a crash; a process resumed
-across a restart loses its registered handlers.
+Compensation registrations are persisted, not engine memory. Each persist replaces the process's
+rows in the `SchemataProcessCompensations` table (see
+[Runtime Services — Persisted compensation bindings](runtime.md#persisted-compensation-bindings));
+on load the engine rehydrates them from `FlowExecutionContext.LoadedCompensationBindings`, so a
+compensation throw after a host restart still resolves its handlers.
 
 ## Extension points
 
@@ -191,7 +193,7 @@ across a restart loses its registered handlers.
 - `IFlowEngineValidator` lets the BPMN package validate structure during process registration.
 - `IConditionExpression` supplies asynchronous guards for exclusive and inclusive gateway branches.
 - `IProcessLifecycleObserver` observes process-level start, transition, termination, and failure.
-- `ITokenLifecycleObserver` observes token fork, join, failure, and cancellation.
+  It is the only lifecycle observer interface; the per-token observer path was removed.
 - `ICompensationLifecycleObserver` observes BPMN-only compensation start and completion.
 
 The concrete contracts live in `src/Schemata.Flow.Skeleton/Runtime/`. The

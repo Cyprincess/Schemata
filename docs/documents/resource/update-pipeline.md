@@ -40,7 +40,10 @@ and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 ### 4. Entity load
 
 The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so a tombstoned resource can be updated. A
-null result throws `ResourceNotFound(name)`.
+null result throws `ResourceNotFound(name)` — unless the request implements
+`Schemata.Abstractions.Resource.IAllowMissing` with `AllowMissing = true`, in which case the handler runs the
+create path (`CreateMissingAsync`): the request is mapped to a new entity, the create-request advisor chain
+runs, and the entity is added instead of updated. The update mask is ignored on this path, per AIP-134.
 
 ### 5. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
 
@@ -51,7 +54,8 @@ null result throws `ResourceNotFound(name)`.
 | `AdviceUpdateFreshness`   | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
 `AdviceUpdateFreshness` fires when the request implements `IFreshness` and supplies a non-empty `EntityTag`: any
-value differing from the entity's current weak tag throws. Only an absent or whitespace tag opts out.
+value differing from the entity's current weak tag throws `AbortedException` with reason
+`CONCURRENCY_MISMATCH` (transports surface 409 / `ABORTED`). Only an absent or whitespace tag opts out.
 
 ### 6. Mapping (field mask)
 
@@ -75,7 +79,8 @@ and copies only those fields. An unknown segment throws `ValidationException` (`
 ### 8. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
 The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseParent` derives
-`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag; `AdviceResponseReadMask` trims to `read_mask`).
+`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag). Responses are full; partial responses are
+not supported.
 
 ## Field masks (AIP-161)
 

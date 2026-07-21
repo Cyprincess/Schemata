@@ -1,13 +1,10 @@
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
@@ -69,36 +66,6 @@ public class BpmnEngineParallelShould
 
         snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, output.CanonicalName, CancellationToken.None);
         Assert.Equal("Completed", snapshot.Process.State);
-    }
-
-    [Fact]
-    public async Task ForkJoin_NotifiesTokenLifecycleObserver() {
-        var definition = ForkJoinDefinition();
-        var process    = NewProcess(definition.Name);
-        var observer   = new RecordingTokenObserver();
-        var services   = new ServiceCollection()
-            .AddSingleton<ITokenLifecycleObserver>(observer)
-            .BuildServiceProvider();
-        var context = new FlowExecutionContext(new TestUnitOfWork(), services);
-        var engine  = new BpmnEngine();
-
-        var snapshot = await engine.StartAsync(definition, process, context, CancellationToken.None);
-        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, context, null, CancellationToken.None);
-
-        Assert.Equal(3, observer.Forked.Count);
-
-        var taskAToken = snapshot.Tokens.First(t => t.StateName == "task-a");
-        var taskBToken = snapshot.Tokens.First(t => t.StateName == "task-b");
-        var taskCToken = snapshot.Tokens.First(t => t.StateName == "task-c");
-
-        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, context, taskAToken.CanonicalName, CancellationToken.None);
-        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, context, taskBToken.CanonicalName, CancellationToken.None);
-        await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, context, taskCToken.CanonicalName, CancellationToken.None);
-
-        var joined = Assert.Single(observer.Joined);
-        Assert.Equal("after-join", joined.Output.StateName);
-        Assert.Equal(3, joined.Inputs.Count);
-        Assert.All(joined.Inputs, input => Assert.Equal("join", input.StateName));
     }
 
     [Fact]
@@ -275,39 +242,4 @@ public class BpmnEngineParallelShould
         };
     }
 
-    private sealed class RecordingTokenObserver : ITokenLifecycleObserver
-    {
-        public List<TokenSnapshot> Forked { get; } = [];
-
-        public List<(TokenSnapshot Output, IReadOnlyList<TokenSnapshot> Inputs)> Joined { get; } = [];
-
-        public Task OnTokenForkedAsync(
-            SchemataProcess   process,
-            TokenSnapshot     token,
-            TokenSnapshot?    spawner,
-            CancellationToken ct = default) {
-            Forked.Add(token);
-            return Task.CompletedTask;
-        }
-
-        public Task OnTokenJoinedAsync(
-            SchemataProcess              process,
-            TokenSnapshot                output,
-            IReadOnlyList<TokenSnapshot> inputs,
-            CancellationToken            ct = default) {
-            Joined.Add((output, inputs));
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class TestUnitOfWork : IUnitOfWork
-    {
-        public ValueTask DisposeAsync() { return ValueTask.CompletedTask; }
-
-        public void Dispose() { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RollbackAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-    }
 }

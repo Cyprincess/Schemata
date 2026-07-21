@@ -113,6 +113,12 @@ Every registered definition is validated at startup, so an invalid process fails
 than on the first start call. The validation rules are in
 [Flow Validation](../documents/flow/validator.md).
 
+Registration also checks the definition against the engine's declared `FlowRuntimeCapabilities`.
+The state-machine engine declares `ProcedureTasks` only, so a definition using parallel or
+inclusive gateways, subprocesses, compensation, loops, or non-interrupting boundary events throws
+`InvalidOperationException` at startup naming the missing capability. Those shapes need the full
+BPMN engine — add `Schemata.Flow.Bpmn` and call `UseBpmn()` instead of `UseStateMachine()`.
+
 ## Expose process management
 
 Both transport extensions chain off the `SchemataFlowBuilder` that `UseFlow` returns. Add the
@@ -185,9 +191,16 @@ var process = await runner.StartAsync("EnrollmentProcess", ct: ct);
 var process = await runner.StartAsync("EnrollmentProcess", application, ct: ct);
 ```
 
-Both overloads accept an optional `StartProcessOptions` (`DisplayName`, `Description`)
-and return the persisted `SchemataProcess` row. The principal enters only through the
-resource-method handlers; the programmatic interface carries none.
+Both overloads accept an optional `StartProcessOptions` (`DisplayName`, `Description`,
+`IdempotencyKey`) and return the persisted `SchemataProcess` row. The principal enters only
+through the resource-method handlers; the programmatic interface carries none.
+
+`IdempotencyKey` is distinct from `RequestId`: starting a process while another instance of the
+same definition carries the same key in a non-terminal state throws `AlreadyExistsException`,
+protecting a retried start from creating a duplicate. The key is released when the process
+reaches a terminal state — it moves into the row's `schemata/flow/idempotency-key` annotation
+and the pair can be reused for a new instance. The HTTP start verb accepts the same field as
+`idempotency_key` on `StartProcessInstanceRequest`.
 
 ## Next steps
 

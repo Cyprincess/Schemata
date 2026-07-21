@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Common;
 
 namespace Schemata.Resource.Foundation.Advisors;
 

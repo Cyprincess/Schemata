@@ -1,9 +1,7 @@
 using System;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Flow.Bpmn.Runtime.Compensation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Xunit;
@@ -69,42 +67,6 @@ public class BpmnEngine_TransactionSubProcessShould
         Assert.Equal("Cancelled", other.State);
         Assert.Contains(snapshot.Transitions, t => t.Kind == TransitionKind.Cancel && t.Token == other.CanonicalName);
         Assert.DoesNotContain(snapshot.Transitions, t => t.Kind == TransitionKind.Cancel && t.Token == cancelBranch.CanonicalName);
-    }
-
-    [Fact]
-    public async Task Execute_TransactionWithCompensationHandlerThrows_PropagatesViaErrorBoundary() {
-        var scenario = TransactionScenario(false, true, true, true);
-        var beforeCancel = await RunToBeforeCancelEndAsync(scenario);
-        RegisterHandler(scenario.Engine, scenario.ParentCanonical(beforeCancel), new ThrowingHandler(scenario.B, new InvalidOperationException("boom")));
-
-        var snapshot = await scenario.Engine.AdvanceAsync(
-            scenario.Definition,
-            beforeCancel.Process,
-            beforeCancel.Tokens,
-            beforeCancel.Tokens.Single(t => t.StateName == "cancel-task").CanonicalName,
-            CancellationToken.None);
-
-        Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "error-boundary", Posterior: "error-handler" });
-        Assert.Equal("Running", snapshot.Process.State);
-    }
-
-    [Fact]
-    public async Task Execute_TransactionWithCompensationHandlerThrowsNoErrorBoundary_PropagatesOutward() {
-        var scenario = TransactionScenario(false, true, true);
-        var beforeCancel = await RunToBeforeCancelEndAsync(scenario);
-        var failure = new InvalidOperationException("boom");
-        RegisterHandler(scenario.Engine, scenario.ParentCanonical(beforeCancel), new ThrowingHandler(scenario.B, failure));
-
-        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await scenario.Engine.AdvanceAsync(
-                scenario.Definition,
-                beforeCancel.Process,
-                beforeCancel.Tokens,
-                beforeCancel.Tokens.Single(t => t.StateName == "cancel-task").CanonicalName,
-                CancellationToken.None));
-
-        Assert.Same(failure, thrown);
-        Assert.Equal("Failed", beforeCancel.Process.State);
     }
 
     [Fact]
@@ -288,16 +250,6 @@ public class BpmnEngine_TransactionSubProcessShould
         definition.Flows.Add(new() { Source = boundary, Target = target });
     }
 
-    private static void RegisterHandler(BpmnEngine engine, string scopeOwner, ICompensationHandler handler) {
-        var ensure = typeof(BpmnEngine).GetMethod(
-            "EnsureCompensationScope",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(ensure);
-
-        var stack = Assert.IsType<CompensationStack>(ensure.Invoke(engine, [scopeOwner]));
-        stack.Register(handler);
-    }
-
     private static SchemataProcess NewProcess(string definitionName) {
         return new() {
             Name           = "p1",
@@ -320,23 +272,4 @@ public class BpmnEngine_TransactionSubProcessShould
         }
     }
 
-    private sealed class ThrowingHandler(Activity activity, Exception failure) : ICompensationHandler
-    {
-        public Activity Activity { get; } = activity;
-
-        public FlowElement CompensationTarget { get; } = new NoneTask { Name = "throwing-target" };
-
-        public ValueTask InvokeAsync(CompensationInvocationContext context, CancellationToken ct = default) {
-            context.Transitions.Add(new() {
-                Name      = Guid.NewGuid().ToString("n"),
-                Process   = context.Process.Name!,
-                Token     = context.Scope.CanonicalName,
-                Previous  = Activity.Name,
-                Posterior = CompensationTarget.Name,
-                Kind      = TransitionKind.Compensate,
-                Event     = "ThrowingHandler",
-            });
-            throw failure;
-        }
-    }
 }

@@ -139,7 +139,7 @@ per operation via `TryAddEnumerable`:
 Each authorize advisor builds an `AccessContext<TRequest>` with the operation name, then:
 
 1. Calls `IEntitlementProvider.GenerateEntitlementExpressionAsync` and passes the result to
-   `container.ApplyModification(expression)`. A non-null predicate becomes a `.Where(...)` on the
+   `container.ApplyWhere(expression)`. A non-null predicate becomes a `.Where(...)` on the
    composed query, narrowing the result set at the data layer. Entitlement filtering runs on List,
    Get, Update, and Delete regardless of the anonymous marker; Create has no entitlement step.
 2. Skips the access check when `AdviceContext.Has<AnonymousGranted>()`; otherwise calls

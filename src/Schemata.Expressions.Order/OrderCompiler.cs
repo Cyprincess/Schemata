@@ -16,10 +16,7 @@ public sealed class OrderCompiler : IOrderCompiler
 {
     #region IOrderCompiler Members
 
-    public Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(
-        string                    source,
-        ExpressionCompileOptions? options = null
-    ) {
+    public Func<IQueryable<T>, IOrderedQueryable<T>> CompileOrder<T>(string source) {
         var keys    = Parse(source);
         var lambdas = new List<(LambdaExpression Key, bool Descending)>(keys.Count);
 

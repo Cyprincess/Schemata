@@ -30,8 +30,8 @@ public static class AdviceDeleteFreshness
 ///     <para>
 ///         The check fires whenever <see cref="DeleteRequest.Etag" /> is non-empty: any value that
 ///         differs from the entity's current weak tag — including strong-format or malformed tags —
-///         raises <see cref="FailedPreconditionException" /> with <c>ETAG_MISMATCH</c> precondition
-///         subject. Only an absent or whitespace tag opts out.
+///         raises <see cref="AbortedException" /> with the <c>CONCURRENCY_MISMATCH</c> reason.
+///         Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
 ///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
@@ -63,9 +63,7 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
         }
 
         if (tag != expected) {
-            throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                entity.CanonicalName,
-                PreconditionSubjects.EtagMismatch);
+            throw SchemataResourceErrors.Aborted<TEntity>(entity.CanonicalName);
         }
 
         return Task.FromResult(AdviseResult.Continue);

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
@@ -30,11 +31,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     }
 
     /// <summary>
-    ///     Gets a resource from a request object that may include a read mask.
+    ///     Gets a resource from a request object.
     /// </summary>
     /// <param name="request">
-    ///     The <see cref="GetRequest" /> carrying the resource name and optional
-    ///     <c>read_mask</c> per <seealso href="https://google.aip.dev/157">AIP-157: Partial responses</seealso>.
+    ///     The <see cref="GetRequest" /> carrying the resource name.
     /// </param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
@@ -49,7 +49,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         var name = request.CanonicalName ?? request.Name ?? string.Empty;
 
         var ctx = CreateAdviceContext();
-        StashReadMask(ctx, request.ReadMask);
 
         var gate = await RunPipelineAsync<GetResultBase<TDetail>>(
             ctx,

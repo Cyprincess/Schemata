@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -74,7 +73,7 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
             );
         }
 
-        if (exchange.Request.CodeVerifier.Length is < 43 or > 128 || !exchange.Request.CodeVerifier.All(IsUnreserved)) {
+        if (!PkceValidation.IsValid(exchange.Request.CodeVerifier)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
@@ -108,8 +107,4 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
     }
 
     #endregion
-
-    private static bool IsUnreserved(char c) {
-        return c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '.' or '_' or '~';
-    }
 }

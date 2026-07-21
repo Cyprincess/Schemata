@@ -92,8 +92,8 @@ State transitions are:
 | `Pending`             | `Running`   | `JobExecutionDispatcher` claims the row using the concurrency token.                             |
 | `Running`             | `Succeeded` | Dispatcher after `IScheduledJob.ExecuteAsync` returns.                                           |
 | `Running`             | `Failed`    | Dispatcher when the job body throws or the job key cannot resolve.                               |
-| `Running`             | `Blocked`   | Dispatcher when an advisor or observer blocks the fire.                                          |
-| `Running`             | `Skipped`   | Dispatcher when an observer skips the fire.                                                      |
+| `Running`             | `Blocked`   | Dispatcher when an execution advisor returns `Block`.                                            |
+| `Running`             | `Skipped`   | Dispatcher when an execution advisor returns `Handle`.                                           |
 | `Pending` / `Running` | `Cancelled` | `CancelOperationHandler` for non-terminal operations.                                            |
 | `Running`             | `Failed`    | `SchedulingInitializer` on startup for rows orphaned by a host restart.                          |
 
@@ -121,9 +121,11 @@ Resource purge uses `TriggerAsync<PurgeJob<TEntity>>`. `PurgeHandler<TEntity>` s
 
 ## Advancing NextRunTime
 
-After a successful fire, a skipped fire, or a blocked fire, `JobExecutionDispatcher` updates the in-memory job row and notifies observers. For one-time jobs, the job becomes `Completed` and `NextRunTime` becomes `null` unless the execution failed. For recurring jobs, the dispatcher computes the next run time and calls `IScheduler.ScheduleAsync` so the next `Pending` row is materialized.
+After a successful fire, a skipped fire, or a blocked fire, `JobExecutionDispatcher` updates the in-memory job row and notifies observers. For one-time jobs, the job becomes `Completed` and `NextRunTime` becomes `null` unless the execution failed. For recurring jobs, the dispatcher computes the next run time from the job's current `NextRunTime` (falling back to now) and calls `IScheduler.ScheduleAsync` so the next `Pending` row is materialized.
 
-Periodic jobs advance by adding `IntervalTicks` to the previous `NextRunTime`. Cron jobs and other mapped schedules round-trip through `ScheduleDefinitionMapper.ToDefinition(job)`.
+Periodic jobs advance by adding `IntervalTicks` to the previous `NextRunTime`. Cron jobs and other mapped schedules round-trip through `ScheduleDefinitionMapper.ToDefinition(job)`, evaluating the next occurrence after the job's current `NextRunTime` when one is set.
+
+`MissedFirePolicy.FireAll` replays every missed occurrence through the dispatcher's advance loop, bounded by `SchemataSchedulingOptions.MaxMissedWalk` (default 100,000) so a long-down host cannot materialize an unbounded backlog.
 
 ## Restart durability
 
@@ -152,7 +154,8 @@ Execution can scale horizontally. Multiple `JobExecutionDispatcher` workers can 
 
 - `SchemataJobExecution` rows are never auto-purged. Run a cleanup job or retention policy to bound growth.
 - `SchemataJob` and `SchemataJobExecution` both enforce concurrency tokens. Scale execution with dispatchers, not duplicate in-memory schedulers.
-- `CancelOperationHandler` cancels non-terminal executions and unschedules the associated job entry when the execution carries a job name.
+- `CancelOperationHandler` cancels non-terminal executions and unschedules the associated job entry when the execution carries a job name. A `Running` execution is cancelled through its in-flight `CancellationTokenSource` before the row is marked `Cancelled`.
+- `IRepository<SchemataJob>` and `IRepository<SchemataJobExecution>` are required registrations. The scheduler, dispatcher, and initializer resolve them with `GetRequiredService`; a missing registration throws rather than degrading to an in-memory-only mode.
 
 ## See also
 

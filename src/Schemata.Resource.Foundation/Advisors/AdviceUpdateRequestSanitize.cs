@@ -21,7 +21,7 @@ public static class AdviceUpdateRequestSanitize
     ///     so authorization decisions are made against the unaltered client payload.
     /// </summary>
     public const int DefaultOrder = AdviceUpdateRequestAuthorize.DefaultOrder + 10_000_000;
-    
+
     /// <summary>
     ///     CLR property names of fields that clients MUST NOT populate on a Create request. The server
     ///     either assigns them (name/canonical_name/uid/owner/etag/timestamps) or derives them from

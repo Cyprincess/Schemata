@@ -6,7 +6,7 @@ namespace Schemata.Core.Tests.Core;
 public class WellKnownOptionsShould
 {
     [Fact]
-    public void Map_RegisterEndpoint() {
+    public void Map_WithSuffix_RegistersEndpoint() {
         var options = new WellKnownOptions();
 
         options.Map("test", () => "ok");

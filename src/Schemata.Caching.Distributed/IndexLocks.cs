@@ -6,7 +6,7 @@ using Schemata.Caching.Skeleton;
 namespace Schemata.Caching.Distributed;
 
 /// <summary>
-///     Striped in-process lock set that serializes read-modify-write on a collection
+///     Striped in-process lock set that serializes read-modify-write on a cache entry
 ///     to prevent lost writes.
 /// </summary>
 /// <remarks>
@@ -16,7 +16,7 @@ namespace Schemata.Caching.Distributed;
 ///         favors write safety over maximum throughput.
 ///     </para>
 ///     <para>
-///         Multiple processes sharing a distributed cache backend require Redis or NCache implementations
+///         Multiple processes sharing a distributed cache backend require cluster-aware implementations
 ///         of <see cref="ICacheProvider" /> for cluster-safe collection operations.
 ///     </para>
 /// </remarks>

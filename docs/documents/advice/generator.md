@@ -50,7 +50,10 @@ it runs before the semantic model is consulted.
 ## Semantic analysis
 
 For each candidate, `GetAdvisorInfo` resolves the symbol and walks `AllInterfaces` then
-`Interfaces` to find the `IAdvisor<...>` generic base:
+`Interfaces` to find the `IAdvisor<...>` generic base. The match is metadata-based: the generator
+resolves `Schemata.Abstractions.Advisors.IAdvisor` through `GetTypeByMetadataName` and accepts any
+generic interface whose `OriginalDefinition.Interfaces` contains that symbol, so `IAdvisor<...>`
+implementations in any namespace are recognized without name heuristics:
 
 1. Extracts the type arguments of the `IAdvisor<T1, ..., TN>` base.
 2. Collects the interface's own type parameters and their constraints.

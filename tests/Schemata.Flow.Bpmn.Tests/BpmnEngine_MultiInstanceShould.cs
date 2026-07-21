@@ -1,3 +1,4 @@
+// SourceEntity is a structural type token for the source-binding repository registered by this harness.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -6,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Advisors;
+using Moq;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
@@ -36,12 +37,12 @@ public class BpmnEngine_MultiInstanceShould
         var snapshot = await harness.StartAsync();
 
         var parent   = Assert.Single(snapshot.Tokens, t => t is { State: "Waiting", StateName: "multi" });
-        var siblings = harness.Tokens.Rows.Where(t => t.Spawner == parent.CanonicalName).ToList();
+        var siblings = harness.Tokens.Where(t => t.Spawner == parent.CanonicalName).ToList();
         Assert.Equal(5, siblings.Count);
         Assert.Equal([0, 1, 2, 3, 4], siblings.Select(t => ReadInt(t, "loopCounter")).OrderBy(v => v));
         Assert.All(siblings, t => Assert.Equal("Active", t.State));
         Assert.Equal("multi", parent.WaitingAtName);
-        Assert.Single(harness.Transitions.Rows, t => t.Kind == TransitionKind.Fork && t.Token == parent.CanonicalName);
+        Assert.Single(harness.Transitions, t => t.Kind == TransitionKind.Fork && t.Token == parent.CanonicalName);
     }
 
     [Fact]
@@ -55,7 +56,7 @@ public class BpmnEngine_MultiInstanceShould
         Assert.Equal("Active", parent.State);
         Assert.Equal("after", parent.StateName);
         Assert.Null(parent.WaitingAtName);
-        Assert.Single(harness.Transitions.Rows, t => t.Kind == TransitionKind.Join && t.Token == parent.CanonicalName);
+        Assert.Single(harness.Transitions, t => t.Kind == TransitionKind.Join && t.Token == parent.CanonicalName);
         Assert.Equal(5, ReadInt(parent, "nrOfCompletedInstances"));
     }
 
@@ -67,9 +68,9 @@ public class BpmnEngine_MultiInstanceShould
         snapshot = await harness.CompleteSiblingsAsync(snapshot, 2);
 
         var parent = Assert.Single(snapshot.Tokens, t => t.Spawner is null);
-        var cancelled = harness.Tokens.Rows.Where(t => t.Spawner == parent.CanonicalName && t.State == "Cancelled").ToList();
+        var cancelled = harness.Tokens.Where(t => t.Spawner == parent.CanonicalName && t.State == "Cancelled").ToList();
         Assert.Equal(3, cancelled.Count);
-        Assert.Equal(3, harness.Transitions.Rows.Count(t => t.Kind == TransitionKind.Cancel));
+        Assert.Equal(3, harness.Transitions.Count(t => t.Kind == TransitionKind.Cancel));
         Assert.Equal("Active", parent.State);
         Assert.Equal("after", parent.StateName);
         Assert.Equal(2, ReadInt(parent, "nrOfCompletedInstances"));
@@ -97,7 +98,7 @@ public class BpmnEngine_MultiInstanceShould
         parent = Assert.Single(snapshot.Tokens, t => t.Spawner is null);
         Assert.Equal("Active", parent.State);
         Assert.Equal("after", parent.StateName);
-        Assert.Single(harness.Tokens.Rows, t => t.Spawner == parent.CanonicalName && t.State == "Cancelled");
+        Assert.Single(harness.Tokens, t => t.Spawner == parent.CanonicalName && t.State == "Cancelled");
         Assert.Equal(2, ReadInt(parent, "nrOfCompletedInstances"));
     }
 
@@ -191,16 +192,16 @@ public class BpmnEngine_MultiInstanceShould
     {
         private Harness(ProcessDefinition definition) {
             Definition  = definition;
-            Tokens      = new();
-            Transitions = new();
-            Sources     = new();
-            SourceEntities = new();
+            Tokens         = [];
+            Transitions    = [];
+            Sources        = [];
+            SourceEntities = [];
 
             var services = new ServiceCollection();
-            services.AddSingleton<IRepository<SchemataProcessToken>>(Tokens);
-            services.AddSingleton<IRepository<SchemataProcessTransition>>(Transitions);
-            services.AddSingleton<IRepository<SchemataProcessSource>>(Sources);
-            services.AddSingleton<IRepository<SourceEntity>>(SourceEntities);
+            services.AddSingleton<IRepository<SchemataProcessToken>>(BpmnEngine_MultiInstanceShould.CreateRepository(Tokens).Object);
+            services.AddSingleton<IRepository<SchemataProcessTransition>>(BpmnEngine_MultiInstanceShould.CreateRepository(Transitions).Object);
+            services.AddSingleton<IRepository<SchemataProcessSource>>(BpmnEngine_MultiInstanceShould.CreateRepository(Sources).Object);
+            services.AddSingleton<IRepository<SourceEntity>>(BpmnEngine_MultiInstanceShould.CreateRepository(SourceEntities).Object);
             Services = services.BuildServiceProvider();
             Engine   = new();
         }
@@ -209,13 +210,13 @@ public class BpmnEngine_MultiInstanceShould
 
         public BpmnEngine Engine { get; }
 
-        public TestRepository<SchemataProcessToken> Tokens { get; }
+        public List<SchemataProcessToken> Tokens { get; }
 
-        public TestRepository<SchemataProcessTransition> Transitions { get; }
+        public List<SchemataProcessTransition> Transitions { get; }
 
-        public TestRepository<SchemataProcessSource> Sources { get; }
+        public List<SchemataProcessSource> Sources { get; }
 
-        public TestRepository<SourceEntity> SourceEntities { get; }
+        public List<SourceEntity> SourceEntities { get; }
 
         private ServiceProvider Services { get; }
 
@@ -257,8 +258,8 @@ public class BpmnEngine_MultiInstanceShould
                     Name          = name(ReadInt(sibling, "loopCounter")),
                     CanonicalName = $"orders/{sibling.Name}",
                 };
-                SourceEntities.Rows.Add(source);
-                Sources.Rows.Add(new() {
+                SourceEntities.Add(source);
+                Sources.Add(new() {
                     Process    = snapshot.Process.CanonicalName!,
                     Token      = sibling.CanonicalName,
                     Name       = "order",
@@ -268,7 +269,7 @@ public class BpmnEngine_MultiInstanceShould
             }
         }
 
-        private FlowExecutionContext Context() { return new(new TestUnitOfWork(), Services); }
+        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
 
         private static SchemataProcessToken NextSibling(ProcessSnapshot snapshot) {
             return snapshot.Tokens.Where(t => t.Spawner is not null && t.State == "Active")
@@ -278,143 +279,67 @@ public class BpmnEngine_MultiInstanceShould
 
         private void Upsert(ProcessSnapshot snapshot) {
             foreach (var token in snapshot.Tokens) {
-                Tokens.Upsert(token, t => t.CanonicalName);
+                BpmnEngine_MultiInstanceShould.Upsert(Tokens, token, t => t.CanonicalName);
             }
 
             foreach (var transition in snapshot.Transitions) {
-                if (Transitions.Rows.All(row => row.Name != transition.Name)) {
-                    Transitions.Rows.Add(transition);
+                if (Transitions.All(row => row.Name != transition.Name)) {
+                    Transitions.Add(transition);
                 }
             }
         }
     }
 
-    private sealed class TestRepository<TEntity> : IRepository<TEntity>
-        where TEntity : class
-    {
-        public List<TEntity> Rows { get; } = [];
+    private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(List<TEntity> rows)
+        where TEntity : class {
+        var repository = new Mock<IRepository<TEntity>>(MockBehavior.Strict);
+        repository.Setup(value => value.Join(It.IsAny<IUnitOfWork>()));
+        repository.Setup(value => value.FirstOrDefaultAsync<TEntity>(
+                      It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
+                      It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      ValueTask.FromResult<TEntity?>(
+                          (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).FirstOrDefault()));
+        repository.Setup(value => value.SingleOrDefaultAsync<TEntity>(
+                      It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
+                      It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      ValueTask.FromResult<TEntity?>(
+                          (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).SingleOrDefault()));
+        repository.Setup(value => value.ListAsync<TEntity>(
+                      It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
+                      It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct) =>
+                      ToAsync<TEntity>(predicate is null ? rows : predicate(rows.AsQueryable()), ct));
+        repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
+                  .Callback<TEntity, CancellationToken>((entity, _) => rows.Add(entity))
+                  .Returns(Task.CompletedTask);
+        repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        return repository;
+    }
 
-        public AdviceContext AdviceContext { get; } = new(new ServiceCollection().BuildServiceProvider());
-
-        public IUnitOfWork Begin() { return new TestUnitOfWork(); }
-
-        public void Join(IUnitOfWork uow) { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public IDisposable SuppressAddValidation() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressUpdateValidation() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressQuerySoftDelete() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressSoftDelete() { return NoopDisposable.Instance; }
-
-        public IDisposable SuppressTimestamp() { return NoopDisposable.Instance; }
-
-        public ValueTask DisposeAsync() { return default; }
-
-        public void Dispose() { }
-
-        public async IAsyncEnumerable<TResult> ListAsync<TResult>(
-            Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-            [EnumeratorCancellation] CancellationToken ct = default
-        ) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            foreach (var item in query.ToList()) {
-                ct.ThrowIfCancellationRequested();
-                yield return item;
-                await Task.Yield();
-            }
-        }
-
-        public ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default) { return new(entity); }
-
-        public ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default) { return new(entity is TResult result ? result : default); }
-
-        public ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) { return new(Rows.FirstOrDefault()); }
-
-        public ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default) { return new(Rows.OfType<TResult>().FirstOrDefault()); }
-
-        public ValueTask<TResult?> FirstOrDefaultAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.FirstOrDefault());
-        }
-
-        public ValueTask<TResult?> SingleOrDefaultAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.SingleOrDefault());
-        }
-
-        public ValueTask<bool> AnyAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.Any());
-        }
-
-        public ValueTask<int> CountAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.Count());
-        }
-
-        public ValueTask<long> LongCountAsync<TResult>(Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default) {
-            var query = predicate is null ? Rows.AsQueryable().OfType<TResult>() : predicate(Rows.AsQueryable());
-            return new(query.LongCount());
-        }
-
-        public Task AddAsync(TEntity entity, CancellationToken ct = default) {
-            Rows.Add(entity);
-            return Task.CompletedTask;
-        }
-
-        public Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
-            Rows.AddRange(entities);
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateAsync(TEntity entity, CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-            Rows.Remove(entity);
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
-            foreach (var entity in entities) {
-                Rows.Remove(entity);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public void Upsert(TEntity entity, Func<TEntity, string?> key) {
-            var existing = Rows.FirstOrDefault(row => string.Equals(key(row), key(entity), StringComparison.Ordinal));
-            if (existing is not null) {
-                Rows.Remove(existing);
-            }
-
-            Rows.Add(entity);
+    private static async IAsyncEnumerable<TEntity> ToAsync<TEntity>(
+        IEnumerable<TEntity> rows,
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
+        foreach (var row in rows.ToList()) {
+            ct.ThrowIfCancellationRequested();
+            yield return row;
+            await Task.Yield();
         }
     }
 
-    private sealed class TestUnitOfWork : IUnitOfWork
-    {
-        public ValueTask DisposeAsync() { return default; }
+    private static void Upsert<TEntity>(List<TEntity> rows, TEntity entity, Func<TEntity, string?> key) {
+        var existing = rows.FirstOrDefault(row => string.Equals(key(row), key(entity), StringComparison.Ordinal));
+        if (existing is not null) {
+            rows.Remove(existing);
+        }
 
-        public void Dispose() { }
-
-        public Task CommitAsync(CancellationToken ct = default) { return Task.CompletedTask; }
-
-        public Task RollbackAsync(CancellationToken ct = default) { return Task.CompletedTask; }
+        rows.Add(entity);
     }
 
-    private sealed class NoopDisposable : IDisposable
-    {
-        public static readonly NoopDisposable Instance = new();
-
-        public void Dispose() { }
-    }
-
-    private sealed class SourceEntity : ICanonicalName
+    public sealed class SourceEntity : ICanonicalName
     {
         public string? Name { get; set; }
 

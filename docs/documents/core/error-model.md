@@ -138,7 +138,7 @@ in `Schemata.Common.Errors`. Each factory method pre-attaches:
   and `ResourceName` (the supplied canonical name),
 - For `PreconditionFailed<T>`, an additional `PreconditionFailureDetail` carrying a single
   `PreconditionViolation` whose `Subject` is the precondition identifier (e.g.
-  `SchemataConstants.PreconditionSubjects.EtagMismatch`).
+  `SchemataConstants.PreconditionSubjects.SoftDeleted`).
 
 `Owner` is only populated on `PermissionDenied<T>`; `NotFound<T>` omits it per AIP-211 to avoid
 leaking existence.

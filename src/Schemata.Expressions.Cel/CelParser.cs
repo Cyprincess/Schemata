@@ -344,6 +344,6 @@ public static class CelParser
             }
         }
 
-        return bytes.ToArray();
+        return [.. bytes];
     }
 }

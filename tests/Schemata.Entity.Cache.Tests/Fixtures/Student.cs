@@ -1,5 +1,4 @@
 using System;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.Cache.Tests.Fixtures;

@@ -64,8 +64,8 @@ no built-in advisor ships.
 | `RegisterEvent<TEvent>(string name)`          | Maps the CLR type to a wire name via `IPostConfigureOptions<EventTypeRegistryConfiguration>`. |
 | `UseProducer(Action<EventProducerBuilder>?)`  | Configures the producer (the `IEventBus` implementation).                                     |
 | `UseConsumer(Action<EventConsumerBuilder>?)`  | Configures the consumer (subscription store, handler resolver, dispatch context).             |
-| `UseHandler<TEvent, THandler>()`              | Registers a scoped `IEventHandler<TEvent>`.                                                   |
-| `UseHandler<TRequest, TResponse, THandler>()` | Registers a scoped `IRequestHandler<TRequest, TResponse>`.                                    |
+| `UseHandler<TEvent, THandler>()`              | Registers a scoped `IEventHandler<TEvent>` via `TryAddEnumerable`; multiple handlers per event type coexist.   |
+| `UseHandler<TRequest, TResponse, THandler>()` | Registers a scoped `IRequestHandler<TRequest, TResponse>` via `TryAddEnumerable`.                              |
 | `ConfigureRouting<TEvent>(EventRouting)`      | Sets the per-type `EventRouting` mode.                                                        |
 
 ## IEventBus
@@ -184,6 +184,10 @@ stored in `SchemataEventOptions.RoutingTable`.
   `PublishAsync`/`SendAsync` during startup.
 - The source-entity overload throws before publishing if the source does not implement both
   `ICanonicalName` and `IConcurrency`.
+- `UseHandler` registrations accumulate (`TryAddEnumerable`): several `IEventHandler<TEvent>`
+  implementations for one event all run (fan-out, or first-wins under `CompetingConsumers` routing).
+  Request/reply still expects exactly one `IRequestHandler<TRequest, TResponse>`; a second
+  registration makes `SendAsync` throw `InvalidOperationException`.
 - `SchemataEvent.EventType` stores the wire name. Queries against this column key on that string,
   not on a CLR type.
 

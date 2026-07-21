@@ -4,9 +4,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Features;
+using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Scheduling.Http.Features;
 
@@ -28,6 +30,16 @@ public sealed class SchemataSchedulingHttpFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         SchedulingResourceRegistration.RegisterHandlers(services);
-        SchedulingResourceRegistration.RegisterMethods(new(schemata, services), HttpResourceAttribute.Name);
+
+        var resources = new SchemataResourceBuilder(schemata, services);
+        resources.Use<SchemataJob, SchemataJob, SchemataJob, SchemataJob>(
+            [HttpResourceAttribute.Name],
+            resource => resource.Methods = SchedulingResourceRegistration.JobMethods);
+        resources.Use<SchemataJobExecution, Operation, Operation, Operation>(
+            [HttpResourceAttribute.Name],
+            resource => {
+                resource.Operations = SchedulingResourceRegistration.ExecutionOperations;
+                resource.Methods    = SchedulingResourceRegistration.ExecutionMethods;
+            });
     }
 }

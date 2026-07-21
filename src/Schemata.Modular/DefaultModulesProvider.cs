@@ -19,7 +19,8 @@ public sealed class DefaultModulesProvider : IModulesProvider
     /// <summary>
     ///     Initializes the provider, scanning the entry assembly for <see cref="ModuleAttribute" /> instances.
     /// </summary>
-    public DefaultModulesProvider() {
+    /// <param name="time">Clock supplying the year for generated copyright notices.</param>
+    public DefaultModulesProvider(TimeProvider time) {
         var entry = Assembly.GetEntryAssembly();
         if (entry is null) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.ENTRY_ASSEMBLY_REQUIRED));
@@ -41,7 +42,8 @@ public sealed class DefaultModulesProvider : IModulesProvider
             var display     = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product;
             var description = assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
             var company     = assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company;
-            var copyright   = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
+            var copyright   = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright
+                           ?? $"\u00a9 {time.GetLocalNow().Year} {company}";
 
             var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             if (string.IsNullOrWhiteSpace(version)) {

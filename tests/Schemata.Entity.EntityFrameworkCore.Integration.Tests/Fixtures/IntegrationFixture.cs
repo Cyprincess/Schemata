@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Common;
 using Schemata.Entity.Repository;
@@ -22,7 +23,8 @@ public class IntegrationFixture : IAsyncLifetime
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
 
-        services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath}"));
+        services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath}")
+                                                         .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
         services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
         services.AddRepository<Course, EfCoreRepository<TestDbContext, Course>>();

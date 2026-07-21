@@ -40,79 +40,59 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
     #region IJobLifecycleObserver Members
 
-    public async Task OnScheduledAsync(SchemataJob job, CancellationToken ct = default) {
-        var config = ResolveConfig(job);
-        if (config.Result == AdviseResult.Block) {
-            return;
-        }
-
-        await _eventBus.PublishAsync(new JobScheduled {
+    public Task OnScheduledAsync(SchemataJob job, CancellationToken ct = default) {
+        return PublishIfAllowedAsync(job, () => new JobScheduled {
             Job         = job.CanonicalName,
             Variables   = job.Variables,
             ScheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
-    public async Task OnUnscheduledAsync(SchemataJob job, CancellationToken ct = default) {
-        var config = ResolveConfig(job);
-        if (config.Result == AdviseResult.Block) {
-            return;
-        }
-
-        await _eventBus.PublishAsync(new JobUnscheduled {
+    public Task OnUnscheduledAsync(SchemataJob job, CancellationToken ct = default) {
+        return PublishIfAllowedAsync(job, () => new JobUnscheduled {
             Job           = job.CanonicalName,
             UnscheduledAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
-    public async Task<JobTriggerOutcome> OnTriggeredAsync(
+    public Task OnTriggeredAsync(
         SchemataJob       job,
         JobContext        context,
         CancellationToken ct = default
     ) {
-        var config = ResolveConfig(job);
-
-        // Block at config time suppresses publishing, stops the fire, and freezes the schedule.
-        if (config.Result == AdviseResult.Block) {
-            return JobTriggerOutcome.Block;
-        }
-
-        await _eventBus.PublishAsync(new JobTriggered {
+        return PublishIfAllowedAsync(job, () => new JobTriggered {
             Job = context.Job, Variables = context.Variables,
         }, ct);
-
-        // InterceptExecution=true means an external system takes over the run: JobTriggered
-        // is published, the body is skipped, and the schedule advances. Observers wanting a
-        // frozen schedule should return Block from a custom hook.
-        return config.InterceptExecution ? JobTriggerOutcome.Skip : JobTriggerOutcome.Proceed;
     }
 
-    public async Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
-        var config = ResolveConfig(job);
-        if (config.Result == AdviseResult.Block) {
-            return;
-        }
+    public Task OnBlockedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PublishIfAllowedAsync(job, () => new JobBlocked {
+            Job = context.Job, Variables = context.Variables, BlockedAt = _time.GetUtcNow().UtcDateTime,
+        }, ct);
+    }
 
-        await _eventBus.PublishAsync(new JobCompleted {
-            Job     = context.Job,
+    public Task OnSkippedAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PublishIfAllowedAsync(job, () => new JobSkipped {
+            Job = context.Job, Variables = context.Variables, SkippedAt = _time.GetUtcNow().UtcDateTime,
+        }, ct);
+    }
+
+    public Task OnSucceededAsync(SchemataJob job, JobContext context, CancellationToken ct = default) {
+        return PublishIfAllowedAsync(job, () => new JobCompleted {
+            Job         = context.Job,
             Variables   = context.Variables,
             CompletedAt = _time.GetUtcNow().UtcDateTime,
         }, ct);
     }
 
-    public async Task OnFailedAsync(
+    public Task OnFailedAsync(
         SchemataJob       job,
         JobContext        context,
         Exception         exception,
         CancellationToken ct = default
     ) {
-        var config = ResolveConfig(job);
-        if (config.Result == AdviseResult.Block) {
-            return;
-        }
-
-        await _eventBus.PublishAsync(new JobFailed {
-            Job   = context.Job,
+        return PublishIfAllowedAsync(job, () => new JobFailed {
+            Job       = context.Job,
             Variables = context.Variables,
             FailedAt  = _time.GetUtcNow().UtcDateTime,
             Error     = exception.Message,
@@ -120,6 +100,13 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
     }
 
     #endregion
+
+    private Task PublishIfAllowedAsync<TEvent>(SchemataJob job, Func<TEvent> factory, CancellationToken ct)
+        where TEvent : IEvent {
+        return ResolveConfig(job).Result == AdviseResult.Block
+            ? Task.CompletedTask
+            : _eventBus.PublishAsync(factory(), ct);
+    }
 
     private (AdviseResult Result, bool InterceptExecution) ResolveConfig(SchemataJob job) {
         if (string.IsNullOrEmpty(job.JobKey)) {

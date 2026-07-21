@@ -3,18 +3,20 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <GenerateProgramFile>false</GenerateProgramFile>
-    <Description>Component-level authorization endpoint tests with mocked authorization managers.</Description>
+    <Description>Component-level authorization endpoint tests with real authorization persistence.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Moq" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>

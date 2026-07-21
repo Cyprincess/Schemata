@@ -4,15 +4,15 @@
 transitions, `AdviceTransitionEvent` keeps `IRepository<SchemataEventSubscription>` in sync with
 the catches the instance is waiting on. When a matching event reaches the bus, `FlowEventHandler`
 wakes waiting instances through the engine-neutral resource method handlers in
-`Schemata.Flow.Foundation`. The same package also publishes process and token lifecycle
+`Schemata.Flow.Foundation`. The same package also publishes process lifecycle
 notifications through `ProcessEventLifecycleObserver`.
 
 ## Where the code lives
 
 | Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Flow.Event`       | `Features/SchemataFlowEventFeature.cs`, `Events/ProcessStartedEvent.cs`, `Events/ProcessCompletedEvent.cs`, `Events/ProcessFailedEvent.cs`, `Events/TransitionMadeEvent.cs`, `Events/TokenCancelledEvent.cs`, `Events/TokenForkedEvent.cs`, `Events/TokenJoinedEvent.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
-| `Schemata.Flow.Skeleton`    | `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Runtime/ITokenLifecycleObserver.cs`                                                                                                                                                                                                                                                                              |
+| `Schemata.Flow.Event`       | `Features/SchemataFlowEventFeature.cs`, `Events/ProcessStartedEvent.cs`, `Events/ProcessCompletedEvent.cs`, `Events/ProcessFailedEvent.cs`, `Events/TransitionMadeEvent.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
+| `Schemata.Flow.Skeleton`    | `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Runtime/IProcessLifecycleObserver.cs`                                                                                                                                                                                                                                                                                      |
 | `Schemata.Event.Skeleton`   | `Entities/SchemataEventSubscription.cs`, `IEventHandler.cs`, `IEventDispatchContext.cs`                                                                                                                                                                                                                                                                                                                                                |
 | `Schemata.Event.Foundation` | `SchemataEventSubscriptionExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                                               |
 
@@ -36,13 +36,12 @@ consumer transport on the event bus for events to move between publishers and co
 
 ## What gets registered
 
-`SchemataFlowEventFeature.ConfigureServices` registers four scoped services and seven event type
+`SchemataFlowEventFeature.ConfigureServices` registers three scoped services and four event type
 aliases:
 
 ```csharp
 services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionEvent>());
 services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
-services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenLifecycleObserver, ProcessEventLifecycleObserver>());
 services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 
 services.Configure<EventTypeRegistryConfiguration>(options => {
@@ -50,15 +49,13 @@ services.Configure<EventTypeRegistryConfiguration>(options => {
     options.Registrations.Add((typeof(ProcessCompletedEvent),  "schemata/flow/process.completed"));
     options.Registrations.Add((typeof(ProcessFailedEvent),     "schemata/flow/process.failed"));
     options.Registrations.Add((typeof(TransitionMadeEvent),    "schemata/flow/transition.made"));
-    options.Registrations.Add((typeof(TokenCancelledEvent),    "schemata/flow/token.cancelled"));
-    options.Registrations.Add((typeof(TokenForkedEvent),       "schemata/flow/token.forked"));
-    options.Registrations.Add((typeof(TokenJoinedEvent),       "schemata/flow/token.joined"));
 });
 ```
 
 `AdviceTransitionEvent` reconciles the subscription repository before a transition commits.
-`ProcessEventLifecycleObserver` is the same instance registered against both `IProcessLifecycleObserver`
-and `ITokenLifecycleObserver`. It publishes lifecycle events after persistence. `FlowEventHandler` is
+`ProcessEventLifecycleObserver` publishes process lifecycle events after persistence; the per-token
+lifecycle observer path and its fork/join/cancel events were removed, so only process-level
+notifications remain. `FlowEventHandler` is
 the generic `IEvent` handler that wakes waiting instances when the bus dispatches a matched event.
 
 ## AdviceTransitionEvent
@@ -81,50 +78,46 @@ atomically with the process row and roll back together on any failure. Returns `
    (`IRepository.FirstOrDefaultAsync` then `AddAsync` or `UpdateAsync`). A gateway adds one
    subscription per outgoing intermediate catch.
 
-The default state-machine engine waits at the host activity for boundary message and signal events,
-so this advisor registers intermediate catches and event-based gateway branches. A custom keyed
-`IFlowRuntime` can follow the same subscription pattern for boundary catches if it parks tokens on
-those catches.
+The advisor walks `ProcessDefinition.AllElements`, so intermediate catches, event-based gateway
+branches, and boundary message/signal catches attached to the host activity of an active token each
+get a subscription row. Boundary subscriptions follow the host activity rather than a waiting
+element: when a token parks on or leaves an activity, its boundary catches are armed or disarmed
+alongside the waiting-element subscriptions.
 
 ### Subscription format
 
 `AdviceTransitionEvent` writes `SchemataEventSubscription` rows through
 `IRepository<SchemataEventSubscription>`. Each row carries `SubscriptionId`, `EventType`,
-`CorrelationKey`, and `Target`.
+`CorrelationKey`, `Target`, and `Token`.
 
 ```csharp
-// Message catch (point-to-point):
+// Message catch (point-to-point, token-scoped):
 new SchemataEventSubscription {
-    SubscriptionId = $"flow:{process.CanonicalName}:{elementName}",
+    SubscriptionId = $"flow:{process.CanonicalName}:{elementName}:{token.CanonicalName}",
     EventType      = definition.Name,
     CorrelationKey = process.CanonicalName,
     Target         = process.CanonicalName,
-    Name           = $"flow:{process.CanonicalName}:{elementName}",
-    CanonicalName  = $"event-subscriptions/flow:{process.CanonicalName}:{elementName}",
+    Token          = token.CanonicalName,
 };
 
 // Signal catch (broadcast):
 new SchemataEventSubscription {
-    SubscriptionId = $"flow:{process.CanonicalName}:{elementName}",
+    SubscriptionId = $"flow:{process.CanonicalName}:{elementName}:broadcast",
     EventType      = definition.Name,
     CorrelationKey = null,
     Target         = process.CanonicalName,
-    Name           = $"flow:{process.CanonicalName}:{elementName}",
-    CanonicalName  = $"event-subscriptions/flow:{process.CanonicalName}:{elementName}",
+    Token          = null,
 };
 ```
 
-The subscription id includes the waiting element name, so two catches in one process can wait for
-the same message or signal name without overwriting each other. `EventType` carries the BPMN-level
-`Message.Name` or `Signal.Name`, `Target` carries the process canonical name, and `CorrelationKey`
-separates point-to-point messages from broadcast signals. Messages set `CorrelationKey` to the
-process canonical name; signals leave it `null`.
+The subscription id is `flow:{process}:{element}:{token|broadcast}`: message rows key on the armed
+token's canonical name, so two tokens parked on the same message name correlate independently;
+signal rows carry the `broadcast` segment and a null `Token`, so one row serves the whole process.
+`EventType` carries the BPMN-level `Message.Name` or `Signal.Name`, `Target` carries the process
+canonical name, and `CorrelationKey` separates point-to-point messages from broadcast signals.
 
-The same subscription id format, `flow:{processName}:{elementName}`, applies to every intermediate
-catch the engine parks a token on, which is what lets one process definition consume the same
-message or signal from multiple subscribed await states. The DSL emits one intermediate catch event
-per `On(message)` call, and the gateway-scoped catch name (`Catch_{gateway}_{eventDefinition}`)
-keeps each subscription distinct.
+The DSL emits one intermediate catch event per `On(message)` call, and the gateway-scoped catch name
+(`Catch_{gateway}_{eventDefinition}`) keeps each subscription distinct.
 
 ## FlowEventHandler
 
@@ -134,16 +127,19 @@ processes by invoking the engine-neutral resource method handlers in `Schemata.F
 within a fresh DI scope per call. The handlers in turn call `FlowRunner.CorrelateAsync` or
 `FlowRunner.ThrowSignalAsync`.
 
-The bridge constructs the request with `Payload = null` and the matched `EventType` as the message
-or signal name; the inbound event body from the bus is not forwarded to the handler or the engine.
-The handler-internal request types (`CorrelateMessageRequest`, `ThrowSignalRequest`) live in
+The bridge serializes the inbound `IEvent` to JSON (`JsonSerializer.Serialize(@event,
+@event.GetType(), SchemataJson.Default)`) and forwards it as the request `Payload`; the matched
+`EventType` becomes the message or signal name. The handler-internal request types
+(`CorrelateMessageRequest`, `ThrowSignalRequest`) live in
 `Schemata.Flow.Skeleton.Models`.
 
 - `CorrelationKey` set — open a scope, resolve `ProcessPersistence`, load the process via
   `persistence.FindAsync`, resolve `CorrelateMessageHandler` from the scope, and invoke it with
-  `MessageName = sub.EventType`, `Payload = null`, the loaded process as entity, and `null` principal.
+  `MessageName = sub.EventType`, `Payload = <serialized event>`, `Token = sub.Token`, the loaded
+  process as entity, and `null` principal.
 - `CorrelationKey` null — open a scope, resolve `ThrowSignalHandler` from the scope, and invoke it
-  with `SignalName = sub.EventType`, `Payload = null`, `null` entity, and `null` principal.
+  with `SignalName = sub.EventType`, `Payload = <serialized event>`, `Token = null`, `null` entity,
+  and `null` principal.
 
 Signal throws are de-duplicated by event type within one handler call. If one dispatched event
 matches several signal subscriptions with the same `EventType`, `FlowEventHandler` invokes the
@@ -153,9 +149,8 @@ message subscription targets one process instance.
 
 ## ProcessEventLifecycleObserver
 
-`ProcessEventLifecycleObserver` implements both `IProcessLifecycleObserver` and
-`ITokenLifecycleObserver`. It publishes Flow lifecycle notifications to `IEventBus` when the bus is
-available:
+`ProcessEventLifecycleObserver` implements `IProcessLifecycleObserver`. It publishes Flow lifecycle
+notifications to `IEventBus` when the bus is available:
 
 | Observer method         | Interface                   | Published event         | Payload                                                                         |
 | ----------------------- | --------------------------- | ----------------------- | ------------------------------------------------------------------------------- |
@@ -163,9 +158,6 @@ available:
 | `OnTransitionedAsync`   | `IProcessLifecycleObserver` | `TransitionMadeEvent`   | `ProcessCanonicalName`, `FromStateName`, `ToStateName`                              |
 | `OnTerminatedAsync`     | `IProcessLifecycleObserver` | `ProcessCompletedEvent` | `ProcessCanonicalName`, `DefinitionName`                                            |
 | `OnFailedAsync`         | `IProcessLifecycleObserver` | `ProcessFailedEvent`    | `ProcessCanonicalName`, `DefinitionName`, `ErrorMessage`                            |
-| `OnTokenCancelledAsync` | `ITokenLifecycleObserver`   | `TokenCancelledEvent`   | `ProcessCanonicalName`, `TokenCanonicalName`, `StateName`                           |
-| `OnTokenForkedAsync`    | `ITokenLifecycleObserver`   | `TokenForkedEvent`      | `ProcessCanonicalName`, `TokenCanonicalName`, `SpawnerCanonicalName`, `StateName`   |
-| `OnTokenJoinedAsync`    | `ITokenLifecycleObserver`   | `TokenJoinedEvent`      | `ProcessCanonicalName`, `TokenCanonicalName`, `InputCanonicalNames`, `StateName`    |
 
 The Flow runtime calls lifecycle observers after commits and logs observer exceptions. A failed
 observer does not roll back a transition that already committed.
@@ -175,8 +167,6 @@ observer does not roll back a transition that already committed.
 - Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to add subscription logic.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to publish additional
   process lifecycle notifications after Flow commits.
-- Implement `ITokenLifecycleObserver` and register via `TryAddEnumerable` to publish additional
-  token lifecycle notifications for fork / join / cancel scopes.
 
 ## Caveats
 
@@ -186,8 +176,8 @@ observer does not roll back a transition that already committed.
 - `IEventHandler<IEvent>` is the generic handler. The bus dispatches by CLR type, and the order in
   which handlers see a given event depends on the bus implementation and any registered
   `IEventHandler<TEvent>` for a more specific CLR type.
-- Subscription ids use the `flow:{processCanonicalName}:{elementName}` format. Reserve the `flow:`
-  prefix for this integration.
+- Subscription ids use the `flow:{processCanonicalName}:{elementName}:{token|broadcast}` format.
+  Reserve the `flow:` prefix for this integration.
 - Persisted or manually seeded processes must carry `StateName`; display `State` is not a resume key.
 
 ## See also

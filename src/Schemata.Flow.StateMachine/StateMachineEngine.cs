@@ -18,6 +18,8 @@ public sealed class StateMachineEngine : IFlowRuntime
     /// <summary>Engine name registered in <see cref="SchemataConstants.FlowEngines"/>.</summary>
     public string EngineName => SchemataConstants.FlowEngines.StateMachine;
 
+    public FlowRuntimeCapabilities Capabilities => FlowRuntimeCapabilities.ProcedureTasks;
+
     /// <summary>Locates the start event, follows its single outgoing flow, and emits the first transition row.</summary>
     public async ValueTask<ProcessSnapshot> StartAsync(
         ProcessDefinition definition,
@@ -329,9 +331,7 @@ public sealed class StateMachineEngine : IFlowRuntime
                 continue;
             }
 
-            if (evt.Definition is null
-             || (!ReferenceEquals(evt.Definition, trigger)
-              && (evt.Definition.Name != trigger.Name || evt.Definition.GetType() != trigger.GetType()))) {
+            if (!FlowEventMatcher.Matches(evt.Definition, trigger)) {
                 continue;
             }
 

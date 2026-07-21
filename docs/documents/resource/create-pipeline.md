@@ -67,8 +67,9 @@ response advisors.
 | --------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `AdviceResponseParent`      | Derives `IChild.Parent` from the entity's canonical name; runs before freshness                           |
 | `AdviceResponseFreshness`   | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
-| `AdviceResponseReadMask`    | Trims the detail to the requested AIP-157 `read_mask` fields                                              |
 | `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key                                                      |
+
+Responses are full: AIP-157 partial responses are not supported, and no response-stage trimming runs.
 
 ## Extension points
 

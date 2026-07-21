@@ -43,7 +43,7 @@ internal static class RuntimeTypeModelConfigurator
             }
 
             foreach (var method in methods) {
-                var iface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
+                var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
                 if (iface is null) {
                     continue;
                 }

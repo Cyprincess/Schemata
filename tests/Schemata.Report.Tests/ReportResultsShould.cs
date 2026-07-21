@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using Schemata.Insight.Skeleton;
 using Schemata.Report.Skeleton;
 using Xunit;
 

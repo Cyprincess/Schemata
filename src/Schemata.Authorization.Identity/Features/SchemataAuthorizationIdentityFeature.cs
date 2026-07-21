@@ -5,10 +5,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Identity.Advisors;
+using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Identity.Foundation.Features;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Identity.Features;
@@ -17,8 +19,8 @@ namespace Schemata.Authorization.Identity.Features;
 ///     Wires Schemata's Identity-backed <see cref="ISubjectProvider" /> and the subject-claims advisor into the
 ///     Authorization pipeline.
 /// </summary>
-[DependsOn("Schemata.Authorization.Foundation.Features.SchemataAuthorizationFeature`4")]
-[DependsOn("Schemata.Identity.Foundation.Features.SchemataIdentityFeature`4")]
+[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]
+[DependsOn(typeof(SchemataIdentityFeature<,,,>))]
 public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
 {
     /// <summary>Default feature priority for Identity-backed authorization integration.</summary>

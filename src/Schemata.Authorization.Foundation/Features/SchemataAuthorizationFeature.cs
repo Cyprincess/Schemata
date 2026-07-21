@@ -131,7 +131,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
                 .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthenticationHandler<TApp, TToken>>(options.BearerScheme, null)
                 .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthorizationCodeHandler<TApp, TToken>>(options.CodeScheme, null);
 
-        services.TryAddTransient<TokenCleanupJob<TToken>>();
         services.Configure<SchemataSchedulingOptions>(o => o.Jobs.Add(new(typeof(TokenCleanupJob<TToken>), new CronSchedule("0 * * * *"))));
+        services.AddScheduledJob<TokenCleanupJob<TToken>>();
     }
 }

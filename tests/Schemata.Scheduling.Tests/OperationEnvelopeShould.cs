@@ -53,7 +53,7 @@ public class OperationEnvelopeShould
     }
 
     [Fact]
-    public void FailedExecution_IntegerStatusCode() {
+    public void FromExecution_WhenStateIsFailedWithRecentError_PopulatesDoneTrueAndErrorCodeTwoAndMessage() {
         var execution = new SchemataJobExecution {
             Name          = "def",
             CanonicalName = "operations/def",

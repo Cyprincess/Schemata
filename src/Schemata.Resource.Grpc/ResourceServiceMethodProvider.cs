@@ -8,6 +8,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Grpc.Internal;
+using Schemata.Transport.Grpc;
 using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
 namespace Schemata.Resource.Grpc;

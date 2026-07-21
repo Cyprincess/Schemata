@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Schemata.Expressions.Skeleton;
 using Xunit;
 
@@ -9,11 +10,14 @@ public class ExpressionLanguageBuilderExtensionsShould
     [Fact]
     public void Enables_Aip_And_Registers_Resolvable_Compiler() {
         var services = new ServiceCollection();
-        var builder  = new FakeBuilder(services);
+        var languages = new ExpressionLanguageProfile();
+        var builder = new Mock<IExpressionLanguageBuilder>(MockBehavior.Strict);
+        builder.SetupGet(value => value.Services).Returns(services);
+        builder.SetupGet(value => value.Languages).Returns(languages);
 
-        builder.UseAip();
+        builder.Object.UseAip();
 
-        var entry = Assert.Single(builder.Languages.Languages);
+        var entry = Assert.Single(languages.Languages);
         Assert.Equal(AipLanguage.Name, entry.Language);
 
         var provider = services.BuildServiceProvider();
@@ -23,21 +27,13 @@ public class ExpressionLanguageBuilderExtensionsShould
     [Fact]
     public void Applies_Entry_Configuration() {
         var services = new ServiceCollection();
-        var builder  = new FakeBuilder(services);
+        var languages = new ExpressionLanguageProfile();
+        var builder = new Mock<IExpressionLanguageBuilder>(MockBehavior.Strict);
+        builder.SetupGet(value => value.Services).Returns(services);
+        builder.SetupGet(value => value.Languages).Returns(languages);
 
-        builder.UseAip(e => e.Filtering = FilteringMode.Residual);
+        builder.Object.UseAip(e => e.Filtering = FilteringMode.Residual);
 
-        Assert.Equal(FilteringMode.Residual, Assert.Single(builder.Languages.Languages).Filtering);
+        Assert.Equal(FilteringMode.Residual, Assert.Single(languages.Languages).Filtering);
     }
-
-    #region Nested type: FakeBuilder
-
-    private sealed class FakeBuilder(IServiceCollection services) : IExpressionLanguageBuilder
-    {
-        public IServiceCollection Services { get; } = services;
-
-        public ExpressionLanguageProfile Languages { get; } = new();
-    }
-
-    #endregion
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 using Schemata.Modular;
@@ -9,8 +10,8 @@ public class DefaultModulesProviderShould
 {
     [Fact]
     public void KeepDiscoveredModules_PerProviderInstance() {
-        var first  = new DefaultModulesProvider();
-        var second = new DefaultModulesProvider();
+        var first  = new DefaultModulesProvider(TimeProvider.System);
+        var second = new DefaultModulesProvider(TimeProvider.System);
 
         var modules = GetModules(first);
         modules.Add(new("test.module", typeof(DefaultModulesProvider).Assembly, typeof(DefaultModulesProvider),

@@ -1,8 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
-// ReSharper disable once CheckNamespace
-namespace System.Linq;
+namespace Schemata.Common;
 
 /// <summary>
 ///     Partially evaluates expression trees by collapsing subtrees that do not depend on parameters into constants.

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Builders;
@@ -81,6 +82,7 @@ public class DslNamedBindingShould
         var data = items.ToList();
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         return repository;

@@ -66,4 +66,5 @@ public class FlowTaskContextShould
     }
 
     private sealed record Widget(string Name);
+
 }

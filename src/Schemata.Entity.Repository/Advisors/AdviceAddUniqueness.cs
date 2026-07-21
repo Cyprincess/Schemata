@@ -13,10 +13,9 @@ namespace Schemata.Entity.Repository.Advisors;
 public static class AdviceAddUniqueness
 {
     /// <summary>
-    ///     Default order: runs last in the add chain, after the identity-assigning and
-    ///     validation advisors, so the lookup sees the final key values.
+    ///     Default execution order: 170,000,000.
     /// </summary>
-    public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 30_000_000;
 }
 
 /// <summary>

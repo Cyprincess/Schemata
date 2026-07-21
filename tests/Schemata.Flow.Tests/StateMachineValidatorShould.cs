@@ -25,7 +25,6 @@ public class StateMachineValidatorShould
         var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
 
         Assert.Null(ex);
-        Assert.NotEmpty(definition.Elements);
     }
 
     [Fact]

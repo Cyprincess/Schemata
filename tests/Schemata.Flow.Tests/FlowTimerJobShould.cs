@@ -20,11 +20,25 @@ public class FlowTimerJobShould
     }
 
     [Fact]
-    public async SystemTask MissingTimerDefinition_Throws() {
+    public async SystemTask MissingTokenName_Throws() {
         var job = new FlowTimerJob(new ServiceCollection().BuildServiceProvider());
 
         var context = new JobContext {
             Variables = new Dictionary<string, string?> { ["processName"] = "processes/p1" },
+        };
+
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => job.ExecuteAsync(context, CancellationToken.None));
+    }
+
+    [Fact]
+    public async SystemTask MissingTimerDefinition_Throws() {
+        var job = new FlowTimerJob(new ServiceCollection().BuildServiceProvider());
+
+        var context = new JobContext {
+            Variables = new Dictionary<string, string?> {
+                ["processName"] = "processes/p1",
+                ["tokenName"]   = "processes/p1/tokens/t1",
+            },
         };
 
         await Assert.ThrowsAsync<FailedPreconditionException>(() => job.ExecuteAsync(context, CancellationToken.None));

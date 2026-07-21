@@ -23,8 +23,23 @@ public class SchedulingInitializerShould
         scheduler.Setup(s => s.StartAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         scheduler.Setup(s => s.StopAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        executions.Setup(r => r.ListAsync(
+                             It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _,
+                            CancellationToken __) => ToAsyncExecutions([]));
+
+        var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                                    It.IsAny<CancellationToken>()))
+            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> _, CancellationToken __) => ToAsyncJobs([]));
+
+        var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
+                                              .BuildServiceProvider();
+
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
-                                                    EmptyServices(), new DefaultScheduledJobRegistry());
+                                                    services, new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
 
@@ -71,8 +86,6 @@ public class SchedulingInitializerShould
 
         await initializer.StopAsync(CancellationToken.None);
     }
-
-    private static IServiceProvider EmptyServices() { return new ServiceCollection().BuildServiceProvider(); }
 
     private static async IAsyncEnumerable<SchemataJob> ToAsyncJobs(IEnumerable<SchemataJob> jobs) {
         foreach (var job in jobs) {

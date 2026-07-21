@@ -60,7 +60,7 @@ public class DeviceAuthorizeHandlerShould
     }
 
     [Fact]
-    public async Task ReturnsResponse_WithAllRequiredFields() {
+    public async Task DeviceAuthorizeAsync_WithOpenIdScope_ReturnsResponseWithDeviceCodeUserCodeVerificationUriLifetimeAndInterval() {
         var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 
@@ -78,7 +78,7 @@ public class DeviceAuthorizeHandlerShould
     }
 
     [Fact]
-    public async Task UserCode_HasCorrectFormat() {
+    public async Task DeviceUserCode_FollowsCrockfordAlphabetWithHyphenAtIndexFour() {
         var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
         var (handler, _) = CreateHandler(app);
 

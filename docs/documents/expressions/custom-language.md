@@ -195,7 +195,7 @@ var filter = compiler.Compile<Student, bool>(tree);
 var students = dbContext.Students.Where(filter).ToList();
 ```
 
-`ExpressionRuntime.Evaluate(filter, student)` evaluates a compiled expression against one object.
+To evaluate a compiled expression against one object, invoke it as a delegate. `ExpressionCache.GetOrAddDelegate(filter)(student)` compiles once and reuses the cached delegate on later calls.
 
 ## Caveats
 

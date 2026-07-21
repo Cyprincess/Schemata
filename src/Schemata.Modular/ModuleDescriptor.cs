@@ -18,7 +18,7 @@ public class ModuleDescriptor
     /// <param name="display">The display name, defaults to <paramref name="name" />.</param>
     /// <param name="description">An optional description from assembly metadata.</param>
     /// <param name="company">The company name from assembly metadata.</param>
-    /// <param name="copyright">The copyright notice, auto-generated if not provided.</param>
+    /// <param name="copyright">The copyright notice supplied by the discovering provider.</param>
     /// <param name="version">The informational version string.</param>
     public ModuleDescriptor(
         string   name,
@@ -35,8 +35,7 @@ public class ModuleDescriptor
         DisplayName  = display ?? name;
         Description  = description;
         Company      = company;
-        // A copyright year is descriptive assembly metadata, so the ambient local year is sufficient.
-        Copyright    = copyright ?? $"\u00a9 {DateTime.Now.Year} {company}";
+        Copyright    = copyright;
         Version      = version;
         Assembly     = assembly;
         EntryType    = entry;

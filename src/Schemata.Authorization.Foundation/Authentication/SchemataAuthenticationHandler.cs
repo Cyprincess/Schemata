@@ -188,6 +188,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
         var now = time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
+            Name              = jti,
             Type              = type,
             Format            = format,
             Status            = TokenStatuses.Valid,
@@ -235,10 +236,13 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             return AuthenticateResult.NoResult();
         }
 
-        var id = principal.Identity as ClaimsIdentity;
-        var claims = id!.Claims.Where(c => c.Type != Claims.Subject)
-                        .Append(new(Claims.Subject, entity.Subject ?? string.Empty))
-                        .ToList();
+        if (principal.Identity is not ClaimsIdentity id) {
+            return AuthenticateResult.NoResult();
+        }
+
+        var claims = id.Claims.Where(c => c.Type != Claims.Subject)
+                       .Append(new(Claims.Subject, entity.Subject ?? string.Empty))
+                       .ToList();
         principal = new(new ClaimsIdentity(claims, id.AuthenticationType, Claims.Subject, Claims.Role));
 
         return AuthenticateResult.Success(new(principal, Scheme.Name));

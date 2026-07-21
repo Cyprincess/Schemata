@@ -10,6 +10,7 @@ using Schemata.Event.Skeleton;
 using Schemata.Flow.Event.Events;
 using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -32,9 +33,9 @@ public sealed class SchemataFlowEventFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.Configure<SchemataFlowOptions>(options => options.Bridges.Add(SchemataFlowOptions.EventsBridge));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionEvent>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenLifecycleObserver, ProcessEventLifecycleObserver>());
         services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 
         services.Configure<EventTypeRegistryConfiguration>(options => {
@@ -42,9 +43,6 @@ public sealed class SchemataFlowEventFeature : FeatureBase
             options.Registrations.Add((typeof(ProcessCompletedEvent), "schemata/flow/process.completed"));
             options.Registrations.Add((typeof(ProcessFailedEvent), "schemata/flow/process.failed"));
             options.Registrations.Add((typeof(TransitionMadeEvent), "schemata/flow/transition.made"));
-            options.Registrations.Add((typeof(TokenCancelledEvent), "schemata/flow/token.cancelled"));
-            options.Registrations.Add((typeof(TokenForkedEvent), "schemata/flow/token.forked"));
-            options.Registrations.Add((typeof(TokenJoinedEvent), "schemata/flow/token.joined"));
         });
     }
 }

@@ -9,6 +9,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Grpc.Internal;
+using Schemata.Transport.Grpc;
 
 namespace Schemata.Resource.Grpc;
 
@@ -55,7 +56,7 @@ internal static class ResourceCustomMethod
         var service    = GrpcResourceNaming.ServiceFullName(entity, descriptor);
 
         foreach (var method in methods) {
-            var handlerInterface = GrpcResourceHelper.FindHandlerInterface(method.Handler);
+            var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
             if (handlerInterface is null) {
                 continue;
             }

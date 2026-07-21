@@ -12,6 +12,7 @@ using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
@@ -84,6 +85,7 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
 
         var authorization = new TAuth {
+            Name                = Identifiers.NewUid().ToString("n"),
             Application         = authz.Application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,

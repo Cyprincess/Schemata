@@ -21,8 +21,6 @@ namespace Schemata.Resource.Foundation.Features;
 ///     auto-discovers resources decorated with <see cref="ResourceAttribute" />.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
-[DependsOn("Schemata.Mapping.Foundation.Features.SchemataMappingFeature`1")]
-[DependsOn("Schemata.Security.Foundation.Features.SchemataSecurityFeature")]
 public sealed class SchemataResourceFeature : FeatureBase
 {
     /// <summary>
@@ -56,9 +54,7 @@ public sealed class SchemataResourceFeature : FeatureBase
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvisor<>), typeof(AdviceDeleteFreshness<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseParent<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseFreshness<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseReadMask<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListResponseAdvisor<>), typeof(AdviceListResponseParent<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListResponseAdvisor<>), typeof(AdviceListResponseReadMask<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseIdempotency<,>)));
 
         // Reverse-resolves an entity type from a resource name / collection segment.

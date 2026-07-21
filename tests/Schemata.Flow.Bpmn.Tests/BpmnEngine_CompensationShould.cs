@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Flow.Bpmn.Runtime.Compensation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Xunit;
@@ -71,38 +69,6 @@ public class BpmnEngine_CompensationShould
     }
 
     [Fact]
-    public async Task Throw_HandlerExceptionInGlobalCompensation_PropagatesToOuterErrorBoundary() {
-        var scenario = NestedThrowingScenario(true);
-        var beforeThrow = await RunToThrowingLastActivityAsync(scenario);
-        var innerOwner = ParentCanonicalForScope(beforeThrow, "inner");
-        RegisterHandler(scenario.Engine, innerOwner, new ThrowingHandler(scenario.ThrowingActivity, scenario.Failure, scenario.Log));
-
-        var snapshot = await AdvanceTokenAsync(scenario, beforeThrow, TokenByState(beforeThrow, "c"));
-
-        Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "c", Posterior: "undo-c" });
-        Assert.DoesNotContain(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "a" });
-        Assert.Equal(["b"], scenario.Log);
-        Assert.Single(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "inner-error-boundary", Posterior: "inner-error-handler" });
-        Assert.Equal("Running", snapshot.Process.State);
-    }
-
-    [Fact]
-    public async Task Throw_HandlerExceptionWithNoErrorBoundaryAnywhere_PropagatesAsProcessFailure() {
-        var scenario = NestedThrowingScenario(false);
-        var beforeThrow = await RunToThrowingLastActivityAsync(scenario);
-        var innerOwner = ParentCanonicalForScope(beforeThrow, "inner");
-        RegisterHandler(scenario.Engine, innerOwner, new ThrowingHandler(scenario.ThrowingActivity, scenario.Failure, scenario.Log));
-
-        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await AdvanceTokenAsync(scenario, beforeThrow, TokenByState(beforeThrow, "c")));
-
-        Assert.Same(scenario.Failure, thrown);
-        Assert.Equal(["b"], scenario.Log);
-        Assert.DoesNotContain("a", scenario.Log);
-        Assert.Equal("Failed", beforeThrow.Process.State);
-    }
-
-    [Fact]
     public async Task Throw_TargetedCompensationAmongFiveActivities_FiresOnlyTargetedHandler() {
         var scenario = LinearScenario(["a", "b", "c", "D", "E"], ["a", "b", "c", "D", "E"], "c");
         var snapshot = await AdvanceIntoThrowAsync(scenario);
@@ -139,13 +105,6 @@ public class BpmnEngine_CompensationShould
         snapshot = await AdvanceTokenAsync(scenario, snapshot, TokenByState(snapshot, "outer-a"));
         snapshot = await AdvanceTokenAsync(scenario, snapshot, TokenByState(snapshot, "outer-gap"));
         snapshot = await AdvanceTokenAsync(scenario, snapshot, TokenByState(snapshot, "inner-a"));
-        return snapshot;
-    }
-
-    private static async Task<ProcessSnapshot> RunToThrowingLastActivityAsync(ThrowingCompensationScenario scenario) {
-        var snapshot = await scenario.Engine.StartAsync(scenario.Definition, scenario.Process, CancellationToken.None);
-        snapshot = await AdvanceTokenAsync(scenario, snapshot, TokenByState(snapshot, "a"));
-        snapshot = await AdvanceTokenAsync(scenario, snapshot, TokenByState(snapshot, "b"));
         return snapshot;
     }
 
@@ -286,69 +245,6 @@ public class BpmnEngine_CompensationShould
         return new(new(), definition, NewProcess(definition.Name));
     }
 
-    private static ThrowingCompensationScenario NestedThrowingScenario(bool errorBoundary) {
-        var start   = new FlowEvent { Name = "start", Position = EventPosition.Start };
-        var inner   = new EmbeddedSubProcess { Name = "inner" };
-        var rootEnd = new FlowEvent { Name = "root-end", Position = EventPosition.End };
-
-        var innerStart = new FlowEvent { Name = "inner-start", Position = EventPosition.Start };
-        var a = new NoneTask { Name = "a" };
-        var b = new NoneTask { Name = "b" };
-        var c = new NoneTask { Name = "c" };
-        var throwEvent = new FlowEvent {
-            Name         = "throw",
-            Position   = EventPosition.IntermediateThrow,
-            Definition = new CompensationDefinition { Name = "Compensate" },
-        };
-        var after = new NoneTask { Name = "after" };
-        var end   = new FlowEvent { Name = "end", Position = EventPosition.End };
-
-        inner.Children.Add(innerStart);
-        inner.Children.Add(a);
-        inner.Children.Add(b);
-        inner.Children.Add(c);
-        inner.Children.Add(throwEvent);
-        inner.Children.Add(after);
-        inner.Children.Add(end);
-        inner.ChildFlows.Add(new() { Source = innerStart, Target = a });
-        inner.ChildFlows.Add(new() { Source = a, Target = b });
-        inner.ChildFlows.Add(new() { Source = b, Target = c });
-        inner.ChildFlows.Add(new() { Source = c, Target = throwEvent });
-        inner.ChildFlows.Add(new() { Source = throwEvent, Target = after });
-        inner.ChildFlows.Add(new() { Source = after, Target = end });
-        AddCompensation(inner.Children, inner.ChildFlows, a, "a");
-        AddCompensation(inner.Children, inner.ChildFlows, c, "c");
-
-        var definition = new ProcessDefinition {
-            Name     = $"throwing-compensation-{Guid.NewGuid():N}",
-            Elements = { start, inner, rootEnd },
-            Flows = {
-                new() { Source = start, Target = inner },
-                new() { Source = inner, Target = rootEnd },
-            },
-        };
-
-        if (errorBoundary) {
-            var boundary = new FlowEvent {
-                Name           = "inner-error-boundary",
-                Position     = EventPosition.Boundary,
-                AttachedTo   = inner,
-                Interrupting = true,
-                Definition   = new ErrorDefinition { Name = "InnerError", ExceptionType = typeof(InvalidOperationException) },
-            };
-            var handler = new NoneTask { Name = "inner-error-handler" };
-            var handlerEnd = new FlowEvent { Name = "inner-error-end", Position = EventPosition.End };
-            definition.Elements.Add(boundary);
-            definition.Elements.Add(handler);
-            definition.Elements.Add(handlerEnd);
-            definition.Flows.Add(new() { Source = boundary, Target = handler });
-            definition.Flows.Add(new() { Source = handler, Target = handlerEnd });
-        }
-
-        var failure = new InvalidOperationException("boom");
-        return new(new(), definition, NewProcess(definition.Name), b, failure, []);
-    }
-
     private static void AddCompensation(ICollection<FlowElement> elements, ICollection<SequenceFlow> flows, Activity activity, string suffix) {
         var boundary = new FlowEvent {
             Name         = $"compensate-{suffix.ToLowerInvariant()}",
@@ -360,16 +256,6 @@ public class BpmnEngine_CompensationShould
         elements.Add(boundary);
         elements.Add(target);
         flows.Add(new() { Source = boundary, Target = target });
-    }
-
-    private static void RegisterHandler(BpmnEngine engine, string scopeOwner, ICompensationHandler handler) {
-        var ensure = typeof(BpmnEngine).GetMethod(
-            "EnsureCompensationScope",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(ensure);
-
-        var stack = Assert.IsType<CompensationStack>(ensure.Invoke(engine, [scopeOwner]));
-        stack.Register(handler);
     }
 
     private static SchemataProcess NewProcess(string definitionName) {
@@ -393,23 +279,4 @@ public class BpmnEngine_CompensationShould
         ProcessDefinition Definition,
         SchemataProcess   Process) : EngineScenario(Engine, Definition, Process);
 
-    private sealed record ThrowingCompensationScenario(
-        BpmnEngine         Engine,
-        ProcessDefinition Definition,
-        SchemataProcess   Process,
-        Activity          ThrowingActivity,
-        InvalidOperationException Failure,
-        IList<string>     Log) : EngineScenario(Engine, Definition, Process);
-
-    private sealed class ThrowingHandler(Activity activity, InvalidOperationException failure, IList<string> log) : ICompensationHandler
-    {
-        public Activity Activity { get; } = activity;
-
-        public FlowElement CompensationTarget { get; } = new NoneTask { Name = "throwing-target" };
-
-        public ValueTask InvokeAsync(CompensationInvocationContext context, CancellationToken ct = default) {
-            log.Add(Activity.Name!);
-            throw failure;
-        }
-    }
 }

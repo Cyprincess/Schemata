@@ -9,7 +9,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -29,7 +28,7 @@ public abstract class RepositoryBase
 
     /// <summary>
     ///     Resolves the key properties for the specified type by reading the class-level
-    ///     <see cref="PrimaryKeyAttribute" /> (EF Core 7+), then falling back to the
+    ///     <see cref="PrimaryKeyAttribute" />, then falling back to the
     ///     <see cref="IIdentifier.Uid" /> convention when no attribute is declared.
     /// </summary>
     /// <param name="type">The entity type to inspect.</param>
@@ -41,7 +40,7 @@ public abstract class RepositoryBase
         if (primary is not null) {
             var map      = properties.ToDictionary(p => p.Name, StringComparer.Ordinal);
             var resolved = new List<PropertyInfo>();
-            foreach (var name in primary.PropertyNames) {
+        foreach (var name in primary.Properties) {
                 if (map.TryGetValue(name, out var prop)) {
                     resolved.Add(prop);
                 } else {
@@ -153,6 +152,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual AdviceContext AdviceContext { get; }
 
+    internal bool HasOpenWriteUnitOfWork => !_completed && (_uow is not null || _added.Count > 0 || _updated.Count > 0 || _removed.Count > 0);
+
     public virtual async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         [EnumeratorCancellation] CancellationToken      ct = default
@@ -193,7 +194,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             keys.Add(value);
         }
 
-        return FindAsync<TResult>(keys.ToArray(), ct);
+        return FindAsync<TResult>([.. keys], ct);
     }
 
     public virtual ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
@@ -402,6 +403,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return context.Result;
     }
 
+    public virtual ValueTask<long> EstimateCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken                               ct = default
+    ) {
+        return LongCountAsync(predicate, ct);
+    }
+
     public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
 
     public virtual async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
@@ -528,9 +536,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <param name="query">The query to execute.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The first result or <see langword="null" />.</returns>
-    protected virtual Task<TResult?> FirstOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
-        throw new NotImplementedException();
-    }
+    protected abstract Task<TResult?> FirstOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
     ///     Executes a provider query and returns its single result or <see langword="null" />.
@@ -539,9 +545,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <param name="query">The query to execute.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The single result or <see langword="null" />.</returns>
-    protected virtual Task<TResult?> SingleOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
-        throw new NotImplementedException();
-    }
+    protected abstract Task<TResult?> SingleOrDefaultAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
     ///     Executes a provider query and returns whether it contains any results.
@@ -550,9 +554,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <param name="query">The query to execute.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns><see langword="true" /> when the query contains at least one result.</returns>
-    protected virtual Task<bool> AnyAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
-        throw new NotImplementedException();
-    }
+    protected abstract Task<bool> AnyAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
     ///     Executes a provider query and returns the result count.
@@ -561,9 +563,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <param name="query">The query to execute.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The result count.</returns>
-    protected virtual Task<int> CountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
-        throw new NotImplementedException();
-    }
+    protected abstract Task<int> CountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
     ///     Executes a provider query and returns the result count as a 64-bit integer.
@@ -572,9 +572,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <param name="query">The query to execute.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The result count.</returns>
-    protected virtual Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
-        throw new NotImplementedException();
-    }
+    protected abstract Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
     ///     Captures the current add/update/remove tracking lists into a snapshot and then clears
@@ -582,7 +580,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// </summary>
     protected CommitChanges<TEntity> SnapshotChanges() {
         var snapshot = new CommitChanges<TEntity> {
-            Added = _added.ToArray(), Updated = _updated.ToArray(), Removed = _removed.ToArray(),
+            Added = [.. _added], Updated = [.. _updated], Removed = [.. _removed],
         };
 
         _added.Clear();
@@ -638,16 +636,14 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     private void Enlist(IUnitOfWork uow) {
         AttachContext(uow);
 
-        if (uow is IUnitOfWorkSink registry) {
-            registry.AddCommitSink(ct => {
-                _completed = true;
-                return DispatchCommittedAsync(SnapshotChanges(), ct);
-            });
-            registry.AddRollbackSink(() => {
-                OnRollback();
-                _completed = true;
-            });
-        }
+        uow.AddCommitSink(ct => {
+            _completed = true;
+            return DispatchCommittedAsync(SnapshotChanges(), ct);
+        });
+        uow.AddRollbackSink(() => {
+            OnRollback();
+            _completed = true;
+        });
 
         OwnsContext = false;
     }
@@ -714,14 +710,37 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <summary>
     ///     Builds a provider queryable after applying build-query advisors and the optional projection.
     /// </summary>
+    /// <remarks>
+    ///     The pipeline is provider-neutral: it assembles the query root through the overridable
+    ///     <see cref="AsQueryContainer" /> / <see cref="BuildQuery{TResult}" /> seams and never
+    ///     touches a provider API directly, so it lives here rather than in each adapter.
+    /// </remarks>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The built queryable.</returns>
-    protected abstract Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
+    protected async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct
-    );
+    ) {
+        ct.ThrowIfCancellationRequested();
+
+        var container = AsQueryContainer();
+
+        switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
+                             .RunAsync(AdviceContext, container, ct)) {
+            case AdviseResult.Continue:
+            case AdviseResult.Handle:
+            default:
+                break;
+            case AdviseResult.Block:
+                container = AsQueryContainer();
+                container.ApplyModification(q => q.Where(_ => false));
+                break;
+        }
+
+        return BuildQuery(container.Query, predicate);
+    }
 
     /// <summary>
     ///     Creates a query container from the provider query root.

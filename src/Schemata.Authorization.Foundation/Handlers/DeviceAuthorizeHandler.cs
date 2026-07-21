@@ -19,6 +19,7 @@ using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -85,6 +86,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new TToken {
+            Name        = Identifiers.NewUid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
@@ -99,6 +101,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         await tokens.CreateAsync(dc, ct);
 
         var uc = new TToken {
+            Name        = Identifiers.NewUid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,

@@ -7,9 +7,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.WebUtilities;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 
 namespace Schemata.Resource.Foundation.Models;
 
@@ -20,7 +22,7 @@ namespace Schemata.Resource.Foundation.Models;
 ///     encrypted so clients cannot read or alter the continuation position; any token that
 ///     fails to decode raises <c>INVALID_ARGUMENT</c>.
 /// </summary>
-public class PageToken
+public class PageToken : IPagination
 {
     /// <summary>
     ///     The <see cref="IDataProtector" /> purpose string isolating page tokens
@@ -77,7 +79,7 @@ public class PageToken
         gz.Write(bytes, 0, bytes.Length);
         gz.Close();
 
-        return protector.Protect(ms.ToArray()).ToBase64UrlString();
+        return WebEncoders.Base64UrlEncode(protector.Protect(ms.ToArray()));
     }
 
     /// <summary>
@@ -94,7 +96,7 @@ public class PageToken
         }
 
         try {
-            var bytes = protector.Unprotect(token.FromBase64UrlString());
+            var bytes = protector.Unprotect(WebEncoders.Base64UrlDecode(token));
 
             using var       ms = new MemoryStream(bytes);
             await using var gz = new BrotliStream(ms, CompressionMode.Decompress);

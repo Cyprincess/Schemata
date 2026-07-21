@@ -52,6 +52,7 @@ tables.
 ## Step 2 — Register the server
 
 ```csharp
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 
@@ -77,7 +78,10 @@ var builder = WebApplication.CreateBuilder(args)
               .UseUserInfo();
 
         schema.ConfigureServices(services => {
-            services.AddRepository(typeof(EfCoreRepository<,>))
+            services.AddRepository<SchemataApplication, EfCoreRepository<AppDbContext, SchemataApplication>>();
+            services.AddRepository<SchemataAuthorization, EfCoreRepository<AppDbContext, SchemataAuthorization>>();
+            services.AddRepository<SchemataScope, EfCoreRepository<AppDbContext, SchemataScope>>();
+            services.AddRepository<SchemataToken, EfCoreRepository<AppDbContext, SchemataToken>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
         });

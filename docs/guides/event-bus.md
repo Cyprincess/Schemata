@@ -89,7 +89,9 @@ Register it with `UseHandler<TEvent, THandler>()`:
 .UseHandler<StudentEnrolled, StudentEnrolledHandler>()
 ```
 
-The handler is registered as scoped.
+The handler is registered as scoped through `TryAddEnumerable`, so calling `UseHandler` again with
+a different handler for the same event adds it rather than replacing the first — every matching
+handler runs on dispatch.
 
 ## Publish an event
 

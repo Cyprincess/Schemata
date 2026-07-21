@@ -52,6 +52,8 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 - [Tenancy](https://nuget.org/packages/Schemata.Tenancy.Foundation) — multi-tenant resolution and per-tenant DI
 - [Validation](https://nuget.org/packages/Schemata.Validation.FluentValidation) — FluentValidation integration
 
+Scheduling packages are intentionally not bundled into any meta target package, like `Schemata.Flow.Bpmn`. Consumers add the required scheduling package explicitly with `<PackageReference />`.
+
 ## Features
 
 Features are modular components that can be integrated at startup.
@@ -101,11 +103,11 @@ An extension feature can be activated in the same way as a built-in feature.
 | 470_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
 | 470_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
 | 480_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
+| 480_060_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
 | 480_100_000 | Schemata.Flow.Http                 | Flow (`MapHttp`)     | HTTP resource bridge for process instances and transitions         |
 | 480_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
 | 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
 | 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
-| 480_500_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
 | 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
 | 490_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
 | 490_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
@@ -141,7 +143,7 @@ It provides a unified interface for these libraries, enabling developers to swit
 
 ### Schemata.Resource.Foundation
 
-The Schemata Resource Foundation complies with the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals.
+The Schemata Resource Foundation complies with the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals. It builds on `Schemata.Mapping.Foundation` for object mapping and no longer requires `Schemata.Security.Foundation`.
 
 ### Schemata.Flow.Foundation
 

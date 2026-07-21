@@ -173,10 +173,12 @@ faults the task with `TimeoutException`.
 
 ## Common pitfalls
 
-**Scoped bus owns a connection.** `RabbitMqEventBus` is registered scoped, but its constructor opens
-the broker connection synchronously (`factory.CreateConnectionAsync().GetAwaiter().GetResult()`).
-Inject `IEventBus` into long-lived services (controllers, background workers); each short-lived scope
-otherwise opens its own connection.
+**The bus connects lazily.** `RabbitMqEventBus` and `RabbitMqEventOutboxPublisher` do not open the
+broker connection in their constructors — the connection, reply channel, and consumer come up on
+the first publish, guarded by a `SemaphoreSlim`. A broker that is down at startup no longer blocks
+the host; the failure surfaces on the first publish instead. Because the bus is scoped, each scope
+still gets its own connection on first use — inject `IEventBus` into long-lived services
+(controllers, background workers) so short-lived scopes don't each pay the connect cost.
 
 **Single handler per request type.** Registering a second `IRequestHandler<TRequest, TResponse>` for
 the same pair makes the resolver throw at dispatch ("Multiple request handlers registered"). For

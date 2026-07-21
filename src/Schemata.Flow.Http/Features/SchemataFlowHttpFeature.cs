@@ -2,14 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Features;
-using Schemata.Flow.Http.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
@@ -21,7 +18,7 @@ namespace Schemata.Flow.Http.Features;
 [DependsOn<SchemataHttpResourceFeature>]
 public sealed class SchemataFlowHttpFeature : FeatureBase
 {
-    /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow HTTP feature.</summary>
+    /// <summary>Default <see cref="FeatureBase.Priority" /> for the Flow HTTP feature.</summary>
     public const int DefaultPriority = SchemataFlowFeature.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
@@ -35,43 +32,22 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
     ) {
         services.AddSchemataApplicationPart<SchemataFlowHttpFeature>();
 
-        RegisterHandlers(services);
-        RegisterResources(new(schemata, services), HttpResourceAttribute.Name);
-    }
-
-    private static void RegisterHandlers(IServiceCollection services) {
-        services.TryAddScoped<FlowHttpSourceLoader>();
-        services.TryAddScoped<FlowHttpStartProcessHandler>();
-        services.TryAddScoped<CompleteActivityHandler>();
-        services.TryAddScoped<FlowHttpCorrelateMessageHandler>();
-        services.TryAddScoped<FlowHttpThrowSignalHandler>();
-        services.TryAddScoped<TerminateProcessHandler>();
-        services.TryAddScoped<CancelTokenHandler>();
-    }
-
-    private static void RegisterResources(SchemataResourceBuilder resources, string endpoint) {
+        FlowResourceRegistration.RegisterHandlers(services);
+        var resources = new SchemataResourceBuilder(schemata, services);
         resources.Use<SchemataProcess, SchemataProcess, SchemataProcess, SchemataProcess>(
-            [endpoint],
+            [HttpResourceAttribute.Name],
             resource => {
-                resource.Operations = [Operations.Get, Operations.List];
-                resource.Methods = [
-                    new("start",     typeof(FlowHttpStartProcessHandler), ResourceMethodScope.Collection),
-                    new("complete",  typeof(CompleteActivityHandler)),
-                    new("correlate", typeof(FlowHttpCorrelateMessageHandler)),
-                    new("signal",    typeof(FlowHttpThrowSignalHandler), ResourceMethodScope.Collection),
-                    new("terminate", typeof(TerminateProcessHandler)),
-                ];
+                resource.Operations = FlowResourceRegistration.ProcessOperations;
+                resource.Methods    = FlowResourceRegistration.ProcessMethods;
             });
-
         resources.Use<SchemataProcessToken, SchemataProcessToken, SchemataProcessToken, SchemataProcessToken>(
-            [endpoint],
+            [HttpResourceAttribute.Name],
             resource => {
-                resource.Operations = [Operations.Get, Operations.List];
-                resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
+                resource.Operations = FlowResourceRegistration.TokenOperations;
+                resource.Methods    = FlowResourceRegistration.TokenMethods;
             });
-
         resources.Use<SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition>(
-            [endpoint],
-            resource => resource.Operations = [Operations.Get, Operations.List]);
+            [HttpResourceAttribute.Name],
+            resource => resource.Operations = FlowResourceRegistration.TransitionOperations);
     }
 }

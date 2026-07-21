@@ -7,6 +7,7 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Caching.Skeleton;
+using Schemata.Common;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;

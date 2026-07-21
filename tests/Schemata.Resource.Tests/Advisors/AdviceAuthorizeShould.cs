@@ -11,7 +11,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using Schemata.Resource.Foundation;
+using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
@@ -29,7 +29,13 @@ public class AdviceAuthorizeShould
                                            It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync(true);
 
-        var advisor = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object);
+        var entitlement = new Mock<IEntitlementProvider<Student, EmptyResourceRequest>>();
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
+                              It.IsAny<AccessContext<EmptyResourceRequest>>(), It.IsAny<ClaimsPrincipal?>(),
+                              It.IsAny<CancellationToken>()))
+                   .ReturnsAsync((Expression<Func<Student, bool>>?)null);
+
+        var advisor = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object, entitlement.Object);
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new ResourceMethodVerb(Verbs.Expunge));
         var request   = new EmptyResourceRequest();
@@ -45,8 +51,70 @@ public class AdviceAuthorizeShould
         access.Verify(
             a => a.HasAccessAsync(It.IsAny<Student?>(),
                                   It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation
-                                                                               == nameof(Operations.Delete)),
+                                                                                == nameof(Operations.Delete)),
                                   It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MethodRequest_CanonicalName_IsUsedForPermissionErrorResource() {
+        AccessContext<EmptyResourceRequest>? captured = null;
+        var access = new Mock<IAccessProvider<Student, EmptyResourceRequest>>();
+        access.Setup(a => a.HasAccessAsync(It.IsAny<Student?>(), It.IsAny<AccessContext<EmptyResourceRequest>>(),
+                                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+              .Callback((Student? _, AccessContext<EmptyResourceRequest> context, ClaimsPrincipal? _,
+                         CancellationToken _) => {
+                  if (context.Operation != nameof(Operations.Get)) {
+                      captured = context;
+                  }
+              })
+              .Returns((Student? _, AccessContext<EmptyResourceRequest> context, ClaimsPrincipal? _,
+                        CancellationToken _) => Task.FromResult(context.Operation == nameof(Operations.Get)));
+
+        var entitlement = new Mock<IEntitlementProvider<Student, EmptyResourceRequest>>();
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
+                              It.IsAny<AccessContext<EmptyResourceRequest>>(), It.IsAny<ClaimsPrincipal?>(),
+                              It.IsAny<CancellationToken>()))
+                   .ReturnsAsync((Expression<Func<Student, bool>>?)null);
+        var advisor = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object, entitlement.Object);
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        ctx.Set(new ResourceMethodVerb("archive"));
+        var request = new EmptyResourceRequest { Name = "42", CanonicalName = "students/42" };
+
+        var ex = await Assert.ThrowsAsync<PermissionDeniedException>(() => advisor.AdviseAsync(
+                                                                       ctx, request, new(), null));
+
+        var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
+        Assert.Equal(request.CanonicalName, resource.ResourceName);
+        Assert.Equal("Permission 'student.archive' denied on resource 'students/42' (or it might not exist).",
+                     resource.Description);
+        Assert.NotNull(captured);
+        Assert.Same(request, captured!.Request);
+        Assert.Equal("archive", captured.Operation);
+    }
+
+    [Fact]
+    public async Task MethodRequest_Anonymous_AppliesEntitlementWithoutAccessCheck() {
+        var access = new Mock<IAccessProvider<Student, EmptyResourceRequest>>(MockBehavior.Strict);
+        Expression<Func<Student, bool>> filter = student => student.FullName == "Allowed";
+        var entitlement = new Mock<IEntitlementProvider<Student, EmptyResourceRequest>>();
+        entitlement.Setup(e => e.GenerateEntitlementExpressionAsync(
+                              It.Is<AccessContext<EmptyResourceRequest>>(c => c.Operation == "archive"),
+                              It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(filter);
+        var advisor = new AdviceMethodRequestAuthorize<Student, EmptyResourceRequest>(access.Object, entitlement.Object);
+        var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        ctx.Set(new ResourceMethodVerb("archive"));
+        ctx.Set(new AnonymousGranted());
+        var container = new ResourceRequestContainer<Student>();
+
+        var result = await advisor.AdviseAsync(ctx, new(), container, null);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        var filtered = container.Query(new[] {
+            new Student { FullName = "Allowed" }, new Student { FullName = "Denied" },
+        }.AsQueryable()).ToArray();
+        Assert.Single(filtered);
+        Assert.Equal("Allowed", filtered[0].FullName);
     }
 
     [Fact]

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
@@ -13,6 +13,8 @@ using Schemata.Resource.Http.Integration.Tests.Fixtures;
 var options = new WebApplicationOptions { Args = args };
 
 var builder = WebApplication.CreateBuilder(options);
+using var connection = new SqliteConnection("Data Source=:memory:");
+connection.Open();
 
 builder.UseSchemata(schema => {
     schema.UseMapster().Map<Student, Student>();
@@ -27,8 +29,7 @@ builder.UseSchemata(schema => {
     schema.Services.AddDistributedMemoryCache();
     schema.Services.AddDistributedCache();
 
-    var dbName = "integration-" + Identifiers.NewUid();
-    schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseInMemoryDatabase(dbName));
+    schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(connection));
 
     schema.Services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
     schema.Services.AddRepository<Trash, EfCoreRepository<TestDbContext, Trash>>();
@@ -39,6 +40,11 @@ builder.UseSchemata(schema => {
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope()) {
+    var database = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+    database.Database.EnsureCreated();
+}
 
 app.Run();
 

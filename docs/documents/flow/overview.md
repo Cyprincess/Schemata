@@ -118,7 +118,7 @@ IFlowRuntime (StateMachineEngine, keyed singleton) -- computes the next ProcessS
     |
     | in unit of work: IFlowTransitionAdvisor pipeline (provisions timers / subscriptions)
     | commit:      ProcessPersistence.PersistSnapshotAsync (single unit of work)
-    | post-commit: IProcessLifecycleObserver + ITokenLifecycleObserver
+    | post-commit: IProcessLifecycleObserver
     v
 persisted process row + token rows + transition row + source-binding rows
 ```
@@ -136,10 +136,10 @@ persisted process row + token rows + transition row + source-binding rows
 - **`IFlowRuntime`** is the engine contract. `StateMachineEngine` is stateless: every call
   receives the current `SchemataProcess` plus token set and returns a `ProcessSnapshot` whose
   mutated entities the handler persists under its own unit of work.
-- **`IProcessLifecycleObserver`** and **`ITokenLifecycleObserver`** react to runtime events
-  after persistence: process `OnStartedAsync` / `OnTransitionedAsync` /
-  `OnTerminatedAsync` / `OnFailedAsync`, and token `OnTokenForkedAsync` /
-  `OnTokenJoinedAsync` / `OnTokenFailedAsync` / `OnTokenCancelledAsync`.
+- **`IProcessLifecycleObserver`** reacts to runtime events after persistence:
+  `OnStartedAsync` / `OnTransitionedAsync` / `OnTerminatedAsync` / `OnFailedAsync`. It is the only
+  lifecycle observer interface; the per-token observer path (fork / join / cancel) was removed, so
+  per-token reactions belong in a transition advisor.
 
 ## Extension points
 
@@ -157,8 +157,6 @@ persisted process row + token rows + transition row + source-binding rows
 - **Lifecycle observers** — Implement `IProcessLifecycleObserver` and register via
   `TryAddEnumerable` to react to `OnStartedAsync`, `OnTransitionedAsync`,
   `OnTerminatedAsync`, and `OnFailedAsync` after the commit.
-- **Token observers** — Implement `ITokenLifecycleObserver` to react to per-token events:
-  `OnTokenForkedAsync`, `OnTokenJoinedAsync`, `OnTokenFailedAsync`, `OnTokenCancelledAsync`.
 - **Transport** — Chain `.MapHttp()` or `.MapGrpc()`.
 - **Integrations** — Chain `.UseEvent()` to bridge message/signal catches to the event bus,
   and `.UseScheduling()` to bridge timer catches to the scheduler.

@@ -84,12 +84,7 @@ public static class SchemataOptionsExtensions
         foreach (var attribute in attributes) {
             var at = attribute.GetType();
 
-            // Only process attributes defined in Schemata.Core.Features namespace
-            if (at.Namespace != "Schemata.Core.Features") {
-                continue;
-            }
-
-            if (at.Name == typeof(DependsOnAttribute<>).Name) {
+            if (at.IsGenericType && at.GetGenericTypeDefinition() == typeof(DependsOnAttribute<>)) {
                 var dependency = at.GenericTypeArguments[0];
                 if (schemata.HasFeature(dependency)) {
                     continue;
@@ -106,7 +101,7 @@ public static class SchemataOptionsExtensions
             }
 
             if (attribute is DependsOnAttribute depends) {
-                var dependency = AppDomainTypeCache.GetType(depends.Name);
+                var dependency = depends.Type ?? AppDomainTypeCache.GetType(depends.Name);
                 if (dependency is not null && schemata.HasFeature(dependency)) {
                     continue;
                 }

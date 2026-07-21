@@ -51,10 +51,4 @@ public class ListRequest
     /// </summary>
     public virtual string? PageToken { get; set; }
 
-    /// <summary>
-    ///     Comma-separated field paths to include in each summary
-    ///     per <seealso href="https://google.aip.dev/157">AIP-157: Partial responses</seealso>.
-    ///     Omitted or <c>*</c> returns every field. Dot paths traverse nested objects and collection elements.
-    /// </summary>
-    public virtual string? ReadMask { get; set; }
 }

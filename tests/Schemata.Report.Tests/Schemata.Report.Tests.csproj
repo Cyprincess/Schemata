@@ -2,11 +2,13 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Moq" />
     <ProjectReference Include="..\..\src\Schemata.Report.Foundation\Schemata.Report.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Report.Http\Schemata.Report.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Report.Grpc\Schemata.Report.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Report.Scheduling\Schemata.Report.Scheduling.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />

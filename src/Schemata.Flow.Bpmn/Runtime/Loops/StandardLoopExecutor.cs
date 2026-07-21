@@ -115,7 +115,7 @@ public sealed class StandardLoopExecutor
             transitions.Add(fail);
 
             BpmnEngine.ApplyAggregateState(process, working);
-            return BpmnEngine.Snapshot(process, working, transitions);
+            return BpmnEngine.Snapshot(process, working, transitions, execution);
         }
 
         return await ExitAsync(engine, definition, process, token, working, activity, activity.Name, "ExitStandardLoop", transitions, execution);
@@ -138,7 +138,7 @@ public sealed class StandardLoopExecutor
             token.State         = "Completed";
             token.WaitingAtName = null;
             BpmnEngine.ApplyAggregateState(process, working);
-            return BpmnEngine.Snapshot(process, working, transitions);
+            return BpmnEngine.Snapshot(process, working, transitions, execution);
         }
 
         var bookkeeping = token.Bookkeeping;
@@ -154,7 +154,7 @@ public sealed class StandardLoopExecutor
             eventName));
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     private static async ValueTask<bool> CanEnterAsync(

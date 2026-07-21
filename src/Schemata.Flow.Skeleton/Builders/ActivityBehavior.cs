@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
@@ -256,17 +257,42 @@ public sealed class ActivityBehavior
     }
 
     private ActivityBehavior EnterTask(string name, Func<FlowTaskContext, ValueTask> body) {
-        var task = Procedure(name, body);
-        _definition.Elements.Add(task);
+        var task             = Procedure(name, body);
+        var (elements, flows) = ScopeFor(Activity);
+        elements.Add(task);
 
-        foreach (var flow in _definition.Flows.Where(f => f.Target == Activity).ToList()) {
+        foreach (var flow in flows.Where(f => f.Target == Activity).ToList()) {
             flow.Target = task;
         }
 
-        _definition.Flows.Add(new() { Source = task, Target = Activity });
+        flows.Add(new() { Source = task, Target = Activity });
         _definition.EnterTasks.TryAdd(Activity, task);
 
         return this;
+    }
+
+    private (List<FlowElement> Elements, List<SequenceFlow> Flows) ScopeFor(Activity activity) {
+        foreach (var scope in _definition.Elements.OfType<SubProcess>()) {
+            if (ScopeFor(scope, activity) is { } nestedScope) {
+                return nestedScope;
+            }
+        }
+
+        return (_definition.Elements, _definition.Flows);
+    }
+
+    private static (List<FlowElement> Elements, List<SequenceFlow> Flows)? ScopeFor(SubProcess scope, Activity activity) {
+        if (scope.Children.Contains(activity)) {
+            return (scope.Children, scope.ChildFlows);
+        }
+
+        foreach (var child in scope.Children.OfType<SubProcess>()) {
+            if (ScopeFor(child, activity) is { } nestedScope) {
+                return nestedScope;
+            }
+        }
+
+        return null;
     }
 
     private ActivityBehavior LeaveTask(string name, Func<FlowTaskContext, ValueTask> body) {

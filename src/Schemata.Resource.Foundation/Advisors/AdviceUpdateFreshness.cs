@@ -6,7 +6,6 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common.Errors;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
@@ -31,8 +30,8 @@ public static class AdviceUpdateFreshness
 ///     <para>
 ///         The check fires whenever the request implements <see cref="IFreshness" /> and supplies a
 ///         non-empty ETag: any value that differs from the entity's current weak tag — including
-///         strong-format or malformed tags — raises <see cref="FailedPreconditionException" />
-///         with <c>ETAG_MISMATCH</c> precondition subject. Only an absent or whitespace tag opts out.
+///         strong-format or malformed tags — raises <see cref="AbortedException" /> with the
+///         <c>CONCURRENCY_MISMATCH</c> reason. Only an absent or whitespace tag opts out.
 ///     </para>
 ///     <para>
 ///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
@@ -66,9 +65,7 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
         }
 
         if (tag != expected) {
-            throw SchemataResourceErrors.PreconditionFailed<TEntity>(
-                entity.CanonicalName,
-                PreconditionSubjects.EtagMismatch);
+            throw SchemataResourceErrors.Aborted<TEntity>(entity.CanonicalName);
         }
 
         return Task.FromResult(AdviseResult.Continue);

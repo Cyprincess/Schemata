@@ -87,7 +87,10 @@ curl -X PATCH "http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8" \
      -d '{"age":21}'
 ```
 
-A stale `If-Match` value is rejected before the write with HTTP 412. When the tags match but another writer swaps the row between the comparison and the write, the database guard fires instead and the server responds with HTTP 409. Sending the current ETag (from the last read) lets the conditional update succeed.
+A stale `If-Match` value is rejected before the write with HTTP 409 (`AbortedException`, reason
+`CONCURRENCY_MISMATCH`). When the tags match but another writer swaps the row between the
+comparison and the write, the database guard fires instead and the server also responds with HTTP
+409. Sending the current ETag (from the last read) lets the conditional update succeed.
 
 ## Next steps
 

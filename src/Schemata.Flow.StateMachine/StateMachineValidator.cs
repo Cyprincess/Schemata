@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Schemata.Abstractions;
@@ -19,6 +20,7 @@ public static class StateMachineValidator
         ProcessStructureValidator.RequireEndEvents(definition);
 
         ProcedureTaskPayloadValidator.Validate(definition);
+        ValidateUnsupportedShapes(definition);
         ProcessStructureValidator.ValidateFlowIntegrity(definition);
         ProcessStructureValidator.ValidateEnterTaskRouting(definition);
 
@@ -57,6 +59,16 @@ public static class StateMachineValidator
         }
 
         ProcessStructureValidator.ValidateReachability(definition, start);
+    }
+
+    private static void ValidateUnsupportedShapes(ProcessDefinition definition) {
+        foreach (var element in definition.AllElements) {
+            var unsupported = element is AdHocSubProcess
+                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition };
+            if (unsupported) {
+                throw new InvalidOperationException($"State machine definition shape '{element.GetType().Name}' is not supported.");
+            }
+        }
     }
 
     private static void ValidateEventBasedGateway(ProcessDefinition definition, EventBasedGateway gateway) {

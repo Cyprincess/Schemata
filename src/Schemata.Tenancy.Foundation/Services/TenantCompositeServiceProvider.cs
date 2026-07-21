@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Tenancy.Foundation.Services;
@@ -13,11 +15,18 @@ namespace Schemata.Tenancy.Foundation.Services;
 ///     services come from the host's request-scope lifecycle while tenant singletons
 ///     stay pinned to the cached per-tenant container.
 /// </summary>
-internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDisposable
+internal sealed class TenantCompositeServiceProvider :
+    IServiceProvider,
+    IServiceScopeFactory,
+    IKeyedServiceProvider,
+    IServiceProviderIsService,
+    IServiceProviderIsKeyedService,
+    IDisposable,
+    IAsyncDisposable
 {
     private readonly ServiceProvider  _overrides;
     private readonly IServiceProvider _root;
-    private          bool             _disposed;
+    private          int              _disposed;
 
     /// <summary>Initializes a provider that resolves tenant overrides before host services.</summary>
     public TenantCompositeServiceProvider(ServiceProvider overrides, IServiceProvider root) {
@@ -34,9 +43,16 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
     #region IDisposable Members
 
     public void Dispose() {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _overrides.Dispose();
+    }
+
+    public ValueTask DisposeAsync() {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) {
+            return ValueTask.CompletedTask;
+        }
+
+        return _overrides.DisposeAsync();
     }
 
     #endregion
@@ -44,11 +60,7 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
     #region IServiceProvider Members
 
     public object? GetService(Type serviceType) {
-        if (serviceType == typeof(IServiceScopeFactory)) {
-            return new CompositeScopeFactory(this);
-        }
-
-        if (serviceType == typeof(IServiceProvider)) {
+        if (IsCompositeService(serviceType)) {
             return this;
         }
 
@@ -57,6 +69,61 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
         }
 
         return _overrides.GetService(serviceType) ?? _root.GetService(serviceType);
+    }
+
+    #endregion
+
+    #region IServiceScopeFactory Members
+
+    public IServiceScope CreateScope() {
+        var hostFactory = _root.GetRequiredService<IServiceScopeFactory>();
+        return new CompositeScope(this, hostFactory.CreateScope());
+    }
+
+    #endregion
+
+    #region IKeyedServiceProvider Members
+
+    public object? GetKeyedService(Type serviceType, object? serviceKey) {
+        var overrides = (IKeyedServiceProvider)_overrides;
+        if (IsEnumerableService(serviceType, out _)) {
+            var items = overrides.GetKeyedService(serviceType, serviceKey);
+            if (items is ICollection { Count: > 0 }) {
+                return items;
+            }
+
+            return (_root as IKeyedServiceProvider)?.GetKeyedService(serviceType, serviceKey);
+        }
+
+        return overrides.GetKeyedService(serviceType, serviceKey)
+            ?? (_root as IKeyedServiceProvider)?.GetKeyedService(serviceType, serviceKey);
+    }
+
+    public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
+        return GetKeyedService(serviceType, serviceKey)
+            ?? throw new InvalidOperationException($"No service for type '{serviceType}' has been registered.");
+    }
+
+    #endregion
+
+    #region IServiceProviderIsService Members
+
+    public bool IsService(Type serviceType) {
+        if (IsCompositeService(serviceType)) {
+            return true;
+        }
+
+        return _overrides.GetRequiredService<IServiceProviderIsService>().IsService(serviceType)
+            || GetServiceProbe(_root)?.IsService(serviceType) == true;
+    }
+
+    #endregion
+
+    #region IServiceProviderIsKeyedService Members
+
+    public bool IsKeyedService(Type serviceType, object? serviceKey) {
+        return _overrides.GetRequiredService<IServiceProviderIsKeyedService>().IsKeyedService(serviceType, serviceKey)
+            || GetKeyedServiceProbe(_root)?.IsKeyedService(serviceType, serviceKey) == true;
     }
 
     #endregion
@@ -89,5 +156,33 @@ internal sealed class TenantCompositeServiceProvider : IServiceProvider, IDispos
         }
 
         return array;
+    }
+
+    internal static bool IsEnumerableService(Type serviceType, out Type elementType) {
+        if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
+            elementType = serviceType.GetGenericArguments()[0];
+            return true;
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    internal static IServiceProviderIsService? GetServiceProbe(IServiceProvider provider) {
+        return provider as IServiceProviderIsService
+            ?? provider.GetService(typeof(IServiceProviderIsService)) as IServiceProviderIsService;
+    }
+
+    internal static IServiceProviderIsKeyedService? GetKeyedServiceProbe(IServiceProvider provider) {
+        return provider as IServiceProviderIsKeyedService
+            ?? provider.GetService(typeof(IServiceProviderIsKeyedService)) as IServiceProviderIsKeyedService;
+    }
+
+    private static bool IsCompositeService(Type serviceType) {
+        return serviceType == typeof(IServiceProvider)
+            || serviceType == typeof(IServiceScopeFactory)
+            || serviceType == typeof(IKeyedServiceProvider)
+            || serviceType == typeof(IServiceProviderIsService)
+            || serviceType == typeof(IServiceProviderIsKeyedService);
     }
 }

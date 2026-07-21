@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using Schemata.Expressions.Skeleton;
 using Xunit;
 
@@ -15,7 +16,7 @@ public class CelCompilerShould
     [InlineData("1 > 2", false)]
     [InlineData("full_name == 'Alice'", true)]
     [InlineData("full_name == 'Bob'", false)]
-    public void Compile_BasicPredicate_ReturnsExpectedResult(string source, bool expected) {
+    public void Compile_BooleanAndComparisonExpressions_ReturnExpectedValue(string source, bool expected) {
         var tree       = _compiler.Parse(source);
         var expression = _compiler.Compile<Student, bool>(tree);
         var func       = expression.Compile();
@@ -189,6 +190,35 @@ public class CelCompilerShould
         var second = _compiler.Compile<Student, bool>(_compiler.Parse("1 > 2"));
 
         Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void Compile_CustomFunction_BindsAtCompileTime() {
+        var options = new ExpressionCompileOptions();
+        options.Functions["startsWith"]
+            = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
+
+        var tree       = _compiler.Parse("startsWith(full_name, 'Al')");
+        var expression = _compiler.Compile<Student, bool>(tree, options);
+        var func       = expression.Compile();
+
+        Assert.True(func(new() { FullName  = "Alice" }));
+        Assert.False(func(new() { FullName = "Bob" }));
+    }
+
+    [Fact]
+    public void Compile_CustomFunctionCacheKey_UsesFunctionIdentity() {
+        var first = new ExpressionCompileOptions();
+        first.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
+        var second = new ExpressionCompileOptions();
+        second.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.EndsWith), null, args[1]));
+
+        var tree       = _compiler.Parse("classify(full_name, 'ice')");
+        var startsWith = _compiler.Compile<Student, bool>(tree, first).Compile();
+        var endsWith   = _compiler.Compile<Student, bool>(tree, second).Compile();
+
+        Assert.False(startsWith(new() { FullName = "Alice" }));
+        Assert.True(endsWith(new() { FullName    = "Alice" }));
     }
 
     #region Nested type: Student

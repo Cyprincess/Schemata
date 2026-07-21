@@ -6,7 +6,8 @@
 
 | Package                         | Key files                                                                                                                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Resource.Foundation`  | `ResourceOperationHandler.List.cs`, `ResourceRequestContainer.cs`, `Models/PageToken.cs`, `SchemataResourceOptions.cs`, `SchemataResourceBuilder.cs`                          |
+| `Schemata.Resource.Foundation`  | `ResourceOperationHandler.List.cs`, `Models/PageToken.cs`, `SchemataResourceOptions.cs`, `SchemataResourceBuilder.cs`                                       |
+| `Schemata.Common`               | `ResourceRequestContainer.cs`, `ResourceIdentifiers.cs`, `IPagination.cs`                                                                                  |
 | `Schemata.Expressions.Skeleton` | `ExpressionLanguageResolver.cs`, `ResolvedLanguage.cs`, `FilteringMode.cs`, `ResidualPage.cs`, `IExpressionCompiler.cs`, `IExpressionPushdownPlanner.cs`, `IOrderCompiler.cs` |
 | `Schemata.Expressions.Aip`      | `AipCompiler.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
 | `Schemata.Expressions.Cel`      | `CelCompiler.cs`, `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
@@ -57,7 +58,7 @@ The effective `FilteringMode` comes from descriptor, profile, and entry settings
 In `Strict`, the handler compiles the full tree and applies it to the repository query:
 
 ```csharp
-container.ApplyFiltering(compiler.Compile<TEntity, bool>(tree));
+container.ApplyWhere(compiler.Compile<TEntity, bool>(tree));
 ```
 
 In `Residual`, the handler resolves `IExpressionPushdownPlanner` keyed by the selected language and plans against `ExpressionCapabilities.Relational`:
@@ -67,7 +68,7 @@ var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.L
 var plan = planner.Plan(tree, ExpressionCapabilities.Relational);
 
 if (plan.Pushed is not null) {
-    container.ApplyFiltering(compiler.Compile<TEntity, bool>(plan.Pushed));
+    container.ApplyWhere(compiler.Compile<TEntity, bool>(plan.Pushed));
 }
 
 if (plan.Residual is not null) {
@@ -128,7 +129,12 @@ For CEL syntax, see [CEL Expressions](../expressions/cel.md). For the full AIP g
 
 ## Pagination
 
-`PageToken` carries `Parent`, `Filter`, `Language`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64. `PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException` (`INVALID_PAGE_TOKEN`).
+`PageToken` carries `Parent`, `Filter`, `Language`, `OrderBy`, `ShowDeleted`, `PageSize`, and `Skip`. It
+implements `Schemata.Common.IPagination` (`Skip`, `PageSize`), so advisors can feed it to
+`PaginationExtensions.WithPaginating`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET
+Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64.
+`PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException`
+(`INVALID_PAGE_TOKEN`).
 
 | Parameter   | Default | Cap       |
 | ----------- | ------- | --------- |
@@ -145,12 +151,11 @@ Without a residual predicate, paging applies in the backend query with one look-
 
 `ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>`:
 
-| Method                              | Effect                                             |
-| ----------------------------------- | -------------------------------------------------- |
-| `ApplyFiltering(predicate)`         | Appends `Where(predicate)`.                        |
-| `ApplyOrdering(order)`              | Applies the order function.                        |
-| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row. |
-| `ApplyModification(predicate)`      | Appends an arbitrary `Where` for advisors.         |
+| Method                              | Effect                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `ApplyWhere(predicate)`             | Appends `Where(predicate)`; serves AIP-160 filtering and advisor predicates (parent scoping, entitlement filtering). |
+| `ApplyOrdering(order)`              | Applies the order function.                                                                       |
+| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row.                                                |
 
 The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, and `ListAsync`.
 
@@ -162,7 +167,7 @@ HTTP surfaces these as `422`; gRPC surfaces them as `InvalidArgument`.
 
 ## Extension points
 
-- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates through `container.ApplyModification` before the handler compiles the request filter.
+- Implement `IResourceListRequestAdvisor<TEntity>` to add predicates through `container.ApplyWhere` before the handler compiles the request filter.
 - Implement a custom `IExpressionCompiler` plus `Use*` builder seam to add a filter language.
 - Implement `IExpressionPushdownPlanner` for residual mode when the language can push a backend-safe subset.
 

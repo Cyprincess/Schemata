@@ -3,7 +3,7 @@ using Schemata.Modeling.Generator.Expressions;
 
 namespace Schemata.Modeling.Generator;
 
-public static partial class Parser
+internal static partial class Parser
 {
     private static FieldOption ParseFieldOption(string normalized) {
         return normalized switch {

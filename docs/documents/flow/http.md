@@ -11,8 +11,8 @@ controller that lists registered process definitions. `MapHttp()` activates
 
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Schemata.Flow.Http`       | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`, `Internal/FlowHttpPayloadHandlers.cs`, `Internal/FlowHttpStartProcessHandler.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs`                                                  |
+| `Schemata.Flow.Http`       | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                                                                |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `FlowPayloadHandlers.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -45,12 +45,13 @@ builder.UseSchemata(schema => {
 3. Registers three resources (`SchemataProcess`, `SchemataProcessToken`, `SchemataProcessTransition`)
    on the HTTP endpoint.
 
-`RegisterHandlers` registers `FlowHttpSourceLoader`, `FlowHttpStartProcessHandler`,
-`CompleteActivityHandler`, `FlowHttpCorrelateMessageHandler`, `FlowHttpThrowSignalHandler`,
-`TerminateProcessHandler`, and `CancelTokenHandler`. The Flow-prefixed types live in
-`Schemata.Flow.Http.Internal`; the three unprefixed handlers (`CompleteActivityHandler`,
-`TerminateProcessHandler`, `CancelTokenHandler`) live in `Schemata.Flow.Foundation` and are reused
-unchanged across transports.
+`RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
+`CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
+`TerminateProcessHandler`, and `CancelTokenHandler`. All seven live in `Schemata.Flow.Foundation`:
+`FlowSourceLoader` and `FlowStartProcessHandler` are public, while `FlowCorrelateMessageHandler`
+and `FlowThrowSignalHandler` are internal. Both transports call the same internal
+`FlowResourceRegistration.RegisterHandlers` / `RegisterMethods`, so the HTTP and gRPC features wire
+an identical handler set.
 
 `SchemataProcess` carries `Operations.Get`, `Operations.List`, and five custom methods:
 
@@ -58,14 +59,13 @@ unchanged across transports.
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Http.Internal;
 
 resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
-    new("start",     typeof(FlowHttpStartProcessHandler),    ResourceMethodScope.Collection),
+    new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
-    new("correlate", typeof(FlowHttpCorrelateMessageHandler)),
-    new("signal",    typeof(FlowHttpThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("correlate", typeof(FlowCorrelateMessageHandler)),
+    new("signal",    typeof(FlowThrowSignalHandler),     ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
@@ -89,13 +89,13 @@ resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
 The custom methods follow the AIP-136 colon convention. Collection-scoped verbs bind to the
 collection; instance-scoped verbs bind to `{name}`:
 
-| Method      | HTTP                                   | Handler                           | Runtime call                  |
-| ----------- | -------------------------------------- | --------------------------------- | ----------------------------- |
-| `start`     | `POST ~/v1/processes:start`            | `FlowHttpStartProcessHandler`     | `FlowRunner.StartAsync`       |
-| `complete`  | `POST ~/v1/processes/{name}:complete`  | `CompleteActivityHandler`         | `FlowRunner.CompleteAsync`    |
-| `correlate` | `POST ~/v1/processes/{name}:correlate` | `FlowHttpCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
-| `signal`    | `POST ~/v1/processes:signal`           | `FlowHttpThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
-| `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler`         | `FlowRunner.TerminateAsync`   |
+| Method      | HTTP                                   | Handler                       | Runtime call                  |
+| ----------- | -------------------------------------- | ----------------------------- | ----------------------------- |
+| `start`     | `POST ~/v1/processes:start`            | `FlowStartProcessHandler`     | `FlowRunner.StartAsync`       |
+| `complete`  | `POST ~/v1/processes/{name}:complete`  | `CompleteActivityHandler`     | `FlowRunner.CompleteAsync`    |
+| `correlate` | `POST ~/v1/processes/{name}:correlate` | `FlowCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
+| `signal`    | `POST ~/v1/processes:signal`           | `FlowThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
+| `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
 Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`. Its
 `InvokeAsync(name, request, entity, principal, ct)` receives the resolved entity (null for
@@ -103,10 +103,11 @@ collection-scoped verbs), resolves source or payload types through the registry,
 runner. `principal` is the request's `ClaimsPrincipal`; authorization runs earlier in the resource
 advisor pipeline when the host enables `WithAuthorization` on the resource builder.
 
-`FlowHttpStartProcessHandler` resolves the optional `Source` canonical name through
-`IResourceTypeResolver` and `IProcessRegistry.SourceTypes`, loads the entity through the registered
-`IRepository<TSource>`, and calls `FlowRunner.StartAsync` with the typed source. When `Source` is
-empty, it calls the no-source `StartAsync` overload.
+`FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
+optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against
+`IProcessRegistry.SourceTypes`, loads the entity through the registered `IRepository<TSource>`,
+and calls `FlowRunner.StartAsync` with the typed source. When `Source` is empty, the handler calls
+the no-source `StartAsync` overload.
 
 ### Token operations
 
@@ -188,8 +189,9 @@ public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification
 ```
 
 `Source` is a canonical name bound to the started process. `Payload` carries the message or signal
-body and is deserialized through the registered payload type map (`reg.MessagePayloadTypes` for
-messages, the matching `reg.SignalPayloadTypes[SignalName]` for signals) before the runtime call.
+body as JSON and is deserialized before the runtime call: messages use the process registration's
+`MessagePayloadTypes`; signals resolve the payload type across every registered process and reject
+a signal name that maps to more than one payload type.
 `:terminate` and `:cancel` take no body.
 
 ## Error mapping

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -35,7 +36,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         IWebHostEnvironment environment
     ) {
         var provider = typeof(TProvider);
-        var modules = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment)!
+        var modules = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment, TimeProvider.System)!
                                .GetModules()
                                .ToList();
         schemata.SetModules(modules);

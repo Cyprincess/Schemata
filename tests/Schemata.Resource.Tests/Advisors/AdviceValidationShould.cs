@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Resource.Foundation;
+using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;

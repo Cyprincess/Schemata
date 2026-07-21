@@ -80,6 +80,7 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestAuthorize<,>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteRequestAdvisor<>), typeof(AdviceDeleteRequestAuthorize<>)));
         Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>), typeof(AdviceMethodRequestAuthorize<,>)));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>), typeof(AdviceMethodEntityAuthorize<,,>)));
 
         return this;
     }

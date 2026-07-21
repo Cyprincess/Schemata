@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Bpmn.Runtime.Compensation;
@@ -59,8 +61,8 @@ public sealed class TransactionExecutor
         }
 
         BpmnEngine.ApplyAggregateState(process, working);
-        engine.ClearCompletedRootScope(process);
-        return BpmnEngine.Snapshot(process, working, transitions);
+        engine.ClearCompletedRootScope(process, execution);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     /// <summary>Enters a transaction from an already active parent token.</summary>
@@ -101,7 +103,7 @@ public sealed class TransactionExecutor
         var spawned = await engine.SpawnSubProcessChildAsync(definition, process, transaction, token, working, false, execution);
 
         BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, [arrivalTransition, spawned.spawnTransition]);
+        return BpmnEngine.Snapshot(process, working, [arrivalTransition, spawned.spawnTransition], execution);
     }
 
     /// <summary>
@@ -146,18 +148,24 @@ public sealed class TransactionExecutor
             return null;
         }
 
-        var stack = engine.EnsureCompensationScope(parent.CanonicalName);
+        var stack = engine.TryGetCompensationStack(definition, process, trigger, working, execution) ?? new();
         var context = new CompensationInvocationContext(
             process,
             definition,
             BpmnEngine.TokenView(trigger),
             new Dictionary<string, int>(trigger.Bookkeeping, StringComparer.Ordinal));
-        var result = await CompensationCoordinator.InvokeAllAsync(stack, context, engine.CompensationObservers(execution), ct);
+        var result = await CompensationCoordinator.InvokeAllAsync(
+            stack,
+            context,
+            engine.CompensationObservers(execution),
+            ct,
+            execution.Services.GetService<ILoggerFactory>()?.CreateLogger(typeof(CompensationCoordinator).FullName!));
         foreach (var handler in result.Compensated) {
             stack.Remove(handler);
         }
 
         var transitions = context.Transitions.ToList();
+        BpmnEngine.RemoveCompensatedBindings(process, trigger, working, execution, transitions);
         ConsumeCancelEnd(process, trigger, previous, cancelEnd, transitions);
         CancelRemainingTransactionTokens(process, working, trigger, transaction, transitions, cancelEnd);
 
@@ -179,9 +187,9 @@ public sealed class TransactionExecutor
             }
         }
 
-        engine.RemoveCompensationScope(parent.CanonicalName);
+        engine.RemoveCompensationScope(parent.CanonicalName, execution);
         BpmnEngine.ApplyAggregateState(process, working);
-        engine.ClearCompletedRootScope(process);
+        engine.ClearCompletedRootScope(process, execution);
 
         if (result.Failed is not null && !errorHandled) {
             parent.State = "Failed";
@@ -189,7 +197,7 @@ public sealed class TransactionExecutor
             throw result.FailureReason ?? new InvalidOperationException("BPMN transaction compensation failed.");
         }
 
-        return BpmnEngine.Snapshot(process, working, transitions);
+        return BpmnEngine.Snapshot(process, working, transitions, execution);
     }
 
     private static void ConsumeCancelEnd(

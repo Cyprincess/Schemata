@@ -97,7 +97,7 @@ curl -X POST http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6:
 
 The handler clears `DeleteTime` and `PurgeTime`, persists the update, and
 returns the restored resource. Calling it on a live (undeleted) resource
-throws `FailedPreconditionException`. Internally the restore is a plain
+throws `AlreadyExistsException`. Internally the restore is a plain
 update — the method pipeline loads the tombstoned row with the query filter
 suppressed, then the handler clears the two fields and commits — the restore
 rides the ordinary update path end to end.
@@ -175,7 +175,10 @@ scope `SuppressSoftDelete()` around the `AddAsync`.
 **`PurgeTime` is a convention field.** The framework stores it and leaves
 enforcement to you. The built-in `POST /v1/students:purge` method is
 filter-driven (AIP-165) — it removes rows matching the request filter on
-demand. Time-based reaping needs a scheduled job of your own that queries for
+demand, and an optional `parent` narrows the purge to that parent's child
+collection. Sending `force = false` runs a preview: the response carries the
+count and a sample of up to 100 matching resource names, and nothing is
+expunged. Time-based reaping needs a scheduled job of your own that queries for
 rows where `PurgeTime <= UtcNow` and calls `RemoveAsync` with
 `SuppressSoftDelete()` scoped around it.
 

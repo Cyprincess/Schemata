@@ -13,6 +13,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
@@ -43,7 +44,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         ct ??= CancellationToken.None;
 
         var ctx = CreateAdviceContext();
-        StashReadMask(ctx, request.ReadMask);
 
         var gate = await RunPipelineAsync<ListResultBase<TSummary>>(
             ctx,
@@ -122,14 +122,14 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                     var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
                     var plan    = planner.Plan(tree, ExpressionCapabilities.Relational);
                     if (plan.Pushed is not null) {
-                        container.ApplyFiltering(compiler.Compile<TEntity, bool>(plan.Pushed));
+                        container.ApplyWhere(compiler.Compile<TEntity, bool>(plan.Pushed));
                     }
 
                     if (plan.Residual is not null) {
-                        residual = compiler.Compile<TEntity, bool>(plan.Residual).Compile();
+                        residual = ExpressionCache.GetOrAddDelegate(compiler.Compile<TEntity, bool>(plan.Residual));
                     }
                 } else {
-                    container.ApplyFiltering(compiler.Compile<TEntity, bool>(tree));
+                    container.ApplyWhere(compiler.Compile<TEntity, bool>(tree));
                 }
             } catch (Exception ex) when (ex is ExpressionException or ArgumentException) {
                 throw new ValidationException([new() {

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using LinqToDB;
+using LinqToDB.Data;
 using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +36,10 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
         services.AddRepository<SchemataProcessToken, LinqToDbRepository<TestDataConnection, SchemataProcessToken>>();
         services.AddRepository<SchemataProcessTransition, LinqToDbRepository<TestDataConnection, SchemataProcessTransition>>();
         services.AddRepository<SchemataProcessSource, LinqToDbRepository<TestDataConnection, SchemataProcessSource>>();
+        services.AddRepository<SchemataProcessCompensation, LinqToDbRepository<TestDataConnection, SchemataProcessCompensation>>();
         services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
+        FlowFixtureServices.AddResourceTypeResolver(
+            services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken));
         FlowFixtureServices.AddFlowServices(services);
 
         _root = services.BuildServiceProvider();
@@ -44,9 +48,11 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
             var connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
             connection.CreateTable<Order>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcess>(tableOptions: TableOptions.CreateIfNotExists);
+            connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataProcesses_DefinitionName_IdempotencyKey\" ON \"SchemataProcesses\" (\"DefinitionName\", \"IdempotencyKey\")");
             connection.CreateTable<SchemataProcessToken>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessTransition>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessSource>(tableOptions: TableOptions.CreateIfNotExists);
+            connection.CreateTable<SchemataProcessCompensation>(tableOptions: TableOptions.CreateIfNotExists);
         }
 
         await FlowFixtureServices.RegisterProcessesAsync(_root);

@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +17,7 @@ namespace Schemata.Report.Scheduling.Features;
 /// <typeparam name="TReport">Persisted report-definition entity type.</typeparam>
 /// <typeparam name="TSnapshot">Persisted report-snapshot entity type.</typeparam>
 /// <typeparam name="TChunk">Persisted report-snapshot chunk entity type.</typeparam>
+[DependsOn(typeof(SchemataReportFeature<,,>))]
 [DependsOn<SchemataSchedulingFeature>]
 public sealed class SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk> : FeatureBase
     where TReport : SchemataReport, new()
@@ -39,14 +38,7 @@ public sealed class SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk> 
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        RequireReport(services);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ReportSchedulingInitializer>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryCommittedAdvisor<TReport>, AdviceReportScheduleSync<TReport>>());
-    }
-
-    private static void RequireReport(IServiceCollection services) {
-        if (services.All(descriptor => descriptor.ServiceType != typeof(IReportService))) {
-            throw new InvalidOperationException("UseScheduling requires UseReport.");
-        }
     }
 }

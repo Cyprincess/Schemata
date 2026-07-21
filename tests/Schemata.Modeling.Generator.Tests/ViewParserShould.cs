@@ -6,7 +6,7 @@ namespace Schemata.Modeling.Generator.Tests;
 public class ViewParserShould
 {
     [Fact]
-    public void Parse_BasicView_ReturnsNameAndFields() {
+    public void Parse_ViewWithIdentifierFields_BindsNameAndFieldCount() {
         var input  = "Object response {\n  id\n  name\n}";
         var result = Parser.View.Parse(input);
         Assert.NotNull(result);

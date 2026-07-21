@@ -11,7 +11,7 @@ The `Schemata.Entity.Cache` package adds transparent query caching and automatic
 | `AdviceCommittedEvictCache<>` | `src/Schemata.Entity.Cache/Advisors/AdviceCommittedEvictCache.cs`             |
 | `ReverseIndex`                | `src/Schemata.Entity.Cache/ReverseIndex.cs`                                   |
 | `Stringizing`                 | `src/Schemata.Entity.Cache/Stringizing.cs`                                    |
-| `PartialEvaluator`            | `src/Schemata.Entity.Cache/PartialEvaluator.cs`                               |
+| `Evaluator.PartialEval`       | `src/Schemata.Common/Evaluator.cs` (shared)                                   |
 | `SchemataQueryCacheOptions`   | `src/Schemata.Entity.Cache/SchemataQueryCacheOptions.cs`                      |
 | `UseQueryCache` extension     | `src/Schemata.Entity.Cache/Extensions/SchemataRepositoryBuilderExtensions.cs` |
 
@@ -26,7 +26,9 @@ Runs before the query executes against the database. On a cache hit, sets `conte
 
 **Steps:**
 
-1. If `QueryCacheSuppressed` is in the advice context, returns `Continue`.
+1. If `QueryCacheSuppressed` is in the advice context, or `context.HasOpenWriteUnitOfWork` is set
+   (the repository is enlisted or holds an implicit write unit of work with pending changes), returns
+   `Continue` — uncommitted state never satisfies a cache read.
 2. Calls `context.ToCacheKey()` to derive the cache key from the query expression. If the key is null or whitespace, returns `Continue`.
 3. Calls `ICacheProvider.GetAsync(key)`. On a cache miss (null bytes), returns `Continue`.
 4. Deserializes the bytes via `JsonSerializer.Deserialize<T>`. If deserialization returns null, returns `Continue`.
@@ -41,7 +43,8 @@ Runs after the query executes and `context.Result` is populated. Stores the resu
 
 **Steps:**
 
-1. If `QueryCacheSuppressed` is in the advice context, returns `Continue`.
+1. If `QueryCacheSuppressed` is in the advice context, or `context.HasOpenWriteUnitOfWork` is set,
+   returns `Continue` — uncommitted results are never written to the cache.
 2. If `context.Result` is null, returns `Continue`.
 3. Calls `context.ToCacheKey()`. If null or whitespace, returns `Continue`.
 4. Serializes `context.Result` via `JsonSerializer.SerializeToUtf8Bytes` and calls `ICacheProvider.SetAsync` with `SlidingExpiration = SchemataQueryCacheOptions.Ttl` (default 5 minutes).
@@ -79,8 +82,8 @@ For single-column primary keys, the key value is formatted via `IFormattable.ToS
 
 Cache keys for queries are derived from the LINQ expression tree:
 
-1. `PartialEvaluator.Eval` folds captured local variables and other closed sub-expressions to constants, so different values of a captured variable produce different keys.
-2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string. Lambda parameters are renamed `_p0`, `_p1`, … in discovery order, and `IFormattable` values use the invariant culture, so equivalent queries stringize identically.
+1. `Evaluator.PartialEval` (from `Schemata.Common`, invoked by `Stringizing` with a cache-specific predicate that keeps composite nodes structural) folds captured local variables and other closed sub-expressions to constants, so different values of a captured variable produce different keys.
+2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string. Lambda parameters are renamed `_p0`, `_p1`, … in discovery order, and `IFormattable` values use the invariant culture, so equivalent queries stringize identically. Custom (`ExpressionType.Extension`) nodes are treated as opaque: the walk does not descend into them.
 3. The return type's `typeof(T).FullName` is appended, separated by `\x1e` (ASCII Record Separator).
 4. The combined string is hashed (CityHash128) and prefixed with the Schemata framework GUID and the `entity` domain marker via `ToCacheKey`.
 
@@ -120,7 +123,7 @@ using (repository.SuppressQueryCache())
 ## Registration
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 

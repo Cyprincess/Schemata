@@ -1,13 +1,12 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
 [CanonicalName("trashes/{trash}")]
-[PrimaryKey(nameof(Uid))]
+[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
 public class Trash : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IValidation, IUpdateMask, ISoftDelete
 {
     public string? FullName { get; set; }

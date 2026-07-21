@@ -69,15 +69,10 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     ///     Gets a single resource by name per <seealso href="https://google.aip.dev/131">AIP-131</seealso>.
     /// </summary>
     /// <param name="name">The resource's relative name segment.</param>
-    /// <param name="readMask">
-    ///     Optional field paths to include in the response
-    ///     per <seealso href="https://google.aip.dev/157">AIP-157</seealso>.
-    /// </param>
     [HttpGet("{name}")]
-    public virtual async Task<IActionResult> GetAsync(string name, [FromQuery] string? readMask = null) {
+    public virtual async Task<IActionResult> GetAsync(string name) {
         var request = new GetRequest {
             CanonicalName = BuildFullName(name),
-            ReadMask      = readMask,
         };
 
         var result = await Handler.GetAsync(request, HttpContext.User, HttpContext.RequestAborted);

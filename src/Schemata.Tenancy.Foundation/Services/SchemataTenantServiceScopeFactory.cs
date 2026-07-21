@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -34,7 +35,11 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
 
     public IServiceScope CreateScope() {
         if (_accessor.Tenant is null) {
-            return _root as IServiceScope ?? _root.CreateScope();
+            if (_root is IServiceScope scope) {
+                return scope;
+            }
+
+            return _root.CreateScope();
         }
 
         var lease = _factory.CreateServiceProvider(_accessor);
@@ -51,7 +56,7 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
 
     #region Nested type: LeasedTenantScope
 
-    private sealed class LeasedTenantScope : IServiceScope
+    private sealed class LeasedTenantScope : IServiceScope, IAsyncDisposable
     {
         private readonly IServiceScope        _inner;
         private readonly ITenantProviderLease _lease;
@@ -75,6 +80,26 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
                 _inner.Dispose();
             } finally {
                 _lease.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) {
+                return;
+            }
+
+            try {
+                if (_inner is IAsyncDisposable inner) {
+                    await inner.DisposeAsync();
+                } else {
+                    _inner.Dispose();
+                }
+            } finally {
+                if (_lease is IAsyncDisposable lease) {
+                    await lease.DisposeAsync();
+                } else {
+                    _lease.Dispose();
+                }
             }
         }
 

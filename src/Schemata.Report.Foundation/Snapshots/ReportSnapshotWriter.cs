@@ -9,6 +9,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Insight.Foundation;
 using Schemata.Insight.Skeleton;
 using Schemata.Report.Skeleton;
 
@@ -27,22 +28,26 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     private readonly ReportRetentionEnforcer<TSnapshot, TChunk> _retention;
     private readonly IServiceProvider                       _services;
     private readonly IServiceScopeFactory                  _scopes;
+    private readonly TimeProvider                          _time;
 
     /// <summary>Creates a bounded snapshot writer.</summary>
     /// <param name="scopes">Factory creating independent repositories for every persisted write.</param>
     /// <param name="options">Limits for each persisted chunk.</param>
     /// <param name="retention">Write-path cleanup for snapshots governed by parent retention.</param>
     /// <param name="services">Service provider resolving snapshot advisors.</param>
+    /// <param name="time">Clock stamping snapshot capture times; defaults to the system clock.</param>
     public ReportSnapshotWriter(
         IServiceScopeFactory                         scopes,
         IOptions<SchemataReportOptions>             options,
         ReportRetentionEnforcer<TSnapshot, TChunk> retention,
-        IServiceProvider                             services
+        IServiceProvider                             services,
+        TimeProvider?                                time = null
     ) {
         _scopes    = scopes;
         _options   = options.Value;
         _retention = retention;
         _services  = services;
+        _time      = time ?? TimeProvider.System;
     }
 
     /// <summary>Creates a snapshot header and streams rows to independently committed chunks.</summary>
@@ -54,9 +59,9 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     /// <param name="ct">Cancellation token checked before each chunk is committed.</param>
     /// <returns>Snapshot reference and response metadata.</returns>
     public async ValueTask<ReportResult> WriteAsync(
-        SchemataReport?                                             report,
-        ReportRunKind                                                kind,
-        Func<CancellationToken, ValueTask<ReportMaterialization>> materialize,
+        SchemataReport?                                          report,
+        ReportRunKind                                            kind,
+        Func<CancellationToken, ValueTask<MaterializedQuery>>    materialize,
         string?                                                     operation = null,
         Func<CancellationToken, ValueTask<bool>>?                  isCancelled = null,
         CancellationToken                                           ct = default
@@ -114,7 +119,7 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
             header.State      = SnapshotState.Succeeded;
             header.RowCount   = rowCount;
             header.ChunkCount = chunks;
-            header.CapturedAt = DateTime.UtcNow;
+            header.CapturedAt = _time.GetUtcNow().UtcDateTime;
             await UpdateHeaderAsync(header, ct);
             await _retention.EnforceAsync(report, ct);
             return Result(header, response);

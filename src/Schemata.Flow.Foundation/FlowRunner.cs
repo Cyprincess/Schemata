@@ -8,12 +8,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -43,7 +46,7 @@ public sealed class FlowRunner(
             throw new InvalidOperationException($"Source entity type '{typeof(TState).FullName}' has no canonical name.");
         }
 
-        return StartCoreAsync(definitionName, options, source, source.CanonicalName, ct);
+        return StartCoreAsync(definitionName, options, source, source.CanonicalName, null, ct);
     }
 
     public ValueTask<SchemataProcess> StartAsync(
@@ -51,7 +54,7 @@ public sealed class FlowRunner(
         StartProcessOptions? options = null,
         CancellationToken    ct      = default
     ) {
-        return StartCoreAsync<object>(definitionName, options, null, null, ct);
+        return StartCoreAsync<object>(definitionName, options, null, null, null, ct);
     }
 
     #endregion
@@ -64,7 +67,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) {
-        return StartCoreAsync<object>(definitionName, options, null, source, ct);
+        return StartCoreAsync<object>(definitionName, options, null, source, principal, ct);
     }
 
     /// <summary>Starts a process from a resource request without a source entity.</summary>
@@ -74,7 +77,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) {
-        return StartCoreAsync<object>(definitionName, options, null, null, ct);
+        return StartCoreAsync<object>(definitionName, options, null, null, principal, ct);
     }
 
     /// <summary>Starts a process from a resource request and binds a loaded source entity.</summary>
@@ -89,7 +92,7 @@ public sealed class FlowRunner(
             throw new InvalidOperationException($"Source entity type '{typeof(TState).FullName}' has no canonical name.");
         }
 
-        return StartCoreAsync(definitionName, options, source, source.CanonicalName, ct);
+        return StartCoreAsync(definitionName, options, source, source.CanonicalName, principal, ct);
     }
 
     /// <summary>Completes the addressed token on a process.</summary>
@@ -106,8 +109,9 @@ public sealed class FlowRunner(
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
             var tokens = await LoadTokensAsync(scope, process.Name!, c);
             var before = WaitingMap(tokens);
-            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
+            var ctx    = await CreateExecutionContextAsync(scope, process, principal, c);
             snapshot = await engine.AdvanceAsync(reg.Definition, process, tokens, ctx, token, c);
+            EnsureBridgeRequirements(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -127,7 +131,7 @@ public sealed class FlowRunner(
     ) {
         var reg   = ResolveRegistration(process.DefinitionName);
         var value = DeserializePayload(payload, reg.MessagePayloadTypes.GetValueOrDefault(messageName));
-        return await CorrelateCoreAsync(process, reg, messageName, value, token, ct);
+        return await CorrelateCoreAsync(process, reg, messageName, value, token, principal, ct);
     }
 
     /// <summary>Correlates a typed message payload to the process.</summary>
@@ -140,7 +144,7 @@ public sealed class FlowRunner(
         CancellationToken ct
     ) {
         var reg = ResolveRegistration(process.DefinitionName);
-        return CorrelateCoreAsync(process, reg, messageName, payload, token, ct);
+        return CorrelateCoreAsync(process, reg, messageName, payload, token, principal, ct);
     }
 
     private async ValueTask<ProcessSnapshot> CorrelateCoreAsync(
@@ -149,6 +153,7 @@ public sealed class FlowRunner(
         string               messageName,
         object?              payload,
         string?              token,
+        ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) {
         var engine  = ResolveEngine(reg);
@@ -160,14 +165,57 @@ public sealed class FlowRunner(
             );
         }
 
+        return await TriggerAddressedAsync(process, reg, engine, message, payload, token, resolveTarget: true, principal, ct);
+    }
+
+    /// <summary>
+    ///     Triggers the token addressed by <paramref name="tokenName" /> through the full transition
+    ///     unit of work so infrastructure bridges never bypass the advisor chain or source write-back.
+    /// </summary>
+    public async ValueTask<ProcessSnapshot> RunEventAsync(
+        string            processName,
+        string?           tokenName,
+        IEventDefinition  trigger,
+        object?           payload,
+        CancellationToken ct
+    ) {
+        ArgumentNullException.ThrowIfNull(trigger);
+
+        var process = await persistence.FindAsync(services, processName, ct);
+        if (process is null) {
+            throw new NotFoundException(
+                SchemataResources.PROCESS_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["name"] = processName }
+            );
+        }
+
+        var reg    = ResolveRegistration(process.DefinitionName);
+        var engine = ResolveEngine(reg);
+        return await TriggerAddressedAsync(process, reg, engine, trigger, payload, tokenName, resolveTarget: false, principal: null, ct);
+    }
+
+    private async ValueTask<ProcessSnapshot> TriggerAddressedAsync(
+        SchemataProcess     process,
+        ProcessRegistration reg,
+        IFlowRuntime        engine,
+        IEventDefinition    trigger,
+        object?             payload,
+        string?             token,
+        bool                resolveTarget,
+        ClaimsPrincipal?    principal,
+        CancellationToken   ct
+    ) {
         ProcessSnapshot? snapshot = null;
 
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
-            var tokens = await LoadTokensAsync(scope, process.Name!, c);
-            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
-            var target = await ResolveTargetAsync(engine, reg.Definition, process, tokens, ctx, message, token, c);
+            var tokens    = await LoadTokensAsync(scope, process.Name!, c);
+            var ctx       = await CreateExecutionContextAsync(scope, process, principal, c);
+            var tokenName = resolveTarget
+                ? await ResolveTargetAsync(engine, reg.Definition, process, tokens, ctx, trigger, token, c)
+                : token;
             var before = WaitingMap(tokens);
-            snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, message, payload, target, c);
+            snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, trigger, payload, tokenName, c);
+            EnsureBridgeRequirements(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -184,7 +232,7 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, ct, true);
+        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, true);
     }
 
     /// <summary>Broadcasts a signal with a typed payload to waiting processes.</summary>
@@ -195,13 +243,14 @@ public sealed class FlowRunner(
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, ct, false);
+        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, false);
     }
 
     private async ValueTask ThrowSignalCoreAsync(
         string           signalName,
         object?          payload,
         string?          token,
+        ClaimsPrincipal? principal,
         CancellationToken ct,
         bool             deserialize
     ) {
@@ -224,7 +273,7 @@ public sealed class FlowRunner(
             var value = deserialize && payload is string text
                 ? DeserializePayload(text, reg.SignalPayloadTypes.GetValueOrDefault(signalName))
                 : payload;
-            await TriggerSignalTargetsAsync(reg, engine, process, signal, value, token, ct);
+            await TriggerSignalTargetsAsync(reg, engine, process, signal, value, token, principal, ct);
         }
     }
 
@@ -240,7 +289,7 @@ public sealed class FlowRunner(
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
             var tokens      = await LoadTokensAsync(scope, process.Name!, c);
             var before      = WaitingMap(tokens);
-            var ctx         = new FlowExecutionContext(scope.UnitOfWork, services);
+            var ctx         = await CreateExecutionContextAsync(scope, process, principal, c);
             var transitions = new List<SchemataProcessTransition>();
             foreach (var item in tokens) {
                 var previous = item.WaitingAtName ?? item.StateName;
@@ -280,7 +329,7 @@ public sealed class FlowRunner(
 
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
             var tokens = await LoadTokensAsync(scope, process.Name!, c);
-            var ctx    = new FlowExecutionContext(scope.UnitOfWork, services);
+            var ctx    = await CreateExecutionContextAsync(scope, process, principal, c);
             var target = tokens.FirstOrDefault(t => t.CanonicalName == token.CanonicalName);
             if (target is null) {
                 throw new NotFoundException(
@@ -322,17 +371,20 @@ public sealed class FlowRunner(
         StartProcessOptions? options,
         TState?              source,
         string?              sourceName,
+        ClaimsPrincipal?     principal,
         CancellationToken    ct
     ) where TState : class {
         var reg    = ResolveRegistration(definitionName);
         var engine = ResolveEngine(reg);
+
         var process = NewProcess(definitionName, options);
         ProcessSnapshot? snapshot = null;
 
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
             await BindStartSourceAsync(scope, reg, process, source, sourceName, c);
-            var ctx = new FlowExecutionContext(scope.UnitOfWork, services);
+            var ctx = await CreateExecutionContextAsync(scope, process, principal, c);
             snapshot = await engine.StartAsync(reg.Definition, process, ctx, c);
+            EnsureBridgeRequirements(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, new Dictionary<string, string?>(), c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -349,15 +401,17 @@ public sealed class FlowRunner(
         Signal              signal,
         object?             payload,
         string?             token,
+        ClaimsPrincipal?    principal,
         CancellationToken   ct
     ) {
         await ExecuteWithNotificationAsync(process, async (scope, c) => {
             var tokens  = await LoadTokensAsync(scope, process.Name!, c);
-            var ctx     = new FlowExecutionContext(scope.UnitOfWork, services);
+            var ctx     = await CreateExecutionContextAsync(scope, process, principal, c);
             var targets = await engine.FindTriggerTargetsAsync(reg.Definition, process, tokens, ctx, signal, c);
             foreach (var target in FilterTargets(targets, token)) {
                 var before = WaitingMap(tokens);
                 var snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, signal, payload, target, c);
+                EnsureBridgeRequirements(reg.Definition, snapshot);
                 await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
                 await persistence.PersistSnapshotAsync(scope, snapshot, c);
                 await notifier.NotifyTransitionedAsync(snapshot, c);
@@ -406,6 +460,7 @@ public sealed class FlowRunner(
                 Token                 = TokenSnapshotFactory.From(token),
                 PreviousWaitingAtName = before.TryGetValue(tokenCanonical, out var waiting) ? waiting : null,
                 UnitOfWork            = scope.UnitOfWork,
+                Principal             = execution.Principal,
             };
             await RunSourceAdvisorsAsync(reg, scope, execution, context, ct);
         }
@@ -424,10 +479,83 @@ public sealed class FlowRunner(
                 Token                 = TokenSnapshotFactory.From(token),
                 PreviousWaitingAtName = transition.Token is not null && before.TryGetValue(transition.Token, out var waiting) ? waiting : null,
                 UnitOfWork            = scope.UnitOfWork,
+                Principal             = execution.Principal,
             };
 
             var advice = new AdviceContext(services);
             await Advisor.For<IFlowTransitionAdvisor>().RunAsync(advice, context, ct);
+        }
+    }
+
+    private void EnsureBridgeRequirements(ProcessDefinition definition, ProcessSnapshot snapshot) {
+        var bridges = services.GetService<IOptions<SchemataFlowOptions>>()?.Value.Bridges;
+        var changed = snapshot.Transitions
+                              .Select(transition => transition.Token)
+                              .Where(token => !string.IsNullOrEmpty(token))
+                              .Select(token => token!)
+                              .Distinct(StringComparer.Ordinal);
+
+        foreach (var tokenName in changed) {
+            var token = snapshot.Tokens.FirstOrDefault(current => current.CanonicalName == tokenName);
+            if (token is null) {
+                continue;
+            }
+
+            foreach (var catchEvent in ResolveBridgeCatches(definition, token)) {
+                var bridge = catchEvent.Definition switch {
+                    Message or Signal => SchemataFlowOptions.EventsBridge,
+                    TimerDefinition   => SchemataFlowOptions.TimersBridge,
+                    _                 => null,
+                };
+
+                if (bridge is null || bridges?.Contains(bridge) == true) {
+                    continue;
+                }
+
+                var activation = bridge == SchemataFlowOptions.EventsBridge
+                    ? "flow.UseEvent()"
+                    : "flow.UseScheduling()";
+                throw new FailedPreconditionException(
+                    message: $"Flow catch '{catchEvent.Name}' requires the Flow bridge; activate it with {activation}.");
+            }
+        }
+    }
+
+    private static IEnumerable<FlowEvent> ResolveBridgeCatches(
+        ProcessDefinition      definition,
+        SchemataProcessToken   token
+    ) {
+        if (!string.IsNullOrEmpty(token.WaitingAtName)) {
+            var waiting = definition.AllElements.FirstOrDefault(element => element.Name == token.WaitingAtName);
+
+            // Direct intermediate catches persist their own name as the waiting location.
+            if (waiting is FlowEvent { Position: EventPosition.IntermediateCatch } catchEvent) {
+                yield return catchEvent;
+                yield break;
+            }
+
+            // Event-based gateways persist their name, while every outgoing catch is armed.
+            if (waiting is EventBasedGateway gateway) {
+                foreach (var flow in definition.AllFlows.Where(flow => flow.Source == gateway)) {
+                    if (flow.Target is FlowEvent { Position: EventPosition.IntermediateCatch } outgoingCatch) {
+                        yield return outgoingCatch;
+                    }
+                }
+            }
+
+            yield break;
+        }
+
+        if (!string.Equals(token.State, "Active", StringComparison.Ordinal)
+         || definition.AllElements.FirstOrDefault(element => element.Name == token.StateName) is not Activity host) {
+            yield break;
+        }
+
+        // Boundary catches leave the token active at their host, so attachment identifies the armed waits.
+        foreach (var catchEvent in definition.AllElements.OfType<FlowEvent>()) {
+            if (catchEvent.Position == EventPosition.Boundary && ReferenceEquals(catchEvent.AttachedTo, host)) {
+                yield return catchEvent;
+            }
         }
     }
 
@@ -468,7 +596,7 @@ public sealed class FlowRunner(
 
         foreach (var binding in bindings) {
             if (!reg.SourceTypes.TryGetValue(binding.Name, out var descriptor)
-             || (descriptor.SourceType.FullName ?? descriptor.SourceType.Name) != binding.SourceType) {
+             || FlowSourceTypeNames.ToName(descriptor.SourceType) != binding.SourceType) {
                 continue;
             }
 
@@ -518,7 +646,7 @@ public sealed class FlowRunner(
                 if (candidates.Count != 1) {
                     throw new FailedPreconditionException(
                         SchemataResources.PROCESS_SOURCE_BINDING_AMBIGUOUS,
-                        new Dictionary<string, string?> { ["type"] = type.FullName ?? type.Name });
+                        new Dictionary<string, string?> { ["type"] = FlowSourceTypeNames.ToName(type) });
                 }
 
                 binding = candidates[0];
@@ -526,7 +654,7 @@ public sealed class FlowRunner(
 
             return (
                 binding.BindingName,
-                type.FullName ?? type.Name,
+                FlowSourceTypeNames.ToName(type),
                 canonicalSource.CanonicalName!,
                 source is IConcurrency concurrency ? concurrency.Timestamp : null);
         }
@@ -537,7 +665,7 @@ public sealed class FlowRunner(
                 message: $"Process '{reg.Name}' binds {types.Count} source types; specify a source name.");
         }
 
-        return (types[0].Key, types[0].Value.SourceType.FullName ?? types[0].Value.SourceType.Name, sourceName!, null);
+        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName!, null);
     }
 
     private static async ValueTask<string?> ResolveTargetAsync(
@@ -580,12 +708,18 @@ public sealed class FlowRunner(
         return targets.Contains(requested, StringComparer.Ordinal) ? [requested] : [];
     }
 
+    /// <summary>Deserializes an embedded message/signal payload using the framework's shared internal options.</summary>
+    /// <remarks>
+    ///     Embedded payloads are bound by CLR property name with case-insensitive matching via
+    ///     <see cref="SchemataJson.Default" />; they deliberately do NOT follow the HTTP snake_case
+    ///     wire policy configured by the transport JSON feature.
+    /// </remarks>
     private static object? DeserializePayload(string? payload, Type? type) {
         if (string.IsNullOrEmpty(payload)) {
             return null;
         }
 
-        return JsonSerializer.Deserialize(payload, type ?? typeof(object));
+        return JsonSerializer.Deserialize(payload, type ?? typeof(object), SchemataJson.Default);
     }
 
     private static Dictionary<string, string?> WaitingMap(IEnumerable<SchemataProcessToken> tokens) {
@@ -626,6 +760,33 @@ public sealed class FlowRunner(
         return list;
     }
 
+    private async ValueTask<FlowExecutionContext> CreateExecutionContextAsync(
+        FlowPersistenceScope scope,
+        SchemataProcess      process,
+        ClaimsPrincipal?     principal,
+        CancellationToken    ct
+    ) {
+        var bindings = new List<ProcessCompensationBinding>();
+        if (!string.IsNullOrEmpty(process.CanonicalName)) {
+            await foreach (var binding in scope.Compensations.ListAsync<SchemataProcessCompensation>(
+                               q => q.Where(row => row.Process == process.CanonicalName)
+                                     .OrderBy(row => row.ScopeOwnerCanonicalName)
+                                     .ThenBy(row => row.RegistrationOrder)
+                                     .ThenBy(row => row.ActivityName), ct)) {
+                bindings.Add(new(
+                    binding.ScopeOwnerCanonicalName,
+                    binding.ActivityName,
+                    binding.RegistrationOrder));
+            }
+        }
+
+        return new(scope.UnitOfWork, services) {
+            LoadedCompensationBindings = bindings,
+            Principal                  = principal,
+            SourceReadGuard            = FlowSourceReadScope.Enter,
+        };
+    }
+
     private static SchemataProcess NewProcess(string definitionName, StartProcessOptions? options) {
         var leaf = FlowHandlerSupport.NewLeafId();
         return new() {
@@ -634,6 +795,7 @@ public sealed class FlowRunner(
             DefinitionName = definitionName,
             DisplayName    = string.IsNullOrWhiteSpace(options?.DisplayName) ? null : options.DisplayName,
             Description    = string.IsNullOrWhiteSpace(options?.Description) ? null : options.Description,
+            IdempotencyKey = string.IsNullOrWhiteSpace(options?.IdempotencyKey) ? null : options.IdempotencyKey,
         };
     }
 
@@ -716,17 +878,14 @@ public sealed class FlowRunner(
             string                source,
             CancellationToken     ct
         ) {
-            var repository = services.GetService<IRepository<TSource>>();
-            if (repository is null) {
-                return;
-            }
+            var repository = services.GetRequiredService<IRepository<TSource>>();
 
             TSource? entity = null;
             if (execution.TouchedSources.TryGetValue((typeof(TSource), source), out var touched)) {
                 entity = (TSource)touched;
             } else {
                 repository.Join(uow);
-                using (repository.SuppressQueryOwner()) {
+                using (FlowSourceReadScope.Enter(repository)) {
                     entity = await repository.FirstOrDefaultAsync(q => q.Where(e => e.CanonicalName == source), ct);
                 }
             }
@@ -758,7 +917,7 @@ public sealed class FlowRunner(
                 return;
             }
 
-            var type = typeof(TSource).FullName ?? typeof(TSource).Name;
+            var type = FlowSourceTypeNames.ToName(typeof(TSource));
             var rows = new List<SchemataProcessSource>();
             await foreach (var row in bindings.ListAsync<SchemataProcessSource>(
                                q => q.Where(binding => binding.Process == process
@@ -781,7 +940,7 @@ public sealed class FlowRunner(
 
             if (source is IConcurrency) {
                 TSource? persisted;
-                using (sources.SuppressQueryOwner()) {
+                using (FlowSourceReadScope.Enter(sources)) {
                     persisted = await sources.FirstOrDefaultAsync(q => q.Where(e => e.CanonicalName == canonical), ct);
                 }
 

@@ -11,7 +11,6 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
-using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -61,7 +60,7 @@ public sealed class AdviceSourceProjection<TSource>(
         sources.Join(context.UnitOfWork);
         bindings.Join(context.UnitOfWork);
 
-        var type = typeof(TSource).FullName ?? typeof(TSource).Name;
+        var type = FlowSourceTypeNames.ToName(typeof(TSource));
         var allRows = new List<SchemataProcessSource>();
         await foreach (var row in bindings.ListAsync<SchemataProcessSource>(
                            q => q.Where(s => s.Process == process
@@ -94,7 +93,7 @@ public sealed class AdviceSourceProjection<TSource>(
                 continue;
             }
 
-            if (descriptor.SourceType.FullName != row.SourceType) {
+            if (FlowSourceTypeNames.ToName(descriptor.SourceType) != row.SourceType) {
                 logger?.LogDebug("Source binding '{BindingName}' has a mismatched source type.", row.Name);
                 continue;
             }
@@ -156,6 +155,11 @@ public sealed class AdviceSourceProjection<TSource>(
                 return true;
             case FlowSourceProjection.Auto:
             case FlowSourceProjection.BusinessState:
+                return TryGetBusinessState(definition, context, row, process, logger, out state);
+            case FlowSourceProjection.Terminal when row.Token is null && ProcessStates.IsTerminal(context.Snapshot.Process.State):
+                state = context.Snapshot.Process.State;
+                return true;
+            case FlowSourceProjection.Terminal:
                 return TryGetBusinessState(definition, context, row, process, logger, out state);
             default:
                 return false;

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
@@ -44,7 +45,7 @@ public sealed class EventBuilder
     public EventBuilder UseHandler<TEvent, THandler>()
         where TEvent : IEvent
         where THandler : class, IEventHandler<TEvent> {
-        Services.AddScoped(typeof(IEventHandler<>).MakeGenericType(typeof(TEvent)), typeof(THandler));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IEventHandler<>).MakeGenericType(typeof(TEvent)), typeof(THandler)));
         return this;
     }
 
@@ -52,8 +53,7 @@ public sealed class EventBuilder
     public EventBuilder UseHandler<TRequest, TResponse, THandler>()
         where TRequest : IRequest<TResponse>
         where THandler : class, IRequestHandler<TRequest, TResponse> {
-        Services.AddScoped(typeof(IRequestHandler<,>).MakeGenericType(typeof(TRequest), typeof(TResponse)),
-                           typeof(THandler));
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestHandler<,>).MakeGenericType(typeof(TRequest), typeof(TResponse)), typeof(THandler)));
         return this;
     }
 

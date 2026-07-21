@@ -22,7 +22,9 @@ internal readonly record struct ReportReadPageToken(int ChunkIndex, int Offset)
                     return new(chunkIndex, offset);
                 }
             }
-        } catch (FormatException) { }
+        } catch (FormatException ex) {
+            throw new InvalidArgumentException(message: $"Invalid page token '{token}': {ex.Message}");
+        }
 
         throw new InvalidArgumentException(message: "Invalid page token.");
     }

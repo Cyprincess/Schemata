@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Moq;
 using Schemata.Flow.Bpmn.Runtime.Boundary;
 using Schemata.Flow.Bpmn.Runtime.Compensation;
-using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Xunit;
 
@@ -95,27 +95,52 @@ public class CompensationBoundaryHandlerShould
     public async Task InvokeAsync_BoundaryHandlerWithStubExecutor_ForwardsCompensationInvocation() {
         var scenario = BoundaryScenario(1, false);
         var boundary = CompensationBoundaryHandler.FindCompensationBoundaries(scenario.Definition, scenario.Host).Single();
-        var executor = new RecordingCompensationExecutor();
-        var handler  = new BoundaryCompensationHandler(scenario.Host, scenario.CompensationTargets[0], boundary.Name, executor);
+        Activity? invokedActivity = null;
+        FlowElement? invokedTarget = null;
+        string? invokedEventName = null;
+        CompensationInvocationContext? invokedContext = null;
+        var executor = new Mock<ICompensationExecutor>();
+        executor.Setup(e => e.ExecuteAsync(
+                    It.IsAny<Activity>(),
+                    It.IsAny<FlowElement>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CompensationInvocationContext>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback((Activity activity, FlowElement target, string eventName, CompensationInvocationContext invocation, CancellationToken _) => {
+                    invokedActivity  = activity;
+                    invokedTarget    = target;
+                    invokedEventName = eventName;
+                    invokedContext   = invocation;
+                })
+                .Returns(ValueTask.CompletedTask);
+        var handler  = new BoundaryCompensationHandler(scenario.Host, scenario.CompensationTargets[0], boundary.Name, executor.Object);
         var context  = NewContext(scenario.Definition);
 
         await handler.InvokeAsync(context);
 
-        Assert.Same(context, executor.Contexts.Single());
-        Assert.Same(scenario.Host, executor.Activities.Single());
-        Assert.Same(scenario.CompensationTargets[0], executor.Targets.Single());
-        Assert.Equal(boundary.Name, executor.EventNames.Single());
+        Assert.Same(context, invokedContext);
+        Assert.Same(scenario.Host, invokedActivity);
+        Assert.Same(scenario.CompensationTargets[0], invokedTarget);
+        Assert.Equal(boundary.Name, invokedEventName);
     }
 
     [Fact]
     public async Task InvokeAsync_ExecutorThrows_PropagatesException() {
         var scenario = BoundaryScenario(1, false);
         var failure  = new InvalidOperationException("boom");
+        var executor = new Mock<ICompensationExecutor>();
+        executor.Setup(e => e.ExecuteAsync(
+                    It.IsAny<Activity>(),
+                    It.IsAny<FlowElement>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CompensationInvocationContext>(),
+                    It.IsAny<CancellationToken>()))
+                .Throws(failure);
         var handler  = new BoundaryCompensationHandler(
             scenario.Host,
             scenario.CompensationTargets[0],
             "boundary-1",
-            new ThrowingCompensationExecutor(failure));
+            executor.Object);
 
         var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await handler.InvokeAsync(NewContext(scenario.Definition)));
@@ -185,39 +210,4 @@ public class CompensationBoundaryHandlerShould
         Activity          Host,
         IReadOnlyList<Activity> CompensationTargets);
 
-    private sealed class RecordingCompensationExecutor : ICompensationExecutor
-    {
-        public List<Activity> Activities { get; } = [];
-
-        public List<FlowElement> Targets { get; } = [];
-
-        public List<CompensationInvocationContext> Contexts { get; } = [];
-
-        public List<string> EventNames { get; } = [];
-
-        public ValueTask ExecuteAsync(
-            Activity                      activity,
-            FlowElement                   compensationTarget,
-            string                        eventName,
-            CompensationInvocationContext context,
-            CancellationToken             ct = default) {
-            Activities.Add(activity);
-            Targets.Add(compensationTarget);
-            Contexts.Add(context);
-            EventNames.Add(eventName);
-            return default;
-        }
-    }
-
-    private sealed class ThrowingCompensationExecutor(Exception failure) : ICompensationExecutor
-    {
-        public ValueTask ExecuteAsync(
-            Activity                      activity,
-            FlowElement                   compensationTarget,
-            string                        eventName,
-            CompensationInvocationContext context,
-            CancellationToken             ct = default) {
-            throw failure;
-        }
-    }
 }

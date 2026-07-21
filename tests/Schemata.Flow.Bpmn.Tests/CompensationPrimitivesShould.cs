@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Moq;
 using Schemata.Flow.Bpmn.Runtime;
 using Schemata.Flow.Bpmn.Runtime.Compensation;
 using Schemata.Flow.Skeleton.Entities;
@@ -65,34 +66,53 @@ public class CompensationPrimitivesShould
     [Fact]
     public async Task InvokeAll_OnSuccess_FiresStartedAndCompletedObservers() {
         var handlers = NewHandlers();
-        var observer = new RecordingObserver();
+        var started = 0;
+        var completed = 0;
+        var observer = new Mock<ICompensationLifecycleObserver>();
+        observer.Setup(o => o.OnCompensationStartedAsync(It.IsAny<SchemataProcess>(), It.IsAny<TokenSnapshot>(), It.IsAny<CancellationToken>()))
+                .Callback(() => started++)
+                .Returns(Task.CompletedTask);
+        observer.Setup(o => o.OnCompensationCompletedAsync(It.IsAny<SchemataProcess>(), It.IsAny<TokenSnapshot>(), It.IsAny<CancellationToken>()))
+                .Callback(() => completed++)
+                .Returns(Task.CompletedTask);
 
-        await CompensationCoordinator.InvokeAllAsync(NewStack(handlers), NewContext(), [observer]);
+        await CompensationCoordinator.InvokeAllAsync(NewStack(handlers), NewContext(), [observer.Object]);
 
-        Assert.Equal(5, observer.Started);
-        Assert.Equal(1, observer.Completed);
+        Assert.Equal(5, started);
+        Assert.Equal(1, completed);
     }
 
     [Fact]
     public async Task InvokeAll_OnFailure_FiresStartedButNotCompletedObserver() {
         var handlers = NewHandlers(failureId: "C", failure: new("boom"));
-        var observer = new RecordingObserver();
+        var started = 0;
+        var completed = 0;
+        var observer = new Mock<ICompensationLifecycleObserver>();
+        observer.Setup(o => o.OnCompensationStartedAsync(It.IsAny<SchemataProcess>(), It.IsAny<TokenSnapshot>(), It.IsAny<CancellationToken>()))
+                .Callback(() => started++)
+                .Returns(Task.CompletedTask);
+        observer.Setup(o => o.OnCompensationCompletedAsync(It.IsAny<SchemataProcess>(), It.IsAny<TokenSnapshot>(), It.IsAny<CancellationToken>()))
+                .Callback(() => completed++)
+                .Returns(Task.CompletedTask);
 
-        await CompensationCoordinator.InvokeAllAsync(NewStack(handlers), NewContext(), [observer]);
+        await CompensationCoordinator.InvokeAllAsync(NewStack(handlers), NewContext(), [observer.Object]);
 
-        Assert.Equal(3, observer.Started);
-        Assert.Equal(0, observer.Completed);
+        Assert.Equal(3, started);
+        Assert.Equal(0, completed);
     }
 
     [Fact]
     public async Task InvokeAll_ObserverThrows_DoesNotInterruptCoordinator() {
         var calls    = new List<string>();
         var handlers = NewHandlers(calls);
+        var observer = new Mock<ICompensationLifecycleObserver>();
+        observer.Setup(o => o.OnCompensationStartedAsync(It.IsAny<SchemataProcess>(), It.IsAny<TokenSnapshot>(), It.IsAny<CancellationToken>()))
+                .Throws(new InvalidOperationException("observer failed"));
 
         var result = await CompensationCoordinator.InvokeAllAsync(
             NewStack(handlers),
             NewContext(),
-            [new ThrowingObserver()]);
+            [observer.Object]);
 
         Assert.Equal(new[] { "E", "D", "C", "B", "A" }, calls);
         Assert.Equal(5, result.Compensated.Count);
@@ -120,64 +140,38 @@ public class CompensationPrimitivesShould
         return stack;
     }
 
-    private static List<FakeHandler> NewHandlers(
+    private static List<ICompensationHandler> NewHandlers(
         List<string>?              calls     = null,
         string?                    failureId = null,
         InvalidOperationException? failure   = null) {
         return [
-            new("A", calls, failureId == "A" ? failure : null),
-            new("B", calls, failureId == "B" ? failure : null),
-            new("C", calls, failureId == "C" ? failure : null),
-            new("D", calls, failureId == "D" ? failure : null),
-            new("E", calls, failureId == "E" ? failure : null),
+            CreateHandler("A", calls, failureId == "A" ? failure : null).Object,
+            CreateHandler("B", calls, failureId == "B" ? failure : null).Object,
+            CreateHandler("C", calls, failureId == "C" ? failure : null).Object,
+            CreateHandler("D", calls, failureId == "D" ? failure : null).Object,
+            CreateHandler("E", calls, failureId == "E" ? failure : null).Object,
         ];
     }
 
-    private sealed class FakeHandler : ICompensationHandler
-    {
-        private readonly List<string>? _calls;
-        private readonly Exception?    _failure;
-
-        public FakeHandler(string id, List<string>? calls, Exception? failure) {
-            Activity           = new NoneTask { Name = id };
-            CompensationTarget = new NoneTask { Name = $"compensate-{id}" };
-            _calls             = calls;
-            _failure           = failure;
+    private static Mock<ICompensationHandler> CreateHandler(
+        string          id,
+        List<string>?   calls,
+        Exception?      failure
+    ) {
+        var handler = new Mock<ICompensationHandler>(MockBehavior.Strict);
+        var activity = new NoneTask { Name = id };
+        handler.SetupGet(value => value.Activity).Returns(activity);
+        handler.SetupGet(value => value.CompensationTarget).Returns(new NoneTask { Name = $"compensate-{id}" });
+        var invocation = handler.Setup(value => value.InvokeAsync(
+            It.IsAny<CompensationInvocationContext>(),
+            It.IsAny<CancellationToken>()));
+        if (failure is not null) {
+            invocation.Throws(failure);
+        } else {
+            invocation.Callback(() => calls?.Add(id)).Returns(ValueTask.CompletedTask);
         }
 
-        public Activity Activity { get; }
-
-        public FlowElement CompensationTarget { get; }
-
-        public ValueTask InvokeAsync(CompensationInvocationContext context, CancellationToken ct = default) {
-            if (_failure is not null) throw _failure;
-
-            _calls?.Add(Activity.Name);
-            return default;
-        }
+        return handler;
     }
 
-    private sealed class RecordingObserver : ICompensationLifecycleObserver
-    {
-        public int Started { get; private set; }
-
-        public int Completed { get; private set; }
-
-        public Task OnCompensationStartedAsync(SchemataProcess process, TokenSnapshot scope, CancellationToken ct = default) {
-            Started++;
-            return Task.CompletedTask;
-        }
-
-        public Task OnCompensationCompletedAsync(SchemataProcess process, TokenSnapshot scope, CancellationToken ct = default) {
-            Completed++;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class ThrowingObserver : ICompensationLifecycleObserver
-    {
-        public Task OnCompensationStartedAsync(SchemataProcess process, TokenSnapshot scope, CancellationToken ct = default) {
-            throw new InvalidOperationException("observer failed");
-        }
-    }
 }

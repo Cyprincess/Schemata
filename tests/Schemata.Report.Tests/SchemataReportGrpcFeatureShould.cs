@@ -31,10 +31,10 @@ public class SchemataReportGrpcFeatureShould
         using var app = builder.Build();
         var options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
 
-        Assert.True(schemata!.HasFeature<SchemataReportGrpcFeature>());
+        Assert.True(schemata!.HasFeature<SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
         Assert.Equal(
             SchemataReportFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>.DefaultPriority + 200_000,
-            new SchemataReportGrpcFeature().Priority);
+            new SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>().Priority);
         Assert.Contains(typeof(SchemataReport).TypeHandle, options.Resources.Keys);
         Assert.Contains(typeof(SchemataReportSnapshot).TypeHandle, options.Resources.Keys);
 

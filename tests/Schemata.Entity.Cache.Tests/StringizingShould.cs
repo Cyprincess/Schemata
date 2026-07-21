@@ -19,7 +19,7 @@ public class StringizingShould
     }
 
     [Fact]
-    public void ToString_BinaryEqual_ProducesExpectedString() {
+    public void ToString_EqualExpressionWithStringLiteral_RendersQuotedLiteral() {
         Expression<Func<Student, bool>> expr = s => s.FullName == "Alice";
 
         var result = Stringizing.ToString(expr);
@@ -28,7 +28,7 @@ public class StringizingShould
     }
 
     [Fact]
-    public void ToString_AndAlso_ProducesExpectedString() {
+    public void ToString_AndAlsoConjunction_RendersParenthesizedAndExpression() {
         Expression<Func<Student, bool>> expr = s => s.Age > 18 && s.FullName == "Bob";
 
         var result = Stringizing.ToString(expr);
@@ -77,7 +77,7 @@ public class StringizingShould
     }
 
     [Fact]
-    public void ToString_MethodCall_ProducesExpectedString() {
+    public void ToString_InstanceMethodCallWithOneArgument_RendersMethodWithAritySuffix() {
         Expression<Func<Student, bool>> expr = s => s.FullName!.Contains("Al");
 
         var result = Stringizing.ToString(expr);

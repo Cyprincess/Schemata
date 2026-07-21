@@ -1,5 +1,5 @@
 using Schemata.Abstractions.Entities;
-using Schemata.Security.Foundation;
+using Schemata.Security.Skeleton;
 using Schemata.Security.Tests.Fixtures;
 using Xunit;
 

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Schemata.Expressions.Skeleton;
 
 /// <summary>
@@ -52,9 +49,4 @@ public sealed class ExpressionCapabilities
     ///     Gets whether substring match functions are translatable.
     /// </summary>
     public bool StringMatch { get; init; } = true;
-
-    /// <summary>
-    ///     Gets the additional named functions the backend can translate beyond the built-in flags.
-    /// </summary>
-    public IReadOnlyCollection<string> Functions { get; init; } = Array.Empty<string>();
 }

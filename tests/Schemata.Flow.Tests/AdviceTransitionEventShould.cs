@@ -28,7 +28,7 @@ public class AdviceTransitionEventShould
         await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
-        Assert.Equal("flow:processes/p1:catch-msg", row.SubscriptionId);
+        Assert.Equal("flow:processes/p1:catch-msg:processes/p1/tokens/t1", row.SubscriptionId);
         Assert.Equal("payment", row.EventType);
         Assert.Equal("processes/p1", row.CorrelationKey);
         Assert.Equal("processes/p1", row.Target);
@@ -58,7 +58,8 @@ public class AdviceTransitionEventShould
     public async SystemTask RemovesOldSubscription_WhenProcessReachesTerminalState() {
         var rows = new List<SchemataEventSubscription> {
             new() {
-                SubscriptionId = "flow:processes/p1:catch-msg",
+                SubscriptionId = "flow:processes/p1:catch-msg:processes/p1/tokens/t1",
+                Token          = "processes/p1/tokens/t1",
                 EventType      = "payment",
                 CorrelationKey = "processes/p1",
                 Target         = "processes/p1",
@@ -80,7 +81,8 @@ public class AdviceTransitionEventShould
     public async SystemTask UpsertsSubscription_WhenReenteringWithDifferentMetadata() {
         var rows = new List<SchemataEventSubscription> {
             new() {
-                SubscriptionId = "flow:processes/p1:catch-msg",
+                SubscriptionId = "flow:processes/p1:catch-msg:processes/p1/tokens/t1",
+                Token          = "processes/p1/tokens/t1",
                 EventType      = "stale-event",
                 CorrelationKey = "stale-key",
                 Target         = "stale-target",
@@ -96,6 +98,29 @@ public class AdviceTransitionEventShould
         Assert.Equal("payment", row.EventType);
         Assert.Equal("processes/p1", row.CorrelationKey);
         Assert.Equal("processes/p1", row.Target);
+    }
+
+    [Fact]
+    public async SystemTask AddsSubscription_ForMessageCatchNestedInSubProcess() {
+        var rows    = new List<SchemataEventSubscription>();
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var catchEvent = new FlowEvent {
+            Name       = "payment-catch",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Message { Name = "payment" },
+        };
+        var nested = new EmbeddedSubProcess { Name = "subprocess" };
+        nested.Children.Add(catchEvent);
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(nested);
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(Advice(), Context(process, definition, "payment-catch"));
+
+        var row = Assert.Single(rows);
+        Assert.Equal("processes/p1/tokens/t1", row.Token);
+        Assert.Equal("flow:processes/p1:payment-catch:processes/p1/tokens/t1", row.SubscriptionId);
     }
 
     [Fact]
@@ -127,8 +152,8 @@ public class AdviceTransitionEventShould
         await advisor.AdviseAsync(Advice(), Context(process, definition, "gw"));
 
         Assert.Equal(2, rows.Count);
-        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-pay", CorrelationKey: "processes/p1" });
-        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-sig", CorrelationKey: null });
+        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-pay:processes/p1/tokens/t1", CorrelationKey: "processes/p1" });
+        Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-sig:broadcast", CorrelationKey: null });
     }
 
     [Fact]
@@ -148,6 +173,91 @@ public class AdviceTransitionEventShould
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async SystemTask AddsBoundarySubscription_WhenActiveAtHostActivity() {
+        var rows    = new List<SchemataEventSubscription>();
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var (definition, host, boundary) = BoundarySetup(new Message { Name = "payment" });
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+
+        var row = Assert.Single(rows);
+        Assert.Equal($"flow:processes/p1:{boundary.Name}:processes/p1/tokens/t1", row.SubscriptionId);
+        Assert.Equal("payment", row.EventType);
+        Assert.Equal("processes/p1", row.CorrelationKey);
+        Assert.Equal("processes/p1", row.Target);
+    }
+
+    [Fact]
+    public async SystemTask AddsBoundarySubscription_WithNullCorrelation_ForSignalCatch() {
+        var rows    = new List<SchemataEventSubscription>();
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var (definition, host, boundary) = BoundarySetup(new Signal { Name = "shutdown" });
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+
+        var row = Assert.Single(rows);
+        Assert.Equal($"flow:processes/p1:{boundary.Name}:broadcast", row.SubscriptionId);
+        Assert.Null(row.CorrelationKey);
+    }
+
+    [Fact]
+    public async SystemTask RemovesBoundarySubscription_WhenTokenLeavesHostActivity() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:Catch_work_payment:processes/p1/tokens/t1",
+                Token          = "processes/p1/tokens/t1",
+                EventType      = "payment",
+                CorrelationKey = "processes/p1",
+                Target         = "processes/p1",
+            },
+        };
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
+        var next = new UserTask { Name = "next" };
+        definition.Elements.Add(next);
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(
+            Advice(),
+            Context(process, definition, null, stateName: next.Name, previousStateName: host.Name));
+
+        Assert.Empty(rows);
+    }
+
+    [Fact]
+    public async SystemTask DoesNotAddBoundarySubscription_WhenTokenNotActive() {
+        var rows    = new List<SchemataEventSubscription>();
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
+        var process = new SchemataProcess { CanonicalName = "processes/p1", State = "Completed" };
+
+        await advisor.AdviseAsync(
+            Advice(),
+            Context(process, definition, null, stateName: host.Name, status: "Completed"));
+
+        Assert.Empty(rows);
+    }
+
+    [Fact]
+    public async SystemTask DoesNotAddBoundarySubscription_ForNonBusEventDefinitions() {
+        var rows    = new List<SchemataEventSubscription>();
+        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+
+        var (definition, host, _) = BoundarySetup(new ErrorDefinition { Name = "Boom" });
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+
+        Assert.Empty(rows);
+    }
+
     private static AdviceContext Advice() {
         return new(new ServiceCollection().BuildServiceProvider());
     }
@@ -156,19 +266,27 @@ public class AdviceTransitionEventShould
         SchemataProcess   process,
         ProcessDefinition definition,
         string?           waitingAtName,
-        string?           previousWaitingAtName = null
+        string?           previousWaitingAtName = null,
+        string?           stateName             = null,
+        string?           status                = null,
+        string?           previousStateName     = null
     ) {
         var token = new TokenSnapshot {
             CanonicalName = "processes/p1/tokens/t1",
             ScopeName     = "p1",
-            StateName     = waitingAtName ?? "post-wait",
+            StateName     = stateName ?? waitingAtName ?? "post-wait",
             WaitingAtName = waitingAtName,
-            Status        = waitingAtName is null ? "Active" : "Waiting",
+            Status        = status ?? (waitingAtName is null ? "Active" : "Waiting"),
         };
+
+        SchemataProcessTransition[] transitions = [];
+        if (previousStateName is not null) {
+            transitions = [new() { Token = token.CanonicalName, Previous = previousStateName }];
+        }
 
         return new() {
             Definition            = definition,
-            Snapshot              = new() { Process = process, Tokens = [], Transitions = [] },
+            Snapshot              = new() { Process = process, Tokens = [], Transitions = transitions },
             Token                 = token,
             PreviousWaitingAtName = previousWaitingAtName,
             UnitOfWork            = Mock.Of<IUnitOfWork>(),
@@ -183,6 +301,23 @@ public class AdviceTransitionEventShould
             Definition = new Message { Name = "payment" },
         });
         return (definition, new() { CanonicalName = "processes/p1" });
+    }
+
+    private static (ProcessDefinition Definition, UserTask Host, FlowEvent Boundary) BoundarySetup(
+        IEventDefinition eventDefinition
+    ) {
+        var host = new UserTask { Name = "work" };
+        var boundary = new FlowEvent {
+            Name       = "Catch_work_payment",
+            Position   = EventPosition.Boundary,
+            Definition = eventDefinition,
+            AttachedTo = host,
+        };
+
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(host);
+        definition.Elements.Add(boundary);
+        return (definition, host, boundary);
     }
 
     private static Mock<IRepository<SchemataEventSubscription>> Repository(List<SchemataEventSubscription> rows) {

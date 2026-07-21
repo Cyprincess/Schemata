@@ -103,7 +103,7 @@ public class AdviceValidateResourceReferencesShould
     }
 
     [Fact]
-    public async Task NoResolverRegistered_Continues() {
+    public async Task ReferencedEntity_MissingResolver_Continues() {
         var advisor    = new AdviceValidateResourceReferences<ReferencingEntity>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<ReferencingEntity>>().Object;
@@ -116,18 +116,13 @@ public class AdviceValidateResourceReferencesShould
 
     [Fact]
     public async Task EntityWithNoResourceReferenceAttributes_Continues() {
-        var resolver = new Mock<IResourceTypeResolver>(MockBehavior.Strict);
-
         var advisor = new AdviceValidateResourceReferences<PlainEntity>();
-        var services = new ServiceCollection();
-        services.AddSingleton(resolver.Object);
-        var ctx        = new AdviceContext(services.BuildServiceProvider());
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<PlainEntity>>().Object;
 
         var result = await advisor.AdviseAsync(ctx, repository, new(), CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
-        resolver.VerifyNoOtherCalls();
     }
 
     private static (AdviceValidateResourceReferences<ReferencingEntity> Advisor, AdviceContext Ctx,

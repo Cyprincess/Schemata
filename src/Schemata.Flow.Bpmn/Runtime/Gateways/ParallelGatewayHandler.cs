@@ -71,7 +71,7 @@ public static class ParallelGatewayHandler
                           .ToList();
 
         if (waitingHere.Count + 1 < incomingCount) {
-            return engine.ParkAtGateway(process, token, working, pg, previousState);
+            return engine.ParkAtGateway(process, token, working, pg, previousState, execution);
         }
 
         return await engine.FireJoinAsync(definition, process, token, working, pg, waitingHere, previousState, execution);

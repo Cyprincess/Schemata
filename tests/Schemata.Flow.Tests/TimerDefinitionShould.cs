@@ -1,5 +1,6 @@
 using System;
 using System.Xml;
+using Microsoft.Extensions.Time.Testing;
 using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
@@ -16,11 +17,12 @@ public class TimerDefinitionShould
         var timer = new TimerDefinition {
             TimerType = TimerType.Duration, TimeExpression = XmlConvert.ToString(TimeSpan.FromMinutes(5)),
         };
+        var now  = new DateTimeOffset(2026, 7, 24, 12, 0, 0, TimeSpan.Zero);
+        var time = new FakeTimeProvider(now);
 
-        var schedule = Assert.IsType<OneTimeSchedule>(TimerDefinitionConverter.ToSchedule(timer));
+        var schedule = Assert.IsType<OneTimeSchedule>(TimerDefinitionConverter.ToSchedule(timer, time));
 
-        var delay = schedule.RunTime - DateTime.UtcNow;
-        Assert.InRange(delay, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(6));
+        Assert.Equal(now.UtcDateTime.AddMinutes(5), schedule.RunTime);
     }
 
     [Fact]

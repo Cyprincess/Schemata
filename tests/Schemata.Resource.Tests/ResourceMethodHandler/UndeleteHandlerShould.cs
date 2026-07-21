@@ -4,7 +4,6 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
@@ -46,24 +45,21 @@ public class UndeleteHandlerShould
     }
 
     [Fact]
-    public async Task Invoke_LiveEntity_ThrowsFailedPrecondition() {
+    public async Task Invoke_LiveEntity_ThrowsAlreadyExists() {
         var entity = new TrashStudent { Name = "alice-1", CanonicalName = "trashStudents/alice-1" };
 
         var repository = new Mock<IRepository<TrashStudent>>();
         var mapper     = new Mock<ISimpleMapper>();
         var handler    = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
-        var ex = await Assert.ThrowsAsync<FailedPreconditionException>(() => handler.InvokeAsync(
-                                                                          entity.CanonicalName, new(), entity,
-                                                                          null,
-                                                                          CancellationToken.None)
-                                                                     .AsTask());
+        var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.InvokeAsync(
+                                                                      entity.CanonicalName, new(), entity,
+                                                                      null,
+                                                                      CancellationToken.None)
+                                                                 .AsTask());
 
         var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
         Assert.Equal(entity.CanonicalName, resource.ResourceName);
-        var precondition = Assert.Single(ex.Details!.OfType<PreconditionFailureDetail>());
-        var violation    = Assert.Single(precondition.Violations!);
-        Assert.Equal(SchemataConstants.PreconditionSubjects.NotSoftDeleted, violation.Subject);
         repository.Verify(r => r.UpdateAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }

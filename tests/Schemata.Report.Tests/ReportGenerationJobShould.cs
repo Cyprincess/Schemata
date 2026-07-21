@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Moq;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Report.Foundation;
@@ -22,25 +22,38 @@ public class ReportGenerationJobShould
 {
     [Fact]
     public async Task Generate_Persists_Pending_Row_And_Returns_Addressable_Operation() {
-        var scheduler = new ReportTestScheduler();
+        JobContext?           context   = null;
+        SchemataJobExecution? triggered = null;
+        var scheduler = ReportTestHost.CreateScheduler((triggerContext, execution) => {
+            context   = triggerContext;
+            triggered = execution;
+        });
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton<IScheduler>(scheduler));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            configure: services => services.AddSingleton(scheduler.Object));
         var service = provider.GetRequiredService<IReportService>();
 
         var operation = await service.GenerateAsync(ReportTestHost.InlineRequest());
 
-        Assert.Equal($"operations/{scheduler.Execution.Uid:n}", operation.CanonicalName);
-        Assert.Equal("generate", scheduler.Context!.Method);
-        Assert.Equal(typeof(ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>), scheduler.JobType);
+        Assert.NotNull(triggered);
+        var uid = Assert.IsType<Guid>(context!.ExecutionUid);
+        Assert.Equal(uid, triggered!.Uid);
+        Assert.Equal($"operations/{triggered.Uid:n}", operation.CanonicalName);
+        Assert.False(operation.Done);
+        Assert.Equal("generate", context.Method);
+        scheduler.Verify(
+            value => value.TriggerAsync<ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(
+                It.IsAny<JobContext>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task Job_Replays_Request_From_ArgsJson() {
-        var reportService = new CapturingReportService(new());
+        var reportService = ReportTestHost.CreateReportService(new());
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton<IReportService>(reportService));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            configure: services => services.AddSingleton(reportService.Object));
         var job = CreateJob(provider);
         var request = ReportTestHost.InlineRequest(persist: true);
 
@@ -48,19 +61,22 @@ public class ReportGenerationJobShould
             ArgsJson = JsonSerializer.Serialize(request, SchemataJson.Default),
         }, CancellationToken.None);
 
-        Assert.NotNull(reportService.Request);
-        Assert.True(reportService.Request!.Persist);
-        Assert.NotNull(reportService.Request.Query);
+        reportService.Verify(
+            value => value.RunAsync(
+                It.Is<ReportRequest>(replayed => replayed.Persist && replayed.Query != null),
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task Job_Writes_Snapshot_Ref_To_Output() {
-        var reportService = new CapturingReportService(new() {
+        var reportService = ReportTestHost.CreateReportService(new() {
             Snapshot = "reports/daily/snapshots/s1",
         });
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton<IReportService>(reportService));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            configure: services => services.AddSingleton(reportService.Object));
         var job = CreateJob(provider);
         var execution = new SchemataJobExecution { Uid = Guid.NewGuid() };
 
@@ -80,11 +96,11 @@ public class ReportGenerationJobShould
         response.Response.Rows.Add(new Dictionary<string, object?>());
         response.Response.Rows.Add(new Dictionary<string, object?>());
         response.Response.Rows.Add(new Dictionary<string, object?>());
-        var reportService = new CapturingReportService(response);
+        var reportService = ReportTestHost.CreateReportService(response);
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)),
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
             maxInlineRows: 2,
-            configure: services => services.AddSingleton<IReportService>(reportService));
+            configure: services => services.AddSingleton(reportService.Object));
         var job = CreateJob(provider);
 
         var exception = await Assert.ThrowsAsync<ReportException>(async () => {
@@ -108,7 +124,7 @@ public class ReportGenerationJobShould
             },
         };
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(8)),
+            ReportTestHost.CreateDriver(ReportTestRows.Create(8)),
             state,
             chunkSize: 2,
             configure: services => services.AddScoped<IRepository<SchemataJobExecution>>(_ => state.CreateExecutionRepository()));
@@ -144,7 +160,7 @@ public class ReportGenerationJobShould
 
     [Fact]
     public async Task Job_Malformed_ArgsJson_Throws_Without_Mutating_Execution() {
-        using var provider = ReportTestHost.Create(new ReportMaterializerProbe(ReportTestRows.Create(1)));
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
         var job = CreateJob(provider);
         var execution = new SchemataJobExecution {
             State = ExecutionState.Running,
@@ -164,7 +180,7 @@ public class ReportGenerationJobShould
     [Fact]
     public async Task Job_From_ArgsJson_Marks_Snapshot_ImmediatePersisted() {
         var state = new ReportPersistenceState();
-        using var provider = ReportTestHost.Create(new(ReportTestRows.Create(1)), state);
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state);
         var job = CreateJob(provider);
 
         await job.ExecuteAsync(new JobContext {
@@ -179,7 +195,7 @@ public class ReportGenerationJobShould
     public async Task Job_From_Variable_Fire_Marks_Snapshot_Scheduled() {
         var state  = new ReportPersistenceState();
         var report = new SchemataReport { Name = "daily", CanonicalName = "reports/daily" };
-        using var provider = ReportTestHost.Create(new(ReportTestRows.Create(1)), state, report: report);
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: report);
         var job = CreateJob(provider);
 
         await job.ExecuteAsync(new JobContext {
@@ -194,19 +210,5 @@ public class ReportGenerationJobShould
         ServiceProvider provider
     ) {
         return new(provider.GetRequiredService<IServiceScopeFactory>(), provider.GetRequiredService<IOptions<SchemataReportOptions>>());
-    }
-
-    private sealed class CapturingReportService(ReportResult result) : IReportService
-    {
-        internal ReportRequest? Request { get; private set; }
-
-        public ValueTask<ReportResult> RunAsync(ReportRequest request, ClaimsPrincipal? principal = null, CancellationToken ct = default) {
-            Request = request;
-            return ValueTask.FromResult(result);
-        }
-
-        public ValueTask<Schemata.Abstractions.Resource.Operation> GenerateAsync(ReportRequest request, CancellationToken ct) {
-            throw new NotSupportedException();
-        }
     }
 }

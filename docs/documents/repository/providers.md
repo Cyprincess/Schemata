@@ -17,21 +17,20 @@ stays provider-agnostic.
 
 ## Registration
 
-Registration is two steps: register the repository type with `AddRepository`, then configure the
-underlying data library.
+Registration is two steps: register the repository for one entity with the closed-generic
+`AddRepository`, then configure the underlying data library.
 
 ```csharp
-services.AddRepository(typeof(EfCoreRepository<,>))
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseEntityFrameworkCore<AppDbContext>((sp, opts) => opts.UseSqlServer(connectionString));
 
-services.AddRepository(typeof(LinqToDbRepository<,>))
+services.AddRepository<Student, LinqToDbRepository<AppDataConnection, Student>>()
         .UseLinqToDb<AppDataConnection>((sp, opts) => opts.UseSQLite(connectionString));
 ```
 
-`AddRepository(Type)` validates that the type implements `IRepository<>`, registers it as an
-open-generic transient, and registers all built-in advisors with `TryAddEnumerable`. The closed-generic
-overload `AddRepository<TEntity, EfCoreRepository<TContext, TEntity>>()` registers one entity's
-repository.
+`AddRepository<TEntity, TImplementation>()` is the only registration overload: call it once per
+entity type. It registers the repository as a transient `IRepository<TEntity>` and all built-in
+advisors with `TryAddEnumerable`.
 
 ## Entity Framework Core provider
 
@@ -69,9 +68,12 @@ key value is already being tracked."
 
 A standalone `CommitAsync` flushes the implicit unit of work, which calls `SaveChangesAsync` and then
 dispatches `IRepositoryCommittedAdvisor<TEntity>`. A `DbUpdateConcurrencyException` from the guarded
-update is normalized to `AbortedException`. When enlisted, the repository commits through the unit
-of work, which buffers every enlisted repository's changes and persists them with one
-`SaveChangesAsync`.
+update is normalized to `AbortedException`. A unique-constraint violation surfaced by the provider
+(SQLite 1555/2067, SQL Server 2601/2627, PostgreSQL `23505`, MySQL 1062 — recognized through
+`DatabaseErrorClassifier.IsUniqueConstraintViolation`) is normalized to `AlreadyExistsException`
+carrying the entity type and, when the offending entry implements `ICanonicalName`, its canonical
+name. When enlisted, the repository commits through the unit of work, which buffers every enlisted
+repository's changes and persists them with one `SaveChangesAsync`.
 
 ## LinqToDB provider
 
@@ -79,8 +81,10 @@ of work, which buffers every enlisted repository's changes and persists them wit
 `TContext : DataConnection`. A repository creates its connection from a registered `Func<TContext>` and
 owns it until enlistment. `UseLinqToDb` also registers a metadata reader
 (`SystemComponentModelDataAnnotationsSchemaAttributeReader`) on the process-wide `MappingSchema.Default`,
-translating `System.ComponentModel.DataAnnotations.Schema` attributes and the EF Core class-level
-`[PrimaryKey]` into LinqToDB mapping attributes so a single set of annotations keys both providers.
+translating `System.ComponentModel.DataAnnotations.Schema` attributes and Schemata's class-level
+`[PrimaryKey]` (`Schemata.Abstractions.Entities`) into LinqToDB mapping attributes so a single set of
+annotations keys both providers. `[Index]` is parsed but not emitted — LinqToDB mapping has no index
+concept, so create indexes through the application's schema-management path.
 
 ### Table name resolution
 
@@ -101,10 +105,19 @@ of work's `Context`.
 
 ### Commit
 
-`CommitAsync` commits the transaction and dispatches committed advisors. On a commit failure it runs the
+`CommitAsync` commits the transaction and dispatches committed advisors. A unique-constraint violation
+recognized by `DatabaseErrorClassifier.IsUniqueConstraintViolation` is normalized to a bare
+`AlreadyExistsException` (no canonical name is attached). On a commit failure it runs the
 rollback sinks and disposes the transaction. Rollback during commit-failure or disposal cleanup is
 swallowed so it does not mask the original error; when an `ILogger` is registered, the swallowed failure
 is logged at warning level.
+
+### EstimateCountAsync
+
+`LinqToDbRepository` overrides `EstimateCountAsync` per backend: PostgreSQL and MySQL/MariaDB read the
+optimizer's `EXPLAIN` estimate, SQL Server sums `sys.partitions` rows, and SQLite reads `sqlite_stat1`.
+The two metadata paths apply only when the predicate has no `Where`. Unrecognized backends and
+estimation failures fall back to the exact `LongCountAsync` passthrough.
 
 ## Provider comparison
 
@@ -116,6 +129,8 @@ is logged at warning level.
 | Read-your-own-writes before commit | No                                                  | Yes                                                   |
 | `UpdateAsync`                      | Detach, `Context.Update`, bump token                | `UpdateOptimisticAsync` or `UpdateAsync`              |
 | Concurrency on update              | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
+| Unique-constraint violation        | `AlreadyExistsException` with type + canonical name | bare `AlreadyExistsException`                         |
+| `EstimateCountAsync`               | exact (`LongCountAsync` passthrough)                | per-backend estimate, exact fallback                  |
 
 ## Extension points
 

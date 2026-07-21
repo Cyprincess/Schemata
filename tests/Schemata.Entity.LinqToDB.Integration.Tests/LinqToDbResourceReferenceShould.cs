@@ -11,7 +11,6 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Xunit;
-using PrimaryKeyAttribute = Microsoft.EntityFrameworkCore.PrimaryKeyAttribute;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
 namespace Schemata.Entity.LinqToDB.Integration.Tests;
@@ -308,7 +307,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     #region Nested type: Book
 
     [Table("rr_books")]
-    [PrimaryKey(nameof(Uid))]
+    [Abstractions.Entities.PrimaryKey(nameof(Uid))]
     public sealed class Book : IIdentifier, ICanonicalName
     {
         public Dictionary<string, string>?  Metadata    { get; set; }
@@ -339,7 +338,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     #region Nested type: Review
 
     [Table("rr_reviews")]
-    [PrimaryKey(nameof(Uid))]
+    [Abstractions.Entities.PrimaryKey(nameof(Uid))]
     public sealed class Review : IIdentifier
     {
         [ResourceReference(typeof(Book))]

@@ -41,7 +41,7 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
             : null;
 
         var filter = PurgeFilter.Compile<TEntity>(_services, args?.Filter, args?.Language);
-        var result = await ExecuteAsync(filter, args?.Force ?? false, ct);
+        var result = await ExecuteAsync(filter, args?.Parent, args?.Force ?? false, ct);
 
         if (context.Execution is { } execution) {
             execution.Output = JsonSerializer.Serialize(result, SchemataJson.Default);
@@ -52,10 +52,13 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
 
     private async Task<PurgeResponse> ExecuteAsync(
         Expression<Func<TEntity, bool>>? filter,
+        string?                          parent,
         bool                             force,
         CancellationToken                ct
     ) {
         var repository = _services.GetRequiredService<IRepository<TEntity>>();
+        var container  = new ResourceRequestContainer<TEntity>();
+        ResourceIdentifiers.ApplyParent(container, parent);
 
         var result = new PurgeResponse();
         using (repository.SuppressQuerySoftDelete()) {
@@ -87,7 +90,7 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
         return result;
 
         IQueryable<TEntity> Query(IQueryable<TEntity> q) {
-            var eligible = q.Where(row => row.DeleteTime != null);
+            var eligible = container.Query(q.Where(row => row.DeleteTime != null));
             return filter is null ? eligible : eligible.Where(filter);
         }
     }

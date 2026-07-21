@@ -4,9 +4,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -14,16 +11,13 @@ using Schemata.Insight.Foundation.Features;
 using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Foundation.Internal;
 using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Report.Foundation.Features;
 
-/// <summary>Registers Report options, fail-fast checks, and the Report resource surface.</summary>
+/// <summary>Registers Report options, fail-fast checks, and the transport-neutral Report services.</summary>
 [DependsOn<SchemataInsightFeature>]
-[DependsOn<SchemataResourceFeature>]
 public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureBase
     where TReport : SchemataReport, new()
     where TSnapshot : SchemataReportSnapshot, new()
@@ -46,19 +40,16 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
         ValidateResourceNames();
         EnsureSingleRegistration(services);
         RegisterInfrastructure(services);
-        RegisterResources(schemata, services);
     }
 
     private static void RegisterInfrastructure(IServiceCollection services) {
         services.Configure<SchemataReportOptions>(_ => { });
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ReportRepositoryStartupCheck<TReport, TSnapshot, TChunk>>());
+        services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ReportExecutionContext>();
 
-        // Shared transport-neutral handlers; HTTP and gRPC only compose their endpoint features.
         services.TryAddScoped<GenerateHandler<TReport>>();
         services.TryAddScoped<ReadSnapshotHandler<TSnapshot>>();
 
-        services.TryAddScoped<IReportMaterializer, DefaultReportMaterializer>();
         services.TryAddSingleton<ReportRetentionEnforcer<TSnapshot, TChunk>>();
         services.TryAddScoped<ReportSnapshotWriter<TReport, TSnapshot, TChunk>>();
         services.TryAddScoped<IReportSnapshotStore, DefaultReportSnapshotStore<TSnapshot, TChunk>>();
@@ -68,25 +59,6 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
         services.TryAddSingleton<IReportDefinitionStore, CompositeReportDefinitionStore>();
         services.AddScheduledJob<ReportGenerationJob<TReport, TSnapshot, TChunk>>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IScheduledJobKeyResolver, ReportJobKeyResolver<TReport, TSnapshot, TChunk>>());
-    }
-
-    private static void RegisterResources(SchemataOptions schemata, IServiceCollection services) {
-        var resources = new SchemataResourceBuilder(schemata, services);
-        resources.Use<TReport, TReport, TReport, TReport>(
-            null,
-            resource => resource.Methods = [
-                new(Verbs.Generate, typeof(GenerateHandler<TReport>), ResourceMethodScope.Collection),
-            ]);
-        resources.Use<TSnapshot, TSnapshot, TSnapshot, TSnapshot>(
-            null,
-            resource => {
-                resource.Operations = [Operations.List, Operations.Get];
-                resource.Methods = [
-                    new(Verbs.Read, typeof(ReadSnapshotHandler<TSnapshot>)) {
-                        Method = ResourceHttpMethod.Get,
-                    },
-                ];
-            });
     }
 
     private static void EnsureSingleRegistration(IServiceCollection services) {

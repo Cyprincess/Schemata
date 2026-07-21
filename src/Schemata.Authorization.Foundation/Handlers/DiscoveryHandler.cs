@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -93,7 +96,6 @@ public sealed class DiscoveryHandler<TScope>(
     /// <summary>
     ///     Returns a JSON Web Key Set containing the public key
     ///     material needed to verify tokens issued by this OP.
-    ///     Private key components are stripped before publication.
     ///     Symmetric keys result in an empty <c>keys</c> array because they
     ///     cannot be disclosed publicly,
     ///     per
@@ -103,55 +105,159 @@ public sealed class DiscoveryHandler<TScope>(
     ///     </seealso>
     ///     .
     /// </summary>
+    /// <remarks>
+    ///     Conversion is public-key-first: a fresh <see cref="SecurityKey" /> holding only public
+    ///     parameters is built from the configured key and only that copy is passed to
+    ///     <see cref="JsonWebKeyConverter" />, so private material can never reach the wire even if
+    ///     converter support is extended to further key types later.
+    ///     <see cref="RsaSecurityKey" />, <see cref="ECDsaSecurityKey" />, and
+    ///     <see cref="X509SecurityKey" /> are supported; every other key type fails closed with
+    ///     <see cref="NotSupportedException" />. A <see cref="JsonWebKey" /> supplied as the signing
+    ///     key is rejected the same way, since it may carry private parameters.
+    ///     X.509 entries publish only the leaf certificate in <c>x5c</c> and its SHA-256 thumbprint
+    ///     under <c>x5t#S256</c>; the SHA-1 <c>x5t</c> member is not emitted,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html#section-4.9">
+    ///         RFC 7517: JSON Web Key (JWK) §4.9: "x5t#S256" (X.509 Certificate SHA-256 Thumbprint)
+    ///         Parameter
+    ///     </seealso>
+    ///     .
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">No signing key is configured.</exception>
+    /// <exception cref="NotSupportedException">The configured signing key type is not publishable.</exception>
     public AuthorizationResult GetJwks() {
-        if (options.Value.SigningKey is null) {
+        var key = options.Value.SigningKey;
+
+        if (key is null) {
             throw new InvalidOperationException(
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing key")
             );
         }
 
-        // symmetric keys MUST NOT appear in a public JWKS.
+        // Symmetric keys MUST NOT appear in a public JWKS.
         // See RFC 7517 §4.2.
-        if (options.Value.SigningKey is SymmetricSecurityKey) {
+        if (key is SymmetricSecurityKey) {
             return AuthorizationResult.Content(new Dictionary<string, object> {
                 ["keys"] = Array.Empty<object>(),
             });
         }
 
-        var jwk = JsonWebKeyConverter.ConvertFromSecurityKey(options.Value.SigningKey);
+        var publicKey = key switch {
+            RsaSecurityKey rsa     => CreatePublicKey(rsa),
+            ECDsaSecurityKey ecdsa => CreatePublicKey(ecdsa),
+            X509SecurityKey x509   => CreatePublicKey(x509),
+            _ => throw new NotSupportedException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), key.GetType().Name)
+            ),
+        };
+
+        var jwk = JsonWebKeyConverter.ConvertFromSecurityKey(publicKey);
+        jwk.Kid = key.KeyId;
         jwk.Use = "sig";
         jwk.Alg = options.Value.SigningAlgorithm!;
 
-        // Strip private key material
-        jwk.D  = null;
-        jwk.P  = null;
-        jwk.Q  = null;
-        jwk.DP = null;
-        jwk.DQ = null;
-        jwk.QI = null;
-        jwk.K  = null;
-
-        var entry = new Dictionary<string, string?> {
-            [JsonWebKeyParameterNames.Kty] = jwk.Kty,
-            [JsonWebKeyParameterNames.Use] = jwk.Use,
-            [JsonWebKeyParameterNames.Alg] = jwk.Alg,
-            [JsonWebKeyParameterNames.Kid] = jwk.Kid,
+        var entry = new JwkEntry {
+            Kty = jwk.Kty,
+            Use = jwk.Use,
+            Alg = jwk.Alg,
+            Kid = jwk.Kid,
+            N   = jwk.N,
+            E   = jwk.E,
+            Crv = jwk.Crv,
+            X   = jwk.X,
+            Y   = jwk.Y,
         };
 
-        switch (options.Value.SigningKey) {
-            case RsaSecurityKey:
-                entry[JsonWebKeyParameterNames.N] = jwk.N;
-                entry[JsonWebKeyParameterNames.E] = jwk.E;
-                break;
-            case ECDsaSecurityKey:
-                entry[JsonWebKeyParameterNames.Crv] = jwk.Crv;
-                entry[JsonWebKeyParameterNames.X]   = jwk.X;
-                entry[JsonWebKeyParameterNames.Y]   = jwk.Y;
-                break;
+        if (key is X509SecurityKey x509Key) {
+            var der = x509Key.Certificate.RawData;
+            entry.X5c     = [Convert.ToBase64String(der)];
+            entry.X5tS256 = Base64UrlEncoder.Encode(SHA256.HashData(der));
         }
 
         return AuthorizationResult.Content(new Dictionary<string, object> {
             ["keys"] = new[] { entry },
         });
+    }
+
+    private static RsaSecurityKey CreatePublicKey(RsaSecurityKey key) {
+        var parameters = key.Rsa is { } rsa
+            ? rsa.ExportParameters(false)
+            : new RSAParameters { Modulus = key.Parameters.Modulus, Exponent = key.Parameters.Exponent };
+
+        return new(parameters);
+    }
+
+    private static ECDsaSecurityKey CreatePublicKey(ECDsaSecurityKey key) {
+        return new(ECDsa.Create(key.ECDsa.ExportParameters(false)));
+    }
+
+    private static SecurityKey CreatePublicKey(X509SecurityKey key) {
+        var certificate = key.Certificate;
+
+        if (certificate.GetRSAPublicKey() is { } rsa) {
+            return new RsaSecurityKey(rsa.ExportParameters(false));
+        }
+
+        if (certificate.GetECDsaPublicKey() is { } ecdsa) {
+            return new ECDsaSecurityKey(ECDsa.Create(ecdsa.ExportParameters(false)));
+        }
+
+        throw new NotSupportedException(
+            string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), "Certificate public key algorithm")
+        );
+    }
+
+    /// <summary>
+    ///     Wire DTO for a single JWKS entry. <see cref="JsonPropertyNameAttribute" /> pins the
+    ///     RFC 7517 member names against any configured naming policy, and the
+    ///     <see cref="JsonIgnoreAttribute" /> conditions pin member presence: metadata members
+    ///     always serialize (nulls included), while key-material and certificate members serialize
+    ///     only when populated.
+    /// </summary>
+    private sealed class JwkEntry
+    {
+        [JsonPropertyName(JsonWebKeyParameterNames.Kty)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public string? Kty { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.Use)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public string? Use { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.Alg)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public string? Alg { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.Kid)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public string? Kid { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.N)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? N { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.E)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? E { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.Crv)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Crv { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.X)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? X { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.Y)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Y { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.X5c)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? X5c { get; set; }
+
+        [JsonPropertyName(JsonWebKeyParameterNames.X5tS256)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? X5tS256 { get; set; }
     }
 }

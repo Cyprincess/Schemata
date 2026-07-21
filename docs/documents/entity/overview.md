@@ -17,6 +17,8 @@ Two opt-in packages extend the entity layer with the same advisor pattern: `Sche
 | ---------------------------- | -------------------------------------------------------------- |
 | Trait interfaces             | `src/Schemata.Abstractions/Entities/`                          |
 | `CanonicalNameAttribute`     | `src/Schemata.Abstractions/Entities/CanonicalNameAttribute.cs` |
+| `PrimaryKeyAttribute`        | `src/Schemata.Abstractions/Entities/PrimaryKeyAttribute.cs`    |
+| `IndexAttribute`             | `src/Schemata.Abstractions/Entities/IndexAttribute.cs`         |
 | Built-in repository advisors | `src/Schemata.Entity.Repository/Advisors/`                     |
 | Key resolution               | `src/Schemata.Entity.Repository/RepositoryBase.cs`             |
 
@@ -33,7 +35,6 @@ time without touching the entity. The full trait-to-advisor mapping, with order 
 An entity with timestamps, soft-delete, and a canonical name:
 
 ```csharp
-using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 [PrimaryKey(nameof(Uid))]
@@ -50,21 +51,42 @@ public class Book : IIdentifier, ITimestamp, ISoftDelete, ICanonicalName
 }
 ```
 
-Traits need no registration. `services.AddRepository(typeof(EfCoreRepository<,>))` registers the
-built-in advisors as open-generic scoped services, so any entity implementing a trait receives the
+Traits need no registration. `services.AddRepository<Book, EfCoreRepository<AppDbContext, Book>>()`
+registers the built-in advisors as scoped services, so any entity implementing a trait receives the
 matching behavior.
 
 ## Primary key convention
 
 `Schemata.Entity.Repository.RepositoryBase.ResolveKeyProperties` resolves keys in two steps:
 
-1. Read the class-level `[PrimaryKey(nameof(A), nameof(B))]` attribute (EF Core 7+). The named
-   properties become the key, in declaration order.
+1. Read the class-level `[PrimaryKey(nameof(A), nameof(B))]` attribute
+   (`Schemata.Abstractions.Entities.PrimaryKeyAttribute`). The attribute's `Properties` become the
+   key, in declaration order.
 2. Fall back to the `IIdentifier.Uid` property when no attribute resolves.
 
 `IIdentifier` uses `Guid` for AIP alignment and to support client-assigned inserts without a database
 sequence. `Schemata.Entity.LinqToDB` recognizes the same class-level `[PrimaryKey]` through its
-metadata reader, so a single declaration keys both providers.
+metadata reader, so a single declaration keys both providers. The attribute lives in
+`Schemata.Abstractions` rather than any ORM package, so the contract layer stays provider-neutral.
+Both providers alias it where a same-named ORM attribute is in scope; in application code
+`using Schemata.Abstractions.Entities;` is enough.
+
+## Index declaration
+
+`[Index(nameof(A), nameof(B), IsUnique = true)]`
+(`Schemata.Abstractions.Entities.IndexAttribute`) declares a secondary index over one or more
+properties. It is class-level and `AllowMultiple`, so repeat it per index:
+
+```csharp
+[PrimaryKey(nameof(Uid))]
+[Index(nameof(Email), IsUnique = true)]
+[Index(nameof(LastName), nameof(FirstName))]
+public class Student : IIdentifier { /* ... */ }
+```
+
+EF Core emits the declared indexes through `SchemataModelCustomizer`. LINQ to DB parses `[Index]`
+but does not emit it (its mapping metadata has no index equivalent); create those indexes through
+the application's schema-management path. Both providers honor `[PrimaryKey]` for key mapping.
 
 ## Trait composition
 

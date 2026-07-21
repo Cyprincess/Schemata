@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

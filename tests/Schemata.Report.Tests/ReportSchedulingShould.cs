@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Security.Claims;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +25,7 @@ public class ReportSchedulingShould
     public async Task Initializer_Arms_Periodic_Reports() {
         var scheduler = CreateScheduler();
         var initializer = new ReportSchedulingInitializer(
-            new StaticReportDefinitionStore([PeriodicReport("daily", "0 0 * * *")]),
+            CreateDefinitionStore(PeriodicReport("daily", "0 0 * * *")).Object,
             scheduler.Object);
 
         await initializer.StartAsync(CancellationToken.None);
@@ -38,12 +37,13 @@ public class ReportSchedulingShould
     public async Task Initializer_Arms_Both_Dsl_And_Db_Periodic_Reports() {
         var scheduler = CreateScheduler();
         var records = new List<SchemataReport> { PeriodicReport("database", "0 * * * *") };
+        var persistence = new ReportPersistenceState();
         var services = new ServiceCollection();
         var reports = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             new SchemataOptions(),
             services);
         reports.Define("dsl", definition => definition.Periodic(cron: "0 0 * * *"));
-        services.AddScoped<IRepository<SchemataReport>>(_ => new ReportTestRepository<SchemataReport>(records));
+        services.AddScoped<IRepository<SchemataReport>>(_ => persistence.CreateRepository(records));
         AddDefinitionSource<ConfigurationReportDefinitionStore>(services);
         AddDefinitionSource<DatabaseReportDefinitionStore<SchemataReport>>(services);
         services.AddSingleton<IReportDefinitionStore, CompositeReportDefinitionStore>();
@@ -62,7 +62,7 @@ public class ReportSchedulingShould
     public async Task Non_Periodic_Reports_Not_Armed() {
         var scheduler = CreateScheduler();
         var initializer = new ReportSchedulingInitializer(
-            new StaticReportDefinitionStore([new() { Name = "manual", Periodic = false }]),
+            CreateDefinitionStore(new SchemataReport { Name = "manual", Periodic = false }).Object,
             scheduler.Object);
 
         await initializer.StartAsync(CancellationToken.None);
@@ -86,7 +86,7 @@ public class ReportSchedulingShould
         };
 
         var result = await advisor.AdviseAsync(
-            new(new ReportTestServiceProvider()),
+            new(EmptyServices()),
             Mock.Of<IRepository<SchemataReport>>(),
             changes,
             CancellationToken.None);
@@ -104,7 +104,7 @@ public class ReportSchedulingShould
         var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object);
 
         await advisor.AdviseAsync(
-            new(new ReportTestServiceProvider()),
+            new(EmptyServices()),
             Mock.Of<IRepository<SchemataReport>>(),
             new() { Removed = [PeriodicReport("daily", "0 0 * * *")] },
             CancellationToken.None);
@@ -120,10 +120,10 @@ public class ReportSchedulingShould
 
     [Fact]
     public async Task Fire_Invokes_Generation_For_Named_Report() {
-        var service = new CapturingReportService();
+        var service = ReportTestHost.CreateReportService(new());
         using var provider = ReportTestHost.Create(
-            new ReportMaterializerProbe(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton<IReportService>(service));
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            configure: services => services.AddSingleton(service.Object));
         var job = new ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             provider.GetRequiredService<IServiceScopeFactory>(),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SchemataReportOptions>>());
@@ -132,19 +132,23 @@ public class ReportSchedulingShould
             Variables = new Dictionary<string, string?> { ["report"] = "daily" },
         }, CancellationToken.None);
 
-        Assert.Equal("daily", service.Request!.Name);
-        Assert.True(service.Request.Persist);
+        service.Verify(
+            value => value.RunAsync(
+                It.Is<ReportRequest>(request => request.Name == "daily" && request.Persist),
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task Missing_CronExpression_Throws_Clear_Error() {
         var scheduler = CreateScheduler();
         var initializer = new ReportSchedulingInitializer(
-            new StaticReportDefinitionStore([new() {
+            CreateDefinitionStore(new SchemataReport {
                 Name         = "daily",
                 Periodic     = true,
                 ScheduleKind = ReportScheduleKind.Cron,
-            }]),
+            }).Object,
             scheduler.Object);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => initializer.StartAsync(CancellationToken.None));
@@ -160,6 +164,12 @@ public class ReportSchedulingShould
                      It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
         return scheduler;
+    }
+
+    private static IServiceProvider EmptyServices() {
+        var services = new Mock<IServiceProvider>(MockBehavior.Strict);
+        services.Setup(value => value.GetService(It.IsAny<Type>())).Returns((object?)null);
+        return services.Object;
     }
 
     private static SchemataReport PeriodicReport(string name, string expression) {
@@ -192,35 +202,12 @@ public class ReportSchedulingShould
             times);
     }
 
-    private sealed class StaticReportDefinitionStore(IEnumerable<SchemataReport> reports) : IReportDefinitionStore
-    {
-        public ValueTask<(SchemataReport Report, QueryInsightRequest Query)?> ResolveAsync(string name, CancellationToken ct) {
-            return ValueTask.FromResult<(SchemataReport Report, QueryInsightRequest Query)?>(null);
-        }
-
-        public async IAsyncEnumerable<SchemataReport> ListPeriodicAsync([EnumeratorCancellation] CancellationToken ct) {
-            foreach (var report in reports) {
-                ct.ThrowIfCancellationRequested();
-                if (report.Periodic) {
-                    yield return report;
-                }
-
-                await Task.CompletedTask;
-            }
-        }
-    }
-
-    private sealed class CapturingReportService : IReportService
-    {
-        internal ReportRequest? Request { get; private set; }
-
-        public ValueTask<ReportResult> RunAsync(ReportRequest request, ClaimsPrincipal? principal = null, CancellationToken ct = default) {
-            Request = request;
-            return ValueTask.FromResult(new ReportResult());
-        }
-
-        public ValueTask<Schemata.Abstractions.Resource.Operation> GenerateAsync(ReportRequest request, CancellationToken ct) {
-            throw new NotSupportedException();
-        }
+    private static Mock<IReportDefinitionStore> CreateDefinitionStore(params SchemataReport[] reports) {
+        var store = new Mock<IReportDefinitionStore>(MockBehavior.Strict);
+        store.Setup(value => value.ResolveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns(ValueTask.FromResult<(SchemataReport Report, QueryInsightRequest Query)?>(null));
+        store.Setup(value => value.ListPeriodicAsync(It.IsAny<CancellationToken>()))
+             .Returns((CancellationToken _) => ReportTestRows.ToAsync(reports.Where(report => report.Periodic)));
+        return store;
     }
 }

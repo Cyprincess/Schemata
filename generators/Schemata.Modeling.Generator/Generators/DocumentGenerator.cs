@@ -5,7 +5,7 @@ using Schemata.Modeling.Generator.Expressions;
 // ReSharper disable once CheckNamespace
 namespace Schemata.Modeling.Generator;
 
-public static class DocumentGenerator
+internal static class DocumentGenerator
 {
     public static void Generate(SourceProductionContext spc, Document doc) {
         GenerateEnums(spc, doc);

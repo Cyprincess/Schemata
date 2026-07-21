@@ -21,6 +21,16 @@ namespace Schemata.Caching.Distributed;
 ///         deployments. Multi-process deployments sharing the same backend remain subject
 ///         to the race condition documented in <see cref="IndexLocks" />.
 ///     </para>
+///     <para>
+///         The atomic operations <see cref="TryAddAsync" />, <see cref="TryReplaceAsync" />, and
+///         <see cref="TryRemoveAsync" /> use the same striped lock to make their check-then-act cycle
+///         atomic within a single process. Because <see cref="IDistributedCache" /> offers no native
+///         compare-and-swap, deployments running multiple application instances against one shared
+///         backend cannot rely on cross-process atomicity: concurrent instances can interleave, so the
+///         idempotency guarantees built on these operations degrade to best-effort. Use a provider with
+///         native compare-and-swap (for example the Redis-backed implementation) when cross-process
+///         atomicity is required.
+///     </para>
 /// </remarks>
 public sealed class DistributedCacheProvider : ICacheProvider
 {
@@ -48,27 +58,75 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
     }
 
-    public Task<bool> TryAddAsync(
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The insert-if-absent check-then-act is serialized by a striped in-process lock
+    ///     (<see cref="IndexLocks" />), so it is atomic only within a single process. The backing
+    ///     <see cref="IDistributedCache" /> exposes no compare-and-swap primitive; across multiple
+    ///     application instances sharing one backend the guarantee degrades to best-effort. See the
+    ///     type-level remarks on <see cref="DistributedCacheProvider" />.
+    /// </remarks>
+    public async Task<bool> TryAddAsync(
         string            key,
         byte[]            value,
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
-        throw new NotSupportedException("Atomic try-add is not supported over IDistributedCache.");
+        using var _ = await IndexLocks.AcquireAsync(key, ct);
+
+        var current = await _cache.GetAsync(key, ct);
+        if (current is not null) {
+            return false;
+        }
+
+        await _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
+        return true;
     }
 
-    public Task<bool> TryReplaceAsync(
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The compare-and-swap is serialized by a striped in-process lock (<see cref="IndexLocks" />),
+    ///     so it is atomic only within a single process. The backing <see cref="IDistributedCache" />
+    ///     exposes no compare-and-swap primitive; across multiple application instances sharing one
+    ///     backend the guarantee degrades to best-effort. See the type-level remarks on
+    ///     <see cref="DistributedCacheProvider" />.
+    /// </remarks>
+    public async Task<bool> TryReplaceAsync(
         string            key,
         byte[]            expected,
         byte[]            replacement,
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
-        throw new NotSupportedException("Atomic compare-and-swap is not supported over IDistributedCache");
+        using var _ = await IndexLocks.AcquireAsync(key, ct);
+
+        var current = await _cache.GetAsync(key, ct);
+        if (!BytesEqual(current, expected)) {
+            return false;
+        }
+
+        await _cache.SetAsync(key, replacement, ToDistributedOptions(options), ct);
+        return true;
     }
 
-    public Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
-        throw new NotSupportedException("Atomic compare-and-delete is not supported over IDistributedCache.");
+    /// <inheritdoc />
+    /// <remarks>
+    ///     The compare-and-delete is serialized by a striped in-process lock (<see cref="IndexLocks" />),
+    ///     so it is atomic only within a single process. The backing <see cref="IDistributedCache" />
+    ///     exposes no compare-and-swap primitive; across multiple application instances sharing one
+    ///     backend the guarantee degrades to best-effort. See the type-level remarks on
+    ///     <see cref="DistributedCacheProvider" />.
+    /// </remarks>
+    public async Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
+        using var _ = await IndexLocks.AcquireAsync(key, ct);
+
+        var current = await _cache.GetAsync(key, ct);
+        if (!BytesEqual(current, expected)) {
+            return false;
+        }
+
+        await _cache.RemoveAsync(key, ct);
+        return true;
     }
 
     public Task RemoveAsync(string key, CancellationToken ct = default) { return _cache.RemoveAsync(key, ct); }
@@ -177,6 +235,10 @@ public sealed class DistributedCacheProvider : ICacheProvider
         }
 
         return result;
+    }
+
+    private static bool BytesEqual(byte[]? current, byte[] expected) {
+        return current is not null && current.AsSpan().SequenceEqual(expected);
     }
 
     #region Nested type: SetPayload

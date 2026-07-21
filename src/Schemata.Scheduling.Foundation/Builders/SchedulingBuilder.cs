@@ -23,7 +23,7 @@ public sealed class SchedulingBuilder
     }
 
     private SchemataOptions Schemata { get; }
-    
+
     /// <summary>Service collection that receives job registrations and scheduler options.</summary>
     public IServiceCollection Services { get; }
 

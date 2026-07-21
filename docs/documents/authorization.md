@@ -162,7 +162,9 @@ ct)` for cleanup.
 ## Background jobs
 
 Token cleanup runs through the Scheduling job model. The core feature registers
-`TokenCleanupJob<TToken>` and adds a `JobRegistration` to `SchemataSchedulingOptions.Jobs` with a
+`TokenCleanupJob<TToken>` through `services.AddScheduledJob<TokenCleanupJob<TToken>>()` (transient
+registration plus a known-only job entry) and adds a `JobRegistration` to
+`SchemataSchedulingOptions.Jobs` with a
 `CronSchedule("0 * * * *")` — hourly at minute 0. The job calls
 `ITokenManager<TToken>.PruneAsync`. This needs `SchemataSchedulingFeature` and the `TToken`
 repository registered.
@@ -177,9 +179,11 @@ there is no cron schedule on it.
 `Schemata.Authorization.Identity` connects the authorization server to ASP.NET Core Identity. It is
 not automatic — you opt in by calling `.UseIdentity()` on the `SchemataAuthorizationBuilder`, which
 adds `SchemataAuthorizationIdentityFeature` (`Priority = Orders.Extension + 50_100_000 =
-450_100_000`). The feature uses string-based `[DependsOn]` attributes naming
-`SchemataAuthorizationFeature`4` and `SchemataIdentityFeature`4` (it cannot reference the open
-generics directly across assemblies). At configure time it discovers the registered user type from
+450_100_000`). The feature declares `[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]` and
+`[DependsOn(typeof(SchemataIdentityFeature<,,,>))]` — open-generic type references that match any
+closed instantiation. The package references `Schemata.Identity.Foundation` (not
+`Schemata.Identity.Skeleton`) so the feature types are reachable. At configure time it discovers the
+registered user type from
 the `IUserValidator<>` descriptor, registers `IdentitySubjectProvider<TUser>` as `ISubjectProvider`,
 and adds `AdviceClaimsSubject` to the `IClaimsAdvisor` chain. `IdentitySubjectProvider` projects
 `sub`, `preferred_username`, `email` (+`email_verified`), `phone_number` (+`phone_number_verified`),

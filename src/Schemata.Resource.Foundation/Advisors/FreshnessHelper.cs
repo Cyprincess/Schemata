@@ -1,4 +1,5 @@
 using System;
+using Microsoft.AspNetCore.WebUtilities;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 
@@ -30,7 +31,7 @@ internal static class FreshnessHelper
             return false;
         }
 
-        tag = $"W/\"{concurrency.Timestamp.ToByteArray().ToBase64UrlString()}\"";
+        tag = $"W/\"{WebEncoders.Base64UrlEncode(concurrency.Timestamp.ToByteArray())}\"";
 
         return true;
     }

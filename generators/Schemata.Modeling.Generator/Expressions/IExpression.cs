@@ -2,4 +2,4 @@ using System;
 
 namespace Schemata.Modeling.Generator.Expressions;
 
-public interface IExpression : IEquatable<IExpression>;
+internal interface IExpression : IEquatable<IExpression>;

@@ -36,22 +36,7 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
     #endregion
 
     private static bool IsAdvisorCandidate(SyntaxNode node) {
-        if (node is not InterfaceDeclarationSyntax iface) {
-            return false;
-        }
-
-        if (iface.BaseList is null) {
-            return false;
-        }
-
-        foreach (var baseType in iface.BaseList.Types) {
-            var text = baseType.Type.ToString();
-            if (text.Contains("IAdvisor")) {
-                return true;
-            }
-        }
-
-        return false;
+        return node is InterfaceDeclarationSyntax { BaseList: not null };
     }
 
     private static AdvisorInterfaceInfo? GetAdvisorInfo(GeneratorSyntaxContext ctx) {
@@ -60,9 +45,14 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
             return null;
         }
 
+        var advisorDefinition = ctx.SemanticModel.Compilation.GetTypeByMetadataName("Schemata.Abstractions.Advisors.IAdvisor");
+        if (advisorDefinition is null) {
+            return null;
+        }
+
         INamedTypeSymbol? advisorInterface = null;
         foreach (var ai in symbol.AllInterfaces) {
-            if (ai.OriginalDefinition.Name != "IAdvisor" || !ai.IsGenericType) {
+            if (!IsAdvisorInterface(ai, advisorDefinition)) {
                 continue;
             }
 
@@ -71,7 +61,7 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
         }
 
         foreach (var directBase in symbol.Interfaces) {
-            if (directBase.OriginalDefinition.Name != "IAdvisor" || !directBase.IsGenericType) {
+            if (!IsAdvisorInterface(directBase, advisorDefinition)) {
                 continue;
             }
 
@@ -167,6 +157,11 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
         result.RunMethodArguments.AddRange(callArgs);
 
         return result;
+    }
+
+    private static bool IsAdvisorInterface(INamedTypeSymbol type, INamedTypeSymbol advisorDefinition) {
+        return type.IsGenericType
+            && type.OriginalDefinition.Interfaces.Any(baseType => SymbolEqualityComparer.Default.Equals(baseType, advisorDefinition));
     }
 
     private static string ResolveTypeArgDisplay(

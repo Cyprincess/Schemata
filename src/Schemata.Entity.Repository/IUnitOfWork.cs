@@ -20,6 +20,18 @@ namespace Schemata.Entity.Repository;
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
     /// <summary>
+    ///     Registers a callback that runs after the unit of work commits its transaction.
+    /// </summary>
+    /// <param name="sink">The post-commit callback.</param>
+    void AddCommitSink(Func<CancellationToken, Task> sink);
+
+    /// <summary>
+    ///     Registers a callback that runs when the unit of work rolls back or is disposed before completion.
+    /// </summary>
+    /// <param name="reset">The rollback callback.</param>
+    void AddRollbackSink(Action reset);
+
+    /// <summary>
     ///     Commits all pending changes and the database transaction, then notifies
     ///     enlisted repositories to dispatch their
     ///     <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipelines.

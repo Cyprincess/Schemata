@@ -41,7 +41,7 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
         if (context.Source is not null) {
             record.SourceType    = context.Source.GetType().FullName;
             record.Source = context.Source is ICanonicalName named ? named.CanonicalName : null;
-            record.SourceTimestamp     = context.Source is IConcurrency stamped ? stamped.Timestamp : null; 
+            record.SourceTimestamp     = context.Source is IConcurrency stamped ? stamped.Timestamp : null;
         }
 
         context.Record = record;

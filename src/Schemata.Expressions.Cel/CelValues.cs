@@ -46,7 +46,11 @@ public static class CelValues
     public static object? PredicateResult(object? value) { return value is true; }
 
     public static object? ConditionalError(object? value) {
-        return value as CelError ?? Error("no matching overload");
+        if (value is CelError error) {
+            return error;
+        }
+
+        return Error("no matching overload");
     }
 
     public static object? Has(object? value) {
