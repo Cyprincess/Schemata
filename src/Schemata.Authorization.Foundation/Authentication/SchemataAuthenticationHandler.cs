@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -160,20 +161,20 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         TimeProvider          time,
         CancellationToken     ct
     ) {
-        var jti = Identifiers.NewUid().ToString("n");
-        claims.Add(new(Claims.JwtId, jti));
+        var jti         = Identifiers.NewUid().ToString("n");
+        var tokenClaims = new List<Claim>(claims) { new(Claims.JwtId, jti) };
 
         string value;
         string reference;
 
         switch (format) {
             case TokenFormats.Jwt:
-                value     = token.CreateToken(claims, lifetime);
+                value     = token.CreateToken(tokenClaims, lifetime);
                 reference = value;
                 break;
 
             case TokenFormats.Jwe:
-                value     = token.CreateToken(claims, lifetime, true);
+                value     = token.CreateToken(tokenClaims, lifetime, true);
                 reference = value;
                 break;
 
@@ -184,7 +185,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 break;
         }
 
-        var payload = format == TokenFormats.Reference ? token.CreateToken(claims, lifetime) : value;
+        var payload = format == TokenFormats.Reference ? token.CreateToken(tokenClaims, lifetime) : value;
 
         var now = time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
@@ -324,7 +325,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         var access = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.AccessToken)).ToList();
         var id     = claims.Where(c => c.Properties.ContainsKey(ClaimDestinations.IdentityToken)).ToList();
 
-        var at = await CreateTokenAsync(tokens, issuer, access, config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken, @internal, app, authorizationName, sid, _time, ct);
+        var at = await CreateTokenAsync(
+            tokens, issuer, access,
+            config.Value.AccessTokenFormat, config.Value.AccessTokenLifetime, TokenTypes.AccessToken,
+            @internal, app, authorizationName, sid, _time, ct);
 
         var response = new TokenResponse {
             AccessToken = at,
@@ -334,7 +338,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         };
 
         if (ShouldIssueRefreshToken(items)) {
-            response.RefreshToken = await CreateTokenAsync(tokens, issuer, [..access], config.Value.RefreshTokenFormat, config.Value.RefreshTokenLifetime, TokenTypes.RefreshToken, @internal, app, authorizationName, sid, _time, ct);
+            response.RefreshToken = await CreateTokenAsync(
+                tokens, issuer, [..access],
+                config.Value.RefreshTokenFormat, config.Value.RefreshTokenLifetime, TokenTypes.RefreshToken,
+                @internal, app, authorizationName, sid, _time, ct);
         }
 
         // OIDC Core §3.1.3.7: ID tokens are only returned when openid is in scope

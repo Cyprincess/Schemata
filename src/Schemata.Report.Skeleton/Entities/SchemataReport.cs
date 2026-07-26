@@ -10,6 +10,7 @@ namespace Schemata.Report.Skeleton;
 /// <summary>Persisted definition of an expression-backed or program-backed report.</summary>
 [CanonicalName("reports/{report}")]
 [DisplayName("Report")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataReport : IIdentifier, ICanonicalName, IDescriptive, ITimestamp, IConcurrency
 {
     /// <summary>JSON-serialized <see cref="QueryInsightRequest" /> definition for expression-backed reports.</summary>

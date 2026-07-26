@@ -11,7 +11,7 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceCodeExchangeValidation{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceCodeExchangeValidation{TApp,TToken}" />.</summary>
 public static class AdviceCodeExchangeValidation
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -30,9 +30,8 @@ public static class AdviceCodeExchangeValidation
 /// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Cross-checks the code against its stored payload: the code must be of type <c>authorization_code</c>,
-///     belong to the authenticated application, and not be expired or revoked. The application's ClientId is
-///     used for matching because <c>request.ClientId</c> is absent for <c>client_secret_basic</c> authentication
-///     (RFC 6749 §2.3.1).
+///     belong to the authenticated application, and not be expired or revoked. Application references use the
+///     application's canonical name because persisted tokens store canonical references.
 /// </remarks>
 /// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
 public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? time = null) : ICodeExchangeAdvisor<TApp, TToken>
@@ -57,7 +56,7 @@ public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? tim
             );
         }
 
-        if (exchange.CodeToken.Application != exchange.Application?.Name) {
+        if (exchange.CodeToken.Application != exchange.Application?.CanonicalName) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)

@@ -29,6 +29,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
                      a.Name = "auth-generated-name";
+                     a.CanonicalName = "authorizations/auth-generated-name";
                      return a;
                  });
 
@@ -42,9 +43,6 @@ public class AdviceAuthorizeAutoApproveSignInShould
         string clientId = "app-1"
     ) {
         var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
-        // ClientId, Name, and CanonicalName populate the AIP-122 trio: ClientId is the OAuth
-        // wire id, Name mirrors it as the SchemataApplication leaf, and CanonicalName is the
-        // full `applications/{client}` form that downstream stores SchemataAuthorization.Application.
         return new() {
             Application     = new() {
                 Uid           = Identifiers.NewUid(),
@@ -68,7 +66,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
 
         Assert.Equal(AdviseResult.Handle, result);
         Assert.True(ctx.TryGet<AuthorizationResult>(out var authResult));
-        Assert.Equal("auth-generated-name", authResult!.Properties![Properties.AuthorizationName]);
+        Assert.Equal("authorizations/auth-generated-name", authResult!.Properties![Properties.AuthorizationName]);
 
         var invocation = Assert.Single(authzMgr.Invocations,
                                        i => i.Method.Name == nameof(IAuthorizationManager<>.CreateAsync));

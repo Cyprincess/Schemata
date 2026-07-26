@@ -135,7 +135,7 @@ public class TokenService
     ///     audience validation is enforced.
     /// </summary>
     /// <param name="token">The JWT/JWE token string, or stored payload for reference tokens.</param>
-    /// <param name="audience">Expected audience (client ID); null disables audience validation.</param>
+    /// <param name="audience">Expected application canonical name; null disables audience validation.</param>
     /// <param name="lifetime">When <c>false</c>, expired tokens are still accepted (used for refresh token inspection).</param>
     public async Task<ClaimsPrincipal?> Validate(string? token, string? audience = null, bool lifetime = true) {
         if (string.IsNullOrWhiteSpace(token)) {

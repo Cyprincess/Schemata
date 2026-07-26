@@ -8,6 +8,7 @@ namespace Schemata.Report.Skeleton;
 /// <summary>Metadata header for a persisted report snapshot whose rows are stored in chunks.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}")]
 [DisplayName("Snapshot")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataReportSnapshot : IIdentifier, ICanonicalName, ITimestamp
 {
     /// <summary>Leaf identifier of the parent report.</summary>

@@ -109,7 +109,7 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             [Properties.State]               = authz.Request?.State,
             [Properties.CodeChallenge]       = authz.Request?.CodeChallenge,
             [Properties.CodeChallengeMethod] = authz.Request?.CodeChallengeMethod,
-            [Properties.AuthorizationName]   = authorization.Name,
+            [Properties.AuthorizationName]   = authorization.CanonicalName,
             [Properties.SessionId]           = sid,
             [Properties.MaxAge]              = authz.Request?.MaxAge,
             [Properties.AuthTime]            = at,

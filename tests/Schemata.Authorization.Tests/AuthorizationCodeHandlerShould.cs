@@ -59,7 +59,7 @@ public class AuthorizationCodeHandlerShould
             Status      = status,
             ExpireTime  = expireTime ?? Anchor.AddMinutes(5),
             Subject     = subject,
-            Application = clientId,
+            Application = $"applications/{clientId}",
             Payload     = JsonSerializer.Serialize(payload, JsonOptions),
         };
     }
@@ -82,7 +82,11 @@ public class AuthorizationCodeHandlerShould
     ) {
         var jsonOpts = Options.Create(JsonOptions);
         var codeOpts = Options.Create(new CodeFlowOptions());
-        var app      = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = TestClientId };
+        var app = new SchemataApplication {
+            Uid           = Identifiers.NewUid(),
+            ClientId      = TestClientId,
+            CanonicalName = $"applications/{TestClientId}",
+        };
 
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),

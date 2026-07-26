@@ -52,7 +52,7 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? tim
             );
         }
 
-        if (exchange.Token.Application != exchange.Application?.Name) {
+        if (exchange.Token.Application != exchange.Application?.CanonicalName) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)

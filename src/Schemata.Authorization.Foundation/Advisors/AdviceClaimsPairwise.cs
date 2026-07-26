@@ -35,7 +35,7 @@ public static class AdviceClaimsPairwise
 ///     The projection is delegated to <see cref="ISubjectIdentifierService" /> and applied only when
 ///     the sectored identifier or subject type requires it.
 /// </remarks>
-/// <seealso cref="AdviceClaimsAudience" />
+/// <seealso cref="AdviceClaimsAudience{TApp}" />
 public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
     where TApp : SchemataApplication
 {

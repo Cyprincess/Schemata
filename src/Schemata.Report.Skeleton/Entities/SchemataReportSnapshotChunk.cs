@@ -7,6 +7,7 @@ namespace Schemata.Report.Skeleton;
 /// <summary>Internal persisted row-data chunk belonging to a report snapshot.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}/chunks/{chunk}")]
 [DisplayName("Chunk")]
+[PrimaryKey(nameof(Uid))]
 public class SchemataReportSnapshotChunk : IIdentifier, ICanonicalName
 {
     /// <summary>Leaf identifier of the report that owns the containing snapshot.</summary>
