@@ -1,9 +1,11 @@
 # Scheduling gRPC Transport
 
 The scheduling gRPC transport exposes the scheduler's two persistent entities — `SchemataJob`
-(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources, plus three
-AIP-136 custom methods: `Run` on a job, `Cancel` and `Wait` on an execution. The transport
-inherits its service synthesis, routing, protobuf-net wire format, exception interceptor, and
+(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources. `Run` is an
+AIP-136 custom method on a job. `Cancel` and `Wait` are Schemata operation methods corresponding to
+`CancelOperation` and `WaitOperation` on `google.longrunning.Operations`; AIP-151 defines the
+`Operation` `name`, `metadata`, `done`, and `error` / `response` result shape. `WaitOperation` has no
+upstream HTTP binding. The transport inherits its service synthesis, routing, protobuf-net wire format, exception interceptor, and
 reflection from the Resource gRPC transport; this feature only registers the resources and their
 custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSchedulingGrpcFeature`
 (priority `SchemataSchedulingFeature.DefaultPriority + 300_000` = `470_300_000`).
@@ -60,7 +62,9 @@ identically across transports.
 
 ## Routing and method mapping
 
-The Resource gRPC transport names custom-method RPCs `{PascalVerb}{Singular}`:
+The Resource gRPC transport names custom-method RPCs `{PascalVerb}{Singular}` from the resource
+descriptor. This is a Schemata naming convention; AIP-136 specifies a verb followed by a noun and
+the colon convention for HTTP custom-method URIs.
 
 | Service            | RPC                                                             | Handler                  |
 | ------------------ | --------------------------------------------------------------- | ------------------------ |
@@ -80,7 +84,9 @@ not exposed. `RunJob` returns an `Operation` representing the queued execution; 
 summary, and `ListResultBase<TSummary>` to the shared `RuntimeTypeModel`. Wire names follow the
 same `ResourceWireNameRules` aliases as HTTP (`Name` dropped, `CanonicalName` → `name`,
 `EntityTag` → `etag`, `Entities` → plural), then go through snake_case via Humanizer
-`Underscore()`. Payloads serialize with the same field names as the HTTP JSON.
+`Underscore()`. Payloads serialize with the same field names as the HTTP JSON. Scalar-keyed
+`Dictionary<string, string?>` values are registered as proto3 maps. A null value is written as a
+key-only entry and a proto3 reader materializes that entry as an empty string.
 
 Custom-method request bodies are the same Skeleton types as the HTTP transport:
 `RunJobRequest`, `EmptyResourceRequest` (for `CancelOperation`), and `WaitOperationRequest`.

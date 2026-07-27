@@ -21,7 +21,11 @@ internal static class SchedulingResourceRegistration
         new(Verbs.Run, typeof(RunJobHandler)),
     ];
 
-    /// <summary>The AIP-136 <c>:cancel</c> and AIP-151 <c>:wait</c> custom methods on <see cref="SchemataJobExecution" />.</summary>
+    /// <summary>
+    ///     The <c>:cancel</c> and <c>:wait</c> custom methods on <see cref="SchemataJobExecution" />,
+    ///     following the AIP-136 colon convention and mirroring <c>CancelOperation</c> and
+    ///     <c>WaitOperation</c> on the <c>google.longrunning.Operations</c> service.
+    /// </summary>
     internal static readonly ResourceMethodAttribute[] ExecutionMethods = [
         new(Verbs.Cancel, typeof(CancelOperationHandler)),
         new(Verbs.Wait,   typeof(WaitOperationHandler)),

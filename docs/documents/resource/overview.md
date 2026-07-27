@@ -13,7 +13,7 @@ both call it, passing a `ClaimsPrincipal?` pulled from their own request context
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` + `.Create.cs`, `.Get.cs`, `.List.cs`, `.Update.cs`, `.Delete.cs`  |
 | `Schemata.Resource.Foundation` | `SchemataResourceBuilder.cs`, `ResourceMethodOperationHandler.cs`                                |
 | `Schemata.Resource.Foundation` | `Features/SchemataResourceFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                 |
-| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceIdentifiers.cs`, `IPagination.cs`                        |
+| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceQueryAdvice.cs`, `ResourceIdentifiers.cs`, `IPagination.cs` |
 | `Schemata.Abstractions`        | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`, `Entities/Operations.cs`     |
 | `Schemata.Abstractions`        | `Resource/ResourceAttribute.cs`, `Resource/CreateResultBase.cs` (and the other `*ResultBase`)    |
 
@@ -158,8 +158,8 @@ or the lowerCamelCase verb for an AIP-136 custom method. Each stage runs through
 `ResourcePipelineRunner<Operations>.RunAsync`, which interprets the `AdviseResult`:
 
 - `Continue` — proceed to the next stage.
-- `Block` — throw the stage's blocked exception. For CRUD that is `NotFoundException`, hiding the resource's
-  existence per AIP-211.
+- `Block` — throw the stage's blocked exception. For CRUD that is `NotFoundException`. AIP-211 instead requires
+  `PERMISSION_DENIED` with an ambiguous message for authorization failures.
 - `Handle` — return a result the advisor stashed in `AdviceContext`, or the handler's fallback (`() => new()`
   for Delete).
 

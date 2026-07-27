@@ -130,7 +130,7 @@ public interface IJobLifecycleObserver
 }
 ```
 
-`OnScheduledAsync` and `OnUnscheduledAsync` run when a schedule is recorded, advanced, paused, or removed. `OnTriggeredAsync` runs after the execution advisors return `Continue` and before the body runs; it returns a plain `Task` and carries no gating result. `OnBlockedAsync` and `OnSkippedAsync` run when an execution advisor blocks or handles the fire; both ship default no-op bodies. `OnSucceededAsync` and `OnFailedAsync` run after the body settles. Observer exceptions are logged at `Warning` and swallowed, so one failing observer does not stop the others.
+`OnScheduledAsync` and `OnUnscheduledAsync` run when a schedule is recorded, advanced, paused, or removed. `OnTriggeredAsync` runs after the execution advisors return `Continue` and before the body runs; it returns a plain `Task` and carries no gating result. `OnBlockedAsync` and `OnSkippedAsync` run when an execution advisor blocks or handles the fire; both ship default no-op bodies. `OnSucceededAsync` and `OnFailedAsync` run after the body settles. Terminal observer callbacks are caught, logged at `Warning`, and do not stop the remaining callbacks. `OnTriggeredAsync` runs before the job body's exception boundary, so an observer implementation must return successfully.
 
 ### Advisor outcomes
 
@@ -166,7 +166,7 @@ resolve IScheduledJob from JobKey
 call ExecuteAsync(context, linkedToken)
   |-- returns: mark Succeeded, persist Output, advance recurring schedule
   |-- throws:  mark Failed, record RecentError
-  |-- cancelled mid-run: leave the row Running for re-dispatch
+  |-- host shutdown cancellation: leave the row Running for re-dispatch
 ```
 
 `SchemataJobAuditObserver` persists the `SchemataJob` row. `JobExecutionDispatcher` owns the execution row from claim through terminal state, then asks observers to record the matching job-row transition. For recurring jobs, the dispatcher computes the next fire from the job's current `NextRunTime` (falling back to now) and calls the scheduler so the next `Pending` row is materialized.

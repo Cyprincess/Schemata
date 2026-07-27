@@ -5,8 +5,8 @@
 A multi-tenant API where each request is resolved to a tenant using a
 combination of resolvers: an `x-tenant-id` header for machine clients, a
 `{Tenant}` route segment for browser-friendly URLs, and a `Tenant` claim for
-authenticated users. You'll also configure per-tenant EF Core connection
-strings so each tenant's data lives in its own database.
+authenticated users. You will configure tenant-specific singleton services and
+identify the separate repository design needed for tenant data isolation.
 
 ## Prerequisites
 
@@ -19,9 +19,16 @@ dotnet add package --prerelease Schemata.Tenancy.Foundation
 
 ## Step 1 — Register the tenancy feature
 
-Call `UseTenancy()` on the `SchemataBuilder` and pick one resolver:
+Define the tenant type, then call `UseTenancy<TTenant>()` and pick one resolver:
 
 ```csharp
+using Schemata.Tenancy.Skeleton.Entities;
+
+public class AppTenant : SchemataTenant
+{
+    public string? ConnectionString { get; set; }
+}
+
 var builder = WebApplication.CreateBuilder(args)
     .UseSchemata(schema => {
         schema.UseLogging();
@@ -29,13 +36,15 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseControllers();
         schema.UseJsonSerializer();
 
-        schema.UseTenancy()
-              .UseHeaderResolver();
+        var tenancy = schema.UseTenancy<AppTenant>()
+                            .UseHeaderResolver();
 
         schema.ConfigureServices(services => {
             services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
+            services.AddRepository<AppTenant, EfCoreRepository<AppDbContext, AppTenant>>();
+            services.AddRepository<SchemataTenantHost, EfCoreRepository<AppDbContext, SchemataTenantHost>>();
         });
 
         schema.UseResource()
@@ -85,35 +94,19 @@ public sealed class HeaderOrPathResolver(
 
 schema.ConfigureServices(services =>
     services.AddScoped<ITenantResolver, HeaderOrPathResolver>());
-schema.UseTenancy();   // No UseXxxResolver — the composite is already in DI.
+schema.UseTenancy<AppTenant>();   // The composite is already in DI; built-in resolver calls would be ignored.
 ```
 
-**Verify:** Start the app and send a request with `x-tenant-id: <guid>`. The middleware resolves the tenant and makes it available via `ITenantContextAccessor<SchemataTenant>`.
+**Verify:** After you seed an `AppTenant` row with the identifier, start the app and send a request
+with `x-tenant-id: <guid>`. The middleware resolves the tenant and makes it available via
+`ITenantContextAccessor<AppTenant>`.
 
-## Step 2 — Use a custom tenant entity
+## Step 2 — Inspect the custom tenant entity
 
-The default `SchemataTenant` entity has `Uid`, `Name`, and `CanonicalName`.
-Add a `ConnectionString` property for per-tenant database routing:
-
-```csharp
-using Schemata.Tenancy.Skeleton.Entities;
-
-public class AppTenant : SchemataTenant
-{
-    public string? ConnectionString { get; set; }
-}
-```
-
-Pass the custom type to `UseTenancy<TTenant>()` with one resolver — or, to
-combine sources, the composite from Step 1:
-
-```csharp
-schema.UseTenancy<AppTenant>()
-      .UseHeaderResolver();
-```
-
-`UseTenancy<TTenant>()` uses `SchemataTenantManager<TTenant>` as the default
-manager. To supply a custom manager, use the three-argument overload:
+`AppTenant` inherits the default `Uid`, `Name`, and `CanonicalName` fields and
+adds the connection string that an application-specific data-isolation layer
+can use. `UseTenancy<TTenant>()` uses `SchemataTenantManager<TTenant>` as the
+default manager. To supply a custom manager, use the three-argument overload:
 `UseTenancy<TManager, TTenant>()`. Only one `ITenantResolver` is active per
 host; stacking `UseHeaderResolver().UsePathResolver()` does not chain them —
 the first wins.
@@ -124,40 +117,47 @@ the first wins.
 ## Step 3 — Configure per-tenant DI overrides
 
 The tenancy system builds one `IServiceProvider` per tenant and caches it.
-Tenant-specific singletons are registered via `SchemataTenancyOptions`. Use
-`DynamicOverrides` to apply a connection string from the resolved tenant:
+Tenant-specific singletons are registered through `ForTenant`:
 
 ```csharp
-schema.ConfigureServices(services => {
-    services.Configure<SchemataTenancyOptions>(o => {
-        o.DynamicOverrides.Add((tenantId, overrides, root) => {
-            // Resolve the tenant entity from the root provider to get its
-            // connection string. The tenant is already in the per-tenant
-            // container as a singleton at this point.
-            var tenant = overrides.BuildServiceProvider()
-                                  .GetService<AppTenant>();
-            if (tenant?.ConnectionString is { } cs)
-            {
-                overrides.AddSingleton<IDbContextFactory<AppDbContext>>(
-                    _ => new TenantDbContextFactory(cs));
-            }
-        });
-    });
-});
+public interface IFeatureGate
+{
+    bool IsEnabled(string feature);
+}
+
+public sealed class PremiumFeatureGate : IFeatureGate
+{
+    public bool IsEnabled(string feature) => feature == "advanced-reporting";
+}
+
+public sealed class DefaultFeatureGate : IFeatureGate
+{
+    public bool IsEnabled(string feature) => false;
+}
+
+tenancy.ForAll(services => {
+           services.AddSingleton<IFeatureGate, DefaultFeatureGate>();
+       })
+       .ForTenant("00000000-0000-0000-0000-000000000001", services => {
+           services.AddSingleton<IFeatureGate, PremiumFeatureGate>();
+       });
 ```
 
 `TenantCompositeServiceProvider` resolves services from the tenant-specific
-container first, then falls back to the host root. `IServiceScopeFactory` is
-intercepted so scoped services created inside a request still come from the
-host's normal request-scope lifecycle.
+container first, then falls back to the host root. Root-registered repositories
+construct their dependencies from the host container, so a tenant override does
+not replace their `IDbContextFactory`. Isolate Student data with a tenant
+discriminator, or implement a root context factory that chooses a connection at
+`CreateDbContext` time while tenant catalog repositories remain on a shared
+control-plane database.
 
 **Important:** Tenant overrides must be registered as `Singleton`. The factory
 enforces this at build time and throws `InvalidOperationException` if a
 `Scoped` or `Transient` service is added to the overrides collection.
 
-**Verify:** Two requests with different `x-tenant-id` headers hit different
-databases. Confirm by inserting a row via one tenant and verifying it does not
-appear when querying via the other.
+**Verify:** A request for the configured tenant resolves `IFeatureGate` as
+`PremiumFeatureGate`; a request for another tenant falls back to the host
+registration.
 
 ## Step 4 — Access the current tenant in application code
 
@@ -194,8 +194,9 @@ long as `UsePathResolver()` is the active resolver. To honor both a header and a
 path segment, use the composite resolver from Step 1 — registering both
 extensions does not combine them.
 
-**Verify:** `GET /acme/students` and `GET /beta/students` return data from
-different tenant databases.
+**Verify:** `GET /acme/students` and `GET /beta/students` resolve different
+tenant contexts when matching tenant rows exist. Database isolation needs the
+tenant-aware repository design described in Step 3.
 
 ## Common pitfalls
 

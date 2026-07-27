@@ -2,7 +2,10 @@
 
 Gate the Student CRUD operations behind permission claims and filter list results per user, using
 `UseSecurity()` and the resource builder's `WithAuthorization()`. This guide builds on
-[Identity](identity.md).
+[Identity](identity.md) for the user store, and on [Object Mapping](object-mapping.md) for the
+`StudentRequest`, `StudentDetail`, and `StudentSummary` types the access and entitlement providers
+are declared against. Readers who skipped Object Mapping either add those DTOs first or substitute
+`Student` for all four type parameters.
 
 ## Add the package
 
@@ -75,6 +78,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Security.Skeleton;
+using static Schemata.Abstractions.SchemataConstants;
 
 public sealed class StudentAccessProvider : IAccessProvider<Student, StudentRequest>
 {
@@ -121,7 +125,7 @@ public sealed class StudentEntitlementProvider
         ClaimsPrincipal?              principal,
         CancellationToken             ct = default)
     {
-        var id = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var id = principal?.FindFirstValue(Claims.Subject);
 
         Expression<Func<Student, bool>> filter = string.IsNullOrEmpty(id)
             ? _ => false
@@ -131,6 +135,9 @@ public sealed class StudentEntitlementProvider
     }
 }
 ```
+
+The Identity bridge supplies `Claims.Subject` as the canonical user name (`users/{uid}`), so the
+filter compares `Owner` with the same canonical reference used by the ownership advisor.
 
 Populating `Owner` on create is your side of the contract — set it in an add advisor, or wire the
 `Schemata.Entity.Owner` package's `UseOwner()` which fills it through an `IOwnerResolver` (see the

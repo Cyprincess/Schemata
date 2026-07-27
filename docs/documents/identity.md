@@ -28,6 +28,11 @@ public override Guid Id { get => Uid; set => Uid = value; }
 The table is `SchemataUsers`, canonical-name pattern `users/{user}`. `SchemataRole` follows the
 same shape over `IdentityRole<Guid>`: table `SchemataRoles`, pattern `roles/{role}`.
 
+`SchemataUserStore<TUser>.CreateAsync` assigns `Identifiers.NewUid()` when `Uid` is empty and sets
+`Name` from `Uid.ToString()` before persisting the user. The canonical-name pattern therefore
+produces `users/{uid}`. `FindByIdAsync` accepts either the raw GUID or a canonical name such as
+`users/{uid}`; it parses the segment after the final `/` as the `Uid` used for lookup.
+
 The supporting join entities — `SchemataUserClaim`, `SchemataRoleClaim`, `SchemataUserRole`,
 `SchemataUserLogin`, `SchemataUserToken` — each carry their own `[Table]` and `[PrimaryKey]`
 attributes, so an `IdentityDbContext` over these types needs no extra Fluent configuration.

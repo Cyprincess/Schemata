@@ -3,15 +3,16 @@
 `StateMachineEngine` is the single-token BPMN runtime that implements `IFlowRuntime`. It traverses a
 `ProcessDefinition` AST using object references, tracks explicit waiting states through
 `SchemataProcessToken.WaitingAtName`, and holds no state of its own. Every call takes the current
-`SchemataProcess` plus token rows and returns a `ProcessSnapshot`. `SchemataFlowFeature` registers it
-as the keyed singleton under `SchemataConstants.FlowEngines.StateMachine`.
+`SchemataProcess` plus token rows and returns a `ProcessSnapshot`.
+`SchemataFlowStateMachineFeature` registers it as the keyed singleton under
+`SchemataConstants.FlowEngines.StateMachine`.
 
 ## Where the code lives
 
 | Package                      | Key files                                                                                                            |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs`                            |
-| `Schemata.Flow.Skeleton`     | `Runtime/IFlowRuntime.cs`, `Runtime/IFlowEngineValidator.cs`, `Runtime/FlowResolver.cs`, `Models/ProcessSnapshot.cs` |
+| `Schemata.Flow.Skeleton`     | `Runtime/IFlowRuntime.cs`, `Runtime/IFlowEngineValidator.cs`, `Runtime/FlowResolver.cs`, `Runtime/FlowEventMatcher.cs`, `Models/ProcessSnapshot.cs` |
 
 ## Supported BPMN subset
 

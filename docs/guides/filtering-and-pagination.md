@@ -1,7 +1,8 @@
 # Filtering and Pagination
 
 Filter, sort, and page the `Student` list endpoint with AIP-160 filter expressions and AIP-132 order-by syntax.
-This guide builds on [Getting Started](getting-started.md).
+This guide follows [Concurrency and Freshness](concurrency-and-freshness.md). It updates the DTO-based resource
+registration from [Object Mapping](object-mapping.md); if you skipped Object Mapping, keep `Use<Student>()` instead.
 
 ## Add the packages
 
@@ -19,7 +20,7 @@ schema.UseResource()
       .UseAip()
       .UseOrdering()
       .MapHttp()
-      .Use<Student>();
+      .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
 `UseAip()` registers the AIP-160 expression language and makes it the default filter language;
@@ -34,7 +35,7 @@ works without either package.
 | Parameter      | Type     | Description                                          |
 | -------------- | -------- | ---------------------------------------------------- |
 | `filter`       | `string` | AIP-160 filter expression                            |
-| `order_by`     | `string` | Comma-separated ordering clauses (AIP-132)           |
+| `order_by`     | `string` | Comma-separated clauses; AIP-132 uses an optional ` desc` suffix |
 | `page_size`    | `int`    | Maximum results per page (default 25, capped at 100) |
 | `page_token`   | `string` | Continuation token from a previous `next_page_token` |
 | `skip`         | `int`    | Results to skip before applying `page_size`          |
@@ -42,7 +43,10 @@ works without either package.
 
 ## Filtering
 
-Filters follow [AIP-160](https://google.aip.dev/160). An invalid expression returns HTTP `422`.
+[AIP-160](https://google.aip.dev/160) says a non-compliant filter should return `INVALID_ARGUMENT`
+(HTTP `400`). Schemata instead wraps parsing and compilation failures in `ValidationException`, so
+an invalid filter returns `INVALID_ARGUMENT` with HTTP `422`. This is Schemata's documented error-model
+divergence, not an AIP-160 requirement.
 
 | Operator  | Meaning                    | Example           |
 | --------- | -------------------------- | ----------------- |
@@ -69,10 +73,15 @@ curl "http://localhost:5000/v1/students?filter=age%3E18%20AND%20full_name%3A%22B
 
 ## Ordering
 
-`order_by` is a comma-separated list of fields, each with optional `ASC` (default) or `DESC`:
+`order_by` is a comma-separated list of fields. AIP-132 makes ascending the default and specifies
+the ` desc` suffix for descending order. Schemata also accepts `asc` case-insensitively as an
+extension; it is not AIP-132 syntax.
 
 ```shell
-# Sort by age descending, then full_name ascending
+# AIP-132 syntax: sort by age descending, then full_name ascending by default
+curl "http://localhost:5000/v1/students?order_by=age%20DESC%2Cfull_name"
+
+# Schemata extension: an explicit ASC token is also accepted
 curl "http://localhost:5000/v1/students?order_by=age%20DESC%2Cfull_name%20ASC"
 ```
 
@@ -107,8 +116,9 @@ The token is opaque and signed; pass it back verbatim to continue:
 curl "http://localhost:5000/v1/students?page_size=2&page_token=eyJza..."
 ```
 
-The `filter`, `order_by`, and `show_deleted` values must stay the same across a paged run — the token encodes them
-and a mismatch returns `422`.
+The `parent`, `filter`, `language`, `order_by`, and `show_deleted` values must stay the same across a paged run.
+Schemata compares them with the values encoded in the token and raises `ValidationException` (HTTP `422`) on a
+mismatch.
 
 ## Show deleted
 

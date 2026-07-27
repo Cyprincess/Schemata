@@ -60,7 +60,7 @@ for verbs excluded by `ResourceAttribute.Operations`.
 | Method   | Route                         | Action                                                                                                      | AIP     |
 | -------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- | ------- |
 | `GET`    | `/v1/{collectionPath}`        | `ListAsync([FromQuery] ListRequest)`                                                                        | AIP-132 |
-| `POST`   | `/v1/{collectionPath}`        | `CreateAsync([FromBody] TRequest)` → `201 Created`                                                          | AIP-133 |
+| `POST`   | `/v1/{collectionPath}`        | `CreateAsync([FromBody] TRequest)`                                                                           | AIP-133 |
 | `GET`    | `/v1/{collectionPath}/{name}` | `GetAsync(string name)`                                                                                     | AIP-131 |
 | `PATCH`  | `/v1/{collectionPath}/{name}` | `UpdateAsync(string name, [FromBody] TRequest)`                                                             | AIP-134 |
 | `DELETE` | `/v1/{collectionPath}/{name}` | `DeleteAsync(string name, [FromQuery] string? etag, [FromQuery(Name = "allow_missing")] bool allowMissing)` | AIP-135 |
@@ -68,6 +68,8 @@ for verbs excluded by `ResourceAttribute.Operations`.
 For a flat resource `CollectionPath` is the plural (`students`), so the routes are `/v1/students` and
 `/v1/students/{name}`. For a nested pattern such as `publishers/{publisher}/books/{book}` the route is
 `/v1/publishers/{publisher}/books` and `{publisher}` becomes a route parameter.
+
+Schemata returns `201 Created` for a successful Create action. AIP-133 requires the `POST` verb and does not prescribe an HTTP status code.
 
 Each action passes `HttpContext.User` and `HttpContext.RequestAborted` to the handler. `ListAsync` fills
 `request.Parent` from route values; `CreateAsync` calls `SetParentFromRouteValues`; `UpdateAsync` reads the ETag
@@ -106,8 +108,9 @@ serializes as `name`, `IFreshness.EntityTag` as `etag`, and `IEntitiesResult<T>.
 `IExceptionHandlerPathFeature.Error`; a non-`SchemataException` is wrapped as a 500
 `SchemataException(ErrorCodes.Internal)`. It sets `Response.StatusCode = ex.Code`, content type
 `application/json`, and writes the body from `ex.CreateErrorResponse(context.TraceIdentifier)`. A handler that
-returns `Block` without throwing surfaces as `NotFoundException` (404), hiding the resource's existence per
-AIP-211.
+returns `Block` without throwing surfaces as `NotFoundException` (404). AIP-211 instead requires
+`PERMISSION_DENIED` with a deliberately ambiguous message when authorization fails, so the framework's generic
+`Block` mapping is not an AIP-211 authorization response.
 
 ## Reflection and metadata
 

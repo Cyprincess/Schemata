@@ -93,7 +93,7 @@ Missed-fire policy (`SchemataSchedulingOptions.MissedFirePolicy`) is applied bef
 
 ## Resource bridge
 
-`MapHttp()` and `MapGrpc()` on `SchedulingBuilder` (`Schemata.Scheduling.Http` / `Schemata.Scheduling.Grpc`) expose the scheduling entities as resources. `SchemataJob` gains a `:run` custom method; `SchemataJobExecution` surfaces as an AIP-151 `Operation` with read, list, delete, `:cancel`, and `:wait` methods. Any module can produce operations on this surface by defining an `IScheduledJob` and triggering it through `IScheduler`.
+`MapHttp()` and `MapGrpc()` on `SchedulingBuilder` (`Schemata.Scheduling.Http` / `Schemata.Scheduling.Grpc`) expose the scheduling entities as resources. `SchemataJob` gains a `:run` custom method; `SchemataJobExecution` projects to the AIP-151 `Operation` envelope and exposes Schemata read, list, delete, `:cancel`, and `:wait` methods. AIP-151 defines the operation's `name`, `metadata`, `done`, and `error` / `response` result shape; `CancelOperation` and `WaitOperation` belong to the `google.longrunning.Operations` service. Schemata supplies its own HTTP routes for both methods, while the upstream `WaitOperation` RPC has no HTTP binding. Any module can produce operations on this surface by defining an `IScheduledJob` and triggering it through `IScheduler`.
 
 The Resource `:purge` method dispatches `PurgeJob<TEntity>` through the scheduler. `PurgeHandler<TEntity>` serializes `PurgeOperationArgs` into `JobContext.ArgsJson`, and `PurgeJobKeyResolver` maps the stable `purge:{collection}` key back to the closed-generic job type after a restart. Push scheduled sends use the same operation surface; see the [Push overview](../push/overview.md).
 

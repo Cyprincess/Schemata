@@ -171,7 +171,20 @@
     - name: Transports
       href: insight/transports.md
 - name: Report
-  href: report.md
+  href: report/overview.md
+  items:
+    - name: Overview
+      href: report/overview.md
+    - name: Definitions
+      href: report/definitions.md
+    - name: Generation
+      href: report/generation.md
+    - name: Snapshots
+      href: report/snapshots.md
+    - name: Transports
+      href: report/transports.md
+    - name: Scheduling Integration
+      href: report/scheduling.md
 - name: Mapping
   href: mapping/overview.md
   items:

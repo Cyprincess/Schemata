@@ -6,6 +6,8 @@
   href: domain-events.md
 - name: Cron Jobs
   href: cron-jobs.md
+- name: Scheduled Report
+  href: scheduled-report.md
 - name: Push Notifications
   href: push-notifications.md
 - name: Flow with Timers

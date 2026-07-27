@@ -45,13 +45,11 @@ builder.UseSchemata(schema => {
 3. Registers three resources (`SchemataProcess`, `SchemataProcessToken`, `SchemataProcessTransition`)
    on the HTTP endpoint.
 
-`RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
+`FlowResourceRegistration.RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
 `CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
-`TerminateProcessHandler`, and `CancelTokenHandler`. All seven live in `Schemata.Flow.Foundation`:
-`FlowSourceLoader` and `FlowStartProcessHandler` are public, while `FlowCorrelateMessageHandler`
-and `FlowThrowSignalHandler` are internal. Both transports call the same internal
-`FlowResourceRegistration.RegisterHandlers` / `RegisterMethods`, so the HTTP and gRPC features wire
-an identical handler set.
+`TerminateProcessHandler`, and `CancelTokenHandler`. The same Foundation type also holds the typed
+operation and `ResourceMethodAttribute` facts consumed by both transport features, so HTTP and gRPC
+use an identical handler set without a reflection-based `RegisterMethods` path.
 
 `SchemataProcess` carries `Operations.Get`, `Operations.List`, and five custom methods:
 

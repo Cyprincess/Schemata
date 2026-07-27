@@ -44,13 +44,11 @@ gRPC stack, the exception-mapping interceptor, server reflection, and the shared
 
 `ConfigureEndpoints` maps the definitions service via `endpoints.MapGrpcService<ProcessDefinitionService>()`.
 
-`RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
+`FlowResourceRegistration.RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
 `CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
-`TerminateProcessHandler`, and `CancelTokenHandler`. All seven live in `Schemata.Flow.Foundation`:
-`FlowSourceLoader` and `FlowStartProcessHandler` are public, while `FlowCorrelateMessageHandler`
-and `FlowThrowSignalHandler` are internal. Both transports call the same internal
-`FlowResourceRegistration.RegisterHandlers` / `RegisterMethods`, so the gRPC and HTTP features wire
-an identical handler set.
+`TerminateProcessHandler`, and `CancelTokenHandler`. The same Foundation type also holds the typed
+operation and `ResourceMethodAttribute` facts consumed by both transport features, so gRPC and HTTP
+use an identical handler set without a reflection-based `RegisterMethods` path.
 
 `SchemataProcess` carries `Operations.Get`, `Operations.List`, and five custom methods:
 
@@ -104,9 +102,10 @@ service:
 
 ## Routing and method mapping
 
-The Resource gRPC transport synthesizes one RPC per custom method on the parent service. Per
-AIP-136, each RPC is named `{PascalVerb}{Singular}` (the singular comes from the resource's
-`[DisplayName]`):
+The Resource gRPC transport synthesizes one RPC per custom method on the parent service. Schemata
+names each RPC `{PascalVerb}{Singular}` from the resource descriptor. AIP-136 specifies that a
+custom method name should be a verb followed by a noun and requires the colon convention for its
+HTTP URI; it does not require a singular noun:
 
 | Method      | Handler                       | Runtime call                  |
 | ----------- | ----------------------------- | ----------------------------- |
@@ -167,6 +166,9 @@ plus `ICanonicalName`), `CorrelateMessageRequest` (`MessageName` / `Payload` / `
 `ICanonicalName`), `ThrowSignalRequest` (`SignalName` / `Payload` / `Token` plus `ICanonicalName`
 
 - `IRequestIdentification`).
+
+Scalar-keyed `Dictionary<string, string?>` values are registered as proto3 maps. A null map value
+is written as a key-only entry and proto3 readers materialize it as an empty string.
 
 ## Error mapping
 

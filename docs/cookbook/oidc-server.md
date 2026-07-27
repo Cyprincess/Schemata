@@ -229,9 +229,13 @@ required and validated in `PostConfigure`. Set them in the `UseAuthorization` de
 **Register Identity before Authorization** — the authorization feature builds on
 `SchemataAuthenticationFeature`, which `UseIdentity` brings in. Call `UseIdentity()` first.
 
-**PKCE is on by default** — `CodeFlowOptions.RequirePkce` (and `RequirePkceS256`) default to `true`.
-A public client must send `code_challenge` and `code_challenge_method=S256`. Relax per deployment
-with `UseCodeFlow(o => o.RelaxPkce())`, not recommended for production.
+**PKCE is on by default** — `CodeFlowOptions.RequirePkce` (and `RequirePkceS256`) default to `true`,
+so a public client sends `code_challenge` with `code_challenge_method=S256`. [RFC 7636 §4.2](https://datatracker.ietf.org/doc/html/rfc7636#section-4.2)
+defines the S256 transformation, and [RFC 7636 §4.4.1](https://datatracker.ietf.org/doc/html/rfc7636#section-4.4.1)
+defines the authorization-endpoint response when a server requires PKCE. [RFC 9700 §2.1.1](https://datatracker.ietf.org/doc/html/rfc9700#section-2.1.1)
+sets the current requirement: public clients MUST use PKCE and authorization servers MUST support
+it. Relax per deployment with `UseCodeFlow(o => o.RelaxPkce())`; production deployments should
+assess that exception against their threat model.
 
 **The bridge is opt-in** — without `.UseIdentity()` on the authorization builder, tokens carry only
 base claims; `sub`, `email`, and `role` come from the bridge.

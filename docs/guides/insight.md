@@ -1,7 +1,9 @@
 # Insight
 
-Add federated read queries to the Student CRUD app. This guide registers the `students` repository as
-an Insight source, queries it over HTTP, adds a computed column, and projects a nested child list.
+Add federated read queries to the Student CRUD app. This guide follows [Push](push.md), but is a
+read-model branch that only requires the Student repository from [Getting Started](getting-started.md).
+It registers that repository as an Insight source, queries it over HTTP, adds a computed column, and
+projects a nested child list.
 
 Insight reads named sources rather than exposing connection strings to callers. The caller binds a
 source name to an alias, then uses that alias in filters, joins, selections, and computed expressions.
@@ -23,36 +25,30 @@ The repository driver reads through the repository provider configured in
 
 ## Enable Insight
 
-Register the `students` resource collection as a repository-backed source:
+Register the `students` resource collection as a repository-backed source inside the existing
+`UseSchemata` callback:
 
 ```csharp
-using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
-using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
 using Schemata.Insight.Foundation;
 
-builder.UseSchemata(schema => {
-    var insight = schema.UseInsight(i => {
-        i.WithTotalSize(TotalSizeMode.Exact);
-        i.AddRepositorySource("students", "students")
-         .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
-    });
-
-    insight.UseAip().UseCel().UseOrdering();
-    insight.MapHttp();
-
-    schema.Services.AddDbContextFactory<AppDbContext>(opts => opts.UseSqlite(connectionString));
-    schema.Services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>();
+var insight = schema.UseInsight(i => {
+    i.WithTotalSize(TotalSizeMode.Exact);
+    i.AddRepositorySource("students", "students")
+     .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
 });
+
+insight.UseAip().UseCel().UseOrdering();
+insight.MapHttp();
 ```
 
 `AddRepositorySource("students", "students")` stores a source named `students` whose repository
-resource collection is also `students`. `MapHttp()` exposes `POST /v1/insight:query`.
+resource collection is also `students`. `MapHttp()` exposes `POST /v1/insight:query`. The guide
+reuses the existing `AppDbContext` factory and `IRepository<Student>` registration; do not register
+them a second time.
 
 ## Run a filter and order query
 
@@ -144,25 +140,14 @@ The compute stage runs after source rows are loaded. The response row includes t
 
 ## Add a nested selection
 
-Add a child collection to the Student model:
+Add a child collection to the existing `Student` model:
 
 ```csharp
-using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 
-[CanonicalName("students/{student}")]
-[PrimaryKey(nameof(Uid))]
-public class Student : IIdentifier, ICanonicalName
-{
-    public Guid             Uid         { get; set; }
-    public string?          Name        { get; set; }
-    public string?          CanonicalName { get; set; }
-    public string?          FullName    { get; set; }
-    public int              Age         { get; set; }
-    public List<Enrollment> Enrollments { get; set; } = [];
-}
+// Add this member inside the existing Student class.
+public List<Enrollment> Enrollments { get; set; } = [];
 
 [PrimaryKey(nameof(Uid))]
 public class Enrollment
@@ -176,6 +161,9 @@ public class Enrollment
 Add the DbSet if your context does not discover it through the navigation:
 
 ```csharp
+using Microsoft.EntityFrameworkCore;
+
+// Add this member inside AppDbContext.
 public DbSet<Enrollment> Enrollments { get; set; } = null!;
 ```
 
@@ -221,6 +209,8 @@ A successful nested response has each parent row with a list under `passing_cour
 
 ## Next steps
 
+- [Reports](report.md) — persist an Insight query as a snapshot and page its rows back
+- [Modular](modular.md) — extract the accumulated Student feature into a module
 - [Federated Query](../cookbook/federated-query.md) — join two sources and aggregate the result
 - [gRPC Transport](grpc-transport.md) — add gRPC beside HTTP
 

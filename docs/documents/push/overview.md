@@ -13,7 +13,7 @@ addressing table maps an owner to a transport endpoint.
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Push.Skeleton`   | `IPushService.cs`, `IPushTransport.cs`, `PushContext.cs`, `PushTarget.cs`, `PushOptions.cs`, `PushPriority.cs`, `TransportResult.cs`, `TransportStatus.cs`, `Advisors/IPushSendAdvisor.cs`, `IPushSubscriptionManager.cs`, `Entities/SchemataPushSubscription.cs` |
 | `Schemata.Push.Foundation` | `DefaultPushService.cs`, `DefaultPushSubscriptionManager.cs`, `Features/SchemataPushFeature.cs`, `Builders/SchemataPushBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                     |
-| `Schemata.Push.Scheduling` | `Features/SchemataPushSchedulingFeature.cs`, `Internal/PushDispatchJob.cs`, `Internal/SchedulingPushService.cs`, `Extensions/PushSchedulingBuilderExtensions.cs`                                                                                                  |
+| `Schemata.Push.Scheduling` | `Features/SchemataPushSchedulingFeature.cs`, `Internal/PushDispatchJob.cs`, `Internal/ScheduledPushService.cs`, `Extensions/PushSchedulingBuilderExtensions.cs`                                                                                                  |
 
 ## Startup
 
@@ -57,11 +57,6 @@ the `provider` it stores subscriptions under.
 public interface IPushService
 {
     IAsyncEnumerable<TransportResult> SendAsync(PushContext context, CancellationToken ct = default);
-
-    ValueTask<Operation> ScheduleSendAsync(
-        PushContext       context,
-        DateTimeOffset?   at = null,
-        CancellationToken ct = default);
 }
 ```
 

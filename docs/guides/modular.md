@@ -2,7 +2,9 @@
 
 Extract the `Student` feature into a self-contained module assembly. The host picks it up through a
 single package or project reference; the `[Module]` attribute that wires it in is stamped into the
-host assembly at build time. This guide builds on [Getting Started](getting-started.md).
+host assembly at build time. This is the final refactoring branch: it can start from
+[Getting Started](getting-started.md), and a reader who completed earlier guides moves every
+Student-specific registration into the module while retaining the host's cross-cutting features.
 
 ## How it works
 
@@ -15,8 +17,9 @@ runtime `DefaultModulesProvider` reads those attributes, loads the named assembl
 ## Enable the modular feature in the host
 
 `Schemata.Application.Complex.Targets` (used by Getting Started) already sets
-`UseModularTargets=true`, so the host build stamps the attributes. The only startup change is to
-call `UseModular()`:
+`UseModularTargets=true`, so the host build stamps the attributes. Add `UseModular()` to the
+existing host configuration; the following is an excerpt, not a replacement for earlier host feature
+registrations:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -57,7 +60,10 @@ advice generator. Use
 ## Move the entity and its advisor into the module
 
 Move `Student.cs`, `AppDbContext.cs`, and `AdviceAddStudentName.cs` from Getting Started into the
-`StudentModule` project, then add a module entry point that inherits `ModuleBase`:
+`StudentModule` project. If you completed Object Mapping, move the three DTOs too. Keep any
+`WithUnitOfWork<AppDbContext>()` and `UseQueryCache()` calls on the module's repository builder;
+host-level cache-provider registration remains in the host. Then add a module entry point that
+inherits `ModuleBase`:
 
 ```csharp
 using Microsoft.AspNetCore.Hosting;
@@ -110,10 +116,11 @@ stamp `[assembly: ModuleAttribute("StudentModule")]` into the host assembly; a N
 module stamps the same attribute through the props file it packs into the consuming app. The
 target-by-target build wiring is in [Modules](../documents/modules.md).
 
-## Trim the host startup
+## Point the host resource at the module types
 
-With data access and the custom advisor extracted, the host startup configures only the
-cross-cutting features and the resource endpoint:
+With data access and the custom advisor extracted, replace only the Student type references in the
+host resource registration. Keep options from earlier guides, such as `UseAip()`, `UseOrdering()`,
+or `WithAuthorization()`, ahead of the transport calls.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -124,7 +131,7 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseJsonSerializer();
         schema.UseResource()
               .MapHttp()
-              .Use<Student>();
+              .Use<StudentModule.Student>();
 
         schema.UseModular();
     });

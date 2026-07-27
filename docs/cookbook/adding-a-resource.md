@@ -9,7 +9,8 @@ and `[GrpcResource]` select transports.
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
-- NuGet packages: `Schemata.Resource.Foundation`, `Schemata.Resource.Http`, `Schemata.Resource.Grpc`.
+- NuGet packages: `Schemata.Resource.Foundation`, `Schemata.Resource.Http`, `Schemata.Resource.Grpc`,
+  and `Schemata.Mapping.Mapster`.
 
 ## Step 1: Define the entity and DTOs
 
@@ -86,6 +87,8 @@ assigns one (the same pattern Getting Started uses for `Student`):
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 public sealed class CourseNameAdvisor : IRepositoryAddAdvisor<Course>
 {
@@ -101,11 +104,18 @@ public sealed class CourseNameAdvisor : IRepositoryAddAdvisor<Course>
         return Task.FromResult(AdviseResult.Continue);
     }
 }
+
+schema.ConfigureServices(services => {
+    services.TryAddEnumerable(
+        ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Course>, CourseNameAdvisor>());
+});
 ```
+
+**Assertion:** Creating a `Course` reaches `AdviceAddCanonicalName<Course>` with a generated `Name`.
 
 ## Step 4: Expose over HTTP
 
-Add `[HttpResource]` and call `MapHttp()`:
+Add `[HttpResource]`, register the `Course` repository and mappings, then call `MapHttp()`:
 
 ```csharp
 [Resource<Course, CourseRequest, CourseDetail, CourseSummary>]
@@ -115,6 +125,22 @@ public class Course : ICanonicalName, IIdentifier, ITimestamp, ISoftDelete { /* 
 ```
 
 ```csharp
+using Microsoft.EntityFrameworkCore;
+using Schemata.Entity.EntityFrameworkCore;
+
+// Add this property to AppDbContext.
+public DbSet<Course> Courses => Set<Course>();
+
+schema.ConfigureServices(services => {
+    services.AddRepository<Course, EfCoreRepository<AppDbContext, Course>>();
+});
+
+schema.UseMapping()
+      .UseMapster()
+      .Map<Course, CourseDetail>()
+      .Map<Course, CourseSummary>()
+      .Map<CourseRequest, Course>();
+
 schema.UseResource()
       .MapHttp()
       .Use<Course, CourseRequest, CourseDetail, CourseSummary>();

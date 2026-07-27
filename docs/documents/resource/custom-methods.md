@@ -74,10 +74,12 @@ ResourceMethodController / ResourceCustomMethod
 ```
 
 A `Block` at any stage throws `NotFoundException` (`Blocked(name)`); a `Handle` returns a `TResponse` stashed in
-`AdviceContext`. For an instance-scoped method the handler binds `request.CanonicalName = name` so the AIP-155
-idempotency key distinguishes the same verb against different resources, then loads the entity inside
-`SuppressQuerySoftDelete()`; a missing entity throws `ResourceNotFound(name)`. A collection-scoped method
-(`name is null`) skips the load and the method-advisor stage, passing a `null` entity to the handler.
+`AdviceContext`. For an instance-scoped method, the handler binds `request.CanonicalName = name` when the request
+implements `ICanonicalName`, so the AIP-155 idempotency key distinguishes the same verb against different
+resources. It then loads the entity with `EnterQueryAdvice(container)` outside
+`_repository.SuppressQuerySoftDelete()`; a missing entity throws `ResourceNotFound(name)`. A collection-scoped
+method (`name is null`) skips the load, query-advice entry, and method-advisor stage, passing a `null` entity to
+the handler.
 
 ### Built-in method advisors
 
@@ -124,7 +126,8 @@ without a web host.
   payload.
 - gRPC RPC names are `{PascalVerb}{Singular}` (`RunJob`); avoid verbs that collide with the standard CRUD RPC
   names.
-- `TRequest` and `TResponse` must implement `ICanonicalName`.
+- `TResponse` must implement `ICanonicalName`. An `ICanonicalName` `TRequest` receives the instance name for
+  AIP-155 request identification; other request types remain valid.
 
 ## See also
 

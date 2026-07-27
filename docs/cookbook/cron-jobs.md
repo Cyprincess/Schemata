@@ -34,7 +34,7 @@ public sealed class ReportJob : IScheduledJob
 ```
 
 `IScheduledJob` has one method. `JobContext.Job` is the `SchemataJob` canonical name (`jobs/{name}`); `JobContext.Variables` is
-a dictionary deserialized from `SchemataJob.Variables` for per-instance configuration.
+an `IReadOnlyDictionary<string, string?>` deserialized from `SchemataJob.Variables` for per-instance configuration.
 
 **Assertion:** `ReportJob` compiles and implements `IScheduledJob`.
 

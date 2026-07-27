@@ -1,6 +1,8 @@
 # Multi-Tenancy
 
-Scope each request to a specific tenant and resolve downstream services from a tenant-isolated DI container. This guide builds on [Getting Started](getting-started.md).
+Scope each request to a specific tenant and resolve downstream services from a tenant-isolated DI container. This
+is a feature branch after [gRPC Transport](grpc-transport.md): it works from [Getting Started](getting-started.md)
+and does not add a tenant filter to `Student` rows by itself.
 
 ## Add the package
 
@@ -19,7 +21,7 @@ schema.UseTenancy()
       .UseHeaderResolver();
 ```
 
-`UseTenancy()` uses `SchemataTenant` as the default tenant entity. On each request, the tenancy middleware resolves the tenant and swaps the request's service provider for a tenant-scoped one for the duration of the request. The middleware position and feature ordering are covered in [Tenancy](../documents/tenancy.md).
+`UseTenancy()` uses `SchemataTenant` as the default tenant entity. On each request, the tenancy middleware resolves the tenant and swaps the request's service provider for a tenant-scoped one for the duration of the request. Register repositories for the tenant entity and `SchemataTenantHost` so the default tenant manager can resolve them. The middleware position and feature ordering are covered in [Tenancy](../documents/tenancy.md).
 
 ## Choose a resolver
 
@@ -55,7 +57,24 @@ schema.UseTenancy<Tenant>()
       .UseHeaderResolver();
 ```
 
-## Per-tenant data isolation
+Register the custom tenant and host repositories in the existing `ConfigureServices` callback. They
+reuse the `AppDbContext` factory already registered for `Student`:
+
+```csharp
+using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Tenancy.Skeleton.Entities;
+
+schema.ConfigureServices(services => {
+    services.AddRepository<Tenant, EfCoreRepository<AppDbContext, Tenant>>();
+    services.AddRepository<SchemataTenantHost, EfCoreRepository<AppDbContext, SchemataTenantHost>>();
+});
+```
+
+The default `SchemataTenantManager<Tenant>` resolves these repositories to look up the identifier
+from the selected resolver. Replace `Tenant` with `SchemataTenant` when you use the non-generic
+`UseTenancy()` overload.
+
+## Per-tenant DI overrides
 
 `ForAll` and `ForTenant` on the builder register services that participate in tenant resolution. They have very different lifetime contracts:
 
@@ -65,26 +84,27 @@ schema.UseTenancy<Tenant>()
 | `ForTenant(tenantId, configure)`               | Per-tenant override container, applied at provider build time                                       | **Singleton only**                                                                                                                             |
 | `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | **Singleton only**                                                                                                                             |
 
-Scoped or transient registrations in either `ForTenant` overload throw `InvalidOperationException` at provider-build time. Per-tenant services that need to participate in the request-scope lifecycle (`AddDbContext`, repositories, etc.) belong in `ForAll`; they pick up the right tenant by consulting `ITenantContextAccessor<TTenant>` at construction time.
+Scoped or transient registrations in either `ForTenant` overload throw `InvalidOperationException` at provider-build time. `ForAll` adds host registrations visible to every tenant; a host service's constructor still resolves from the host container, so tenant-aware host services must consult `ITenantContextAccessor<TTenant>` while performing their work.
 
 ```csharp
+public interface IFeatureGate
+{
+    bool IsEnabled(string feature);
+}
+
+public sealed class AcmeFeatureGate : IFeatureGate
+{
+    public bool IsEnabled(string feature) => feature == "advanced-reporting";
+}
+
 schema.UseTenancy<Tenant>()
-      .ForAll(services => {
-          services.AddDbContext<AppDbContext>((sp, opts) => {
-              var tenant = sp.GetRequiredService<ITenantContextAccessor<Tenant>>().Tenant;
-              var conn   = tenant?.Plan == "premium"
-                  ? "Data Source=premium.db"
-                  : "Data Source=shared.db";
-              opts.UseSqlite(conn);
-          });
-      })
       .ForTenant("00000000-0000-0000-0000-000000000001", overrides => {
           overrides.AddSingleton<IFeatureGate, AcmeFeatureGate>();
       })
       .UseHeaderResolver();
 ```
 
-Lookups hit the per-tenant overrides first, then fall through to the host root. Tenant providers are cached with bounded capacity and sliding expiration; the composite-provider internals and cache tuning options are in [Tenancy](../documents/tenancy.md).
+Lookups hit the per-tenant overrides first, then fall through to the host root. This gives the Acme tenant a distinct `IFeatureGate`; it does not replace dependencies captured by root-registered repositories. Add row ownership, a tenant discriminator, or an application-specific context factory when Student data itself needs isolation. Tenant providers are cached with bounded capacity and sliding expiration; the composite-provider internals and cache tuning options are in [Tenancy](../documents/tenancy.md).
 
 ## Access the current tenant
 
@@ -101,28 +121,38 @@ The `Tenant` property is `null` until middleware initialization completes for th
 
 ## Verify
 
+Seed the tenant before sending a request:
+
+```csharp
+using var scope = app.Services.CreateScope();
+var manager = scope.ServiceProvider.GetRequiredService<ITenantManager<Tenant>>();
+var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+if (await manager.FindByTenantId(tenantId, default) is null)
+{
+    await manager.CreateAsync(new Tenant {
+        Uid = tenantId,
+        Name = tenantId.ToString("N"),
+    }, default);
+}
+```
+
 ```shell
 dotnet run
 ```
 
 ```shell
-# Create a student under a specific tenant
-curl -X POST http://localhost:5000/v1/students \
-     -H "Content-Type: application/json" \
-     -H "x-tenant-id: 00000000-0000-0000-0000-000000000001" \
-     -d '{"full_name":"Alice","age":20}'
-
-# List students — only returns students for this tenant
+# Resolve a tenant-scoped service for the configured tenant
 curl http://localhost:5000/v1/students \
      -H "x-tenant-id: 00000000-0000-0000-0000-000000000001"
 ```
 
-Requests without the `x-tenant-id` header skip tenant resolution; `accessor.Tenant` stays `null` and the request runs against the host root provider.
+After you seed a `Tenant` with this `Uid`, the request resolves that tenant and the `AcmeFeatureGate` is available from the request service provider. The base Student repository still uses its configured database until you add an isolation strategy.
 
 ## Next steps
 
-- [Flow](flow.md) — add a BPMN process to the tenant-scoped Student entity
-- [Event Bus](event-bus.md) — publish events from per-tenant services
+- [Flow](flow.md) — use the resolved tenant context in a BPMN application
+- [Event Bus](event-bus.md) — publish events from tenant-aware services
 - [gRPC Transport](grpc-transport.md) — tenant resolution works the same on gRPC
 
 ## See also

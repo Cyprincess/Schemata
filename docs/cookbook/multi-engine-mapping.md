@@ -1,13 +1,20 @@
 # Multi-Engine Mapping
 
+## What you'll build
+
 Run one application against either mapping engine and switch between them with a single call. The
 `ISimpleMapper` surface, the mapping declarations, and the field-mask behavior are identical across
 AutoMapper and Mapster, so handler code never changes.
 
-This recipe assumes the DTOs and `Map<,>` declarations from
-[Object Mapping](../guides/object-mapping.md).
+## Prerequisites
 
-## Start with Mapster
+- Complete [Object Mapping](../guides/object-mapping.md) so `StudentRequest`, `StudentDetail`, and
+  `StudentSummary` exist.
+- Add one adapter package: `Schemata.Mapping.Mapster` or `Schemata.Mapping.AutoMapper`.
+
+## Steps
+
+### Step 1: Start with Mapster
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -30,7 +37,10 @@ var builder = WebApplication.CreateBuilder(args)
 registers the result as a singleton. It then adds `SchemataMappingFeature<SimpleMapper>`, which
 registers `ISimpleMapper` as scoped.
 
-## Switch to AutoMapper
+**Assertion:** resolve `ISimpleMapper` from a request scope; its type is
+`Schemata.Mapping.Mapster.SimpleMapper`.
+
+### Step 2: Switch to AutoMapper
 
 Replace the engine call. The `Map<,>` declarations move onto `UseAutoMapper()` unchanged:
 
@@ -49,7 +59,10 @@ engines satisfy `ISimpleMapper`, so the resource handler is unaffected.
 > that lacks a source expression throws `InvalidOperationException` from `Map<,>.Compile()` before
 > the first request, naming the destination type.
 
-## Custom field mappings carry over
+**Assertion:** restart the application and resolve `ISimpleMapper`; its type is
+`Schemata.Mapping.AutoMapper.SimpleMapper`.
+
+### Step 3: Keep custom field mappings across engines
 
 Declarations use the engine-agnostic `For`/`From`/`Ignore`/`With` surface, so the same block works
 on either engine:
@@ -57,7 +70,7 @@ on either engine:
 ```csharp
 .Map<StudentRequest, Student>(map => {
     map.For(d => d.FullName).From(s => s.FullName);
-    map.For(d => d.Nickname).Ignore((s, _) => s.FullName == "Hidden");
+    map.For(d => d.Age).Ignore((s, _) => s.Age == 0);
 })
 ```
 
@@ -65,7 +78,10 @@ on either engine:
 and `Map`/`Ignore`/`MapWith` respectively. A field with no source expression, ignore, or converter
 fails `Compile()` at startup on both engines.
 
-## Field masks behave identically
+**Assertion:** start each engine with this declaration; both reject an unconfigured destination field
+and accept the configured `FullName` mapping.
+
+### Step 4: Verify field masks
 
 A `PATCH` carrying `update_mask` flows through `ISimpleMapper.Map(request, entity, fields)`, which
 both adapters route through `SimpleMapperHelper.MapWithMask`. The resource handler converts the
@@ -83,7 +99,10 @@ Only `full_name` changes. Masked fields are authoritative — a null source valu
 clears the destination — while unmasked fields keep their pre-update values. Nested paths such as
 `profile.display_name` traverse one level of objects; collection-element traversal is rejected.
 
-## Confirm the active engine
+**Assertion:** send the request with either engine and verify that `full_name` changes while another
+Student field keeps its previous value.
+
+### Step 5: Confirm the active engine
 
 ```csharp
 app.MapGet("/debug/mapper", (ISimpleMapper mapper) => mapper.GetType().FullName);
@@ -92,7 +111,9 @@ app.MapGet("/debug/mapper", (ISimpleMapper mapper) => mapper.GetType().FullName)
 The response is `Schemata.Mapping.AutoMapper.SimpleMapper` or `Schemata.Mapping.Mapster.SimpleMapper`,
 matching the `Use*` call in startup.
 
-## Pitfalls
+**Assertion:** `GET /debug/mapper` returns the type for the adapter you registered.
+
+## Common pitfalls
 
 - `SchemataMappingFeature<T>` registers `ISimpleMapper` with `TryAddScoped`, so the first engine
   added wins. Call exactly one of `UseAutoMapper()` and `UseMapster()`.

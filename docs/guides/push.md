@@ -1,7 +1,8 @@
 # Push
 
 Add push notifications to the Student CRUD app: register a transport, record a subscription, and
-broadcast a message to a recipient. This guide builds on [Getting Started](getting-started.md).
+broadcast a message to a recipient. This is a notification branch after [Scheduling](scheduling.md)
+and only requires the Student persistence setup from [Getting Started](getting-started.md).
 
 Push is a broadcast fan-out layer. One `SendAsync` call hands the same message to every registered
 transport; each transport decides whether the target is its concern. Push ships no transport of its
@@ -132,12 +133,40 @@ device and reports `Sent`; a transport with no matching subscription reports `Sk
 
 ## Verify
 
+Add a temporary endpoint after `var app = builder.Build()` to exercise the subscription and dispatch
+paths together:
+
+```csharp
+using Schemata.Push.Skeleton;
+
+app.MapPost("/demo/notify/{userId}", async (
+    string userId,
+    IPushSubscriptionManager subscriptions,
+    IPushService push,
+    CancellationToken ct) => {
+    await subscriptions.AddAsync($"users/{userId}", "console", "desk-1", ct: ct);
+
+    await foreach (var result in push.SendAsync(
+                       new PushContext("Welcome, Alice", new RecipientTarget($"users/{userId}")), ct))
+    {
+        Console.WriteLine($"{result.Transport}: {result.Status}");
+    }
+
+    return Results.Ok();
+});
+```
+
 ```shell
 dotnet run
 ```
 
-Wire `SubscriptionService.SubscribeAsync` and `NotificationService.NotifyAsync` into an endpoint or
-the create pipeline, then subscribe and notify:
+Call the endpoint with a recipient identifier:
+
+```shell
+curl -X POST http://localhost:5000/demo/notify/alice
+```
+
+The console shows one delivery and its transport result:
 
 ```text
 [console:desk-1] Welcome, Alice
@@ -146,6 +175,7 @@ console: Sent
 
 ## Next steps
 
+- [Insight](insight.md) — add federated read queries beside the Student resource
 - [Modular](modular.md) — package the transport in its own module
 - [Event Bus](event-bus.md) — publish a domain event that triggers a push send
 

@@ -69,7 +69,7 @@ response advisors.
 | `AdviceResponseFreshness`   | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
 | `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key                                                      |
 
-Responses are full: AIP-157 partial responses are not supported, and no response-stage trimming runs.
+Schemata returns the full detail and provides no AIP-157 partial-response selection stage or response-stage trimming.
 
 ## Extension points
 
@@ -92,6 +92,8 @@ request's first arrival; a cached result is returned only after that request wou
   `RequestId` can legitimately appear in several cache entries.
 - `CreateRequestValidationSuppressed` is placed on `AdviceContext` by `ResourceAdviceContext.Create` when
   `SchemataResourceOptions.SuppressCreateValidation` is set; it affects only the current request scope.
+- Create request advisors receive a `ResourceRequestContainer<TEntity>`, but Create does not enter its
+  `QueryAdvice` because the path maps and persists a new entity without a container-scoped entity load.
 
 ## See also
 

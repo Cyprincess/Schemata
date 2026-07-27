@@ -2,7 +2,8 @@
 
 Add a BPMN process engine to the Student app and model a small enrollment workflow with the
 code-first C# DSL: a start event, a review activity, an exclusive decision, and two end events. This
-guide builds on [Getting Started](getting-started.md).
+is a feature branch after [Multi-Tenancy](multi-tenancy.md): it reuses the established `Student`
+repository and works when you skip the tenancy branch.
 
 ## Add the package
 
@@ -65,23 +66,16 @@ public sealed class EnrollmentProcess : ProcessDefinition
         this.Start().Go(Review);
 
         this.During(Review).Decide(
-            this.When<Application>(a => a.Accepted).Go(Approved),
+            this.When<Student>(student => student.Age >= 18).Go(Approved),
             this.Otherwise().Go(Rejected));
     }
 }
 
-// Application is a source entity. When<Application> requires ICanonicalName.
-public sealed class Application : ICanonicalName
-{
-    public string? Name          { get; set; }
-    public string? CanonicalName { get; set; }
-    public bool    Accepted      { get; set; }
-}
 ```
 
-The `Application` source type must implement `ICanonicalName`. The `When<Application>` constraint is
+`Student` is the source entity already registered by Getting Started. The `When<T>` constraint is
 `where T : class, ICanonicalName`; the predicate evaluates against the source bound to the current
-token under the binding name `application` (the type name lowercased and underscored).
+token under the binding name `student` (the type name lowercased and underscored).
 
 DSL methods map to BPMN node types:
 
@@ -153,7 +147,7 @@ Content-Type: application/json
 
 {
   "definitionName": "EnrollmentProcess",
-  "source": "applications/a1",
+  "source": "students/a1b2c3d4e5f6a7b8",
   "displayName": "...",
   "description": "...",
   "requestId": "..."
@@ -161,8 +155,9 @@ Content-Type: application/json
 ```
 
 When `source` is present, the handler resolves the entity through `IRepository<T>` and binds it via
-`IFlowRunner.StartAsync<TState>`. When `source` is absent, the handler falls through to the
-sourceless overload. The endpoint responds `200 OK` with the process row.
+`IFlowRunner.StartAsync<TState>`. Use the `name` returned by the Student create endpoint. When
+`source` is absent, the handler falls through to the sourceless overload. The endpoint responds
+`200 OK` with the process row.
 
 A complete body follows `CompleteActivityRequest`:
 
@@ -187,8 +182,8 @@ using Schemata.Flow.Foundation;
 // Sourceless variant.
 var process = await runner.StartAsync("EnrollmentProcess", ct: ct);
 
-// Variant binding a source entity. Application must implement ICanonicalName.
-var process = await runner.StartAsync("EnrollmentProcess", application, ct: ct);
+// Variant binding the Student source entity from Getting Started.
+var process = await runner.StartAsync("EnrollmentProcess", student, ct: ct);
 ```
 
 Both overloads accept an optional `StartProcessOptions` (`DisplayName`, `Description`,

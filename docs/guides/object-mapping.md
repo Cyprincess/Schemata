@@ -2,7 +2,8 @@
 
 Split the API surface from the stored entity. Introduce a request DTO and two response DTOs so
 clients see only the fields they need, while the `Student` entity stays the database shape. This
-guide builds on [Getting Started](getting-started.md).
+guide follows [Unit of Work](unit-of-work.md), but changes only the resource contracts, so it also
+works from [Getting Started](getting-started.md) when you skip Unit of Work.
 
 ## What you have
 
@@ -119,7 +120,7 @@ schema.UseResource()
 
 A `PATCH` request maps through `ISimpleMapper`. The update handler reads `IUpdateMask.UpdateMask`:
 
-- No mask, or the `*` wildcard, maps with `ISimpleMapper.Map(request, entity)` — a merge that keeps
+- An omitted mask, or the `*` wildcard, maps with `ISimpleMapper.Map(request, entity)` — a merge that keeps
   the destination value for any null or blank source field.
 - A mask resolves its `snake_case` paths to CLR property paths, then maps with
   `ISimpleMapper.Map(request, entity, fields)`. Listed fields are written authoritatively;
@@ -160,7 +161,7 @@ The response is a `StudentDetail`:
 }
 ```
 
-List responses return `StudentSummary` items, without timestamps or ETags.
+List responses return `StudentSummary` items; its contract omits timestamps and ETags.
 
 ## Next steps
 

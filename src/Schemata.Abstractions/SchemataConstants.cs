@@ -1935,7 +1935,10 @@ public static class SchemataConstants
         /// <summary>Restores a soft-deleted resource, per AIP-164.</summary>
         public const string Undelete = "undelete";
 
-        /// <summary>Waits for a long-running operation to reach a terminal state, per AIP-151.</summary>
+        /// <summary>
+        ///     Waits for a long-running operation to reach a terminal state, mirroring
+        ///     <c>WaitOperation</c> on the <c>google.longrunning.Operations</c> service.
+        /// </summary>
         public const string Wait = "wait";
     }
 

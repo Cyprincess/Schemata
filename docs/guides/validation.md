@@ -1,8 +1,9 @@
 # Validation
 
-Add server-side input validation with FluentValidation. Registration goes through
-`IServiceCollection.AddValidator<TValidator>()`; there is no `UseValidation` builder method. This
-guide builds on [Object Mapping](object-mapping.md).
+Add server-side input validation with FluentValidation. Register each validator through
+`IServiceCollection.AddValidator<TValidator>()`. This guide follows [Query Caching](query-caching.md)
+and requires [Object Mapping](object-mapping.md) because it validates `StudentRequest`; Query Caching
+itself remains optional.
 
 ## How it works
 

@@ -77,7 +77,7 @@ value       = integer | number | TRUE | FALSE | NULL | unquoted | quoted
 | Logical OR                 | `OR`       | Case-insensitive.                                                   |
 | Logical NOT                | `NOT`, `-` | Case-insensitive.                                                   |
 
-`AND` binds tighter than `OR`; adjacent terms with no explicit operator are implicitly ANDed.
+`OR` binds tighter than `AND`; adjacent terms with no explicit operator are implicitly ANDed.
 
 ### Literals
 

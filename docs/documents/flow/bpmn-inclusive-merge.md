@@ -51,8 +51,8 @@ arrivals. Waiting for C would park the process forever. If the split selected on
 must fire after A arrives. If A arrives while B is still active and can reach the merge, A must
 wait.
 
-Schemata solves this by looking at live tokens, not only gateway degree. A path is dead when no live
-token outside the arriving token can reach the merge in the current process definition.
+Schemata resolves the merge from live-token reachability rather than gateway degree. A path is dead
+when no live token outside the arriving token can reach the merge in the current process definition.
 
 ## Engine algorithm
 

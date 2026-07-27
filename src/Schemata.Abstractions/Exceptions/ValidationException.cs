@@ -9,8 +9,11 @@ namespace Schemata.Abstractions.Exceptions;
 ///     Request validation failed with field-level violation details.
 /// </summary>
 /// <remarks>
-///     Maps to <c>google.rpc.Code.INVALID_ARGUMENT</c> (HTTP 422), per
-///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
+///     Carries the canonical status <c>google.rpc.Code.INVALID_ARGUMENT</c>, per
+///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>, and defaults to
+///     HTTP 422 so that validation failures stay distinguishable from malformed requests.
+///     <c>google.rpc.Code</c> maps <c>INVALID_ARGUMENT</c> to HTTP 400, which is the default
+///     <see cref="InvalidArgumentException" /> uses.
 ///     Attaches <see cref="ErrorReasons.ValidationFailed" /> on
 ///     <see cref="ErrorInfoDetail" />; each field-level violation is surfaced through
 ///     <see cref="BadRequestDetail.FieldViolations" />.

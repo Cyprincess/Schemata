@@ -39,8 +39,8 @@ Receives the `DeleteRequest`, the container, and the principal. Authorization ad
 
 ### 4. Entity load
 
-The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so an already-tombstoned entity can be
-hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRequest.AllowMissing` is set
+The entity is loaded with `EnterQueryAdvice(container)` outside `_repository.SuppressQuerySoftDelete()`, so an
+already-tombstoned entity can be hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRequest.AllowMissing` is set
 (AIP-135), in which case the delete returns an empty success without committing. Over HTTP the flag is the
 `allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.
 
@@ -74,12 +74,14 @@ for a hard delete; gRPC returns the detail message or `google.protobuf.Empty`.
 
 ## Built-in soft-delete methods
 
-`SchemataResourceFeature.RegisterResource` adds three AIP-164/165 custom methods to every `ISoftDelete` resource.
-Each is skipped when the `Operations` whitelist excludes it or the entity already declares the same verb.
+`SchemataResourceFeature.RegisterResource` adds Schemata's `undelete`, `expunge`, and `purge` custom methods to
+every `ISoftDelete` resource. AIP-164 says a soft-deletable resource should provide `Undelete` and may provide
+`Expunge`; AIP-165 specifies the criteria-based `Purge` operation. Each method is skipped when the `Operations`
+whitelist excludes it or the entity already declares the same verb.
 
 | Method      | Route                                   | Handler                             | Behavior                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                                                               |
+| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException`                                                                                                                                                                                                                                                                      |
 | `:expunge`  | `POST /v1/{collection}/{name}:expunge`  | `ExpungeHandler<TEntity>`           | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                         |
 | `:purge`    | `POST /v1/{collection}:purge`           | `PurgeHandler<TEntity>`             | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the open-generic job and its `PurgeJobKeyResolver` (mapping the stable `purge:{collection}` key back to the closed type after a restart) are registered by the resource feature, and the handler throws `InvalidOperationException` when no scheduler is registered |
 

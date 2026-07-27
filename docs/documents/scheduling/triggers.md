@@ -125,7 +125,7 @@ and fire immediately.
 | -------------------- | ---------------------------------------------------------------------- |
 | `Skip`               | Advance `NextRunTime` without firing; log at `Information`.            |
 | `FireOnce` (default) | Fire once immediately, then advance to the next occurrence.            |
-| `FireAll`            | Replay every missed occurrence in sequence, capped at 1024 iterations. |
+| `FireAll`            | Replay every missed occurrence in sequence, capped by `MaxMissedWalk` (100,000 by default). |
 
 `FireOnce` is the default. Use `Skip` for snapshots where a missed window is acceptable, and `FireAll`
 only when every missed occurrence has independent business value — a 1-minute job paused for a day

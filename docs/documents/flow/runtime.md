@@ -104,7 +104,8 @@ public interface IFlowRunner
 
 `FlowRunner` exposes five `StartAsync` overloads in addition to the two `IFlowRunner` ones. The
 extra overloads carry a `ClaimsPrincipal?` and are used by the HTTP and gRPC transport handlers so
-the foundation layer never reads `HttpContext` directly.
+the foundation layer never reads `HttpContext` directly. Its public `RunEventAsync` entry point lets
+the event and scheduling bridges address a persisted token through the same transition path.
 
 ```csharp
 ValueTask<SchemataProcess> StartAsync(
@@ -168,7 +169,9 @@ Every state-changing method follows the same pattern:
 
 1. Load persisted tokens for the addressed process.
 2. Snapshot previous waiting positions for advisor comparisons (`WaitingMap(tokens)`).
-3. Create `FlowExecutionContext` with the shared `IUnitOfWork` and application `IServiceProvider`.
+3. Create `FlowExecutionContext` with the shared `IUnitOfWork`, the execution scope's
+   `IServiceProvider`, and the initiating principal. Timer and event bridges set the principal to
+   `null` for system-initiated continuations.
 4. Invoke the engine driver to compute a `ProcessSnapshot`.
 5. For each distinct token in the snapshot, build a `FlowTransitionContext` and run the
    `IFlowSourceAdvisor<TSource>` pipeline for every binding row in that token's scope, then flush
@@ -288,9 +291,8 @@ supplied runtime work, and commits. `PersistSnapshotAsync` upserts the process a
 appends transition rows. Source-binding rows are written through `BindStartSourceAsync` on the
 start path and through `FlowTaskContext.BindSourceAsync` for token-scoped rows; their concurrency
 stamps are refreshed by the source advisor pipeline on every transition. All five repositories commit or
-roll back together because they share the same unit of work. There is no persistence
-observer; durability is built into the runtime's commit path, and lifecycle observers are
-post-commit notifications.
+roll back together because they share the same unit of work. `ProcessPersistence` owns durability in
+the runtime commit path, and lifecycle observers are post-commit notifications.
 
 ### Persisted compensation bindings
 
@@ -399,8 +401,8 @@ member and skips the update when nothing changed.
 ### Concurrency-stamp protocol
 
 Each binding row's `SourceTimestamp` mirrors the bound entity's `IConcurrency.Timestamp`. On every
-transition the framework validates all binding rows the process holds for that entity, not just
-the rows in the current token's scope, and after the entity write it refreshes every one of them
+transition the framework validates every binding row the process holds for that entity across token
+scopes, and after the entity write it refreshes every one of them
 to the new timestamp. Validating and refreshing across the whole entity is what keeps per-token
 bindings of one entity from raising false conflicts when a sibling branch writes. A stale row
 aborts the transition with `FailedPreconditionException`, reason
@@ -421,6 +423,10 @@ observes the task's mutations within the same unit of work. Condition evaluation
 write back sources: conditions are pure reads, and application code must not mutate a source
 inside a `When<T>` predicate.
 
+`FlowSourceReadScope` suppresses owner and soft-delete query filters while a process reads an
+already-bound source. The durable binding authorizes that transition to retain access to its source;
+the suppression applies only for the guarded repository read.
+
 Projected values are part of the application's data contract. Consumers read business node names
 and lifecycle states from the source row, so renaming a flow node changes what those consumers
 observe. Treat node names as stable identifiers once a process runs in production.
@@ -429,6 +435,7 @@ observe. Treat node names as stable identifiers once a process runs in productio
 ## IFlowTransitionAdvisor
 
 ```csharp
+using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Models;
@@ -444,6 +451,7 @@ public class FlowTransitionContext
     public required TokenSnapshot Token           { get; init; }
     public string?            PreviousWaitingAtName { get; set; }
     public IUnitOfWork?       UnitOfWork          { get; set; }
+    public ClaimsPrincipal?   Principal           { get; init; }
 }
 ```
 
@@ -453,7 +461,8 @@ advisors provision wake-up infrastructure for the new waiting state and return `
 aborts the transition so a process never persists into a state whose timer job or event
 subscription was never created. The `PreviousWaitingAtName` field is the only source for the
 pre-transition waiting element, because the snapshot already reflects the engine result by the time
-the advisor runs.
+the advisor runs. `Principal` carries the initiating caller and is `null` for timer and event bridge
+continuations.
 
 `Schemata.Flow.Event` registers `AdviceTransitionEvent` to maintain
 `IRepository<SchemataEventSubscription>` rows; `Schemata.Flow.Scheduling` registers

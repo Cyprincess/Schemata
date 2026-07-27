@@ -1,8 +1,8 @@
 # Event Bus
 
 Add an in-process event bus to the Student CRUD app: register an event type, wire a producer and
-consumer, and handle the event with a typed handler. This guide builds on
-[Getting Started](getting-started.md).
+consumer, and handle the event with a typed handler. This is an event-driven branch after
+[Flow](flow.md) and only requires the Student repository from [Getting Started](getting-started.md).
 
 ## Add the package
 
@@ -93,31 +93,50 @@ The handler is registered as scoped through `TryAddEnumerable`, so calling `UseH
 a different handler for the same event adds it rather than replacing the first — every matching
 handler runs on dispatch.
 
-## Publish an event
+## Publish after the student commit
 
-Inject `IEventBus` and call `PublishAsync`:
+Publish from a committed advisor so the event is recorded only after the Student transaction succeeds:
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Event.Skeleton;
 
-public sealed class EnrollmentService(IEventBus bus)
+public sealed class PublishStudentEnrolledAdvisor(IEventBus bus)
+    : IRepositoryCommittedAdvisor<Student>
 {
-    public async Task EnrollAsync(string name, int age, CancellationToken ct)
-    {
-        // ... persist the student ...
+    public int Order => 0;
 
-        await bus.PublishAsync(new StudentEnrolled {
-            StudentName = name,
-            Age         = age,
-        }, ct);
+    public async Task<AdviseResult> AdviseAsync(
+        AdviceContext        ctx,
+        IRepository<Student> repository,
+        CommitChanges<Student> changes,
+        CancellationToken    ct = default)
+    {
+        foreach (var student in changes.Added)
+        {
+            await bus.PublishAsync(new StudentEnrolled {
+                StudentName = student.FullName,
+                Age         = student.Age,
+            }, ct);
+        }
+
+        return AdviseResult.Continue;
     }
 }
+
+schema.ConfigureServices(services => {
+    services.TryAddEnumerable(
+        ServiceDescriptor.Scoped<IRepositoryCommittedAdvisor<Student>, PublishStudentEnrolledAdvisor>());
+});
 ```
 
 `PublishAsync` records the event in a durable outbox and returns immediately — it does not run the
 handler inline. A background dispatcher drains the outbox and invokes `StudentEnrolledHandler` a
-moment later. The handler may run after `EnrollAsync` has already returned, so write handlers to be
-idempotent.
+moment later. The handler can run after the HTTP response returns, so write handlers to be idempotent.
 
 ## Verify
 
@@ -131,7 +150,7 @@ curl -X POST http://localhost:5000/v1/students \
      -d '{"full_name":"Alice","age":20}'
 ```
 
-If you publish `StudentEnrolled` from a service wired to the create pipeline, the console prints,
+The committed advisor publishes `StudentEnrolled` after the Student create commits. The console prints,
 shortly after the response, once the outbox dispatcher drains the row:
 
 ```text

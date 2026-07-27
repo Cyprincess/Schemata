@@ -1,6 +1,6 @@
 # src — Runtime Packages
 
-60 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
+65 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
 
 ## Suffix Vocabulary
 
@@ -19,6 +19,10 @@
 | `FluentValidation` | validation vendor adapter |
 | `Identity` (as suffix) | Identity-bridging variant (Authorization.Identity ties OAuth to ASP.NET Core Identity) |
 | `Owner` | per-entity ownership advisor for the repository pipeline |
+| `Bpmn` | full BPMN 2.0.2 alternate engine for the Flow AST |
+| `Aip` / `Cel` / `Order` | expression-language implementations behind `Expressions.Skeleton` |
+| `Transport` (as domain) | shared HTTP / gRPC plumbing; no Skeleton, pulled in by every other domain's `.Http` / `.Grpc` |
+| `Modular` (bare) | module discovery and loading on top of `Core` |
 
 ## Domain Map
 
@@ -56,6 +60,8 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 ### Expressions (parsers + planners)
 
 - `Skeleton` ← `Order`, `Cel`, `Aip` (siblings independent of each other)
+- No `src/` csproj references `Aip`, `Cel` or `Order`. Insight, Resource and Flow depend on `Expressions.Skeleton` only; consumers pick the language package through a meta target or an explicit `PackageReference`.
+- Compilers, pushdown planners and language descriptors are keyed DI services (`"aip"` / `"cel"`); `IOrderCompiler` is the one non-keyed registration.
 
 ### Flow (BPMN process engine)
 
@@ -81,6 +87,13 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 ### Push (notification scheduling)
 
 - `Skeleton` ← `Foundation` (uses `Entity.Owner`) ← `Scheduling` (uses `Scheduling.Foundation`)
+
+### Report (Insight-backed snapshots)
+
+- `Skeleton` ← `Foundation` ← `Http`, `Grpc`, `Scheduling`
+- `Skeleton` depends on `Insight.Skeleton`; `Foundation` pulls `Insight.Foundation` and `Scheduling.Skeleton`
+- Three entities: `SchemataReport` → `SchemataReportSnapshot` → `SchemataReportSnapshotChunk`
+- Nothing in `src/` consumes Report — it sits at the top of the dependency graph.
 
 ### Resource (Google AIP CRUD)
 
@@ -128,6 +141,7 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 
 ## Notes
 
-- File counts: hot spots are `Schemata.Authorization.Foundation` (120), `Schemata.Flow.Skeleton` (107), `Schemata.Abstractions` (101), `Schemata.Resource.Foundation` (90), `Schemata.Authorization.Skeleton` (72). Each has its own `AGENTS.md` where present.
+- File counts: hot spots are `Schemata.Authorization.Foundation` (121), `Schemata.Flow.Skeleton` (109), `Schemata.Abstractions` (104), `Schemata.Resource.Foundation` (85), `Schemata.Authorization.Skeleton` (72), `Schemata.Identity.Skeleton` (49).
+- Packages with their own `AGENTS.md`: Abstractions, Advice, Authorization.Foundation, Authorization.Skeleton, Common, Core, Entity.Repository, Expressions.Skeleton, Flow.Bpmn, Flow.Foundation, Flow.Skeleton, Identity.Skeleton, Insight.Foundation, Report.Foundation, Resource.Foundation, Scheduling.Foundation. Several of those cover their whole domain, not just their own package — Expressions.Skeleton covers Aip/Cel/Order, Scheduling.Foundation covers the Skeleton, Report.Foundation and Insight.Foundation cover all layers of their domains.
 - The advice generator is auto-attached as an analyzer to every `src/*` project via [../Directory.Build.props](../Directory.Build.props#L90-L94). Skip with `-p:SchemataSkipGenerators=true`.
 - All packages share `Schemata.png` / `LICENSE` / root `README.md` for the NuGet display via `PackageIconFullPath` + `PackageReadmeFile` resolved in [../Directory.Build.props](../Directory.Build.props#L120-L130).

@@ -1,10 +1,11 @@
 # Error Model
 
-Schemata returns structured errors per [Google AIP-193](https://google.aip.dev/193). Every error
-carries an HTTP status code, a canonical `google.rpc.Code` string, a developer message, and typed
-detail entries on the exception itself. The HTTP exception-handler middleware turns any
-`SchemataException` into the JSON envelope automatically; any other exception becomes a generic
-500 with a request trace identifier.
+Schemata formats most `SchemataException` subclasses as structured errors per
+[Google AIP-193](https://google.aip.dev/193). Each AIP-style exception carries an HTTP status code,
+a canonical `google.rpc.Code` string, a developer message, and typed detail entries on the exception
+itself. `OAuthException` instead emits the RFC 6749 OAuth error envelope. The HTTP
+exception-handler middleware turns any `SchemataException` into its response envelope; any other
+exception becomes a generic 500 with a request trace identifier.
 
 ## Where the code lives
 
@@ -51,7 +52,7 @@ specific value such as `USER_NOT_FOUND`.
 
 | Property  | Type                  | Description                                                                         |
 | --------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `code`    | `int`                 | The HTTP status code (mirrors `google.rpc.Status.code`, e.g. `404`)                 |
+| `code`    | `int`                 | The HTTP status code (e.g. `404`), rather than the numeric `google.rpc.Status.code` |
 | `status`  | `string?`             | The canonical `google.rpc.Code` name (e.g. `"NOT_FOUND"`) for client-side branching |
 | `message` | `string?`             | Developer-oriented diagnostic message, not localized for display                    |
 | `details` | `List<IErrorDetail>?` | Typed detail entries; each serializes with an `@type` discriminator                 |
@@ -130,7 +131,7 @@ returns `null` so no body is written.
 
 Resource-themed exceptions (`NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`,
 `PERMISSION_DENIED`, `ABORTED`) flow through
-[`SchemataResourceErrors`](file:///D:/source/repos/Cyprin/Schemata/src/Schemata.Common/Errors/SchemataResourceErrors.cs)
+`SchemataResourceErrors`
 in `Schemata.Common.Errors`. Each factory method pre-attaches:
 
 - `ErrorInfoDetail` with the matching AIP-193 `Reason`,
@@ -140,8 +141,10 @@ in `Schemata.Common.Errors`. Each factory method pre-attaches:
   `PreconditionViolation` whose `Subject` is the precondition identifier (e.g.
   `SchemataConstants.PreconditionSubjects.SoftDeleted`).
 
-`Owner` is only populated on `PermissionDenied<T>`; `NotFound<T>` omits it per AIP-211 to avoid
-leaking existence.
+`Owner` is populated only on `PermissionDenied<T>`; `NotFound<T>` leaves it unset. This is a
+Schemata policy. [AIP-211](https://google.aip.dev/211) requires failed authorization checks to
+return `PERMISSION_DENIED` and recommends a message that allows for unknown resource existence; it
+does not define `ResourceInfo.owner`.
 
 ```csharp
 using Schemata.Common.Errors;
@@ -221,11 +224,18 @@ exceptions emit their own envelope.
 
 ## Caveats
 
-- `ValidationException` uses HTTP 422, not 400, to separate validation failures from malformed
+- `ValidationException` uses HTTP 422 with `INVALID_ARGUMENT`. [`google.rpc.Code`](https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto)
+  maps `INVALID_ARGUMENT` to HTTP 400; Schemata separates validation failures from malformed
   requests.
+- `FailedPreconditionException` uses HTTP 412 with `FAILED_PRECONDITION`. `google.rpc.Code` maps
+  `FAILED_PRECONDITION` to HTTP 400, which `TenantResolveException` uses. The classes have separate
+  defaults, and their source does not state why they differ.
 - `AbortedException` uses HTTP 409 with status `ABORTED`, matching the `google.rpc.Code` table.
-- `NoContentException` is a control-flow signal for validate-only requests; its
-  `CreateErrorResponse` returns `null` and the response is HTTP 204 with no body.
+- `NoContentException` uses HTTP 204 with `OK`; `google.rpc.Code` maps `OK` to HTTP 200. It is a
+  control-flow signal for validate-only requests, and its `CreateErrorResponse` returns `null` so
+  the response has no body.
+- `OAuthException` returns an RFC 6749 `OAuthErrorResponse`; its `error` value is an OAuth error
+  code rather than a `google.rpc.Code` name.
 
 ## See also
 

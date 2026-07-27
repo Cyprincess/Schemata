@@ -6,9 +6,9 @@ An API where deleting a resource sets `DeleteTime` instead of removing the
 row, normal queries exclude deleted rows automatically, and the built-in
 `:undelete` method brings a resource back. The recipe uses the `Student` entity
 from [Getting Started](../guides/getting-started.md) and walks through the
-three advisors that implement AIP-164 soft delete, plus the suppression
-markers you need when purging or listing tombstoned rows from application
-code.
+three advisors that provide Schemata's AIP-164-aligned soft-delete behavior,
+plus the suppression markers you use when purging or listing tombstoned rows
+from application code.
 
 ## Prerequisites
 
@@ -62,7 +62,8 @@ Three advisors activate automatically for any entity that implements
 | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | `Orders.Base` (100M) | Appends `WHERE DeleteTime IS NULL` to every query                 |
 
 **Verify:** `DELETE /v1/students/{name}` returns 200 with the tombstoned row —
-the body carries a non-null `delete_time`, per AIP-164. A subsequent
+the body carries a non-null `delete_time`. AIP-164 says soft-deletable resources
+should provide `delete_time` and `purge_time`; Schemata exposes both. A subsequent
 `GET /v1/students` filters the deleted student out of the results. A direct
 database query confirms the row still exists with `DeleteTime` set.
 
@@ -85,9 +86,9 @@ does not call `Context.Remove(entity)`.
 
 ## Step 3 — Restore a deleted student
 
-Every `ISoftDelete` resource gets the AIP-164 `Undelete` method on its HTTP
-surface for free — `SchemataResourceFeature` registers `UndeleteHandler` for
-it during startup:
+Every `ISoftDelete` resource gets an `Undelete` method on its HTTP surface —
+`SchemataResourceFeature` registers `UndeleteHandler` during startup. This
+implements the method AIP-164 says soft-deletable resources should provide:
 
 ```shell
 curl -X POST http://localhost:5000/v1/students/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6:undelete \
@@ -173,14 +174,15 @@ pre-set `DeleteTime` (e.g., importing archived records) loses it unless you
 scope `SuppressSoftDelete()` around the `AddAsync`.
 
 **`PurgeTime` is a convention field.** The framework stores it and leaves
-enforcement to you. The built-in `POST /v1/students:purge` method is
-filter-driven (AIP-165) — it removes rows matching the request filter on
-demand, and an optional `parent` narrows the purge to that parent's child
-collection. Sending `force = false` runs a preview: the response carries the
-count and a sample of up to 100 matching resource names, and nothing is
-expunged. Time-based reaping needs a scheduled job of your own that queries for
-rows where `PurgeTime <= UtcNow` and calls `RemoveAsync` with
-`SuppressSoftDelete()` scoped around it.
+time-based enforcement to you. The built-in `POST /v1/students:purge` method
+implements AIP-165 as a long-running operation. AIP-165 requires `filter` and
+`force`; Schemata persists those arguments, runs a restart-durable `PurgeJob`,
+and returns an `operations/{operation}` envelope. An optional `parent` narrows
+a child-resource purge. With `force = false`, the completed operation output
+contains the count and a sample of up to 100 matching resource names, and the
+job leaves every row intact. Time-based reaping needs a scheduled job of your
+own that queries for rows where `PurgeTime <= UtcNow` and calls `RemoveAsync`
+with `SuppressSoftDelete()` scoped around it.
 
 **Undelete rides the update pipeline.** The restore goes through the update
 advisor pipeline, so add-time advisors such as `AdviceAddSoftDelete` stay out

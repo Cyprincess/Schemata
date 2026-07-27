@@ -51,8 +51,8 @@ run, `LocalPipelineExecutor` wraps those rows under the source alias before eval
 | `Order`   | driver can apply `OrderNode`                |
 | `Group`   | driver can apply `GroupNode`                |
 | `Limit`   | driver can apply `LimitNode`                |
-| `Join`    | driver can join sources in the same backend |
-| `Nested`  | driver can own nested list projection       |
+| `Join`    | driver can join sources in the same backend; the current executor evaluates joins locally |
+| `Nested`  | driver can materialize child collections for local nested projection |
 
 `DriverCapabilities.All` is the union of all flags. The current splitter uses the plan shape and the
 built-in barriers described below; custom drivers should still report accurate flags because the flags
@@ -60,17 +60,14 @@ are part of the public contract.
 
 ## Pushable and local stages
 
-`PlanExecutor.Split` walks the single-source chain from the root toward `SourceNode`. A plan is handed
-to the driver unchanged until a local barrier appears. The current barriers are:
+`PlanExecutor.Split` walks the single-source chain from the root toward `SourceNode`. It leaves a
+top-level `LimitNode` local and stops before any other stage the driver does not advertise. Computed
+selections run locally. A selection containing nested items also runs locally so the child pipeline can
+filter, order, limit, compute, group, and project its collection.
 
-- `ComputeNode`
-- `GroupNode`
-- a `SelectionNode` containing nested or computed selections
-
-When a barrier exists, only the source plus contiguous filter/order stages below the barrier are pushed.
-The barrier and every stage above it run locally. A nested selection also appears in the pushable side so
-the repository driver can materialize child lists, then it runs locally for child pipelines and final
-projection.
+When a driver advertises `Nested`, the splitter also sends a nested-only selection in the pushed prefix
+so the driver can materialize the child collection. A driver without `Nested` leaves the terminal
+selection local and supplies a child collection in its raw parent rows when it supports nested data.
 
 ## Local pipeline
 
@@ -82,6 +79,9 @@ projection.
 
 It supports filter, compute, group, order, limit, selection, and join stages. Computed values and group
 aggregates become root scalar keys. Terminal selection flattens the response shape.
+
+Local `Min` and `Max` use one comparer. Values of the same CLR type use `IComparable`; mixed numeric
+types are converted through `double` before comparison.
 
 Joins are local nested-loop joins over compiled predicates. The buffered side is capped by
 `SchemataInsightOptions.MaxResidualScanRows` (default 10,000).
@@ -107,15 +107,13 @@ comparing `ResourceNameDescriptor.ForType(type).Collection`.
 `RepositoryDriver.Capabilities` includes:
 
 - `Filter`
-- `Compute`
 - `Project`
 - `Order`
-- `Group`
-- `Limit`
+- `Nested`
 
-It does not report `Join` because joins can span heterogeneous repository providers. It does not report
-`Nested`, although it can eager-load navigation collections and pass child rows into the local nested
-selection pipeline.
+It does not report `Compute`, `Group`, `Limit`, or `Join`; those stages can span heterogeneous
+providers or need local execution. Its `Nested` capability eager-loads navigation collections and
+passes child rows into the local nested selection pipeline.
 
 ### Query lowering
 
@@ -137,7 +135,8 @@ The driver then streams repository entities, applies every residual predicate, a
 ### Nested selections and EF Include
 
 Nested selections need the parent navigation collection loaded before the local child pipeline runs.
-`RepositoryDriver.NavigationNames` strips the parent alias and Pascalizes each segment:
+`RepositoryDriver` receives the nested-only push selection, and `RepositoryDriver.NavigationNames`
+strips the parent alias and Pascalizes each segment:
 
 ```text
 c.orders -> Orders
@@ -149,7 +148,9 @@ reflectively. EF Core providers receive the string include. Providers without th
 without include support, so navigation loading follows the provider's own behavior.
 
 `RowMaterializer` converts each child object in the navigation collection into a snake_case dictionary.
-The nested local pipeline then filters, orders, limits, computes, groups, and projects those child rows.
+The local fallback anchors a nested path to its owning source dictionary, accepts dictionary or CLR
+child values, and applies the child pipeline. A missing child collection raises `UNIMPLEMENTED`; a
+non-collection value raises `INVALID_ARGUMENT`.
 
 ### Schema materialization
 
@@ -167,6 +168,12 @@ The nested local pipeline then filters, orders, limits, computes, groups, and pr
 | other types                  | `Object`    |
 
 Computed selections currently report `FieldType.Object` because the expression result type is dynamic.
+
+### Multi-source schema
+
+Multi-source plans run their joins and terminal selection locally. `PlanExecutor` rebuilds the response
+schema from that local selection output rather than returning a driver schema, preserving selected
+field aliases, computed fields, and nested descriptors.
 
 ## Source-level security
 

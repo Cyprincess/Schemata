@@ -132,6 +132,19 @@ The federated read-query system.
 | [Drivers](insight/drivers.md)       | `ISourceDriver`, pushdown, residual stages, repository source behavior   |
 | [Transports](insight/transports.md) | HTTP and gRPC query endpoints and error translation                      |
 
+## Report
+
+Report definitions and the snapshots they materialize from Insight queries.
+
+| Document                                    | Covers                                                        |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| [Overview](report/overview.md)              | Packages, startup, options, and the persistence boundaries    |
+| [Definitions](report/definitions.md)        | Configuration, the program DSL, and database-backed rows      |
+| [Generation](report/generation.md)          | `IReportService`, inline runs, and long-running operations    |
+| [Snapshots](report/snapshots.md)            | Chunked materialization, snapshot states, and retention       |
+| [Transports](report/transports.md)          | HTTP routes, gRPC services, and paged snapshot reads          |
+| [Scheduling Integration](report/scheduling.md) | Periodic definitions armed through the scheduler           |
+
 ## Flow
 
 The BPMN process engine.
@@ -145,6 +158,8 @@ The BPMN process engine.
 | [Validator](flow/validator.md)               | Process-definition validation rules         |
 | [Runtime Services](flow/runtime.md)          | `FlowRunner`, persistence, registration     |
 | [State Machine](flow/state-machine.md)       | The default engine wiring                   |
+| [BPMN Engine](flow/bpmn-engine.md)           | The full BPMN 2.0.2 multi-token engine      |
+| [BPMN Inclusive Merge](flow/bpmn-inclusive-merge.md) | Live-token analysis at an inclusive join |
 | [Event Integration](flow/event.md)           | Message and signal catches on the event bus |
 | [Scheduling Integration](flow/scheduling.md) | Timer catches on the scheduler              |
 | [HTTP Transport](flow/http.md)               | The process surface over HTTP               |

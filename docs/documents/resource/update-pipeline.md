@@ -9,7 +9,8 @@ sequences advisors within a stage.
 
 | Package                        | Key files                                                                                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`, `ResourceWireMask.cs`                                                                                                    |
+| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`                                                                                                                             |
+| `Schemata.Common`              | `ResourceWireNameRules.cs`                                                                                                                                        |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs`, `Advisors/AdviceUpdateRequestValidation.cs`                                                                         |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`, `Advisors/AdviceUpdateSoftDeleted.cs`, `Advisors/AdviceUpdateFreshness.cs` |
 | `Schemata.Abstractions`        | `Resource/UpdateResultBase.cs`, `Resource/IUpdateMask.cs`                                                                                                      |
@@ -39,11 +40,13 @@ and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 
 ### 4. Entity load
 
-The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so a tombstoned resource can be updated. A
-null result throws `ResourceNotFound(name)` — unless the request implements
+The entity is loaded with `EnterQueryAdvice(container)` outside `_repository.SuppressQuerySoftDelete()`, so a
+tombstoned resource can be updated. A null result throws `ResourceNotFound(name)` — unless the request implements
 `Schemata.Abstractions.Resource.IAllowMissing` with `AllowMissing = true`, in which case the handler runs the
 create path (`CreateMissingAsync`): the request is mapped to a new entity, the create-request advisor chain
 runs, and the entity is added instead of updated. The update mask is ignored on this path, per AIP-134.
+`CreateMissingAsync` does not enter query advice, so request-container entries apply only to the initial
+existing-entity lookup.
 
 ### 5. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
 
@@ -69,7 +72,7 @@ if (mask is null || mask.Trim() == Wildcards.Any) {
 ```
 
 With no mask (or `update_mask=*`) the mapper merges the whole request. With a mask, `ResolveMaskFields` converts
-the wire paths to CLR leaf paths through `MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireMask.Convert)`
+the wire paths to CLR leaf paths through `MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireNameRules.ResolveClrName)`
 and copies only those fields. An unknown segment throws `ValidationException` (`InvalidUpdateMask`).
 
 ### 7. Persistence
@@ -79,13 +82,13 @@ and copies only those fields. An unknown segment throws `ValidationException` (`
 ### 8. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
 The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseParent` derives
-`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag). Responses are full; partial responses are
-not supported.
+`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag). The response chain maps the full detail and
+does not project selected response fields.
 
 ## Field masks (AIP-161)
 
 `UpdateMask` is a comma-separated list of wire-format (snake_case) field paths. Dot paths target nested object
-fields; `ResourceWireMask.Convert` maps the AIP wire aliases (`name` to the canonical-name property, `etag` to
+fields; `ResourceWireNameRules.ResolveClrName` maps the AIP wire aliases (`name` to the canonical-name property, `etag` to
 the entity-tag property, and the plural collection field) before falling back to PascalCase. Only the listed
 fields are applied.
 

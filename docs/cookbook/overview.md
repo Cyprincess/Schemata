@@ -17,6 +17,7 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 | Recipe                                  | What it covers                                              |
 | --------------------------------------- | ----------------------------------------------------------- |
 | [Cron Jobs](cron-jobs.md)               | A cron schedule with Cronos syntax and a missed-fire policy |
+| [Scheduled Report](scheduled-report.md) | A periodic report definition with a snapshot retention window |
 | [Flow with Timers](flow-with-timers.md) | A BPMN intermediate timer catch fired through the scheduler |
 | [Flow with Events](flow-with-events.md) | A BPMN event-based gateway correlated through the event bus |
 

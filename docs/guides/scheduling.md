@@ -1,7 +1,8 @@
 # Scheduling
 
 Add background job scheduling to the Student CRUD app: register a recurring job on a 5-field Cronos
-cron expression. This guide builds on [Getting Started](getting-started.md).
+cron expression. This is a background-work branch after [Event Bus](event-bus.md) and only requires
+the persistence setup from [Getting Started](getting-started.md).
 
 ## Add the package
 
@@ -59,8 +60,8 @@ public sealed class StudentReportJob : IScheduledJob
 ```
 
 `IScheduledJob` has one method. `JobContext.Job` is the `SchemataJob.Name`; `JobContext.Variables` is
-the dictionary deserialized from `SchemataJob.Variables`. The scheduler resolves the job from DI as a
-transient on each fire.
+an `IReadOnlyDictionary<string, string?>` deserialized from `SchemataJob.Variables`. The scheduler
+resolves the job from DI as a transient on each fire.
 
 The scheduler persists each definition and run, so configure a persistence provider (the EF Core
 setup from Getting Started) for the `SchemataJob` and `SchemataJobExecution` rows.
@@ -126,6 +127,7 @@ Every 5 minutes the console prints:
 
 ## Next steps
 
+- [Push](push.md) — fan out notifications from a scheduled job
 - [Event Bus](event-bus.md) — subscribe to `JobTriggered` / `JobCompleted` / `JobFailed`
 - [Flow](flow.md) — BPMN timer catches fire through this scheduler
 - [Modular](modular.md) — package jobs in a self-contained module

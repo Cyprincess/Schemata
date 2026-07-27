@@ -45,7 +45,7 @@ public enum ScheduleType { OneTime, Periodic, Cron }
 public enum JobState { Active, Paused, Completed, Failed, Cancelled }
 ```
 
-`Active` jobs are loaded by `SchedulingInitializer` on startup. `Paused` jobs are recorded but not armed. `Completed`, `Failed`, and `Cancelled` are terminal states.
+`Active` jobs are loaded by `SchedulingInitializer` on startup. `Paused` jobs are recorded but not armed. `Completed`, `Failed`, and `Cancelled` are terminal job states.
 
 ## SchemataJobExecution
 
@@ -97,7 +97,7 @@ State transitions are:
 | `Pending` / `Running` | `Cancelled` | `CancelOperationHandler` for non-terminal operations.                                            |
 | `Running`             | `Failed`    | `SchedulingInitializer` on startup for rows orphaned by a host restart.                          |
 
-Terminal states are `Succeeded`, `Failed`, `Cancelled`, `Blocked`, and `Skipped`. `WaitOperationHandler` polls until it sees one of the terminal operation states it recognizes (`Succeeded`, `Failed`, or `Cancelled`) or its timeout elapses.
+`Blocked` and `Skipped` are advisor outcomes recorded on the execution row. The operation envelope sets `done` only for `Succeeded`, `Failed`, and `Cancelled`; `WaitOperationHandler` polls that envelope until `done` is true or its timeout elapses.
 
 ## Startup loading
 

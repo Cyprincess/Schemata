@@ -72,7 +72,7 @@ if (plan.Pushed is not null) {
 }
 
 if (plan.Residual is not null) {
-    residual = compiler.Compile<TEntity, bool>(plan.Residual).Compile();
+    residual = ExpressionCache.GetOrAddDelegate(compiler.Compile<TEntity, bool>(plan.Residual));
 }
 ```
 
@@ -98,7 +98,7 @@ var order = compiler.CompileOrder<TEntity>(request.OrderBy);
 container.ApplyOrdering(KeyOrdering<TEntity>.Compose(order));
 ```
 
-The syntax is AIP-132: comma-separated fields with optional `asc` or `desc` direction.
+Per AIP-132, `order_by` is a comma-separated field list: ascending is the default and a ` desc` suffix selects descending order. `OrderCompiler` also accepts a case-insensitive `asc` suffix as a Schemata extension.
 
 ```text
 GET /v1/students?order_by=age desc, full_name asc
@@ -149,15 +149,22 @@ Without a residual predicate, paging applies in the backend query with one look-
 
 ## `ResourceRequestContainer`
 
-`ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>`:
+`ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>` and carries explicit query advice:
 
-| Method                              | Effect                                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Member                              | Effect                                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `QueryAdvice`                       | A `ResourceQueryAdvice` instance that supplies explicit entries to the repository `AdviceContext` for a query. |
 | `ApplyWhere(predicate)`             | Appends `Where(predicate)`; serves AIP-160 filtering and advisor predicates (parent scoping, entitlement filtering). |
-| `ApplyOrdering(order)`              | Applies the order function.                                                                       |
-| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row.                                                |
+| `ApplyOrdering(order)`              | Applies the order function.                                                                                       |
+| `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row.                                                                |
 
 The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, and `ListAsync`.
+
+`ResourceQueryAdvice` is a sealed collection keyed by `RuntimeTypeHandle`. `Set<T>(T? value = default)` replaces the entry for `T`. `ApplyTo(AdviceContext)` opens one `AdviceContext.Use<T>` scope for each stored entry and disposes the scopes in reverse order; an empty instance returns a no-op scope.
+
+Request advisors can set entries directly through `container.QueryAdvice.Set<T>()`. `Schemata.Entity.Owner` also exposes `container.SuppressQueryOwner()`, and `Schemata.Entity.Repository` exposes `container.SuppressQuerySoftDelete()`; both write the same `QueryOwnerSuppressed` and `QuerySoftDeleteSuppressed` markers used by the corresponding repository suppression methods.
+
+The private `EnterQueryAdvice(container)` helper calls `container.QueryAdvice.ApplyTo(_repository.AdviceContext)`. Get, the existing-entity path of Update, Delete, and instance-scoped custom methods enter that scope outside `_repository.SuppressQuerySoftDelete()`. List keeps both the count and row fetch inside the query-advice scope, with `_repository.SuppressQuerySoftDelete()` inside it only when `request.ShowDeleted` is `true`. The seam applies to those reads; Create, the Update create-missing path, and collection-scoped custom methods do not enter query advice because they perform no container-scoped entity load.
 
 ## Error mapping
 

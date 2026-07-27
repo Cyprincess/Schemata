@@ -1,6 +1,8 @@
 # Query Caching
 
-Add transparent query result caching to the `Student` repository with automatic eviction on update and delete. This guide builds on [Getting Started](getting-started.md).
+Add transparent query result caching to the `Student` repository with automatic eviction on update and delete. This
+guide follows [Filtering and Pagination](filtering-and-pagination.md), but caching only requires the repository from
+[Getting Started](getting-started.md), so you can skip the filter and mapping branches.
 
 ## How it works
 
@@ -25,7 +27,8 @@ dotnet add package --prerelease Schemata.Caching.Distributed
 
 ## Register the cache
 
-In `Program.cs`, add the cache provider and enable query caching on the repository builder:
+In `Program.cs`, add the cache provider and append `UseQueryCache()` to the existing repository
+registration. The following is the complete repository registration after [Unit of Work](unit-of-work.md):
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -38,6 +41,7 @@ var builder = WebApplication.CreateBuilder(args)
             services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"))
+                .WithUnitOfWork<AppDbContext>()
                 .UseQueryCache();
 
             services.TryAddEnumerable(
@@ -48,6 +52,9 @@ var builder = WebApplication.CreateBuilder(args)
 ```
 
 `AddDistributedMemoryCache()` registers ASP.NET's in-memory `IDistributedCache`. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`.
+
+If you skipped Unit of Work, omit `.WithUnitOfWork<AppDbContext>()`; query caching remains active, while
+the open-transaction behavior below applies only when a repository joins a unit of work.
 
 ## Configure TTL and eviction
 
@@ -75,7 +82,10 @@ using (repository.SuppressQueryCache())
 
 ## Open write units of work
 
-Cache advisors also stand down while a write unit of work is open. When a repository is enlisted via `Join(uow)` and the unit of work has uncommitted writes, the query context carries `HasOpenWriteUnitOfWork`; `AdviceQueryCache` and `AdviceResultCache` both return `AdviseResult.Continue` in that state, so reads inside the transaction hit the database and see uncommitted changes instead of a stale cached copy. No marker or suppression scope is needed — enlistment alone activates the behavior, and caching resumes once the unit of work commits or rolls back.
+Enlisting a repository with `Join(uow)` automatically activates transaction-aware caching behavior. While the unit of
+work has uncommitted writes, the query context carries `HasOpenWriteUnitOfWork`; `AdviceQueryCache` and
+`AdviceResultCache` return `AdviseResult.Continue`, so reads inside the transaction hit the database and see
+uncommitted changes instead of a stale cached copy. Caching resumes when the unit of work commits or rolls back.
 
 ## Commit-time eviction
 

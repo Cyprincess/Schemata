@@ -70,9 +70,9 @@ builder.UseSchemata(schema => {
 2. `ProcessPersistence` (singleton); `ProcessLifecycleNotifier` (scoped).
 3. `FlowRunner` and `IFlowRunner` (scoped).
 4. `IFlowSourceAdvisor<>` (scoped, enumerable) for source-bound advisors.
-5. The six resource-method handlers: `StartProcessHandler`, `CompleteActivityHandler`,
-   `CorrelateMessageHandler`, `ThrowSignalHandler`, `TerminateProcessHandler`,
-   `CancelTokenHandler` (scoped).
+5. The core transition handlers: `CompleteActivityHandler`, `CorrelateMessageHandler`,
+   `ThrowSignalHandler`, `TerminateProcessHandler`, and `CancelTokenHandler` (scoped). The HTTP and
+   gRPC features add source loading and start handling through `FlowResourceRegistration`.
 
 The engine, its validator, and the `IFlowRuntime` keyed registrations come from
 `SchemataFlowStateMachineFeature`, which `[DependsOn<SchemataFlowFeature]`.
@@ -133,6 +133,8 @@ persisted process row + token rows + transition row + source-binding rows
   token, transition, and source rows in one unit of work, then notifies lifecycle observers.
   Handlers exposed by `SchemataFlowFeature` cover the full operation set: `StartAsync`,
   `CompleteAsync`, `CorrelateAsync`, `ThrowSignalAsync`, `TerminateAsync`, `CancelTokenAsync`.
+- **`FlowRunner.RunEventAsync`** is a public bridge entry point that addresses a persisted token with
+  an infrastructure trigger without an HTTP or gRPC request.
 - **`IFlowRuntime`** is the engine contract. `StateMachineEngine` is stateless: every call
   receives the current `SchemataProcess` plus token set and returns a `ProcessSnapshot` whose
   mutated entities the handler persists under its own unit of work.

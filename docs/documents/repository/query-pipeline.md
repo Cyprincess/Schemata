@@ -101,6 +101,10 @@ using (repository.SuppressQuerySoftDelete())
 }
 ```
 
+Resource request advisors can call `container.SuppressQuerySoftDelete()`. That entry point stores
+`QuerySoftDeleteSuppressed` in `container.QueryAdvice`; `ResourceOperationHandler` applies the marker around its
+Get, List, existing-entity Update, Delete, and instance-scoped custom-method queries.
+
 ### AdviceBuildQueryOwner
 
 | Property      | Value                                   |
@@ -112,6 +116,10 @@ using (repository.SuppressQuerySoftDelete())
 | Registered by | `UseOwner()`                            |
 
 Restricts results to entities owned by the current caller. Resolves the owner via `IOwnerResolver<TEntity>` and appends `.Where(e => e.Owner == owner)`. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`. See [ownership.md](ownership.md).
+
+Repository callers can use `repository.SuppressQueryOwner()`, and resource request advisors can use
+`container.SuppressQueryOwner()`. Both set `QueryOwnerSuppressed`; the latter reaches the repository context when
+the resource handler enters its query-advice scope.
 
 ## QueryContainer and QueryContext
 

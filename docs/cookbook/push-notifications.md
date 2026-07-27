@@ -100,7 +100,11 @@ returns the existing row without inserting a duplicate. The owner is a free-form
 ## Step 4: Send a notification
 
 ```csharp
-public async Task NotifyAsync(string userId, string body, CancellationToken ct)
+public static async Task NotifyAsync(
+    IPushService push,
+    string userId,
+    string body,
+    CancellationToken ct)
 {
     var context = new PushContext(body, new RecipientTarget($"users/{userId}"));
 
@@ -152,6 +156,47 @@ during quiet hours.
 
 **Assertion:** during 22:00–07:00 UTC, `SendAsync` produces no results and the console prints nothing.
 
+## Step 6: Schedule a durable delivery
+
+Add the scheduling bridge and enable it on the existing push builder:
+
+```shell
+dotnet add package --prerelease Schemata.Scheduling.Foundation
+dotnet add package --prerelease Schemata.Push.Scheduling
+```
+
+```csharp
+schema.UsePush()
+      .AddTransport<ConsolePushTransport>()
+      .UseScheduling();
+```
+
+Inject `IScheduledPushService` to persist a send as a long-running operation:
+
+```csharp
+using Schemata.Push.Scheduling;
+using Schemata.Push.Skeleton;
+using Schemata.Abstractions.Resource;
+
+public static ValueTask<Operation> ScheduleAsync(
+    IScheduledPushService scheduledPush,
+    string userId,
+    CancellationToken ct)
+{
+    return scheduledPush.ScheduleSendAsync(
+        new PushContext("Welcome later", new RecipientTarget($"users/{userId}")),
+        DateTimeOffset.UtcNow.AddMinutes(5),
+        ct);
+}
+```
+
+`ScheduleSendAsync` persists a `PushDispatchJob` through the scheduler and returns an
+`operations/{operation}` envelope. The job survives a host restart and invokes `IPushService` at the
+requested time.
+
+**Assertion:** `ScheduleAsync` returns an operation whose name starts with `operations/`; the console
+prints the delivery after the scheduled time.
+
 ## Common pitfalls
 
 **Throwing from a transport.** A transport must return `TransportResult.Skipped(Name)` for a target it
@@ -166,8 +211,9 @@ delivered. Routing lives in each transport's `TrySendAsync`.
 `IPushSubscriptionManager` are scoped. A transport that injects the manager must be scoped too;
 `AddTransport<T>()` registers it scoped for that reason.
 
-**Passing a future `at`.** The durable backend dispatches immediately; a future `at` throws
-`NotSupportedException`. Pass `null` for immediate durable dispatch.
+**Using `IPushService` for a deferred delivery.** `IPushService.SendAsync` dispatches immediately.
+Use `IScheduledPushService.ScheduleSendAsync` from `Schemata.Push.Scheduling` when the delivery must
+be durable or scheduled for a future time.
 
 ## See also
 

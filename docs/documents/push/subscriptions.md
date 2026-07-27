@@ -20,7 +20,7 @@ public class SchemataPushSubscription : IIdentifier, ICanonicalName, IOwnable, I
 {
     public virtual string? Provider    { get; set; }   // "fcm", "apns", "webhook", ...
     public virtual string? ProviderKey { get; set; }   // device token, URL, address
-    public virtual string? Metadata    { get; set; }   // transport-specific JSON
+    public virtual Dictionary<string, string?>? Metadata { get; set; } // transport-specific JSON
     // Owner, Name, CanonicalName, Uid, Timestamp, DisplayName, Description,
     // DeleteTime, PurgeTime, CreateTime, UpdateTime from the traits
 }
@@ -56,7 +56,7 @@ public interface IPushSubscriptionManager
 
     ValueTask<SchemataPushSubscription> AddAsync(
         string owner, string provider, string providerKey,
-        string? metadata = null, CancellationToken ct = default);
+        Dictionary<string, string?>? metadata = null, CancellationToken ct = default);
 
     ValueTask RemoveAsync(
         string owner, string provider, string providerKey, CancellationToken ct = default);

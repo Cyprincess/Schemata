@@ -10,7 +10,9 @@ The Guides section is a progressive tutorial that builds a complete Student CRUD
 
 ## Guide Sequence
 
-Start with [Getting Started](getting-started.md) and work through the guides in order. Each guide builds on the code from the previous one. The `Student` entity defined in Getting Started is the running example throughout the series.
+Start with [Getting Started](getting-started.md) and work through the guides in order. The `Student` entity defined in Getting Started is the running example throughout the series, and each guide states in its Prerequisites which earlier guides its code assumes.
+
+Most guides extend the application from the previous one. Three stand apart: [Authorization](authorization.md) is a branch off [Identity](identity.md) rather than a step after [Access Control](access-control.md), [Reports](report.md) builds on [Insight](insight.md) and [Scheduling](scheduling.md), and [Modular](modular.md) is a closing refactor that repackages whatever you have built. Each of those tells you what to add if you skipped a guide it depends on.
 
 | #   | Guide                                                     | What you add                                                  |
 | --- | --------------------------------------------------------- | ------------------------------------------------------------- |
@@ -31,7 +33,8 @@ Start with [Getting Started](getting-started.md) and work through the guides in 
 | 15  | [Scheduling](scheduling.md)                               | Cron and periodic background jobs                             |
 | 16  | [Push](push.md)                                           | Broadcast notification fan-out across transports              |
 | 17  | [Insight](insight.md)                                     | Federated read query across registered sources                |
-| 18  | [Modular](modular.md)                                     | Module discovery and assembly loading                         |
+| 18  | [Reports](report.md)                                      | Persisted report snapshots and paged snapshot reads           |
+| 19  | [Modular](modular.md)                                     | Module discovery and assembly loading                         |
 
 ## What the guides don't cover
 

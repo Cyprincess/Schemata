@@ -14,6 +14,7 @@ Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the a
 | `AdviceBuildQueryOwner<TEntity>`                | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                            |
 | `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceValidateResourceReferenceExistence.cs`     |
 | `UseOwner` extension                            | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs`            |
+| Resource query-container extensions             | `src/Schemata.Entity.Owner/Extensions/OwnerResourceRequestContainerExtensions.cs`         |
 
 ## IOwnerResolver
 
@@ -112,10 +113,11 @@ public sealed class PrincipalOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 
 ## Suppression
 
-| Method                            | Marker                 | Effect                                           |
-| --------------------------------- | ---------------------- | ------------------------------------------------ |
-| `repository.SuppressOwner()`      | `OwnerSuppressed`      | Skips `AdviceAddOwner` for this instance.        |
-| `repository.SuppressQueryOwner()` | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for this instance. |
+| Entry point                                  | Marker                 | Effect                                                       |
+| -------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
+| `repository.SuppressOwner()`                 | `OwnerSuppressed`      | Skips `AdviceAddOwner` for this repository instance.         |
+| `repository.SuppressQueryOwner()`            | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for this repository scope.     |
+| `container.SuppressQueryOwner()`             | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for the resource query scope.  |
 
 ```csharp
 // Add without assigning ownership
@@ -130,6 +132,10 @@ using (repository.SuppressQueryOwner())
     var all = await repository.ListAsync<Document>(null, ct).ToListAsync(ct);
 }
 ```
+
+`container.SuppressQueryOwner()` writes `QueryOwnerSuppressed` to `ResourceRequestContainer<T>.QueryAdvice`.
+`ResourceOperationHandler` applies that entry around List counts and row fetches, Get loads, existing-entity Update
+loads, Delete loads, and instance-scoped custom-method loads.
 
 ## Override and bypass
 

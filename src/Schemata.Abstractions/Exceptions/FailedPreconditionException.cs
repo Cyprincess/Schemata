@@ -9,8 +9,10 @@ namespace Schemata.Abstractions.Exceptions;
 ///     The system state blocks the operation.
 /// </summary>
 /// <remarks>
-///     Maps to <c>google.rpc.Code.FAILED_PRECONDITION</c> (HTTP 412), per
-///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
+///     Carries the canonical status <c>google.rpc.Code.FAILED_PRECONDITION</c>, per
+///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>, and defaults to
+///     HTTP 412. <c>google.rpc.Code</c> maps <c>FAILED_PRECONDITION</c> to HTTP 400, which is the
+///     default <see cref="TenantResolveException" /> uses for the same canonical status.
 ///     Attaches <see cref="ErrorReasons.PreconditionNotSatisfied" /> on
 ///     <see cref="ErrorInfoDetail" />; specific failed predicates are surfaced through
 ///     <see cref="PreconditionViolation" /> entries supplied to the violations overload.

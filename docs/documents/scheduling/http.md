@@ -1,9 +1,12 @@
 # Scheduling HTTP Transport
 
 The scheduling HTTP transport exposes the scheduler's two persistent entities — `SchemataJob`
-(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources, plus three
-AIP-136 custom methods: `:run` on a job, `:cancel` and `:wait` on an execution. The transport
-inherits its controller synthesis, routing, JSON wire format, and exception handler from the
+(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources. `:run` is an
+AIP-136 custom method on a job. `:cancel` and `:wait` are Schemata operation routes on an execution:
+they correspond to `CancelOperation` and `WaitOperation` on `google.longrunning.Operations`, while
+AIP-151 defines `Operation`'s `name`, `metadata`, `done`, and `error` / `response` result shape. `operations.proto` binds `CancelOperation` to HTTP and
+leaves `WaitOperation` without an HTTP binding; Schemata supplies both routes. The transport inherits
+its controller synthesis, routing, JSON wire format, and exception handler from the
 Resource HTTP transport; this feature only registers the resources and their custom-method
 handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFeature` (priority
 `SchemataSchedulingFeature.DefaultPriority + 200_000` = `470_200_000`).
@@ -62,9 +65,9 @@ at `/v1/operations`.
 | `POST`   | `/v1/jobs/{name}:run`          | Trigger one fire → returns `Operation` | AIP-136 |
 | `GET`    | `/v1/operations`               | List executions                        | AIP-132 |
 | `GET`    | `/v1/operations/{name}`        | Get execution                          | AIP-131 |
-| `DELETE` | `/v1/operations/{name}`        | Cancel + remove                        | AIP-135 |
-| `POST`   | `/v1/operations/{name}:cancel` | Cancel a running execution             | AIP-136 |
-| `POST`   | `/v1/operations/{name}:wait`   | Long-poll for terminal state           | AIP-136 |
+| `DELETE` | `/v1/operations/{name}`        | Soft-delete the operation record        | AIP-135 |
+| `POST`   | `/v1/operations/{name}:cancel` | Cancel a running execution             | `Operations.CancelOperation` |
+| `POST`   | `/v1/operations/{name}:wait`   | Long-poll for terminal state           | Schemata route (`WaitOperation` has no upstream HTTP binding) |
 
 `Operations` on `SchemataJobExecution` is set to `[Get, List, Delete]`; `Create` and `Update` are
 not synthesized. The `:run` handler returns an `Operation` representing the queued execution; the

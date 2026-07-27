@@ -230,21 +230,20 @@ it at registration with the keyed `IExpressionCompiler` selected by
 ```csharp
 using System;
 using System.Collections.Generic;
-using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 public sealed class FlowConditionContext
 {
-    public ProcessDefinition    Definition   { get; set; } = null!;
-    public TokenSnapshot        Token        { get; set; } = null!;
-    public SchemataProcess?     Process      { get; set; }
+    public ProcessDefinition      Definition   { get; set; } = null!;
+    public TokenSnapshot          Token        { get; set; } = null!;
+    public SchemataProcess?       Process      { get; set; }
     public SchemataProcessToken? TokenEntity { get; set; }
-    public IUnitOfWork?         UnitOfWork   { get; set; }
-    public object?              Payload      { get; set; }
+    public required FlowExecutionContext Execution { get; set; }
+    public object?                Payload      { get; set; }
     public Dictionary<string, int> Bookkeeping { get; set; } = [];
-    public string               CurrentState { get; set; } = null!;
-    public required IServiceProvider Services { get; set; }
+    public string                 CurrentState { get; set; } = null!;
 
     public FlowTaskContext CreateTaskContext();
 }
@@ -253,7 +252,9 @@ public sealed class FlowConditionContext
 `CreateTaskContext()` materializes a `FlowTaskContext` for source-aware conditions, exposing
 `SourceAsync<TEntity>(string?, ...)`, `Repository<TEntity>()`, and the general
 `GetService<TService>(object? key)` / `GetRequiredService<TService>(object? key)` resolvers.
-A resolved `IRepository` is enlisted in the current unit of work before it is returned.
+`FlowConditionContext.Execution` is required and carries the execution scope's provider and unit of
+work, so conditions, procedure tasks, and advisors resolve services from one scope. A resolved
+`IRepository` is enlisted in that unit of work before it is returned.
 
 ## ProcessDefinition
 

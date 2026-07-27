@@ -3,9 +3,10 @@ using System.Collections.Generic;
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Provides user-facing display names and descriptions, corresponding
-///     to <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>
-///     <c>display_name</c> and <c>description</c>.
+///     Provides user-facing display names and descriptions. <c>DisplayName</c> corresponds to
+///     <seealso href="https://google.aip.dev/148">AIP-148: Standard fields</seealso>
+///     <c>display_name</c>; the description members and every localized map are Schemata
+///     additions, since AIP-148 declares no <c>description</c> standard field.
 /// </summary>
 public interface IDescriptive
 {
@@ -21,7 +22,7 @@ public interface IDescriptive
     Dictionary<string, string?>? DisplayNames { get; set; }
 
     /// <summary>
-    ///     The primary description, corresponding to AIP-148 <c>description</c>.
+    ///     The primary description. This is a Schemata field with no AIP-148 counterpart.
     /// </summary>
     string? Description { get; set; }
 

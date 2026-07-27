@@ -87,10 +87,11 @@ transports:
 - `ICanonicalName.Name` returns `null` — the property is suppressed on the wire.
 - `ICanonicalName.CanonicalName` returns `name` (AIP-122).
 - `IFreshness.EntityTag` returns `etag` (AIP-154).
-- `IEntitiesResult<TItem>.Entities` returns the plural collection name of `TItem` (AIP-132).
+- `IEntitiesResult<TItem>.Entities` returns the plural collection name of `TItem` (AIP-140). AIP-132 requires the
+  repeated resource field but does not prescribe its plural form.
 - Any other property returns its own name; the transport's naming policy (snake_case) applies on top.
 
-`ResolveClr` inverts these aliases for AIP-161 field-mask parsing, so a mask such as `name,etag` targets the same
+`ResolveClrName` inverts these aliases for AIP-161 field-mask parsing, so a mask such as `name,etag` targets the same
 properties the response serializes them from.
 
 ## AIP-159: reading across collections

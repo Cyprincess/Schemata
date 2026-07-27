@@ -165,8 +165,9 @@ public static class SchemataResourceErrors
     /// <summary>
     ///     Builds a <see cref="PermissionDeniedException" /> for a named resource of type
     ///     <typeparamref name="T" />. The <paramref name="owner" /> field is propagated to
-    ///     <see cref="ResourceInfoDetail.Owner" />; existence has already been acknowledged
-    ///     so this does not leak under AIP-211.
+    ///     <see cref="ResourceInfoDetail.Owner" />, which discloses that the resource exists.
+    ///     Supply it only where the caller is already entitled to know that; AIP-211 otherwise
+    ///     recommends a message that leaves existence ambiguous.
     /// </summary>
     /// <typeparam name="T">The resource entity type.</typeparam>
     /// <param name="name">The canonical resource name.</param>

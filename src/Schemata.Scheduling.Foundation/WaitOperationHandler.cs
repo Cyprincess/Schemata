@@ -9,7 +9,9 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation;
 
 /// <summary>
-///     AIP-151 <c>:wait</c> handler on <see cref="SchemataJobExecution" />.
+///     <c>:wait</c> handler on <see cref="SchemataJobExecution" />, mirroring
+///     <c>WaitOperation</c> on the <c>google.longrunning.Operations</c> service. That RPC declares
+///     no HTTP binding, so the route is Schemata's; AIP-151 supplies the <c>Operation</c> shape.
 ///     Performs server-side bounded polling capped at 30 seconds and returns the
 ///     current snapshot once the row reaches a terminal state or the deadline
 ///     elapses.

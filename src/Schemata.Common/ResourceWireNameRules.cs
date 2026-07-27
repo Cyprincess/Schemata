@@ -10,9 +10,9 @@ namespace Schemata.Common;
 
 /// <summary>
 ///     Maps resource-specific CLR property names to their public wire names and back. Owns the
-///     AIP-122 (<c>name</c>), AIP-154 (<c>etag</c>), and AIP-132/231-235 (collection plural)
-///     aliases plus the wire-segment-to-CLR-property fallback used by AIP-157 / AIP-161 mask
-///     parsing.
+///     AIP-122 (<c>name</c>) and AIP-154 (<c>etag</c>) aliases, the plural collection field that
+///     AIP-140 requires of the repeated results in AIP-132 list and AIP-231-235 batch responses,
+///     and the wire-segment-to-CLR-property fallback used by AIP-161 update-mask parsing.
 /// </summary>
 public static class ResourceWireNameRules
 {

@@ -102,6 +102,11 @@ if (await manager.FindByClientIdAsync("student-app", default) is null)
 
 Manager methods take a `CancellationToken`; pass `default` when seeding.
 
+`SchemataApplication.Name` aliases `ClientId`. Its canonical record is
+`applications/student-app`, which Schemata uses as the default `aud` value and persists in the
+`Application` field of issued tokens. Bearer validation uses that canonical application reference
+as the expected audience.
+
 ## Verify
 
 ```shell

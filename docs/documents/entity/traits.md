@@ -206,8 +206,9 @@ public interface IDescriptive
 }
 ```
 
-Provides user-facing display names and descriptions per AIP-148. `DisplayNames` and `Descriptions` are
-localized variants keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`). No built-in advisor.
+Provides a user-facing `DisplayName` corresponding to AIP-148 `display_name`, plus Schemata-specific
+`Description`, `DisplayNames`, and `Descriptions` fields. The map properties are localized variants
+keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`). No built-in advisor.
 
 ## IAnnotatable
 

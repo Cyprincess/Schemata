@@ -1,7 +1,8 @@
 # gRPC Transport
 
 Expose the `Student` resource over gRPC alongside its HTTP endpoints, using code-first protobuf-net serialization.
-This guide builds on [Getting Started](getting-started.md).
+This is a transport branch: it follows [Authorization](authorization.md) in the full sequence, but it
+only requires the HTTP Student resource from [Getting Started](getting-started.md).
 
 ## Add the package
 
@@ -14,27 +15,28 @@ dotnet add package --prerelease Schemata.Resource.Grpc
 ## Enable gRPC transport
 
 `MapGrpc()` is an extension on `SchemataResourceBuilder` that activates the gRPC transport and returns the
-same builder, so it chains alongside `.MapHttp()` and `.Use<Student>()`:
+same builder. Replace the final HTTP-only resource registration with the merged transport registration:
 
 ```csharp
-var resource = schema.UseResource();
-
-resource.MapHttp()
-        .Use<Student>();
-
-resource.MapGrpc()
-        .Use<Student>();
+schema.UseResource()
+      .MapHttp()
+      .MapGrpc()
+      .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 ```
 
-`Use<Student>()` is shorthand for `Use<Student, Student, Student, Student>()`. To split the surfaces, pass all
-four type parameters:
+Keep options already enabled by earlier guides ahead of `MapHttp()` — for example, `UseAip()`,
+`UseOrdering()`, and, if you completed Access Control, `WithAuthorization()`. If you skipped Object
+Mapping, use the established shorthand instead:
 
 ```csharp
-resource.MapGrpc()
-        .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
+schema.UseResource()
+      .MapHttp()
+      .MapGrpc()
+      .Use<Student>();
 ```
 
-All four types must implement `ICanonicalName`.
+All four types must implement `ICanonicalName`. The first registration is the continuation of the
+full guide chain; the second is the Getting Started branch.
 
 ## Add protobuf-net attributes
 
@@ -43,11 +45,12 @@ Code-first gRPC needs protobuf-net field numbers on the serialized types. Add `[
 
 ```csharp
 using ProtoBuf;
+using System.ComponentModel.DataAnnotations;
 using Schemata.Abstractions.Entities;
 
 [ProtoContract]
 [CanonicalName("students/{student}")]
-public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
+public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, IConcurrency
 {
     [ProtoMember(1)] public Guid      Uid           { get; set; }
     [ProtoMember(2)] public string?   Name          { get; set; }
@@ -58,6 +61,9 @@ public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
     [ProtoMember(7)] public DateTime? UpdateTime    { get; set; }
     [ProtoMember(8)] public DateTime? DeleteTime    { get; set; }
     [ProtoMember(9)] public DateTime? PurgeTime     { get; set; }
+    [ProtoMember(10)]
+    [ConcurrencyCheck]
+    public Guid Timestamp { get; set; }
 }
 ```
 
@@ -92,7 +98,7 @@ using ProtoBuf.Grpc.Client;
 using Schemata.Resource.Grpc;
 
 var channel = GrpcChannel.ForAddress("http://localhost:5000");
-var client  = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>();
+var client  = channel.CreateGrpcService<IResourceService<Student, StudentRequest, StudentDetail, StudentSummary>>();
 var result  = await client.ListAsync(new ListRequest());
 ```
 
