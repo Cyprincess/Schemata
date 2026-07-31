@@ -27,11 +27,13 @@ builder.UseSchemata(schema => {
 
     schema.UseWellKnown();
     schema.UseAuthorization(o => {
-               o.Issuer = "https://localhost";
+               o.Issuer         = "https://localhost";
+               o.InteractionUri = "https://localhost/interact";
                o.AddEphemeralSigningKey();
                o.AddEphemeralEncryptionKey();
                o.PermitResponseType("code");
            })
+           .UseCodeFlow()
            .UseClientCredentialsFlow()
            .UseRefreshTokenFlow()
            .UseIntrospection();
@@ -52,6 +54,14 @@ using (var scope = app.Services.CreateScope()) {
     };
     await applications.SetClientSecretAsync(testApp, "test-secret");
     await applications.CreateAsync(testApp);
+
+    var browserApp = new SchemataApplication {
+        ClientId     = "browser-client",
+        ClientType   = "public",
+        RedirectUris = new List<string> { "https://localhost/callback" },
+        Permissions  = new List<string> { "e:/Connect/Authorize", "g:authorization_code" },
+    };
+    await applications.CreateAsync(browserApp);
 }
 
 app.Run();

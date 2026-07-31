@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
@@ -32,6 +33,10 @@ public class DeviceInteractionHandlerShould
             ClientId      = "device-client",
             Name          = "device-client",
             CanonicalName = "applications/device-client",
+            DisplayName   = "Device Client",
+            DisplayNames  = new() { ["zh-Hans"] = "设备客户端" },
+            Description   = "Signs in on a TV.",
+            Descriptions  = new() { ["zh-Hans"] = "在电视上登录。" },
         };
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByClientIdAsync("device-client", It.IsAny<CancellationToken>())).ReturnsAsync(app);
@@ -68,7 +73,18 @@ public class DeviceInteractionHandlerShould
         tokens.Setup(t => t.FindByReferenceIdAsync("user-ref", It.IsAny<CancellationToken>())).ReturnsAsync(userCode);
         tokens.Setup(t => t.FindByNameAsync(device.Name!, It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
-        var scopes   = new Mock<IScopeManager<SchemataScope>>();
+        var openid = new SchemataScope {
+            Uid          = Identifiers.NewUid(),
+            Name         = "openid",
+            DisplayName  = "Sign you in",
+            DisplayNames = new() { ["zh-Hans"] = "登录" },
+            Description  = "Confirms who you are.",
+            Descriptions = new() { ["zh-Hans"] = "确认你的身份。" },
+        };
+
+        var scopes = new Mock<IScopeManager<SchemataScope>>();
+        scopes.Setup(s => s.ListAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+              .Returns(ToAsync(openid));
         var authzMgr = new Mock<IAuthorizationManager<SchemataAuthorization>>();
         authzMgr.Setup(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((SchemataAuthorization a, CancellationToken _) => {
@@ -84,6 +100,13 @@ public class DeviceInteractionHandlerShould
         return new(handler, tokens, authzMgr, device, userCode);
     }
 
+    private static async IAsyncEnumerable<SchemataScope> ToAsync(params SchemataScope[] rows) {
+        foreach (var row in rows) {
+            yield return row;
+            await Task.CompletedTask;
+        }
+    }
+
     private static ClaimsPrincipal CreatePrincipal(string subject = "users/u-42", string sid = "sess-99") {
         return new(new ClaimsIdentity([new(Claims.Subject, subject), new("sid", sid)], "test"));
     }
@@ -94,7 +117,7 @@ public class DeviceInteractionHandlerShould
         var principal = CreatePrincipal(sid: "sess-xyz");
 
         await Assert.ThrowsAsync<NoContentException>(() => f.Handler.ApproveAsync(
-                                                         new() { Code = "user-ref" }, principal, "https://auth",
+                                                         new() { UserCode = "user-ref" }, principal, "https://auth",
                                                          CancellationToken.None));
 
         var createInvocation = Assert.Single(f.AuthzMgr.Invocations,
@@ -112,12 +135,35 @@ public class DeviceInteractionHandlerShould
     }
 
     [Fact]
+    public async Task CarriesEveryLabelOfTheApplicationAndScopes_OnGetDetails() {
+        var f = CreateFixture();
+
+        var result = await f.Handler.GetDetailsAsync(new() { UserCode = "user-ref" }, "https://auth",
+                                                     CancellationToken.None);
+
+        var response = Assert.IsType<InteractionResponse>(result.Data);
+
+        var client = Assert.IsType<ApplicationResponse>(response.Application);
+        Assert.Equal("Device Client", client.DisplayName);
+        Assert.Equal("设备客户端", client.DisplayNames!["zh-Hans"]);
+        Assert.Equal("Signs in on a TV.", client.Description);
+        Assert.Equal("在电视上登录。", client.Descriptions!["zh-Hans"]);
+
+        var scope = Assert.Single(response.Scopes!);
+        Assert.Equal("openid", scope.Name);
+        Assert.Equal("Sign you in", scope.DisplayName);
+        Assert.Equal("登录", scope.DisplayNames!["zh-Hans"]);
+        Assert.Equal("Confirms who you are.", scope.Description);
+        Assert.Equal("确认你的身份。", scope.Descriptions!["zh-Hans"]);
+    }
+
+    [Fact]
     public async Task DoesNotCreateAuthorization_WhenSubjectMissing() {
         var f         = CreateFixture();
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
         await Assert.ThrowsAsync<OAuthException>(() => f.Handler.ApproveAsync(
-                                                     new() { Code = "user-ref" }, principal, "https://auth",
+                                                     new() { UserCode = "user-ref" }, principal, "https://auth",
                                                      CancellationToken.None));
 
         Assert.DoesNotContain(f.AuthzMgr.Invocations,

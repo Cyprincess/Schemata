@@ -1,5 +1,7 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
@@ -49,6 +51,16 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
         services.Configure<SchemataAuthorizationOptions>(o => {
             o.AllowedResponseTypes.Add(ResponseTypes.Code);
             o.AllowedResponseModes.Add(ResponseModes.FormPost);
+        });
+
+        services.PostConfigure<SchemataAuthorizationOptions>(o => {
+            if (string.IsNullOrWhiteSpace(o.InteractionUri)) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.REQUIRED_SETTING_MISSING), "Code flow", nameof(o.InteractionUri)));
+            }
+
+            if (!Uri.TryCreate(o.InteractionUri, UriKind.Absolute, out var _)) {
+                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.ABSOLUTE_URI_REQUIRED), nameof(o.InteractionUri)));
+            }
         });
 
         services.TryAddScoped<AuthorizeEndpoint, AuthorizeHandler<TApp, TToken>>();

@@ -88,19 +88,6 @@ public sealed class AuthorizeHandler<TApp, TToken>(
             };
         }
 
-        if (authz.RequireReauthentication) {
-            return AuthorizationResult.Challenge();
-        }
-
-        if (string.IsNullOrWhiteSpace(options.Value.InteractionUri)) {
-            throw new OAuthException(
-                OAuthErrors.ServerError,
-                SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-            ) {
-                RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
-            };
-        }
-
         var reference = issuer.CreateReference();
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 

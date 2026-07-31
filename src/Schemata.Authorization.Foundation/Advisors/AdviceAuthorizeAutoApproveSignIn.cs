@@ -62,16 +62,12 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             return AdviseResult.Continue;
         }
 
+        // No session: fall through so the handler redirects to the interaction URI, where the user
+        // signs in and the authorize request resumes. Only prompt=none turns this into
+        // login_required, which AdviceAuthorizePrompt raises on its own.
         var subject = authz.Principal?.FindFirstValue(Claims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
-            throw new OAuthException(
-                OAuthErrors.LoginRequired,
-                SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED)
-            ) {
-                RedirectUri  = authz.Request?.RedirectUri,
-                State        = authz.Request?.State,
-                ResponseMode = authz.ResponseMode,
-            };
+            return AdviseResult.Continue;
         }
 
         var claims = new List<Claim> {

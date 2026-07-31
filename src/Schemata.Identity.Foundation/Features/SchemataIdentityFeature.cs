@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Json;
@@ -16,6 +17,7 @@ using Schemata.Core.Features;
 using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
+using Schemata.Identity.Foundation.Internal;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Json;
@@ -103,6 +105,12 @@ public sealed class SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore
                               .AddRoles<TRole>()
                               .AddUserManager<SchemataUserManager<TUser>>()
                               .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>();
+
+        // Registered after AddIdentityApiEndpoints so this assignment is the last one applied to the
+        // application cookie's redirect event.
+        services.Configure<CookieAuthenticationOptions>(
+            IdentityConstants.ApplicationScheme,
+            o => o.Events.OnRedirectToLogin = LoginContinuation.RedirectToLoginAsync);
 
         build(builder);
     }

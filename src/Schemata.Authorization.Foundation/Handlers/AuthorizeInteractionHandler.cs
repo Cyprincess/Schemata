@@ -117,12 +117,10 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         var requested = ScopeParser.Parse(authorize.Scope);
 
         var scopes = await _scopes.ResolveScopesAsync(requested, ct)
-                                  .Map(s => new ScopeResponse {
-                                       Name         = s.Name,
-                                       DisplayName  = s.DisplayName,
-                                       DisplayNames = s.DisplayNames,
-                                       Description  = s.Description,
-                                       Descriptions = s.Descriptions,
+                                  .Map(s => {
+                                       var scope = new ScopeResponse { Name = s.Name };
+                                       s.CopyLabels(scope);
+                                       return scope;
                                    }, ct).ToListAsync(ct);
 
         // Re-resolve response_mode from response_type when it was not explicitly
@@ -131,15 +129,14 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             authorize.ResponseMode = ResponseModeService.ResolveMode(authorize.ResponseMode, authorize.ResponseType);
         }
 
+        var client = new ApplicationResponse { ClientId = application.ClientId };
+        application.CopyLabels(client);
+
         return AuthorizationResult.Content(new InteractionResponse {
-            Type    = InteractionTypes.Authorize,
-            Request = authorize,
-            Application = new() {
-                ClientId     = application.ClientId,
-                DisplayName  = application.DisplayName,
-                DisplayNames = application.DisplayNames,
-            },
-            Scopes = scopes,
+            Type        = InteractionTypes.Authorize,
+            Request     = authorize,
+            Application = client,
+            Scopes      = scopes,
         });
     }
 
@@ -159,9 +156,12 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         string            issuer,
         CancellationToken ct
     ) {
+        // The interaction page calls this endpoint over XHR; a cookie challenge would answer with a
+        // redirect the caller cannot follow, so an unauthenticated approval is a plain 401.
         var subject = principal.FindFirstValue(Claims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
-            return AuthorizationResult.Challenge();
+            throw new UnauthenticatedException(
+                message: SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED));
         }
 
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);

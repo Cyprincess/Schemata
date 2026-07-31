@@ -118,13 +118,16 @@ public class AdviceAuthorizeAutoApproveSignInShould
     }
 
     [Fact]
-    public async Task ThrowsLoginRequired_WhenSubjectMissing() {
-        var (advisor, _) = CreateAdvisor();
+    public async Task ContinuesToTheInteractionRedirect_WhenSubjectMissing() {
+        var (advisor, authzMgr) = CreateAdvisor();
         var ctx   = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = CreateGrantedContext();
         authz.Principal = new(new ClaimsIdentity("test"));
 
-        var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
-        Assert.Equal(OAuthErrors.LoginRequired, ex.Status);
+        var result = await advisor.AdviseAsync(ctx, authz);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        authzMgr.Verify(m => m.CreateAsync(It.IsAny<SchemataAuthorization>(), It.IsAny<CancellationToken>()),
+                        Times.Never);
     }
 }

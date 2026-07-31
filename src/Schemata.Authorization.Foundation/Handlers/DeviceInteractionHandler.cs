@@ -60,7 +60,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         string            issuer,
         CancellationToken ct
     ) {
-        var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
+        var token = await tokens.FindByReferenceIdAsync(request.UserCode, ct);
         if (token?.Status != TokenStatuses.Valid
          || token.Type != TokenTypes.UserCode
             || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
@@ -109,22 +109,19 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         var requested = ScopeParser.Parse(payload.Scope);
 
         var list = await scopes.ResolveScopesAsync(requested, ct)
-                               .Map(s => new ScopeResponse {
-                                    Name         = s.Name,
-                                    DisplayName  = s.DisplayName,
-                                    DisplayNames = s.DisplayNames,
-                                    Description  = s.Description,
-                                    Descriptions = s.Descriptions,
+                               .Map(s => {
+                                    var scope = new ScopeResponse { Name = s.Name };
+                                    s.CopyLabels(scope);
+                                    return scope;
                                 }, ct).ToListAsync(ct);
 
+        var client = new ApplicationResponse { ClientId = payload.ClientId };
+        application.CopyLabels(client);
+
         return AuthorizationResult.Content(new InteractionResponse {
-            Type = InteractionTypes.Device,
-            Application = new() {
-                ClientId     = payload.ClientId,
-                DisplayName  = application.DisplayName,
-                DisplayNames = application.DisplayNames,
-            },
-            Scopes = list,
+            Type        = InteractionTypes.Device,
+            Application = client,
+            Scopes      = list,
         });
     }
 
@@ -152,7 +149,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             );
         }
 
-        var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
+        var token = await tokens.FindByReferenceIdAsync(request.UserCode, ct);
         if (token?.Status != TokenStatuses.Valid
          || token.Type != TokenTypes.UserCode
             || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
@@ -228,7 +225,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     /// <param name="request">Interaction request containing the user code.</param>
     /// <param name="ct">A cancellation token.</param>
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
-        var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
+        var token = await tokens.FindByReferenceIdAsync(request.UserCode, ct);
         if (token?.Type != TokenTypes.UserCode || string.IsNullOrWhiteSpace(token.Payload)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

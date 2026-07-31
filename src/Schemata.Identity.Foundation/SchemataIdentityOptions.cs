@@ -23,4 +23,12 @@ public sealed class SchemataIdentityOptions
 
     /// <summary>Whether the 2FA enrollment and downgrade endpoints are enabled. Default: true.</summary>
     public bool AllowTwoFactorAuthentication { get; set; } = true;
+
+    /// <summary>
+    ///     Sign-in page a browser hitting an <c>[Authorize]</c> endpoint without a cookie session is
+    ///     sent to. The framework appends a <c>continue</c> parameter holding the original local path,
+    ///     protected by ASP.NET Data Protection, which <c>GET ~/Authenticate/Continue</c> unprotects
+    ///     and redirects back to. Leave unset to answer such requests with 401 instead.
+    /// </summary>
+    public string? LoginUri { get; set; }
 }

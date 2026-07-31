@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Authorization.Skeleton;
+using Schemata.Common;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
@@ -15,10 +17,11 @@ namespace Schemata.Authorization.Identity;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Accepts <c>subject</c> in either AIP-122 canonical form (<c>"users/{uid}"</c>)
-///         emitted by <c>SchemataUserClaimsPrincipalFactory</c>, or as the bare uid
-///         string. The leaf segment after the last <c>'/'</c> is used as the lookup key
-///         against <c>SchemataUserManager.FindByIdAsync</c>.
+///         Accepts <c>subject</c> in either AIP-122 canonical form (<c>"users/{uid}"</c> or the
+///         stamped <c>"users/{name}"</c>) emitted by <c>SchemataUserClaimsPrincipalFactory</c>, or
+///         as the bare uid string. A leaf segment that parses as a <see cref="Guid" /> is looked
+///         up through <c>SchemataUserManager.FindByIdAsync</c>; any other subject is matched
+///         against the stored canonical name through <c>SchemataUserManager.FindByCanonicalNameAsync</c>.
 ///     </para>
 ///     <para>
 ///         Emits <c>sub</c> as the resolved user's <c>CanonicalName</c> so downstream
@@ -81,17 +84,19 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
     #endregion
 
     /// <summary>
-    ///     Resolves a subject string to the owning user. Accepts canonical form
-    ///     (<c>"users/{uid}"</c>) or the bare uid; the leaf segment is fed into
-    ///     <c>SchemataUserManager.FindByIdAsync</c>.
+    ///     Resolves a subject string to the owning user. The leaf comes from the user pattern, so a
+    ///     subject under any other collection stays with the canonical-name lookup and finds nothing.
+    ///     A Guid leaf takes the id lookup; every other leaf takes the canonical-name lookup.
     /// </summary>
     private Task<TUser?> ResolveAsync(string subject) {
         if (string.IsNullOrWhiteSpace(subject)) {
             return Task.FromResult<TUser?>(null);
         }
 
-        var slash = subject.LastIndexOf('/');
-        var leaf  = slash < 0 ? subject : subject[(slash + 1)..];
-        return manager.FindByIdAsync(leaf);
+        var leaf = ResourceNameDescriptor.ForType<TUser>().ParseCanonicalName(subject)?.LeafName ?? subject;
+
+        return Guid.TryParse(leaf, out _)
+            ? manager.FindByIdAsync(leaf)
+            : manager.FindByCanonicalNameAsync(subject);
     }
 }
