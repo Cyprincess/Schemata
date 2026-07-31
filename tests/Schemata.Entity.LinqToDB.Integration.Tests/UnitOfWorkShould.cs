@@ -237,7 +237,7 @@ public class UnitOfWorkShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CommitAsync_Twice_ThrowsAfterCompleted() {
+    public async Task CommitAsync_Twice_IsANoOpOnItsOwnUnitOfWork() {
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
@@ -248,14 +248,14 @@ public class UnitOfWorkShould : IAsyncLifetime
                                     Name     = "double-commit",
                                 });
             await repo.CommitAsync();
+            await repo.CommitAsync();
 
-            // The standalone commit completed the implicit unit of work; committing again rejects it.
-            await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.CommitAsync());
+            Assert.Equal(1, await repo.CountAsync(q => q.Where(s => s.Name == "double-commit")));
         }
     }
 
     [Fact]
-    public async Task WriteAfterCommit_ThrowsAndDoesNotPersist() {
+    public async Task WriteAfterCommit_StagesIntoAFreshUnitOfWork() {
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
@@ -268,21 +268,22 @@ public class UnitOfWorkShould : IAsyncLifetime
                                     });
                 await repo.CommitAsync();
 
-                // The unit of work has completed; a further write must fail fast before any
-                // autocommit path can persist it.
-                await Assert.ThrowsAsync<InvalidOperationException>(async () => await repo.AddAsync(new() {
+                // The repository reopened its own unit of work, so the second write stages into a new
+                // one and stays uncommitted until its own CommitAsync.
+                await repo.AddAsync(new() {
                     Uid      = Identifiers.NewUid(),
                     FullName = "After-Commit",
                     Age      = 1,
                     Grade    = 1,
                     Name     = "after-commit-canary",
-                }));
+                });
             }
         }
 
         {
             var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
             using (verifyScope) {
+                Assert.Equal(1, await verifier.CountAsync(q => q.Where(s => s.Name == "before-commit")));
                 var found = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "after-commit-canary"));
                 Assert.Null(found);
             }

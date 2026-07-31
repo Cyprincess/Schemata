@@ -27,11 +27,16 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
 {
     private const int SampleLimit = 100;
 
-    private readonly IServiceProvider _services;
+    private readonly IRepository<TEntity> _repository;
+    private readonly IServiceProvider     _services;
 
     /// <summary>Initializes the durable purge executor.</summary>
-    /// <param name="services">The service provider for resolving repositories and expression compilers.</param>
-    public PurgeJob(IServiceProvider services) { _services = services; }
+    /// <param name="repository">The repository of the purged resource.</param>
+    /// <param name="services">The service provider for resolving expression compilers.</param>
+    public PurgeJob(IRepository<TEntity> repository, IServiceProvider services) {
+        _repository = repository;
+        _services   = services;
+    }
 
     #region IScheduledJob Members
 
@@ -56,18 +61,17 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
         bool                             force,
         CancellationToken                ct
     ) {
-        var repository = _services.GetRequiredService<IRepository<TEntity>>();
         var container  = new ResourceRequestContainer<TEntity>();
         ResourceIdentifiers.ApplyParent(container, parent);
 
         var result = new PurgeResponse();
-        using (repository.SuppressQuerySoftDelete()) {
-            result.PurgeCount = await repository.LongCountAsync(Query, ct);
+        using (_repository.SuppressQuerySoftDelete()) {
+            result.PurgeCount = await _repository.LongCountAsync(Query, ct);
         }
 
         if (!force) {
-            using (repository.SuppressQuerySoftDelete()) {
-                await foreach (var row in repository.ListAsync(q => Query(q).Take(SampleLimit), ct)) {
+            using (_repository.SuppressQuerySoftDelete()) {
+                await foreach (var row in _repository.ListAsync(q => Query(q).Take(SampleLimit), ct)) {
                     var item = row.CanonicalName;
                     if (!string.IsNullOrWhiteSpace(item)) {
                         result.PurgeSample.Add(item);
@@ -78,14 +82,14 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
             return result;
         }
 
-        using (repository.SuppressQuerySoftDelete()) {
-            await foreach (var row in repository.ListAsync(Query, ct)) {
-                using var removeSuppression = repository.SuppressSoftDelete();
-                await repository.RemoveAsync(row, ct);
+        using (_repository.SuppressQuerySoftDelete()) {
+            await foreach (var row in _repository.ListAsync(Query, ct)) {
+                using var removeSuppression = _repository.SuppressSoftDelete();
+                await _repository.RemoveAsync(row, ct);
             }
         }
 
-        await repository.CommitAsync(ct);
+        await _repository.CommitAsync(ct);
 
         return result;
 

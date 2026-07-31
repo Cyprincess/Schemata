@@ -437,6 +437,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         if (_uow is not null) {
             await _uow.CommitAsync(ct);
+            Reopen();
             return;
         }
 
@@ -447,7 +448,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         // Owned but never mutated: a degenerate commit. Dispatch the empty snapshot so committed
         // advisors observe the no-op commit on the same footing as the enlisted path.
         await DispatchCommittedAsync(SnapshotChanges(), ct);
-        _completed = true;
+        Reopen();
     }
 
     public virtual IDisposable SuppressAddValidation()    { return AdviceContext.Use<AddValidationSuppressed>(); }
@@ -631,6 +632,19 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
         _uow = CreateUnitOfWork();
         Enlist(_uow);
+    }
+
+    /// <summary>
+    ///     Reopens the repository after its own unit of work commits. The context adopted from that
+    ///     unit of work stays in place until the next write enlists a fresh one, so reads between the
+    ///     two still resolve; after the implicit commit the repository owns the live context for reads,
+    ///     and the next write replaces it with a fresh unit-of-work context.
+    /// </summary>
+    private void Reopen() {
+        _uow        = null;
+        _completed  = false;
+        OwnsContext = true;
+        ResetTracking();
     }
 
     private void Enlist(IUnitOfWork uow) {

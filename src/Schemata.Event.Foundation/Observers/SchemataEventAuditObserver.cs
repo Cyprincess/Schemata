@@ -19,13 +19,13 @@ namespace Schemata.Event.Foundation.Observers;
 /// </summary>
 public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
 {
-    private readonly JsonSerializerOptions _json;
-    private readonly IServiceProvider      _services;
+    private readonly JsonSerializerOptions          _json;
+    private readonly IRepository<SchemataEvent>     _records;
 
-    /// <summary>Initializes an audit observer resolving event repositories from <paramref name="services" />.</summary>
-    public SchemataEventAuditObserver(IServiceProvider services, IOptions<JsonSerializerOptions> json) {
-        _services = services;
-        _json     = json.Value;
+    /// <summary>Initializes an audit observer writing through <paramref name="records" />.</summary>
+    public SchemataEventAuditObserver(IRepository<SchemataEvent> records, IOptions<JsonSerializerOptions> json) {
+        _records = records;
+        _json    = json.Value;
     }
 
     #region IEventLifecycleObserver Members
@@ -46,18 +46,15 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
 
         context.Record = record;
 
-        var records = _services.GetRequiredService<IRepository<SchemataEvent>>();
-        await records.AddAsync(record, ct);
-        await records.CommitAsync(ct);
+        await _records.AddAsync(record, ct);
+        await _records.CommitAsync(ct);
     }
 
     public async Task OnDeliveredAsync(EventContext context, CancellationToken ct = default) {
-        var records = _services.GetRequiredService<IRepository<SchemataEvent>>();
-
         var record = context.Record;
         if (record is null && !string.IsNullOrEmpty(context.CorrelationId)) {
             var correlationId = context.CorrelationId;
-            record = await records.FirstOrDefaultAsync(q => q.Where(r => r.CorrelationId == correlationId), ct);
+            record = await _records.FirstOrDefaultAsync(q => q.Where(r => r.CorrelationId == correlationId), ct);
         }
 
         if (record is null) {
@@ -65,17 +62,15 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
         }
 
         record.State = EventState.Recorded;
-        await records.UpdateAsync(record, ct);
-        await records.CommitAsync(ct);
+        await _records.UpdateAsync(record, ct);
+        await _records.CommitAsync(ct);
     }
 
     public async Task OnConsumedAsync(EventContext context, CancellationToken ct = default) {
-        var records = _services.GetRequiredService<IRepository<SchemataEvent>>();
-
         // Cross-process consume: recover the producer's audit row by CorrelationId.
         if (context.Record is null && !string.IsNullOrEmpty(context.CorrelationId)) {
             var correlationId = context.CorrelationId;
-            context.Record = await records.FirstOrDefaultAsync(
+            context.Record = await _records.FirstOrDefaultAsync(
                 q => q.Where(r => r.CorrelationId == correlationId), ct);
         }
 
@@ -91,8 +86,8 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
             context.Record.ResponsePayload = JsonSerializer.Serialize(context.Result, _json);
         }
 
-        await records.UpdateAsync(context.Record, ct);
-        await records.CommitAsync(ct);
+        await _records.UpdateAsync(context.Record, ct);
+        await _records.CommitAsync(ct);
     }
 
     #endregion

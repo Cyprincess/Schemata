@@ -64,7 +64,7 @@ public class PurgeJobShould
         using var services = new ServiceCollection()
                             .AddSingleton(repository.Object)
                             .BuildServiceProvider();
-        var job = new PurgeJob<ParentTrashStudent>(services);
+        var job = new PurgeJob<ParentTrashStudent>(repository.Object, services);
         var execution = new SchemataJobExecution();
 
         await job.ExecuteAsync(new JobContext {

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Skeleton.Attributes;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -13,11 +14,15 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>.
 ///     Best-effort by spec: failures are logged, not thrown.
 /// </summary>
+[ScheduledJob(JobKey)]
 public sealed class BackChannelLogoutJob(
     IHttpClientFactory            factory,
     ILogger<BackChannelLogoutJob> logger
 ) : IScheduledJob
 {
+    /// <summary>Stable scheduler key persisted on back-channel logout execution rows.</summary>
+    public const string JobKey = "schemata.authorization.logout.backchannel";
+
     #region IScheduledJob Members
 
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {

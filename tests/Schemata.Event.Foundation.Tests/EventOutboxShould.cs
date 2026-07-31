@@ -21,8 +21,7 @@ public class EventOutboxShould
                .Returns(Task.CompletedTask);
         records.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var services = new ServiceCollection().AddSingleton(records.Object).BuildServiceProvider();
-        var observer = new SchemataEventAuditObserver(services, Options.Create(new JsonSerializerOptions()));
+        var observer = new SchemataEventAuditObserver(records.Object, Options.Create(new JsonSerializerOptions()));
         var context = new EventContext(Mock.Of<IEvent>(), "sample") {
             Payload = "{}", CorrelationId = "c1", RequiresOutboxDelivery = true,
         };

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Skeleton.Attributes;
 
 namespace Schemata.Authorization.Foundation.Services;
 
@@ -12,9 +13,13 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     <see cref="ITokenManager{TToken}" />.  Registered as an hourly cron
 ///     entry on <see cref="SchemataSchedulingOptions.Jobs" />.
 /// </summary>
+[ScheduledJob(JobKey)]
 public sealed class TokenCleanupJob<TToken>(ITokenManager<TToken> tokens, TimeProvider? time = null) : IScheduledJob
     where TToken : SchemataToken
 {
+    /// <summary>Stable scheduler key persisted on token-cleanup job and execution rows.</summary>
+    public const string JobKey = "schemata.authorization.token.cleanup";
+
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     #region IScheduledJob Members
