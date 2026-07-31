@@ -69,12 +69,12 @@ public static class SchemataResourceErrors
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceNotFound) {
-        var descriptor = ResourceNameDescriptor.ForType(type);
+        var resource = ResourceType(type);
         var exception  = new NotFoundException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },
             new ResourceInfoDetail {
-                ResourceType = descriptor.Singular,
+                ResourceType = resource,
                 ResourceName = name,
                 Description  = description,
             },
@@ -110,12 +110,12 @@ public static class SchemataResourceErrors
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceAlreadyExists) {
-        var descriptor = ResourceNameDescriptor.ForType(type);
+        var resource = ResourceType(type);
         var exception  = new AlreadyExistsException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },
             new ResourceInfoDetail {
-                ResourceType = descriptor.Singular,
+                ResourceType = resource,
                 ResourceName = name,
                 Description  = description,
             },
@@ -140,19 +140,19 @@ public static class SchemataResourceErrors
         string? subject     = null,
         string? description = null,
         string  reason      = ErrorReasons.PreconditionNotSatisfied) {
-        var descriptor = ResourceNameDescriptor.ForType<T>();
+        var resource = ResourceType(typeof(T));
         var exception  = new FailedPreconditionException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },
             new ResourceInfoDetail {
-                ResourceType = descriptor.Singular,
+                ResourceType = resource,
                 ResourceName = name,
                 Description  = description,
             },
             new PreconditionFailureDetail {
                 Violations = [
                     new() {
-                        Type        = descriptor.Singular,
+                        Type        = resource,
                         Subject     = subject,
                         Description = description,
                     },
@@ -179,12 +179,12 @@ public static class SchemataResourceErrors
         string? owner       = null,
         string? description = null,
         string  reason      = ErrorReasons.InsufficientPermission) {
-        var descriptor = ResourceNameDescriptor.ForType<T>();
+        var resource = ResourceType(typeof(T));
         var exception  = new PermissionDeniedException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },
             new ResourceInfoDetail {
-                ResourceType = descriptor.Singular,
+                ResourceType = resource,
                 ResourceName = name,
                 Owner        = owner,
                 Description  = description,
@@ -208,16 +208,27 @@ public static class SchemataResourceErrors
         string? name        = null,
         string? description = null,
         string  reason      = ErrorReasons.ConcurrencyMismatch) {
-        var descriptor = ResourceNameDescriptor.ForType<T>();
+        var resource = ResourceType(typeof(T));
         var exception  = new AbortedException(reason: null);
         exception.Details = [
             new ErrorInfoDetail { Reason = reason },
             new ResourceInfoDetail {
-                ResourceType = descriptor.Singular,
+                ResourceType = resource,
                 ResourceName = name,
                 Description  = description,
             },
         ];
         return exception;
+    }
+
+    /// <summary>
+    ///     Labels <paramref name="type" /> for <see cref="ResourceInfoDetail.ResourceType" />. Addressable
+    ///     resources report their canonical singular; anything else reports its CLR name, so reporting an
+    ///     error stays possible for a type that never declared a resource pattern.
+    /// </summary>
+    private static string ResourceType(Type type) {
+        var descriptor = ResourceNameDescriptor.ForType(type);
+
+        return descriptor.IsAddressable ? descriptor.Singular : type.Name;
     }
 }

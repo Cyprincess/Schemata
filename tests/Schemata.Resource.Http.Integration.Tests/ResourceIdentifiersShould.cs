@@ -55,6 +55,7 @@ public class ResourceIdentifiersShould
 
     #region Nested type: SimpleThing
 
+    [CanonicalName("simplethings/{simple_thing}")]
     private sealed class SimpleThing : ICanonicalName
     {
         #region ICanonicalName Members

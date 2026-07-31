@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -15,7 +14,6 @@ namespace Schemata.Push.Skeleton.Entities;
 ///     (<c>users/{x}</c>, <c>groups/{x}</c>, <c>tags/{x}</c>, …), so subscriptions are not bound to
 ///     any identity model.
 /// </summary>
-[DisplayName("PushSubscription")]
 [Table("SchemataPushSubscriptions")]
 [CanonicalName("pushSubscriptions/{push_subscription}")]
 [PrimaryKey(nameof(Uid))]

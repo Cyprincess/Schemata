@@ -93,7 +93,7 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
         }
 
         throw new InvalidOperationException(
-            $"Report entity '{type.FullName}' must re-declare [CanonicalName(\"{pattern}\")] and [DisplayName(\"{singular}\")] to preserve its report resource collection."
+            $"Report entity '{type.FullName}' must re-declare [CanonicalName(\"{pattern}\")] to preserve its report resource collection and the '{singular}' resource identity."
         );
     }
 }

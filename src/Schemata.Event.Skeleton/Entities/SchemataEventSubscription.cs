@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -7,7 +6,6 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Event.Skeleton.Entities;
 
 /// <summary>Durable event subscription row used by event dispatchers and bridge features.</summary>
-[DisplayName("EventSubscription")]
 [Table("SchemataEventSubscriptions")]
 [PrimaryKey(nameof(Uid))]
 [CanonicalName("event-subscriptions/{event_subscription}")]

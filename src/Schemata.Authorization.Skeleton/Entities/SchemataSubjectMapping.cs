@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -25,7 +24,6 @@ namespace Schemata.Authorization.Skeleton.Entities;
 ///               (the hash itself is one-way).</item>
 ///     </list>
 /// </remarks>
-[DisplayName("SubjectMapping")]
 [Table("SchemataSubjectMappings")]
 [CanonicalName("subjectMappings/{subjectMapping}")]
 [PrimaryKey(nameof(Uid))]

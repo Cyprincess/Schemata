@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.ComponentModel;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Scheduling.Skeleton;
@@ -10,8 +9,6 @@ namespace Schemata.Scheduling.Skeleton;
 ///     <see cref="ICanonicalName" /> identity so it satisfies the
 ///     <c>IResourceMethodHandler</c> constraint.
 /// </summary>
-[DisplayName("RunJobRequest")]
-[CanonicalName("jobs/{job}")]
 public sealed class RunJobRequest : ICanonicalName
 {
     /// <summary>

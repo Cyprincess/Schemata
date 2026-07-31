@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -13,7 +12,6 @@ namespace Schemata.Flow.Skeleton.Entities;
 ///     always keeps exactly one token; the BPMN engine grows / merges tokens across fork, join,
 ///     boundary catch, and sub-process scopes.
 /// </summary>
-[DisplayName("Token")]
 [Table("SchemataProcessTokens")]
 [CanonicalName("processes/{process}/tokens/{token}")]
 [PrimaryKey(nameof(Uid))]

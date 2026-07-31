@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -15,7 +14,6 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 ///     is <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
 ///     read / list / delete only.
 /// </summary>
-[DisplayName("Operation")]
 [Table("SchemataJobExecutions")]
 [CanonicalName("operations/{operation}")]
 [PrimaryKey(nameof(Uid))]

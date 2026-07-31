@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -10,7 +9,6 @@ namespace Schemata.Authorization.Skeleton.Entities;
 /// <summary>
 ///     Represents an OAuth 2.0 token (authorization code, access token, refresh token, or device code).
 /// </summary>
-[DisplayName("Token")]
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 [PrimaryKey(nameof(Uid))]

@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -10,7 +9,6 @@ namespace Schemata.Authorization.Skeleton.Entities;
 /// <summary>
 ///     Represents a resource owner's consent grant to an application for a set of scopes.
 /// </summary>
-[DisplayName("Authorization")]
 [Table("SchemataAuthorizations")]
 [CanonicalName("authorizations/{authorization}")]
 [PrimaryKey(nameof(Uid))]

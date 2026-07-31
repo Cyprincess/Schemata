@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Abstractions.Resource;
@@ -9,7 +8,6 @@ namespace Schemata.Abstractions.Resource;
 ///     Returned by custom methods that dispatch background work (e.g. <c>:run</c>,
 ///     <c>:purge</c>) and by reads on the <c>operations/{operation}</c> resource.
 /// </summary>
-[DisplayName("Operation")]
 [CanonicalName("operations/{operation}")]
 public sealed class Operation : ICanonicalName
 {

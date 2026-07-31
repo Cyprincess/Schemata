@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -8,7 +7,6 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Flow.Skeleton.Entities;
 
 /// <summary>Persisted process instance derived from a registered <see cref="Models.ProcessDefinition" />.</summary>
-[DisplayName("Process")]
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]

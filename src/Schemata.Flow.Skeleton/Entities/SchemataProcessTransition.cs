@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -9,7 +8,6 @@ using Schemata.Flow.Skeleton.Models;
 namespace Schemata.Flow.Skeleton.Entities;
 
 /// <summary>A state transition within a process instance.</summary>
-[DisplayName("Transition")]
 [Table("SchemataProcessTransitions")]
 [CanonicalName("processes/{process}/transitions/{transition}")]
 [PrimaryKey(nameof(Uid))]

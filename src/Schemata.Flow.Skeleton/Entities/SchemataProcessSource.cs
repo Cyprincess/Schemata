@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -10,7 +9,6 @@ namespace Schemata.Flow.Skeleton.Entities;
 /// <summary>
 ///     Source entity binding for a process or a specific token branch.
 /// </summary>
-[DisplayName("ProcessSource")]
 [Table("SchemataProcessSources")]
 [PrimaryKey(nameof(Uid))]
 [Index(nameof(Process), nameof(Token), nameof(Name), IsUnique = true)]

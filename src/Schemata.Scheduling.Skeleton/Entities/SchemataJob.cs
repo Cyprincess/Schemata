@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -8,7 +7,6 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Scheduling.Skeleton.Entities;
 
 /// <summary>Persisted record for a scheduler entry, mirroring the in-memory registry.</summary>
-[DisplayName("Job")]
 [Table("SchemataJobs")]
 [CanonicalName("jobs/{job}")]
 [PrimaryKey(nameof(Uid))]

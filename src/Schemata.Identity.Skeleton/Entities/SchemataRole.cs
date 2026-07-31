@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
@@ -12,7 +11,6 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// <summary>
 ///     Identity role entity used by Schemata identity stores.
 /// </summary>
-[DisplayName("Role")]
 [Table("SchemataRoles")]
 [CanonicalName("roles/{role}")]
 [PrimaryKey(nameof(Uid))]

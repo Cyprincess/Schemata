@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -10,7 +9,6 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 /// <summary>
 ///     Represents a tenant in a multi-tenant system.
 /// </summary>
-[DisplayName("Tenant")]
 [Table("SchemataTenants")]
 [CanonicalName("tenants/{tenant}")]
 [PrimaryKey(nameof(Uid))]

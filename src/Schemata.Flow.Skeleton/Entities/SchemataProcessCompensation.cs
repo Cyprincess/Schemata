@@ -1,12 +1,10 @@
 using System;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Flow.Skeleton.Entities;
 
 /// <summary>Persisted compensation binding registered by a process execution.</summary>
-[DisplayName("ProcessCompensation")]
 [Table("SchemataProcessCompensations")]
 [PrimaryKey(nameof(Uid))]
 [CanonicalName("process-compensations/{process_compensation}")]

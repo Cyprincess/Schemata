@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -27,23 +25,22 @@ public sealed class ResourceNameDescriptor
     private readonly Segment?  _leafSegment;
     private readonly Segment[] _parentSegments;
     private readonly Segment[] _segments;
+    private readonly Type      _type = null!;
+    private readonly string?   _plural;
+    private readonly string?   _singular;
 
     private ResourceNameDescriptor(Type type) {
         var canonical = type.GetCustomAttribute<CanonicalNameAttribute>(false);
-
-        Singular = type.GetCustomAttribute<DisplayNameAttribute>(false)?.DisplayName
-                ?? type.GetCustomAttribute<TableAttribute>(false)?.Name.Singularize()
-                ?? type.Name;
-
-        Plural = Singular.Pluralize();
 
         Package = type.GetCustomAttribute<ResourcePackageAttribute>(false)?.Package;
 
         SupportsReadAcross = type.GetCustomAttribute<ReadAcrossAttribute>(false) is not null;
 
+        _type = type;
+
         if (canonical is null) {
-            Collection      = Plural.ToLowerInvariant();
-            CollectionPath  = Collection;
+            Collection      = "";
+            CollectionPath  = "";
             _segments       = [];
             _parentSegments = [];
             return;
@@ -51,13 +48,19 @@ public sealed class ResourceNameDescriptor
 
         Pattern = canonical.ResourceName;
 
-        var parts = Pattern.Split('/');
+        // The leaf placeholder of an ICanonicalName resource binds to Name however it is spelled:
+        // `books/{bookId}` and `parents/{parent}` both address the resource's own Name.
+        var identifies = typeof(ICanonicalName).IsAssignableFrom(type);
+        var parts      = Pattern.Split('/');
         _segments = new Segment[parts.Length];
         for (var i = 0; i < parts.Length; i++) {
             var p = parts[i];
             if (p.Length > 2 && p[0] == '{' && p[^1] == '}') {
-                var name = p.Substring(1, p.Length - 2);
-                _segments[i] = new(p, name, ResolvePropertyName(name.Pascalize()));
+                var placeholder = p.Substring(1, p.Length - 2);
+                var property = identifies && i == parts.Length - 1
+                    ? nameof(ICanonicalName.Name)
+                    : PascalizeSegment(placeholder);
+                _segments[i] = new(p, placeholder, property);
             } else {
                 _segments[i] = new(p, null, null);
             }
@@ -68,6 +71,8 @@ public sealed class ResourceNameDescriptor
             _leafSegment   = leaf;
             Collection     = _segments.Length >= 2 ? _segments[^2].Raw : "";
             CollectionPath = string.Join("/", SliceSegments(_segments, 0, _segments.Length - 1).Select(s => s.Raw));
+            _singular      = PascalizeSegment(leaf.Placeholder!);
+            _plural        = Collection.Length > 0 ? PascalizeSegment(Collection) : _singular.Pluralize();
         } else {
             _leafSegment   = null;
             Collection     = leaf.Raw;
@@ -82,16 +87,17 @@ public sealed class ResourceNameDescriptor
         } else {
             _parentSegments = SliceSegments(_segments, 0, _segments.Length - 1);
         }
+    }
 
-        return;
+    /// <summary>
+    ///     Pascalizes a pattern segment. Humanizer splits on <c>_</c> and spaces only, so
+    ///     <c>event-subscriptions</c> would otherwise become <c>Event-subscriptions</c>.
+    /// </summary>
+    private static string PascalizeSegment(string segment) { return segment.Replace('-', '_').Pascalize(); }
 
-        string ResolvePropertyName(string placeholder) {
-            return placeholder switch {
-                nameof(IChild.Parent)                           => nameof(IChild.Parent),
-                var _ when string.Equals(Singular.Pascalize(), placeholder) => nameof(ICanonicalName.Name),
-                var _                                           => placeholder,
-            };
-        }
+    private InvalidOperationException NotAddressable() {
+        return new($"Type '{_type.FullName}' declares no [CanonicalName] pattern ending in a placeholder, "
+                 + "so it carries no resource identity.");
     }
 
     /// <summary>
@@ -102,15 +108,19 @@ public sealed class ResourceNameDescriptor
     public string? Pattern { get; }
 
     /// <summary>
-    ///     PascalCase singular form derived from <see cref="DisplayNameAttribute" />, <see cref="TableAttribute" />, or
-    ///     the type name.
+    ///     PascalCase singular form, taken from the pattern's leaf placeholder, e.g. <c>"Book"</c>.
+    ///     Available when <see cref="IsAddressable" /> holds; the pattern is the sole source of
+    ///     resource identity.
     /// </summary>
-    public string Singular { get; }
+    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    public string Singular => _singular ?? throw NotAddressable();
 
     /// <summary>
-    ///     PascalCase plural form.
+    ///     PascalCase plural form, taken from the pattern's collection segment as authored, so
+    ///     <c>people/{person}</c> yields <c>"People"</c>.
     /// </summary>
-    public string Plural { get; }
+    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    public string Plural => _plural ?? throw NotAddressable();
 
     /// <summary>
     ///     Last collection segment from the pattern, e.g., <c>"books"</c>.
@@ -133,6 +143,13 @@ public sealed class ResourceNameDescriptor
     ///     <see langword="true" /> when the resource has parent segments in its pattern.
     /// </summary>
     public bool HasParent => _parentSegments.Length > 0;
+
+    /// <summary>
+    ///     <see langword="true" /> when the pattern addresses individual resources: it ends in a
+    ///     placeholder preceded by a collection literal. Standard Get / Update / Delete routes,
+    ///     <see cref="ParseCanonicalName" /> and parent scoping all require this shape.
+    /// </summary>
+    public bool IsAddressable => _leafSegment is not null && Collection.Length > 0 && Collection[0] != '{';
 
     /// <summary>
     ///     <see langword="true" /> when the entity type has <see cref="ReadAcrossAttribute" /> (
@@ -251,19 +268,28 @@ public sealed class ResourceNameDescriptor
     /// <summary>
     ///     Builds a parent path string from ASP.NET route values.
     ///     e.g., routeValues <c>{ publisher: "acme" }</c> => <c>"publishers/acme"</c>.
+    ///     Every parent placeholder must be present, so the result always addresses one parent.
     /// </summary>
     /// <param name="routeValues">The route value dictionary.</param>
-    /// <returns>The parent path, or <see langword="null" /> if no parent segments exist.</returns>
+    /// <returns>
+    ///     The parent path; <see langword="null" /> when the pattern declares no parent segments or
+    ///     <paramref name="routeValues" /> leaves a parent placeholder unbound.
+    /// </returns>
     public string? ResolveParent(IDictionary<string, object?> routeValues) {
         if (_parentSegments.Length == 0) return null;
         var parts = new string[_parentSegments.Length];
         for (var i = 0; i < _parentSegments.Length; i++) {
             var seg = _parentSegments[i];
-            if (seg.IsPlaceholder && routeValues.TryGetValue(seg.Placeholder!, out var value) && value is string text) {
-                parts[i] = text;
-            } else {
+            if (!seg.IsPlaceholder) {
                 parts[i] = seg.Raw;
+                continue;
             }
+
+            if (!routeValues.TryGetValue(seg.Placeholder!, out var value) || value is not string text) {
+                return null;
+            }
+
+            parts[i] = text;
         }
 
         return string.Join("/", parts);
@@ -287,7 +313,9 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Sets parent properties on the target object from route values.
+    ///     Sets parent properties on the target object from route values, including
+    ///     <see cref="IChild.Parent" /> when every parent placeholder is present in
+    ///     <paramref name="routeValues" />.
     /// </summary>
     /// <param name="target">The target object.</param>
     /// <param name="routeValues">The route value dictionary.</param>
@@ -302,6 +330,10 @@ public sealed class ResourceNameDescriptor
                 }
             }
         }
+
+        if (target is IChild child && ResolveParent(routeValues) is { } parent) {
+            child.Parent = parent;
+        }
     }
 
     /// <summary>
@@ -312,6 +344,10 @@ public sealed class ResourceNameDescriptor
     /// <typeparam name="T">The entity type.</typeparam>
     /// <param name="parentValues">The parent values dictionary.</param>
     /// <returns>A predicate expression, or <see langword="null" /> if no conditions can be built.</returns>
+    /// <exception cref="MissingFieldException">
+    ///     Thrown when a non-wildcard parent value addresses a placeholder that has no matching property
+    ///     on <typeparamref name="T" />. Skipping it would widen the query past the requested parent scope.
+    /// </exception>
     public Expression<Func<T, bool>>? BuildParentPredicate<T>(Dictionary<string, string> parentValues) {
         var parameter  = Expression.Parameter(typeof(T), "e");
         var properties = AppDomainTypeCache.GetProperties(typeof(T));
@@ -331,7 +367,7 @@ public sealed class ResourceNameDescriptor
             }
 
             if (!properties.TryGetValue(seg.Property!, out var property)) {
-                continue;
+                throw new MissingFieldException(typeof(T).Name, seg.Property!);
             }
 
             var member   = Expression.Property(parameter, property);
@@ -349,7 +385,9 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
-    ///     Clears parent properties on the target object (sets them to <see langword="null" />).
+    ///     Clears every parent channel on the target object, both the structural parent properties
+    ///     and <see cref="IChild.Parent" />. Update reads the parent from the URI, so a request body
+    ///     that still carried either channel would reparent the resource.
     /// </summary>
     /// <param name="target">The target object.</param>
     public void ClearParentProperties(object target) {
@@ -359,6 +397,10 @@ public sealed class ResourceNameDescriptor
             if (!seg.IsPlaceholder) continue;
             if (!properties.TryGetValue(seg.Property!, out var property)) continue;
             property.SetValue(target, null);
+        }
+
+        if (target is IChild child) {
+            child.Parent = null;
         }
     }
 

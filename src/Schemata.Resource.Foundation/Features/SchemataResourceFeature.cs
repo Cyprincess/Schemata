@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation.Advisors;
@@ -113,6 +114,8 @@ public sealed class SchemataResourceFeature : FeatureBase
     /// <param name="services">The <see cref="IServiceCollection" />.</param>
     /// <param name="resource">The <see cref="ResourceAttribute" /> describing the resource.</param>
     public static void RegisterResource(IServiceCollection services, ResourceAttribute resource) {
+        EnsureAddressablePattern(resource.Entity);
+
         resource.Endpoints ??= resource.Entity.GetCustomAttributes<ResourceEndpointAttributeBase>()
                                        .Select(a => a.Endpoint)
                                        .ToArray();
@@ -179,6 +182,26 @@ public sealed class SchemataResourceFeature : FeatureBase
             existing.Clear();
             existing.AddRange(byVerb.Values);
         });
+    }
+
+    /// <summary>
+    ///     Rejects a resource whose <see cref="CanonicalNameAttribute" /> pattern cannot address a
+    ///     single row; canonical patterns must identify individual resource rows before registration.
+    /// </summary>
+    private static void EnsureAddressablePattern(Type entity) {
+        if (!typeof(ICanonicalName).IsAssignableFrom(entity)) {
+            return;
+        }
+
+        var descriptor = ResourceNameDescriptor.ForType(entity);
+        if (descriptor.IsAddressable) {
+            return;
+        }
+
+        var found = descriptor.Pattern is null ? "no [CanonicalName]" : $"\"{descriptor.Pattern}\"";
+        throw new InvalidOperationException(
+            $"Resource '{entity.FullName}' must declare a [CanonicalName] pattern ending in a placeholder "
+            + $"preceded by a collection literal, such as \"books/{{book}}\". Found {found}.");
     }
 
     private static Type? FindResourceMethodHandlerInterface(Type handler) {

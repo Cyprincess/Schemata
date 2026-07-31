@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using Schemata.Abstractions.Entities;
 using Schemata.Insight.Skeleton;
 
@@ -7,7 +6,6 @@ namespace Schemata.Report.Skeleton;
 
 /// <summary>Metadata header for a persisted report snapshot whose rows are stored in chunks.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}")]
-[DisplayName("Snapshot")]
 [PrimaryKey(nameof(Uid))]
 public class SchemataReportSnapshot : IIdentifier, ICanonicalName, ITimestamp
 {

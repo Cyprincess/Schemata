@@ -193,17 +193,13 @@ public class SchemataResourceFeatureRegisterMethodShould
     }
 
     [Fact]
-    public void PreserveLatestDeclaration_WhenSameVerbReRegistered() {
-        var services   = new ServiceCollection();
-        var firstPass  = new ResourceAttribute<SingleVerbEntity, RunRequest>();
-        var secondPass = new ResourceAttribute<SingleVerbEntity, RunRequest>();
+    public void RegisterOneMethod_WhenTheSameResourceIsDeclaredTwice() {
+        var services = new ServiceCollection();
 
-        SchemataResourceFeature.RegisterResource(services, firstPass);
-        SchemataResourceFeature.RegisterResource(services, secondPass);
+        SchemataResourceFeature.RegisterResource(services, new ResourceAttribute<SingleVerbEntity, RunRequest>());
+        SchemataResourceFeature.RegisterResource(services, new ResourceAttribute<SingleVerbEntity, RunRequest>());
 
-        var options    = BuildOptions(services);
-        var methods    = options.Methods[typeof(SingleVerbEntity).TypeHandle];
-        var registered = Assert.Single(methods);
+        var registered = Assert.Single(BuildOptions(services).Methods[typeof(SingleVerbEntity).TypeHandle]);
         Assert.Equal("run", registered.Verb);
     }
 
@@ -227,6 +223,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     #region Nested type: InvalidHandlerEntity
 
     [ResourceMethod("badVerb", typeof(NotAHandler))]
+    [CanonicalName("invalidHandlerEntities/{invalid_handler_entity}")]
     public sealed class InvalidHandlerEntity : ICanonicalName
     {
         #region ICanonicalName Members
@@ -243,6 +240,7 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     [ResourceMethod("archive", typeof(RunHandler))]
     [ResourceMethod("batchCreate", typeof(RunHandler), ResourceMethodScope.Collection)]
+    [CanonicalName("multiVerbEntities/{multi_verb_entity}")]
     public sealed class MultiVerbEntity : ICanonicalName
     {
         #region ICanonicalName Members
@@ -263,6 +261,7 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: PlainEntity
 
+    [CanonicalName("plainEntities/{plain_entity}")]
     public sealed class PlainEntity : ICanonicalName
     {
         #region ICanonicalName Members
@@ -348,6 +347,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     #region Nested type: ScanResource
 
     [Resource<ScanResource>]
+    [CanonicalName("scanResources/{scan_resource}")]
     public sealed class ScanResource : ICanonicalName
     {
         #region ICanonicalName Members
@@ -363,6 +363,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     #region Nested type: SingleVerbEntity
 
     [ResourceMethod("run", typeof(RunHandler))]
+    [CanonicalName("singleVerbEntities/{single_verb_entity}")]
     public sealed class SingleVerbEntity : ICanonicalName
     {
         #region ICanonicalName Members
@@ -377,6 +378,7 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: SoftEntity
 
+    [CanonicalName("softEntities/{soft_entity}")]
     public sealed class SoftEntity : ICanonicalName, ISoftDelete
     {
         #region ICanonicalName Members
@@ -399,6 +401,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     #region Nested type: SoftOverrideEntity
 
     [ResourceMethod("undelete", typeof(SoftUndeleteHandler))]
+    [CanonicalName("softOverrideEntities/{soft_override_entity}")]
     public sealed class SoftOverrideEntity : ICanonicalName, ISoftDelete
     {
         #region ICanonicalName Members
@@ -442,6 +445,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     #region Nested type: SoftPurgeOverrideEntity
 
     [ResourceMethod("purge", typeof(SoftPurgeHandler), ResourceMethodScope.Collection)]
+    [CanonicalName("softPurgeOverrideEntities/{soft_purge_override_entity}")]
     public sealed class SoftPurgeOverrideEntity : ICanonicalName, ISoftDelete
     {
         #region ICanonicalName Members

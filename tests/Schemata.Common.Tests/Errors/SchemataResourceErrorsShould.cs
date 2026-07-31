@@ -1,4 +1,5 @@
 using System.Linq;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common.Errors;
@@ -130,6 +131,7 @@ public class SchemataResourceErrorsShould
 
     #region Nested type: Book
 
+    [CanonicalName("books/{book}")]
     private sealed class Book
     {
         public string? Name { get; set; }

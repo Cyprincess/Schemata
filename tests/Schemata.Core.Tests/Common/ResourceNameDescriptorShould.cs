@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.ComponentModel;
 using Schemata.Common;
 using Schemata.Core.Tests.Fixtures;
 using Xunit;
@@ -50,14 +49,14 @@ public class ResourceNameDescriptorShould
     }
 
     [Fact]
-    public void Collection_BeLowercasePluralOfTypeName() {
+    public void Collection_BeTheCollectionSegmentOfThePattern() {
         var descriptor = ResourceNameDescriptor.ForType<Book>();
 
         Assert.Equal("books", descriptor.Collection);
     }
 
     [Fact]
-    public void Plural_BePascalCasePluralOfTypeName() {
+    public void Plural_BePascalCaseOfTheCollectionSegment() {
         var descriptor = ResourceNameDescriptor.ForType<Book>();
 
         Assert.Equal("Books", descriptor.Plural);
@@ -106,21 +105,23 @@ public class ResourceNameDescriptorShould
     }
 
     [Fact]
-    public void Singular_PreserveDisplayNameThatSingularizesToDifferentValue() {
-        var descriptor = ResourceNameDescriptor.ForType<ProcessDescriptor>();
+    public void Singular_ReadTheLeafPlaceholder_WhenItIsNotTheSingularizedCollection() {
+        var descriptor = ResourceNameDescriptor.ForType<Person>();
 
-        Assert.Equal("Process", descriptor.Singular);
+        Assert.Equal("Person", descriptor.Singular);
+        Assert.Equal("People", descriptor.Plural);
     }
 
     [Fact]
-    public void Plural_PluralizePreservedSingular() {
+    public void Plural_ReadTheCollectionSegment_WithoutPluralizingTheSingular() {
         var descriptor = ResourceNameDescriptor.ForType<Process>();
 
+        Assert.Equal("Process", descriptor.Singular);
         Assert.Equal("Processes", descriptor.Plural);
     }
 
     [Fact]
-    public void Resolve_MapLeafToName_ForDisplayNameThatOverSingularizes() {
+    public void Resolve_MapLeafToName_ForASingleSegmentResource() {
         var descriptor = ResourceNameDescriptor.ForType<Process>();
 
         var resolved = descriptor.Resolve(new Process { Name = "p1" });
@@ -136,7 +137,4 @@ public class ResourceNameDescriptorShould
 
         Assert.Equal("processes/p1/steps/s1", resolved);
     }
-
-    [DisplayName("Process")]
-    private sealed class ProcessDescriptor { }
 }

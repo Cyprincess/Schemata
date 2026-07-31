@@ -16,6 +16,8 @@ public class SchemataReportSnapshotChunkShould
 
         Assert.Equal("reports/{report}/snapshots/{snapshot}/chunks", descriptor.CollectionPath);
         Assert.Equal("Chunk", descriptor.Singular);
+        Assert.Equal("Chunks", descriptor.Plural);
+        Assert.Equal("chunks", descriptor.Collection);
         Assert.Equal(
             "reports/daily-sales/snapshots/2026-07-18/chunks/chunk-0",
             descriptor.Resolve(new SchemataReportSnapshotChunk {

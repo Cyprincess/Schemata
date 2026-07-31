@@ -1,12 +1,10 @@
 using System;
-using System.ComponentModel;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Report.Skeleton;
 
 /// <summary>Internal persisted row-data chunk belonging to a report snapshot.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}/chunks/{chunk}")]
-[DisplayName("Chunk")]
 [PrimaryKey(nameof(Uid))]
 public class SchemataReportSnapshotChunk : IIdentifier, ICanonicalName
 {

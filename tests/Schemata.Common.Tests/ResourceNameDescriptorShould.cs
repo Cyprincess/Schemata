@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Schemata.Abstractions.Entities;
 using Xunit;
 
@@ -7,52 +6,62 @@ namespace Schemata.Common.Tests;
 public class ResourceNameDescriptorShould
 {
     [Fact]
-    public void Resolve_MapLeafToName_ForDisplayNameContainingSpaces() {
+    public void Resolve_MapLeafToName_ForCamelCaseCollection() {
         var descriptor = ResourceNameDescriptor.ForType<SalesOrder>();
 
-        var resolved = descriptor.Resolve(new SalesOrder { Name = "1" });
-
-        Assert.Equal("salesOrders/1", resolved);
+        Assert.Equal("SalesOrder", descriptor.Singular);
+        Assert.Equal("SalesOrders", descriptor.Plural);
+        Assert.Equal("salesOrders/1", descriptor.Resolve(new SalesOrder { Name = "1" }));
     }
 
     [Fact]
-    public void Resolve_MapLeafToName_ForPascalDisplayName() {
-        var descriptor = ResourceNameDescriptor.ForType<Invoice>();
+    public void Resolve_MapLeafToName_ForHyphenatedCollection() {
+        var descriptor = ResourceNameDescriptor.ForType<EventSubscription>();
 
-        var resolved = descriptor.Resolve(new Invoice { Name = "1" });
-
-        Assert.Equal("invoices/1", resolved);
+        Assert.Equal("EventSubscription", descriptor.Singular);
+        Assert.Equal("EventSubscriptions", descriptor.Plural);
+        Assert.Equal("event-subscriptions/1", descriptor.Resolve(new EventSubscription { Name = "1" }));
     }
 
     [Fact]
-    public void Resolve_MapLeafToName_ForTypeNameWithoutDisplayName() {
-        var descriptor = ResourceNameDescriptor.ForType<Shipment>();
+    public void Resolve_MapLeafToName_WhenTheLeafPlaceholderIsNotTheSingular() {
+        var descriptor = ResourceNameDescriptor.ForType<Book>();
 
-        var resolved = descriptor.Resolve(new Shipment { Name = "1" });
-
-        Assert.Equal("shipments/1", resolved);
+        Assert.Equal("books/1", descriptor.Resolve(new Book { Name = "1" }));
     }
 
-    [DisplayName("Sales Order")]
+    [Fact]
+    public void Resolve_MapLeafToName_WhenTheLeafPlaceholderIsNamedParent() {
+        var descriptor = ResourceNameDescriptor.ForType<Parent>();
+
+        Assert.Equal("parents/1", descriptor.Resolve(new Parent { Name = "1" }));
+    }
+
     [CanonicalName("salesOrders/{salesOrder}")]
     private sealed class SalesOrder : ICanonicalName
     {
-        public string? Name { get; set; }
+        public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }
 
-    [DisplayName("Invoice")]
-    [CanonicalName("invoices/{invoice}")]
-    private sealed class Invoice : ICanonicalName
+    [CanonicalName("event-subscriptions/{event_subscription}")]
+    private sealed class EventSubscription : ICanonicalName
     {
-        public string? Name { get; set; }
+        public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }
 
-    [CanonicalName("shipments/{shipment}")]
-    private sealed class Shipment : ICanonicalName
+    [CanonicalName("books/{bookId}")]
+    private sealed class Book : ICanonicalName
     {
-        public string? Name { get; set; }
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+    }
+
+    [CanonicalName("parents/{parent}")]
+    private sealed class Parent : ICanonicalName
+    {
+        public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }
 }
