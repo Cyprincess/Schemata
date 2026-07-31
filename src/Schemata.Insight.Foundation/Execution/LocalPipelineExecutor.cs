@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Skeleton;
 
 namespace Schemata.Insight.Foundation;
@@ -81,9 +82,8 @@ public sealed partial class LocalPipelineExecutor
         JoinKind                                              kind,
         [EnumeratorCancellation] CancellationToken             ct
     ) {
-        var predicate = Compiler(on.Language)
-                       .Compile<IReadOnlyDictionary<string, object?>, bool>(on.Tree)
-                       .Compile();
+        var predicate = ExpressionCache.GetOrAddDelegate(
+            Compiler(on.Language).Compile<IReadOnlyDictionary<string, object?>, bool>(on.Tree));
 
         var buildRight = kind is JoinKind.Inner or JoinKind.Left or JoinKind.Full;
         var probe      = buildRight ? left : right;

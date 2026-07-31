@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Skeleton;
 
 namespace Schemata.Insight.Foundation;
@@ -17,9 +18,10 @@ public sealed partial class LocalPipelineExecutor
     ) {
         var fields = compute.Fields
                             .Select(field => (field.Alias,
-                                              Value: Compiler(field.Expression.Language)
-                                                    .Compile<IReadOnlyDictionary<string, object?>, object>(field.Expression.Tree)
-                                                    .Compile()))
+                                              Value: ExpressionCache.GetOrAddDelegate(
+                                                  Compiler(field.Expression.Language)
+                                                     .Compile<IReadOnlyDictionary<string, object?>, object>(
+                                                          field.Expression.Tree))))
                             .ToArray();
 
         await foreach (var row in rows.WithCancellation(ct)) {

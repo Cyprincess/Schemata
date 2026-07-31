@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Skeleton;
 
 namespace Schemata.Insight.Foundation;
@@ -13,9 +14,9 @@ public sealed partial class LocalPipelineExecutor
         FilterNode                                            filter,
         [EnumeratorCancellation] CancellationToken             ct
     ) {
-        var predicate = Compiler(filter.Predicate.Language)
-                       .Compile<IReadOnlyDictionary<string, object?>, bool>(filter.Predicate.Tree)
-                       .Compile();
+        var predicate = ExpressionCache.GetOrAddDelegate(
+            Compiler(filter.Predicate.Language)
+               .Compile<IReadOnlyDictionary<string, object?>, bool>(filter.Predicate.Tree));
 
         await foreach (var row in rows.WithCancellation(ct)) {
             if (predicate(row)) {
