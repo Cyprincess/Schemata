@@ -29,10 +29,9 @@ Register the `students` resource collection as a repository-backed source inside
 `UseSchemata` callback:
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
-using Schemata.Expressions.Aip;
-using Schemata.Expressions.Cel;
-using Schemata.Expressions.Order;
 using Schemata.Insight.Foundation;
 
 var insight = schema.UseInsight(i => {
@@ -144,7 +143,7 @@ Add a child collection to the existing `Student` model:
 
 ```csharp
 using System.Collections.Generic;
-using Schemata.Abstractions.Entities;
+using Microsoft.EntityFrameworkCore;
 
 // Add this member inside the existing Student class.
 public List<Enrollment> Enrollments { get; set; } = [];

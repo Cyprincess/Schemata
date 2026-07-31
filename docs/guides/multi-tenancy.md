@@ -111,6 +111,8 @@ Lookups hit the per-tenant overrides first, then fall through to the host root. 
 Inject the generic accessor anywhere to read the resolved tenant:
 
 ```csharp
+using Schemata.Tenancy.Skeleton;
+
 public sealed class StudentService(ITenantContextAccessor<Tenant> accessor)
 {
     public string? GetTenantName() => accessor.Tenant?.DisplayName;
@@ -124,6 +126,9 @@ The `Tenant` property is `null` until middleware initialization completes for th
 Seed the tenant before sending a request:
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Tenancy.Skeleton;
+
 using var scope = app.Services.CreateScope();
 var manager = scope.ServiceProvider.GetRequiredService<ITenantManager<Tenant>>();
 var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");

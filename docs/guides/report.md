@@ -28,7 +28,9 @@ Scheduling Foundation package.
 
 ## Step 2: Add Report storage
 
-Add the Report entity sets and mappings to `AppDbContext`:
+Add the Report entity sets and mappings to `AppDbContext`. Keep the base class the earlier guides
+gave it — [Identity](identity.md) changes it to `IdentityDbContext<...>`, and this step only adds
+entity sets and an `OnModelCreating` override:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -81,9 +83,7 @@ Insight registration with this one, or add only the calls that are absent.
 
 ```csharp
 using Microsoft.AspNetCore.Builder;
-using Schemata.Expressions.Aip;
-using Schemata.Expressions.Cel;
-using Schemata.Expressions.Order;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Insight.Foundation;
 
 schema.UseInsight(insight => {

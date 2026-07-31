@@ -19,8 +19,10 @@ In `Student.cs`, add the interface and annotate the property with `[ConcurrencyC
 
 ```csharp
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("students/{student}")]
 public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, IConcurrency
 {

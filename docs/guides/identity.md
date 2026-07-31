@@ -35,7 +35,7 @@ schema.UseIdentity(
 
 | Parameter   | Type                              | Purpose                                                        |
 | ----------- | --------------------------------- | -------------------------------------------------------------- |
-| `identify`  | `Action<SchemataIdentityOptions>` | Enable/disable registration, password reset, email change, 2FA |
+| `identify`  | `Action<SchemataIdentityOptions>` | Enable/disable registration, account confirmation, password reset, password change, email change, phone-number change, 2FA; set `LoginUri` |
 | `configure` | `Action<IdentityOptions>`         | Password policy, lockout, sign-in requirements                 |
 | `build`     | `Action<IdentityBuilder>`         | Add token providers or custom stores                           |
 | `bearer`    | `Action<BearerTokenOptions>`      | Token expiration, refresh behavior                             |
@@ -49,6 +49,20 @@ schema.UseIdentity<CustomUser, CustomRole, CustomUserStore, CustomRoleStore>();
 ```
 
 Type constraints: `TUser : SchemataUser, new()` and `TRole : SchemataRole`.
+
+## Browser sign-in redirects
+
+A browser that hits an `[Authorize]` endpoint without a cookie session gets HTTP 401 by default.
+Set `LoginUri` to redirect it to your sign-in page instead:
+
+```csharp
+schema.UseIdentity(identify: opts => opts.LoginUri = "/login");
+```
+
+The framework appends a `continue` parameter holding the original local path, protected by ASP.NET
+Data Protection. After your sign-in page authenticates the user, send the browser to
+`GET ~/Authenticate/Continue?continue=<value>`; that endpoint unprotects the value, checks it is a
+local URL, and redirects back to where the user started.
 
 ## Update the DbContext
 

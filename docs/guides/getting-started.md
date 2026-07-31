@@ -28,6 +28,7 @@ package supplies the database driver used in this guide.
 Create `Student.cs`. Implement the trait interfaces for the capabilities you want:
 
 ```csharp
+using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Entities;
 
 [PrimaryKey(nameof(Uid))]
@@ -90,6 +91,7 @@ populates `Uid` and `Name` first:
 
 ```csharp
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -104,7 +106,7 @@ public sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
         CancellationToken    ct = default)
     {
         if (entity.Uid == Guid.Empty)
-            entity.Uid = Guid.CreateVersion7();
+            entity.Uid = Identifiers.NewUid();
 
         if (string.IsNullOrWhiteSpace(entity.Name))
             entity.Name = entity.Uid.ToString("N");
@@ -114,9 +116,10 @@ public sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
 }
 ```
 
-`Guid.CreateVersion7()` produces a time-ordered UUID that sorts well as a primary key. `Order = 0`
-runs this advisor ahead of every built-in repository advisor, the lowest of which is at
-100,000,000.
+`Identifiers.NewUid()` from `Schemata.Common` is the framework's primary-key generator. It compiles
+on both target frameworks: on .NET 10 it returns a time-ordered UUIDv7 that sorts well as a primary
+key, and on .NET 8 it returns `Guid.NewGuid()`. `Order = 0` runs this advisor ahead of every
+built-in repository advisor, the lowest of which is at 100,000,000.
 
 ## Configure the application
 

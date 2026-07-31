@@ -7,6 +7,7 @@ Wrap multiple repository operations in a single database transaction using `IUni
 The `Student` entity from [Getting Started](getting-started.md):
 
 ```csharp
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("students/{student}")]
 public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete
 {

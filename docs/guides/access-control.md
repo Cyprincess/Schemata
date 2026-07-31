@@ -106,8 +106,25 @@ schema.ConfigureServices(services =>
 ## Row-level filtering
 
 `IEntitlementProvider<T, TRequest>` returns a LINQ predicate composed into the repository query, or
-`null` for no filter. The default returns `null`. To restrict each user to their own rows, give
-`Student` the `IOwnable` trait (a `string? Owner` property) and filter on it:
+`null` for no filter. The default returns `null`. To restrict each user to their own rows, first add
+the `IOwnable` trait to `Student.cs`:
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Schemata.Abstractions.Entities;
+
+[PrimaryKey(nameof(Uid))]
+[CanonicalName("students/{student}")]
+public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, IConcurrency, IOwnable
+{
+    // ... the properties from the earlier guides
+
+    // IOwnable
+    public string? Owner { get; set; }
+}
+```
+
+Delete `app.db` so EF Core recreates the schema with the new `Owner` column. Then filter on it:
 
 ```csharp
 using System;
@@ -116,6 +133,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Security.Skeleton;
+using static Schemata.Abstractions.SchemataConstants;
 
 public sealed class StudentEntitlementProvider
     : IEntitlementProvider<Student, StudentRequest>

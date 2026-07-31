@@ -44,11 +44,13 @@ Code-first gRPC needs protobuf-net field numbers on the serialized types. Add `[
 `[ProtoMember]` to `Student`:
 
 ```csharp
-using ProtoBuf;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using ProtoBuf;
 using Schemata.Abstractions.Entities;
 
 [ProtoContract]
+[PrimaryKey(nameof(Uid))]
 [CanonicalName("students/{student}")]
 public class Student : IIdentifier, ICanonicalName, ITimestamp, ISoftDelete, IConcurrency
 {
@@ -95,6 +97,7 @@ From a .NET client:
 ```csharp
 using Grpc.Net.Client;
 using ProtoBuf.Grpc.Client;
+using Schemata.Abstractions.Resource;
 using Schemata.Resource.Grpc;
 
 var channel = GrpcChannel.ForAddress("http://localhost:5000");

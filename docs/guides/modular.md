@@ -60,10 +60,11 @@ advice generator. Use
 ## Move the entity and its advisor into the module
 
 Move `Student.cs`, `AppDbContext.cs`, and `AdviceAddStudentName.cs` from Getting Started into the
-`StudentModule` project. If you completed Object Mapping, move the three DTOs too. Keep any
-`WithUnitOfWork<AppDbContext>()` and `UseQueryCache()` calls on the module's repository builder;
-host-level cache-provider registration remains in the host. Then add a module entry point that
-inherits `ModuleBase`:
+`StudentModule` project, and put each moved type in the `StudentModule` namespace by adding
+`namespace StudentModule;` at the top of every moved file. If you completed Object Mapping, move
+the three DTOs too. Keep any `WithUnitOfWork<AppDbContext>()` and `UseQueryCache()` calls on the
+module's repository builder; host-level cache-provider registration remains in the host. Then add a
+module entry point that inherits `ModuleBase`:
 
 ```csharp
 using Microsoft.AspNetCore.Hosting;
@@ -77,7 +78,7 @@ using Schemata.Entity.Repository.Advisors;
 
 namespace StudentModule;
 
-public sealed class StudentModule : ModuleBase
+public sealed class StudentsModule : ModuleBase
 {
     public override int Order => 100;
 
@@ -146,7 +147,7 @@ app.Run();
 dotnet run
 ```
 
-The application starts, `StudentModule.ConfigureServices` registers the EF Core repository and the
+The application starts, `StudentsModule.ConfigureServices` registers the EF Core repository and the
 name advisor, and every Getting Started endpoint keeps working. To see the stamped attribute,
 inspect the generated assembly-info source under `obj/`.
 
@@ -156,6 +157,9 @@ To load modules from a directory or plugin folder instead of the stamped attribu
 `IModulesProvider`:
 
 ```csharp
+using System.Collections.Generic;
+using Schemata.Modular;
+
 public sealed class PluginModulesProvider : IModulesProvider
 {
     public IEnumerable<ModuleDescriptor> GetModules() {

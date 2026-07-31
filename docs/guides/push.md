@@ -76,6 +76,7 @@ Inject `IPushSubscriptionManager` and add a row:
 
 ```csharp
 using Schemata.Push.Skeleton;
+using Schemata.Push.Skeleton.Entities;
 
 public sealed class SubscriptionService(IPushSubscriptionManager subscriptions)
 {
