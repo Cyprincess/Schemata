@@ -50,6 +50,8 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         void Configure(JsonSerializerOptions options) {
             options.MaxDepth = 32;
 
+            options.TypeInfoResolver = PolymorphicTypeResolver.Instance;
+
             options.DictionaryKeyPolicy    = JsonNamingPolicy.SnakeCaseLower;
             options.PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower;
             options.NumberHandling         = JsonNumberHandling.AllowReadingFromString;
