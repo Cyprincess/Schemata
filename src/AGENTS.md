@@ -103,7 +103,7 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 ### Scheduling (cron / periodic / one-time jobs)
 
 - `Skeleton` ← `Foundation` ← `Http`, `Grpc`, `Event`
-- `Foundation` pulls `Mapping.Skeleton`, `Resource.Foundation`
+- `Foundation` pulls `Core`, `Entity.Repository`, `Mapping.Skeleton`
 - `Http` pulls `Resource.Http`; `Grpc` pulls `Resource.Grpc`
 - `Event` pulls `Event.Foundation`
 - Intentionally in no meta-package (like `Flow.Bpmn`): consumers add an explicit `PackageReference`.

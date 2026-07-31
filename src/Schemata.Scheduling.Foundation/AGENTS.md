@@ -27,11 +27,11 @@ Trigger kinds, all implementing `IScheduleDefinition` (`IsRecurring`, `GetNextRu
 | `Block` | finalize as `ExecutionState.Blocked`, notify `OnBlockedAsync` |
 | `Handle` (and default) | finalize as `ExecutionState.Skipped`, notify `OnSkippedAsync` |
 
-`IJobLifecycleObserver` is **notification-only**, exactly 7 members: `OnScheduledAsync`, `OnUnscheduledAsync`, `OnTriggeredAsync`, `OnBlockedAsync`, `OnSkippedAsync`, `OnSucceededAsync`, `OnFailedAsync`. The last two of the first five — `OnBlockedAsync` and `OnSkippedAsync` — carry default no-op interface bodies, so pre-existing implementations compile untouched.
+`IJobLifecycleObserver` is **notification-only**, exactly 7 members: `OnScheduledAsync`, `OnUnscheduledAsync`, `OnTriggeredAsync`, `OnBlockedAsync`, `OnSkippedAsync`, `OnSucceededAsync`, `OnFailedAsync`. The last two of the first five — `OnBlockedAsync` and `OnSkippedAsync` — carry default no-op interface bodies as optional notification hooks, matching the `IEventLifecycleObserver` / `IProcessLifecycleObserver` convention.
 
 ## RUNTIME COMPONENTS
 
-- [JobExecutionDispatcher.cs](JobExecutionDispatcher.cs) — singleton `BackgroundService`, registered both as a service and a hosted service. 30 s poll, 100-row batch. Claims `Pending` → `Running` with a concurrency token, runs the advisor/observer/job pipeline, writes the terminal state in a fresh scope, re-arms recurring schedules. `NotifyPending()` releases a semaphore for immediate pickup.
+- [JobExecutionDispatcher.cs](JobExecutionDispatcher.cs) — singleton `BackgroundService`, registered both as a service and a hosted service. 30 s poll, 100-row batch. Claims `Pending` → `Running` with a concurrency token, runs the advisor/observer/job pipeline, writes the terminal state, re-arms recurring schedules. One dispatch pass opens one DI scope and every step resolves from it. `NotifyPending()` releases a semaphore for immediate pickup.
 - [Internal/DefaultScheduler.cs](Internal/DefaultScheduler.cs) — singleton, `partial` across `DefaultScheduler.cs` / `Schedule.cs` / `Trigger.cs`. **Never runs a job body.** It materializes `Pending` rows, arms in-memory timers, and calls the dispatcher's `NotifyPending`.
 - [SchedulingInitializer.cs](SchedulingInitializer.cs) — hosted service. Populates the job registry in `StartAsync` (before the dispatcher's first pass), fails orphaned `Running` rows left by a crash, re-arms persisted `Active` jobs.
 
@@ -41,7 +41,7 @@ Trigger kinds, all implementing `IScheduleDefinition` (`IsRecurring`, `GetNextRu
 
 Options: `SchemataSchedulingOptions { Jobs, MissedFirePolicy = FireOnce, MaxMissedWalk = 100_000, OperationPollInterval = 500ms }`. `MissedFirePolicy {Skip, FireOnce, FireAll}`.
 
-Job identity: `[ScheduledJob("key")]` supplies a stable key; `IScheduledJobRegistry` maps key ↔ type and falls through to `IScheduledJobKeyResolver` for closed-generic jobs. A `SchemataJob` row whose `JobKey` resolves to nothing cannot fire.
+Job identity: `[ScheduledJob("key")]` supplies a stable key; `IScheduledJobRegistry` maps key ↔ type and falls through to `IScheduledJobKeyResolver` for closed-generic jobs. Without either, `DefaultScheduledJobRegistry` derives the key from the type name minus assembly qualification and generic arity, with generic arguments appended as dotted short names. `SchedulingInitializer` writes that one key to both `SchemataJob.Name` and `SchemataJob.JobKey`, so the `jobs/{job}` segment and the dispatcher lookup are the same string. A `SchemataJob` row whose `JobKey` resolves to nothing cannot fire.
 
 ## GOTCHAS
 

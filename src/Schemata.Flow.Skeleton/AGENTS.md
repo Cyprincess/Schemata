@@ -38,6 +38,7 @@ src/Schemata.Flow.Skeleton/
 | Share engine-neutral scope and graph validation helpers | `Utilities/ProcessScopeMap.cs`, `Utilities/ProcessStructureValidator.cs` |
 | Wire a CallActivity target | `Runtime/IProcessRegistry.cs`, `ProcessRegistration` |
 | Declare source bindings and projection | `Models/ProcessDefinition.cs` (`BindSource`), `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Runtime/FlowSourceDescriptor.cs` |
+| Derive the default binding name for a source type | `FlowSourceDescriptor.DefaultBindingName` — the single derivation shared by the builders, `FlowTaskContext`, `ProcessDefinition.BindSource` and `FlowRunner` |
 
 ## CONVENTIONS / GOTCHAS
 
@@ -52,4 +53,4 @@ src/Schemata.Flow.Skeleton/
 - **Token states are closed.** Adding a new `SchemataProcessTokenState` requires updating `TokenAggregator.ApplyResolvedToToken` and the persistence path in lockstep.
 - **String conditions compile at registration.** `SourceStringConditionExpression` carries raw expression text; `ProcessRegistry` (Foundation) binds the predicate via the keyed `IExpressionCompiler` selected by `ProcessConfiguration.Language`. Running an unregistered definition leaves them uncompiled and `Evaluate` throws.
 - **CallActivity wiring.** Engines resolve the target at runtime via `IProcessRegistry` / `ProcessRegistration`.
-- **Dependency.** `Schemata.Entity.Repository` (entities only). No engine package references, and no owner-package reference — owner-query suppression for source-entity loads is applied by `Schemata.Flow.Foundation` when it creates the persistence scope (`QueryOwnerSuppressed` on the joined repositories' advice contexts).
+- **Dependency.** `Schemata.Common` (canonical names, label extensions) and `Schemata.Entity.Repository` (entities only). No engine package references, and no owner-package reference — owner-query suppression for source-entity loads is applied by `Schemata.Flow.Foundation` when it creates the persistence scope (`QueryOwnerSuppressed` on the joined repositories' advice contexts).

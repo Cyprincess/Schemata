@@ -32,7 +32,7 @@ All in [Entities/](Entities/). A trait is a marker interface; advisors react to 
 | `IExpiration` | `ExpireTime` filtering |
 | `IStateful` | `State` enum + transition support |
 | `ITransition` | history of state transitions |
-| `IDescriptive` | AIP-148 `DisplayName` / `Description` plus localized `DisplayNames` / `Descriptions` maps (`Dictionary<string, string?>?`) |
+| `IDescriptive` | AIP-148 `display_name` plus a `Description` and localized `DisplayNames` / `Descriptions` maps (`Dictionary<string, string?>?`); declared via stock `[DisplayName]` / `[Description]` and the repeatable `[Localized(locale, displayName, description?)]` in [Entities/LocalizedAttribute.cs](Entities/LocalizedAttribute.cs) |
 | `IAnnotatable` | AIP-148 `Annotations` map (`Dictionary<string, string?>`) |
 | `ISourceReference` | external system back-link |
 | `ICanonicalName` | AIP resource name parsing (paired with `[CanonicalName]`) |
