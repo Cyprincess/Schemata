@@ -60,9 +60,15 @@ public sealed class SchedulingInitializer : BackgroundService
                 continue;
             }
 
+            var jobKey = _registry.ResolveKey(registration.JobType);
+            if (string.IsNullOrWhiteSpace(jobKey)) {
+                _logger?.LogWarning("Scheduled job '{JobType}' resolved no key and was not armed.", registration.JobType);
+                continue;
+            }
+
             var job = new SchemataJob {
-                Name   = registration.JobType.FullName!,
-                JobKey = _registry.ResolveKey(registration.JobType) ?? registration.JobType.FullName!,
+                Name   = jobKey,
+                JobKey = jobKey,
                 State  = JobState.Active,
             };
             ScheduleDefinitionMapper.ApplyToJob(registration.Schedule, job);

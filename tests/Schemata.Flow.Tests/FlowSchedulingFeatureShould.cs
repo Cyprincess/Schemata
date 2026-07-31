@@ -7,9 +7,11 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Core;
 using Schemata.Flow.Scheduling.Features;
+using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -41,6 +43,7 @@ public sealed class FlowSchedulingFeatureShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.NotNull(scheduled);
         Assert.Equal("flow-p1-timer-t1", scheduled!.Name);
+        Assert.Equal(FlowTimerJob.JobKey, scheduled.JobKey);
         Assert.Equal(ScheduleType.Cron, scheduled.ScheduleType);
         Assert.Equal("*/5 * * * *", scheduled.CronExpression);
         Assert.NotNull(variables);
@@ -57,6 +60,7 @@ public sealed class FlowSchedulingFeatureShould
     private static ServiceProvider CreateServices(Mock<IScheduler> scheduler) {
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
+        services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         new SchemataFlowSchedulingFeature().ConfigureServices(
             services, new(), new(), new ConfigurationBuilder().Build(), null!);
         return services.BuildServiceProvider();

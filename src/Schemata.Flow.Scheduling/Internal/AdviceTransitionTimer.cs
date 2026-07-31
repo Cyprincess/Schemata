@@ -60,22 +60,20 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
             }
         }
 
-        var timerJobs = new List<(SchemataJob Job, Dictionary<string, string?> Variables)>();
+        var timers = new List<(string ElementName, TimerDefinition Definition)>();
         if (!string.IsNullOrEmpty(token.WaitingAtName)
          && definition is not null
          && definition.AllElements.FirstOrDefault(e => e.Name == token.WaitingAtName) is FlowEvent {
                 Position: EventPosition.IntermediateCatch, Definition: TimerDefinition timerDef,
             }) {
-            timerJobs.Add(CreateTimerJob(process, token.CanonicalName, token.WaitingAtName, timerDef));
+            timers.Add((token.WaitingAtName, timerDef));
         } else if (definition is not null
                 && string.Equals(token.Status, "Active", StringComparison.Ordinal)
                 && definition.AllElements.FirstOrDefault(e => e.Name == token.StateName) is Activity host) {
-            foreach (var (elementName, boundaryTimer) in ResolveBoundaryTimers(host, definition)) {
-                timerJobs.Add(CreateTimerJob(process, token.CanonicalName, elementName, boundaryTimer));
-            }
+            timers.AddRange(ResolveBoundaryTimers(host, definition));
         }
 
-        if (previousTimerJobs.Count == 0 && timerJobs.Count == 0) {
+        if (previousTimerJobs.Count == 0 && timers.Count == 0) {
             return AdviseResult.Continue;
         }
 
@@ -91,7 +89,9 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
             await scheduler.UnscheduleAsync($"{collection}/{previousTimerJob}", ct);
         }
 
-        foreach (var (timerJob, timerVariables) in timerJobs) {
+        var jobKey = _services.GetRequiredService<IScheduledJobRegistry>().ResolveKey(typeof(FlowTimerJob));
+        foreach (var (elementName, timerDefinition) in timers) {
+            var (timerJob, timerVariables) = CreateTimerJob(process, token.CanonicalName, elementName, timerDefinition, jobKey);
             await scheduler.ScheduleAsync(timerJob, timerVariables, ct);
         }
 
@@ -111,11 +111,12 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
         SchemataProcess process,
         string          token,
         string          elementName,
-        TimerDefinition timerDefinition
+        TimerDefinition timerDefinition,
+        string?         jobKey
     ) {
         var job = new SchemataJob {
             Name   = JobName(process, elementName, token),
-            JobKey = typeof(FlowTimerJob).FullName,
+            JobKey = jobKey,
             State  = JobState.Active,
         };
         ScheduleDefinitionMapper.ApplyToJob(TimerDefinitionConverter.ToSchedule(timerDefinition), job);

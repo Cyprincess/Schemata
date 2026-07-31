@@ -18,7 +18,7 @@ public sealed partial class DefaultScheduler
         }
 
         var registry = _services.GetRequiredService<IScheduledJobRegistry>();
-        var jobKey   = registry.ResolveKey(typeof(TJob)) ?? typeof(TJob).FullName!;
+        var jobKey   = registry.ResolveKey(typeof(TJob));
 
         // The transient SchemataJob materialises the fire context; it is never persisted via
         // IRepository<SchemataJob>, so CanonicalName carries whatever the caller supplied

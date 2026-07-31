@@ -8,6 +8,7 @@ using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
+using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -33,6 +34,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var jobs = await ReadJobsAsync(process.CanonicalName!);
         Assert.Equal(2, jobs.Count);
         Assert.Equal(2, jobs.Select(j => j.Name).Distinct().Count());
+        Assert.All(jobs, job => Assert.Equal(FlowTimerJob.JobKey, job.JobKey));
         Assert.Equal(
             waiting.Select(t => t.CanonicalName).OrderBy(n => n),
             jobs.Select(j => j.Variables!["tokenName"]).OrderBy(n => n));

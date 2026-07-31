@@ -10,6 +10,7 @@ using Schemata.Common;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Skeleton.Attributes;
 
 namespace Schemata.Flow.Scheduling.Internal;
 
@@ -18,8 +19,12 @@ namespace Schemata.Flow.Scheduling.Internal;
 ///     <see cref="FlowRunner.RunEventAsync" />, which advances the addressed token through the full
 ///     transition unit of work: advisor chain, source projection, and follow-up event subscriptions.
 /// </summary>
+[ScheduledJob(JobKey)]
 public sealed class FlowTimerJob : IScheduledJob
 {
+    /// <summary>Stable scheduler key persisted on BPMN timer-catch job and execution rows.</summary>
+    public const string JobKey = "schemata.flow.timer";
+
     private readonly IServiceProvider _services;
 
     public FlowTimerJob(IServiceProvider services) {

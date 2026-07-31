@@ -38,7 +38,6 @@ public sealed class JobExecutionDispatcher(
     private readonly        SemaphoreSlim _pending  = new(0, int.MaxValue);
     private readonly        ConcurrentDictionary<string, CancellationTokenSource> _running =
         services.GetService<ConcurrentDictionary<string, CancellationTokenSource>>() ?? new();
-    private readonly        IServiceScopeFactory _scopes = services.GetRequiredService<IServiceScopeFactory>();
     private readonly        TimeProvider  _time     = time ?? TimeProvider.System;
 
 
@@ -55,7 +54,7 @@ public sealed class JobExecutionDispatcher(
             } catch (OperationCanceledException) when (st.IsCancellationRequested) {
                 return;
             } catch (Exception ex) {
-                logger?.LogWarning(ex, "Job execution dispatch pass failed; retrying next interval.");
+                logger?.LogError(ex, "Job execution dispatch pass failed; retrying next interval.");
             }
         }
     }
@@ -88,7 +87,7 @@ public sealed class JobExecutionDispatcher(
         CancellationToken                 ct
     ) {
         if (string.IsNullOrWhiteSpace(execution.JobKey)) {
-            await MarkFailedAsync(execution, "Job execution is missing its JobKey.", ct);
+            await MarkFailedAsync(serviceProvider, execution, "Job execution is missing its JobKey.", ct);
             return;
         }
 
@@ -117,7 +116,7 @@ public sealed class JobExecutionDispatcher(
         var registry = serviceProvider.GetRequiredService<IScheduledJobRegistry>();
         var jobType  = registry.Resolve(execution.JobKey!);
         if (jobType is null) {
-            await MarkFailedAsync(execution, $"Job key '{execution.JobKey}' is not registered.", ct);
+            await MarkFailedAsync(serviceProvider, execution, $"Job key '{execution.JobKey}' is not registered.", ct);
             return;
         }
 
@@ -176,10 +175,10 @@ public sealed class JobExecutionDispatcher(
     }
 
     /// <summary>
-    ///     Writes the terminal execution row through a fresh repository scope after the claim's unit
-    ///     of work completes. The claimed <paramref name="execution" /> instance retains its expected
-    ///     concurrency token so a concurrent cancellation aborts finalization instead of being overwritten.
-    ///     Then runs the matching lifecycle observers and advances a recurring job to its next occurrence.
+    ///     Writes the terminal execution row, then runs the matching lifecycle observers and advances
+    ///     a recurring job to its next occurrence. The claimed <paramref name="execution" /> instance
+    ///     carries its expected concurrency token, so a concurrent cancellation aborts finalization
+    ///     instead of overwriting it.
     /// </summary>
     private async Task FinalizeAsync(
         IServiceProvider                  serviceProvider,
@@ -199,8 +198,7 @@ public sealed class JobExecutionDispatcher(
         execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = exception?.Message;
 
-        await using var scope = _scopes.CreateAsyncScope();
-        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var executions = serviceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);
@@ -312,6 +310,7 @@ public sealed class JobExecutionDispatcher(
     }
 
     private async Task MarkFailedAsync(
+        IServiceProvider     serviceProvider,
         SchemataJobExecution execution,
         string               error,
         CancellationToken    ct
@@ -320,10 +319,7 @@ public sealed class JobExecutionDispatcher(
         execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = error;
 
-        // Write through a fresh scope: the unregistered-job-key path runs after the claim's unit of
-        // work has already committed, so reusing that repository would flush a completed unit of work.
-        await using var scope = _scopes.CreateAsyncScope();
-        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var executions = serviceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         try {
             await executions.UpdateAsync(execution, ct);
             await executions.CommitAsync(ct);

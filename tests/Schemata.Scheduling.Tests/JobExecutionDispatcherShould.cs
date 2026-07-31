@@ -126,6 +126,42 @@ public class JobExecutionDispatcherShould
     }
 
     [Fact]
+    public async Task DispatchPendingAsync_TwoDueExecutions_TransitionsBothPastPending() {
+        // Two rows, because the second claim reuses the repository the first claim committed.
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("2b6f0cc9-04b9-4a2f-9b8f-6c1d2e3f4a5b"),
+                JobKey    = "jobs.completing",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("aa000000-0000-0000-0000-000000000001"),
+            },
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("3c7f1dd0-15ca-4b30-ac90-7d2e3f405b6c"),
+                JobKey    = "jobs.completing",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("aa000000-0000-0000-0000-000000000002"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<CompletingJob>("jobs.completing");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<CompletingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        var snapshot = storage.Snapshot();
+        Assert.Equal(2, snapshot.Count);
+        Assert.All(snapshot, row => Assert.Equal(ExecutionState.Succeeded, row.State));
+    }
+
+    [Fact]
     public async Task DispatchPendingAsync_UnregisteredJobKey_MarksExecutionFailed_AfterClaimCommit() {
         var storage  = new CompletionStorage();
         var registry = new DefaultScheduledJobRegistry();
@@ -284,7 +320,6 @@ public class JobExecutionDispatcherShould
 
         internal IRepository<SchemataJobExecution> CreateRepository() {
             var repository = new Mock<IRepository<SchemataJobExecution>>();
-            var completed  = false;
             SchemataJobExecution? pending = null;
 
             repository.Setup(r => r.ListAsync(
@@ -304,13 +339,11 @@ public class JobExecutionDispatcherShould
                                        query(new[] { Copy(_stored) }.AsQueryable()).FirstOrDefault()));
             repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                       .Returns((SchemataJobExecution row, CancellationToken _) => {
-                          EnsureOpen(completed);
                           pending = row;
                           return Task.CompletedTask;
                       });
             repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
                       .Returns((CancellationToken _) => {
-                          EnsureOpen(completed);
                           if (pending is not null) {
                               if (pending.Timestamp != _stored.Timestamp) {
                                   throw new InvalidOperationException("Concurrency token did not match the persisted execution.");
@@ -321,7 +354,6 @@ public class JobExecutionDispatcherShould
                               pending.Timestamp = _stored.Timestamp;
                           }
 
-                          completed = true;
                           return Task.CompletedTask;
                       });
 
@@ -340,12 +372,71 @@ public class JobExecutionDispatcherShould
                 Timestamp   = source.Timestamp,
             };
         }
+    }
 
-        private static void EnsureOpen(bool completed) {
-            if (completed) {
-                throw new InvalidOperationException(
-                    "Repository's unit of work has already completed. Resolve a fresh IRepository<T> to start new work.");
+    private sealed class MultiExecutionStorage
+    {
+        private readonly object                     _gate = new();
+        private readonly List<SchemataJobExecution> _stored;
+
+        internal MultiExecutionStorage(params SchemataJobExecution[] rows) {
+            _stored = rows.Select(Copy).ToList();
+        }
+
+        internal IReadOnlyList<SchemataJobExecution> Snapshot() {
+            lock (_gate) {
+                return _stored.Select(Copy).ToList();
             }
+        }
+
+        internal IRepository<SchemataJobExecution> CreateRepository() {
+            var                   repository = new Mock<IRepository<SchemataJobExecution>>();
+            SchemataJobExecution? pending    = null;
+
+            repository.Setup(r => r.ListAsync(
+                                  It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                                  It.IsAny<CancellationToken>()))
+                      .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
+                                CancellationToken _) => ToAsync(query(Rows().AsQueryable())));
+            repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                      .Returns((SchemataJobExecution row, CancellationToken _) => {
+                          pending = row;
+                          return Task.CompletedTask;
+                      });
+            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
+                      .Returns((CancellationToken _) => {
+                          if (pending is not null) {
+                              lock (_gate) {
+                                  var index = _stored.FindIndex(e => e.Uid == pending.Uid);
+                                  if (index >= 0) {
+                                      _stored[index] = Copy(pending);
+                                  }
+                              }
+                          }
+
+                          return Task.CompletedTask;
+                      });
+
+            return repository.Object;
+        }
+
+        private List<SchemataJobExecution> Rows() {
+            lock (_gate) {
+                return _stored.Select(Copy).ToList();
+            }
+        }
+
+        private static SchemataJobExecution Copy(SchemataJobExecution source) {
+            return new() {
+                Uid         = source.Uid,
+                JobKey      = source.JobKey,
+                State       = source.State,
+                StartTime   = source.StartTime,
+                EndTime     = source.EndTime,
+                RecentError = source.RecentError,
+                Output      = source.Output,
+                Timestamp   = source.Timestamp,
+            };
         }
     }
 

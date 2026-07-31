@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Attributes;
 
@@ -32,7 +33,7 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 
     public void Register<T>(string? key = null)
         where T : class, IScheduledJob {
-        Register(typeof(T), key ?? typeof(T).FullName!);
+        Register(typeof(T), key ?? DeclaredKey(typeof(T)));
     }
 
     public Type? Resolve(string key) {
@@ -64,7 +65,9 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
             }
         }
 
-        return null;
+        var declared = DeclaredKey(jobType);
+        Register(jobType, declared);
+        return declared;
     }
 
     public void RegisterAll(IEnumerable<Type> jobTypes) {
@@ -75,10 +78,40 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
                 continue;
             }
 
-            var key = jobType.GetCustomAttribute<ScheduledJobAttribute>()?.Key ?? jobType.FullName;
-            if (!string.IsNullOrWhiteSpace(key)) {
-                Register(jobType, key);
+            Register(jobType, DeclaredKey(jobType));
+        }
+    }
+
+    /// <summary>
+    ///     Reads the key from <see cref="ScheduledJobAttribute" />, else derives one by dropping
+    ///     assembly qualification and generic arity and appending generic arguments as dotted short
+    ///     names. A closed generic's assembly-qualified CLR name runs past 200 characters and carries
+    ///     <c>`</c>, <c>[[</c>, <c>,</c>, <c>=</c> and spaces, which both a <c>jobs/{job}</c> segment
+    ///     and the persisted key column reject.
+    /// </summary>
+    private static string DeclaredKey(Type jobType) {
+        if (jobType.GetCustomAttribute<ScheduledJobAttribute>() is { Key: var declared } && !string.IsNullOrWhiteSpace(declared)) {
+            return declared;
+        }
+
+        var builder = new StringBuilder(StripArity(jobType.FullName ?? jobType.Name));
+        AppendArguments(builder, jobType);
+        return builder.ToString();
+
+        static void AppendArguments(StringBuilder builder, Type type) {
+            if (!type.IsGenericType) {
+                return;
             }
+
+            foreach (var argument in type.GetGenericArguments()) {
+                builder.Append('.').Append(StripArity(argument.Name));
+                AppendArguments(builder, argument);
+            }
+        }
+
+        static string StripArity(string name) {
+            var arity = name.IndexOf('`');
+            return arity < 0 ? name : name[..arity];
         }
     }
 }

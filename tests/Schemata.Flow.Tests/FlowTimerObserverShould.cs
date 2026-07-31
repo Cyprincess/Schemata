@@ -8,6 +8,7 @@ using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -36,6 +37,7 @@ public class FlowTimerObserverShould
 
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
+        services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         var provider = services.BuildServiceProvider();
         var advisor  = new AdviceTransitionTimer(provider);
         var advice   = new AdviceContext(provider);
@@ -75,7 +77,9 @@ public class FlowTimerObserverShould
            .Callback<SchemataJob, IReadOnlyDictionary<string, string?>?, CancellationToken>((job, _, _) => jobs.Add(job))
            .Returns(SystemTask.CompletedTask);
 
-        var services = new ServiceCollection().AddSingleton(scheduler.Object).BuildServiceProvider();
+        var services = new ServiceCollection().AddSingleton(scheduler.Object)
+                                              .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
+                                              .BuildServiceProvider();
         var advisor  = new AdviceTransitionTimer(services);
         var advice   = new AdviceContext(services);
 

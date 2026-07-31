@@ -38,6 +38,7 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
 
         var order   = await CreateOrderAsync();
         var process = await StartAsync(order);
+        await CompleteAsync(process);
         var token   = await ReadTokenAsync(process.Name!);
         Assert.Equal("Await_Review", token.WaitingAtName);
 
@@ -84,6 +85,12 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         Assert.NotNull(current);
         var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
         return await runner.StartAsync(nameof(ApprovalProcess), current, null, null, CancellationToken.None);
+    }
+
+    private async Task CompleteAsync(SchemataProcess process) {
+        using var scope  = _fixture.CreateScope();
+        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+        await runner.CompleteAsync(process, null, null, CancellationToken.None);
     }
 
     private async Task<SchemataProcessToken> ReadTokenAsync(string process) {
