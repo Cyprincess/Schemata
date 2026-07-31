@@ -9,13 +9,18 @@ namespace Schemata.Abstractions.Entities;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Persistence stays untouched: structural parent segments on the entity
-///         (mode A, bare leaf id) are not affected by this trait. On the response
-///         side, the framework derives <c>Parent</c> from the entity's canonical name
-///         and writes it onto the DTO. On the request side, the framework parses the
-///         supplied <c>Parent</c> back into the entity's mode A field(s) so a request
-///         body can carry <c>tenants/t1</c> instead of relying on HTTP route values
-///         only.
+///         The trait only affects response/request projection; structural parent
+///         segments on the entity (mode A, bare leaf id) are not affected. On the
+///         response side, the framework derives <c>Parent</c> from the entity's
+///         canonical name and writes it onto the DTO.
+///     </para>
+///     <para>
+///         On the request side the URI decides the parent. Create overwrites
+///         <c>Parent</c> from the route when the route carries every parent segment,
+///         and falls back to the body otherwise; Update clears <c>Parent</c> before the
+///         advisor chain, so a request body cannot move a resource to another parent.
+///         The framework then parses the surviving <c>Parent</c> back into the entity's
+///         mode A field(s).
 ///     </para>
 ///     <para>
 ///         Intended for DTO types only. Do not implement <see cref="IChild" /> on a
@@ -25,9 +30,8 @@ namespace Schemata.Abstractions.Entities;
 ///     </para>
 ///     <para>
 ///         Implementing <see cref="IChild" /> on a DTO whose target entity has no
-///         parent segment in its <c>[CanonicalName]</c> template results in a
-///         <see langword="null" /> <see cref="Parent" /> on responses; no harm, just
-///         no value.
+///         parent segment in its <c>[CanonicalName]</c> template leaves
+///         <see cref="Parent" /> as <see langword="null" /> on responses.
 ///     </para>
 /// </remarks>
 public interface IChild

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
@@ -5,6 +6,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 using Xunit;
 
@@ -81,6 +83,45 @@ public class AdviceApplyChildParentShould
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal("acme", entity.Tenant);
     }
+
+    [Fact]
+    public void ClearEveryParentChannel_SoAnUpdateBodyCannotReParent() {
+        var child      = new HostRequest { Parent = "tenants/b", Name = "h" };
+        var structural = new HostEntity { Tenant = "b", Name = "h" };
+
+        Descriptor().ClearParentProperties(child);
+        Descriptor().ClearParentProperties(structural);
+
+        Assert.Null(child.Parent);
+        Assert.Null(structural.Tenant);
+    }
+
+    [Fact]
+    public async Task PreferTheRouteParent_OverTheCreateBodyParent() {
+        var entity  = new HostEntity { Name = "h" };
+        var request = new HostRequest { Parent = "tenants/b", Name = "h" };
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+
+        Descriptor().SetParentFromRouteValues(request, new Dictionary<string, object?> { ["tenant"] = "a" });
+        await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+
+        Assert.Equal("tenants/a", request.Parent);
+        Assert.Equal("a", entity.Tenant);
+    }
+
+    [Fact]
+    public async Task KeepTheCreateBodyParent_WhenTheRouteCarriesNoParent() {
+        var entity  = new HostEntity { Name = "h" };
+        var request = new HostRequest { Parent = "tenants/b", Name = "h" };
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+
+        Descriptor().SetParentFromRouteValues(request, new Dictionary<string, object?>());
+        await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+
+        Assert.Equal("b", entity.Tenant);
+    }
+
+    private static ResourceNameDescriptor Descriptor() { return ResourceNameDescriptor.ForType<HostEntity>(); }
 
     private static AdviceContext EmptyContext() {
         return new(new ServiceCollection().BuildServiceProvider());
