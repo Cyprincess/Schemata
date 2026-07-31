@@ -73,7 +73,7 @@ public sealed class CompensationThrowHandler
             throw new InvalidOperationException($"Compensation binding is missing for scope '{throwing.ScopeName}'.");
         }
 
-        var context = NewContext(process, definition, throwing);
+        var context = new CompensationInvocationContext(process, definition, throwing, execution);
         return compensation.Activity is { } target
             ? await FireTargetedAsync(stack, context, target, execution, observers, ct)
             : await FireGlobalAsync(stack, context, execution, observers, ct);
@@ -134,17 +134,6 @@ public sealed class CompensationThrowHandler
             [.. context.Transitions],
             result.Failed,
             result.FailureReason ?? new InvalidOperationException("BPMN compensation failed."));
-    }
-
-    private static CompensationInvocationContext NewContext(
-        SchemataProcess      process,
-        ProcessDefinition    definition,
-        SchemataProcessToken throwing) {
-        return new(
-            process,
-            definition,
-            BpmnEngine.TokenView(throwing),
-            new Dictionary<string, int>(throwing.Bookkeeping, StringComparer.Ordinal));
     }
 
     private static async Task NotifyStartedAsync(

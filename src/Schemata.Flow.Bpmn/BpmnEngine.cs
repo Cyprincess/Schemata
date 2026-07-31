@@ -597,7 +597,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
     #endregion
 
     /// <summary>Executes the compensation target and records its transition row.</summary>
-    public ValueTask ExecuteAsync(
+    public async ValueTask ExecuteAsync(
         Activity                      activity,
         FlowElement                   compensationTarget,
         string                        eventName,
@@ -607,14 +607,23 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         ArgumentNullException.ThrowIfNull(compensationTarget);
         ArgumentNullException.ThrowIfNull(context);
 
+        var variables = new Dictionary<string, int>(context.Bookkeeping, StringComparer.Ordinal);
+        var resolved = await ResolveTargetAsync(
+            context.Definition,
+            compensationTarget,
+            variables,
+            context.Scope,
+            context.Execution,
+            context.Process,
+            context.Token);
+
         context.Transitions.Add(NewTransition(
             context.Process.Name!,
             context.Scope.CanonicalName,
             activity.Name,
-            compensationTarget.Name,
+            resolved.StateName,
             TransitionKind.Compensate,
             eventName));
-        return default;
     }
 
     internal CompensationStack? TryGetCompensationStack(

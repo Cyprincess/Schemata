@@ -148,12 +148,8 @@ public sealed class TransactionExecutor
             return null;
         }
 
-        var stack = engine.TryGetCompensationStack(definition, process, trigger, working, execution) ?? new();
-        var context = new CompensationInvocationContext(
-            process,
-            definition,
-            BpmnEngine.TokenView(trigger),
-            new Dictionary<string, int>(trigger.Bookkeeping, StringComparer.Ordinal));
+        var stack   = engine.TryGetCompensationStack(definition, process, trigger, working, execution) ?? new();
+        var context = new CompensationInvocationContext(process, definition, trigger, execution);
         var result = await CompensationCoordinator.InvokeAllAsync(
             stack,
             context,

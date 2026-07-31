@@ -127,9 +127,10 @@ public class CompensationPrimitivesShould
                 CanonicalName = "processes/1/tokens/root",
                 ScopeName       = "scope",
                 StateName       = "scope",
-                Status        = "Compensating",
+                State         = "Compensating",
+                Bookkeeping   = new Dictionary<string, int> { ["scope"] = 1 },
             },
-            new Dictionary<string, int> { ["scope"] = 1 });
+            BpmnEngineTestExtensions.Context([]));
     }
 
     private static CompensationStack NewStack(IEnumerable<ICompensationHandler> handlers) {

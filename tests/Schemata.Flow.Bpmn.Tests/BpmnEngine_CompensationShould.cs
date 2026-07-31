@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
@@ -78,6 +79,78 @@ public class BpmnEngine_CompensationShould
         Assert.Equal("undo-c", transition.Posterior);
         Assert.DoesNotContain(snapshot.Transitions, t => t is { Kind: TransitionKind.Compensate, Previous: "a" or "b" or "D" or "E" });
 
+    }
+
+    [Fact]
+    public async Task Throw_ProcedureCompensationTarget_RunsTargetBodyOnce() {
+        var log = new List<string>();
+        var (engine, definition, process) = ProcedureScenario(_ => {
+            log.Add("undo");
+            return ValueTask.CompletedTask;
+        });
+
+        var snapshot = await engine.StartAsync(definition, process, CancellationToken.None);
+        Assert.Empty(log);
+
+        snapshot = await AdvanceTokenAsync(new LinearCompensationScenario(engine, definition, process, definition.Elements.OfType<NoneTask>().First()),
+                                           snapshot,
+                                           snapshot.Tokens.Single());
+
+        Assert.Equal(["undo"], log);
+        var transition = Assert.Single(snapshot.Transitions, t => t.Kind == TransitionKind.Compensate);
+        Assert.Equal("a", transition.Previous);
+        Assert.Equal("undo-a", transition.Posterior);
+    }
+
+    [Fact]
+    public async Task Throw_FailingCompensationTarget_PropagatesFailureWithoutRecordingCompensation() {
+        var attempts = 0;
+        var (engine, definition, process) = ProcedureScenario(_ => {
+            attempts++;
+            throw new InvalidOperationException("boom");
+        });
+
+        var snapshot = await engine.StartAsync(definition, process, CancellationToken.None);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, snapshot.Tokens.Single().CanonicalName, CancellationToken.None).AsTask());
+
+        Assert.Equal("boom", ex.Message);
+        Assert.Equal(1, attempts);
+        Assert.Equal("Failed", process.State);
+        Assert.Equal("Failed", snapshot.Tokens.Single().State);
+    }
+
+    private static (BpmnEngine Engine, ProcessDefinition Definition, SchemataProcess Process) ProcedureScenario(
+        Func<FlowTaskContext, ValueTask> undoBody) {
+        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var a     = new NoneTask { Name = "a" };
+        var throwEvent = new FlowEvent {
+            Name       = "throw",
+            Position   = EventPosition.IntermediateThrow,
+            Definition = new CompensationDefinition { Name = "Compensate", Activity = a },
+        };
+        var after = new NoneTask { Name = "after" };
+        var end   = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var boundary = new FlowEvent {
+            Name         = "compensate-a",
+            Position     = EventPosition.Boundary,
+            AttachedTo   = a,
+            Definition   = new CompensationDefinition { Name = "compensate-a", Activity = a },
+        };
+        var undo = new ProcedureTask { Name = "undo-a", Body = undoBody };
+
+        var definition = new ProcessDefinition { Name = $"compensation-{Guid.NewGuid():N}" };
+        definition.Elements.AddRange([start, a, throwEvent, after, end, boundary, undo]);
+        definition.Flows.AddRange([
+            new() { Source = start, Target = a },
+            new() { Source = a, Target = throwEvent },
+            new() { Source = throwEvent, Target = after },
+            new() { Source = after, Target = end },
+            new() { Source = boundary, Target = undo },
+        ]);
+
+        return (new(), definition, NewProcess(definition.Name));
     }
 
     private static async Task<ProcessSnapshot> AdvanceIntoThrowAsync(LinearCompensationScenario scenario) {

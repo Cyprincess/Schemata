@@ -200,9 +200,9 @@ public class CompensationBoundaryHandlerShould
                 CanonicalName = "processes/p1/tokens/root",
                 ScopeName       = "compensation-boundary",
                 StateName       = "host",
-                Status        = "Compensating",
+                State         = "Compensating",
             },
-            new Dictionary<string, int>());
+            BpmnEngineTestExtensions.Context([]));
     }
 
     private sealed record BoundaryTestScenario(
