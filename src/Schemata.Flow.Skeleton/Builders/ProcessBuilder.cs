@@ -47,6 +47,16 @@ public static class ProcessBuilder
         return new(definition, activity);
     }
 
+    /// <summary>
+    ///     Opens a behavior builder for <paramref name="event" />, so an <c>OnEnter</c> procedure can
+    ///     be attached to an end or intermediate-catch event the same way it is to an activity.
+    /// </summary>
+    /// <param name="definition">The process definition being built.</param>
+    /// <param name="event">The event whose enter behavior is being configured.</param>
+    public static EventBehavior During(this ProcessDefinition definition, FlowEvent @event) {
+        return new(definition, @event);
+    }
+
     /// <summary>Inserts a parallel join gateway that waits for all <paramref name="exits" /> to complete before continuing.</summary>
     /// <param name="definition">The process definition being built.</param>
     /// <param name="exits">The parallel branches that must all arrive before the join fires.</param>
@@ -92,7 +102,7 @@ public static class ProcessBuilder
     /// <param name="predicate">The predicate evaluated against the typed variable value.</param>
     public static Branch When<T>(this ProcessDefinition definition, Func<T, bool> predicate)
         where T : class, ICanonicalName {
-        return definition.When(typeof(T).Name.Underscore().ToLowerInvariant(), predicate);
+        return definition.When(FlowSourceDescriptor.DefaultBindingName<T>(), predicate);
     }
 
     /// <summary>Creates a branch guarded by a predicate over an explicitly named source binding.</summary>
@@ -113,7 +123,7 @@ public static class ProcessBuilder
     /// <param name="expression">The expression text, compiled at registration with the configured Language.</param>
     public static Branch When<T>(this ProcessDefinition definition, string expression)
         where T : class, ICanonicalName {
-        return definition.When<T>(typeof(T).Name.Underscore().ToLowerInvariant(), expression);
+        return definition.When<T>(FlowSourceDescriptor.DefaultBindingName<T>(), expression);
     }
 
     /// <summary>Creates a branch guarded by a string expression over an explicitly named source binding.</summary>
@@ -140,7 +150,7 @@ public static class ProcessBuilder
         Message<TPayload>      message,
         Func<TSource, TPayload, bool> predicate
     ) where TSource : class, ICanonicalName {
-        return definition.When(typeof(TSource).Name.Underscore().ToLowerInvariant(), message, predicate);
+        return definition.When(FlowSourceDescriptor.DefaultBindingName<TSource>(), message, predicate);
     }
 
     /// <summary>Creates a branch guarded by an explicitly named source and typed message payload predicate.</summary>

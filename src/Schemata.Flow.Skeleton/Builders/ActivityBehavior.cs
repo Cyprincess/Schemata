@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Humanizer;
 using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -21,10 +22,13 @@ public sealed class ActivityBehavior
 {
     private readonly ProcessDefinition _definition;
 
+    private IDescriptive _labelTarget;
+
     internal ActivityBehavior(ProcessDefinition definition, Activity activity) {
-        _definition = definition;
-        Activity    = activity;
-        LastTarget  = activity;
+        _definition  = definition;
+        Activity     = activity;
+        LastTarget   = activity;
+        _labelTarget = activity;
     }
 
     /// <summary>The activity whose outgoing behavior is being configured.</summary>
@@ -51,7 +55,7 @@ public sealed class ActivityBehavior
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
     public ActivityBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
         where TSource : class, ICanonicalName {
-        return OnEnter<TSource>(DefaultSourceName<TSource>(), body);
+        return OnEnter<TSource>(FlowSourceDescriptor.DefaultBindingName<TSource>(), body);
     }
 
     /// <summary>
@@ -64,7 +68,7 @@ public sealed class ActivityBehavior
     public ActivityBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
         where TSource : class, ICanonicalName {
         ArgumentException.ThrowIfNullOrEmpty(source);
-        return EnterTask($"Enter_{Activity.Name}", SourceBody(source, body));
+        return EnterTask($"Enter_{Activity.Name}", FlowSourceBody.Bind(source, body));
     }
 
     /// <summary>
@@ -84,7 +88,7 @@ public sealed class ActivityBehavior
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
     public ActivityBehavior OnLeave<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
         where TSource : class, ICanonicalName {
-        return OnLeave<TSource>(DefaultSourceName<TSource>(), body);
+        return OnLeave<TSource>(FlowSourceDescriptor.DefaultBindingName<TSource>(), body);
     }
 
     /// <summary>
@@ -97,7 +101,29 @@ public sealed class ActivityBehavior
     public ActivityBehavior OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
         where TSource : class, ICanonicalName {
         ArgumentException.ThrowIfNullOrEmpty(source);
-        return LeaveTask($"Leave_{LastTarget.Name}", SourceBody(source, body));
+        return LeaveTask($"Leave_{LastTarget.Name}", FlowSourceBody.Bind(source, body));
+    }
+
+    /// <summary>
+    ///     Labels the element this builder created most recently — the synthesized end event,
+    ///     gateway or procedure task — falling back to the configured activity when the builder has
+    ///     synthesized nothing yet. Synthesized elements have no declaration site to carry
+    ///     <c>[DisplayName]</c>, so this is their only label channel.
+    /// </summary>
+    /// <param name="displayName">Human-readable element label.</param>
+    /// <param name="description">Optional description of the element's role.</param>
+    public ActivityBehavior Labelled(string displayName, string? description = null) {
+        _labelTarget.Label(displayName, description);
+        return this;
+    }
+
+    /// <summary>Labels the same element for one language tag, filling its localized maps.</summary>
+    /// <param name="locale">IETF BCP 47 language tag, e.g. <c>"zh-Hans"</c>.</param>
+    /// <param name="displayName">Display name for <paramref name="locale" />.</param>
+    /// <param name="description">Description for <paramref name="locale" />.</param>
+    public ActivityBehavior Localized(string locale, string displayName, string? description = null) {
+        _labelTarget.Localize(locale, displayName, description);
+        return this;
     }
 
     /// <summary>Routes the current activity to another <see cref="Activity" />.</summary>
@@ -114,7 +140,7 @@ public sealed class ActivityBehavior
     /// <param name="target">The intermediate or end event to transition to.</param>
     public ActivityBehavior Go(FlowEvent target) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() { Source = LastTarget, Target = target });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = _definition.ResolveEntry(target) });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -128,6 +154,7 @@ public sealed class ActivityBehavior
         _definition.Elements.Add(endEvent);
         _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = endEvent;
         return this;
     }
 
@@ -135,7 +162,7 @@ public sealed class ActivityBehavior
     /// <param name="endEvent">The end event to route to.</param>
     public ActivityBehavior End(EndEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = _definition.ResolveEntry(endEvent) });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -144,7 +171,7 @@ public sealed class ActivityBehavior
     /// <param name="endEvent">The flow event to route to.</param>
     public ActivityBehavior End(FlowEvent endEvent) {
         EnsureNoOutgoingConflict(LastTarget);
-        _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
+        _definition.Flows.Add(new() { Source = LastTarget, Target = _definition.ResolveEntry(endEvent) });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
         return this;
     }
@@ -160,6 +187,7 @@ public sealed class ActivityBehavior
         _definition.Elements.Add(endEvent);
         _definition.Flows.Add(new() { Source = LastTarget, Target = endEvent });
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = endEvent;
         return this;
     }
 
@@ -174,15 +202,19 @@ public sealed class ActivityBehavior
         for (var i = 0; i < branches.Length; i++) {
             var branch = branches[i];
             branch.EnsureExitRegistered(_definition, gateway, i);
-            _definition.Flows.Add(new() {
+            var edge = new SequenceFlow {
                 Source    = gateway,
                 Target    = _definition.ResolveEntry(branch.Exit),
                 Condition = branch.Condition,
                 IsDefault = branch.IsDefault,
-            });
+            };
+
+            branch.CopyLabels(edge);
+            _definition.Flows.Add(edge);
         }
 
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = gateway;
         return this;
     }
 
@@ -199,15 +231,19 @@ public sealed class ActivityBehavior
         for (var i = 0; i < branches.Length; i++) {
             var branch = branches[i];
             branch.EnsureExitRegistered(_definition, gateway, i);
-            _definition.Flows.Add(new() {
+            var edge = new SequenceFlow {
                 Source    = gateway,
                 Target    = _definition.ResolveEntry(branch.Exit),
                 Condition = branch.Condition,
                 IsDefault = branch.IsDefault,
-            });
+            };
+
+            branch.CopyLabels(edge);
+            _definition.Flows.Add(edge);
         }
 
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = gateway;
         return new(_definition, gateway);
     }
 
@@ -226,6 +262,7 @@ public sealed class ActivityBehavior
         }
 
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = gateway;
         return new(_definition, gateway, branches);
     }
 
@@ -242,6 +279,7 @@ public sealed class ActivityBehavior
         }
 
         _definition.ActivitiesWithOutgoing.Add(LastTarget);
+        _labelTarget = gateway;
         return this;
     }
 
@@ -257,63 +295,20 @@ public sealed class ActivityBehavior
     }
 
     private ActivityBehavior EnterTask(string name, Func<FlowTaskContext, ValueTask> body) {
-        var task             = Procedure(name, body);
-        var (elements, flows) = ScopeFor(Activity);
-        elements.Add(task);
-
-        foreach (var flow in flows.Where(f => f.Target == Activity).ToList()) {
-            flow.Target = task;
-        }
-
-        flows.Add(new() { Source = task, Target = Activity });
-        _definition.EnterTasks.TryAdd(Activity, task);
-
+        var task = Procedure(name, body);
+        _definition.InsertEnterTask(Activity, task);
+        _labelTarget = task;
         return this;
-    }
-
-    private (List<FlowElement> Elements, List<SequenceFlow> Flows) ScopeFor(Activity activity) {
-        foreach (var scope in _definition.Elements.OfType<SubProcess>()) {
-            if (ScopeFor(scope, activity) is { } nestedScope) {
-                return nestedScope;
-            }
-        }
-
-        return (_definition.Elements, _definition.Flows);
-    }
-
-    private static (List<FlowElement> Elements, List<SequenceFlow> Flows)? ScopeFor(SubProcess scope, Activity activity) {
-        if (scope.Children.Contains(activity)) {
-            return (scope.Children, scope.ChildFlows);
-        }
-
-        foreach (var child in scope.Children.OfType<SubProcess>()) {
-            if (ScopeFor(child, activity) is { } nestedScope) {
-                return nestedScope;
-            }
-        }
-
-        return null;
     }
 
     private ActivityBehavior LeaveTask(string name, Func<FlowTaskContext, ValueTask> body) {
         var task = Procedure(name, body);
         _definition.Elements.Add(task);
-        return Go(task);
+        Go(task);
+        _labelTarget = task;
+        return this;
     }
 
-    private static string DefaultSourceName<TSource>() {
-        return typeof(TSource).Name.Underscore().ToLowerInvariant();
-    }
-
-    private static Func<FlowTaskContext, ValueTask> SourceBody<TSource>(
-        string                                 source,
-        Func<FlowTaskContext, TSource, ValueTask> body
-    ) where TSource : class, ICanonicalName {
-        return async ctx => {
-            var entity = await ctx.SourceAsync<TSource>(source);
-            await body(ctx, entity);
-        };
-    }
 
     #region Boundary Events
 

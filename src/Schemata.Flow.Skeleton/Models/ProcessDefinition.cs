@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,6 +7,7 @@ using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Schemata.Flow.Skeleton.Builders;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Models;
 
@@ -22,9 +22,12 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     <see cref="Message"/>, <see cref="Message{TPayload}"/>, <see cref="Signal"/>,
 ///     <see cref="Signal{TPayload}"/>, <see cref="ErrorDefinition"/>,
 ///     <see cref="EscalationDefinition"/>) are instantiated (when null) and registered on the
-///     definition collections by the base constructor. Element names default to the property
-///     name (or <see cref="DisplayNameAttribute"/>), which makes them deterministic across
-///     definition rebuilds — element names are the canonical identity persisted on tokens.
+///     definition collections by the base constructor. An element's name is always its property
+///     name, which makes it deterministic across definition rebuilds — property names define the
+///     persisted element identity. Labels populate <see cref="IDescriptive"/> members through a
+///     separate channel: <c>[DisplayName]</c>, <c>[Description]</c> and repeatable
+///     <c>[Localized]</c> declarations land on the element, and the same declarations on the
+///     definition class label the process itself.
 ///     Pre-initialized properties keep their explicit name and are registered when absent;
 ///     a pre-initialized element that belongs inside a sub-process scope must be placed into
 ///     that scope's children before the base constructor runs, or not be exposed as a
@@ -35,10 +38,16 @@ namespace Schemata.Flow.Skeleton.Models;
     ///         rebuild graph views from the mutable definition collections on each access.
 ///     </para>
 /// </remarks>
-public class ProcessDefinition
+public class ProcessDefinition : IDescriptive
 {
-    /// <summary>Initializes a new <see cref="ProcessDefinition" /> and seeds known auto-properties via reflection.</summary>
-    public ProcessDefinition() { InitializeProperties(); }
+    /// <summary>
+    ///     Initializes a new <see cref="ProcessDefinition" />, applies the labels declared on the
+    ///     definition type itself, and seeds known auto-properties via reflection.
+    /// </summary>
+    public ProcessDefinition() {
+        GetType().ApplyLabels(this);
+        InitializeProperties();
+    }
 
     /// <summary>Stable identifier of the process definition; serves as the lookup key in the registry.</summary>
     public string Name { get; set; } = null!;
@@ -46,8 +55,14 @@ public class ProcessDefinition
     /// <summary>Human-readable label surfaced in tooling and audit rows.</summary>
     public string? DisplayName { get; set; }
 
+    /// <summary>Localized display names keyed by IETF BCP 47 language tag.</summary>
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+
     /// <summary>Free-form description of the process intent.</summary>
     public string? Description { get; set; }
+
+    /// <summary>Localized descriptions keyed by IETF BCP 47 language tag.</summary>
+    public Dictionary<string, string?>? Descriptions { get; set; }
 
     /// <summary>Every BPMN element discovered on the definition (activities, events, gateways).</summary>
     public List<FlowElement> Elements { get; } = [];
@@ -58,12 +73,55 @@ public class ProcessDefinition
     /// <summary>Activities that already have outgoing sequence flows during graph construction.</summary>
     internal HashSet<Activity> ActivitiesWithOutgoing { get; } = [];
 
-    /// <summary>Head of the enter-task chain per activity; inbound edges route to it.</summary>
-    internal Dictionary<Activity, ProcedureTask> EnterTasks { get; } = [];
+    /// <summary>Head of the enter-task chain per element; inbound edges route to it.</summary>
+    internal Dictionary<FlowElement, ProcedureTask> EnterTasks { get; } = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Returns the enter-task chain head when <paramref name="target" /> owns one, otherwise the target itself.</summary>
     internal FlowElement ResolveEntry(FlowElement target) {
-        return target is Activity activity && EnterTasks.TryGetValue(activity, out var entry) ? entry : target;
+        return EnterTasks.TryGetValue(target, out var entry) ? entry : target;
+    }
+
+    /// <summary>
+    ///     Splices <paramref name="task" /> in front of <paramref name="target" />: adds it to the
+    ///     target's scope, rewires every existing inbound edge to the task, links the task to the
+    ///     target, and records the routing so edges declared later reach the task through
+    ///     <see cref="ResolveEntry" />. This is the shared machinery behind activity and event
+    ///     <c>OnEnter</c> — the body runs because a real node sits in the graph.
+    /// </summary>
+    internal void InsertEnterTask(FlowElement target, ProcedureTask task) {
+        var (elements, flows) = ScopeFor(target);
+        elements.Add(task);
+
+        foreach (var flow in flows.Where(f => f.Target == target).ToList()) {
+            flow.Target = task;
+        }
+
+        flows.Add(new() { Source = task, Target = target });
+        EnterTasks.TryAdd(target, task);
+    }
+
+    private (List<FlowElement> Elements, List<SequenceFlow> Flows) ScopeFor(FlowElement element) {
+        foreach (var scope in Elements.OfType<SubProcess>()) {
+            if (ScopeFor(scope, element) is { } nested) {
+                return nested;
+            }
+        }
+
+        return (Elements, Flows);
+    }
+
+    private static (List<FlowElement> Elements, List<SequenceFlow> Flows)? ScopeFor(SubProcess scope, FlowElement element) {
+        if (scope.Children.Contains(element)) {
+            return (scope.Children, scope.ChildFlows);
+        }
+
+        foreach (var child in scope.Children.OfType<SubProcess>()) {
+            if (ScopeFor(child, element) is { } nested) {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Message definitions referenced by message events and tasks.</summary>
@@ -97,7 +155,7 @@ public class ProcessDefinition
     /// <param name="projection">The projection mode applied to the binding.</param>
     protected void BindSource<T>(string? name = null, FlowSourceProjection? projection = null)
         where T : class, ICanonicalName {
-        var binding = string.IsNullOrEmpty(name) ? typeof(T).Name.Underscore().ToLowerInvariant() : name;
+        var binding = string.IsNullOrEmpty(name) ? FlowSourceDescriptor.DefaultBindingName<T>() : name;
         _sources.Add(new(binding, typeof(T), projection));
     }
 
@@ -106,7 +164,7 @@ public class ProcessDefinition
     /// <param name="state">The source member receiving the projected state.</param>
     protected void BindSource<T>(Expression<Func<T, string?>> state)
         where T : class, ICanonicalName {
-        var binding = typeof(T).Name.Underscore().ToLowerInvariant();
+        var binding = FlowSourceDescriptor.DefaultBindingName<T>();
         _sources.Add(new(binding, typeof(T), StateMember: state));
     }
 
@@ -116,7 +174,7 @@ public class ProcessDefinition
     /// <param name="state">The source member receiving the projected state.</param>
     protected void BindSource<T>(string name, Expression<Func<T, string?>> state)
         where T : class, ICanonicalName {
-        var binding = string.IsNullOrEmpty(name) ? typeof(T).Name.Underscore().ToLowerInvariant() : name;
+        var binding = string.IsNullOrEmpty(name) ? FlowSourceDescriptor.DefaultBindingName<T>() : name;
         _sources.Add(new(binding, typeof(T), StateMember: state));
     }
 
@@ -129,7 +187,7 @@ public class ProcessDefinition
         var builder = new FlowSourceBindingBuilder<T>();
         configure(builder);
 
-        var binding = string.IsNullOrEmpty(name) ? typeof(T).Name.Underscore().ToLowerInvariant() : name;
+        var binding = string.IsNullOrEmpty(name) ? FlowSourceDescriptor.DefaultBindingName<T>() : name;
         _sources.Add(new(binding, typeof(T), builder.ProjectionMode, builder.StateMember, builder.LifecycleMember));
     }
 
@@ -141,7 +199,7 @@ public class ProcessDefinition
         var builder = new FlowSourceBindingBuilder<T>();
         configure(builder);
 
-        var binding = typeof(T).Name.Underscore().ToLowerInvariant();
+        var binding = FlowSourceDescriptor.DefaultBindingName<T>();
         _sources.Add(new(binding, typeof(T), builder.ProjectionMode, builder.StateMember, builder.LifecycleMember));
     }
 
@@ -249,11 +307,11 @@ public class ProcessDefinition
         var properties = AppDomainTypeCache.GetProperties(type).Values.Where(p => p.CanRead);
 
         foreach (var prop in properties) {
-            var displayName = prop.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName;
-            var name        = displayName ?? prop.Name;
+            var name = prop.Name;
 
             if (prop.GetValue(this) is { } existing) {
                 RegisterProperty(existing, name);
+                Describe(prop, existing);
                 continue;
             }
 
@@ -302,6 +360,16 @@ public class ProcessDefinition
                 SetPropertyValue(this, prop, escalation);
                 Escalations.Add(escalation);
             }
+
+            if (prop.GetValue(this) is { } created) {
+                Describe(prop, created);
+            }
+        }
+    }
+
+    private static void Describe(MemberInfo member, object element) {
+        if (element is IDescriptive descriptive) {
+            member.ApplyLabels(descriptive);
         }
     }
 

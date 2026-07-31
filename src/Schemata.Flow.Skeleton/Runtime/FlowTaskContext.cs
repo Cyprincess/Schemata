@@ -60,7 +60,7 @@ public sealed class FlowTaskContext
     /// <param name="ct">A cancellation token.</param>
     public ValueTask<TEntity> SourceAsync<TEntity>(CancellationToken ct = default)
         where TEntity : class, ICanonicalName {
-        return SourceAsync<TEntity>(DefaultSourceName<TEntity>(), ct);
+        return SourceAsync<TEntity>(FlowSourceDescriptor.DefaultBindingName<TEntity>(), ct);
     }
 
     /// <summary>Loads the source binding with the supplied name.</summary>
@@ -137,7 +137,7 @@ public sealed class FlowTaskContext
     /// <param name="ct">A cancellation token.</param>
     public ValueTask BindSourceAsync<TEntity>(TEntity entity, CancellationToken ct = default)
         where TEntity : class, ICanonicalName {
-        return BindSourceAsync(DefaultSourceName<TEntity>(), entity, ct);
+        return BindSourceAsync(FlowSourceDescriptor.DefaultBindingName<TEntity>(), entity, ct);
     }
 
     /// <summary>Binds the current token to an entity under the supplied source name.</summary>
@@ -166,8 +166,6 @@ public sealed class FlowTaskContext
 
         TrackSource(entity);
     }
-
-    private static string DefaultSourceName<TEntity>() { return typeof(TEntity).Name.Underscore().ToLowerInvariant(); }
 
     private async ValueTask<SchemataProcessSource?> FindSourceAsync(string name, CancellationToken ct) {
         var repository = Repository<SchemataProcessSource>();

@@ -1,3 +1,5 @@
+using Schemata.Abstractions.Entities;
+
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     and an Intermediate Catch Event.
 ///     See <seealso href="https://www.omg.org/spec/BPMN/2.0.2/">BPMN 2.0.2</seealso> Section 10.3.
 /// </summary>
-public interface IEventDefinition
+public interface IEventDefinition : IDescriptive
 {
     /// <summary>
     ///     The human-readable name used for matching triggers during runtime.

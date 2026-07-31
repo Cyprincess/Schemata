@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
 using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Models;
@@ -7,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     <see cref="Source" /> and <see cref="Target" /> hold direct object
 ///     references so the engine matches by identity during graph traversal.
 /// </summary>
-public sealed class SequenceFlow
+public sealed class SequenceFlow : IDescriptive
 {
     public FlowElement Source { get; set; } = null!;
 
@@ -18,4 +20,13 @@ public sealed class SequenceFlow
 
     /// <summary>Indicates that this flow is the gateway fallback after sibling conditions fail.</summary>
     public bool IsDefault { get; set; }
+
+    #region IDescriptive Members
+
+    public string?                      DisplayName  { get; set; }
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+    public string?                      Description  { get; set; }
+    public Dictionary<string, string?>? Descriptions { get; set; }
+
+    #endregion
 }

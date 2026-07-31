@@ -1,16 +1,44 @@
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Builders;
 
 /// <summary>One arm of <see cref="ActivityBehavior.Await" /> waiting on an event definition.</summary>
-public sealed class EventBranch
+public sealed class EventBranch : IDescriptive
 {
-    private readonly IEventDefinition _eventDefinition;
-    private          Branch[]?        _decisionBranches;
-    private          FlowElement?     _target;
+    private readonly IEventDefinition                  _eventDefinition;
+    private          Branch[]?                         _decisionBranches;
+    private          Func<FlowTaskContext, ValueTask>? _onEnter;
+    private          FlowElement?                      _target;
 
     internal EventBranch(IEventDefinition eventDefinition) { _eventDefinition = eventDefinition; }
+
+    /// <summary>Label carried onto the synthesized catch event.</summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>Localized display names carried onto the synthesized catch event.</summary>
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+
+    /// <summary>Description carried onto the synthesized catch event.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Localized descriptions carried onto the synthesized catch event.</summary>
+    public Dictionary<string, string?>? Descriptions { get; set; }
+
+    /// <summary>
+    ///     Splices a procedure task running <paramref name="body" /> onto the catch's outgoing edge;
+    ///     the body runs when the catch fires and the token passes through the inserted sequence-flow node.
+    /// </summary>
+    /// <param name="body">The delegate executed by the inserted procedure task when the catch fires.</param>
+    public EventBranch OnEnter(Func<FlowTaskContext, ValueTask> body) {
+        _onEnter = body;
+        return this;
+    }
 
     /// <summary>Routes the branch to <paramref name="target" /> when the event fires.</summary>
     public EventBranch Go(FlowElement target) {
@@ -29,6 +57,26 @@ public sealed class EventBranch
 
     /// <summary>Routes the branch to <paramref name="target" />.</summary>
     public EventBranch Go(EndEvent target) { return Go((FlowElement)target); }
+
+    /// <summary>
+    ///     Labels the synthesized catch event. The event has no declaration site to carry
+    ///     <c>[DisplayName]</c>, so this is its only label channel.
+    /// </summary>
+    /// <param name="displayName">Human-readable event label.</param>
+    /// <param name="description">Optional description of what the branch waits for.</param>
+    public EventBranch Labelled(string displayName, string? description = null) {
+        this.Label(displayName, description);
+        return this;
+    }
+
+    /// <summary>Labels the synthesized catch event for one language tag.</summary>
+    /// <param name="locale">IETF BCP 47 language tag, e.g. <c>"zh-Hans"</c>.</param>
+    /// <param name="displayName">Event label for <paramref name="locale" />.</param>
+    /// <param name="description">Description for <paramref name="locale" />.</param>
+    public EventBranch Localized(string locale, string displayName, string? description = null) {
+        this.Localize(locale, displayName, description);
+        return this;
+    }
 
     /// <summary>Inserts an exclusive gateway after the catch event with the supplied <paramref name="branches" />.</summary>
     public EventBranch Decide(params Branch[] branches) {
@@ -54,27 +102,39 @@ public sealed class EventBranch
             Definition = _eventDefinition,
         };
 
+        this.CopyLabels(catchEvent);
         definition.Elements.Add(catchEvent);
         definition.Flows.Add(new() { Source = gateway, Target = catchEvent });
+
+        FlowElement source = catchEvent;
+        if (_onEnter is not null) {
+            var task = new ProcedureTask { Name = $"Enter_{catchEvent.Name}", Body = _onEnter };
+            definition.Elements.Add(task);
+            definition.Flows.Add(new() { Source = catchEvent, Target = task });
+            source = task;
+        }
 
         if (_decisionBranches is not null) {
             var exclusiveGw = new ExclusiveGateway { Name = $"Decision_{catchEvent.Name}" };
             definition.Elements.Add(exclusiveGw);
 
-            definition.Flows.Add(new() { Source = catchEvent, Target = exclusiveGw });
+            definition.Flows.Add(new() { Source = source, Target = exclusiveGw });
 
             for (var i = 0; i < _decisionBranches.Length; i++) {
                 var branch = _decisionBranches[i];
                 branch.EnsureExitRegistered(definition, exclusiveGw, i);
-                definition.Flows.Add(new() {
+                var edge = new SequenceFlow {
                     Source    = exclusiveGw,
                     Target    = definition.ResolveEntry(branch.Exit),
                     Condition = branch.Condition,
                     IsDefault = branch.IsDefault,
-                });
+                };
+
+                branch.CopyLabels(edge);
+                definition.Flows.Add(edge);
             }
         } else if (_target is not null) {
-            definition.Flows.Add(new() { Source = catchEvent, Target = definition.ResolveEntry(_target) });
+            definition.Flows.Add(new() { Source = source, Target = definition.ResolveEntry(_target) });
         }
     }
 }

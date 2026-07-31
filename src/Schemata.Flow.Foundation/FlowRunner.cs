@@ -640,7 +640,7 @@ public sealed class FlowRunner(
         if (source is ICanonicalName canonicalSource) {
             var type = typeof(TState);
             var candidates = reg.SourceTypes.Values.Where(descriptor => descriptor.SourceType == type).ToList();
-            var conventional = type.Name.Underscore().ToLowerInvariant();
+            var conventional = FlowSourceDescriptor.DefaultBindingName(type);
             var binding = candidates.FirstOrDefault(descriptor => descriptor.BindingName == conventional);
             if (binding is null) {
                 if (candidates.Count != 1) {

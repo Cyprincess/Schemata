@@ -154,16 +154,13 @@ public sealed class ProcessPersistence
                 dst.DefinitionName = src.DefinitionName;
                 dst.IdempotencyKey = src.IdempotencyKey;
                 dst.State          = src.State;
-                dst.DisplayName    = src.DisplayName;
-                dst.DisplayNames   = src.DisplayNames;
-                dst.Description    = src.Description;
-                dst.Descriptions   = src.Descriptions;
                 dst.Annotations    = new(src.Annotations);
                 dst.Timestamp      = src.Timestamp;
                 dst.CreateTime     = src.CreateTime;
                 dst.UpdateTime     = src.UpdateTime;
                 dst.DeleteTime     = src.DeleteTime;
                 dst.PurgeTime      = src.PurgeTime;
+                src.CopyLabels(dst);
                 break;
             case (SchemataProcessToken dst, SchemataProcessToken src):
                 dst.Uid           = src.Uid;

@@ -179,16 +179,6 @@ public static class StateMachineValidator
                 SchemataResources.STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT,
                 new Dictionary<string, string?> { ["name"] = activity.Name });
         }
-
-        // A pass-through none task never rests in Active, so its boundary catches can never arm.
-        if (activity is NoneTask
-         && outgoing is [{ Target : EventBasedGateway or FlowEvent { Position: EventPosition.End } }]
-         && definition.Elements.OfType<FlowEvent>()
-                      .Any(e => e.Position == EventPosition.Boundary && e.AttachedTo == activity)) {
-            throw new FailedPreconditionException(
-                SchemataResources.STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE,
-                new Dictionary<string, string?> { ["name"] = activity.Name });
-        }
     }
 
 }

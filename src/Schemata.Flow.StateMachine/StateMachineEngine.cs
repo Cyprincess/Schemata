@@ -71,7 +71,7 @@ public sealed class StateMachineEngine : IFlowRuntime
     ) {
         var token = ResolveSingleToken(process, tokens, tokenName);
 
-        var previousState = definition.FindElementByName(token.StateName)?.Name ?? token.WaitingAtName;
+        var previousState = token.WaitingAtName ?? token.StateName;
         var resolved      = await ResolveTriggerAsync(definition, process, token, context, trigger, payload);
 
         if (resolved is null) {
@@ -257,8 +257,6 @@ public sealed class StateMachineEngine : IFlowRuntime
         }
 
         switch (target) {
-            case NoneTask task when ResolvePassThrough(definition, task) is { } wait:
-                return wait;
             case Activity activity:
                 return new(activity.Name, null, false);
             case FlowEvent { Position: EventPosition.End } end:
@@ -280,25 +278,6 @@ public sealed class StateMachineEngine : IFlowRuntime
                     SchemataResources.STATE_MACHINE_UNKNOWN_TARGET,
                     new Dictionary<string, string?> { ["name"] = target.Name });
         }
-    }
-
-    /// <summary>
-    ///     Resolves the pass-through hop for a none task: a single outgoing flow to an event-based
-    ///     gateway parks the token at the gateway while the task name stays the business state; a
-    ///     single outgoing flow to an end event completes the token on arrival. Any other shape
-    ///     keeps the explicit-advance semantics shared by all activities.
-    /// </summary>
-    private static TargetState? ResolvePassThrough(ProcessDefinition definition, NoneTask task) {
-        var outgoing = definition.Flows.Where(sf => sf.Source == task).ToList();
-        if (outgoing.Count != 1) {
-            return null;
-        }
-
-        return outgoing[0].Target switch {
-            EventBasedGateway gateway                 => new(task.Name, gateway.Name, false),
-            FlowEvent { Position: EventPosition.End } => new(task.Name, null, true),
-            _                                         => null,
-        };
     }
 
     private static async ValueTask<SequenceFlow?> ResolveAutoFlowAsync(

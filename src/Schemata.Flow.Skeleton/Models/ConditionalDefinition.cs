@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Models;
@@ -16,6 +17,15 @@ public sealed class ConditionalDefinition : IEventDefinition
     #region IEventDefinition Members
 
     public string Name { get; set; } = null!;
+
+    #endregion
+
+    #region IDescriptive Members
+
+    public string?                      DisplayName  { get; set; }
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+    public string?                      Description  { get; set; }
+    public Dictionary<string, string?>? Descriptions { get; set; }
 
     #endregion
 }
