@@ -72,6 +72,7 @@ advisor before `AdviceAddCanonicalName<Book>` runs:
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -86,7 +87,7 @@ public sealed class AdviceAddBookName : IRepositoryAddAdvisor<Book>
         CancellationToken   ct = default)
     {
         if (entity.Uid == Guid.Empty)
-            entity.Uid = Guid.CreateVersion7();
+            entity.Uid = Identifiers.NewUid();
 
         if (string.IsNullOrWhiteSpace(entity.Name))
             entity.Name = entity.Uid.ToString("N");

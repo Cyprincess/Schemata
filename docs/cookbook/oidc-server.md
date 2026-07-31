@@ -226,6 +226,10 @@ Constraints: `TApp : SchemataApplication`, `TAuth : SchemataAuthorization, new()
 **`InvalidOperationException` for `SigningKey` / `SigningAlgorithm` / `Issuer`** — all three are
 required and validated in `PostConfigure`. Set them in the `UseAuthorization` delegate.
 
+**`UseCodeFlow()` requires an absolute `InteractionUri`** — `AuthorizationCodeFlowFeature` checks it
+once at startup and throws `InvalidOperationException` for a blank value or one that is relative.
+`https://localhost:5001/consent` passes; `/consent` does not.
+
 **Register Identity before Authorization** — the authorization feature builds on
 `SchemataAuthenticationFeature`, which `UseIdentity` brings in. Call `UseIdentity()` first.
 

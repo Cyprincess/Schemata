@@ -121,9 +121,9 @@ Before the job body runs, `JobExecutionDispatcher` invokes the `IJobExecutionAdv
   `OnBlockedAsync`.
 
 For a recurring job the schedule advances to the next occurrence after any of these outcomes.
-`IJobLifecycleObserver` is notification-only: `OnTriggeredAsync` returns `Task`, and
-`OnBlockedAsync` / `OnSkippedAsync` carry default no-op bodies, so an existing observer compiles
-untouched and cannot gate a fire — gating belongs to the execution advisors.
+`IJobLifecycleObserver` is notification-only. Every member returns `Task`, and `OnBlockedAsync` /
+`OnSkippedAsync` carry default no-op bodies, making them optional hooks. Gating belongs to the
+execution advisors.
 
 To publish those transitions, add `Schemata.Scheduling.Event` and chain `UseEvent()`:
 
@@ -163,11 +163,14 @@ roughly 10,000 missed runs. `FireAll` caps at `MaxMissedWalk` but still executes
 sequentially on startup, blocking `SchedulingInitializer`. Use `Skip` or `FireOnce` for
 high-frequency jobs, or lower `MaxMissedWalk` to bound the replay.
 
-**Job type must resolve through the registry.** `DefaultScheduler` resolves the job by its `JobKey`
-through `IScheduledJobRegistry.Resolve`. `WithJob<T>()` registers `T` as transient and the registry
-initializer keys it by `[ScheduledJob]` or the full type name. A `SchemataJob` row created outside the
-scheduling feature must carry a `JobKey` that resolves to a registered type, or the fire is skipped
-with a warning.
+**Job type must resolve through the registry.** The dispatcher resolves the job by its `JobKey`
+through `IScheduledJobRegistry.Resolve`. `WithJob<T>()` registers `T` as transient, and
+`DefaultScheduledJobRegistry` keys it by `[ScheduledJob("key")]` first, then by the first
+`IScheduledJobKeyResolver` that answers for the type, and failing both by the type's full name
+stripped of generic arity with generic arguments appended as dotted short names. A `SchemataJob` row
+created outside the scheduling feature must carry a `JobKey` that resolves to a registered type; an
+unresolvable key finalizes the execution row as `Failed`. Renaming a type that has no
+`[ScheduledJob]` key changes the derived key, and rows persisted under the old one stop resolving.
 
 **Gating belongs to `IJobExecutionAdvisor`, not the observer.** To suppress a fire, register an
 execution advisor that returns `Handle` (execution recorded as `Skipped`) or `Block` (recorded as

@@ -82,10 +82,11 @@ resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
 ## Service synthesis
 
 The Resource gRPC transport synthesizes one `ResourceService<,,,>` per registered resource. The
-service name comes from `GrpcResourceNaming.ServiceName` and the resource's `[DisplayName]`
-singular: `SchemataProcess` (`[DisplayName("Process")]`) becomes `ProcessService`,
-`SchemataProcessToken` (`[DisplayName("Token")]`) becomes `TokenService`, and
-`SchemataProcessTransition` (`[DisplayName("Transition")]`) becomes `TransitionService`. The
+service name comes from `GrpcResourceNaming.ServiceName` and the singular read off the resource's
+`[CanonicalName]` leaf placeholder: `SchemataProcess` (`processes/{process}`) becomes
+`ProcessService`, `SchemataProcessToken` (`processes/{process}/tokens/{token}`) becomes
+`TokenService`, and `SchemataProcessTransition` (`processes/{process}/transitions/{transition}`)
+becomes `TransitionService`. The
 synthesized services are mapped via `endpoints.MapGrpcService`; the same
 `ResourceOperationHandler` runs under both HTTP and gRPC.
 
@@ -151,8 +152,10 @@ public interface IProcessDefinitionService
 
 The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation passes the
 registry-backed `ProcessDefinitionQueryService.ListProcessDefinitions()` results through
-unchanged; each entry has `CanonicalName = "definitions/{name}"`, plus `DisplayName` and
-`Description` from the source `ProcessDefinition`.
+unchanged; each entry has `CanonicalName = "definitions/{name}"`, plus the `IDescriptive` label
+fields from the source `ProcessDefinition`, and the same `messages` / `elements` / `flows`
+definition graph documented for the HTTP endpoint. `messages` carries the message definitions the
+process declares.
 
 ## Request and response wire format
 

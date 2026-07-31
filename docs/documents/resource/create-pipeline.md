@@ -49,8 +49,9 @@ Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principa
 
 Receives the original request and the freshly mapped entity. This is the socket for entity-level logic that must
 run before persistence. `AdviceApplyChildParent` reverse-parses `request.Parent` into the entity's mode-A parent
-field for `IChild` DTOs; other trait behavior such as timestamp, canonical name, and uniqueness is applied by
-repository add advisors during `AddAsync`.
+field for `IChild` DTOs. The transport has already overwritten `Parent` from the route when the URI carries every
+parent segment, so the body's parent applies only where the route supplies none. Other trait behavior such as
+timestamp, canonical name, and uniqueness is applied by repository add advisors during `AddAsync`.
 
 ### 5. Persistence
 
@@ -92,8 +93,9 @@ request's first arrival; a cached result is returned only after that request wou
   `RequestId` can legitimately appear in several cache entries.
 - `CreateRequestValidationSuppressed` is placed on `AdviceContext` by `ResourceAdviceContext.Create` when
   `SchemataResourceOptions.SuppressCreateValidation` is set; it affects only the current request scope.
-- Create request advisors receive a `ResourceRequestContainer<TEntity>`, but Create does not enter its
-  `QueryAdvice` because the path maps and persists a new entity without a container-scoped entity load.
+- Create request advisors receive a `ResourceRequestContainer<TEntity>`, but Create performs no
+  container-scoped entity load — the path maps and persists a new entity — so container predicates
+  have no effect on this path.
 
 ## See also
 

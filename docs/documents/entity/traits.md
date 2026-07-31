@@ -206,9 +206,34 @@ public interface IDescriptive
 }
 ```
 
-Provides a user-facing `DisplayName` corresponding to AIP-148 `display_name`, plus Schemata-specific
-`Description`, `DisplayNames`, and `Descriptions` fields. The map properties are localized variants
-keyed by IETF BCP 47 language tag (e.g., `"en"`, `"zh-Hans"`). No built-in advisor.
+`DisplayName` carries the user-facing name defined by AIP-148 `display_name`: mutable, user-settable,
+under 63 characters, and free of uniqueness requirements. `Description`, `DisplayNames`, and
+`Descriptions` are Schemata extensions AIP-148 does not cover. The two map properties hold localized
+variants keyed by IETF BCP 47 language tag (`"en"`, `"zh-Hans"`). No built-in advisor.
+
+Declaration-site labels feed the same four members. Stock `[DisplayName]` and `[Description]` from
+`System.ComponentModel` supply the unlocalized pair; the repeatable
+`[Localized(locale, displayName, description?)]` in `Schemata.Abstractions.Entities` supplies the
+maps, one entry per language tag.
+
+```csharp
+using System.ComponentModel;
+using Schemata.Abstractions.Entities;
+
+[DisplayName("Approval")]
+[Description("Routes a request to an approver.")]
+[Localized("zh-Hans", "审批", "将请求路由给审批人。")]
+[Localized("ja", "承認", "リクエストを承認者に回します。")]
+public UserTask Approval { get; set; } = new();
+```
+
+`DescriptiveExtensions.ApplyLabels(MemberInfo, IDescriptive)` in `Schemata.Common` reads those
+attributes onto a target. Whatever the target already holds wins: the unlocalized pair is assigned
+only when it is null, and each localized entry goes in through `TryAdd`, so a language tag already on
+the target keeps its value. `Label(displayName, description?)` and
+`Localize(locale, displayName, description?)` write from code and replace what the target holds.
+`CopyLabels(source, target)` moves all four members and hands the target the source's own
+`DisplayNames` / `Descriptions` instances, so a later `Localize` on either side shows up on both.
 
 ## IAnnotatable
 

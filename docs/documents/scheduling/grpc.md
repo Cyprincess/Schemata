@@ -15,7 +15,8 @@ custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSc
 | Package                        | Key files                                                                                                                                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Grpc`     | `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                         |
-| `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
+| `Schemata.Scheduling.Foundation` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`                                                                                                                                     |
+| `Schemata.Scheduling.Skeleton`   | `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`                                                                             |
 
 ## Activation
 
@@ -50,10 +51,11 @@ method binding happen in the Resource gRPC pipeline.
 
 ## Service synthesis
 
-`SchemataJob` carries `[DisplayName("Job")]`, so the Resource gRPC transport synthesizes a
+`SchemataJob` carries `[CanonicalName("jobs/{job}")]`, so the Resource gRPC transport synthesizes a
 `JobService` with the standard `ListJobs`, `GetJob`, `CreateJob`, `UpdateJob`, `DeleteJob` RPCs.
-`SchemataJobExecution` is projected through `Operation` (`[DisplayName("Operation")]`), producing
-an `OperationService` with `ListOperations`, `GetOperation`, `DeleteOperation`. With
+`SchemataJobExecution` carries `[CanonicalName("operations/{operation}")]` and is projected through
+`Operation`, producing an `OperationService` with `ListOperations`, `GetOperation`,
+`DeleteOperation`. With
 `[ResourcePackage]` set, the prefix `{package}.` precedes each service name.
 
 The closed `ResourceService<,,,>` implementations are mapped via `endpoints.MapGrpcService`. The

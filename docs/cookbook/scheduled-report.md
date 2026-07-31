@@ -5,6 +5,7 @@
 A periodic Student roster report that runs from a Cronos cron expression, persists each result as a
 snapshot, and retains the newest snapshots by age and count. The recipe registers the Insight source,
 the Report Scheduling bridge, and the repositories that store report definitions, snapshot headers,
+snapshot chunks, and the scheduler's own job and execution rows.
 
 ## Prerequisites
 

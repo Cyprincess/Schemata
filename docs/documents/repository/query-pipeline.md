@@ -101,9 +101,9 @@ using (repository.SuppressQuerySoftDelete())
 }
 ```
 
-Resource request advisors can call `container.SuppressQuerySoftDelete()`. That entry point stores
-`QuerySoftDeleteSuppressed` in `container.QueryAdvice`; `ResourceOperationHandler` applies the marker around its
-Get, List, existing-entity Update, Delete, and instance-scoped custom-method queries.
+Suppression lives on the repository only: `repository.SuppressQuerySoftDelete()` stores
+`QuerySoftDeleteSuppressed` in the repository's `AdviceContext` until the scope disposes. There is no
+container-level entry point; the resource handler applies the repository scope itself where documented.
 
 ### AdviceBuildQueryOwner
 
@@ -117,9 +117,10 @@ Get, List, existing-entity Update, Delete, and instance-scoped custom-method que
 
 Restricts results to entities owned by the current caller. Resolves the owner via `IOwnerResolver<TEntity>` and appends `.Where(e => e.Owner == owner)`. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`. See [ownership.md](ownership.md).
 
-Repository callers can use `repository.SuppressQueryOwner()`, and resource request advisors can use
-`container.SuppressQueryOwner()`. Both set `QueryOwnerSuppressed`; the latter reaches the repository context when
-the resource handler enters its query-advice scope.
+Repository callers can scope `repository.SuppressQueryOwner()` around a query. The resource
+handler queries through its own repository instance, so request advisors cannot reach that seam;
+they bridge through a scoped `IRepositoryBuildQueryAdvisor<TEntity>` that marks the query advice
+context with `QueryOwnerSuppressed` instead.
 
 ## QueryContainer and QueryContext
 

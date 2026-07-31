@@ -76,9 +76,9 @@ ResourceMethodController / ResourceCustomMethod
 A `Block` at any stage throws `NotFoundException` (`Blocked(name)`); a `Handle` returns a `TResponse` stashed in
 `AdviceContext`. For an instance-scoped method, the handler binds `request.CanonicalName = name` when the request
 implements `ICanonicalName`, so the AIP-155 idempotency key distinguishes the same verb against different
-resources. It then loads the entity with `EnterQueryAdvice(container)` outside
+resources. It then loads the entity inside
 `_repository.SuppressQuerySoftDelete()`; a missing entity throws `ResourceNotFound(name)`. A collection-scoped
-method (`name is null`) skips the load, query-advice entry, and method-advisor stage, passing a `null` entity to
+method (`name is null`) skips the load and the method-advisor stage, passing a `null` entity to
 the handler.
 
 ### Built-in method advisors

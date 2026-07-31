@@ -16,7 +16,8 @@ handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFe
 | Package                        | Key files                                                                                                                                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Http`     | `Features/SchemataSchedulingHttpFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                         |
-| `Schemata.Scheduling.Skeleton` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs` |
+| `Schemata.Scheduling.Foundation` | `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`                                                                                                                                     |
+| `Schemata.Scheduling.Skeleton`   | `RunJobRequest.cs`, `WaitOperationRequest.cs`, `OperationMapper.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`                                                                             |
 
 ## Activation
 
@@ -50,10 +51,9 @@ synthesis, and convention rewriting happen in the Resource transport pipeline.
 
 ## Routing and method mapping
 
-`SchemataJob` carries `[DisplayName("Job")]` and `[CanonicalName("jobs/{job}")]`, so the Resource
-HTTP transport mounts it at `/v1/jobs`. `SchemataJobExecution` is projected through `Operation`,
-which carries `[DisplayName("Operation")]` and `[CanonicalName("operations/{operation}")]`, mounting
-at `/v1/operations`.
+`SchemataJob` carries `[CanonicalName("jobs/{job}")]`, so the Resource HTTP transport mounts it at
+`/v1/jobs`. `SchemataJobExecution` is projected through `Operation`, and both carry
+`[CanonicalName("operations/{operation}")]`, mounting at `/v1/operations`.
 
 | Method   | Route                          | Action                                 | AIP     |
 | -------- | ------------------------------ | -------------------------------------- | ------- |

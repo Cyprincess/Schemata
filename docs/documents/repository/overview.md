@@ -102,9 +102,7 @@ semantics.
 ## Suppression scopes
 
 Repository `Suppress*()` methods store a marker class in `AdviceContext` and return an `IDisposable` that
-restores the prior state on dispose. Resource request containers expose matching query entry points that store the
-marker in `ResourceRequestContainer<T>.QueryAdvice`; the resource handler applies it to the repository context for
-the applicable query. The convention is a verb method (`SuppressSoftDelete()`) and a state-noun marker
+restores the prior state on dispose. The convention is a verb method (`SuppressSoftDelete()`) and a state-noun marker
 (`SoftDeleteSuppressed`). The advisor checks `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync`.
 
 | Entry point                                     | Marker class                 | Advisors bypassed                               |
@@ -112,11 +110,9 @@ the applicable query. The convention is a verb method (`SuppressSoftDelete()`) a
 | `repository.SuppressAddValidation()`            | `AddValidationSuppressed`    | `AdviceAddValidation`                           |
 | `repository.SuppressUpdateValidation()`         | `UpdateValidationSuppressed` | `AdviceUpdateValidation`                        |
 | `repository.SuppressQuerySoftDelete()`          | `QuerySoftDeleteSuppressed`  | `AdviceBuildQuerySoftDelete`                    |
-| `container.SuppressQuerySoftDelete()`           | `QuerySoftDeleteSuppressed`  | `AdviceBuildQuerySoftDelete`                    |
 | `repository.SuppressSoftDelete()`               | `SoftDeleteSuppressed`       | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete` |
 | `repository.SuppressTimestamp()`                | `TimestampSuppressed`        | `AdviceAddTimestamp`, `AdviceUpdateTimestamp`   |
 | `repository.SuppressQueryOwner()`               | `QueryOwnerSuppressed`       | `AdviceBuildQueryOwner`                         |
-| `container.SuppressQueryOwner()`                | `QueryOwnerSuppressed`       | `AdviceBuildQueryOwner`                         |
 
 Scope a suppression with `using`:
 
@@ -130,8 +126,7 @@ using (repository.SuppressQuerySoftDelete())
 The `Schemata.Entity.Owner` and `Schemata.Entity.Cache` packages add further repository scopes as
 `IRepository<TEntity>` extension methods — `SuppressOwner()`, `SuppressQueryOwner()`,
 `SuppressQueryCache()`, `SuppressQueryCacheEviction()` — when `UseOwner()` or `UseQueryCache()` is
-called on the repository builder. `Schemata.Entity.Owner` and `Schemata.Entity.Repository` add the container query
-entry points shown in the table for resource request advisors.
+called on the repository builder.
 
 ## AdviceContext
 

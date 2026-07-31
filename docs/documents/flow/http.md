@@ -132,11 +132,28 @@ The `Get` and `List` operations come from the resource registration, not a hand-
 ### Definitions endpoint
 
 `ProcessDefinitionsController` is the only hand-written controller. Mounted at
-`~/v1/processes:definitions`, its single `GET` lists registered definition names through
-`ProcessDefinitionQueryService`. The controller re-projects each query result into a new
-`ProcessDefinitionInfo` with `CanonicalName` populated and `DisplayName` / `Description` left
-unset, so the HTTP response carries the canonical name only. The gRPC path passes the query
-service's output through unchanged and exposes all three fields.
+`~/v1/processes:definitions`, its single `GET` lists registered definitions through
+`ProcessDefinitionQueryService` and returns the result unchanged. Each row carries
+`CanonicalName`, the four `IDescriptive` label fields, `messages` (declared message names with
+their labels), and the definition graph:
+
+- `elements` — `name`, shape `kind`, `scope` (enclosing sub-process, absent at the top level),
+  event `position`, `trigger` and `trigger_kind` (the event definition's name and shape),
+  `attached_to`, `interrupting`, `is_terminate`, `triggered_by_event`, `loop`, plus label fields.
+- `flows` — `source` / `target` element names, `is_default`, `is_conditional`, plus label fields.
+  The guard expression itself never crosses the wire.
+
+Together the fields carry enough structure to rebuild the BPMN diagram from one list call.
+The gRPC path exposes the same rows.
+
+### Which messages a token accepts
+
+The server does not project this. A client derives it from the definition graph it already
+holds: look up the element named by the token's `state_name` / `waiting_at_name`, and when its
+`kind` is `EventBasedGateway` follow `flows` from that name to the targets whose `position` is
+`IntermediateCatch` and whose `trigger_kind` is `Message`, collecting their `trigger`; a token
+waiting directly on such a catch accepts that one message. The graph says nothing about
+authorization — intersect it with your own permission model.
 
 ## Request and response wire format
 
@@ -216,8 +233,9 @@ runtime catalog of registered process definitions; there is no separate reflecti
 
 - Process execution is resource-driven, not controller-driven. The only controller is the
   definitions lister; the verbs and read endpoints are synthesized by the Resource transport.
-- The HTTP definitions endpoint returns `ProcessDefinitionInfo` rows with only `CanonicalName`
-  populated; the gRPC endpoint exposes `DisplayName` and `Description` as well.
+- The definition graph describes the declared process. Boundary and event-sub-process
+  subscriptions armed while a token is active are visible as elements but are not implied by the
+  token's current wait.
 
 ## See also
 

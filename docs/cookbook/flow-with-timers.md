@@ -71,7 +71,7 @@ builder.UseSchemata(schema => {
 The flow-builder `UseScheduling()` adds `SchemataFlowSchedulingFeature` (priority `480_400_000`). It
 depends on `SchemataFlowFeature` and `SchemataSchedulingFeature`, so both are pulled in if missing.
 The feature registers `AdviceTransitionTimer` as a scoped `IFlowTransitionAdvisor` and
-`FlowTimerJob` as a scheduled job keyed by its full type name.
+`FlowTimerJob` as a scheduled job under its declared key, `schemata.flow.timer`.
 
 The advisor bridges both timer shapes: intermediate catches like the one in this recipe, and
 boundary timer catches attached to an activity. A boundary timer is armed while its host activity
@@ -96,7 +96,7 @@ The engine advances through `Review` and stops at the timer catch, setting `Wait
 converts the `TimerDefinition` to a schedule, and schedules a `SchemataJob`:
 
 - `Name` = `flow-{process.CanonicalName}-{timerCatchElementName}`.
-- `JobKey` = `FlowTimerJob`'s full type name.
+- `JobKey` = `FlowTimerJob`'s registry key, `schemata.flow.timer`.
 - `State` = `JobState.Active`.
 - Job variables carry `processName` (the canonical name) and `timerDef`.
 
@@ -153,7 +153,7 @@ exclusive gateway after the catch to leave the cycle once a process condition ho
 ## Common pitfalls
 
 **`FlowTimerJob` runs outside any request scope.** The scheduler activates it by its job key
-(`typeof(FlowTimerJob).FullName`); the job opens its own DI scope and resolves `ProcessPersistence`,
+(`FlowTimerJob.JobKey`); the job opens its own DI scope and resolves `ProcessPersistence`,
 `IProcessRegistry`, and the keyed `IFlowRuntime` from there. Anything ambient to a web request
 (current user, tenant context from the request) is absent when the timer fires.
 

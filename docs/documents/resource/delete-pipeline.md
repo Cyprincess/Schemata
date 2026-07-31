@@ -39,7 +39,7 @@ Receives the `DeleteRequest`, the container, and the principal. Authorization ad
 
 ### 4. Entity load
 
-The entity is loaded with `EnterQueryAdvice(container)` outside `_repository.SuppressQuerySoftDelete()`, so an
+The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so an
 already-tombstoned entity can be hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRequest.AllowMissing` is set
 (AIP-135), in which case the delete returns an empty success without committing. Over HTTP the flag is the
 `allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.

@@ -34,8 +34,10 @@ public Message<OrderPaid> PayPaid{ get; } = null!;
 | `ErrorDefinition`                                                                                                                                            | the error                        | `Errors`      |
 | `EscalationDefinition`                                                                                                                                       | the escalation                   | `Escalations` |
 
-`[DisplayName("...")]` on a property overrides `Name`, which becomes the value persisted to
-`SchemataProcess.State`.
+`Name` is always the property name, so the value persisted to `SchemataProcess.State` does not move
+when a label changes. `[DisplayName("...")]` and `[Description("...")]` from
+`System.ComponentModel`, plus the repeatable `[Localized(locale, displayName, description?)]`, fill
+the element's `IDescriptive` members instead.
 
 ## Entry points
 
@@ -71,7 +73,9 @@ this.Merge(params Activity[] exits)                            // implicit inclu
 ```
 
 `When<T>` and `When<TSource, TPayload>` carry the constraint `T : class, ICanonicalName`; the
-binding name comes from `typeof(T).Name.Underscore().ToLowerInvariant()`.
+binding name comes from `FlowSourceDescriptor.DefaultBindingName`, which underscores and lowers the
+type name (`Order` → `order`, `OrderRequest` → `order_request`). Declaration, resolution and
+projection share that one derivation, so a source type addresses a single binding.
 
 ## StartFlow
 
@@ -151,10 +155,9 @@ this.When<Order>(o => o.Amount > 100).Go(Review)
 this.Otherwise().Go(Reject)
 ```
 
-`When<T>(predicate)` derives the source-binding key from the type name via Humanizer
-(`typeof(T).Name.Underscore().ToLowerInvariant()`), so `Order` reads binding `order` and
-`OrderRequest` reads `order_request`. The lambda resolves that binding to `T` and applies the
-predicate. `When<TSource, TPayload>(Message<TPayload>, predicate)` builds a typed-message branch.
+`When<T>(predicate)` derives the source-binding key through
+`FlowSourceDescriptor.DefaultBindingName`, so `Order` reads binding `order`. The lambda resolves
+that binding to `T` and applies the predicate. `When<TSource, TPayload>(Message<TPayload>, predicate)` builds a typed-message branch.
 
 ## FlowBranch, ParallelFork, ParallelJoin
 
@@ -202,9 +205,9 @@ this.During(Approve).Await(
     this.OnTimer(TimeSpan.FromMinutes(30)).Go(TimedOut));
 ```
 
-Under the state-machine engine, a `NoneTask` whose only outgoing path is `.Await(...)` parks at the
-gateway the moment the token arrives, so the branches are correlatable without an explicit
-complete; a `UserTask` reaches the gateway when its work item completes.
+Under the state-machine engine, a `NoneTask` rests Active on arrival like every other activity;
+an explicit complete advances it onto the gateway, where the branches become correlatable — the
+same cadence a `UserTask` follows when its work item completes.
 
 An `EventBranch` can carry an XOR decision after the catch:
 
@@ -258,7 +261,13 @@ public sealed class OrderApprovalProcess : ProcessDefinition
 ## Extension points
 
 - Implement `IConditionExpression` for a custom guard evaluator and pass it to `When(...)`.
-- Use `[DisplayName("...")]` on a magic property to control the persisted state label.
+- Label a magic property with `[DisplayName]` / `[Description]` for the unlocalized pair, and
+  repeatable `[Localized("zh-Hans", "审批", "…")]` for the localized maps. A label assigned in code
+  wins over the attributes.
+- Label a synthesized element or edge with `.Labelled("Finished", "…")` and
+  `.Localized("zh-Hans", "完成", "…")` on `ActivityBehavior`, `EventBehavior`, `EventBranch`,
+  `BoundaryCatch`, or `Branch`. A synthesized node has no declaration site, so this is its only label
+  channel; on `ActivityBehavior` both target the element the builder produced most recently.
 
 ## Design rationale
 
@@ -283,9 +292,8 @@ throws `InvalidOperationException` at construction time.
 - `OnEnter` routing is declaration-order-independent: edges declared before the call are rerouted,
   edges declared afterwards target the enter task directly. Flows added around the DSL that bypass
   an enter task are rejected at validation (`STATE_MACHINE_ENTER_TASK_BYPASSED`).
-- A `NoneTask` whose only outgoing path is `.Await(...)` or `.End()` passes through on arrival
-  under the state-machine engine; boundary catches on such a task can never fire and are rejected
-  at validation (`STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE`).
+- A `NoneTask` rests Active on arrival like every other activity; reaching an `.Await(...)` gateway
+  or an `.End()` takes an explicit advance, matching the BPMN engine's cadence.
 
 ## See also
 

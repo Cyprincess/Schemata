@@ -175,7 +175,13 @@ the stack: a targeted throw selects the most recent handler for the referenced a
 global throw runs all eligible handlers in reverse registration order. The reverse order also
 applies when a `TransactionSubProcess` reaches a cancel end event.
 
-If a compensation handler fails, already completed handlers stay compensated. The failure routes
+Activating a handler executes its compensation activity through the engine's normal node
+resolution: a procedure task's body runs, followed by any chained procedure tasks. The
+`Compensate` transition records only after successful execution, and the invoking token does not
+move.
+
+If a compensation handler fails, already completed handlers stay compensated. The failed handler
+records no transition and stays registered. The failure routes
 through the same boundary error path used by other BPMN failures; it does not mark the compensation
 operation complete. `ICompensationLifecycleObserver` receives start notifications per handler and a
 completion notification only after the whole compensation operation succeeds.

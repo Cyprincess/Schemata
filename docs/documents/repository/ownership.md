@@ -117,7 +117,6 @@ public sealed class PrincipalOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 | -------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
 | `repository.SuppressOwner()`                 | `OwnerSuppressed`      | Skips `AdviceAddOwner` for this repository instance.         |
 | `repository.SuppressQueryOwner()`            | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for this repository scope.     |
-| `container.SuppressQueryOwner()`             | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for the resource query scope.  |
 
 ```csharp
 // Add without assigning ownership
@@ -133,9 +132,12 @@ using (repository.SuppressQueryOwner())
 }
 ```
 
-`container.SuppressQueryOwner()` writes `QueryOwnerSuppressed` to `ResourceRequestContainer<T>.QueryAdvice`.
-`ResourceOperationHandler` applies that entry around List counts and row fetches, Get loads, existing-entity Update
-loads, Delete loads, and instance-scoped custom-method loads.
+Suppression is repository-scoped only. The resource handler queries through its own
+`IRepository<TEntity>` instance, which request advisors never see, so a request advisor cannot
+suppress the owner filter for a handler-initiated read. A consumer that needs owner-free reads
+of its own resource registers a scoped `IRepositoryBuildQueryAdvisor<TEntity>` that marks the
+query advice context with `QueryOwnerSuppressed`; the marker skips `AdviceBuildQueryOwner` for
+that repository query.
 
 ## Override and bypass
 

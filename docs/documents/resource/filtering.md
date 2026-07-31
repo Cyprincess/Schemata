@@ -149,22 +149,24 @@ Without a residual predicate, paging applies in the backend query with one look-
 
 ## `ResourceRequestContainer`
 
-`ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>` and carries explicit query advice:
+`ResourceRequestContainer<T>` accumulates query modifications into a composable `Func<IQueryable<T>, IQueryable<T>>`:
 
 | Member                              | Effect                                                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `QueryAdvice`                       | A `ResourceQueryAdvice` instance that supplies explicit entries to the repository `AdviceContext` for a query. |
 | `ApplyWhere(predicate)`             | Appends `Where(predicate)`; serves AIP-160 filtering and advisor predicates (parent scoping, entitlement filtering). |
 | `ApplyOrdering(order)`              | Applies the order function.                                                                                       |
 | `ApplyPaginating(token, lookahead)` | Appends `Skip` and `Take` with the look-ahead row.                                                                |
 
 The composed `Query` function is passed to `CountAsync`, `EstimateCountAsync`, and `ListAsync`.
 
-`ResourceQueryAdvice` is a sealed collection keyed by `RuntimeTypeHandle`. `Set<T>(T? value = default)` replaces the entry for `T`. `ApplyTo(AdviceContext)` opens one `AdviceContext.Use<T>` scope for each stored entry and disposes the scopes in reverse order; an empty instance returns a no-op scope.
-
-Request advisors can set entries directly through `container.QueryAdvice.Set<T>()`. `Schemata.Entity.Owner` also exposes `container.SuppressQueryOwner()`, and `Schemata.Entity.Repository` exposes `container.SuppressQuerySoftDelete()`; both write the same `QueryOwnerSuppressed` and `QuerySoftDeleteSuppressed` markers used by the corresponding repository suppression methods.
-
-The private `EnterQueryAdvice(container)` helper calls `container.QueryAdvice.ApplyTo(_repository.AdviceContext)`. Get, the existing-entity path of Update, Delete, and instance-scoped custom methods enter that scope outside `_repository.SuppressQuerySoftDelete()`. List keeps both the count and row fetch inside the query-advice scope, with `_repository.SuppressQuerySoftDelete()` inside it only when `request.ShowDeleted` is `true`. The seam applies to those reads; Create, the Update create-missing path, and collection-scoped custom methods do not enter query advice because they perform no container-scoped entity load.
+Suppression of query-time advisors (owner filtering, soft-delete) happens on the repository, not
+the container: the handler queries through its own `IRepository<TEntity>` instance, which request
+advisors never see, so `container`-level suppression entry points do not exist. List suppresses
+soft-delete filtering only when `request.ShowDeleted` is `true`; the other reads query with the
+repository's default filters. A consumer that needs owner-free or tombstone reads for its own
+resource registers a scoped `IRepositoryBuildQueryAdvisor<TEntity>` that marks the query advice
+context, or scopes `repository.SuppressQueryOwner()` / `repository.SuppressQuerySoftDelete()`
+around queries against a repository it resolves itself.
 
 ## Error mapping
 

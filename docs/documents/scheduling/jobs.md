@@ -19,7 +19,7 @@ public interface IScheduledJob
 }
 ```
 
-The dispatcher resolves the job type from `SchemataJobExecution.JobKey`, creates a DI scope, builds a `JobContext`, and calls `ExecuteAsync`. A job can set `context.Execution.Output` to publish the AIP-151 `response` payload on the operation row.
+The dispatcher opens one DI scope per dispatch pass, resolves the job type from `SchemataJobExecution.JobKey`, builds a `JobContext`, and calls `ExecuteAsync`. The claim, the advisors, the observers, the job body and the terminal write all resolve from that one scope. A job can set `context.Execution.Output` to publish the AIP-151 `response` payload on the operation row.
 
 ```csharp
 public sealed class ReportJob : IScheduledJob
@@ -67,12 +67,17 @@ Register an on-demand job without a schedule through `WithJob<T>()` or `AddSched
 
 A persisted execution stores `JobKey`, not an in-process delegate. The registry resolves that key to the concrete job type when `JobExecutionDispatcher` drains the row.
 
-Key resolution order:
+`SchedulingInitializer` registers every discovered job type at startup, taking `[ScheduledJob("stable-key")]` when the type carries one and otherwise deriving a bounded key: the type's full name with the generic-arity suffix stripped and each generic argument appended as a dotted short name. That bound keeps a closed generic inside the length and character set a `jobs/{job}` segment and the persisted key column accept.
 
-1. `[ScheduledJob("stable-key")]` on the job type.
-2. Explicit registrations already known to `IScheduledJobRegistry`.
-3. `Type.FullName` when no attribute supplies a key.
-4. `IScheduledJobKeyResolver` implementations on registry misses.
+`IScheduledJobRegistry.ResolveKey` handles a type that startup did not register, in order:
+
+1. The key already registered for that type.
+2. The registered `IScheduledJobKeyResolver` implementations, in order; the first non-null answer is cached.
+3. The declared key — the attribute when present, otherwise the bounded derived key.
+
+`Resolve(key)` walks the same registry in reverse: a registered key returns its type, and a miss falls through to the resolvers. A key that satisfies neither fails the execution row.
+
+A key change re-identifies every future row. Rows persisted under a previous key resolve to nothing and their executions fail; the framework carries no translation for them.
 
 Use `[ScheduledJob]` for ordinary jobs whose key must survive a type rename:
 

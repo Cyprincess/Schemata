@@ -90,6 +90,32 @@ pipeline), backed by `DiscoveryHandler<TScope>`. Each `IDiscoveryAdvisor` contri
 discovery document, so the advertised grant types and endpoints reflect exactly which flows are
 enabled.
 
+## Interaction redirect
+
+`/Connect/Authorize` never collects credentials itself. When the request needs a human — no cookie
+session, `prompt=login`, or a consent decision that is not already granted — the handler mints an
+interaction token and returns `302` to
+`{SchemataAuthorizationOptions.InteractionUri}?code={reference}&code_type={type}`. The interaction
+page signs the user in, then posts the code back to `/Connect/Interact` to resume the authorize
+request. `AuthorizationCodeFlowFeature` checks `InteractionUri` once at startup — blank values and
+values that fail `Uri.TryCreate(..., UriKind.Absolute, ...)` both throw `InvalidOperationException`,
+so `AuthorizeHandler` builds the redirect without re-checking it. `UseDeviceFlow()` validates
+`DeviceVerificationUri` the same way.
+
+Two exceptions stay outside the redirect: `prompt=none` without a session raises `login_required`
+per OpenID Connect Core §3.1.2.1, and `POST /Connect/Interact` from an unauthenticated caller answers
+`401` rather than a redirect the XHR caller cannot follow.
+
+The device flow reuses `/Connect/Interact` and carries its end-user verification code in the
+`user_code` parameter, the name RFC 8628 §3.2 gives that value in the device authorization response
+and §3.3 has the user type at the verification URI. `DeviceInteractionHandler` reads
+`InteractRequest.UserCode` for every device interaction — details, approve, and deny.
+`InteractRequest.Code` carries the opaque interaction reference minted by `/Connect/Authorize`.
+
+`InteractionUri` is the authorization server's interaction page. The identity package's
+`SchemataIdentityOptions.LoginUri` is a separate redirect serving cookie challenges on ordinary
+`[Authorize]` endpoints — see [Identity](identity.md). Neither redirects to the other.
+
 ## Flows
 
 Each method on `SchemataAuthorizationBuilder` adds one or more flow features. The grant types and

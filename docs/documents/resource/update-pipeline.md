@@ -23,8 +23,9 @@ Receives the principal and the token `nameof(Operations.Update)`. `Block` throws
 
 ### 2. Parent clearing and name binding
 
-`ResourceNameDescriptor.ClearParentProperties(request)` nulls the request's parent-segment properties so a client
-cannot re-parent the resource. The handler then sets `request.CanonicalName = name` so the AIP-155 idempotency key
+`ResourceNameDescriptor.ClearParentProperties(request)` nulls every parent channel on the request — the
+parent-segment properties and `IChild.Parent` — so a client cannot re-parent the resource through the body. The
+URI is the only parent input on this path. The handler then sets `request.CanonicalName = name` so the AIP-155 idempotency key
 distinguishes updates to different resources that share a `RequestId`. `ResourceIdentifiers.Apply` adds the leaf
 and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 
@@ -40,19 +41,19 @@ and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 
 ### 4. Entity load
 
-The entity is loaded with `EnterQueryAdvice(container)` outside `_repository.SuppressQuerySoftDelete()`, so a
+The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so a
 tombstoned resource can be updated. A null result throws `ResourceNotFound(name)` — unless the request implements
 `Schemata.Abstractions.Resource.IAllowMissing` with `AllowMissing = true`, in which case the handler runs the
 create path (`CreateMissingAsync`): the request is mapped to a new entity, the create-request advisor chain
 runs, and the entity is added instead of updated. The update mask is ignored on this path, per AIP-134.
-`CreateMissingAsync` does not enter query advice, so request-container entries apply only to the initial
+`CreateMissingAsync` performs no container-scoped load, so request-advisor predicates apply only to the initial
 existing-entity lookup.
 
 ### 5. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
 
 | Advisor                   | What it does                                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `AdviceApplyChildParent`  | Reverse-parses `request.Parent` into the entity's mode-A parent field for `IChild` DTOs; runs first                      |
+| `AdviceApplyChildParent`  | No-op on update: the handler cleared both parent channels off the request, so the entity keeps its parent                 |
 | `AdviceUpdateSoftDeleted` | Rejects updates to a soft-deleted entity with `FailedPreconditionException`; runs before freshness                       |
 | `AdviceUpdateFreshness`   | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
 
@@ -87,9 +88,11 @@ does not project selected response fields.
 
 ## Field masks (AIP-161)
 
-`UpdateMask` is a comma-separated list of wire-format (snake_case) field paths. Dot paths target nested object
-fields; `ResourceWireNameRules.ResolveClrName` maps the AIP wire aliases (`name` to the canonical-name property, `etag` to
-the entity-tag property, and the plural collection field) before falling back to PascalCase. Only the listed
+`UpdateMask` carries wire-format (snake_case) field paths, comma-separated as `google.protobuf.FieldMask`
+serializes them. AIP-161 defines the `.` traversal character for nested fields; the whole-resource `*` value
+comes from AIP-134, which requires update masks to accept it as full replacement.
+`ResourceWireNameRules.ResolveClrName` maps the AIP wire aliases (`name` to the canonical-name property, `etag`
+to the entity-tag property, and the plural collection field) before falling back to PascalCase. Only the listed
 fields are applied.
 
 ```csharp

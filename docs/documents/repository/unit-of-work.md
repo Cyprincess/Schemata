@@ -93,10 +93,10 @@ await students.AddAsync(student, ct);
 await students.CommitAsync(ct);
 ```
 
-The implicit unit of work is one-shot too: after a standalone commit, the repository is completed, and
-a further write or commit throws `InvalidOperationException`. Resolve a fresh `IRepository<T>` to start
-new work. A repository owned but never mutated still dispatches an empty committed snapshot on commit,
-so committed advisors observe the no-op on the same footing as the enlisted path.
+`CommitAsync` commits that implicit unit of work and reopens the repository, so the same instance takes
+further writes — see [Reopening after commit](#reopening-after-commit). A repository owned but never
+mutated still dispatches an empty committed snapshot on commit, so committed advisors observe the no-op
+on the same footing as the enlisted path.
 
 ## Committed advisor pipeline
 
@@ -120,6 +120,27 @@ several as an `AggregateException`) after running the remaining sinks.
 
 Query-cache eviction uses this pipeline: updated and removed entities evict reverse-indexed cache
 entries after commit; added entities do not.
+
+## Reopening after commit
+
+A repository that opened its own unit of work — the implicit one a standalone write enlists — reopens
+as soon as that unit of work commits. The same injected `IRepository<T>` therefore serves several
+write-then-commit cycles in one scope, and the next write enlists a fresh unit of work:
+
+```csharp
+await repository.AddAsync(first);
+await repository.CommitAsync();
+
+await repository.AddAsync(second);   // stages into a new unit of work
+await repository.CommitAsync();
+```
+
+Reads issued between a commit and the next write still resolve against the committed context.
+
+A unit of work supplied through `Begin()` or `Join(uow)` belongs to the caller and never reopens: once
+it completes, further work on that repository throws. Call `Begin()` again, or resolve a fresh
+`IRepository<T>`, to start the next one — `Begin()` always creates a new unit of work rather than
+handing out the repository's implicit one.
 
 ## Rollback and disposal
 

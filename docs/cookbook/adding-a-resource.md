@@ -85,6 +85,7 @@ assigns one (the same pattern Getting Started uses for `Student`):
 
 ```csharp
 using Schemata.Abstractions.Advisors;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Microsoft.Extensions.DependencyInjection;
@@ -99,7 +100,7 @@ public sealed class CourseNameAdvisor : IRepositoryAddAdvisor<Course>
         IRepository<Course> repository,
         Course              entity,
         CancellationToken   ct = default) {
-        if (entity.Uid == Guid.Empty)         entity.Uid  = Guid.CreateVersion7();
+        if (entity.Uid == Guid.Empty)         entity.Uid  = Identifiers.NewUid();
         if (string.IsNullOrWhiteSpace(entity.Name)) entity.Name = entity.Uid.ToString("N");
         return Task.FromResult(AdviseResult.Continue);
     }

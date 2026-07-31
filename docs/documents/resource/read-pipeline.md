@@ -26,7 +26,7 @@ Receives the principal and the token `nameof(Operations.List)`. `Block` throws `
 
 Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run
 here when `WithAuthorization()` is configured; an entitlement advisor adds predicates via
-`container.ApplyWhere`. Request advisors can also populate `container.QueryAdvice` for the repository query.
+`container.ApplyWhere`.
 
 ### 3. Parent scoping
 
@@ -61,12 +61,12 @@ keeping page boundaries stable.
 ### 7. Count and fetch
 
 `ResolveTotalSizeMode()` selects the count strategy: `None` skips counting (`TotalSize` is null), `Estimated`
-calls `_repository.EstimateCountAsync`, otherwise `_repository.CountAsync`. `EnterQueryAdvice(container)` wraps
-both the count and the row fetch. The query fetches one look-ahead row beyond `page_size`;
-`_mapper.EachAsync<TEntity, TSummary>` maps the stream to summaries. The extra row sets `hasMore` and is then
+calls `_repository.EstimateCountAsync`, otherwise `_repository.CountAsync`. The query fetches one look-ahead row
+beyond `page_size`; `_mapper.EachAsync<TEntity, TSummary>` maps the stream to summaries. The extra row sets
+`hasMore` and is then
 removed; `next_page_token` is sealed only when `hasMore`, so an exactly-full last page omits it per AIP-158.
-When `request.ShowDeleted` is true, `_repository.SuppressQuerySoftDelete()` is nested inside the query-advice
-scope so tombstoned rows are included.
+When `request.ShowDeleted` is true, the count and row fetch run inside `_repository.SuppressQuerySoftDelete()`
+so tombstoned rows are included.
 
 ### 8. List response — `IResourceListResponseAdvisor<TSummary>`
 
@@ -93,7 +93,7 @@ Receives the `GetRequest`, the container, and the principal. Authorization advis
 
 ### 4. Entity load
 
-`EnterQueryAdvice(container)` wraps `_repository.SuppressQuerySoftDelete()` for the entity load, so Get returns
+Get loads the entity inside `_repository.SuppressQuerySoftDelete()`, so Get returns
 tombstoned rows and the caller can inspect `DeleteTime`. A null result throws `ResourceNotFound(name)` carrying a
 `ResourceInfoDetail`.
 
@@ -107,8 +107,8 @@ reads. The response chain maps the full detail and has no partial-response selec
 
 - Implement `IResourceListRequestAdvisor<TEntity>` to add predicates via `container.ApplyWhere`
   (entitlement, tenant scoping).
-- Implement `IResourceGetRequestAdvisor<TEntity>` for per-get logic, including `container.QueryAdvice` entries
-  that apply only while the entity loads.
+- Implement `IResourceGetRequestAdvisor<TEntity>` for per-get logic, such as additional
+  `container.ApplyWhere` predicates evaluated during the entity load.
 - Implement `IResourceListResponseAdvisor<TSummary>` or `IResourceResponseAdvisor<TEntity, TDetail>` to
   post-process responses.
 

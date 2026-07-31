@@ -99,8 +99,8 @@ against the current token position:
 1. **Waiting at an element** (`WaitingAtName` set): if the waiting element is an `EventBasedGateway`,
    or an intermediate catch reached from one, the gateway's branches are matched against the trigger.
 2. **At an activity** (`WaitingAtName` null): boundary events attached to the current activity are
-   matched. A none task that awaits a gateway never rests in this position — it parks at the
-   gateway on arrival — so its catches are always consumable through case 1.
+   matched. A none task rests here on arrival like every other activity, so its boundary catches
+   fire before the next advance.
 
 A trigger that matches nothing valid from the current state throws `InvalidArgumentException`.
 
@@ -156,7 +156,7 @@ it takes the flow with no condition (the default).
 
 - Reaching an `IntermediateCatch` event sets both `StateName` and `WaitingAtName` to the event name.
 - Parking at an `EventBasedGateway` sets `WaitingAtName` to the gateway name. Arriving from an
-  activity (an explicit advance or a none-task pass-through) keeps the business state on
+  activity (an explicit advance) keeps the business state on
   `StateName`; only a gateway with no preceding activity (`Start().Await(...)`) surfaces the
   gateway name as `StateName`.
 - `AdvanceAsync` returns early while `WaitingAtName` is set.
@@ -169,12 +169,10 @@ that starts directly into an event-based gateway (`Start().Await(...)` on this e
 `StartIntoEventBased` path on the BPMN engine): with no preceding activity, `StateName` holds the
 gateway name.
 
-A `NoneTask` whose single outgoing flow targets an `EventBasedGateway` parks at that gateway on
-arrival, and one whose single outgoing flow targets an end event completes on arrival. A
-message-driven state machine modeled with none tasks therefore runs start → correlate → correlate,
-with no explicit complete between hops; `UserTask` and the other task types keep the
-explicit-complete wait state. Boundary catches on a pass-through none task could never arm, so the
-validator rejects that combination.
+A `NoneTask` rests Active on arrival like every other activity, matching the BPMN engine: reaching
+an event-based gateway or an end event takes an explicit advance, and a trigger routes the token
+from the gateway to the branch target as Active. The transition row written by a trigger names the
+gateway as its `Previous`, the same value the BPMN engine records.
 
 ## Extension points
 

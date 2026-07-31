@@ -93,6 +93,7 @@ account actions carry `[Authorize]`.
 | `POST`  | `~/Authenticate/Login`         | `Login`         | Password login; issues a bearer token |
 | `POST`  | `~/Authenticate/Refresh`       | `Refresh`       | Exchange a refresh token              |
 | `POST`  | `~/Authenticate/SignOut`       | `SignOut`       | Clear cookie and bearer sessions      |
+| `GET`   | `~/Authenticate/Continue`      | `Continue`      | Resume the request that triggered a sign-in redirect |
 | `GET`   | `~/Authenticate/Confirm`       | `Confirm`       | Confirm email or phone from a code    |
 | `POST`  | `~/Authenticate/Code`          | `Code`          | Send an account-confirmation code     |
 | `POST`  | `~/Authenticate/Forgot`        | `Forgot`        | Send a password-reset code            |
@@ -146,6 +147,28 @@ These rely on the custom store interfaces `IUserDisplayNameStore<TUser>`,
 `IUserPrincipalNameStore<TUser>`, `IUserCanonicalNameStore<TUser>`, and `IUserPhoneStore<TUser>`,
 all implemented by `SchemataUserStore`.
 
+## Sign-in redirect
+
+A browser reaching an `[Authorize]` endpoint without a cookie session triggers the application
+cookie's login challenge. Schemata replaces the stock handling:
+
+- `LoginUri` unset — the response is `401`, so an API host never redirects.
+- `LoginUri` set — the response is `302` to `{LoginUri}?continue={payload}`. The payload is the
+  original request's `PathBase + Path + QueryString`, protected by ASP.NET Data Protection under the
+  purpose `Schemata.Identity.Continue`, so the browser and the login page see an opaque, tamper-
+  evident blob.
+
+After authenticating, the login page sends the browser to `GET ~/Authenticate/Continue?continue=…`.
+That action unprotects the payload under the same purpose and redirects to the decoded target. Two
+checks guard it: a payload that fails to unprotect raises `CryptographicException`, and a decoded
+target that fails `Url.IsLocalUrl` is refused. Either path throws a `ValidationException` naming the
+`continue` field, which keeps a forged or replayed payload from turning the endpoint into an open
+redirect.
+
+The redirect and its resume endpoint belong to Identity alone; they run with the Authorization
+package absent. The authorization server's consent/login page is a separate setting,
+`SchemataAuthorizationOptions.InteractionUri` — see [Authorization](authorization.md).
+
 ## SchemataIdentityOptions
 
 Seven booleans, all defaulting to `true`, gate the endpoint groups:
@@ -161,6 +184,9 @@ Seven booleans, all defaulting to `true`, gate the endpoint groups:
 | `AllowTwoFactorAuthentication` | `Authenticator`, `Enroll`, `Downgrade` |
 
 A disabled operation returns `NotFoundException` (HTTP 404) from `AdviceRequestFeature`.
+
+`LoginUri` is the eighth property and takes a URL rather than a flag; see
+[Sign-in redirect](#sign-in-redirect).
 
 ## Extension points
 

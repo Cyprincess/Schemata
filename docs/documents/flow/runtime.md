@@ -345,7 +345,9 @@ public sealed class OrderProcess : ProcessDefinition
 }
 ```
 
-The binding name defaults to the type name, underscored and lowered (`Order` becomes `order`).
+The binding name defaults to `FlowSourceDescriptor.DefaultBindingName`, which underscores and lowers
+the type name (`Order` becomes `order`). The builders, `ProcessDefinition.BindSource`,
+`FlowTaskContext` and `FlowRunner` all derive it there.
 Overloads cover the convention form, a bare state member selector (`BindSource<Order>(o =>
 o.State)`), and the builder form above. A `When<T>` guard condition also registers a default
 declaration under the same convention name, with no member configuration; an explicit `BindSource`

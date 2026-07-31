@@ -56,7 +56,9 @@ public interface IScheduledJob
 }
 ```
 
-`JobContext.Job` is the job's canonical name, `JobContext.Variables` carries the deserialized dictionary from `SchemataJob.Variables`, `JobContext.ArgsJson` carries typed persisted arguments, and `JobContext.Execution` points to the `SchemataJobExecution` row the dispatcher is running. Apply `[ScheduledJob("stable-key")]` to pin a key that survives type renames; without it the registry defaults to the type's full name.
+`JobContext.Job` is the job's canonical name, `JobContext.Variables` carries the deserialized dictionary from `SchemataJob.Variables`, `JobContext.ArgsJson` carries typed persisted arguments, and `JobContext.Execution` points to the `SchemataJobExecution` row the dispatcher is running.
+
+`DefaultScheduledJobRegistry` picks a job's key in three steps. `[ScheduledJob("stable-key")]` on the type wins outright and is the way to pin a key across a type rename. On a registry miss the registered `IScheduledJobKeyResolver` implementations are consulted in order, and the first non-null answer is cached. Failing both, the registry derives a key from the type's full name with the generic-arity suffix stripped and each generic argument appended as a dotted short name, which keeps a closed generic inside the length and character set that a `jobs/{job}` segment and the persisted key column accept. Changing a key changes the identity of every future row; rows already persisted under the previous key resolve to nothing and their executions fail.
 
 ## IScheduler
 
@@ -82,7 +84,7 @@ The `SchemataJobExecution` row is the single durable unit of work for cron, peri
 
 - The scheduler is a materializer and timer. `ScheduleAsync` and `TriggerAsync` persist a `Pending` execution row up front, carrying the occurrence's due time in `SchemataJobExecution.StartTime`. An in-memory timer signals the dispatcher when the row comes due; the scheduler does not run job bodies.
 - A future-dated occurrence is a `Pending` row whose `StartTime` is in the future. There is no separate `Scheduled` state. `TriggerAsync` with a future `JobContext.StartTime` returns an immediately addressable operation and arms a timer for the due time; the durable row is the restart backstop.
-- `JobExecutionDispatcher` drains rows where `State == Pending && StartTime <= now`, claims each with a `Pending -> Running` transition guarded by the concurrency token, runs the advisor -> observer -> body pipeline, records the terminal state, and advances recurring schedules by asking the scheduler to materialize the next `Pending` row.
+- `JobExecutionDispatcher` drains rows where `State == Pending && StartTime <= now`, claims each with a `Pending -> Running` transition guarded by the concurrency token, runs the advisor -> observer -> body pipeline, records the terminal state, and advances recurring schedules by asking the scheduler to materialize the next `Pending` row. One dispatch pass opens one DI scope with `services.CreateScope()`; the claim, the advisors, the observers, the job body, the terminal write, and the fast-fail write all resolve from that provider, so they share one repository instance and one unit of work.
 
 Two background services run alongside the scheduler:
 

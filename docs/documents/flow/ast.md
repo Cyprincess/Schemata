@@ -21,9 +21,14 @@ state machine rejects them at validation. They exist for alternate engines regis
 Every graph node derives from `FlowElement`:
 
 ```csharp
-public abstract class FlowElement
+public abstract class FlowElement : IDescriptive
 {
     public string Name { get; set; } = null!;
+
+    public string?                      DisplayName  { get; set; }
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+    public string?                      Description  { get; set; }
+    public Dictionary<string, string?>? Descriptions { get; set; }
 }
 ```
 
@@ -34,9 +39,9 @@ because the rebuilt definition produces identical element names. `Name` is also 
 persisted on `SchemataProcessToken.StateName` and `WaitingAtName`, and the label surfaced in
 transition rows.
 
-When a magic property declares an element, `Name` defaults to the property name (or to
-`[DisplayName("...")]` when present). DSL-synthesized elements derive deterministic names from
-their structural position:
+When a magic property declares an element, `Name` is the property name. No attribute overrides it —
+labels travel on a separate channel (see [Labels](#labels)). DSL-synthesized elements derive
+deterministic names from their structural position:
 
 | Synthesized element | Name pattern |
 | ------------------------------------ | ----------------------------------------------------------------- |
@@ -156,7 +161,7 @@ A definition supplies the event's semantics. All definitions expose a `Name` use
 matching:
 
 ```csharp
-public interface IEventDefinition
+public interface IEventDefinition : IDescriptive
 {
     string Name { get; }
 }
@@ -193,19 +198,50 @@ list as their base types.
 ## SequenceFlow
 
 ```csharp
-public sealed class SequenceFlow
+public sealed class SequenceFlow : IDescriptive
 {
     public FlowElement           Source    { get; set; } = null!;
     public FlowElement           Target    { get; set; } = null!;
     public IConditionExpression? Condition { get; set; }
     public bool                  IsDefault { get; set; }
+
+    public string?                      DisplayName  { get; set; }
+    public Dictionary<string, string?>? DisplayNames { get; set; }
+    public string?                      Description  { get; set; }
+    public Dictionary<string, string?>? Descriptions { get; set; }
 }
 ```
 
 `Source` and `Target` are direct object references, so traversal matches by reference. Sequence
 flows carry no identity of their own; validation errors identify a flow by its source and target
 element names. A flow with a `Condition` is a guarded edge; the `IsDefault` flow is taken when no
-guarded sibling matches.
+guarded sibling matches. `SequenceFlow` does not derive from `FlowElement`, so it declares
+`IDescriptive` on its own to carry edge labels.
+
+## Labels
+
+`FlowElement`, `IEventDefinition`, `SequenceFlow` and `ProcessDefinition` all implement
+`IDescriptive`. Labels are a channel parallel to `Name`: editing one never moves a token, because
+`SchemataProcessToken.StateName` and `WaitingAtName` store `Name`.
+
+| Declaration site | Channel |
+| ----------------- | -------- |
+| Magic property | `[DisplayName]` and `[Description]` from `System.ComponentModel` for the unlocalized pair, repeatable `[Localized(locale, displayName, description?)]` for the localized maps |
+| Pre-built element | assign `DisplayName` / `DisplayNames` / `Description` / `Descriptions` directly |
+| DSL-synthesized element or edge | `.Labelled(displayName, description?)` and `.Localized(locale, displayName, description?)` on `ActivityBehavior`, `EventBehavior`, `EventBranch`, `BoundaryCatch`, `Branch` |
+
+`Branch`, `BoundaryCatch` and `EventBranch` accumulate the labels of the element they synthesize, so
+they implement `IDescriptive` themselves and hand the labels over when the element is built. Every
+write goes through `Schemata.Common.DescriptiveExtensions`.
+
+`ApplyLabels` reads the declaration-site attributes with target-wins semantics: a `DisplayName` or
+`Description` already set on the element survives, and each `[Localized]` entry lands through
+`TryAdd`, so a locale the element already carries keeps its value. Assigning in code therefore
+overrides the attributes, whichever order the two run in.
+
+`ProcessDefinitionQueryService` projects all four members onto every element, event definition,
+message, and edge, so a client renders a localized diagram with no dictionary of its own. The four
+projection DTOs implement `IDescriptive` for that reason.
 
 ## IConditionExpression
 
@@ -219,8 +255,8 @@ public interface IConditionExpression
 The engine `await`s `Evaluate`, so conditions are genuinely asynchronous.
 `LambdaConditionExpression` wraps a `Func<FlowConditionContext, ValueTask<bool>>`. The DSL's
 typed `When<T>(...)` builds a `SourceConditionExpression<TSource>` that resolves the source
-binding named after `T` (`typeof(T).Name.Underscore().ToLowerInvariant()`, e.g. `Order` →
-`order`, `OrderRequest` → `order_request`) and applies the predicate.
+binding named after `T` via `FlowSourceDescriptor.DefaultBindingName` (`Order` → `order`,
+`OrderRequest` → `order_request`) and applies the predicate.
 `When<TSource, TPayload>(Message<TPayload>, ...)` builds a `SourcePayloadConditionExpression<TSource, TPayload>`.
 `When<T>("state == 'paid'")` and `When<T>(name, expression)` build a
 `SourceStringConditionExpression<TSource>` carrying the raw expression text; the registry compiles
@@ -279,7 +315,7 @@ properties**: public auto-properties that are `null` and whose type is a declara
 (any non-abstract `Activity` subtype, `StartEvent`, `EndEvent`, `FlowEvent`, `Message`,
 `Message<TPayload>`, `Signal`, `Signal<TPayload>`, `ErrorDefinition`, `EscalationDefinition`).
 For each it constructs an instance and writes it back through the compiler-generated backing field,
-setting `Name` to the property name (or to `[DisplayName("...")]` when present). The `Elements`
+setting `Name` to the property name. The `Elements`
 list receives every flow element; `Messages` and `Signals` receive the matching event definitions.
 Pre-initialized element, message, signal, error, and escalation properties are also registered into
 the definition collections (reference-guarded) with their `Name` defaulted to the property name

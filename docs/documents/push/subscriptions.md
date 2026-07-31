@@ -10,7 +10,6 @@ a transport endpoint, unique by `(owner, provider, providerKey)`. `IPushSubscrip
 `Schemata.Push.Skeleton.Entities.SchemataPushSubscription`:
 
 ```csharp
-[DisplayName("PushSubscription")]
 [Table("SchemataPushSubscriptions")]
 [CanonicalName("pushSubscriptions/{push_subscription}")]
 [PrimaryKey(nameof(Uid))]

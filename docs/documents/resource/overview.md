@@ -13,7 +13,7 @@ both call it, passing a `ClaimsPrincipal?` pulled from their own request context
 | `Schemata.Resource.Foundation` | `ResourceOperationHandler.cs` + `.Create.cs`, `.Get.cs`, `.List.cs`, `.Update.cs`, `.Delete.cs`  |
 | `Schemata.Resource.Foundation` | `SchemataResourceBuilder.cs`, `ResourceMethodOperationHandler.cs`                                |
 | `Schemata.Resource.Foundation` | `Features/SchemataResourceFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                 |
-| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceQueryAdvice.cs`, `ResourceIdentifiers.cs`, `IPagination.cs` |
+| `Schemata.Common`              | `ResourceRequestContainer.cs`, `ResourceIdentifiers.cs`, `IPagination.cs` |
 | `Schemata.Abstractions`        | `Entities/ICanonicalName.cs`, `Entities/CanonicalNameAttribute.cs`, `Entities/Operations.cs`     |
 | `Schemata.Abstractions`        | `Resource/ResourceAttribute.cs`, `Resource/CreateResultBase.cs` (and the other `*ResultBase`)    |
 
@@ -64,13 +64,15 @@ builder.UseSchemata(schema => {
 ```
 
 `SchemataResourceFeature.DefaultPriority` is `Orders.Extension + 90_000_000` (490M). It declares
-`[DependsOn<SchemataRoutingFeature>]` and `[DependsOn(typeof(SchemataMappingFeature<>))]`, so those
-features auto-register. Anonymous-access plumbing (`AnonymousAccess`, `AnonymousGranted`) lives in
-`Schemata.Security.Skeleton`; the resource feature no longer depends on `SchemataSecurityFeature`.
+`[DependsOn<SchemataRoutingFeature>]`, so routing auto-registers. Anonymous-access plumbing
+(`AnonymousAccess`, `AnonymousGranted`) lives in `Schemata.Security.Skeleton`, which the resource feature
+consumes without pulling in `SchemataSecurityFeature`.
 
 `ConfigureServices` registers the open-generic `ResourceOperationHandler<,,,>` and
-`ResourceMethodOperationHandler<,,>` as scoped, calls `services.AddAipExpressions()`, adds the HTTP context
-accessor and Data Protection, and registers the built-in advisor lanes.
+`ResourceMethodOperationHandler<,,>` as scoped, adds the HTTP context accessor and Data Protection,
+registers the built-in advisor lanes, the `IResourceTypeResolver` singleton, and the open-generic
+`PurgeJob<>` together with its `PurgeJobKeyResolver`. Filter languages are opt-in on
+`SchemataResourceBuilder` (`UseAip()`, `UseCel()`, `UseOrdering()`); see [Filtering](filtering.md).
 
 ## Registering a resource
 
@@ -102,7 +104,9 @@ same scan reads `[ResourceMethod]` attributes and stores them in `SchemataResour
 `Use<...>(endpoints, configure)` also accepts an `Action<ResourceAttribute>` so a caller can set
 `Operations`, `Endpoints`, or `Methods` without entity attributes.
 
-`RegisterResource` keys the `ResourceAttribute` on `entity.TypeHandle`, registers per-entity Create/Update
+`RegisterResource` first calls `EnsureAddressablePattern`, which throws `InvalidOperationException` when an
+`ICanonicalName` entity carries no `[CanonicalName]` pattern ending in a placeholder preceded by a collection
+literal. It then keys the `ResourceAttribute` on `entity.TypeHandle`, registers per-entity Create/Update
 idempotency advisors, and — for `ISoftDelete` entities — adds the built-in `undelete`, `expunge`, and `purge`
 methods (each skipped when the `Operations` whitelist excludes it or the entity already declares that verb).
 
@@ -243,7 +247,7 @@ lets the foundation layer run under either transport and stay unit-testable with
 ## Caveats
 
 - All four type parameters must implement `ICanonicalName`. An entity with a different identity scheme needs
-  `Name` and `CanonicalName` properties plus a `[CanonicalName("...")]` pattern.
+  `Name` and `CanonicalName` properties plus an addressable `[CanonicalName("...")]` pattern.
 - `SchemataResourceFeature` is registered through `AddFeature`, which deduplicates by `RuntimeTypeHandle`, so
   calling `UseResource()` twice is safe.
 - Assembly-scan discovery reads `AppDomain.CurrentDomain.GetAssemblies()` during `ConfigureServices`. A type in
