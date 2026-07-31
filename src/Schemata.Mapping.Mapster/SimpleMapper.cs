@@ -33,11 +33,13 @@ public sealed class SimpleMapper : ISimpleMapper
     }
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination) {
-        SimpleMapperHelper.MapMerging(source, destination, (s, d) => _mapper.Map(s, d));
+        SimpleMapperHelper.MapMerging(source, destination,
+                                      (s, d) => SimpleMapperHelper.ReconcileReplacement(_mapper.Map(s, d), d));
     }
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields) {
-        SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
+        SimpleMapperHelper.MapWithMask(source, destination, fields,
+                                       (s, d) => SimpleMapperHelper.ReconcileReplacement(_mapper.Map(s, d), d));
     }
 
     public object? Map(object source, Type sourceType, Type destinationType) {
@@ -55,7 +57,8 @@ public sealed class SimpleMapper : ISimpleMapper
             destination,
             sourceType,
             destinationType,
-            () => _mapper.Map(source, destination, sourceType, destinationType));
+            () => SimpleMapperHelper.ReconcileReplacement(
+                _mapper.Map(source, destination, sourceType, destinationType), destination));
     }
 
     #endregion

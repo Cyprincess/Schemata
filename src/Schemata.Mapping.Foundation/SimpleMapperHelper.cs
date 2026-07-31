@@ -121,6 +121,22 @@ public static class SimpleMapperHelper
         MapMergingCore(source, destination, sourceType, destinationType, mapAction);
     }
 
+    /// <summary>
+    ///     Copies values from a replacement mapping result back to the original map-to-target
+    ///     destination. A no-op when the mapper returns the same reference it was given.
+    /// </summary>
+    /// <param name="mapped">The instance returned by the map-to-target operation.</param>
+    /// <param name="destination">The target instance supplied to the mapper.</param>
+    public static void ReconcileReplacement(object? mapped, object? destination) {
+        if (mapped is null || destination is null || ReferenceEquals(mapped, destination)) {
+            return;
+        }
+
+        foreach (var property in AppDomainTypeCache.GetWritableProperties(destination.GetType())) {
+            property.SetValue(destination, property.GetValue(mapped));
+        }
+    }
+
     private static void MapMergingCore(
         object source,
         object destination,
