@@ -3,6 +3,30 @@
 <Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:System.Linq.AsyncEnumerableExtensions.ToDictionaryAsync``2(System.Collections.Generic.IAsyncEnumerable{``0},System.Func{``0,``1},System.Collections.Generic.IEqualityComparer{``1},System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Schemata.Entity.Repository.dll</Left>
+    <Right>lib/net10.0/Schemata.Entity.Repository.dll</Right>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:System.Linq.AsyncEnumerableExtensions.ToDictionaryAsync``2(System.Collections.Generic.IAsyncEnumerable{``0},System.Func{``0,``1},System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Schemata.Entity.Repository.dll</Left>
+    <Right>lib/net10.0/Schemata.Entity.Repository.dll</Right>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:System.Linq.AsyncEnumerableExtensions.ToDictionaryAsync``3(System.Collections.Generic.IAsyncEnumerable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Collections.Generic.IEqualityComparer{``1},System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Schemata.Entity.Repository.dll</Left>
+    <Right>lib/net10.0/Schemata.Entity.Repository.dll</Right>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:System.Linq.AsyncEnumerableExtensions.ToDictionaryAsync``3(System.Collections.Generic.IAsyncEnumerable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Schemata.Entity.Repository.dll</Left>
+    <Right>lib/net10.0/Schemata.Entity.Repository.dll</Right>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:System.Linq.AsyncEnumerableExtensions.ToListAsync``1(System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.CancellationToken)</Target>
     <Left>lib/net8.0/Schemata.Entity.Repository.dll</Left>
     <Right>lib/net10.0/Schemata.Entity.Repository.dll</Right>
