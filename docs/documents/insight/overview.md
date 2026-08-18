@@ -112,12 +112,12 @@ from the selected entity properties.
 
 ## Security gate
 
-Drivers call `InsightSecurityGate.AuthorizeAsync` after resolving the row type and before opening the
-source. The gate closes `IAccessProvider<rowType, QueryInsightRequest>` and
-`IEntitlementProvider<rowType, QueryInsightRequest>` reflectively:
+Drivers call `InsightSecurityGate.AuthorizeAsync<TEntity>` before opening the source, passing the row
+type they are already generic over. The gate resolves `IAccessProvider<TEntity, QueryInsightRequest>`
+and `IEntitlementProvider<TEntity, QueryInsightRequest>` from the container:
 
 - an access provider can deny the entire source for the request and principal;
-- an entitlement provider can return an `Expression<Func<rowType, bool>>` row predicate;
+- an entitlement provider can return an `Expression<Func<TEntity, bool>>` row predicate;
 - a missing provider leaves that layer ungated.
 
 `RepositoryDriver` applies the entitlement expression before filter pushdown so row security remains in

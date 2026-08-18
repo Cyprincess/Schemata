@@ -1,7 +1,7 @@
 # Flow Scheduling Integration
 
 `Schemata.Flow.Scheduling` bridges intermediate and boundary timer catches to the scheduler. As a
-process transitions, `AdviceTransitionTimer` schedules or cancels a one-shot job for the timer the
+process transitions, `FlowTimerCatchHandler` schedules or cancels a one-shot job for the timer the
 instance is waiting on (or the boundary timers attached to the activity a token sits on). When the
 job fires, `FlowTimerJob` delegates to `FlowRunner.RunEventAsync`, which loads the process, resolves
 the keyed engine, triggers the timer event on the addressed token, persists the snapshot, and
@@ -11,8 +11,8 @@ notifies lifecycle observers.
 
 | Package                        | Key files                                                                                                                                                                                             |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Flow.Scheduling`     | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/AdviceTransitionTimer.cs`, `Internal/FlowTimerJob.cs`, `Internal/TimerDefinitionConverter.cs`, `Extensions/FlowSchedulingBuilderExtensions.cs` |
-| `Schemata.Flow.Skeleton`       | `Observers/IFlowTransitionAdvisor.cs`, `Models/TimerDefinition.cs`                                                                                                                                    |
+| `Schemata.Flow.Scheduling`     | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerCatchHandler.cs`, `Internal/FlowTimerJob.cs`, `Internal/TimerDefinitionConverter.cs`, `Extensions/FlowSchedulingBuilderExtensions.cs` |
+| `Schemata.Flow.Skeleton`       | `Runtime/IFlowCatchHandler.cs`, `Models/TimerDefinition.cs`                                                                                                                                    |
 | `Schemata.Scheduling.Skeleton` | `IScheduler.cs`, `IScheduledJob.cs`, `Entities/SchemataJob.cs`                                                                                                                                        |
 
 ## Activation
@@ -35,22 +35,19 @@ in if missing.
 
 ## What gets registered
 
-`SchemataFlowSchedulingFeature.ConfigureServices` registers the timer advisor and the job:
-
-```csharp
-services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionTimer>());
-services.AddScheduledJob<FlowTimerJob>();
-```
+`SchemataFlowSchedulingFeature.ConfigureServices` adds `FlowTimerCatchHandler` to the
+`IFlowCatchHandler` chain and declares `FlowTimerJob` with the scheduler. Both happen inside the
+feature; an application enables them with `UseScheduling()` and registers nothing itself.
 
 The advisor runs inside the transition pipeline; the job runs from the scheduler activation path.
 
-## AdviceTransitionTimer
+## FlowTimerCatchHandler
 
-`AdviceTransitionTimer` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
-`AdviseAsync` runs inside the transition unit of work, before the commit, and reconciles the
-scheduler against the new waiting state, returning `AdviseResult.Continue`. Only timer-catch
-transitions touch the scheduler;
-other transitions pass through untouched.
+`FlowTimerCatchHandler` is an `IFlowCatchHandler`: it claims the `Timer` catch kind, and its
+`ArmAsync` runs inside the transition unit of work, before the commit, reconciling the scheduler
+against the new waiting state. Only timer-catch transitions touch the scheduler; other transitions
+pass through untouched. A missing `IScheduler` is reported by this handler itself, as
+`FLOW_TIMER_REQUIRES_SCHEDULING`.
 
 ### Timer lifecycle
 
@@ -103,12 +100,14 @@ The instance advances past the timer catch. A `OneTimeSchedule` does not resched
 
 ## Extension points
 
-- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to add timer logic.
+- Implement `IFlowCatchHandler` and register via `TryAddEnumerable` to add timer logic.
+- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to observe or reject a
+  transition without owning a catch kind.
 - Implement `IScheduledJob` to replace `FlowTimerJob`.
 
 ## Caveats
 
-- The advisor runs inside the transition unit of work, but the scheduler write is an external side
+- The handler runs inside the transition unit of work, but the scheduler write is an external side
   effect outside that unit of work. A failed commit rolls back the instance row while the scheduled
   job survives; reconcile by dropping jobs without a matching waiting instance.
 - The job name `flow-{process.CanonicalName}-{elementName}-{token}` is deterministic per waiting

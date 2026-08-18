@@ -3,8 +3,8 @@
 ## What you'll build
 
 A `Course` resource exposed over both HTTP REST and gRPC with separate request, detail, and summary DTOs. You'll
-see how the four type parameters collapse rightward, how `[Resource]` drives discovery, and how `[HttpResource]`
-and `[GrpcResource]` select transports.
+see how the four type parameters collapse rightward, how `[Resource]` lets registration name the entity alone,
+and how `[HttpResource]` and `[GrpcResource]` select transports.
 
 ## Prerequisites
 
@@ -66,7 +66,7 @@ public class CourseSummary : ICanonicalName         // list items
 
 ## Step 2: Attach the resource attribute
 
-`[Resource<...>]` on the entity drives both imperative registration and assembly-scan discovery.
+`[Resource<...>]` on the entity carries the four type roles, so registration can name the entity alone.
 
 ```csharp
 [Resource<Course, CourseRequest, CourseDetail, CourseSummary>]
@@ -177,20 +177,24 @@ schema.UseResource()
 
 **Assertion:** a gRPC client calling `CourseService/GetCourse` with a valid name receives a `CourseDetail`.
 
-## Step 6: Use discovery instead of imperative registration
+## Step 6: Register by entity alone
 
-`SchemataResourceFeature` scans loaded assemblies for `[Resource]`-decorated types during `ConfigureServices`.
-Drop the `.Use<>()` call and ensure the assembly holding `Course` is loaded first:
+`Course` already carries `[Resource<Course, CourseRequest, CourseDetail, CourseSummary>]`, so registration does not
+need to repeat the four type parameters. `AddResource<TEntity>()` reads them off the attribute:
 
 ```csharp
 schema.UseResource()
       .MapHttp()
-      .MapGrpc();
-// Course is discovered from [Resource<...>] + [HttpResource] + [GrpcResource]
+      .MapGrpc()
+      .AddResource<Course>();   // type roles come from [Resource<...>]; transports from [HttpResource]/[GrpcResource]
 ```
 
-**Assertion:** the app starts and `GET /v1/courses` works without an explicit `.Use<Course, ...>()`, provided the
-assembly is referenced and loaded.
+This is the same registration as `.Use<Course, CourseRequest, CourseDetail, CourseSummary>()`, written once. Use
+`Use<...>()` when the entity carries no `[Resource]` attribute, or when you want to name different DTO types than
+the attribute declares.
+
+**Assertion:** `GET /v1/courses` still works after replacing the four-parameter `Use<>()` call with
+`AddResource<Course>()`.
 
 ## Common pitfalls
 
@@ -200,8 +204,9 @@ assembly is referenced and loaded.
   then serves persistence, requests, and responses. Add separate DTOs before exposing the API publicly.
 - **Call `MapHttp()`/`MapGrpc()` before `Use<>()`.** The `Use<>()` overloads tag the resource with the
   transport's endpoint name; calling them on the base `SchemataResourceBuilder` skips that tag.
-- **Discovery reads `AppDomain.CurrentDomain.GetAssemblies()` at `ConfigureServices` time.** A type in an
-  assembly loaded later is not discovered.
+- **Decorating an entity does not register it.** `[Resource<...>]` supplies the type roles; the entity still has to
+  reach `AddResource<T>()` or `Use<...>()`. An entity that never does has no endpoints, and `IResourceTypeResolver`
+  cannot resolve it by name.
 
 ## See also
 

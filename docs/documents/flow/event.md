@@ -1,7 +1,7 @@
 # Flow Event Integration
 
 `Schemata.Flow.Event` bridges BPMN message and signal catches to the event bus. As a process
-transitions, `AdviceTransitionEvent` keeps `IRepository<SchemataEventSubscription>` in sync with
+transitions, `FlowEventCatchHandler` keeps `IRepository<SchemataEventSubscription>` in sync with
 the catches the instance is waiting on. When a matching event reaches the bus, `FlowEventHandler`
 wakes waiting instances through the engine-neutral resource method handlers in
 `Schemata.Flow.Foundation`. The same package also publishes process lifecycle
@@ -11,8 +11,8 @@ notifications through `ProcessEventLifecycleObserver`.
 
 | Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Flow.Event`       | `Features/SchemataFlowEventFeature.cs`, `Events/ProcessStartedEvent.cs`, `Events/ProcessCompletedEvent.cs`, `Events/ProcessFailedEvent.cs`, `Events/TransitionMadeEvent.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
-| `Schemata.Flow.Skeleton`    | `Observers/IFlowTransitionAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Runtime/FlowEventMatcher.cs`, `Runtime/IProcessLifecycleObserver.cs`                                                                                                                                                                                                                                                           |
+| `Schemata.Flow.Event`       | `Features/SchemataFlowEventFeature.cs`, `Events/ProcessStartedEvent.cs`, `Events/ProcessCompletedEvent.cs`, `Events/ProcessFailedEvent.cs`, `Events/TransitionMadeEvent.cs`, `Internal/FlowEventCatchHandler.cs`, `Internal/FlowEventHandler.cs`, `Internal/ProcessEventLifecycleObserver.cs`, `Extensions/FlowEventBuilderExtensions.cs` |
+| `Schemata.Flow.Skeleton`    | `Runtime/IFlowCatchHandler.cs`, `Observers/FlowTransitionContext.cs`, `Runtime/FlowEventMatcher.cs`, `Runtime/IProcessLifecycleObserver.cs`                                                                                                                                                                                                                                                           |
 | `Schemata.Event.Skeleton`   | `Entities/SchemataEventSubscription.cs`, `IEventHandler.cs`, `IEventDispatchContext.cs`                                                                                                                                                                                                                                                                                                                                                |
 | `Schemata.Event.Foundation` | `SchemataEventSubscriptionExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                                               |
 
@@ -40,7 +40,7 @@ consumer transport on the event bus for events to move between publishers and co
 aliases:
 
 ```csharp
-services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionEvent>());
+services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowEventCatchHandler>());
 services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
 services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 
@@ -52,7 +52,7 @@ services.Configure<EventTypeRegistryConfiguration>(options => {
 });
 ```
 
-`AdviceTransitionEvent` reconciles the subscription repository before a transition commits.
+`FlowEventCatchHandler` reconciles the subscription repository before a transition commits.
 `ProcessEventLifecycleObserver` publishes process lifecycle events after persistence; the per-token
 lifecycle observer path and its fork/join/cancel events were removed, so only process-level
 notifications remain. `FlowEventHandler` is
@@ -60,13 +60,13 @@ the generic `IEvent` handler that wakes waiting instances when the bus dispatche
 `FlowEventMatcher` lives in `Schemata.Flow.Skeleton`, so both engines apply the same matching rule to
 boundary events, event-based branches, and intermediate catches.
 
-## AdviceTransitionEvent
+## FlowEventCatchHandler
 
-`AdviceTransitionEvent` is an `IFlowTransitionAdvisor` (`IAdvisor<FlowTransitionContext>`). Its
-`AdviseAsync` runs inside the transition's unit of work, before the process row is persisted, and
-reconciles `IRepository<SchemataEventSubscription>` against the new waiting state. It enlists the
+`FlowEventCatchHandler` is an `IFlowCatchHandler`: it claims the `Message` and `Signal` catch kinds,
+and its `ArmAsync` runs inside the transition's unit of work, before the process row is persisted,
+reconciling `IRepository<SchemataEventSubscription>` against the new waiting state. It enlists the
 subscription repository in `context.UnitOfWork` via `IRepository.Join`, so subscription writes commit
-atomically with the process row and roll back together on any failure. Returns `AdviseResult.Continue`.
+atomically with the process row and roll back together on any failure.
 
 ### Subscription lifecycle
 
@@ -88,7 +88,7 @@ alongside the waiting-element subscriptions.
 
 ### Subscription format
 
-`AdviceTransitionEvent` writes `SchemataEventSubscription` rows through
+`FlowEventCatchHandler` writes `SchemataEventSubscription` rows through
 `IRepository<SchemataEventSubscription>`. Each row carries `SubscriptionId`, `EventType`,
 `CorrelationKey`, `Target`, and `Token`.
 
@@ -145,9 +145,10 @@ The bridge serializes the inbound `IEvent` to JSON (`JsonSerializer.Serialize(@e
 
 Signal throws are de-duplicated by event type within one handler call. If one dispatched event
 matches several signal subscriptions with the same `EventType`, `FlowEventHandler` invokes the
-`ThrowSignalHandler` once for that name; `FlowRunner.ThrowSignalAsync` then iterates every waiting
-process and triggers the matched token(s). Message subscriptions are handled one by one because each
-message subscription targets one process instance.
+`ThrowSignalHandler` once for that name; `FlowRunner.ThrowSignalAsync` then delivers to every waiting
+process that declares the signal, each in its own unit of work, and returns one `SignalDeliveryResult`
+per target. Message subscriptions are handled one by one because each message subscription targets one
+process instance.
 
 ## ProcessEventLifecycleObserver
 
@@ -166,7 +167,9 @@ observer does not roll back a transition that already committed.
 
 ## Extension points
 
-- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to add subscription logic.
+- Implement `IFlowCatchHandler` and register via `TryAddEnumerable` to add subscription logic.
+- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to observe or reject a
+  transition without owning a catch kind.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to publish additional
   process lifecycle notifications after Flow commits.
 

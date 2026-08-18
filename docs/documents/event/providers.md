@@ -10,7 +10,8 @@ reaches handlers.
 | Package                     | Key files                                                                                                                                                                                                                                                                                   |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `SchemataEventSubscriptionExtensions.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`                                                                  |
-| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Internal/CorrelationTracker.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Internal/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs` |
 
 ## In-process provider
 
@@ -58,7 +59,9 @@ resolve matching subscriptions during dispatch.
 
 ## RabbitMQ provider
 
-Bridges the bus to a RabbitMQ broker over a topic exchange. Configured via `RabbitMqEventOptions`.
+Bridges the bus to a RabbitMQ broker over a topic exchange. Topology is configured via
+`RabbitMqEventOptions`; the broker connection itself is configured via `RabbitMqConnectionOptions`
+and owned by `Schemata.Transport.RabbitMq`.
 
 ### Registration
 
@@ -69,34 +72,33 @@ schema.UseEvent()
       .UseConsumer(c => c.UseRabbitMq());
 ```
 
-`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus`,
-`RabbitMqEventOutboxPublisher` as the `IEventOutboxPublisher` singleton, and a `CorrelationTracker`
-singleton. On the consumer it registers `RabbitMqConsumerHost` as a hosted service and a
-`CorrelationTracker` singleton.
+`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus` and
+`RabbitMqEventOutboxPublisher` as the `IEventOutboxPublisher` singleton. On the consumer it registers
+`RabbitMqConsumerHost` as a hosted service. Both call `AddRabbitMqTransport()`, which contributes the
+shared `IRabbitMqConnectionProvider` and `CorrelationTracker` singletons; calling it from both sides
+is idempotent, which is what keeps one connection per process.
 
 ### Connection lifecycle
 
-Neither `RabbitMqEventBus` nor `RabbitMqEventOutboxPublisher` opens the broker connection in its
-constructor. The connection (and, for the bus, the reply channel and consumer) is created lazily on
-first use — `InitializeAsync` on the bus, `ConnectAsync` on the outbox publisher — guarded by a
-`SemaphoreSlim(1, 1)` so concurrent first publishers share one connection attempt. A failed attempt
-rolls the channel and connection back to null so the next publish retries cleanly. A host with an
-unreachable broker starts normally; only the first publish observes the connection failure.
+The broker connection belongs to `IRabbitMqConnectionProvider` in `Schemata.Transport.RabbitMq`, and
+every client in the process shares that one `IConnection`. It is not opened in any constructor: the
+provider connects lazily on the first `GetConnectionAsync` call, guarded by a `SemaphoreSlim(1, 1)`
+so concurrent first callers share one connection attempt. A failed attempt leaves the field null so
+the next call retries cleanly. A host with an unreachable broker starts normally; only the first
+publish or consume observes the failure.
+
+Channels remain per-client and are disposed by their owner: the bus keeps its reply channel, the
+consumer host its consume channel, and the outbox publisher opens a publisher-confirm channel per
+publish. None of them closes the shared connection.
 
 ### RabbitMqEventOptions
 
 ```csharp
 public class RabbitMqEventOptions
 {
-    public string HostName             { get; set; } = "localhost";
-    public int    Port                 { get; set; } = 5672;
-    public string UserName             { get; set; } = "guest";
-    public string Password             { get; set; } = "guest";
-    public string VirtualHost          { get; set; } = "/";
     public string ExchangeName         { get; set; } = "schemata.events";
     public string ExchangeType         { get; set; } = "topic";
     public string QueueName            { get; set; } = "schemata.consumer";
-    public int    ConnectionTimeoutMs  { get; set; } = 30000;
     public int    RequestTimeoutMs     { get; set; } = 30000;
     public ushort PrefetchCount        { get; set; } = 16;
     public string DeadLetterExchange   { get; set; } = "schemata.events.dlx";
@@ -106,6 +108,26 @@ public class RabbitMqEventOptions
 
 Configure via the `UseRabbitMq(o => ...)` delegate, `services.Configure<RabbitMqEventOptions>(...)`,
 or `appsettings.json`.
+
+### RabbitMqConnectionOptions
+
+Declared in `Schemata.Transport.RabbitMq` and shared by every RabbitMQ client in the process.
+
+```csharp
+public class RabbitMqConnectionOptions
+{
+    public string HostName            { get; set; } = "localhost";
+    public int    Port                { get; set; } = 5672;
+    public string UserName            { get; set; } = "guest";
+    public string Password            { get; set; } = "guest";
+    public string VirtualHost         { get; set; } = "/";
+    public int    ConnectionTimeoutMs { get; set; } = 30000;
+}
+```
+
+Configure via the second `UseRabbitMq(null, c => ...)` delegate, a direct
+`services.AddRabbitMqTransport(c => ...)`, `services.Configure<RabbitMqConnectionOptions>(...)`, or
+`appsettings.json`.
 
 ### Routing key
 

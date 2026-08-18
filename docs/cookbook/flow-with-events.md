@@ -3,7 +3,7 @@
 ## What you'll build
 
 A BPMN process that parks at an event-based gateway and resumes when either a message or a signal
-arrives on the event bus. `UseEvent()` on the flow builder wires `AdviceTransitionEvent`, which
+arrives on the event bus. `UseEvent()` on the flow builder wires `FlowEventCatchHandler`, which
 upserts and removes `IRepository<SchemataEventSubscription>` rows as the instance waits and
 advances. Publishing through `IEventBus` lets `FlowEventHandler` correlate the event back to the
 waiting instance.
@@ -101,8 +101,8 @@ The flow-builder `UseEvent()` adds `SchemataFlowEventFeature` (priority `480_300
 on both `SchemataFlowFeature` and `SchemataEventFeature`, so `UseEvent()` composes at any position
 in the builder chain. The bus still needs a producer and a consumer for events to flow.
 
-`SchemataFlowEventFeature.ConfigureServices` registers `AdviceTransitionEvent` as a scoped
-`IFlowTransitionAdvisor` and `FlowEventHandler` as a scoped `IEventHandler<IEvent>`.
+`SchemataFlowEventFeature.ConfigureServices` registers `FlowEventCatchHandler` as a scoped
+`IFlowCatchHandler` and `FlowEventHandler` as a scoped `IEventHandler<IEvent>`.
 
 **Check:** the app starts and `IRepository<SchemataEventSubscription>` resolves from DI.
 
@@ -118,7 +118,7 @@ Content-Type: application/json
 ```
 
 The engine advances through the start event and parks at the event-based gateway.
-`AdviceTransitionEvent` runs inside the transition's unit of work and adds two subscriptions that
+`FlowEventCatchHandler` runs inside the transition's unit of work and adds two subscriptions that
 commit atomically with the transition:
 
 - `flow:{processName}:{payElementId}:{tokenName}` with `CorrelationKey = {processName}` and the
@@ -181,8 +181,10 @@ public async Task<IActionResult> Shutdown(CancellationToken ct) {
 
 For signal subscriptions, `CorrelationKey` is null. `FlowEventHandler` invokes `ThrowSignalHandler`
 once per distinct `EventType`, again forwarding the serialized payload. The handler drives
-`FlowRunner.ThrowSignalAsync`, which enumerates waiting processes whose definition declares the
-named signal and advances each one through `Cancel` to its end.
+`FlowRunner.ThrowSignalAsync`, which snapshots the waiting processes whose definition declares the
+named signal and advances each one through `Cancel` to its end. Every target commits on its own, and
+the call returns a `SignalDeliveryResult` per target — `ThrowSignalHandler` does not surface them, so
+a component that needs to know which targets landed should call the runner directly.
 
 **Check:** every instance parked at the gateway transitions to complete via the `Cancel` path.
 

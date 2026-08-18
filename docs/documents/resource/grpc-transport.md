@@ -119,7 +119,9 @@ the full schema.
 - `ExceptionMappingInterceptor` is required for status mapping; without it every exception surfaces as
   `INTERNAL`.
 - `WithAuthorization(scheme)` applies the authentication scheme to the gRPC endpoints; the authorization decision
-  happens in the advisor pipeline.
+  happens in the advisor pipeline. A resource that sets `ResourceAttribute.AuthenticationScheme` overrides that
+  default, which is how the Flow, Report and Scheduling builders demand their own scheme without changing the
+  global one.
 
 ## See also
 

@@ -16,13 +16,13 @@ validator under the `"statemachine"` key. Every process registered through
 `SchemataFlowStateMachineFeature` carries `[DependsOn<SchemataFlowFeature>]` and runs:
 
 ```csharp
-services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
+services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
 
 services.TryAddEnumerable(
     ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
 ```
 
-The engine key is `SchemataConstants.FlowEngines.StateMachine`, the string `"statemachine"`.
+The engine key is `FlowConstants.Engines.StateMachine`, the string `"statemachine"`.
 `SchemataFlowBuilder.Use<TProcess>()` defaults to this key when none is given.
 
 `SchemataFlowStateMachineFeature` exposes the engine and validator through
@@ -36,7 +36,7 @@ flow.Use<ComplexProcess>(engine: "statemachine");  // explicit, same result
 flow.Use<ComplexProcess>(engine: "my-engine");     // custom keyed engine
 ```
 
-`SchemataConstants.FlowEngines` also defines `Bpmn` (`"bpmn"`), the key under which
+`FlowConstants.Engines` also defines `Bpmn` (`"bpmn"`), the key under which
 `Schemata.Flow.Bpmn.BpmnEngine` registers itself when `UseBpmn()` is on.
 
 ## What the engine does

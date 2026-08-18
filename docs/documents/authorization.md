@@ -165,7 +165,7 @@ ordered chains.
 ## Permissions
 
 A client's capabilities are a list of permission strings on `SchemataApplication.Permissions`,
-prefixed per `SchemataConstants.PermissionPrefixes`:
+prefixed per `AuthorizationConstants.PermissionPrefixes`:
 
 | Prefix | Constant    | Example                                                           |
 | ------ | ----------- | ----------------------------------------------------------------- |
@@ -212,7 +212,8 @@ Token cleanup runs through the Scheduling job model. The core feature registers
 `TokenCleanupJob<TToken>` through `services.AddScheduledJob<TokenCleanupJob<TToken>>()` (transient
 registration plus a known-only job entry) and adds a `JobRegistration` to
 `SchemataSchedulingOptions.Jobs` with a
-`CronSchedule("0 * * * *")` — hourly at minute 0. The job calls
+`CronSchedule("0 * * * *")` — hourly at minute 0. That extension is the registration helper for
+feature authors; application code registers jobs through `WithJob<T>()`. The job calls
 `ITokenManager<TToken>.PruneAsync`. This needs `SchemataSchedulingFeature` and the `TToken`
 repository registered.
 

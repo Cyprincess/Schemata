@@ -5,6 +5,9 @@
 docs/_site/
 docs/api/
 
+# .NET SDK
+.dotnet
+
 # Created by https://www.toptal.com/developers/gitignore/api/csharp,jetbrains+all,visualstudio,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=csharp,jetbrains+all,visualstudio,visualstudiocode
 

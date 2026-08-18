@@ -109,7 +109,7 @@ State transitions are:
 4. It materializes each configured registration that has a schedule as a `SchemataJob` and calls `IScheduler.ScheduleAsync`.
 5. It reloads persisted `SchemataJob` rows with `State == Active` and reschedules them. Persisted rows win when they share a name with a configured registration.
 
-Known-only registrations, created by `WithJob<T>()` or `AddScheduledJob<T>()`, do not create `SchemataJob` rows during startup. They populate the registry so persisted `SchemataJobExecution.JobKey` values can resolve when the dispatcher drains pending rows.
+Known-only registrations, created by `WithJob<T>()` (or by the internal helper a feature uses to do the same), do not create `SchemataJob` rows during startup. They populate the registry so persisted `SchemataJobExecution.JobKey` values can resolve when the dispatcher drains pending rows.
 
 ## Materializing executions
 

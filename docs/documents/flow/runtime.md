@@ -3,7 +3,7 @@
 `ProcessRegistry`, `FlowRunner`, and `ProcessPersistence` bridge Flow engines to the rest of the
 framework. `ProcessRegistry` holds compiled definitions and resolves the engine for each.
 `FlowRunner` loads persisted state, creates a `FlowExecutionContext`, drives the engine, runs the
-advisor pipeline inside the transition unit of work, persists the returned snapshot, and notifies
+catch handlers inside the transition unit of work, persists the returned snapshot, and notifies
 observers. `ProcessPersistence` coordinates process, token, transition, source-binding, and compensation
 repositories under one unit of work.
 
@@ -12,7 +12,7 @@ repositories under one unit of work.
 | Package                    | Key files                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Flow.Foundation` | `FlowRunner.cs`, `IFlowRunner.cs`, `ProcessRegistry.cs`, `ProcessPersistence.cs`, `ProcessLifecycleNotifier.cs`, `FlowHandlerSupport.cs`, `Advisors/AdviceSourceProjection.cs`, `StartProcessOptions.cs`                                                                                                                                                                                                                                                                               |
-| `Schemata.Flow.Skeleton`   | `Runtime/IFlowRuntime.cs`, `Runtime/FlowRuntimeCapabilities.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Runtime/TokenStates.cs`, `Runtime/FlowSourceDescriptor.cs`, `Runtime/ProcessStates.cs`, `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/IFlowSourceAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessSource.cs`, `Entities/SchemataProcessTransition.cs`, `Entities/SchemataProcessCompensation.cs` |
+| `Schemata.Flow.Skeleton`   | `Runtime/IFlowRuntime.cs`, `Runtime/FlowRuntimeCapabilities.cs`, `Runtime/IProcessRegistry.cs`, `Runtime/IProcessLifecycleObserver.cs`, `Runtime/TokenStates.cs`, `Runtime/FlowSourceDescriptor.cs`, `Runtime/ProcessStates.cs`, `Models/FlowSourceProjection.cs`, `Builders/FlowSourceBindingBuilder.cs`, `Runtime/IFlowCatchHandler.cs`, `Observers/IFlowTransitionAdvisor.cs`, `Observers/IFlowSourceAdvisor.cs`, `Observers/FlowTransitionContext.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessSource.cs`, `Entities/SchemataProcessTransition.cs`, `Entities/SchemataProcessCompensation.cs` |
 
 ## ProcessRegistry
 
@@ -133,11 +133,11 @@ ValueTask<ProcessSnapshot> CorrelateAsync(
     SchemataProcess process, string messageName, object? payload,
     string? token, ClaimsPrincipal? principal, CancellationToken ct);
 
-ValueTask ThrowSignalAsync(
+ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
     string signalName, string? payload,
     string? token, ClaimsPrincipal? principal, CancellationToken ct);
 
-ValueTask ThrowSignalAsync(
+ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
     string signalName, object? payload,
     string? token, ClaimsPrincipal? principal, CancellationToken ct);
 
@@ -153,7 +153,7 @@ ValueTask<ProcessSnapshot> CancelTokenAsync(
 | `StartAsync`       | Creates a `SchemataProcess`, optionally binds a source entity via `BindStartSourceAsync`, calls `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
 | `CompleteAsync`    | Loads tokens, calls `engine.AdvanceAsync`, runs advisors, persists, and returns the snapshot.                                                                                           |
 | `CorrelateAsync`   | Resolves the `Message` definition by name, picks the target token (the supplied `token` argument, or `engine.FindTriggerTargetsAsync` when omitted), calls `engine.TriggerAsync` for that token, runs advisors, persists, and returns the snapshot.     |
-| `ThrowSignalAsync` | Lists every persisted process that has a waiting token, matches each against the signal definition, and calls `engine.TriggerAsync` for every accepted target.                          |
+| `ThrowSignalAsync` | Snapshots every persisted process that has a waiting token and declares the signal, then delivers to each in its own scope and unit of work, bounded by `SchemataFlowOptions.SignalBroadcastConcurrency`. Returns one `SignalDeliveryResult` per candidate, ordered by canonical name; a failing target rolls back only itself and the broadcast continues. |
 | `TerminateAsync`   | Marks every live token `Cancelled`, sets the process state to `Terminated`, runs advisors, persists, and notifies observers.                                                            |
 | `CancelTokenAsync` | Cancels one token, sets the process state to `Cancelled` only when every token is terminal, runs advisors, and persists.                                                                |
 
@@ -177,9 +177,11 @@ Every state-changing method follows the same pattern:
    `IFlowSourceAdvisor<TSource>` pipeline for every binding row in that token's scope, then flush
    the entities task code touched through `FlowTaskContext.SourceAsync` / `BindSourceAsync`. The
    projection and write-back semantics are described in the source advisors section below.
-6. For each transition in the snapshot, build a `FlowTransitionContext` and run the
-   `IFlowTransitionAdvisor` pipeline against it. This runs inside the transition unit of work,
-   before the commit: an advisor that throws aborts the transition before anything is persisted.
+6. For each transition in the snapshot, build a `FlowTransitionContext`, run the
+   `IFlowTransitionAdvisor` pipeline against it, then run `IFlowCatchHandler.ArmAsync`. Both run
+   inside the transition unit of work, before the commit: an advisor or handler that throws aborts
+   the transition before anything is persisted. Arming is not conditional on the pipeline result —
+   an advisor that returns `Block` ends the advisor chain only.
 7. Persist the snapshot through `ProcessPersistence.PersistSnapshotAsync`. `PersistSnapshotAsync`
    upserts the process and token rows and appends transition rows; source-binding rows are written
    separately via `BindStartSourceAsync` (start path) and via the source advisor (transition path).
@@ -445,6 +447,39 @@ using Schemata.Flow.Skeleton.Models;
 public interface IFlowTransitionAdvisor : IAdvisor<FlowTransitionContext>
 {
 }
+```
+
+A transition advisor is an `IAdvisor<FlowTransitionContext>`: the pipeline is ordered by
+`IAdvisor.Order` and runs inside the transition unit of work, before the commit. Use it for work that
+observes or rejects a transition — auditing, read-model projection, invariant enforcement.
+
+Rejecting a transition is done by throwing, which aborts before persistence and rolls back everything
+that joined the unit of work; external writes that already completed remain. Returning
+`AdviseResult.Block` or `AdviseResult.Handle` only ends the advisor chain, because the engine has
+already produced the snapshot by the time advisors run. Neither result suppresses catch arming.
+
+The `PreviousWaitingAtName` field is the only source for the pre-transition waiting element, because
+the snapshot already reflects the engine result by the time the advisor runs. `Principal` carries the
+initiating caller and is `null` for timer and event continuations.
+
+## IFlowCatchHandler
+
+```csharp
+using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Entity.Repository;
+using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Observers;
+
+public enum FlowCatchKind { Message, Signal, Timer }
+
+public interface IFlowCatchHandler
+{
+    bool Handles(FlowCatchKind kind);
+
+    ValueTask ArmAsync(FlowTransitionContext context, CancellationToken ct = default);
+}
 
 public class FlowTransitionContext
 {
@@ -457,19 +492,29 @@ public class FlowTransitionContext
 }
 ```
 
-A transition advisor is an `IAdvisor<FlowTransitionContext>`: its `AdviseAsync` returns an
-`AdviseResult`, and it runs inside the transition unit of work, before the commit. The built-in
-advisors provision wake-up infrastructure for the new waiting state and return `AdviseResult.Continue`; a throwing advisor
-aborts the transition so a process never persists into a state whose timer job or event
-subscription was never created. The `PreviousWaitingAtName` field is the only source for the
-pre-transition waiting element, because the snapshot already reflects the engine result by the time
-the advisor runs. `Principal` carries the initiating caller and is `null` for timer and event bridge
-continuations.
+A catch handler owns whatever arrangement outside the engine its kind needs. `ArmAsync` runs for every
+transition inside the transition unit of work, before the commit: it arms the catches the token now
+waits on and releases the ones it just left. A throwing handler aborts the transition, so a process
+never persists into a state whose timer job or event subscription was never created. The
+`PreviousWaitingAtName` field is the only source for the pre-transition waiting element, because the
+snapshot already reflects the engine result by the time the handler runs. `Principal` carries the
+initiating caller and is `null` for timer and event continuations.
 
-`Schemata.Flow.Event` registers `AdviceTransitionEvent` to maintain
+Arming is infrastructure the engine requires, not advice, which is why it is a separate contract from
+`IFlowTransitionAdvisor`: it runs after that pipeline, carries no order, and cannot be short-circuited
+by an advisor. Implement it only to own a catch kind — per-transition work that is not catch delivery
+belongs on `IFlowTransitionAdvisor`, and claiming a kind you do not actually deliver masks it from the
+check below and parks the token forever.
+
+`Handles` answers a second question: before a token may park on a Message, Signal or Timer catch,
+`FlowRunner.EnsureCatchesHaveHandlers` requires some registered handler to claim that kind, otherwise
+the run fails rather than waiting for a delivery that will never come. The diagnostic names the catch
+and its kind — never the package that would supply a handler.
+
+`Schemata.Flow.Event` registers `FlowEventCatchHandler` to maintain
 `IRepository<SchemataEventSubscription>` rows; `Schemata.Flow.Scheduling` registers
-`AdviceTransitionTimer` to schedule and cancel timer jobs. Both register through
-`TryAddEnumerable`, so additional advisors stack alongside. Subscriptions are token-scoped: arming
+`FlowTimerCatchHandler` to schedule and cancel timer jobs. Both register through
+`TryAddEnumerable`, so additional handlers stack alongside. Subscriptions are token-scoped: arming
 walks the full element tree, so nested message catches and boundary events on nested hosts each get a
 row whose `Token` column names the armed token, while signals keep a process-wide row
 (`Token = null`) and broadcast. Correlation therefore routes a bus event to exactly the waiting
@@ -512,8 +557,10 @@ a transition advisor.
 
 ## Extension points
 
-- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to provision infrastructure
-  or veto a transition before it commits.
+- Implement `IFlowTransitionAdvisor` and register via `TryAddEnumerable` to observe or reject a
+  transition before it commits.
+- Implement `IFlowCatchHandler` and register via `TryAddEnumerable` to own the delivery of a catch
+  kind and provision the infrastructure it depends on.
 - Implement `IProcessLifecycleObserver` and register via `TryAddEnumerable` to react after the
   commit.
 - Implement `IFlowSourceAdvisor<TSource>` and register it via `TryAddEnumerable` to project runtime
@@ -532,6 +579,10 @@ before calling in.
   `ProcessDefinition` constructor. Keep those constructors cheap.
 - `ThrowSignalAsync` enumerates persisted instances with `WaitingAtName != null` to find signal
   matches. For large deployments, index `WaitingAtName`.
+- A broadcast has no cross-target atomicity and no built-in retry: each target commits on its own, so
+  a partially delivered broadcast is a normal outcome. Read the returned results and decide there
+  whether to redeliver. On a single-writer store such as SQLite, set `SignalBroadcastConcurrency` to
+  1 — concurrent deliveries would contend for the write lock and surface as `Failed`.
 - Source advisors only run when the source type is resolvable, implements `ICanonicalName`, has an
   `IRepository<TSource>` registration, and has a matching `SchemataProcessSource` binding.
 

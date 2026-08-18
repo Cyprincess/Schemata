@@ -45,7 +45,7 @@ builder.UseSchemata(schema => {
 | `WithJob<T>(DateTime runTime)`             | One-time fire at the UTC `runTime`.                                                                                                  |
 | `AddFeature<T>()`                          | Adds a feature to the Schemata configuration.                                                                                        |
 
-Scheduled overloads register `T` as transient and append a `JobRegistration` with a schedule to `SchemataSchedulingOptions.Jobs`. `WithJob<T>()` and `AddScheduledJob<T>()` append known-only registrations so on-demand executions can resolve their key after a restart.
+Scheduled overloads register `T` as transient and append a `JobRegistration` with a schedule to `SchemataSchedulingOptions.Jobs`. The scheduleless `WithJob<T>()` appends a known-only registration so on-demand executions can resolve their key after a restart.
 
 ## IScheduledJob
 

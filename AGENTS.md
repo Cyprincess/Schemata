@@ -4,12 +4,12 @@
 
 ## OVERVIEW
 
-Modular .NET application framework shipped as 65 NuGet packages (C#, `net8.0;net10.0`, ASP.NET Core). Consumers bootstrap via `WebApplicationBuilder.UseSchemata(...)`; features compose through a three-phase lifecycle (`ConfigureServices` / `ConfigureApplication` / `ConfigureEndpoints` on `ISimpleFeature`). Built with the dotnet Arcade SDK. There is no `Program.cs` in this repo — the entire public API is extension methods living in `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces.
+Modular .NET application framework shipped as 66 NuGet packages (C#, `net8.0;net10.0`, ASP.NET Core). Consumers bootstrap via `WebApplicationBuilder.UseSchemata(...)`; features compose through a three-phase lifecycle (`ConfigureServices` / `ConfigureApplication` / `ConfigureEndpoints` on `ISimpleFeature`). Built with the dotnet Arcade SDK. There is no `Program.cs` in this repo — the entire public API is extension methods living in `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces.
 
 ## STRUCTURE
 
 ```
-src/         65 packages: <Domain>.<Layer> naming (taxonomy below)
+src/         66 packages: <Domain>.<Layer> naming (taxonomy below)
 generators/  2 Roslyn source generators (netstandard2.0): Advice codegen + SKM DSL
 targets/     10 MSBuild meta-packages in 3 dirs (Application/Business/Module × Bare/Persisting/Complex[/Modular])
 tests/       37 xUnit projects (26 *.Tests + 11 *.Integration.Tests); classes named *Should, never *Tests

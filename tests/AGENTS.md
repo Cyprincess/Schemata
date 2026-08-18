@@ -34,6 +34,7 @@ There is **no shared test utility project**. Helpers are duplicated across proje
 
 ## Conventions Worth Knowing
 
+- **A test project that consumes `internal` members must set `<SignAssembly>true</SignAssembly>` itself.** [../Directory.Build.props](../Directory.Build.props#L96-L102) turns signing off for everything under `tests/`, and `src/*` grants friendship with a `Key=` (the assemblies are strong-named), so an unsigned test assembly fails the identity check and the `InternalsVisibleTo` silently does not apply. The compiler does not say so: a missing internal extension method surfaces as `CS1061 … no accessible extension method`. `Schemata.Flow.Tests`, `Schemata.Scheduling.Tests` and `Schemata.Resource.Tests` each carry the override.
 - **EF / LinqToDB integration tests** use `Fixtures/IntegrationFixture.cs` implementing `IAsyncLifetime`. They create/teardown a SQLite or in-memory DB per fixture.
 - **LinqToDB fixtures use a fixture-private `MappingSchema`.** Mutating `MappingSchema.Default` from a fixture races parallel test classes and corrupts linq2db's entity-descriptor caches (symptom: intermittent `no such table`).
 - **`GrpcTestCollection.cs` exists in `Schemata.Resource.Grpc.Integration.Tests` only** — it wraps `WebApplicationFactory` in a shared collection so the server starts once. `Schemata.Insight.Grpc.Integration.Tests` does not use it; it takes `IClassFixture<WebAppFactory>` instead.
@@ -48,6 +49,24 @@ There is **no shared test utility project**. Helpers are duplicated across proje
 - **Do NOT** rename a test class away from the `Should` suffix; tooling and existing patterns rely on it.
 - **Do NOT** introduce a top-level shared `Schemata.Testing` helper project without RFCing — the per-project duplication is intentional.
 - **Do NOT** push `[Trait("Category","Integration")]` onto unit-style projects to opt them into the integration runner; convert the whole project (rename to `*.Integration.Tests`) instead.
+
+## What Does Not Count As A Test
+
+A test must be able to fail for a reason that is Schemata's fault. These verify nothing about this repo and are deleted on sight, not left to inflate the count:
+
+- **Language or runtime behaviour.** If the subject's whole body is a constant — `True<T>() => q => true` — then compiling it and asserting the constant tests the C# compiler. Feeding it three inputs it ignores does not make it a test.
+- **Vendor guarantees.** protobuf-net round-tripping a map, an ORM connecting, `Guid.NewGuid()` being non-empty, AutoMapper/Mapster copying a like-named member. Schemata's semantics layered on top — wire-name rewrites, null-map-to-empty-string, merge and field-mask rules — are ours and belong under test.
+- **The mock.** Configuring a `Mock<T>`, calling it, and asserting the value you just configured, without a production type in between.
+- **Generated members.** Record equality, default `ToString`, generated DTOs and builders. The two `*.Generator.Tests` projects are the exception: there the generated output is the subject.
+- **Property assignment.** Setting a property or passing a constructor argument and asserting it comes back.
+- **Nothing at all.** No `Assert`, no `Verify`, and no exception-based pass/fail criterion. A timeout or an `Assert.Throws`-shaped guard does count as a criterion; a bare log or a print does not.
+
+Two rules follow from cases already settled here, so re-litigating them costs nothing but time:
+
+- **Hand-written doubles are for the positions Moq cannot occupy.** `TestRepository`, `CapturingJob`, `RecordingJob`, `BlockingJob` and friends exist because `AddRepository<TEntity, TImpl>()` and `<TJob>` need a type nameable at compile time, which a Moq proxy is not. Anywhere a dependency is passed as a value, use Moq.
+- **Exemptions are not self-granted.** A comment may state the constraint that forces an unusual shape; it may not declare itself sanctioned or narrate what a previous version did.
+
+Name the behaviour, not the call: `_Works`, `_StillWorks`, `TestCreate` and `ItWorks` say nothing that survives the test failing.
 
 ## Notes
 

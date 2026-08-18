@@ -143,7 +143,7 @@ public sealed class StudentEntitlementProvider
         ClaimsPrincipal?              principal,
         CancellationToken             ct = default)
     {
-        var id = principal?.FindFirstValue(Claims.Subject);
+        var id = principal?.FindFirstValue(IdentityClaims.Subject);
 
         Expression<Func<Student, bool>> filter = string.IsNullOrEmpty(id)
             ? _ => false
@@ -154,7 +154,7 @@ public sealed class StudentEntitlementProvider
 }
 ```
 
-The Identity bridge supplies `Claims.Subject` as the canonical user name (`users/{uid}`), so the
+The Identity bridge supplies `IdentityClaims.Subject` as the canonical user name (`users/{uid}`), so the
 filter compares `Owner` with the same canonical reference used by the ownership advisor.
 
 Populating `Owner` on create is your side of the contract — set it in an add advisor, or wire the

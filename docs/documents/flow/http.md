@@ -12,7 +12,7 @@ controller that lists registered process definitions. `MapHttp()` activates
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Flow.Http`       | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                                                                |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `FlowPayloadHandlers.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -46,7 +46,7 @@ builder.UseSchemata(schema => {
    on the HTTP endpoint.
 
 `FlowResourceRegistration.RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
-`CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
+`CompleteActivityHandler`, `CorrelateMessageHandler`, `ThrowSignalHandler`,
 `TerminateProcessHandler`, and `CancelTokenHandler`. The same Foundation type also holds the typed
 operation and `ResourceMethodAttribute` facts consumed by both transport features, so HTTP and gRPC
 use an identical handler set without a reflection-based `RegisterMethods` path.
@@ -62,8 +62,8 @@ resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
     new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
-    new("correlate", typeof(FlowCorrelateMessageHandler)),
-    new("signal",    typeof(FlowThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("correlate", typeof(CorrelateMessageHandler)),
+    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
@@ -91,8 +91,8 @@ collection; instance-scoped verbs bind to `{name}`:
 | ----------- | -------------------------------------- | ----------------------------- | ----------------------------- |
 | `start`     | `POST ~/v1/processes:start`            | `FlowStartProcessHandler`     | `FlowRunner.StartAsync`       |
 | `complete`  | `POST ~/v1/processes/{name}:complete`  | `CompleteActivityHandler`     | `FlowRunner.CompleteAsync`    |
-| `correlate` | `POST ~/v1/processes/{name}:correlate` | `FlowCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
-| `signal`    | `POST ~/v1/processes:signal`           | `FlowThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
+| `correlate` | `POST ~/v1/processes/{name}:correlate` | `CorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
+| `signal`    | `POST ~/v1/processes:signal`           | `ThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
 | `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
 Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`. Its

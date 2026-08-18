@@ -11,7 +11,7 @@ service that lists registered process definitions. `MapGrpc()` activates `Schema
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Flow.Grpc`       | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                               |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `FlowPayloadHandlers.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -45,7 +45,7 @@ gRPC stack, the exception-mapping interceptor, server reflection, and the shared
 `ConfigureEndpoints` maps the definitions service via `endpoints.MapGrpcService<ProcessDefinitionService>()`.
 
 `FlowResourceRegistration.RegisterHandlers` registers `FlowSourceLoader`, `FlowStartProcessHandler`,
-`CompleteActivityHandler`, `FlowCorrelateMessageHandler`, `FlowThrowSignalHandler`,
+`CompleteActivityHandler`, `CorrelateMessageHandler`, `ThrowSignalHandler`,
 `TerminateProcessHandler`, and `CancelTokenHandler`. The same Foundation type also holds the typed
 operation and `ResourceMethodAttribute` facts consumed by both transport features, so gRPC and HTTP
 use an identical handler set without a reflection-based `RegisterMethods` path.
@@ -61,8 +61,8 @@ resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
     new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
-    new("correlate", typeof(FlowCorrelateMessageHandler)),
-    new("signal",    typeof(FlowThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("correlate", typeof(CorrelateMessageHandler)),
+    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
@@ -112,8 +112,8 @@ HTTP URI; it does not require a singular noun:
 | ----------- | ----------------------------- | ----------------------------- |
 | `start`     | `FlowStartProcessHandler`     | `FlowRunner.StartAsync`       |
 | `complete`  | `CompleteActivityHandler`     | `FlowRunner.CompleteAsync`    |
-| `correlate` | `FlowCorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
-| `signal`    | `FlowThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
+| `correlate` | `CorrelateMessageHandler` | `FlowRunner.CorrelateAsync`   |
+| `signal`    | `ThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
 | `terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
 `start` and `signal` are collection-scoped on `ProcessService`; `complete`, `correlate`, and

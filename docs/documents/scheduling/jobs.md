@@ -44,7 +44,11 @@ schema.UseScheduling()
       .WithJob<ReportJob>("0 8 * * *");  // daily at 08:00 UTC
 ```
 
-Register an on-demand job without a schedule through `WithJob<T>()` or `AddScheduledJob<T>()`. That records the type in `SchemataSchedulingOptions.Jobs` so the registry can resolve executions after a restart without arming a timer at startup.
+Register an on-demand job without a schedule through `WithJob<T>()`. That records the type in `SchemataSchedulingOptions.Jobs` so the registry can resolve executions after a restart without arming a timer at startup.
+
+### Internal registration helper
+
+`AddScheduledJob<T>()` on `IServiceCollection` makes the same known-only registration and exists for **feature authors**: it lets a package register a job while depending on `Schemata.Scheduling.Skeleton` alone, instead of pulling in `Schemata.Scheduling.Foundation`. Application code registers jobs through `WithJob<T>()`.
 
 ## JobContext
 

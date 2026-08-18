@@ -5,7 +5,7 @@
 `SchemataProcessToken.WaitingAtName`, and holds no state of its own. Every call takes the current
 `SchemataProcess` plus token rows and returns a `ProcessSnapshot`.
 `SchemataFlowStateMachineFeature` registers it as the keyed singleton under
-`SchemataConstants.FlowEngines.StateMachine`.
+`FlowConstants.Engines.StateMachine`.
 
 ## Where the code lives
 
@@ -79,7 +79,7 @@ public interface IFlowRuntime
 }
 ```
 
-`StateMachineEngine.EngineName` returns `SchemataConstants.FlowEngines.StateMachine` (`"statemachine"`).
+`StateMachineEngine.EngineName` returns `FlowConstants.Engines.StateMachine` (`"statemachine"`).
 
 Engines never load or persist state. Each method receives the current process row plus the live
 token set and returns a `ProcessSnapshot` that the runtime persists under its own unit of work.

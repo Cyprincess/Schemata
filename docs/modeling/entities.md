@@ -3,6 +3,10 @@
 The generator emits each entity as a `public record` with one init-set auto-property per field.
 Trait interfaces from `Use` declarations and the base list appear in the record's base list.
 
+The generator emits no resource registration. To expose a generated entity as an AIP resource, register it
+explicitly with `AddResource<TEntity>()` (or `Use<TEntity, TRequest, TDetail, TSummary>()`) on the resource
+builder — see [Documents: Resource Overview](../documents/resource/overview.md).
+
 ## Syntax
 
 ```text

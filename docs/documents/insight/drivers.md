@@ -177,7 +177,7 @@ field aliases, computed fields, and nested descriptors.
 
 ## Source-level security
 
-`RepositoryDriver` calls `InsightSecurityGate.AuthorizeAsync(typeof(TEntity), request, principal, …)`
+`RepositoryDriver` calls `InsightSecurityGate.AuthorizeAsync<TEntity>(request, principal, …)`
 before the repository query runs. The gate resolves Security providers for the entity type and
 `QueryInsightRequest`:
 

@@ -386,7 +386,7 @@ using Schemata.Abstractions;
 public sealed class ProcessConfiguration
 {
     public string  Name           { get; set; } = null!;
-    public string  Engine         { get; set; } = SchemataConstants.FlowEngines.StateMachine;
+    public string  Engine         { get; set; } = FlowConstants.Engines.StateMachine;
     public Type?   DefinitionType { get; set; }
     public string? Language       { get; set; }
 }

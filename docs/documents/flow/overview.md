@@ -12,12 +12,12 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 
 | Package                      | Key files                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Schemata.Flow.Skeleton`     | `Models/` (AST: `ProcessDefinition.cs`, elements, requests), `Builders/` (DSL: `ProcessBuilder.cs`, `ActivityBehavior.cs`), `Runtime/` (`IFlowRuntime.cs`, contexts, registration), `Observers/` (`IFlowTransitionAdvisor.cs`, `IFlowSourceAdvisor.cs`), `Entities/` (process, token, source, transition rows)                 |
+| `Schemata.Flow.Skeleton`     | `Models/` (AST: `ProcessDefinition.cs`, elements, requests), `Builders/` (DSL: `ProcessBuilder.cs`, `ActivityBehavior.cs`), `Runtime/` (`IFlowRuntime.cs`, `IFlowCatchHandler.cs`, contexts, registration), `Observers/` (`IFlowTransitionAdvisor.cs`, `IFlowSourceAdvisor.cs`), `Entities/` (process, token, source, transition rows)                 |
 | `Schemata.Flow.Foundation`   | `Features/SchemataFlowFeature.cs`, `Builders/SchemataFlowBuilder.cs`, `Extensions/FlowBuilderExtensions.cs`, `IFlowRunner.cs`, `FlowRunner.cs`, `StartProcessOptions.cs`, `ProcessRegistry.cs`, `ProcessPersistence.cs`, `ProcessLifecycleNotifier.cs`, `Advisors/AdviceSourceProjection.cs` |
 | `Schemata.Flow.StateMachine` | `StateMachineEngine.cs`, `StateMachineFlowEngineValidator.cs`, `StateMachineValidator.cs`, `Features/SchemataFlowStateMachineFeature.cs`, `Extensions/FlowStateMachineBuilderExtensions.cs`                                                                                                                                    |
 | `Schemata.Flow.Bpmn`         | `BpmnEngine.cs`, `BpmnValidator.cs`, `BpmnFlowEngineValidator.cs`, `Features/SchemataFlowBpmnFeature.cs`, `Extensions/FlowBpmnBuilderExtensions.cs`, `Runtime/`                                                                                                                                                                |
-| `Schemata.Flow.Event`        | `Features/SchemataFlowEventFeature.cs`, `Internal/AdviceTransitionEvent.cs`, `Internal/FlowEventHandler.cs`                                                                                                                                                                                                                    |
-| `Schemata.Flow.Scheduling`   | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/AdviceTransitionTimer.cs`, `Internal/FlowTimerJob.cs`                                                                                                                                                                                                                   |
+| `Schemata.Flow.Event`        | `Features/SchemataFlowEventFeature.cs`, `Internal/FlowEventCatchHandler.cs`, `Internal/FlowEventHandler.cs`                                                                                                                                                                                                                    |
+| `Schemata.Flow.Scheduling`   | `Features/SchemataFlowSchedulingFeature.cs`, `Internal/FlowTimerCatchHandler.cs`, `Internal/FlowTimerJob.cs`                                                                                                                                                                                                                   |
 | `Schemata.Flow.Http`         | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`                                                                                                                                                                                                                                           |
 | `Schemata.Flow.Grpc`         | `Features/SchemataFlowGrpcFeature.cs`, `Services/ProcessDefinitionService.cs`                                                                                                                                                                                                                                                  |
 
@@ -36,7 +36,7 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 
 `Schemata.Flow.StateMachine` ships in its own package and is activated by `UseStateMachine()`.
 The feature depends on `SchemataFlowFeature` and registers `StateMachineEngine` as a keyed
-singleton `IFlowRuntime` under `SchemataConstants.FlowEngines.StateMachine` (the string
+singleton `IFlowRuntime` under `FlowConstants.Engines.StateMachine` (the string
 `"statemachine"`), plus `StateMachineFlowEngineValidator` as an enumerable
 `IFlowEngineValidator`. `Schemata.Flow.Bpmn` is a separate opt-in package activated by
 `UseBpmn()` and selected with `flow.Use<TProcess>(engine: "bpmn")`; see [BPMN Engine](bpmn-engine.md)
@@ -112,11 +112,12 @@ ProcessDefinition (C# class, DSL in constructor)
     | held by      IProcessRegistry (ProcessRegistry, singleton)
     v
 IFlowRunner / FlowRunner (scoped)
-    |  resolves the keyed engine, runs advisor pipeline, persists, dispatches observers
+    |  resolves the keyed engine, arms catch handlers, persists, dispatches observers
     v
 IFlowRuntime (StateMachineEngine, keyed singleton) -- computes the next ProcessSnapshot
     |
-    | in unit of work: IFlowTransitionAdvisor pipeline (provisions timers / subscriptions)
+    | in unit of work: IFlowTransitionAdvisor (observes / rejects the transition)
+    | in unit of work: IFlowCatchHandler.ArmAsync (provisions timers / subscriptions)
     | commit:      ProcessPersistence.PersistSnapshotAsync (single unit of work)
     | post-commit: IProcessLifecycleObserver
     v
@@ -129,7 +130,7 @@ persisted process row + token rows + transition row + source-binding rows
   type maps that correlate message and signal payloads to CLR types. Validation runs once, at
   registration.
 - **`IFlowRunner`** is the public surface for callers. `FlowRunner` loads instances, invokes the
-  engine, runs the transition advisor pipeline before the commit, persists the process,
+  engine, arms the catch handlers before the commit, persists the process,
   token, transition, and source rows in one unit of work, then notifies lifecycle observers.
   Handlers exposed by `SchemataFlowFeature` cover the full operation set: `StartAsync`,
   `CompleteAsync`, `CorrelateAsync`, `ThrowSignalAsync`, `TerminateAsync`, `CancelTokenAsync`.
@@ -141,16 +142,21 @@ persisted process row + token rows + transition row + source-binding rows
 - **`IProcessLifecycleObserver`** reacts to runtime events after persistence:
   `OnStartedAsync` / `OnTransitionedAsync` / `OnTerminatedAsync` / `OnFailedAsync`. It is the only
   lifecycle observer interface; the per-token observer path (fork / join / cancel) was removed, so
-  per-token reactions belong in a transition advisor.
+  per-token reactions belong in a catch handler.
 
 ## Extension points
 
 - **Custom engine** — Implement `IFlowRuntime`, register it as a keyed singleton under your
   engine name, and pass that name to `flow.Use<TProcess>(engine: "...")`.
 - **Transition advisors** — Implement `IFlowTransitionAdvisor` (an `IAdvisor<FlowTransitionContext>`)
-  and register via `TryAddEnumerable`. They run inside the transition unit of work, before the
-  commit, and provision the infrastructure a new waiting state depends on; a thrown advisor aborts
-  the transition.
+  and register via `TryAddEnumerable` to observe or reject a transition. The pipeline is ordered by
+  `IAdvisor.Order` and runs inside the transition unit of work, before the commit; rejecting means
+  throwing, since `Block` and `Handle` only end the chain.
+- **Catch handlers** — Implement `IFlowCatchHandler` and register via `TryAddEnumerable`. `Handles`
+  declares which catch kinds the handler delivers; `ArmAsync` runs inside the transition unit of work,
+  before the commit, and provisions the infrastructure a new waiting state depends on. A throwing
+  handler aborts the transition. Arming is required infrastructure, so it runs after the advisor
+  pipeline and no advisor can suppress it.
 - **Source-bound advisors** — Implement `IFlowSourceAdvisor<TSource>` (an
   `IAdvisor<FlowTransitionContext, TSource>`) for advisors that read the entity bound to the
   current process or token. The default `AdviceSourceProjection<TSource>` projects the token's

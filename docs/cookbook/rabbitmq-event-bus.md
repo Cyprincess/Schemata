@@ -50,9 +50,10 @@ builder.UseSchemata(schema => {
           .RegisterEvent<PriceQuery>("orders/price-query")
           .RegisterEvent<PriceResult>("orders/price-result")
           .UseProducer(p => p.UseRabbitMq(o => {
-              o.HostName           = "localhost";
               o.ExchangeName       = "schemata.events";
               o.DeadLetterExchange = "schemata.events.dlx";
+          }, c => {
+              c.HostName = "localhost";
           }))
           .UseConsumer(c => c.UseRabbitMq())
           .UseHandler<OrderPlaced, OrderPlacedHandler>()
@@ -64,9 +65,11 @@ builder.UseSchemata(schema => {
 pair needs all three types registered: the request, the response, and any broadcast event the
 consumer receives.
 
-`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus`,
-`RabbitMqEventOutboxPublisher` as the outbox publisher, and a `CorrelationTracker`. On the consumer it
-registers `RabbitMqConsumerHost` as a hosted service.
+`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus` and
+`RabbitMqEventOutboxPublisher` as the outbox publisher. On the consumer it registers
+`RabbitMqConsumerHost` as a hosted service. Both sides also call `AddRabbitMqTransport()`, which
+contributes the shared broker connection and the `CorrelationTracker` — the first delegate configures
+topology (`RabbitMqEventOptions`), the second the connection (`RabbitMqConnectionOptions`).
 
 **Assertion:** `dotnet run` starts without throwing on `IEventTypeRegistry.RequireName`.
 

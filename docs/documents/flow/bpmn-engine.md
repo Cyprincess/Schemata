@@ -19,7 +19,7 @@ Add a direct package reference to `Schemata.Flow.Bpmn`, then call `UseBpmn()` on
 `SchemataFlowBuilder` returned by `UseFlow()`. The extension is defined in
 `src/Schemata.Flow.Bpmn/Extensions/FlowBpmnBuilderExtensions.cs`; it adds
 `SchemataFlowBpmnFeature`, which depends on `SchemataFlowFeature` and registers the BPMN runtime and
-validator under `SchemataConstants.FlowEngines.Bpmn`.
+validator under `FlowConstants.Engines.Bpmn`.
 
 ```text
 schema.UseFlow()
@@ -62,8 +62,8 @@ current executable subset. `Subset` means the element class is supported with ex
 | Boundary event, non-interrupting                                       | Event         | Full          | `NonInterruptingBoundaryHandler` spawns a sibling token and leaves the host live.                                                                                |
 | Error boundary event                                                   | Event         | Full          | `FireBoundaryAsync` plus `EscalationBoundaryHandler.TryFireErrorBoundaryAsync`.                                                                                  |
 | Escalation boundary event                                              | Event         | Full          | `BoundaryCatch` defaults `Interrupting = false` for `EscalationDefinition`; `EscalationBoundaryHandler` bubbles throws through scope boundaries.                 |
-| Timer boundary event                                                   | Event         | Full          | Engine routes the token; `AdviceTransitionTimer` provisions the scheduler wake-up.                                                                               |
-| Message boundary event                                                 | Event         | Full          | Engine routes the token; `AdviceTransitionEvent` provisions the subscription.                                                                                    |
+| Timer boundary event                                                   | Event         | Full          | Engine routes the token; `FlowTimerCatchHandler` provisions the scheduler wake-up.                                                                               |
+| Message boundary event                                                 | Event         | Full          | Engine routes the token; `FlowEventCatchHandler` provisions the subscription.                                                                                    |
 | Signal boundary event                                                  | Event         | Full          | Same routing as message; `FlowEventHandler` dispatches matching signals.                                                                                         |
 | Conditional boundary event                                             | Event         | Full          | Boundary matching uses `FlowEventMatcher.Matches`.                                                                                                                |
 | Compensation boundary event                                            | Event         | Full          | `RegisterCompensationBoundaries` records handlers through `CompensationBoundaryHandler.RegisterAll`.                                                             |
@@ -194,7 +194,7 @@ compensation throw after a host restart still resolves its handlers.
 
 ## Extension points
 
-- `IFlowRuntime` is keyed by `SchemataConstants.FlowEngines.Bpmn` (`"bpmn"`), so multiple engines can
+- `IFlowRuntime` is keyed by `FlowConstants.Engines.Bpmn` (`"bpmn"`), so multiple engines can
   coexist in one host.
 - `IFlowEngineValidator` lets the BPMN package validate structure during process registration.
 - `IConditionExpression` supplies asynchronous guards for exclusive and inclusive gateway branches.
@@ -209,12 +209,12 @@ The concrete contracts live in `src/Schemata.Flow.Skeleton/Runtime/`. The
 ## Bridges
 
 `Schemata.Flow.Event` provisions message and signal wake-up infrastructure. Its
-`AdviceTransitionEvent` runs before a Flow transition commits and keeps event subscriptions aligned
+`FlowEventCatchHandler` runs before a Flow transition commits and keeps event subscriptions aligned
 with the new waiting state; `FlowEventHandler` later calls into `FlowRunner` (via
 `CorrelateMessageHandler` and `ThrowSignalHandler`) when a matching event is dispatched. See
 [Flow Event Integration](event.md).
 
-`Schemata.Flow.Scheduling` provisions timer wake-ups. Its `AdviceTransitionTimer` schedules or
+`Schemata.Flow.Scheduling` provisions timer wake-ups. Its `FlowTimerCatchHandler` schedules or
 cancels one-shot timer jobs for timer catches; the timer job invokes `FlowRunner.CompleteAsync` (or
 the matching handler in the resource bridge) when the timer fires. See
 [Flow Scheduling Integration](scheduling.md).

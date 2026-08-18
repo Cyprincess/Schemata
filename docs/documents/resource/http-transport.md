@@ -129,7 +129,9 @@ skips synthesizing the generated one.
 
 - The HTTP transport is unary. For streaming, use gRPC.
 - `WithAuthorization(scheme)` adds an always-pass `AuthorizeFilter` so the authentication middleware runs for the
-  scheme; the actual authorization decision happens in the advisor pipeline.
+  scheme; the actual authorization decision happens in the advisor pipeline. A resource that sets
+  `ResourceAttribute.AuthenticationScheme` overrides that default, which is how the Flow, Report and Scheduling
+  builders demand their own scheme without changing the global one.
 
 ## See also
 

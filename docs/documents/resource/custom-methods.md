@@ -42,8 +42,8 @@ public sealed class RunJobHandler : IResourceMethodHandler<Job, RunJobRequest, R
 ```
 
 `ResourceMethodAttribute(verb, handler, scope = Instance)` stores the verb (lowerCamelCase), the handler type, and
-the scope, plus an optional `Method` (`ResourceHttpMethod`). `SchemataResourceFeature` discovers it during
-assembly scanning, registers it in `SchemataResourceOptions.Methods` keyed by entity `RuntimeTypeHandle`,
+the scope, plus an optional `Method` (`ResourceHttpMethod`). The attribute is read when the entity is registered,
+which records it in `IResourceRegistry` against the entity type,
 registers the handler in DI, and reads the `TRequest`/`TResponse` types from the handler's
 `IResourceMethodHandler<TEntity, TRequest, TResponse>` interface.
 

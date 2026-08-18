@@ -1,6 +1,6 @@
 # src — Runtime Packages
 
-65 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
+66 packages organised by **`Schemata.{Domain}.{Role}`**. All target `net8.0;net10.0`, ship `.nupkg` + `.snupkg`, and embed XML doc comments.
 
 ## Suffix Vocabulary
 
@@ -21,7 +21,7 @@
 | `Owner` | per-entity ownership advisor for the repository pipeline |
 | `Bpmn` | full BPMN 2.0.2 alternate engine for the Flow AST |
 | `Aip` / `Cel` / `Order` | expression-language implementations behind `Expressions.Skeleton` |
-| `Transport` (as domain) | shared HTTP / gRPC plumbing; no Skeleton, pulled in by every other domain's `.Http` / `.Grpc` |
+| `Transport` (as domain) | shared HTTP / gRPC / RabbitMQ plumbing; no Skeleton, pulled in by every other domain's `.Http` / `.Grpc` / `.RabbitMq` |
 | `Modular` (bare) | module discovery and loading on top of `Core` |
 
 ## Domain Map
@@ -56,6 +56,7 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 ### Event (in-process + RabbitMQ bus)
 
 - `Skeleton` ← `Foundation` ← `RabbitMq`
+- `RabbitMq` also pulls `Transport.RabbitMq` for the shared broker connection and the correlation tracker; it holds no `ConnectionFactory` of its own
 
 ### Expressions (parsers + planners)
 
@@ -116,13 +117,61 @@ Skeleton/Foundation arrows are intra-domain; siblings without arrows do not depe
 
 - `Skeleton` (depends on `Entity.Repository`) ← `Foundation`
 
-### Transport (shared HTTP / gRPC plumbing)
+### Transport (shared HTTP / gRPC / RabbitMQ plumbing)
 
 - `Transport.Http`, `Transport.Grpc` — no skeleton; both stand alone and are pulled in by the corresponding `*.Http` / `*.Grpc` packages in other domains.
+- `Transport.RabbitMq` — owns the one `IConnection` every RabbitMQ client in the process shares, plus `RabbitMqConnectionOptions` and `CorrelationTracker`. Entry point is `AddRabbitMqTransport()`; it references no Schemata package at all, carries no feature and takes no priority band.
 
 ### Validation (FluentValidation integration)
 
 - `Validation.Skeleton` ← `Validation.FluentValidation`
+
+## Application Assembly Rules (F1–F10)
+
+Every service registration, middleware install and endpoint mapping reaches the host through a feature. These ten rules govern that path.
+
+- **F1 — a feature is the only assembly channel.** `SchemataStartup` is the one `IStartupFilter`; do not add another, and do not build an equivalent path outside the feature pipeline.
+- **F2 — no feature, no priority.** The `Priority` / `Order` bands exist to sequence features. A package that carries no feature takes no band.
+- **F3 — placement decides whether a component goes through a feature.** Answer one design question: is this component meant to be usable with no Schemata lifecycle at all? *Standalone-usable* components deliberately do not reference `Schemata.Core` and expose an `IServiceCollection` entry point. *Ecosystem* components depend on feature ordering, `DependsOn` and `SchemataOptions`, and must assemble through a feature. Which one a package is, is a ruling — see below — never inferred from its current dependency graph.
+- **F4 — what standalone-usable promises.** No reference to `Schemata.Core`; the public entry point is an `IServiceCollection` extension; **no dependency on any ecosystem component**. The third is the one that breaks: depend on a Foundation that carries a feature and the component can no longer run without Schemata, so it is an ecosystem component and needs a feature.
+- **F5 — a feature declares, an extension method implements.** Lifecycle methods answer *when* (`Priority`), *after what* (`DependsOn`) and *exactly once*; the capability lives in a public `IServiceCollection` / `IApplicationBuilder` / `IEndpointRouteBuilder` extension that can be called and tested without a feature. An environment guard followed by builder calls is still a declaration; loops, LINQ pipelines, runtime reflection and private helpers on the feature class are not.
+- **F6 — `.Skeleton` holds contracts, not DI wiring.** Exemptions are ruled, never claimed; see below.
+- **F7 — parts are transparent to each other; probing is banned.** No checking whether a service is registered, no reading options to discover an optional package, no flag field standing for "X is installed". Optional dependencies have exactly two legal forms: resolve at runtime (`GetService` / `GetServices` — absent means not enabled), or declare a hard prerequisite with `DependsOn`. The capability interface belongs to the **consumer's** own Skeleton or Foundation, never to the bridge package; name it for the role it plays — handler / observer / advisor — never `Bridge`.
+- **F8 — a root contract is decided by consumption breadth, not by its name.** Measure how many domains actually consume it before moving it. Multi-domain contracts stay in `Schemata.Abstractions`; single-domain contracts belong to that domain's Skeleton.
+- **F9 — bridges buy optionality, not "cross-package".** A `Schemata.A.B` bridge exists so that A still works without it. A mandatory dependency between Foundations does not get a bridge; it gets a direct reference **plus** the matching `[DependsOn<TFeature>]`. The architectural assertion is therefore "a direct Foundation-to-Foundation reference must carry its `DependsOn` declaration", which is stricter than banning the reference.
+- **F10 — an optional backend provider gets no feature of its own.** A package that swaps the implementation of a contract the domain already declared adds no lifecycle work, so it needs no feature and no band. It registers through the domain's builder or an `IServiceCollection` extension, where staged registration lands before the feature runs and wins under `TryAdd` without `Replace` and without probing. The moment it needs lifecycle work or a `DependsOn`, it stopped being a replacement and becomes an ecosystem component under F3.
+
+### Ruled exemptions
+
+Exemptions are decided by the repository owner. Code does not grant itself one, and a comment or doc line asserting its own exemption is not a ruling.
+
+#### F6 — `.Skeleton` packages that do register services
+
+These three are the complete set; every other `.Skeleton` package declares no `IServiceCollection` extension.
+
+| Package | Surface | Why it is allowed |
+|---|---|---|
+| `Schemata.Scheduling.Skeleton` | `AddScheduledJob<T>()` | Registers a contract the **consumer** implements, so a consumer depends on the Skeleton alone instead of dragging in `Scheduling.Foundation`. Body uses only `Configure` + `TryAddTransient`. |
+| `Schemata.Security.Skeleton` | `AddAccessProvider<T, TRequest, TProvider>()`, `AddEntitlementProvider(Type)`, `AddPermissionResolver<TResolver>()`, `AddPermissionMatcher<TMatcher>()` | Same shape. Body uses only `TryAddScoped`. |
+| `Schemata.Mapping.Skeleton` | `Map<TSource, TDestination>()` | Same shape. Body uses only `Configure`. |
+
+The common ground: each one registers an implementation the consumer wrote, using order-independent primitives only. None touches the pipeline, sets a flag, or creates a second activation path.
+
+`Schemata.Identity.Skeleton` is **not** an F6 case — it declares no `IServiceCollection` extension at all. Its documented deviation is that it ships concrete stores and a manager, which is a different question and is not settled here.
+
+#### F3 — packages ruled standalone-usable
+
+| Package(s) | Why |
+|---|---|
+| `Schemata.Caching.Distributed`, `Schemata.Caching.Redis` | Reference `Caching.Skeleton` only — pure contracts. |
+| `Schemata.Expressions.Aip`, `.Cel`, `.Order` | Reference `Common` and `Expressions.Skeleton` only; `Common` is a base component and the Skeleton is pure contracts. |
+| `Schemata.Validation.FluentValidation` | References `Abstractions`, `Advice`, `Validation.Skeleton`; no ecosystem dependency, and `AddValidator<>()` uses order-independent primitives only. |
+| `Schemata.Entity.Cache`, `.Owner`, `.EntityFrameworkCore`, `.LinqToDB` | Follow `Entity.Repository`'s standing position; each was checked to hold F4's three promises. |
+| `Schemata.Transport.RabbitMq` | References no Schemata package at all — only `RabbitMQ.Client` plus the Microsoft DI and Options abstractions. Its entry point is the `AddRabbitMqTransport()` `IServiceCollection` extension. |
+
+`Schemata.Mapping.AutoMapper` and `.Mapster` are **ecosystem** components and already compliant: `UseAutoMapper()` / `UseMapster()` register through `SchemataMappingFeature<T>`, which lives in `Mapping.Foundation` so both adapters share it.
+
+`Schemata.Event.RabbitMq` is an **ecosystem** component holding a ruled exemption from carrying its own feature: it is an optional backend for `Event.Foundation` that registers one consumer and one producer, and a dedicated feature plus priority band would not pay for itself. It reaches the container through the staged registration on `EventProducerBuilder` / `EventConsumerBuilder`, which lands before the feature and so wins over the in-process default.
 
 ## Conventions
 

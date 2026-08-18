@@ -25,7 +25,7 @@ public interface IFlowEngineValidator
 
 `ProcessRegistry.RegisterAsync` calls `Validate` on every registered `IFlowEngineValidator` whose
 `EngineName` matches the configuration's engine. `StateMachineFlowEngineValidator.EngineName`
-returns `SchemataConstants.FlowEngines.StateMachine` (the string `"statemachine"`), and its
+returns `FlowConstants.Engines.StateMachine` (the string `"statemachine"`), and its
 `Validate` delegates to the static `StateMachineValidator.Validate(definition)`.
 
 ## Validation rules

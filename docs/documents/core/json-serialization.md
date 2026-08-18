@@ -11,7 +11,7 @@ the MVC `JsonOptions` — so every endpoint serializes the same way.
 | ------------------------- | -------------------------------------------------------------------------- |
 | `Schemata.Core`           | `Features/SchemataJsonSerializerFeature.cs`                                |
 | `Schemata.Core`           | `Json/JsonStringNumberConverter.cs`, `Json/PolymorphicTypeResolver.cs`     |
-| `Schemata.Abstractions`   | `Json/PolymorphicAttribute.cs`, `SchemataConstants.cs` (`Parameters.Type`) |
+| `Schemata.Abstractions`   | `Json/PolymorphicAttribute.cs`                                             |
 | `Schemata.Transport.Http` | `SchemataJsonTraits.cs`, `Features/SchemataTransportHttpFeature.cs`        |
 
 Two layers configure JSON. `SchemataJsonSerializerFeature` (`Schemata.Core`, Priority 240M)
@@ -82,7 +82,7 @@ derived types:
 
 | Option                                 | Value                                              |
 | -------------------------------------- | -------------------------------------------------- |
-| `TypeDiscriminatorPropertyName`        | `"@type"` (`SchemataConstants.Parameters.Type`)    |
+| `TypeDiscriminatorPropertyName`        | `"@type"`                                          |
 | `IgnoreUnrecognizedTypeDiscriminators` | `true`                                             |
 | `UnknownDerivedTypeHandling`           | `JsonUnknownDerivedTypeHandling.FailSerialization` |
 

@@ -96,19 +96,41 @@ schema.UseResource()
       .Use<Course>();                           // Course over every active transport
 ```
 
-**Declarative** — annotate the entity with `[Resource]`. `ConfigureServices` scans every non-dynamic, non-`Schemata.*`
-assembly in `AppDomain.CurrentDomain.GetAssemblies()` and registers each type carrying a `ResourceAttribute`. The
-same scan reads `[ResourceMethod]` attributes and stores them in `SchemataResourceOptions.Methods` keyed by
-`entity.TypeHandle`.
+**Declarative** — annotate the entity with `[Resource]` so the four type roles live on the entity itself, then
+register it with `AddResource<TEntity>()`. The attribute carries the type roles; it does not register anything on
+its own.
+
+```csharp
+schema.UseResource()
+      .MapHttp().MapGrpc()
+      .AddResource<Course>();                   // Course carries [Resource<Course, CourseRequest, ...>]
+```
+
+`[ResourceMethod]` attributes on the entity are read during that call and stored in `IResourceRegistry`,
+retrievable through `GetMethods(entityType)`. The registry seals on its first read, so every resource must be
+registered while services are being configured.
+
+> **Registration is always explicit.** No assembly is scanned and no type is discovered by decoration alone. A
+> `[Resource]`-decorated entity that is never passed to `AddResource<T>()` or `Use<...>()` has no endpoints, and
+> `IResourceTypeResolver` cannot resolve it from a resource name. If an upgrade turns resource endpoints into 404s
+> or makes name resolution fail, the fix is to add the missing `AddResource<T>()` call for each entity that used to
+> be picked up by decoration.
 
 `Use<...>(endpoints, configure)` also accepts an `Action<ResourceAttribute>` so a caller can set
 `Operations`, `Endpoints`, or `Methods` without entity attributes.
 
-`RegisterResource` first calls `EnsureAddressablePattern`, which throws `InvalidOperationException` when an
-`ICanonicalName` entity carries no `[CanonicalName]` pattern ending in a placeholder preceded by a collection
-literal. It then keys the `ResourceAttribute` on `entity.TypeHandle`, registers per-entity Create/Update
-idempotency advisors, and — for `ISoftDelete` entities — adds the built-in `undelete`, `expunge`, and `purge`
-methods (each skipped when the `Operations` whitelist excludes it or the entity already declares that verb).
+Both calls land in the same place. Registration first runs `EnsureAddressablePattern`, which throws
+`InvalidOperationException` when an `ICanonicalName` entity carries no `[CanonicalName]` pattern ending in a
+placeholder preceded by a collection literal. It then keys the `ResourceAttribute` on `entity.TypeHandle`, registers
+per-entity Create/Update idempotency advisors, and — for `ISoftDelete` entities — adds the built-in `undelete`,
+`expunge`, and `purge` methods (each skipped when the `Operations` whitelist excludes it or the entity already
+declares that verb).
+
+`SchemataResourceBuilder` owns the registry that receives all of this. The first builder constructed over a given
+`SchemataOptions` creates it, stores it in the options bag, and registers it as the `IResourceRegistry` singleton;
+every later builder — including the ones Flow, Report and Scheduling construct for their own resources — picks up
+that same instance. There is no second way in: the underlying `AddResource` extension is internal and takes the
+registry as an argument.
 
 ## Cross-resource references
 
@@ -215,7 +237,7 @@ Each operation returns a thin result base carrying the response DTO:
 
 | Method                                                  | Effect                                                                                                          |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `WithAuthorization(scheme?)`                            | Registers anonymous + authorize advisors for all operations; sets `AuthenticationScheme` when `scheme` is given |
+| `WithAuthorization(scheme?)`                            | Registers anonymous + authorize advisors for all operations; sets the default `AuthenticationScheme` when `scheme` is given |
 | `WithoutCreateValidation()`                             | Sets `SchemataResourceOptions.SuppressCreateValidation = true`                                                  |
 | `WithoutUpdateValidation()`                             | Sets `SchemataResourceOptions.SuppressUpdateValidation = true`                                                  |
 | `WithoutFreshness()`                                    | Sets `SchemataResourceOptions.SuppressFreshness = true`                                                         |
@@ -250,8 +272,8 @@ lets the foundation layer run under either transport and stay unit-testable with
   `Name` and `CanonicalName` properties plus an addressable `[CanonicalName("...")]` pattern.
 - `SchemataResourceFeature` is registered through `AddFeature`, which deduplicates by `RuntimeTypeHandle`, so
   calling `UseResource()` twice is safe.
-- Assembly-scan discovery reads `AppDomain.CurrentDomain.GetAssemblies()` during `ConfigureServices`. A type in
-  an assembly loaded after that point is not discovered.
+- Decorating an entity with `[Resource]` does not register it. The attribute supplies the type roles; the entity
+  still has to reach `AddResource<T>()` or `Use<...>()`.
 
 ## See also
 

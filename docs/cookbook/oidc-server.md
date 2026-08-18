@@ -145,7 +145,7 @@ if (await apps.FindByClientIdAsync("my-spa", default) is null)
 }
 ```
 
-`Permissions` uses the `SchemataConstants.PermissionPrefixes` strings: `e:` for endpoints, `g:` for
+`Permissions` uses the `AuthorizationConstants.PermissionPrefixes` strings: `e:` for endpoints, `g:` for
 grant types, `s:` for scopes. A public client carries no secret, so PKCE is the proof of
 possession.
 
